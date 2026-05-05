@@ -54,14 +54,23 @@ class CampaignSchema : VariableSchema() {
 
 The constraint DSL covers `and`, `or`, `implies`, `iff`, `!` for the Boolean
 side; `eq` / `ne` against label literals on nominals; full integer arithmetic
-through `+`, `-`, unary `-`, and `*` by constant; the comparators `le`, `lt`,
-`ge`, `gt`, `eq`, `ne` over arbitrary integer expressions on either side; the
-same comparators against float literals on `floatVar` (resolved to
-bucket-index comparisons at construction time); and `atMost`, `atLeast`,
-`cardinality` for counting constraints. Every form composes inside Boolean
-connectives: a multi-variable comparison, a linear arithmetic constraint, or
-a cardinality expression nested inside `implies` is reified through a fresh
-auxiliary literal so the rest of the lowering can treat it as a Boolean.
+through `+`, `-`, unary `-`, `*`, `/`, and `%`, including variable-by-variable
+multiplication, division, and modulo; the comparators `le`, `lt`, `ge`, `gt`,
+`eq`, `ne` over arbitrary integer expressions on either side; the same
+comparators against float literals on `floatVar` (resolved to bucket-index
+comparisons at construction time); `atMost`, `atLeast`, `cardinality` for
+counting constraints; `min`, `max`, `abs` as integer expressions; `element`
+for array indexing by an int variable; `ifThenElse` for conditional integer
+expressions; `allDifferent` for pairwise inequality; `channel` to link an
+integer to a one-hot Boolean array; and `lexLeq` / `lexLt` for lexicographic
+ordering. Every form composes inside Boolean connectives: a multi-variable
+comparison, a linear arithmetic constraint, or a cardinality expression
+nested inside `implies` is reified through a fresh auxiliary literal so the
+rest of the lowering can treat it as a Boolean. Non-affine integer
+expressions (`*`, `/`, `%`, `min`, `max`, `abs`, `element`, `ifThenElse`) are
+hoisted out of the surrounding affine residual into auxiliary integer
+variables with auxiliary constraints, so the affine pipeline never sees a
+nonlinear node directly.
 
 ---
 
@@ -101,6 +110,8 @@ suitable for any external propositional SAT engine.
 - Additional search strategies: probSAT, SAPS, tabu, simulated annealing, restart schedules.
 - Diversification beyond the rolling window: Hamming and XOR blocking factors.
 - Pseudo-Boolean factor with weighted-sum semantics; XOR factor for parity-based diversification.
+- Global `AllDifferent` factor with a duplicates-counter payload, sharper than the current pairwise-NE decomposition.
+- Signed multiplication, division, and modulo (current `Product`/`div`/`mod` require non-negative operand domains).
 - Soft constraints surfaced in the DSL with weights.
 - Typed handle-based decode API to replace name-string lookups.
 - LogicNG adapter (jvmMain) for SAT-engine cross-checks and UNSAT proofs.
