@@ -2,7 +2,7 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.not
-import com.eignex.klause.export.DimacsWriter
+import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.factor.Cardinality
@@ -10,7 +10,6 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.IntLeq
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -114,20 +113,12 @@ class CompileTest {
     }
 
     @Test
-    fun dimacsExportRejectsIntProblems() {
-        val compiled = IntCampaign().compile()
-        assertFailsWith<IllegalArgumentException> { DimacsWriter.write(compiled.problem) }
-    }
-
-    @Test
-    fun dimacsExportProducesParseableHeader() {
+    fun bitBlastRoundTripsCnfHeader() {
         val schema = TinyCampaign()
         val compiled = schema.compile()
-        val text = DimacsWriter.write(compiled.problem)
+        val text = BitBlaster.compile(compiled.problem).toDimacs()
         val firstLine = text.lineSequence().first()
         assertTrue(firstLine.startsWith("p cnf "))
-        val parts = firstLine.split(' ')
-        assertEquals(compiled.problem.numBoolVars.toString(), parts[2])
         text.lineSequence().drop(1).filter { it.isNotBlank() }.forEach { line ->
             assertTrue(line.trimEnd().endsWith("0"))
         }

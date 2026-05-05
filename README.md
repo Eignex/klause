@@ -30,8 +30,8 @@ an exactly-one factor, integer comparisons become dedicated comparator factors
 that propose snap-to-bound repair moves, and nested non-literal subexpressions
 go through Tseitin with hidden aux variables. The solver runs WalkSAT directly
 over that registry and yields hard-feasible assignments as a lazy sequence;
-full CNF conversion only happens on the DIMACS export path, which is Boolean
-only.
+full CNF conversion only happens on the bit-blasting export path, where the
+problem is handed off to an external propositional SAT engine.
 
 ### Installation
 
@@ -99,19 +99,7 @@ decoding that does not go through the helpers.
 
 ---
 
-## DIMACS export
-
-```kotlin
-val dimacs = DimacsWriter.write(compiled.problem)
-```
-
-`DimacsWriter` is the fast path for Boolean-only problems. Cardinality factors
-are lowered to clauses on the way out: at-most-1 to pairwise binary clauses,
-at-least-1 to a single big clause, exactly-one to both. Higher-k cardinality
-bounds and any integer factors are rejected, since the sequential-counter
-encoding is out of scope.
-
-## Bit-blasting
+## Bit-blasting to CNF
 
 ```kotlin
 val cnf = BitBlaster.compile(compiled.problem)
@@ -119,19 +107,20 @@ val text = cnf.toDimacs()
 val intValue = cnf.decodeInt(originalIntVarId, model)
 ```
 
-For mixed Boolean/integer problems `BitBlaster` produces a propositional CNF
-using canonical binary encoding. Each integer variable in `[min, max]` gets
-`ceil(log2(max - min + 1))` bits representing the offset from `min`; an
-explicit domain constraint is added when the domain size is not a power of
-two. Reusable circuit builders cover Tseitin AND/OR/XOR3/MAJ3, zero-extend,
+`BitBlaster` produces a propositional CNF for any problem klause supports,
+suitable for handing to an external SAT engine. Integer variables use
+canonical binary encoding: each variable in `[min, max]` gets
+`ceil(log2(max - min + 1))` bits representing the offset from `min`, with an
+explicit domain constraint when the domain size is not a power of two.
+Reusable circuit builders cover Tseitin AND/OR/XOR3/MAJ3, zero-extend,
 shift-left, ripple-carry add, multiply-by-constant, constant comparators, and
 unsigned `≤` / `==` over arbitrary widths.
 
 Lowered factor types: `Clause`, `Cardinality` (only AtMostOne / AtLeastOne /
-ExactlyOne), `IntLeq`, `IntGeq`, `IntEq`, `IntNeq`, `Linear` (any signed
-coefficients and bound), and `ReifiedIntCompare`. Out-of-domain `IntEq` /
-`IntNeq` constants are short-circuited at compile time. The CNF is suitable
-for any external propositional SAT engine.
+ExactlyOne, since the sequential-counter encoding is out of scope),
+`IntLeq`, `IntGeq`, `IntEq`, `IntNeq`, `Linear` (any signed coefficients and
+bound), and `ReifiedIntCompare`. Out-of-domain `IntEq` / `IntNeq` constants
+short-circuit to a true/false unit clause at compile time.
 
 ## How it works
 
