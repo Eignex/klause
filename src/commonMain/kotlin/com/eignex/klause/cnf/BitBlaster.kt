@@ -11,10 +11,13 @@ import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
+import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.ast.IntCmpOp
+import com.eignex.klause.ast.PbOp
 
 /**
  * Compiles a [Problem] (mixed Boolean/integer factors) to propositional CNF using canonical
@@ -80,9 +83,11 @@ object BitBlaster {
                 }
                 is Linear -> emitLinear(b, factor, intBits, intMin)
                 is Product -> emitProduct(b, factor, intBits, intMin, problem)
+                is PseudoBoolean -> emitPseudoBoolean(b, factor, boolMap)
                 is ReifiedIntCompare -> emitReifiedIntCompare(b, factor, boolMap, intBits, intMin)
                 is ReifiedLinear -> emitReifiedLinear(b, factor, boolMap, intBits, intMin)
                 is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
+                is ReifiedPseudoBoolean -> emitReifiedPseudoBoolean(b, factor, boolMap)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -154,6 +159,55 @@ object BitBlaster {
             b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(s[i - 1][k - 1])))
         }
         b.addClause(intArrayOf(Lit.negate(lits[n - 1]), Lit.negate(s[n - 2][k - 1])))
+    }
+
+    private fun emitPseudoBoolean(b: CnfBuilder, f: PseudoBoolean, boolMap: IntArray) {
+        b.addClause(intArrayOf(buildPbComparator(b, f.weights, f.literals, f.op, f.bound, boolMap)))
+    }
+
+    private fun emitReifiedPseudoBoolean(b: CnfBuilder, f: ReifiedPseudoBoolean, boolMap: IntArray) {
+        val cnfAux = Lit.make(boolMap[f.auxBoolVar], positive = true)
+        val cmp = buildPbComparator(b, f.weights, f.literals, f.op, f.bound, boolMap)
+        b.addClause(intArrayOf(Lit.negate(cnfAux), cmp))
+        b.addClause(intArrayOf(cnfAux, Lit.negate(cmp)))
+    }
+
+    private fun buildPbComparator(
+        b: CnfBuilder,
+        weights: IntArray,
+        literals: IntArray,
+        op: PbOp,
+        bound: Int,
+        boolMap: IntArray,
+    ): Int {
+        // Split positive- and negative-weight terms; bound shifts to absorb negative contributions.
+        // Σ wᵢ * lᵢ = posSum − negSum, where posSum / negSum are non-negative.
+        val posTerms = mutableListOf<IntArray>()
+        val negTerms = mutableListOf<IntArray>()
+        for (i in literals.indices) {
+            val w = weights[i]
+            if (w == 0) continue
+            val lit = literals[i]
+            val cnfLit = Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
+            val term = b.multiplyByConstant(intArrayOf(cnfLit), kotlin.math.abs(w))
+            if (w > 0) posTerms += term else negTerms += term
+        }
+        val pSum = sumAll(b, posTerms)
+        val nSum = sumAll(b, negTerms)
+        val lhs: IntArray
+        val rhs: IntArray
+        if (bound >= 0) {
+            lhs = pSum
+            rhs = if (bound > 0) b.rippleAdd(nSum, constantLits(b, bound.toLong())) else nSum
+        } else {
+            lhs = b.rippleAdd(pSum, constantLits(b, (-bound).toLong()))
+            rhs = nSum
+        }
+        return when (op) {
+            PbOp.LE -> b.unsignedLeq(lhs, rhs)
+            PbOp.GE -> b.unsignedLeq(rhs, lhs)
+            PbOp.EQ -> b.unsignedEq(lhs, rhs)
+        }
     }
 
     private fun emitProduct(

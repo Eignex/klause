@@ -26,6 +26,25 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
 }
 
 /**
+ * Pseudo-Boolean weighted-sum constraint: `Σ wᵢ * lᵢ ⟨op⟩ bound` over Boolean literals.
+ * Each literal contributes its weight when true, 0 when false.
+ */
+fun pseudoBoolean(weights: List<Int>, lits: List<BoolTerm>, op: PbOp, bound: Int): BoolExpr {
+    require(weights.size == lits.size) { "pseudoBoolean: weights/lits length mismatch" }
+    require(lits.isNotEmpty()) { "pseudoBoolean: need at least one literal" }
+    return PseudoBooleanExpr(weights, lits.map { it.toExpr() }, op, bound)
+}
+
+fun pbAtMost(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr =
+    pseudoBoolean(weights, lits, PbOp.LE, k)
+
+fun pbAtLeast(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr =
+    pseudoBoolean(weights, lits, PbOp.GE, k)
+
+fun pbExactly(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr =
+    pseudoBoolean(weights, lits, PbOp.EQ, k)
+
+/**
  * Extensional positive table: `vars` must equal one of the listed `allowed` tuples.
  */
 fun table(vars: List<IntTerm>, allowed: List<List<Int>>): BoolExpr =

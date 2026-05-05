@@ -188,6 +188,23 @@ data class TableConstraint(
 }
 
 @Serializable
+enum class PbOp { LE, GE, EQ }
+
+@Serializable
+@SerialName("pb")
+data class PseudoBooleanExpr(
+    val weights: List<Int>,
+    val lits: List<BoolExpr>,
+    val op: PbOp,
+    val bound: Int,
+) : BoolExpr {
+    init {
+        require(weights.size == lits.size) { "PseudoBooleanExpr: weights/lits length mismatch" }
+        require(lits.isNotEmpty()) { "PseudoBooleanExpr: need at least one literal" }
+    }
+}
+
+@Serializable
 data class NamedConstraint(
     val name: String,
     val expr: BoolExpr,

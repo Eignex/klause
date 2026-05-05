@@ -4,6 +4,8 @@ import com.eignex.klause.ast.AllDifferent
 import com.eignex.klause.ast.And
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
+import com.eignex.klause.ast.PbOp
+import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolRef
@@ -47,7 +49,9 @@ import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
+import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 
@@ -137,6 +141,17 @@ class Compiler {
                 is IntCompare -> assertIntCompare(expr, isHard, weight)
                 is AllDifferent -> assertAllDifferent(expr.terms, isHard, weight)
                 is TableConstraint -> assertExpr(expandTable(expr), isHard, weight)
+                is PseudoBooleanExpr -> {
+                    val lits = lowerAllBool(expr.lits)
+                    factors += PseudoBoolean(
+                        weights = expr.weights.toIntArray(),
+                        literals = lits,
+                        op = expr.op,
+                        bound = expr.bound,
+                        isHard = isHard,
+                        weight = weight,
+                    )
+                }
             }
         }
 
@@ -308,6 +323,12 @@ class Compiler {
                 tseitinAnd(pairs)
             }
             is TableConstraint -> lowerToLit(expandTable(expr))
+            is PseudoBooleanExpr -> {
+                val lits = lowerAllBool(expr.lits)
+                val aux = newBoolVar()
+                factors += ReifiedPseudoBoolean(aux, expr.weights.toIntArray(), lits, expr.op, expr.bound)
+                Lit.make(aux, positive = true)
+            }
         }
 
         fun reifyCardinality(children: List<BoolExpr>, min: Int, max: Int): Int {
