@@ -14,3 +14,8 @@ fun abs(x: IntTerm): IntExpr = IntAbs(x.toIntExpr())
 
 fun ifThenElse(cond: BoolTerm, thenE: IntTerm, elseE: IntTerm): IntExpr =
     IntIfThenElse(cond.toExpr(), thenE.toIntExpr(), elseE.toIntExpr())
+
+fun element(index: IntTerm, items: List<IntTerm>): IntExpr {
+    require(items.isNotEmpty()) { "element(): items must not be empty" }
+    return IntElement(index.toIntExpr(), items.map { it.toIntExpr() })
+}

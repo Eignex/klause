@@ -15,6 +15,7 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntAbs
+import com.eignex.klause.ast.IntElement
 import com.eignex.klause.ast.IntIfThenElse
 import com.eignex.klause.ast.IntMax
 import com.eignex.klause.ast.IntMin
@@ -416,6 +417,33 @@ class Compiler {
             is IntMax -> liftMinMax(expr.children, isMin = false)
             is IntAbs -> liftAbs(expr.child)
             is IntIfThenElse -> liftIfThenElse(expr.cond, expr.thenE, expr.elseE)
+            is IntElement -> liftElement(expr.index, expr.items)
+        }
+
+        private fun liftElement(index: IntExpr, items: List<IntExpr>): IntExpr {
+            val idxLifted = lift(index)
+            val itemsLifted = items.map { lift(it) }
+            val itemDoms = itemsLifted.map { domainOf(it) }
+            val auxDomain = IntDomain(itemDoms.minOf { it.min }, itemDoms.maxOf { it.max })
+            val auxName = newAuxIntVar(auxDomain)
+            val auxRef = IntRef(auxName)
+            val idxDom = domainOf(idxLifted)
+            // For each j the index could take, link the aux to items[j] when index = j; for
+            // out-of-bounds j, force index ≠ j.
+            for (j in idxDom.min..idxDom.max) {
+                if (j in items.indices) {
+                    assertExpr(
+                        Implies(
+                            IntCompare(idxLifted, IntCmpOp.EQ, IntLit(j)),
+                            IntCompare(auxRef, IntCmpOp.EQ, itemsLifted[j]),
+                        ),
+                        isHard = true, weight = 1.0,
+                    )
+                } else {
+                    assertExpr(IntCompare(idxLifted, IntCmpOp.NE, IntLit(j)), isHard = true, weight = 1.0)
+                }
+            }
+            return auxRef
         }
 
         private fun liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntExpr): IntExpr {

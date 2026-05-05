@@ -141,6 +141,12 @@ data class IntAbs(val child: IntExpr) : IntExpr
 data class IntIfThenElse(val cond: BoolExpr, val thenE: IntExpr, val elseE: IntExpr) : IntExpr
 
 @Serializable
+@SerialName("intelem")
+data class IntElement(val index: IntExpr, val items: List<IntExpr>) : IntExpr {
+    init { require(items.isNotEmpty()) { "IntElement must have at least one item" } }
+}
+
+@Serializable
 enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 
 @Serializable
