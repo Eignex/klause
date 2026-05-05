@@ -43,6 +43,11 @@ class Solver(
         recentWindow: Int = 16,
     ): Sequence<Sample> {
         require(recentWindow >= 0) { "recentWindow must be non-negative, got $recentWindow" }
+        val totalBits = problem.numBoolVars + problem.numIntVars
+        require(minHammingDistance <= totalBits) {
+            "minHammingDistance ($minHammingDistance) exceeds the total variable count ($totalBits); " +
+                "no two assignments can ever satisfy that distance."
+        }
         val seed = randomSeed ?: Random.Default.nextLong()
         return sequence {
             val state = SolverState(problem, Random(seed))
