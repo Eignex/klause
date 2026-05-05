@@ -1,0 +1,57 @@
+package com.eignex.klause.compile
+
+import com.eignex.klause.ast.channel
+import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.Solver
+import kotlin.test.Test
+import kotlin.test.assertTrue
+
+class ChannelDslTest {
+
+    @Test
+    fun channelLinksIntToOneHotBooleans() {
+        class S : VariableSchema() {
+            val idx by intVar(min = 0, max = 3)
+            val b0 by boolVar()
+            val b1 by boolVar()
+            val b2 by boolVar()
+            val b3 by boolVar()
+            val link by constraint { channel(idx, listOf(b0, b1, b2, b3)) }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.sample(maxFlips = 20_000, randomSeed = 21).take(10).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val i = compiled.decodeInt("idx", s)
+            val flags = listOf("b0", "b1", "b2", "b3").map { compiled.decodeBool(it, s) }
+            for (j in flags.indices) {
+                assertTrue(flags[j] == (i == j), "i=$i flags=$flags mismatch at j=$j")
+            }
+        }
+    }
+
+    @Test
+    fun channelHonoursOffset() {
+        class S : VariableSchema() {
+            val idx by intVar(min = 5, max = 7)
+            val a by boolVar()
+            val b by boolVar()
+            val c by boolVar()
+            val link by constraint { channel(idx, listOf(a, b, c), offset = 5) }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.sample(maxFlips = 20_000, randomSeed = 6).take(10).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val i = compiled.decodeInt("idx", s)
+            val flags = listOf("a", "b", "c").map { compiled.decodeBool(it, s) }
+            for (j in flags.indices) {
+                assertTrue(flags[j] == (i == 5 + j), "i=$i flags=$flags mismatch at j=$j")
+            }
+        }
+    }
+}

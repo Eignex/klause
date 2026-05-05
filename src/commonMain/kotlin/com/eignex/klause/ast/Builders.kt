@@ -24,3 +24,16 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
     require(xs.size >= 2) { "allDifferent(): need at least two terms" }
     return AllDifferent(xs.map { it.toIntExpr() })
 }
+
+/**
+ * Channel an integer variable to a list of Boolean indicators: `bools[i] iff (intVar = offset+i)`
+ * for every index `i`. Useful for switching between an integer and a one-hot Boolean encoding.
+ */
+fun channel(intVar: IntTerm, bools: List<BoolTerm>, offset: Int = 0): BoolExpr {
+    require(bools.isNotEmpty()) { "channel(): need at least one indicator" }
+    val intExpr = intVar.toIntExpr()
+    val pieces = bools.mapIndexed { i, b ->
+        Iff(b.toExpr(), IntCompare(intExpr, IntCmpOp.EQ, IntLit(offset + i)))
+    }
+    return if (pieces.size == 1) pieces[0] else And(pieces)
+}
