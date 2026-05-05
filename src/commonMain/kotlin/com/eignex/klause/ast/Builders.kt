@@ -1,0 +1,13 @@
+package com.eignex.klause.ast
+
+fun min(vararg xs: IntTerm): IntExpr {
+    require(xs.isNotEmpty()) { "min(): need at least one argument" }
+    return IntMin(xs.map { it.toIntExpr() })
+}
+
+fun max(vararg xs: IntTerm): IntExpr {
+    require(xs.isNotEmpty()) { "max(): need at least one argument" }
+    return IntMax(xs.map { it.toIntExpr() })
+}
+
+fun abs(x: IntTerm): IntExpr = IntAbs(x.toIntExpr())

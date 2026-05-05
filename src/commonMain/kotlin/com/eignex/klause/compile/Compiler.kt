@@ -14,6 +14,9 @@ import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
+import com.eignex.klause.ast.IntAbs
+import com.eignex.klause.ast.IntMax
+import com.eignex.klause.ast.IntMin
 import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntScale
 import com.eignex.klause.ast.IntSpec
@@ -53,6 +56,7 @@ class Compiler {
         val floatDecoders = mutableMapOf<String, FloatSpec>()
         var numBoolVars = 0
         var numIntVars = 0
+        private var auxIntCounter = 0
 
         fun run(def: SchemaDef): CompiledProblem {
             for (spec in def.vars) {
@@ -407,6 +411,74 @@ class Compiler {
             is IntRef, is IntLit -> expr
             is IntScale -> IntScale(expr.coeff, lift(expr.child))
             is IntSum -> IntSum(expr.children.map { lift(it) })
+            is IntMin -> liftMinMax(expr.children, isMin = true)
+            is IntMax -> liftMinMax(expr.children, isMin = false)
+            is IntAbs -> liftAbs(expr.child)
+        }
+
+        private fun liftMinMax(children: List<IntExpr>, isMin: Boolean): IntExpr {
+            val lifted = children.map { lift(it) }
+            val doms = lifted.map { domainOf(it) }
+            val auxDomain = if (isMin) {
+                IntDomain(doms.minOf { it.min }, doms.minOf { it.max })
+            } else {
+                IntDomain(doms.maxOf { it.min }, doms.maxOf { it.max })
+            }
+            val auxName = newAuxIntVar(auxDomain)
+            val auxRef = IntRef(auxName)
+            val op = if (isMin) IntCmpOp.LE else IntCmpOp.GE
+            for (c in lifted) assertExpr(IntCompare(auxRef, op, c), isHard = true, weight = 1.0)
+            val orChildren = lifted.map { IntCompare(auxRef, IntCmpOp.EQ, it) as BoolExpr }
+            assertExpr(if (orChildren.size == 1) orChildren[0] else Or(orChildren), isHard = true, weight = 1.0)
+            return auxRef
+        }
+
+        private fun liftAbs(child: IntExpr): IntExpr {
+            val lifted = lift(child)
+            val d = domainOf(lifted)
+            val absMax = maxOf(if (d.min < 0) -d.min else d.min, if (d.max < 0) -d.max else d.max)
+            val auxName = newAuxIntVar(IntDomain(0, absMax))
+            val auxRef = IntRef(auxName)
+            // z >= 0; z >= x; z >= -x; (z = x) ∨ (z = -x).
+            assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntLit(0)), isHard = true, weight = 1.0)
+            assertExpr(IntCompare(auxRef, IntCmpOp.GE, lifted), isHard = true, weight = 1.0)
+            assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntScale(-1, lifted)), isHard = true, weight = 1.0)
+            assertExpr(
+                Or(listOf(
+                    IntCompare(auxRef, IntCmpOp.EQ, lifted),
+                    IntCompare(auxRef, IntCmpOp.EQ, IntScale(-1, lifted)),
+                )),
+                isHard = true,
+                weight = 1.0,
+            )
+            return auxRef
+        }
+
+        private fun newAuxIntVar(domain: IntDomain): String {
+            val name = "__aux_int_${auxIntCounter++}"
+            intVarIdByName[name] = newIntVar(domain)
+            return name
+        }
+
+        /** Domain of any [IntExpr] post-lift. The expression must reside in the affine
+         *  fragment (caller is responsible for lifting non-affine subexpressions first). */
+        private fun domainOf(expr: IntExpr): IntDomain = when (expr) {
+            is IntRef -> intDomains[intVarOf(expr.name)]
+            is IntLit -> IntDomain(expr.value, expr.value)
+            is IntScale -> {
+                val c = expr.coeff
+                val d = domainOf(expr.child)
+                if (c >= 0) IntDomain(c * d.min, c * d.max) else IntDomain(c * d.max, c * d.min)
+            }
+            is IntSum -> {
+                var lo = 0; var hi = 0
+                for (ch in expr.children) {
+                    val d = domainOf(ch)
+                    lo += d.min; hi += d.max
+                }
+                IntDomain(lo, hi)
+            }
+            else -> error("domainOf called on non-affine expression: $expr")
         }
 
         // Affine canonical form: Σ coeffs[name] * name + constant.
@@ -432,6 +504,7 @@ class Compiler {
                 coeffs.entries.removeAll { it.value == 0 }
                 Affine(coeffs, constant)
             }
+            else -> error("affine() called on non-affine expression — caller must lift first: $expr")
         }
 
         private fun subtract(left: Affine, right: Affine): Affine {

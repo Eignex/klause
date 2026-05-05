@@ -121,6 +121,22 @@ data class IntSum(val children: List<IntExpr>) : IntExpr {
 }
 
 @Serializable
+@SerialName("intmin")
+data class IntMin(val children: List<IntExpr>) : IntExpr {
+    init { require(children.isNotEmpty()) { "IntMin must have at least one child" } }
+}
+
+@Serializable
+@SerialName("intmax")
+data class IntMax(val children: List<IntExpr>) : IntExpr {
+    init { require(children.isNotEmpty()) { "IntMax must have at least one child" } }
+}
+
+@Serializable
+@SerialName("intabs")
+data class IntAbs(val child: IntExpr) : IntExpr
+
+@Serializable
 enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 
 @Serializable
