@@ -97,7 +97,7 @@ suitable for any external propositional SAT engine.
 - Per-variable make/break cache for incremental scoring instead of recomputing each step.
 - Additional search strategies: probSAT, SAPS, tabu, simulated annealing, restart schedules.
 - Diversification beyond the rolling window: Hamming and XOR blocking factors.
-- Pseudo-Boolean and XOR factors; general `Cardinality(min, max)` beyond k=1.
+- Pseudo-Boolean factor with weighted-sum semantics; XOR factor for parity-based diversification.
 - Soft constraints surfaced in the DSL with weights.
 - Typed handle-based decode API to replace name-string lookups.
 - LogicNG adapter (jvmMain) for SAT-engine cross-checks and UNSAT proofs.
