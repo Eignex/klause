@@ -52,31 +52,19 @@ class CampaignSchema : VariableSchema() {
 }
 ```
 
-The constraint DSL covers `and`, `or`, `implies`, `iff`, `!`, and `xor` for
-the Boolean side; `eq` / `ne` against label literals on nominals; full
-signed integer arithmetic through `+`, `-`, unary `-`, `*`, `/`, and `%`,
-including variable-by-variable multiplication and Java-truncated division
-and modulo; the comparators `le`, `lt`, `ge`, `gt`, `eq`, `ne` over
-arbitrary integer expressions on either side; the same comparators against
-float literals on `floatVar` (resolved to bucket-index comparisons at
-construction time); `atMost`, `atLeast`, `cardinality` for counting
-constraints; `pbAtMost` / `pbAtLeast` / `pbExactly` / `pseudoBoolean` for
-weighted-sum-of-bools constraints; `gcc` for global cardinality across
-several values; `table` and `notTable` for extensional allowed and
-forbidden tuples; `min`, `max`, `abs` as integer expressions; `element` for
-array indexing by an int variable; `ifThenElse` for conditional integer
-expressions; `allDifferent` for pairwise inequality (specialised to a
-single global factor when applied to bare handles); `channel` to link an
-integer to a one-hot Boolean array; and `lexLeq` / `lexLt` for
-lexicographic ordering. Every form composes inside Boolean connectives: a
-multi-variable comparison, a linear arithmetic constraint, a cardinality
-expression, a pseudo-Boolean expression, or an extensional table nested
-inside `implies` is reified through a fresh auxiliary literal so the rest
-of the lowering can treat it as a Boolean. Non-affine integer expressions
-(`*`, `/`, `%`, `min`, `max`, `abs`, `element`, `ifThenElse`) are hoisted
-out of the surrounding affine residual into auxiliary integer variables
-with auxiliary constraints, so the affine pipeline never sees a nonlinear
-node directly.
+The DSL covers:
+
+* **Boolean**: `and`, `or`, `implies`, `iff`, `!`, `xor`.
+* **Nominal**: `eq` and `ne` against label literals.
+* **Integer arithmetic**: signed `+`, `-`, unary `-`, `*`, `/`, `%`, including variable-by-variable multiplication and Java-truncated division and modulo.
+* **Comparisons**: `le`, `lt`, `ge`, `gt`, `eq`, `ne` over arbitrary integer expressions on either side. Float comparisons against literals resolve to bucket-index comparisons at construction time.
+* **Counting**: `atMost`, `atLeast`, `cardinality`, plus `pbAtMost` / `pbAtLeast` / `pbExactly` / `pseudoBoolean` for weighted sums of Booleans.
+* **Global**: `gcc` for cardinality across several values, `allDifferent` for pairwise inequality (specialised to a single global factor when operands are bare handles).
+* **Tabular**: `table` and `notTable` for extensional allowed and forbidden tuples.
+* **Integer expressions**: `min`, `max`, `abs`, `element` for array indexing by an int variable, `ifThenElse` for conditional integer expressions.
+* **Linking**: `channel` to bridge an integer and a one-hot Boolean array; `lexLeq` / `lexLt` for lexicographic ordering.
+
+Multi-variable comparisons, cardinality expressions, pseudo-Boolean expressions, and tables nested inside Boolean connectives are reified through a fresh auxiliary literal so the rest of the lowering can treat them as Booleans. Non-affine integer expressions (`*`, `/`, `%`, `min`, `max`, `abs`, `element`, `ifThenElse`) are hoisted into auxiliary integer variables with auxiliary constraints, so the affine pipeline never sees a nonlinear node directly.
 
 ---
 
