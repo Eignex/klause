@@ -15,9 +15,9 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
+import com.eignex.klause.ast.IntScale
 import com.eignex.klause.ast.IntSpec
-import com.eignex.klause.ast.LinearCmpOp
-import com.eignex.klause.ast.LinearConstraint
+import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.Not
@@ -37,6 +37,7 @@ import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.solver.factor.ReifiedLinear
 
 class Compiler {
 
@@ -121,48 +122,116 @@ class Compiler {
                     factors += Clause(intArrayOf(lowerToLit(expr)), isHard, weight)
                 }
                 is IntCompare -> assertIntCompare(expr, isHard, weight)
-                is LinearConstraint -> assertLinear(expr, isHard, weight)
             }
         }
 
         fun assertIntCompare(expr: IntCompare, isHard: Boolean, weight: Double) {
-            val left = expr.left
-            val right = expr.right
-            if (left is IntRef && right is IntLit) {
-                val v = intVarOf(left.name)
-                val (op, bound) = normalize(expr.op, right.value)
-                factors += when (op) {
-                    IntCmpOp.LE -> IntLeq(v, bound, isHard, weight)
-                    IntCmpOp.GE -> IntGeq(v, bound, isHard, weight)
-                    IntCmpOp.EQ -> IntEq(v, bound, isHard, weight)
-                    IntCmpOp.NE -> IntNeq(v, bound, isHard, weight)
-                    IntCmpOp.LT, IntCmpOp.GT -> error("normalize() should have rewritten LT/GT")
-                }
-                return
+            val (op, normBound) = normalize(expr.op, 0)
+            val combined = subtract(affine(expr.left), affine(expr.right))
+            val coeffs = combined.coeffs
+            val bound = normBound - combined.constant
+            // Apply LT/GT bound shifts on top of the affine subtraction.
+            val (finalOp, finalBound) = when (expr.op) {
+                IntCmpOp.LT -> IntCmpOp.LE to (bound - 1)
+                IntCmpOp.GT -> IntCmpOp.GE to (bound + 1)
+                else -> op to bound
             }
-            if (left is IntLit && right is IntRef) {
-                assertIntCompare(IntCompare(right, swapOp(expr.op), left), isHard, weight)
-                return
-            }
-            if (left is IntRef && right is IntRef) {
-                val (op, bound) = toLinear(expr.op)
-                val coeffs = intArrayOf(1, -1)
-                val ids = intArrayOf(intVarOf(left.name), intVarOf(right.name))
-                factors += Linear(coeffs, ids, op, bound, isHard, weight)
-                return
-            }
-            error("Unsupported IntCompare shape: $expr")
+            emitTopLevelCmp(coeffs, finalOp, finalBound, isHard, weight)
         }
 
-        fun assertLinear(expr: LinearConstraint, isHard: Boolean, weight: Double) {
-            val ids = IntArray(expr.refs.size) { intVarOf(expr.refs[it]) }
-            val coeffs = expr.coeffs.toIntArray()
-            val op = when (expr.op) {
-                LinearCmpOp.LE -> LinearOp.LE
-                LinearCmpOp.EQ -> LinearOp.EQ
-                LinearCmpOp.GE -> LinearOp.GE
+        private fun emitTopLevelCmp(
+            coeffs: Map<String, Int>,
+            op: IntCmpOp,
+            bound: Int,
+            isHard: Boolean,
+            weight: Double,
+        ) {
+            if (coeffs.isEmpty()) {
+                // 0 op bound: trivially true or false at compile time.
+                val holds = when (op) {
+                    IntCmpOp.LE -> 0 <= bound
+                    IntCmpOp.GE -> 0 >= bound
+                    IntCmpOp.EQ -> 0 == bound
+                    IntCmpOp.NE -> 0 != bound
+                    IntCmpOp.LT, IntCmpOp.GT -> error("LT/GT should have been normalized away")
+                }
+                if (!holds) factors += Clause(IntArray(0), isHard, weight)
+                return
             }
-            factors += Linear(coeffs, ids, op, expr.bound, isHard, weight)
+            if (coeffs.size == 1) {
+                val (name, c) = coeffs.entries.first()
+                emitSingleVar(name, c, op, bound, isHard, weight)
+                return
+            }
+            val (varIds, coeffArr) = coeffsToArrays(coeffs)
+            when (op) {
+                IntCmpOp.LE -> factors += Linear(coeffArr, varIds, LinearOp.LE, bound, isHard, weight)
+                IntCmpOp.GE -> factors += Linear(coeffArr, varIds, LinearOp.GE, bound, isHard, weight)
+                IntCmpOp.EQ -> factors += Linear(coeffArr, varIds, LinearOp.EQ, bound, isHard, weight)
+                IntCmpOp.NE -> {
+                    // Reify equality and negate: aux ↔ Σ = bound; assert ¬aux.
+                    val aux = newBoolVar()
+                    factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, bound, isHard, weight)
+                    factors += Clause(intArrayOf(Lit.make(aux, positive = false)), isHard, weight)
+                }
+                IntCmpOp.LT, IntCmpOp.GT -> error("LT/GT should have been normalized away")
+            }
+        }
+
+        private fun emitSingleVar(
+            name: String,
+            coeff: Int,
+            op: IntCmpOp,
+            bound: Int,
+            isHard: Boolean,
+            weight: Double,
+        ) {
+            // Σ c x ⟨op⟩ b reduces to x ⟨op'⟩ b/c (assuming exact division). Avoid the division
+            // by lowering through the Linear factor when c isn't ±1.
+            if (coeff == 1) {
+                emitSingleVarCanonical(name, op, bound, isHard, weight)
+                return
+            }
+            if (coeff == -1) {
+                // -x op b ⟺ x op' -b with op flipped (LE↔GE etc).
+                val flipped = when (op) {
+                    IntCmpOp.LE -> IntCmpOp.GE
+                    IntCmpOp.GE -> IntCmpOp.LE
+                    IntCmpOp.EQ -> IntCmpOp.EQ
+                    IntCmpOp.NE -> IntCmpOp.NE
+                    IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+                }
+                emitSingleVarCanonical(name, flipped, -bound, isHard, weight)
+                return
+            }
+            // General coeff: emit as Linear over one variable.
+            val varId = intVarOf(name)
+            val linOp = when (op) {
+                IntCmpOp.LE -> LinearOp.LE
+                IntCmpOp.GE -> LinearOp.GE
+                IntCmpOp.EQ -> LinearOp.EQ
+                IntCmpOp.NE -> {
+                    val aux = newBoolVar()
+                    factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), LinearOp.EQ, bound, isHard, weight)
+                    factors += Clause(intArrayOf(Lit.make(aux, positive = false)), isHard, weight)
+                    return
+                }
+                IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+            }
+            factors += Linear(intArrayOf(coeff), intArrayOf(varId), linOp, bound, isHard, weight)
+        }
+
+        private fun emitSingleVarCanonical(
+            name: String, op: IntCmpOp, bound: Int, isHard: Boolean, weight: Double,
+        ) {
+            val v = intVarOf(name)
+            factors += when (op) {
+                IntCmpOp.LE -> IntLeq(v, bound, isHard, weight)
+                IntCmpOp.GE -> IntGeq(v, bound, isHard, weight)
+                IntCmpOp.EQ -> IntEq(v, bound, isHard, weight)
+                IntCmpOp.NE -> IntNeq(v, bound, isHard, weight)
+                IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+            }
         }
 
         fun lowerAllBool(children: List<BoolExpr>): IntArray {
@@ -191,25 +260,83 @@ class Compiler {
                 tseitinIff(l, r)
             }
             is IntCompare -> reifyIntCompare(expr)
-            is LinearConstraint -> error("Reified linear constraints are not yet supported (Phase B-1)")
             is AtMost, is AtLeast, is CardinalityExpr ->
-                error("Nested cardinality expressions are not yet supported (Phase A)")
+                error("Nested cardinality expressions are not yet supported")
         }
 
         fun reifyIntCompare(expr: IntCompare): Int {
-            val left = expr.left
-            val right = expr.right
-            if (left is IntRef && right is IntLit) {
-                val v = intVarOf(left.name)
-                val aux = newBoolVar()
-                val (op, bound) = normalize(expr.op, right.value)
-                factors += ReifiedIntCompare(aux, v, op, bound)
-                return Lit.make(aux, positive = true)
+            val (op, normBound) = normalize(expr.op, 0)
+            val combined = subtract(affine(expr.left), affine(expr.right))
+            val coeffs = combined.coeffs
+            val bound = normBound - combined.constant
+            val (finalOp, finalBound) = when (expr.op) {
+                IntCmpOp.LT -> IntCmpOp.LE to (bound - 1)
+                IntCmpOp.GT -> IntCmpOp.GE to (bound + 1)
+                else -> op to bound
             }
-            if (left is IntLit && right is IntRef) {
-                return reifyIntCompare(IntCompare(right, swapOp(expr.op), left))
+            if (coeffs.isEmpty()) {
+                val holds = when (finalOp) {
+                    IntCmpOp.LE -> 0 <= finalBound
+                    IntCmpOp.GE -> 0 >= finalBound
+                    IntCmpOp.EQ -> 0 == finalBound
+                    IntCmpOp.NE -> 0 != finalBound
+                    IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+                }
+                return if (holds) trueLit() else falseLit()
             }
-            error("Reified IntCompare currently supports only IntRef vs IntLit; got $expr")
+            if (coeffs.size == 1) {
+                val (name, c) = coeffs.entries.first()
+                return reifySingleVar(name, c, finalOp, finalBound)
+            }
+            val (varIds, coeffArr) = coeffsToArrays(coeffs)
+            val aux = newBoolVar()
+            val linOp = when (finalOp) {
+                IntCmpOp.LE -> LinearOp.LE
+                IntCmpOp.GE -> LinearOp.GE
+                IntCmpOp.EQ -> LinearOp.EQ
+                IntCmpOp.NE -> {
+                    factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, finalBound)
+                    return Lit.make(aux, positive = false)
+                }
+                IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+            }
+            factors += ReifiedLinear(aux, coeffArr, varIds, linOp, finalBound)
+            return Lit.make(aux, positive = true)
+        }
+
+        private fun reifySingleVar(name: String, coeff: Int, op: IntCmpOp, bound: Int): Int {
+            // Normalize so the var has unit coefficient when possible; else fall back to ReifiedLinear.
+            val (effectiveOp, effectiveBound) = when (coeff) {
+                1 -> op to bound
+                -1 -> {
+                    val flipped = when (op) {
+                        IntCmpOp.LE -> IntCmpOp.GE; IntCmpOp.GE -> IntCmpOp.LE
+                        IntCmpOp.EQ -> IntCmpOp.EQ; IntCmpOp.NE -> IntCmpOp.NE
+                        IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+                    }
+                    flipped to -bound
+                }
+                else -> {
+                    val varId = intVarOf(name)
+                    val aux = newBoolVar()
+                    val linOp = when (op) {
+                        IntCmpOp.LE -> LinearOp.LE
+                        IntCmpOp.GE -> LinearOp.GE
+                        IntCmpOp.EQ -> LinearOp.EQ
+                        IntCmpOp.NE -> {
+                            factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), LinearOp.EQ, bound)
+                            return Lit.make(aux, positive = false)
+                        }
+                        IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+                    }
+                    factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), linOp, bound)
+                    return Lit.make(aux, positive = true)
+                }
+            }
+            val v = intVarOf(name)
+            val aux = newBoolVar()
+            factors += ReifiedIntCompare(aux, v, effectiveOp, effectiveBound)
+            return Lit.make(aux, positive = true)
         }
 
         fun tseitinAnd(children: List<BoolExpr>): Int {
@@ -258,26 +385,60 @@ class Compiler {
             else -> op to bound
         }
 
-        fun swapOp(op: IntCmpOp): IntCmpOp = when (op) {
-            IntCmpOp.LE -> IntCmpOp.GE
-            IntCmpOp.LT -> IntCmpOp.GT
-            IntCmpOp.GE -> IntCmpOp.LE
-            IntCmpOp.GT -> IntCmpOp.LT
-            IntCmpOp.EQ -> IntCmpOp.EQ
-            IntCmpOp.NE -> IntCmpOp.NE
-        }
-
-        fun toLinear(op: IntCmpOp): Pair<LinearOp, Int> = when (op) {
-            IntCmpOp.LE -> LinearOp.LE to 0
-            IntCmpOp.LT -> LinearOp.LE to -1
-            IntCmpOp.GE -> LinearOp.GE to 0
-            IntCmpOp.GT -> LinearOp.GE to 1
-            IntCmpOp.EQ -> LinearOp.EQ to 0
-            IntCmpOp.NE -> error("Linear constraints cannot directly express '!=' (var-vs-var)")
-        }
-
         fun intVarOf(name: String): Int =
             intVarIdByName[name] ?: error("Unknown int/float variable '$name'")
+
+        // Affine canonical form: Σ coeffs[name] * name + constant.
+        private data class Affine(val coeffs: Map<String, Int>, val constant: Int)
+
+        private fun affine(expr: IntExpr): Affine = when (expr) {
+            is IntRef -> Affine(mapOf(expr.name to 1), 0)
+            is IntLit -> Affine(emptyMap(), expr.value)
+            is IntScale -> {
+                val a = affine(expr.child)
+                val coeffs = HashMap<String, Int>(a.coeffs.size)
+                for ((k, v) in a.coeffs) coeffs[k] = v * expr.coeff
+                Affine(coeffs, a.constant * expr.coeff)
+            }
+            is IntSum -> {
+                val coeffs = HashMap<String, Int>()
+                var constant = 0
+                for (c in expr.children) {
+                    val a = affine(c)
+                    constant += a.constant
+                    for ((k, v) in a.coeffs) coeffs[k] = (coeffs[k] ?: 0) + v
+                }
+                coeffs.entries.removeAll { it.value == 0 }
+                Affine(coeffs, constant)
+            }
+        }
+
+        private fun subtract(left: Affine, right: Affine): Affine {
+            val coeffs = HashMap(left.coeffs)
+            for ((k, v) in right.coeffs) coeffs[k] = (coeffs[k] ?: 0) - v
+            coeffs.entries.removeAll { it.value == 0 }
+            return Affine(coeffs, left.constant - right.constant)
+        }
+
+        private fun coeffsToArrays(coeffs: Map<String, Int>): Pair<IntArray, IntArray> {
+            val varIds = IntArray(coeffs.size)
+            val coeffArr = IntArray(coeffs.size)
+            var i = 0
+            for ((name, c) in coeffs) {
+                varIds[i] = intVarOf(name)
+                coeffArr[i] = c
+                i++
+            }
+            return varIds to coeffArr
+        }
+
+        private fun trueLit(): Int {
+            val v = newBoolVar()
+            factors += Clause(intArrayOf(Lit.make(v, positive = true)))
+            return Lit.make(v, positive = true)
+        }
+
+        private fun falseLit(): Int = Lit.negate(trueLit())
     }
 }
 
