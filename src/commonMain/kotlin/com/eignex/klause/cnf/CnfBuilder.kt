@@ -156,23 +156,32 @@ class CnfBuilder {
 
     /**
      * Signed multiplier via sign-magnitude: `out = a * b` where both inputs are interpreted as
-     * two's-complement values. Returns a bit-vector of width `a.size + b.size + 1` (the extra
-     * bit accommodates sign). [signA] / [signB] are the most-significant bits of the input
-     * representations (the caller is responsible for zero-extending the magnitudes if the
-     * canonical representation needs more headroom).
+     * two's-complement values. Sign-extends each operand by one bit before extracting the sign
+     * bit and forming the absolute value, so that the most-negative input (e.g. `1000` in 4
+     * bits = -8) does not overflow `negateBv`. Output width is `a.size + b.size + 3`, signed.
      */
     fun signedMultiply(a: IntArray, b: IntArray): IntArray {
         require(a.isNotEmpty() && b.isNotEmpty()) { "signedMultiply: empty operand" }
-        val signA = a.last()
-        val signB = b.last()
-        val absA = mux(signA, negateBv(a), a)
-        val absB = mux(signB, negateBv(b), b)
+        val aExt = signExtendOne(a)
+        val bExt = signExtendOne(b)
+        val signA = aExt.last()
+        val signB = bExt.last()
+        val absA = mux(signA, negateBv(aExt), aExt)
+        val absB = mux(signB, negateBv(bExt), bExt)
         val product = multiply(absA, absB)
         // Sign of result is signA XOR signB.
         val resultSign = tseitinXor(signA, signB)
         // Pad product by one bit so the negation can express the most-negative value.
         val padded = zeroExtend(product, product.size + 1)
         return mux(resultSign, negateBv(padded), padded)
+    }
+
+    /** Sign-extend a two's-complement bit-vector by one bit; new MSB replicates the sign. */
+    private fun signExtendOne(bits: IntArray): IntArray {
+        val out = IntArray(bits.size + 1)
+        bits.copyInto(out, 0, 0, bits.size)
+        out[bits.size] = bits.last()
+        return out
     }
 
     /**

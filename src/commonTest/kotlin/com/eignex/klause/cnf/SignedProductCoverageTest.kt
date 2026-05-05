@@ -9,6 +9,35 @@ import kotlin.test.assertEquals
 class SignedProductCoverageTest {
 
     @Test
+    fun signedProductAtMostNegativeBoundaryMatchesEnumeration() {
+        // a, b ∈ [-4, 3] — width 4, so -4 is the most-negative representable value. result can
+        // hold up to ±16 so we widen its domain.
+        val factor = Product(a = 0, b = 1, result = 2)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(-4, 3), IntDomain(-4, 3), IntDomain(-16, 16)),
+            factors = listOf(factor),
+        )
+        val cnf = BitBlaster.compile(problem)
+        for (av in -4..3) for (bv in -4..3) for (rv in -16..16) {
+            val expected = (av * bv == rv)
+            val pins = mutableListOf<Int>()
+            val values = listOf(av, bv, rv)
+            val mins = listOf(-4, -4, -16)
+            for (idx in 0..2) {
+                val bits = cnf.intVarBits[idx]
+                val offset = values[idx] - mins[idx]
+                for (i in bits.indices) {
+                    pins += bits[i]; pins += (offset shr i) and 1
+                }
+            }
+            val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
+            assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
+        }
+    }
+
+    @Test
     fun signedProductMatchesEnumeration() {
         // a, b ∈ [-2..2], result ∈ [-4..4].
         val factor = Product(a = 0, b = 1, result = 2)
