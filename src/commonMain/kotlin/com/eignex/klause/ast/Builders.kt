@@ -26,6 +26,35 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
 }
 
 /**
+ * Lexicographic less-or-equal: `a` is no greater than `b` when read left-to-right. Empty lists
+ * are equal (true). Lists must be the same length.
+ */
+fun lexLeq(a: List<IntTerm>, b: List<IntTerm>): BoolExpr = lexChain(a, b, strict = false)
+
+/** Strict lexicographic less-than. */
+fun lexLt(a: List<IntTerm>, b: List<IntTerm>): BoolExpr = lexChain(a, b, strict = true)
+
+private fun lexChain(a: List<IntTerm>, b: List<IntTerm>, strict: Boolean): BoolExpr {
+    require(a.size == b.size) { "lex: lists must have equal length, got ${a.size} and ${b.size}" }
+    require(a.isNotEmpty()) { "lex: empty lists are not supported" }
+    val ax = a.map { it.toIntExpr() }
+    val bx = b.map { it.toIntExpr() }
+    // Tail recursion: lex(a, b) ⟺ a[0] < b[0] ∨ (a[0] = b[0] ∧ lex(a[1..], b[1..])).
+    // Base case at the last index: <= becomes a[k] ≤ b[k], < becomes a[k] < b[k].
+    var result: BoolExpr = if (strict) {
+        IntCompare(ax.last(), IntCmpOp.LT, bx.last())
+    } else {
+        IntCompare(ax.last(), IntCmpOp.LE, bx.last())
+    }
+    for (i in ax.size - 2 downTo 0) {
+        val less = IntCompare(ax[i], IntCmpOp.LT, bx[i])
+        val equal = IntCompare(ax[i], IntCmpOp.EQ, bx[i])
+        result = Or(listOf(less, And(listOf(equal, result))))
+    }
+    return result
+}
+
+/**
  * Channel an integer variable to a list of Boolean indicators: `bools[i] iff (intVar = offset+i)`
  * for every index `i`. Useful for switching between an integer and a one-hot Boolean encoding.
  */
