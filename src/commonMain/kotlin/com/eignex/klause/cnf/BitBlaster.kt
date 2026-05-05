@@ -16,6 +16,7 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
 
@@ -88,6 +89,7 @@ object BitBlaster {
                 is ReifiedLinear -> emitReifiedLinear(b, factor, boolMap, intBits, intMin)
                 is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
                 is ReifiedPseudoBoolean -> emitReifiedPseudoBoolean(b, factor, boolMap)
+                is Xor -> emitXor(b, factor, boolMap)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -159,6 +161,18 @@ object BitBlaster {
             b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(s[i - 1][k - 1])))
         }
         b.addClause(intArrayOf(Lit.negate(lits[n - 1]), Lit.negate(s[n - 2][k - 1])))
+    }
+
+    private fun emitXor(b: CnfBuilder, f: Xor, boolMap: IntArray) {
+        val remapped = IntArray(f.literals.size) {
+            val lit = f.literals[it]
+            Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
+        }
+        // Chain pairwise XOR to combine all literals into a single parity literal.
+        var acc = remapped[0]
+        for (i in 1 until remapped.size) acc = b.tseitinXor(acc, remapped[i])
+        // Assert parity matches the target.
+        b.addClause(intArrayOf(if (f.targetParity == 1) acc else Lit.negate(acc)))
     }
 
     private fun emitPseudoBoolean(b: CnfBuilder, f: PseudoBoolean, boolMap: IntArray) {

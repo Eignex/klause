@@ -7,6 +7,7 @@ import com.eignex.klause.ast.AtMost
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.TableConstraint
+import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.BoolSpec
@@ -52,6 +53,7 @@ import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 
@@ -151,6 +153,10 @@ class Compiler {
                         isHard = isHard,
                         weight = weight,
                     )
+                }
+                is XorExpr -> {
+                    val lits = lowerAllBool(expr.children)
+                    factors += Xor(lits, targetParity = 1, isHard = isHard, weight = weight)
                 }
             }
         }
@@ -328,6 +334,17 @@ class Compiler {
                 val aux = newBoolVar()
                 factors += ReifiedPseudoBoolean(aux, expr.weights.toIntArray(), lits, expr.op, expr.bound)
                 Lit.make(aux, positive = true)
+            }
+            is XorExpr -> {
+                // aux ↔ xor(c1, …, cn)  ⟺  xor(aux, c1, …, cn) has even parity.
+                val childLits = lowerAllBool(expr.children)
+                val aux = newBoolVar()
+                val auxLit = Lit.make(aux, positive = true)
+                val all = IntArray(childLits.size + 1)
+                all[0] = auxLit
+                childLits.copyInto(all, destinationOffset = 1)
+                factors += Xor(all, targetParity = 0)
+                auxLit
             }
         }
 

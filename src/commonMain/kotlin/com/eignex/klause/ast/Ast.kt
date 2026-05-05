@@ -191,6 +191,12 @@ data class TableConstraint(
 enum class PbOp { LE, GE, EQ }
 
 @Serializable
+@SerialName("xor")
+data class XorExpr(val children: List<BoolExpr>) : BoolExpr {
+    init { require(children.isNotEmpty()) { "XorExpr needs at least one child" } }
+}
+
+@Serializable
 @SerialName("pb")
 data class PseudoBooleanExpr(
     val weights: List<Int>,

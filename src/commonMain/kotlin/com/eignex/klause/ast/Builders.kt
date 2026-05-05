@@ -26,6 +26,14 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
 }
 
 /**
+ * N-ary XOR. Evaluates to true iff an odd number of children are true.
+ */
+fun xor(vararg children: BoolTerm): BoolExpr {
+    require(children.isNotEmpty()) { "xor: need at least one child" }
+    return XorExpr(children.map { it.toExpr() })
+}
+
+/**
  * Pseudo-Boolean weighted-sum constraint: `Σ wᵢ * lᵢ ⟨op⟩ bound` over Boolean literals.
  * Each literal contributes its weight when true, 0 when false.
  */
