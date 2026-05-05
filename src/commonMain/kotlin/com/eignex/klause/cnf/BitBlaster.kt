@@ -259,17 +259,70 @@ object BitBlaster {
         problem: Problem,
     ) {
         val aMin = intMin[f.a]; val bMin = intMin[f.b]; val rMin = intMin[f.result]
-        require(aMin >= 0 && bMin >= 0) {
-            "Product bit-blasting v1 requires non-negative operand domains; got aMin=$aMin, bMin=$bMin"
+        val aMax = problem.intDomains[f.a].max
+        val bMax = problem.intDomains[f.b].max
+        val rMax = problem.intDomains[f.result].max
+
+        if (aMin >= 0 && bMin >= 0 && rMin >= 0) {
+            // Unsigned fast path.
+            val aActual = if (aMin == 0) bitsToLits(intBits[f.a])
+                else b.rippleAdd(bitsToLits(intBits[f.a]), constantLits(b, aMin.toLong()))
+            val bActual = if (bMin == 0) bitsToLits(intBits[f.b])
+                else b.rippleAdd(bitsToLits(intBits[f.b]), constantLits(b, bMin.toLong()))
+            val rActual = if (rMin == 0) bitsToLits(intBits[f.result])
+                else b.rippleAdd(bitsToLits(intBits[f.result]), constantLits(b, rMin.toLong()))
+            val product = b.multiply(aActual, bActual)
+            b.addClause(intArrayOf(b.unsignedEq(product, rActual)))
+            return
         }
-        val aActual = if (aMin == 0) bitsToLits(intBits[f.a])
-            else b.rippleAdd(bitsToLits(intBits[f.a]), constantLits(b, aMin.toLong()))
-        val bActual = if (bMin == 0) bitsToLits(intBits[f.b])
-            else b.rippleAdd(bitsToLits(intBits[f.b]), constantLits(b, bMin.toLong()))
-        val rActual = if (rMin == 0) bitsToLits(intBits[f.result])
-            else b.rippleAdd(bitsToLits(intBits[f.result]), constantLits(b, rMin.toLong()))
-        val product = b.multiply(aActual, bActual)
-        b.addClause(intArrayOf(b.unsignedEq(product, rActual)))
+
+        // Signed path: build two's-complement bit-vectors wide enough to hold each operand's
+        // signed range, then use signedMultiply.
+        val aWidth = signedWidth(aMin, aMax)
+        val bWidth = signedWidth(bMin, bMax)
+        val rWidth = signedWidth(rMin, rMax)
+        val aSigned = toSignedBits(b, intBits[f.a], aMin, aWidth)
+        val bSigned = toSignedBits(b, intBits[f.b], bMin, bWidth)
+        val rSigned = toSignedBits(b, intBits[f.result], rMin, rWidth)
+        val product = b.signedMultiply(aSigned, bSigned)
+        // Sign-extend whichever side is shorter so unsignedEq can compare bit-for-bit.
+        val targetWidth = maxOf(product.size, rSigned.size)
+        val productExt = signExtend(b, product, targetWidth)
+        val rExt = signExtend(b, rSigned, targetWidth)
+        b.addClause(intArrayOf(b.unsignedEq(productExt, rExt)))
+    }
+
+    /** Bits needed for two's-complement representation of a value range `[min, max]`. */
+    private fun signedWidth(min: Int, max: Int): Int {
+        val maxAbs = maxOf(if (min < 0) -min - 1 else 0, if (max > 0) max else 0)
+        // 1 sign bit + bits to represent maxAbs.
+        val payload = if (maxAbs == 0) 1 else (32 - maxAbs.countLeadingZeroBits())
+        return payload + 1
+    }
+
+    /**
+     * Build a [width]-bit two's-complement representation of `min + decode(bits)`. The integer
+     * variable is encoded as offset bits with offset `min`; this lifts that to a signed
+     * bit-vector by zero-extending the offset bits and adding `min` modulo `2^width`.
+     */
+    private fun toSignedBits(b: CnfBuilder, bits: IntArray, min: Int, width: Int): IntArray {
+        val lits = bitsToLits(bits)
+        val zeroExtended = b.zeroExtend(lits, width)
+        if (min == 0) return zeroExtended
+        val constMod = if (min >= 0) min.toLong() else (1L shl width) + min.toLong()
+        val sum = b.rippleAdd(zeroExtended, constantLits(b, constMod))
+        // Truncate to `width`; overflow bits are discarded (intended in two's complement).
+        return sum.copyOfRange(0, width)
+    }
+
+    /** Sign-extend a two's-complement bit-vector to [width]. */
+    private fun signExtend(b: CnfBuilder, bits: IntArray, width: Int): IntArray {
+        if (bits.size >= width) return bits.copyOfRange(0, width)
+        val sign = bits.last()
+        val out = IntArray(width)
+        bits.copyInto(out, 0, 0, bits.size)
+        for (i in bits.size until width) out[i] = sign
+        return out
     }
 
     private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray) {

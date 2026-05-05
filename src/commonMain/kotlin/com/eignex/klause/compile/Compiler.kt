@@ -545,17 +545,15 @@ class Compiler {
             // Constant folding: const * x or x * const → IntScale.
             if (l is IntLit) return IntScale(l.value, r)
             if (r is IntLit) return IntScale(r.value, l)
-            // Both sides are real variables. Materialise each side as a single int var (Product
-            // factor takes raw int var ids), then emit Product on aux vars wrapping the affine
-            // residuals.
             val aRef = materializeIntVar(l)
             val bRef = materializeIntVar(r)
             val aDom = intDomains[intVarOf(aRef.name)]
             val bDom = intDomains[intVarOf(bRef.name)]
-            require(aDom.min >= 0 && bDom.min >= 0) {
-                "IntMul v1 requires non-negative operand domains; got $aDom and $bDom"
-            }
-            val productDomain = IntDomain(aDom.min * bDom.min, aDom.max * bDom.max)
+            val corners = intArrayOf(
+                aDom.min * bDom.min, aDom.min * bDom.max,
+                aDom.max * bDom.min, aDom.max * bDom.max,
+            )
+            val productDomain = IntDomain(corners.min(), corners.max())
             val resultName = newAuxIntVar(productDomain)
             factors += Product(intVarOf(aRef.name), intVarOf(bRef.name), intVarOf(resultName))
             return IntRef(resultName)

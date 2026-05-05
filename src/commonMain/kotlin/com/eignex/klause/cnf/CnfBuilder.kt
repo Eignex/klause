@@ -124,6 +124,57 @@ class CnfBuilder {
         return out
     }
 
+    /** Bit-wise mux: each output bit is `sel ? a[i] : b[i]`. Both inputs must have equal width. */
+    fun mux(sel: Int, a: IntArray, b: IntArray): IntArray {
+        require(a.size == b.size) { "mux: arms must have equal width" }
+        val out = IntArray(a.size)
+        for (i in a.indices) {
+            // sel ? a : b  =  (sel ∧ a) ∨ (¬sel ∧ b)
+            val left = tseitinAnd(intArrayOf(sel, a[i]))
+            val right = tseitinAnd(intArrayOf(Lit.negate(sel), b[i]))
+            out[i] = tseitinOr(intArrayOf(left, right))
+        }
+        return out
+    }
+
+    /**
+     * Two's-complement negation of [bits]: invert every bit and add 1. Output width matches
+     * input. Note that negating the most-negative value overflows; callers should size their
+     * inputs to leave room.
+     */
+    fun negateBv(bits: IntArray): IntArray {
+        val inverted = IntArray(bits.size) { Lit.negate(bits[it]) }
+        // Add 1 by feeding a true literal as the initial carry into a half-adder chain.
+        val out = IntArray(bits.size)
+        var carry = trueLit()
+        for (i in bits.indices) {
+            out[i] = tseitinXor(inverted[i], carry)
+            carry = tseitinAnd(intArrayOf(inverted[i], carry))
+        }
+        return out
+    }
+
+    /**
+     * Signed multiplier via sign-magnitude: `out = a * b` where both inputs are interpreted as
+     * two's-complement values. Returns a bit-vector of width `a.size + b.size + 1` (the extra
+     * bit accommodates sign). [signA] / [signB] are the most-significant bits of the input
+     * representations (the caller is responsible for zero-extending the magnitudes if the
+     * canonical representation needs more headroom).
+     */
+    fun signedMultiply(a: IntArray, b: IntArray): IntArray {
+        require(a.isNotEmpty() && b.isNotEmpty()) { "signedMultiply: empty operand" }
+        val signA = a.last()
+        val signB = b.last()
+        val absA = mux(signA, negateBv(a), a)
+        val absB = mux(signB, negateBv(b), b)
+        val product = multiply(absA, absB)
+        // Sign of result is signA XOR signB.
+        val resultSign = tseitinXor(signA, signB)
+        // Pad product by one bit so the negation can express the most-negative value.
+        val padded = zeroExtend(product, product.size + 1)
+        return mux(resultSign, negateBv(padded), padded)
+    }
+
     /**
      * Unsigned shift-and-add multiplier: `out = a * b`. Output width is `a.size + b.size`.
      * For each bit `b[i]`, conditionally adds `a << i` to the running total: `(b[i] AND a[j])`

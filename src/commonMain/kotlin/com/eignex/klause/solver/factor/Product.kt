@@ -5,8 +5,9 @@ import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.SolverState
 
 /**
- * `a * b = result`. v1 supports non-negative operand domains only; init-asserts that a and b
- * have `min >= 0`. The bit-blaster lowers via an unsigned shift-and-add multiplier.
+ * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
+ * via an unsigned shift-and-add multiplier on absolute values, then conditionally negates the
+ * product based on the operand sign bits.
  *
  * No payload: the product is recomputed in O(1) from the current assignment on each query.
  */
@@ -21,13 +22,7 @@ class Product(
     override val boolVars: IntArray = EMPTY
     override val intVars: IntArray = intArrayOf(a, b, result)
 
-    override fun initialize(state: SolverState, factorId: Int) {
-        val ad = state.problem.intDomains[a]
-        val bd = state.problem.intDomains[b]
-        require(ad.min >= 0 && bd.min >= 0) {
-            "Product factor v1 requires non-negative operand domains; got a=$ad, b=$bd"
-        }
-    }
+    override fun initialize(state: SolverState, factorId: Int) {}
 
     override fun isViolated(state: SolverState, factorId: Int): Boolean {
         val av = state.assignment.intValue(a)
