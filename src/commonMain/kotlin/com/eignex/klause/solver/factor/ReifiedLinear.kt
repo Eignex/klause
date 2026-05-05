@@ -110,9 +110,14 @@ class ReifiedLinear(
         // the integer value that makes the equality hold. When wantHolds=false we snap to a
         // value that violates the predicate by one unit.
         val numerator = bound - sumWithout
-        val targetEq = if (coeff != 0) numerator / coeff else return null
+        if (coeff == 0) return null
+        val targetEq = numerator / coeff
         return when (op) {
-            LinearOp.EQ -> if (wantHolds) targetEq else targetEq + 1
+            LinearOp.EQ -> when {
+                wantHolds && numerator % coeff != 0 -> null   // no integer satisfies coeff·v = numerator
+                wantHolds -> targetEq
+                else -> targetEq + 1
+            }
             LinearOp.LE -> if (wantHolds) {
                 if (coeff > 0) floorDiv(numerator, coeff) else ceilDiv(numerator, coeff)
             } else {

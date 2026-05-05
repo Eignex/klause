@@ -84,7 +84,7 @@ class Linear(
     private fun snapTarget(coeff: Int, sumWithout: Int): Int? {
         val numerator = bound - sumWithout
         return when (op) {
-            LinearOp.EQ -> numerator / coeff
+            LinearOp.EQ -> if (numerator % coeff == 0) numerator / coeff else null
             LinearOp.LE -> if (coeff > 0) floorDiv(numerator, coeff) else ceilDiv(numerator, coeff)
             LinearOp.GE -> if (coeff > 0) ceilDiv(numerator, coeff) else floorDiv(numerator, coeff)
         }
