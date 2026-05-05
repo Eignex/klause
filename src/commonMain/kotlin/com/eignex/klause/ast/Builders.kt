@@ -26,6 +26,21 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
 }
 
 /**
+ * Global cardinality constraint. For each `(value, range)` entry, the count of `vars` taking
+ * that value must lie inside `range`. Decomposes into one [CardinalityExpr] per entry.
+ */
+fun gcc(vars: List<IntTerm>, valueCounts: Map<Int, IntRange>): BoolExpr {
+    require(vars.isNotEmpty()) { "gcc(): vars must not be empty" }
+    require(valueCounts.isNotEmpty()) { "gcc(): valueCounts must not be empty" }
+    val parts = valueCounts.map { (value, range) ->
+        require(range.first <= range.last) { "gcc: invalid range for value $value: $range" }
+        val children = vars.map { v -> IntCompare(v.toIntExpr(), IntCmpOp.EQ, IntLit(value)) }
+        CardinalityExpr(children, range.first, range.last)
+    }
+    return if (parts.size == 1) parts[0] else And(parts)
+}
+
+/**
  * Lexicographic less-or-equal: `a` is no greater than `b` when read left-to-right. Empty lists
  * are equal (true). Lists must be the same length.
  */
