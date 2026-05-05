@@ -87,3 +87,13 @@ val text = cnf.toDimacs()
 Integer variables use canonical binary encoding, with reusable circuit
 builders for the standard Tseitin gates and bit-vector primitives. The CNF is
 suitable for any external propositional SAT engine.
+
+## TODO
+
+- More search strategies: probSAT, SAPS, tabu, simulated annealing.
+- Pseudo-Boolean and XOR factors; general `Cardinality(min, max)` beyond k=1.
+- Reified linear constraints for non-top-level positions.
+- Solution-pool diversification: Hamming and XOR-slice blocking factors.
+- Linear arithmetic in the DSL (sums, scales, soft constraints with weights).
+- External SAT adapter (LogicNG) for cross-checks and UNSAT proofs.
+- Benchmark suite, Maven Central publishing, CI.
