@@ -90,8 +90,15 @@ data class AtLeast(val children: List<BoolExpr>, val k: Int) : BoolExpr
 @SerialName("card")
 data class CardinalityExpr(val children: List<BoolExpr>, val min: Int, val max: Int) : BoolExpr
 
+/** Anything that can be coerced into an [IntExpr] inside the constraint DSL. */
+interface IntTerm {
+    fun toIntExpr(): IntExpr
+}
+
 @Serializable
-sealed interface IntExpr
+sealed interface IntExpr : IntTerm {
+    override fun toIntExpr(): IntExpr = this
+}
 
 @Serializable
 @SerialName("intref")
@@ -101,27 +108,24 @@ data class IntRef(val name: String) : IntExpr
 @SerialName("intlit")
 data class IntLit(val value: Int) : IntExpr
 
+/** `coeff * child`. */
+@Serializable
+@SerialName("intscale")
+data class IntScale(val coeff: Int, val child: IntExpr) : IntExpr
+
+/** Sum of children. */
+@Serializable
+@SerialName("intsum")
+data class IntSum(val children: List<IntExpr>) : IntExpr {
+    init { require(children.isNotEmpty()) { "IntSum must have at least one child" } }
+}
+
 @Serializable
 enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 
 @Serializable
 @SerialName("intcmp")
 data class IntCompare(val left: IntExpr, val op: IntCmpOp, val right: IntExpr) : BoolExpr
-
-@Serializable
-enum class LinearCmpOp { LE, EQ, GE }
-
-/** `Σ coeffs[i] * refs[i] ⟨op⟩ bound`. */
-@Serializable
-@SerialName("linear")
-data class LinearConstraint(
-    val coeffs: List<Int>,
-    val refs: List<String>,
-    val op: LinearCmpOp,
-    val bound: Int,
-) : BoolExpr {
-    init { require(coeffs.size == refs.size) { "coeffs/refs length mismatch" } }
-}
 
 @Serializable
 data class NamedConstraint(

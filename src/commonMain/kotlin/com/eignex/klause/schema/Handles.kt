@@ -5,10 +5,10 @@ import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.BoolTerm
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
+import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
-import com.eignex.klause.ast.LinearCmpOp
-import com.eignex.klause.ast.LinearConstraint
+import com.eignex.klause.ast.IntTerm
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.not
 import kotlin.math.roundToInt
@@ -25,25 +25,15 @@ class NominalHandle(val name: String, val labels: List<String>) {
     infix fun ne(label: String): BoolExpr = !eq(label)
 }
 
-class IntHandle(val name: String, val min: Int, val max: Int) {
-    private val ref: IntRef = IntRef(name)
-
-    infix fun le(c: Int): BoolExpr = IntCompare(ref, IntCmpOp.LE, IntLit(c))
-    infix fun lt(c: Int): BoolExpr = IntCompare(ref, IntCmpOp.LT, IntLit(c))
-    infix fun ge(c: Int): BoolExpr = IntCompare(ref, IntCmpOp.GE, IntLit(c))
-    infix fun gt(c: Int): BoolExpr = IntCompare(ref, IntCmpOp.GT, IntLit(c))
-    infix fun eq(c: Int): BoolExpr = IntCompare(ref, IntCmpOp.EQ, IntLit(c))
-    infix fun ne(c: Int): BoolExpr = IntCompare(ref, IntCmpOp.NE, IntLit(c))
-
-    infix fun le(other: IntHandle): BoolExpr = LinearConstraint(listOf(1, -1), listOf(name, other.name), LinearCmpOp.LE, 0)
-    infix fun ge(other: IntHandle): BoolExpr = LinearConstraint(listOf(1, -1), listOf(name, other.name), LinearCmpOp.GE, 0)
-    infix fun eq(other: IntHandle): BoolExpr = LinearConstraint(listOf(1, -1), listOf(name, other.name), LinearCmpOp.EQ, 0)
+class IntHandle(val name: String, val min: Int, val max: Int) : IntTerm {
+    override fun toIntExpr(): IntExpr = IntRef(name)
 }
 
 /**
  * Float variable bucketed at the schema layer. All comparisons resolve at construction time
  * to integer comparisons against the bucket index, so the AST stays integer-only beyond the
- * schema definition itself.
+ * schema definition itself. Float arithmetic is intentionally not provided; combine floats
+ * via integer expressions on bucket indices if you need it.
  */
 class FloatHandle(val name: String, val min: Double, val max: Double, val buckets: Int) {
     private val ref: IntRef = IntRef(name)
