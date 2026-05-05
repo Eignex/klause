@@ -11,3 +11,6 @@ fun max(vararg xs: IntTerm): IntExpr {
 }
 
 fun abs(x: IntTerm): IntExpr = IntAbs(x.toIntExpr())
+
+fun ifThenElse(cond: BoolTerm, thenE: IntTerm, elseE: IntTerm): IntExpr =
+    IntIfThenElse(cond.toExpr(), thenE.toIntExpr(), elseE.toIntExpr())

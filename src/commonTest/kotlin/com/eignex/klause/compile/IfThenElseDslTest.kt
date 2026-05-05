@@ -1,0 +1,57 @@
+package com.eignex.klause.compile
+
+import com.eignex.klause.ast.eq
+import com.eignex.klause.ast.ifThenElse
+import com.eignex.klause.ast.le
+import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.Solver
+import kotlin.test.Test
+import kotlin.test.assertTrue
+
+class IfThenElseDslTest {
+
+    @Test
+    fun ifThenElseDispatchesByCondition() {
+        class S : VariableSchema() {
+            val flag by boolVar()
+            val x by intVar(min = 0, max = 9)
+            val y by intVar(min = 0, max = 9)
+            val pin by constraint { ifThenElse(flag, x, y) eq 5 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.sample(maxFlips = 20_000, randomSeed = 42).take(10).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val flag = compiled.decodeBool("flag", s)
+            val xv = compiled.decodeInt("x", s)
+            val yv = compiled.decodeInt("y", s)
+            val picked = if (flag) xv else yv
+            assertTrue(picked == 5, "flag=$flag x=$xv y=$yv selected=$picked, expected 5")
+        }
+    }
+
+    @Test
+    fun ifThenElseInsideArithmetic() {
+        class S : VariableSchema() {
+            val flag by boolVar()
+            val x by intVar(min = 0, max = 4)
+            val y by intVar(min = 0, max = 4)
+            // (flag ? x : y) ≤ 2
+            val cap by constraint { ifThenElse(flag, x, y) le 2 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.sample(maxFlips = 20_000, randomSeed = 99).take(10).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val flag = compiled.decodeBool("flag", s)
+            val xv = compiled.decodeInt("x", s)
+            val yv = compiled.decodeInt("y", s)
+            val picked = if (flag) xv else yv
+            assertTrue(picked <= 2, "selected=$picked > 2")
+        }
+    }
+}

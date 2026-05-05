@@ -137,6 +137,10 @@ data class IntMax(val children: List<IntExpr>) : IntExpr {
 data class IntAbs(val child: IntExpr) : IntExpr
 
 @Serializable
+@SerialName("intite")
+data class IntIfThenElse(val cond: BoolExpr, val thenE: IntExpr, val elseE: IntExpr) : IntExpr
+
+@Serializable
 enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 
 @Serializable

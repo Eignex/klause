@@ -15,6 +15,7 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntAbs
+import com.eignex.klause.ast.IntIfThenElse
 import com.eignex.klause.ast.IntMax
 import com.eignex.klause.ast.IntMin
 import com.eignex.klause.ast.IntRef
@@ -414,6 +415,20 @@ class Compiler {
             is IntMin -> liftMinMax(expr.children, isMin = true)
             is IntMax -> liftMinMax(expr.children, isMin = false)
             is IntAbs -> liftAbs(expr.child)
+            is IntIfThenElse -> liftIfThenElse(expr.cond, expr.thenE, expr.elseE)
+        }
+
+        private fun liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntExpr): IntExpr {
+            val tLifted = lift(thenE)
+            val eLifted = lift(elseE)
+            val tDom = domainOf(tLifted)
+            val eDom = domainOf(eLifted)
+            val auxName = newAuxIntVar(IntDomain(minOf(tDom.min, eDom.min), maxOf(tDom.max, eDom.max)))
+            val auxRef = IntRef(auxName)
+            // cond ⇒ aux = thenE; ¬cond ⇒ aux = elseE.
+            assertExpr(Implies(cond, IntCompare(auxRef, IntCmpOp.EQ, tLifted)), isHard = true, weight = 1.0)
+            assertExpr(Implies(Not(cond), IntCompare(auxRef, IntCmpOp.EQ, eLifted)), isHard = true, weight = 1.0)
+            return auxRef
         }
 
         private fun liftMinMax(children: List<IntExpr>, isMin: Boolean): IntExpr {
