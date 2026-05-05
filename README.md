@@ -55,10 +55,13 @@ class CampaignSchema : VariableSchema() {
 The constraint DSL covers `and`, `or`, `implies`, `iff`, `!` for the Boolean
 side; `eq` / `ne` against label literals on nominals; full integer arithmetic
 through `+`, `-`, unary `-`, and `*` by constant; the comparators `le`, `lt`,
-`ge`, `gt`, `eq`, `ne` over arbitrary integer expressions on either side;
-the same comparators against float literals on `floatVar` (resolved to
-bucket-index comparisons at construction time); and top-level `atMost`,
-`atLeast`, `cardinality` for counting constraints.
+`ge`, `gt`, `eq`, `ne` over arbitrary integer expressions on either side; the
+same comparators against float literals on `floatVar` (resolved to
+bucket-index comparisons at construction time); and `atMost`, `atLeast`,
+`cardinality` for counting constraints. Every form composes inside Boolean
+connectives: a multi-variable comparison, a linear arithmetic constraint, or
+a cardinality expression nested inside `implies` is reified through a fresh
+auxiliary literal so the rest of the lowering can treat it as a Boolean.
 
 ---
 
