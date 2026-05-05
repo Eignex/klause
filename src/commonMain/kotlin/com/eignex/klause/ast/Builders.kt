@@ -19,3 +19,8 @@ fun element(index: IntTerm, items: List<IntTerm>): IntExpr {
     require(items.isNotEmpty()) { "element(): items must not be empty" }
     return IntElement(index.toIntExpr(), items.map { it.toIntExpr() })
 }
+
+fun allDifferent(vararg xs: IntTerm): BoolExpr {
+    require(xs.size >= 2) { "allDifferent(): need at least two terms" }
+    return AllDifferent(xs.map { it.toIntExpr() })
+}

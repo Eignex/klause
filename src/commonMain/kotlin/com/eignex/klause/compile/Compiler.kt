@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.ast.AllDifferent
 import com.eignex.klause.ast.And
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
@@ -129,6 +130,14 @@ class Compiler {
                     factors += Clause(intArrayOf(lowerToLit(expr)), isHard, weight)
                 }
                 is IntCompare -> assertIntCompare(expr, isHard, weight)
+                is AllDifferent -> assertAllDifferent(expr.terms, isHard, weight)
+            }
+        }
+
+        private fun assertAllDifferent(terms: List<IntExpr>, isHard: Boolean, weight: Double) {
+            val lifted = terms.map { lift(it) }
+            for (i in lifted.indices) for (j in i + 1 until lifted.size) {
+                assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]), isHard, weight)
             }
         }
 
@@ -270,6 +279,14 @@ class Compiler {
             is AtMost -> reifyCardinality(expr.children, 0, expr.k)
             is AtLeast -> reifyCardinality(expr.children, expr.k, expr.children.size)
             is CardinalityExpr -> reifyCardinality(expr.children, expr.min, expr.max)
+            is AllDifferent -> {
+                val lifted = expr.terms.map { lift(it) }
+                val pairs = mutableListOf<BoolExpr>()
+                for (i in lifted.indices) for (j in i + 1 until lifted.size) {
+                    pairs += IntCompare(lifted[i], IntCmpOp.NE, lifted[j])
+                }
+                tseitinAnd(pairs)
+            }
         }
 
         fun reifyCardinality(children: List<BoolExpr>, min: Int, max: Int): Int {

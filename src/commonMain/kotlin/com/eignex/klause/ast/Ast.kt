@@ -154,6 +154,12 @@ enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 data class IntCompare(val left: IntExpr, val op: IntCmpOp, val right: IntExpr) : BoolExpr
 
 @Serializable
+@SerialName("alldiff")
+data class AllDifferent(val terms: List<IntExpr>) : BoolExpr {
+    init { require(terms.size >= 2) { "AllDifferent needs at least two terms" } }
+}
+
+@Serializable
 data class NamedConstraint(
     val name: String,
     val expr: BoolExpr,
