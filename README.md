@@ -11,27 +11,18 @@
 # Klause
 
 Klause samples satisfying assignments to constraint problems over Boolean,
-nominal, integer, and bucketed-float variables, using stochastic local search
-in the WalkSAT family.
+nominal, integer, and bucketed-float variables, using stochastic local search.
 
 ## Overview
 
-A schema is declared as a Kotlin class. Property delegates capture each
-variable and constraint as a typed value, so the whole schema serializes
-through kotlinx.serialization and crosses the wire intact.
+A schema is a Kotlin class. Property delegates capture each variable and
+constraint as a typed value, so the whole schema is a serializable value that
+crosses the wire intact through kotlinx.serialization. Compiling the schema
+yields a problem the solver runs local search over directly; nothing in the
+hot path goes through CNF.
 
-The compiler lowers a schema to a native factor registry. Variables split into
-two id spaces: Boolean vars are packed into bits, integer vars carry a domain
-and live in a separate int array. Float vars are bucketed at the schema layer
-and become integer vars internally with a decoder kept for read-back.
-
-Disjunctions become clauses, nominal variables become indicator booleans plus
-an exactly-one factor, integer comparisons become dedicated comparator factors
-that propose snap-to-bound repair moves, and nested non-literal subexpressions
-go through Tseitin with hidden aux variables. The solver runs WalkSAT directly
-over that registry and yields hard-feasible assignments as a lazy sequence;
-full CNF conversion only happens on the bit-blasting export path, where the
-problem is handed off to an external propositional SAT engine.
+For handing the same problem to an external SAT engine, a separate
+bit-blasting compiler lowers it to propositional CNF.
 
 ### Installation
 
@@ -57,17 +48,11 @@ class CampaignSchema : VariableSchema() {
 }
 ```
 
-Inside a `constraint { ... }` block the DSL provides `and`, `or`, `implies`,
-`iff`, and unary `!` for the Boolean side; `eq` / `ne` against label literals
-on nominals; `le`, `lt`, `ge`, `gt`, `eq`, `ne` against integer or float
-literals (and against another variable of the same kind); and top-level
-`atMost`, `atLeast`, `cardinality` for counting constraints. The returned
-value is a sealed `BoolExpr` tree, never a host-language lambda, so
-`schema.definition()` round-trips through JSON or ProtoBuf.
-
-Float comparisons resolve at construction time to integer comparisons against
-the bucket index, so the AST stays integer-only beyond the schema definition
-itself.
+The constraint DSL covers `and`, `or`, `implies`, `iff`, `!` for the Boolean
+side; `eq` / `ne` against label literals on nominals; `le`, `lt`, `ge`, `gt`,
+`eq`, `ne` against integer or float literals (and against another variable of
+the same kind); and top-level `atMost`, `atLeast`, `cardinality` for counting
+constraints.
 
 ---
 
@@ -75,7 +60,7 @@ itself.
 
 ```kotlin
 val compiled = CampaignSchema().compile()
-val solver   = Solver(compiled.problem, randomSeed = 42L)
+val solver   = Solver(compiled.problem)
 
 solver.sample(maxFlips = 100_000).take(20).forEach { sample ->
     val type   = compiled.decodeNominal("type", sample)
@@ -85,82 +70,18 @@ solver.sample(maxFlips = 100_000).take(20).forEach { sample ->
 }
 ```
 
-`Solver.sample` returns a lazy `Sequence<Sample>` where each sample carries a
-`bools: BooleanArray` and an `ints: IntArray`. The diversity knobs
-(`randomSeed`, `minHammingDistance`, `recentWindow`) are parameters of
-`sample`, not the `Solver`, so independent draws never share state. After
-each yielded sample the search restarts from a randomized state.
+`sample` returns a lazy sequence that restarts the search after each yield.
+Per-draw configuration (random seed, dedup window, minimum distance between
+samples) lives on `sample`, not on `Solver`, so independent draws share no
+state and can run on parallel threads.
 
-Yielded samples are deduplicated against a rolling window of the most recent
-ones, sized by `recentWindow` (default 16). `minHammingDistance` (default 1)
-is the minimum number of primitive variable differences a new sample must
-have from each sample in the window; raise it for UUID-style diversity, set
-it to 0 to allow duplicates, or raise `recentWindow` toward `Int.MAX_VALUE`
-for global uniqueness. If the local solution space within the window is
-exhausted before the iteration budget, the sequence ends.
-
-The default strategy is `WalkSat(noise)`: pick a violated factor, ask it for
-repair-move suggestions, then either flip a random suggestion (probability
-`noise`) or pick the suggestion with the smallest break count, ties broken
-uniformly at random.
-
-`compiled.boolVarIdByName`, `compiled.intVarIdByName`, `compiled.nominalIndicators`,
-and `compiled.floatDecoders` map schema names back to solver-side ids for any
-decoding that does not go through the helpers.
-
----
-
-## Bit-blasting to CNF
+## Bit-blasting
 
 ```kotlin
 val cnf = BitBlaster.compile(compiled.problem)
 val text = cnf.toDimacs()
-val intValue = cnf.decodeInt(originalIntVarId, model)
 ```
 
-`BitBlaster` produces a propositional CNF for any problem klause supports,
-suitable for handing to an external SAT engine. Integer variables use
-canonical binary encoding: each variable in `[min, max]` gets
-`ceil(log2(max - min + 1))` bits representing the offset from `min`, with an
-explicit domain constraint when the domain size is not a power of two.
-Reusable circuit builders cover Tseitin AND/OR/XOR3/MAJ3, zero-extend,
-shift-left, ripple-carry add, multiply-by-constant, constant comparators, and
-unsigned `≤` / `==` over arbitrary widths.
-
-Lowered factor types: `Clause`, `Cardinality` (only AtMostOne / AtLeastOne /
-ExactlyOne, since the sequential-counter encoding is out of scope),
-`IntLeq`, `IntGeq`, `IntEq`, `IntNeq`, `Linear` (any signed coefficients and
-bound), and `ReifiedIntCompare`. Out-of-domain `IntEq` / `IntNeq` constants
-short-circuit to a true/false unit clause at compile time.
-
-## How it works
-
-The `Problem` is immutable: a count of Boolean variables, a count of integer
-variables with their `IntDomain` bounds, and an ordered list of factors, plus
-two precomputed occurrence lists (one per variable kind) mapping each variable
-to the factors that mention it. The mutable `SolverState` holds an
-`Assignment` (packed bits + int array), an `intPayload` array carrying
-per-factor scratch, the violated-factor set behind an `IntSwapSet` for O(1)
-random pick, and aggregated `hardCost` and `softCost`.
-
-| Factor                | Payload                  | Violated when                          |
-|-----------------------|--------------------------|----------------------------------------|
-| `Clause`              | count of true literals   | count is 0                             |
-| `Cardinality(a, b)`   | count of true literals   | count is below a or above b            |
-| `IntLeq(x, b)`        | none                     | `x > b`                                |
-| `IntGeq(x, b)`        | none                     | `x < b`                                |
-| `IntEq(x, v)`         | none                     | `x != v`                               |
-| `IntNeq(x, v)`        | none                     | `x == v`                               |
-| `Linear(c, x, op, b)` | current weighted sum     | `Σ c·x` on wrong side of `b`           |
-| `ReifiedIntCompare`   | none                     | `aux != (x op b)`                      |
-
-Literals use the MiniSAT encoding: `lit = (variable shl 1) or 1` for negated,
-so `lit xor 1` flips polarity and `lit ushr 1` recovers the variable id.
-Boolean factors override `applyBoolFlip`, integer factors override
-`applyIntSet`, and the strategy enumerates moves via `proposeRepairMoves`,
-which each factor implements with structural insight (a comparator snaps to
-its bound, a linear constraint solves for the integer value that puts the sum
-on the right side). On each accepted move only the factors mentioning the
-changed variable refresh their payload, and the violated set is updated
-incrementally; the per-move cost is proportional to the degree of the changed
-variable, not the total factor count.
+Integer variables use canonical binary encoding, with reusable circuit
+builders for the standard Tseitin gates and bit-vector primitives. The CNF is
+suitable for any external propositional SAT engine.
