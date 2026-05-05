@@ -105,11 +105,33 @@ decoding that does not go through the helpers.
 val dimacs = DimacsWriter.write(compiled.problem)
 ```
 
-Boolean problems only. Cardinality factors are lowered to clauses on the way
-out: at-most-1 to pairwise binary clauses, at-least-1 to a single big clause,
-exactly-one to both. Higher-k cardinality bounds and any integer factors are
-rejected, since the sequential-counter and bit-encoding lowerings are not in
-scope yet.
+`DimacsWriter` is the fast path for Boolean-only problems. Cardinality factors
+are lowered to clauses on the way out: at-most-1 to pairwise binary clauses,
+at-least-1 to a single big clause, exactly-one to both. Higher-k cardinality
+bounds and any integer factors are rejected, since the sequential-counter
+encoding is out of scope.
+
+## Bit-blasting
+
+```kotlin
+val cnf = BitBlaster.compile(compiled.problem)
+val text = cnf.toDimacs()
+val intValue = cnf.decodeInt(originalIntVarId, model)
+```
+
+For mixed Boolean/integer problems `BitBlaster` produces a propositional CNF
+using canonical binary encoding. Each integer variable in `[min, max]` gets
+`ceil(log2(max - min + 1))` bits representing the offset from `min`; an
+explicit domain constraint is added when the domain size is not a power of
+two. Reusable circuit builders cover Tseitin AND/OR/XOR3/MAJ3, zero-extend,
+shift-left, ripple-carry add, multiply-by-constant, constant comparators, and
+unsigned `≤` / `==` over arbitrary widths.
+
+Lowered factor types: `Clause`, `Cardinality` (only AtMostOne / AtLeastOne /
+ExactlyOne), `IntLeq`, `IntGeq`, `IntEq`, `IntNeq`, `Linear` (any signed
+coefficients and bound), and `ReifiedIntCompare`. Out-of-domain `IntEq` /
+`IntNeq` constants are short-circuited at compile time. The CNF is suitable
+for any external propositional SAT engine.
 
 ## How it works
 
