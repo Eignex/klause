@@ -124,6 +124,24 @@ class CnfBuilder {
         return out
     }
 
+    /**
+     * Unsigned shift-and-add multiplier: `out = a * b`. Output width is `a.size + b.size`.
+     * For each bit `b[i]`, conditionally adds `a << i` to the running total: `(b[i] AND a[j])`
+     * forms each partial-product bit via `tseitinAnd`.
+     */
+    fun multiply(a: IntArray, b: IntArray): IntArray {
+        if (a.isEmpty() || b.isEmpty()) return intArrayOf(falseLit())
+        val width = a.size + b.size
+        var acc = intArrayOf(falseLit())
+        for (i in b.indices) {
+            val partial = IntArray(a.size) { j -> tseitinAnd(intArrayOf(b[i], a[j])) }
+            val shifted = shiftLeft(partial, i)
+            acc = rippleAdd(acc, shifted)
+        }
+        // Truncate / extend to the canonical product width.
+        return if (acc.size >= width) acc.copyOfRange(0, width) else zeroExtend(acc, width)
+    }
+
     /** Multiply [bits] by a non-negative integer constant via shift-and-add. */
     fun multiplyByConstant(bits: IntArray, k: Int): IntArray {
         require(k >= 0) { "multiplyByConstant: k must be non-negative, got $k" }

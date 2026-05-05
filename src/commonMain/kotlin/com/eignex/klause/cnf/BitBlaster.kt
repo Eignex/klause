@@ -10,6 +10,7 @@ import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
@@ -78,6 +79,7 @@ object BitBlaster {
                     }
                 }
                 is Linear -> emitLinear(b, factor, intBits, intMin)
+                is Product -> emitProduct(b, factor, intBits, intMin, problem)
                 is ReifiedIntCompare -> emitReifiedIntCompare(b, factor, boolMap, intBits, intMin)
                 is ReifiedLinear -> emitReifiedLinear(b, factor, boolMap, intBits, intMin)
                 is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
@@ -152,6 +154,27 @@ object BitBlaster {
             b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(s[i - 1][k - 1])))
         }
         b.addClause(intArrayOf(Lit.negate(lits[n - 1]), Lit.negate(s[n - 2][k - 1])))
+    }
+
+    private fun emitProduct(
+        b: CnfBuilder,
+        f: Product,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+        problem: Problem,
+    ) {
+        val aMin = intMin[f.a]; val bMin = intMin[f.b]; val rMin = intMin[f.result]
+        require(aMin >= 0 && bMin >= 0) {
+            "Product bit-blasting v1 requires non-negative operand domains; got aMin=$aMin, bMin=$bMin"
+        }
+        val aActual = if (aMin == 0) bitsToLits(intBits[f.a])
+            else b.rippleAdd(bitsToLits(intBits[f.a]), constantLits(b, aMin.toLong()))
+        val bActual = if (bMin == 0) bitsToLits(intBits[f.b])
+            else b.rippleAdd(bitsToLits(intBits[f.b]), constantLits(b, bMin.toLong()))
+        val rActual = if (rMin == 0) bitsToLits(intBits[f.result])
+            else b.rippleAdd(bitsToLits(intBits[f.result]), constantLits(b, rMin.toLong()))
+        val product = b.multiply(aActual, bActual)
+        b.addClause(intArrayOf(b.unsignedEq(product, rActual)))
     }
 
     private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray) {
