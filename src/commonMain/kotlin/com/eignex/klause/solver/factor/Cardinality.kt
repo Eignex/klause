@@ -5,8 +5,8 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.SolverState
 
 /**
- * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true literals.
- * AtMostOne, AtLeastOne, ExactlyOne are all special cases.
+ * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true
+ * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
 class Cardinality(
     val literals: IntArray,
@@ -21,12 +21,13 @@ class Cardinality(
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
     }
 
-    override val variables: IntArray = IntArray(literals.size) { Lit.variable(literals[it]) }
+    override val boolVars: IntArray = IntArray(literals.size) { Lit.variable(literals[it]) }
+    override val intVars: IntArray = EMPTY
 
     override fun initialize(state: SolverState, factorId: Int) {
         var count = 0
         for (lit in literals) {
-            if (Lit.evaluate(lit, state.assignment[Lit.variable(lit)])) count++
+            if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
         }
         state.intPayload[factorId] = count
     }
@@ -36,11 +37,11 @@ class Cardinality(
         return n < min || n > max
     }
 
-    override fun deltaIfFlipped(state: SolverState, factorId: Int, variable: Int): Int {
-        val pre = state.assignment[variable]
+    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+        val pre = state.assignment.boolValue(boolVar)
         var change = 0
         for (lit in literals) {
-            if (Lit.variable(lit) != variable) continue
+            if (Lit.variable(lit) != boolVar) continue
             change += if (Lit.evaluate(lit, pre)) -1 else 1
         }
         val n = state.intPayload[factorId]
@@ -50,11 +51,11 @@ class Cardinality(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyFlip(state: SolverState, factorId: Int, variable: Int): Int {
-        val post = state.assignment[variable]
+    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+        val post = state.assignment.boolValue(boolVar)
         var change = 0
         for (lit in literals) {
-            if (Lit.variable(lit) != variable) continue
+            if (Lit.variable(lit) != boolVar) continue
             change += if (Lit.evaluate(lit, post)) 1 else -1
         }
         val oldN = state.intPayload[factorId]
@@ -74,5 +75,7 @@ class Cardinality(
 
         fun exactlyOne(literals: IntArray, isHard: Boolean = true, weight: Double = 1.0): Cardinality =
             Cardinality(literals, min = 1, max = 1, isHard = isHard, weight = weight)
+
+        private val EMPTY: IntArray = IntArray(0)
     }
 }

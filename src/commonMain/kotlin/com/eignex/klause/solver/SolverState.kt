@@ -4,18 +4,14 @@ import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
 
 /**
- * Mutable state of an ongoing solve. Holds the current assignment, per-factor scratch, the set
- * of currently violated factors, and aggregated hard/soft costs.
- *
- * Each factor type stashes its own scratch in [intPayload] (e.g. `numSat` for clauses, `trueCount`
- * for at-most-one). Factors that need richer scratch can use [refPayload]. Both are sized to
- * [Problem.numFactors].
+ * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
+ * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard/soft cost.
  */
 class SolverState(
     val problem: Problem,
     val rng: Random,
 ) {
-    val assignment: Assignment = Assignment(problem.numVars)
+    val assignment: Assignment = Assignment(problem.numBoolVars, problem.numIntVars)
     val violated: IntSwapSet = IntSwapSet(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
@@ -26,17 +22,13 @@ class SolverState(
     var softCost: Double = 0.0
         internal set
 
-    /**
-     * Reinitialize: randomize the assignment, then ask every factor to rebuild its payload
-     * and refresh hard/soft cost and the violated set from scratch.
-     */
     fun restart() {
-        assignment.randomize(rng)
+        assignment.randomize(rng, problem.intDomains)
         recompute()
     }
 
     fun recompute() {
-        violated.let { v -> for (i in 0 until problem.numFactors) v.remove(i) }
+        for (i in 0 until problem.numFactors) violated.remove(i)
         hardCost = 0
         softCost = 0.0
         problem.factors.forEachIndexed { id, factor ->
@@ -48,25 +40,38 @@ class SolverState(
         }
     }
 
-    /**
-     * Flip [variable], propagate the change to every factor mentioning it, and update violated
-     * set + costs incrementally.
-     */
-    fun flip(variable: Int) {
-        assignment.flip(variable)
-        val occurs = problem.occurrences[variable]
-        for (factorId in occurs) {
+    fun apply(move: Move) = when (move) {
+        is Move.BoolFlip -> applyBoolFlip(move.varId)
+        is Move.IntSet -> applyIntSet(move.varId, move.newValue)
+    }
+
+    private fun applyBoolFlip(boolVar: Int) {
+        assignment.flipBool(boolVar)
+        for (factorId in problem.boolOccurrences[boolVar]) {
             val factor = problem.factors[factorId]
-            val deltaViolated = factor.applyFlip(this, factorId, variable)
-            when (deltaViolated) {
-                +1 -> {
-                    violated.add(factorId)
-                    if (factor.isHard) hardCost++ else softCost += factor.weight
-                }
-                -1 -> {
-                    violated.remove(factorId)
-                    if (factor.isHard) hardCost-- else softCost -= factor.weight
-                }
+            updateViolation(factor, factorId, factor.applyBoolFlip(this, factorId, boolVar))
+        }
+    }
+
+    private fun applyIntSet(intVar: Int, newValue: Int) {
+        val old = assignment.intValue(intVar)
+        if (old == newValue) return
+        assignment.setInt(intVar, newValue)
+        for (factorId in problem.intOccurrences[intVar]) {
+            val factor = problem.factors[factorId]
+            updateViolation(factor, factorId, factor.applyIntSet(this, factorId, intVar, old))
+        }
+    }
+
+    private fun updateViolation(factor: Factor, factorId: Int, deltaViolated: Int) {
+        when (deltaViolated) {
+            +1 -> {
+                violated.add(factorId)
+                if (factor.isHard) hardCost++ else softCost += factor.weight
+            }
+            -1 -> {
+                violated.remove(factorId)
+                if (factor.isHard) hardCost-- else softCost -= factor.weight
             }
         }
     }

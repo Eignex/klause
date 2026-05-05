@@ -1,49 +1,64 @@
 package com.eignex.klause.solver.strategy
 
+import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.SolverState
 
 /**
- * Selman-Kautz-Cohen WalkSAT: pick a violated factor uniformly, then either pick the variable
- * with smallest break count (ties broken uniformly at random) or, with probability [noise],
- * flip a random variable from the factor.
+ * WalkSAT extended to mixed Boolean/integer moves. Pick a violated factor uniformly, ask it
+ * for repair-move suggestions, then either flip a random suggestion (probability [noise]) or
+ * pick the suggestion with the smallest break count (ties broken uniformly at random).
  */
 class WalkSat(val noise: Double = 0.5) : Strategy {
 
-    override fun pickFlip(state: SolverState): Int {
-        if (state.violated.isEmpty()) return -1
+    private val sink = MoveSink()
+
+    override fun pickMove(state: SolverState): Move? {
+        if (state.violated.isEmpty()) return null
         val factorId = state.violated.random(state.rng)
         val factor = state.problem.factors[factorId]
-        val vars = factor.variables
-        if (vars.isEmpty()) return -1
+        sink.clear()
+        factor.proposeRepairMoves(state, factorId, sink)
+        val moves = sink.list
+        if (moves.isEmpty()) return null
 
         if (state.rng.nextDouble() < noise) {
-            return vars[state.rng.nextInt(vars.size)]
+            return moves[state.rng.nextInt(moves.size)]
         }
 
         var bestBreak = Int.MAX_VALUE
         var bestCount = 0
-        var pick = -1
-        for (v in vars) {
-            val brk = breakCount(state, v)
+        var pick: Move? = null
+        for (m in moves) {
+            val brk = breakCount(state, m)
             if (brk < bestBreak) {
                 bestBreak = brk
                 bestCount = 1
-                pick = v
+                pick = m
             } else if (brk == bestBreak) {
                 bestCount++
-                if (state.rng.nextInt(bestCount) == 0) pick = v
+                if (state.rng.nextInt(bestCount) == 0) pick = m
             }
         }
         return pick
     }
 
-    private fun breakCount(state: SolverState, variable: Int): Int {
-        var count = 0
-        for (factorId in state.problem.occurrences[variable]) {
-            val f = state.problem.factors[factorId]
-            if (!f.isHard) continue
-            if (f.deltaIfFlipped(state, factorId, variable) > 0) count++
+    private fun breakCount(state: SolverState, move: Move): Int = when (move) {
+        is Move.BoolFlip -> {
+            var count = 0
+            for (factorId in state.problem.boolOccurrences[move.varId]) {
+                val f = state.problem.factors[factorId]
+                if (f.isHard && f.deltaIfBoolFlipped(state, factorId, move.varId) > 0) count++
+            }
+            count
         }
-        return count
+        is Move.IntSet -> {
+            var count = 0
+            for (factorId in state.problem.intOccurrences[move.varId]) {
+                val f = state.problem.factors[factorId]
+                if (f.isHard && f.deltaIfIntSet(state, factorId, move.varId, move.newValue) > 0) count++
+            }
+            count
+        }
     }
 }

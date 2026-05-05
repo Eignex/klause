@@ -6,8 +6,8 @@ import kotlin.random.Random
 
 /**
  * Local-search solver around a [Problem]. [sample] is a lazy sequence of hard-feasible
- * assignments; the search continues across yields by restarting after each one, so callers
- * can `take(n)` to draw `n` samples (with no formal uniformity guarantee — see README).
+ * assignments; the search restarts after each yield so callers can `take(n)` to draw `n`
+ * samples (with no formal uniformity guarantee, see README).
  */
 class Solver(
     val problem: Problem,
@@ -16,7 +16,7 @@ class Solver(
     val maxFlipsBeforeRestart: Int = 10_000,
 ) {
 
-    fun sample(maxFlips: Long = Long.MAX_VALUE): Sequence<BooleanArray> = sequence {
+    fun sample(maxFlips: Long = Long.MAX_VALUE): Sequence<Sample> = sequence {
         val state = SolverState(problem, Random(randomSeed))
         state.restart()
         var flipsSinceRestart = 0
@@ -24,7 +24,7 @@ class Solver(
 
         while (totalFlips < maxFlips) {
             if (state.hardCost == 0) {
-                yield(state.assignment.toBooleanArray())
+                yield(state.assignment.snapshot())
                 state.restart()
                 flipsSinceRestart = 0
                 continue
@@ -34,13 +34,13 @@ class Solver(
                 flipsSinceRestart = 0
                 continue
             }
-            val v = strategy.pickFlip(state)
-            if (v < 0) {
+            val move = strategy.pickMove(state)
+            if (move == null) {
                 state.restart()
                 flipsSinceRestart = 0
                 continue
             }
-            state.flip(v)
+            state.apply(move)
             flipsSinceRestart++
             totalFlips++
         }
