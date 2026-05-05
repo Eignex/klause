@@ -530,7 +530,12 @@ class Compiler {
             val rDomain = IntDomain(-(dAbsMax - 1), dAbsMax - 1)
             val qName = newAuxIntVar(qDomain)
             val rName = newAuxIntVar(rDomain)
-            val dqAbsMax = nAbsMax * dAbsMax + dAbsMax
+            val dqAbsMaxLong = nAbsMax.toLong() * dAbsMax + dAbsMax
+            require(dqAbsMaxLong <= Int.MAX_VALUE) {
+                "div/mod intermediate domain overflows Int: |q*d| up to $dqAbsMaxLong " +
+                    "(numerator domain $nDom, denominator domain $dDom)"
+            }
+            val dqAbsMax = dqAbsMaxLong.toInt()
             val dqDomain = IntDomain(-dqAbsMax, dqAbsMax)
             val dqName = newAuxIntVar(dqDomain)
             factors += Product(intVarOf(dRef.name), intVarOf(qName), intVarOf(dqName))
@@ -565,11 +570,16 @@ class Compiler {
             val bRef = materializeIntVar(r)
             val aDom = intDomains[intVarOf(aRef.name)]
             val bDom = intDomains[intVarOf(bRef.name)]
-            val corners = intArrayOf(
-                aDom.min * bDom.min, aDom.min * bDom.max,
-                aDom.max * bDom.min, aDom.max * bDom.max,
+            val cornersLong = longArrayOf(
+                aDom.min.toLong() * bDom.min, aDom.min.toLong() * bDom.max,
+                aDom.max.toLong() * bDom.min, aDom.max.toLong() * bDom.max,
             )
-            val productDomain = IntDomain(corners.min(), corners.max())
+            val pMin = cornersLong.min()
+            val pMax = cornersLong.max()
+            require(pMin >= Int.MIN_VALUE && pMax <= Int.MAX_VALUE) {
+                "IntMul product domain overflows Int: $aDom * $bDom = [$pMin, $pMax]"
+            }
+            val productDomain = IntDomain(pMin.toInt(), pMax.toInt())
             val resultName = newAuxIntVar(productDomain)
             factors += Product(intVarOf(aRef.name), intVarOf(bRef.name), intVarOf(resultName))
             return IntRef(resultName)
