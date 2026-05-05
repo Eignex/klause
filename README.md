@@ -10,8 +10,9 @@
 
 # Klause
 
-Klause samples satisfying assignments to constraint problems over Boolean and
-nominal variables, using stochastic local search in the WalkSAT family.
+Klause samples satisfying assignments to constraint problems over Boolean,
+nominal, integer, and bucketed-float variables, using stochastic local search
+in the WalkSAT family.
 
 ## Overview
 
@@ -19,12 +20,18 @@ A schema is declared as a Kotlin class. Property delegates capture each
 variable and constraint as a typed value, so the whole schema serializes
 through kotlinx.serialization and crosses the wire intact.
 
-The compiler lowers a schema to a native factor registry. Disjunctions become
-clauses, nominal variables become indicator booleans plus an exactly-one
-factor, and nested non-literal subexpressions go through Tseitin with hidden
-aux variables. The solver runs WalkSAT directly over that registry and yields
-hard-feasible assignments as a lazy sequence; full CNF conversion only happens
-on the DIMACS export path.
+The compiler lowers a schema to a native factor registry. Variables split into
+two id spaces: Boolean vars are packed into bits, integer vars carry a domain
+and live in a separate int array. Float vars are bucketed at the schema layer
+and become integer vars internally with a decoder kept for read-back.
+
+Disjunctions become clauses, nominal variables become indicator booleans plus
+an exactly-one factor, integer comparisons become dedicated comparator factors
+that propose snap-to-bound repair moves, and nested non-literal subexpressions
+go through Tseitin with hidden aux variables. The solver runs WalkSAT directly
+over that registry and yields hard-feasible assignments as a lazy sequence;
+full CNF conversion only happens on the DIMACS export path, which is Boolean
+only.
 
 ### Installation
 
@@ -41,17 +48,26 @@ and core library are also required.
 
 ```kotlin
 class CampaignSchema : VariableSchema() {
-    val premium       by boolVar()
-    val type          by nominal("a", "b", "c")
-    val noPremiumForA by constraint { (type eq "a") implies !premium }
+    val type    by nominal("a", "b", "c")
+    val budget  by intVar(min = 1000, max = 4000)
+    val rate    by floatVar(min = 0.0, max = 1.0, buckets = 21)
+
+    val capWhenA by constraint { (type eq "a") implies (budget le 2000) }
+    val highRate by constraint { rate ge 0.5 }
 }
 ```
 
 Inside a `constraint { ... }` block the DSL provides `and`, `or`, `implies`,
-`iff`, and unary `!`, plus `eq` / `ne` against label literals on nominals and
-top-level `atMost`, `atLeast`, `cardinality` for counting constraints. The
-returned value is a sealed `BoolExpr` tree, never a host-language lambda, so
+`iff`, and unary `!` for the Boolean side; `eq` / `ne` against label literals
+on nominals; `le`, `lt`, `ge`, `gt`, `eq`, `ne` against integer or float
+literals (and against another variable of the same kind); and top-level
+`atMost`, `atLeast`, `cardinality` for counting constraints. The returned
+value is a sealed `BoolExpr` tree, never a host-language lambda, so
 `schema.definition()` round-trips through JSON or ProtoBuf.
+
+Float comparisons resolve at construction time to integer comparisons against
+the bucket index, so the AST stays integer-only beyond the schema definition
+itself.
 
 ---
 
@@ -61,22 +77,25 @@ returned value is a sealed `BoolExpr` tree, never a host-language lambda, so
 val compiled = CampaignSchema().compile()
 val solver   = Solver(compiled.problem, randomSeed = 42L)
 
-solver.sample(maxFlips = 100_000).take(20).forEach { bits ->
-    val type    = compiled.decodeNominal("type", bits)
-    val premium = compiled.decodeBool("premium", bits)
-    println("type=$type premium=$premium")
+solver.sample(maxFlips = 100_000).take(20).forEach { sample ->
+    val type   = compiled.decodeNominal("type", sample)
+    val budget = compiled.decodeInt("budget", sample)
+    val rate   = compiled.decodeFloat("rate", sample)
+    println("type=$type budget=$budget rate=$rate")
 }
 ```
 
-`Solver.sample` returns a lazy `Sequence<BooleanArray>`. After each yielded
-assignment the search restarts from a randomized state, so callers take as
-many samples as they want with no formal uniformity guarantee. The default
-strategy is `WalkSat(noise)`: with probability `noise` flip a random variable
-in a violated factor, otherwise pick the variable with the smallest break
-count, ties broken uniformly at random.
+`Solver.sample` returns a lazy `Sequence<Sample>` where each sample carries a
+`bools: BooleanArray` and an `ints: IntArray`. After each yielded sample the
+search restarts from a randomized state, so callers take as many samples as
+they want with no formal uniformity guarantee. The default strategy is
+`WalkSat(noise)`: pick a violated factor, ask it for repair-move suggestions,
+then either flip a random suggestion (probability `noise`) or pick the
+suggestion with the smallest break count, ties broken uniformly at random.
 
-`compiled.varIdByName` and `compiled.nominalIndicators` map schema names back
-to solver variable ids for any decoding that does not go through the helpers.
+`compiled.boolVarIdByName`, `compiled.intVarIdByName`, `compiled.nominalIndicators`,
+and `compiled.floatDecoders` map schema names back to solver-side ids for any
+decoding that does not go through the helpers.
 
 ---
 
@@ -86,29 +105,40 @@ to solver variable ids for any decoding that does not go through the helpers.
 val dimacs = DimacsWriter.write(compiled.problem)
 ```
 
-Cardinality factors are lowered to clauses on the way out: at-most-1 to
-pairwise binary clauses, at-least-1 to a single big clause, exactly-one to
-both. Higher-k cardinality bounds are rejected, since the sequential-counter
-encoding is not in scope yet.
+Boolean problems only. Cardinality factors are lowered to clauses on the way
+out: at-most-1 to pairwise binary clauses, at-least-1 to a single big clause,
+exactly-one to both. Higher-k cardinality bounds and any integer factors are
+rejected, since the sequential-counter and bit-encoding lowerings are not in
+scope yet.
 
 ## How it works
 
-The `Problem` is immutable: a count of Boolean variables and an ordered list
-of factors, plus a precomputed occurrence list mapping each variable to the
-factors that mention it. The mutable `SolverState` holds a packed-bit
-`Assignment`, an `intPayload` array carrying per-factor scratch (the count of
-true literals, for both factor types in scope today), the violated-factor set
-behind an `IntSwapSet` for O(1) random pick, and aggregated `hardCost` and
-`softCost`.
+The `Problem` is immutable: a count of Boolean variables, a count of integer
+variables with their `IntDomain` bounds, and an ordered list of factors, plus
+two precomputed occurrence lists (one per variable kind) mapping each variable
+to the factors that mention it. The mutable `SolverState` holds an
+`Assignment` (packed bits + int array), an `intPayload` array carrying
+per-factor scratch, the violated-factor set behind an `IntSwapSet` for O(1)
+random pick, and aggregated `hardCost` and `softCost`.
 
-| Factor               | Payload                  | Violated when             |
-|----------------------|--------------------------|---------------------------|
-| `Clause`             | count of true literals   | count is 0                |
-| `Cardinality(a, b)`  | count of true literals   | count is below a or above b |
+| Factor                | Payload                  | Violated when                          |
+|-----------------------|--------------------------|----------------------------------------|
+| `Clause`              | count of true literals   | count is 0                             |
+| `Cardinality(a, b)`   | count of true literals   | count is below a or above b            |
+| `IntLeq(x, b)`        | none                     | `x > b`                                |
+| `IntGeq(x, b)`        | none                     | `x < b`                                |
+| `IntEq(x, v)`         | none                     | `x != v`                               |
+| `IntNeq(x, v)`        | none                     | `x == v`                               |
+| `Linear(c, x, op, b)` | current weighted sum     | `Σ c·x` on wrong side of `b`           |
+| `ReifiedIntCompare`   | none                     | `aux != (x op b)`                      |
 
 Literals use the MiniSAT encoding: `lit = (variable shl 1) or 1` for negated,
-so `lit xor 1` flips polarity and `lit ushr 1` recovers the variable id. On
-each accepted flip only the factors mentioning the flipped variable refresh
-their payload, and the violated set is updated incrementally; the per-move
-cost is proportional to the degree of the flipped variable, not the total
-factor count.
+so `lit xor 1` flips polarity and `lit ushr 1` recovers the variable id.
+Boolean factors override `applyBoolFlip`, integer factors override
+`applyIntSet`, and the strategy enumerates moves via `proposeRepairMoves`,
+which each factor implements with structural insight (a comparator snaps to
+its bound, a linear constraint solves for the integer value that puts the sum
+on the right side). On each accepted move only the factors mentioning the
+changed variable refresh their payload, and the violated set is updated
+incrementally; the per-move cost is proportional to the degree of the changed
+variable, not the total factor count.
