@@ -17,6 +17,7 @@ import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
 
@@ -90,6 +91,7 @@ object BitBlaster {
                 is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
                 is ReifiedPseudoBoolean -> emitReifiedPseudoBoolean(b, factor, boolMap)
                 is Xor -> emitXor(b, factor, boolMap)
+                is AllDifferentFactor -> emitAllDifferent(b, factor, intBits, intMin)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -161,6 +163,31 @@ object BitBlaster {
             b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(s[i - 1][k - 1])))
         }
         b.addClause(intArrayOf(Lit.negate(lits[n - 1]), Lit.negate(s[n - 2][k - 1])))
+    }
+
+    private fun emitAllDifferent(
+        b: CnfBuilder,
+        f: AllDifferentFactor,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+    ) {
+        // Pairwise NE via offset-shifted bit-vector equality. For two vars i, j with possibly
+        // different domains, compare their actual values: i_actual = iMin + decode(iBits) and
+        // similarly for j. NE on actuals ⟺ NE on (iBits + (iMin - jMin)) and jBits when both
+        // shifted to a common reference. Simpler: rebuild both as canonical bit-vectors of equal
+        // width via a small offset add, then assert unsignedEq is false.
+        for (i in f.vars.indices) for (j in i + 1 until f.vars.size) {
+            val a = f.vars[i]; val c = f.vars[j]
+            val aMin = intMin[a]; val cMin = intMin[c]
+            val aLits = bitsToLits(intBits[a])
+            val cLits = bitsToLits(intBits[c])
+            // Shift the smaller-min side up so both reference the same zero. Both shifts produce
+            // non-negative values since aMin / cMin can be any integer; pick the lower as base.
+            val base = minOf(aMin, cMin)
+            val aShifted = if (aMin == base) aLits else b.rippleAdd(aLits, constantLits(b, (aMin - base).toLong()))
+            val cShifted = if (cMin == base) cLits else b.rippleAdd(cLits, constantLits(b, (cMin - base).toLong()))
+            b.addClause(intArrayOf(Lit.negate(b.unsignedEq(aShifted, cShifted))))
+        }
     }
 
     private fun emitXor(b: CnfBuilder, f: Xor, boolMap: IntArray) {

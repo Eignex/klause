@@ -54,6 +54,7 @@ import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 
@@ -177,6 +178,16 @@ class Compiler {
 
         private fun assertAllDifferent(terms: List<IntExpr>, isHard: Boolean, weight: Double) {
             val lifted = terms.map { lift(it) }
+            // Specialisation: when every operand is a bare IntRef (no arithmetic residual), emit
+            // the global factor. Otherwise fall back to pairwise NE through the existing
+            // reification path.
+            if (lifted.all { it is IntRef }) {
+                val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+                if (ids.toSet().size == ids.size) {
+                    factors += AllDifferentFactor(ids, isHard, weight)
+                    return
+                }
+            }
             for (i in lifted.indices) for (j in i + 1 until lifted.size) {
                 assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]), isHard, weight)
             }

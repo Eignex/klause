@@ -4,6 +4,7 @@ import com.eignex.klause.ast.allDifferent
 import com.eignex.klause.ast.implies
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.factor.AllDifferent
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -19,6 +20,8 @@ class AllDifferentDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
+        // Top-level allDifferent over bare handles uses the global factor.
+        assertTrue(compiled.problem.factors.any { it is AllDifferent })
         val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
         val samples = solver.sample(maxFlips = 30_000, randomSeed = 4).take(8).toList()
         assertTrue(samples.isNotEmpty())
