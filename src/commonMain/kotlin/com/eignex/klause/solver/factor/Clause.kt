@@ -15,7 +15,14 @@ class Clause(
     override val weight: Double = 1.0,
 ) : Factor {
 
-    override val boolVars: IntArray = IntArray(literals.size) { Lit.variable(literals[it]) }
+    override val boolVars: IntArray = run {
+        val seen = LinkedHashSet<Int>()
+        for (lit in literals) seen.add(Lit.variable(lit))
+        val out = IntArray(seen.size)
+        var i = 0
+        for (v in seen) out[i++] = v
+        out
+    }
     override val intVars: IntArray = EMPTY
 
     override fun initialize(state: SolverState, factorId: Int) {
