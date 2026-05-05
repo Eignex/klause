@@ -217,7 +217,12 @@ class Compiler {
                     IntCmpOp.NE -> 0 != bound
                     IntCmpOp.LT, IntCmpOp.GT -> error("LT/GT should have been normalized away")
                 }
-                if (!holds) factors += Clause(IntArray(0), isHard, weight)
+                if (!holds) {
+                    throw IllegalStateException(
+                        "Constraint reduces to a constant-false comparison ($op against $bound) " +
+                            "and is unsatisfiable as written."
+                    )
+                }
                 return
             }
             if (coeffs.size == 1) {
