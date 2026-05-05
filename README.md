@@ -1,29 +1,43 @@
-# klause
+<p align="center">
+  <a href="https://eignex.com/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner-white.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg">
+      <img alt="Eignex" src="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg" style="max-width: 100%; width: 22em;">
+    </picture>
+  </a>
+</p>
 
-Local-search MaxSAT/Max-CSP solver for mixed integer-Boolean schemas.
+# Klause
 
-klause is a Kotlin Multiplatform library for declaring constraint problems over Boolean and nominal variables and sampling diverse satisfying assignments. The engine is a stochastic local search in the WalkSAT family, running directly over a native factor representation; full CNF conversion happens only on the export path for compatibility with external SAT/MaxSAT solvers.
+Klause samples satisfying assignments to constraint problems over Boolean and
+nominal variables, using stochastic local search in the WalkSAT family.
 
 ## Overview
 
-The library is laid out in three layers, with one direction of dependency:
+A schema is declared as a Kotlin class. Property delegates capture each
+variable and constraint as a typed value, so the whole schema serializes
+through kotlinx.serialization and crosses the wire intact.
 
+The compiler lowers a schema to a native factor registry. Disjunctions become
+clauses, nominal variables become indicator booleans plus an exactly-one
+factor, and nested non-literal subexpressions go through Tseitin with hidden
+aux variables. The solver runs WalkSAT directly over that registry and yields
+hard-feasible assignments as a lazy sequence; full CNF conversion only happens
+on the DIMACS export path.
+
+### Installation
+
+```kotlin
+dependencies {
+    implementation("com.eignex:klause:0.1.0")
+}
 ```
-schema (DSL) ── compile ──▶  factor registry  ◀── consume ── solver
-   (AST, @Serializable)        (runtime form)              (state, moves, loop)
-```
 
-1. **Schema** (`com.eignex.klause.schema`) — `VariableSchema` with property delegates for declaring typed variables and constraints. The schema is a serializable value, not an imperative builder.
-2. **AST** (`com.eignex.klause.ast`) — a sealed `@Serializable` constraint tree (`And`, `Or`, `Not`, `Implies`, `Iff`, `AtMost`, `AtLeast`, `CardinalityExpr`). The wire format.
-3. **Compiler** (`com.eignex.klause.compile`) — pure `SchemaDef → Problem` lowering with Tseitin-style aux variables hidden from the user.
-4. **Solver** (`com.eignex.klause.solver`) — the stateful engine. Packed-bit assignment, factor payloads (true counts), occurrence lists, and a violated-factor set behind an `IntSwapSet` for O(1) random pick.
-5. **Export** (`com.eignex.klause.export`) — DIMACS CNF writer for handing the same problem to an external SAT solver.
+The constraint AST uses `@Serializable`, so the kotlinx.serialization plugin
+and core library are also required.
 
----
-
-## Schema
-
-A `VariableSchema` declares typed variables and constraints as class properties. Each delegate captures the property's name and registers a spec; constraint bodies are typed trees of values, never host-language lambdas, so the whole schema round-trips through `kotlinx.serialization`.
+## Schema and constraints
 
 ```kotlin
 class CampaignSchema : VariableSchema() {
@@ -33,33 +47,19 @@ class CampaignSchema : VariableSchema() {
 }
 ```
 
-The DSL inside `constraint { ... }` provides:
+Inside a `constraint { ... }` block the DSL provides `and`, `or`, `implies`,
+`iff`, and unary `!`, plus `eq` / `ne` against label literals on nominals and
+top-level `atMost`, `atLeast`, `cardinality` for counting constraints. The
+returned value is a sealed `BoolExpr` tree, never a host-language lambda, so
+`schema.definition()` round-trips through JSON or ProtoBuf.
 
-* **Boolean operators**: `and`, `or`, `implies`, `iff`, `!` (which folds into the `BoolRef.negated` flag).
-* **Nominal predicates**: `nominalHandle eq "label"` and `ne "label"`.
-* **Cardinality**: top-level `atMost(k, ...)`, `atLeast(k, ...)`, `cardinality(min, max, ...)` over a list of terms.
+---
 
-`schema.definition()` returns a `SchemaDef(vars, constraints)` that serializes to JSON or ProtoBuf out of the box.
-
-## Compiler
-
-`schema.compile()` lowers a `VariableSchema` to a solver-side `Problem` plus the index needed to decode an assignment back to schema values.
+## Solving and sampling
 
 ```kotlin
 val compiled = CampaignSchema().compile()
-compiled.problem        // Problem(numVars, factors)
-compiled.varIdByName    // Boolean variable name → solver var id
-compiled.nominalIndicators // nominal name → label → solver var id
-```
-
-A `NominalSpec` lowers to one Boolean indicator per label plus an `ExactlyOne` cardinality factor. Disjunctions of literals become `Clause` factors directly; nested non-literal sub-expressions go through Tseitin (`tseitinAnd`, `tseitinOr`, `tseitinIff`), which introduces a fresh aux variable and equivalence clauses. Top-level `AtMost` / `AtLeast` / `CardinalityExpr` lower to a single `Cardinality` factor.
-
-## Solver
-
-`Solver` runs WalkSAT (Selman-Kautz-Cohen) over the factor registry and returns hard-feasible assignments as a lazy `Sequence<BooleanArray>`. After each yielded assignment the search restarts from a randomized state, so callers can `take(n)` to draw `n` samples.
-
-```kotlin
-val solver = Solver(compiled.problem, randomSeed = 42L)
+val solver   = Solver(compiled.problem, randomSeed = 42L)
 
 solver.sample(maxFlips = 100_000).take(20).forEach { bits ->
     val type    = compiled.decodeNominal("type", bits)
@@ -68,40 +68,47 @@ solver.sample(maxFlips = 100_000).take(20).forEach { bits ->
 }
 ```
 
-* **Strategy**: `WalkSat(noise)` — with probability `noise`, flip a random variable from a violated factor; otherwise pick the variable with the smallest break count, tied uniformly at random.
-* **State**: `SolverState` holds the packed-bit `Assignment`, per-factor `intPayload` (true count for clauses and cardinality), the violated-factor `IntSwapSet`, and aggregated `hardCost` / `softCost`.
-* **Restarts**: `maxFlipsBeforeRestart` triggers a randomized restart when the current trajectory stalls. The `Strategy` interface is the extension point for additional engines (probSAT, SAPS, tabu, simulated annealing).
+`Solver.sample` returns a lazy `Sequence<BooleanArray>`. After each yielded
+assignment the search restarts from a randomized state, so callers take as
+many samples as they want with no formal uniformity guarantee. The default
+strategy is `WalkSat(noise)`: with probability `noise` flip a random variable
+in a violated factor, otherwise pick the variable with the smallest break
+count, ties broken uniformly at random.
 
-Sampling has no formal uniformity guarantee: distinct restarts and the WalkSAT noise term give approximately diverse, satisfying assignments rather than a uniformly random one.
-
-## Export
-
-`DimacsWriter.write(problem)` returns a DIMACS CNF string for any `Problem`. Cardinality factors are lowered to clauses on the way out: `AtMost-1` to pairwise binary clauses, `AtLeast-1` to a single big clause, `ExactlyOne` to both. Higher-`k` cardinality bounds raise — the sequential-counter encoding is intentionally not in scope yet.
-
-```kotlin
-val dimacs = DimacsWriter.write(compiled.problem)
-println(dimacs)
-// p cnf 4 4
-// -2 -3 0
-// -2 -4 0
-// -3 -4 0
-// 2 3 4 0
-// ...
-```
+`compiled.varIdByName` and `compiled.nominalIndicators` map schema names back
+to solver variable ids for any decoding that does not go through the helpers.
 
 ---
 
-## How It Works
+## DIMACS export
 
-The solver maintains an immutable `Problem` (variables and `Factor` registry) and a mutable `SolverState` (assignment, violation state, aggregated cost). Each `Factor` owns three operations: `initialize` populates its scratch from the current assignment, `isViolated` reads it, and `applyFlip` updates it incrementally when a variable is flipped — touching only `O(degree-of-variable)` factors per move rather than the whole problem.
+```kotlin
+val dimacs = DimacsWriter.write(compiled.problem)
+```
 
-Variables and literals use the MiniSAT encoding: `lit = (variable shl 1) or (1 if negated else 0)`, so `lit xor 1` flips polarity and `lit ushr 1` recovers the variable id. The `Problem` precomputes an occurrence list (`bitToFactors: Array<IntArray>`) so flips propagate without any factor lookup.
+Cardinality factors are lowered to clauses on the way out: at-most-1 to
+pairwise binary clauses, at-least-1 to a single big clause, exactly-one to
+both. Higher-k cardinality bounds are rejected, since the sequential-counter
+encoding is not in scope yet.
 
-The two factor types in scope today are:
+## How it works
 
-| Factor | Payload | Violated when |
-|---|---|---|
-| `Clause` | count of true literals | count == 0 |
-| `Cardinality(min, max)` | count of true literals | count < min or count > max |
+The `Problem` is immutable: a count of Boolean variables and an ordered list
+of factors, plus a precomputed occurrence list mapping each variable to the
+factors that mention it. The mutable `SolverState` holds a packed-bit
+`Assignment`, an `intPayload` array carrying per-factor scratch (the count of
+true literals, for both factor types in scope today), the violated-factor set
+behind an `IntSwapSet` for O(1) random pick, and aggregated `hardCost` and
+`softCost`.
 
-WalkSAT picks a violated factor uniformly from the `IntSwapSet`, scores its variables by break count (number of currently-satisfied hard factors a flip would break), and either takes the lowest-break variable (tie-broken at random) or — with probability `noise` — flips a random variable in the factor. After each accepted flip, only the factors mentioning the flipped variable refresh their payload and the violated set is updated incrementally.
+| Factor               | Payload                  | Violated when             |
+|----------------------|--------------------------|---------------------------|
+| `Clause`             | count of true literals   | count is 0                |
+| `Cardinality(a, b)`  | count of true literals   | count is below a or above b |
+
+Literals use the MiniSAT encoding: `lit = (variable shl 1) or 1` for negated,
+so `lit xor 1` flips polarity and `lit ushr 1` recovers the variable id. On
+each accepted flip only the factors mentioning the flipped variable refresh
+their payload, and the violated set is updated incrementally; the per-move
+cost is proportional to the degree of the flipped variable, not the total
+factor count.
