@@ -198,13 +198,7 @@ class Compiler {
             val combined = subtract(affine(lift(expr.left)), affine(lift(expr.right)))
             val coeffs = combined.coeffs
             val bound = normBound - combined.constant
-            // Apply LT/GT bound shifts on top of the affine subtraction.
-            val (finalOp, finalBound) = when (expr.op) {
-                IntCmpOp.LT -> IntCmpOp.LE to (bound - 1)
-                IntCmpOp.GT -> IntCmpOp.GE to (bound + 1)
-                else -> op to bound
-            }
-            emitTopLevelCmp(coeffs, finalOp, finalBound, isHard, weight)
+            emitTopLevelCmp(coeffs, op, bound, isHard, weight)
         }
 
         private fun emitTopLevelCmp(
@@ -371,11 +365,8 @@ class Compiler {
             val combined = subtract(affine(lift(expr.left)), affine(lift(expr.right)))
             val coeffs = combined.coeffs
             val bound = normBound - combined.constant
-            val (finalOp, finalBound) = when (expr.op) {
-                IntCmpOp.LT -> IntCmpOp.LE to (bound - 1)
-                IntCmpOp.GT -> IntCmpOp.GE to (bound + 1)
-                else -> op to bound
-            }
+            val finalOp = op
+            val finalBound = bound
             if (coeffs.isEmpty()) {
                 val holds = when (finalOp) {
                     IntCmpOp.LE -> 0 <= finalBound
