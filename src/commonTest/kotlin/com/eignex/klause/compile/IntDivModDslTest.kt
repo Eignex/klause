@@ -64,4 +64,64 @@ class IntDivModDslTest {
         val cnf = BitBlaster.compile(compiled.problem)
         assertTrue(cnf.clauses.isNotEmpty())
     }
+
+    @Test
+    fun signedNumeratorTruncatedDivision() {
+        // n = -7, d ∈ {1,2,3} → q = trunc(-7/d), r = -7 % d.
+        class S : VariableSchema() {
+            val n by intVar(min = -7, max = -7)
+            val d by intVar(min = 1, max = 3)
+            val pinQ by constraint { (n / d) eq -2 }   // -7/3 = -2 (truncated), -7/2=-3 fails
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.sample(maxFlips = 30_000, randomSeed = 61).take(10).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val nv = compiled.decodeInt("n", s)
+            val dv = compiled.decodeInt("d", s)
+            assertTrue(nv / dv == -2, "n=$nv d=$dv n/d=${nv / dv}")
+        }
+    }
+
+    @Test
+    fun signedDenominatorTruncatedDivision() {
+        // d ∈ {-3,-2,-1}, n ∈ [0..6]; pin q = -2 to find feasible (n,d) pairs.
+        class S : VariableSchema() {
+            val n by intVar(min = 0, max = 6)
+            val d by intVar(min = -3, max = -1)
+            val pinQ by constraint { (n / d) eq -2 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.sample(maxFlips = 30_000, randomSeed = 71).take(10).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val nv = compiled.decodeInt("n", s)
+            val dv = compiled.decodeInt("d", s)
+            assertTrue(nv / dv == -2, "n=$nv d=$dv n/d=${nv / dv}")
+        }
+    }
+
+    @Test
+    fun signedModTruncatedSemantics() {
+        // -10 % 3 = -1 (Java/Kotlin truncated). Pin n=-10, d=3, expect r=-1.
+        class S : VariableSchema() {
+            val n by intVar(min = -10, max = -10)
+            val d by intVar(min = 3, max = 3)
+            val pinR by constraint { (n % d) eq -1 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.sample(maxFlips = 20_000, randomSeed = 47).take(5).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val nv = compiled.decodeInt("n", s)
+            val dv = compiled.decodeInt("d", s)
+            assertTrue(nv == -10 && dv == 3 && nv % dv == -1, "n=$nv d=$dv n%d=${nv % dv}")
+        }
+    }
 }

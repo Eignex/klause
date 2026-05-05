@@ -511,32 +511,52 @@ class Compiler {
         }
 
         /**
-         * Lower `n div d` and `n mod d` together. Truncated semantics on non-negative operands:
-         * `q * d + r = n`, with `0 ≤ r < d`. v1 requires `n.min ≥ 0` and `d.min ≥ 1`.
+         * Lower `n div d` and `n mod d` together with Java-truncated semantics:
+         *
+         *   q * d + r = n,    |r| < |d|,    r * n ≥ 0,    d ≠ 0.
+         *
+         * The first equation pins q and r relative to n and d; the second bounds the remainder;
+         * the third forces the remainder's sign to follow the numerator's sign (so dividing -7
+         * by 3 gives q = -2, r = -1 — same as `kotlin.Int.div` / `kotlin.Int.rem`).
          */
         private fun liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
             val nLifted = lift(num)
             val dLifted = lift(den)
             val nDom = domainOf(nLifted)
             val dDom = domainOf(dLifted)
-            require(nDom.min >= 0) { "div/mod v1 requires numerator domain min ≥ 0; got $nDom" }
-            require(dDom.min >= 1) { "div/mod v1 requires denominator domain min ≥ 1; got $dDom" }
+            require(0 !in dDom) { "div/mod requires denominator domain to exclude 0; got $dDom" }
             val nRef = materializeIntVar(nLifted)
             val dRef = materializeIntVar(dLifted)
-            val qDomain = IntDomain(0, nDom.max / dDom.min)
-            val rDomain = IntDomain(0, dDom.max - 1)
+
+            val nAbsMax = maxOf(if (nDom.min < 0) -nDom.min else nDom.min, nDom.max)
+            val dAbsMax = maxOf(if (dDom.min < 0) -dDom.min else dDom.min, dDom.max)
+            val qDomain = IntDomain(-nAbsMax, nAbsMax)
+            val rDomain = IntDomain(-(dAbsMax - 1), dAbsMax - 1)
             val qName = newAuxIntVar(qDomain)
             val rName = newAuxIntVar(rDomain)
-            val dqDomain = IntDomain(0, qDomain.max * dDom.max)
+            val dqAbsMax = nAbsMax * dAbsMax + dAbsMax
+            val dqDomain = IntDomain(-dqAbsMax, dqAbsMax)
             val dqName = newAuxIntVar(dqDomain)
             factors += Product(intVarOf(dRef.name), intVarOf(qName), intVarOf(dqName))
+
             // dq + r = n.
             assertExpr(
                 IntCompare(IntSum(listOf(IntRef(dqName), IntRef(rName))), IntCmpOp.EQ, nRef),
                 isHard = true, weight = 1.0,
             )
-            // r < d.
-            assertExpr(IntCompare(IntRef(rName), IntCmpOp.LT, dRef), isHard = true, weight = 1.0)
+            // |r| < |d| → lift turns IntAbs into aux non-negative ints with the right semantics.
+            assertExpr(
+                IntCompare(IntAbs(IntRef(rName)), IntCmpOp.LT, IntAbs(dRef)),
+                isHard = true, weight = 1.0,
+            )
+            // r * n ≥ 0 enforces sign(r) = sign(n) when r ≠ 0; trivially holds when r = 0.
+            assertExpr(
+                IntCompare(IntMul(IntRef(rName), nRef), IntCmpOp.GE, IntLit(0)),
+                isHard = true, weight = 1.0,
+            )
+            // d ≠ 0 is required regardless of domain; emit an explicit guard if the domain spans 0.
+            // (Handled implicitly by the require above when 0 ∉ dDom.)
+
             return if (returnRemainder) IntRef(rName) else IntRef(qName)
         }
 
