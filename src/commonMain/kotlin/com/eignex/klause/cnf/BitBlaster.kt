@@ -1,0 +1,209 @@
+package com.eignex.klause.cnf
+
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.IntEq
+import com.eignex.klause.solver.factor.IntGeq
+import com.eignex.klause.solver.factor.IntLeq
+import com.eignex.klause.solver.factor.IntNeq
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.ast.IntCmpOp
+
+/**
+ * Compiles a [Problem] (mixed Boolean/integer factors) to propositional CNF using canonical
+ * binary encoding for integer variables. Each integer variable in domain `[min, max]` gets
+ * `ceil(log2(max - min + 1))` bits representing the offset from `min`; an explicit
+ * `constantLeq` domain constraint is emitted when the domain size is not a power of two.
+ *
+ * Supported factor types: [Clause], [Cardinality] (only AtMostOne / AtLeastOne / ExactlyOne;
+ * higher-k cardinality bounds raise), [IntLeq], [IntGeq], [IntEq], [IntNeq], [Linear],
+ * [ReifiedIntCompare]. Out-of-domain `IntEq`/`IntNeq` constants are short-circuited at compile
+ * time to a true/false unit clause.
+ */
+object BitBlaster {
+
+    fun compile(problem: Problem): CnfProblem {
+        val b = CnfBuilder()
+        val boolMap = IntArray(problem.numBoolVars) { b.newVar() }
+        val intBits = Array(problem.numIntVars) { i ->
+            val d = problem.intDomains[i]
+            val width = bitWidth(d.size - 1).coerceAtLeast(1)
+            IntArray(width) { b.newVar() }
+        }
+        val intMin = IntArray(problem.numIntVars) { problem.intDomains[it].min }
+
+        for (i in 0 until problem.numIntVars) {
+            val bits = intBits[i]
+            val d = problem.intDomains[i]
+            val maxOffset = d.size - 1
+            val capacity = if (bits.size >= 31) Int.MAX_VALUE else (1 shl bits.size) - 1
+            if (maxOffset < capacity) {
+                val ok = b.constantLeq(bitsToLits(bits), maxOffset)
+                b.addClause(intArrayOf(ok))
+            }
+        }
+
+        for (factor in problem.factors) {
+            when (factor) {
+                is Clause -> emitClause(b, factor.literals, boolMap)
+                is Cardinality -> emitCardinality(b, factor, boolMap)
+                is IntLeq -> {
+                    val offset = factor.bound - intMin[factor.intVar]
+                    b.addClause(intArrayOf(b.constantLeq(bitsToLits(intBits[factor.intVar]), offset)))
+                }
+                is IntGeq -> {
+                    val offset = factor.bound - intMin[factor.intVar]
+                    b.addClause(intArrayOf(b.constantGeq(bitsToLits(intBits[factor.intVar]), offset)))
+                }
+                is IntEq -> {
+                    val d = problem.intDomains[factor.intVar]
+                    if (factor.value !in d) {
+                        b.addClause(IntArray(0))
+                    } else {
+                        b.addClause(intArrayOf(b.constantEq(bitsToLits(intBits[factor.intVar]), factor.value - intMin[factor.intVar])))
+                    }
+                }
+                is IntNeq -> {
+                    val d = problem.intDomains[factor.intVar]
+                    if (factor.value !in d) {
+                        // trivially true; nothing to emit
+                    } else {
+                        b.addClause(intArrayOf(b.constantNeq(bitsToLits(intBits[factor.intVar]), factor.value - intMin[factor.intVar])))
+                    }
+                }
+                is Linear -> emitLinear(b, factor, intBits, intMin)
+                is ReifiedIntCompare -> emitReifiedIntCompare(b, factor, boolMap, intBits, intMin)
+                else -> throw UnsupportedOperationException(
+                    "BitBlaster cannot lower factor type ${factor::class.simpleName}"
+                )
+            }
+        }
+
+        return CnfProblem(
+            numVars = b.numVars,
+            clauses = b.clauses.toList(),
+            boolVarToCnfVar = boolMap,
+            intVarBits = intBits,
+            intVarMin = intMin,
+        )
+    }
+
+    private fun emitClause(b: CnfBuilder, literals: IntArray, boolMap: IntArray) {
+        val out = IntArray(literals.size)
+        for (i in literals.indices) {
+            val lit = literals[i]
+            val cnfVar = boolMap[Lit.variable(lit)]
+            out[i] = Lit.make(cnfVar, Lit.isPositive(lit))
+        }
+        b.addClause(out)
+    }
+
+    private fun emitCardinality(b: CnfBuilder, c: Cardinality, boolMap: IntArray) {
+        val remapped = IntArray(c.literals.size) {
+            val lit = c.literals[it]
+            Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
+        }
+        if (c.max < c.literals.size) {
+            require(c.max == 1) { "BitBlaster only supports AtMost-1 (got ${c.max})" }
+            for (i in remapped.indices) {
+                for (j in i + 1 until remapped.size) {
+                    b.addClause(intArrayOf(Lit.negate(remapped[i]), Lit.negate(remapped[j])))
+                }
+            }
+        }
+        if (c.min > 0) {
+            require(c.min == 1) { "BitBlaster only supports AtLeast-1 (got ${c.min})" }
+            b.addClause(remapped.copyOf())
+        }
+    }
+
+    private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray) {
+        // Substitute x_i = x_i' + min_i; new bound b' = bound - Σ c_i min_i.
+        var bPrime: Long = f.bound.toLong()
+        for (i in f.vars.indices) bPrime -= f.coeffs[i].toLong() * intMin[f.vars[i]].toLong()
+
+        // Split positive and negative contributions, both as non-negative coefficient × x_i'.
+        val posTerms = mutableListOf<IntArray>()
+        val negTerms = mutableListOf<IntArray>()
+        for (i in f.vars.indices) {
+            val c = f.coeffs[i]
+            if (c == 0) continue
+            val term = b.multiplyByConstant(bitsToLits(intBits[f.vars[i]]), kotlin.math.abs(c))
+            if (c > 0) posTerms += term else negTerms += term
+        }
+        val pSum = sumAll(b, posTerms)
+        val nSum = sumAll(b, negTerms)
+
+        // Rearrange so both sides are non-negative: lhs op rhs.
+        val lhs: IntArray
+        val rhs: IntArray
+        if (bPrime >= 0) {
+            lhs = pSum
+            rhs = if (bPrime > 0) b.rippleAdd(nSum, constantLits(b, bPrime)) else nSum
+        } else {
+            lhs = b.rippleAdd(pSum, constantLits(b, -bPrime))
+            rhs = nSum
+        }
+
+        val resultLit = when (f.op) {
+            LinearOp.LE -> b.unsignedLeq(lhs, rhs)
+            LinearOp.GE -> b.unsignedLeq(rhs, lhs)
+            LinearOp.EQ -> b.unsignedEq(lhs, rhs)
+        }
+        b.addClause(intArrayOf(resultLit))
+    }
+
+    private fun emitReifiedIntCompare(
+        b: CnfBuilder,
+        f: ReifiedIntCompare,
+        boolMap: IntArray,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+    ) {
+        val cnfAux = Lit.make(boolMap[f.auxBoolVar], positive = true)
+        val bits = bitsToLits(intBits[f.intVar])
+        val offset = f.bound - intMin[f.intVar]
+        val cmp = when (f.op) {
+            IntCmpOp.LE -> b.constantLeq(bits, offset)
+            IntCmpOp.LT -> b.constantLeq(bits, offset - 1)
+            IntCmpOp.GE -> b.constantGeq(bits, offset)
+            IntCmpOp.GT -> b.constantGeq(bits, offset + 1)
+            IntCmpOp.EQ -> b.constantEq(bits, offset)
+            IntCmpOp.NE -> b.constantNeq(bits, offset)
+        }
+        // aux ↔ cmp:  (¬aux ∨ cmp) ∧ (aux ∨ ¬cmp).
+        b.addClause(intArrayOf(Lit.negate(cnfAux), cmp))
+        b.addClause(intArrayOf(cnfAux, Lit.negate(cmp)))
+    }
+
+    private fun sumAll(b: CnfBuilder, terms: List<IntArray>): IntArray {
+        if (terms.isEmpty()) return intArrayOf(b.falseLit())
+        var acc = terms[0]
+        for (i in 1 until terms.size) acc = b.rippleAdd(acc, terms[i])
+        return acc
+    }
+
+    private fun constantLits(b: CnfBuilder, value: Long): IntArray {
+        require(value >= 0) { "constantLits expects non-negative, got $value" }
+        if (value == 0L) return intArrayOf(b.falseLit())
+        val width = 64 - value.countLeadingZeroBits()
+        val out = IntArray(width)
+        val tL = b.trueLit()
+        val fL = b.falseLit()
+        for (i in 0 until width) out[i] = if ((value ushr i) and 1L == 1L) tL else fL
+        return out
+    }
+
+    private fun bitsToLits(bits: IntArray): IntArray {
+        val out = IntArray(bits.size)
+        for (i in bits.indices) out[i] = Lit.make(bits[i], positive = true)
+        return out
+    }
+
+    private fun bitWidth(value: Int): Int =
+        if (value <= 0) 1 else 32 - value.countLeadingZeroBits()
+}
