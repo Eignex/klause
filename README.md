@@ -10,8 +10,10 @@
 
 # Klause
 
-Klause samples satisfying assignments to constraint problems over Boolean,
-nominal, integer, and bucketed-float variables, using stochastic local search.
+Klause is a stochastic local-search SMT solver for mixed Boolean and
+bounded-integer schemas, focused on sampling diverse satisfying assignments.
+Nominal variables are encoded as Boolean indicators; floats are bucketed onto
+bounded integers.
 
 ## Overview
 
