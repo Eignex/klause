@@ -128,7 +128,7 @@ class Compiler {
 
         fun assertIntCompare(expr: IntCompare, isHard: Boolean, weight: Double) {
             val (op, normBound) = normalize(expr.op, 0)
-            val combined = subtract(affine(expr.left), affine(expr.right))
+            val combined = subtract(affine(lift(expr.left)), affine(lift(expr.right)))
             val coeffs = combined.coeffs
             val bound = normBound - combined.constant
             // Apply LT/GT bound shifts on top of the affine subtraction.
@@ -275,7 +275,7 @@ class Compiler {
 
         fun reifyIntCompare(expr: IntCompare): Int {
             val (op, normBound) = normalize(expr.op, 0)
-            val combined = subtract(affine(expr.left), affine(expr.right))
+            val combined = subtract(affine(lift(expr.left)), affine(lift(expr.right)))
             val coeffs = combined.coeffs
             val bound = normBound - combined.constant
             val (finalOp, finalBound) = when (expr.op) {
@@ -396,6 +396,18 @@ class Compiler {
 
         fun intVarOf(name: String): Int =
             intVarIdByName[name] ?: error("Unknown int/float variable '$name'")
+
+        /**
+         * Rewrite [expr] so that the residual is affine: every non-affine subexpression is
+         * replaced by a fresh aux [IntRef], with auxiliary constraints emitted that pin the
+         * aux to the correct value. The affine fragment ([IntRef], [IntLit], [IntScale],
+         * [IntSum]) passes through unchanged.
+         */
+        fun lift(expr: IntExpr): IntExpr = when (expr) {
+            is IntRef, is IntLit -> expr
+            is IntScale -> IntScale(expr.coeff, lift(expr.child))
+            is IntSum -> IntSum(expr.children.map { lift(it) })
+        }
 
         // Affine canonical form: Σ coeffs[name] * name + constant.
         private data class Affine(val coeffs: Map<String, Int>, val constant: Int)
