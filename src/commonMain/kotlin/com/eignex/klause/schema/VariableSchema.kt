@@ -2,6 +2,8 @@ package com.eignex.klause.schema
 
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolSpec
+import com.eignex.klause.ast.FloatSpec
+import com.eignex.klause.ast.IntSpec
 import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.SchemaDef
@@ -11,11 +13,12 @@ import kotlin.properties.ReadOnlyProperty
 
 /**
  * Property-delegate base class for declaring a typed schema. Mirrors kumulant's `StatSchema`:
- * each `boolVar()` / `nominal(...)` / `constraint { ... }` call returns a delegate provider that
- * captures the host property's name and registers a [VarSpec] / [NamedConstraint].
+ * each `boolVar()` / `intVar(...)` / `floatVar(...)` / `nominal(...)` / `constraint { ... }`
+ * call returns a delegate provider that captures the host property's name and registers a
+ * [VarSpec] / [NamedConstraint].
  *
- * Constraint delegates execute their build lambda *during class initialization*, so any handles
- * referenced inside `constraint { ... }` must be declared earlier in the class.
+ * Constraint delegates execute their build lambda *during class initialization*, so any
+ * handles referenced inside `constraint { ... }` must be declared earlier in the class.
  */
 abstract class VariableSchema {
     private val _vars = mutableListOf<VarSpec>()
@@ -38,6 +41,20 @@ abstract class VariableSchema {
             val labelList = labels.toList()
             _vars += NominalSpec(prop.name, labelList)
             val handle = NominalHandle(prop.name, labelList)
+            ReadOnlyProperty { _, _ -> handle }
+        }
+
+    protected fun intVar(min: Int, max: Int) =
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, IntHandle>> { _, prop ->
+            _vars += IntSpec(prop.name, min, max)
+            val handle = IntHandle(prop.name, min, max)
+            ReadOnlyProperty { _, _ -> handle }
+        }
+
+    protected fun floatVar(min: Double, max: Double, buckets: Int) =
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, FloatHandle>> { _, prop ->
+            _vars += FloatSpec(prop.name, min, max, buckets)
+            val handle = FloatHandle(prop.name, min, max, buckets)
             ReadOnlyProperty { _, _ -> handle }
         }
 
