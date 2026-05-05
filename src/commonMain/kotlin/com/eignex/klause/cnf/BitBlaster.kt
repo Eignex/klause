@@ -10,6 +10,7 @@ import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.ast.IntCmpOp
@@ -79,6 +80,7 @@ object BitBlaster {
                 is Linear -> emitLinear(b, factor, intBits, intMin)
                 is ReifiedIntCompare -> emitReifiedIntCompare(b, factor, boolMap, intBits, intMin)
                 is ReifiedLinear -> emitReifiedLinear(b, factor, boolMap, intBits, intMin)
+                is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -109,18 +111,47 @@ object BitBlaster {
             val lit = c.literals[it]
             Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
         }
-        if (c.max < c.literals.size) {
-            require(c.max == 1) { "BitBlaster only supports AtMost-1 (got ${c.max})" }
-            for (i in remapped.indices) {
-                for (j in i + 1 until remapped.size) {
-                    b.addClause(intArrayOf(Lit.negate(remapped[i]), Lit.negate(remapped[j])))
-                }
-            }
-        }
+        if (c.max < c.literals.size) emitAtMostK(b, remapped, c.max)
         if (c.min > 0) {
-            require(c.min == 1) { "BitBlaster only supports AtLeast-1 (got ${c.min})" }
-            b.addClause(remapped.copyOf())
+            // at-least-min over lits ⟺ at-most-(n-min) over negated lits.
+            val negated = IntArray(remapped.size) { Lit.negate(remapped[it]) }
+            emitAtMostK(b, negated, remapped.size - c.min)
         }
+    }
+
+    /** Sinz 2005 sequential-counter encoding of `at-most-k`. Falls back to specialised forms
+     *  for the corner cases (k=0, k=n-1, small pairwise). */
+    private fun emitAtMostK(b: CnfBuilder, lits: IntArray, k: Int) {
+        val n = lits.size
+        if (k >= n) return
+        if (k == 0) {
+            for (l in lits) b.addClause(intArrayOf(Lit.negate(l)))
+            return
+        }
+        if (k == n - 1) {
+            val cl = IntArray(n) { Lit.negate(lits[it]) }
+            b.addClause(cl)
+            return
+        }
+        if (k == 1 && n <= 4) {
+            for (i in 0 until n) for (j in i + 1 until n) {
+                b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(lits[j])))
+            }
+            return
+        }
+        val s = Array(n - 1) { IntArray(k) { Lit.make(b.newVar(), positive = true) } }
+        b.addClause(intArrayOf(Lit.negate(lits[0]), s[0][0]))
+        for (j in 1 until k) b.addClause(intArrayOf(Lit.negate(s[0][j])))
+        for (i in 1 until n - 1) {
+            b.addClause(intArrayOf(Lit.negate(lits[i]), s[i][0]))
+            b.addClause(intArrayOf(Lit.negate(s[i - 1][0]), s[i][0]))
+            for (j in 1 until k) {
+                b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(s[i - 1][j - 1]), s[i][j]))
+                b.addClause(intArrayOf(Lit.negate(s[i - 1][j]), s[i][j]))
+            }
+            b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(s[i - 1][k - 1])))
+        }
+        b.addClause(intArrayOf(Lit.negate(lits[n - 1]), Lit.negate(s[n - 2][k - 1])))
     }
 
     private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray) {
@@ -168,6 +199,25 @@ object BitBlaster {
             LinearOp.GE -> b.unsignedLeq(rhs, lhs)
             LinearOp.EQ -> b.unsignedEq(lhs, rhs)
         }
+    }
+
+    private fun emitReifiedCardinality(b: CnfBuilder, f: ReifiedCardinality, boolMap: IntArray) {
+        val cnfAux = Lit.make(boolMap[f.auxBoolVar], positive = true)
+        val remapped = IntArray(f.literals.size) {
+            val lit = f.literals[it]
+            Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
+        }
+        // Sum each 0/1-valued literal into a count bitvector.
+        var sum = if (remapped.isEmpty()) intArrayOf(b.falseLit()) else intArrayOf(remapped[0])
+        for (i in 1 until remapped.size) sum = b.rippleAdd(sum, intArrayOf(remapped[i]))
+        val parts = mutableListOf<Int>()
+        if (f.min > 0) parts += b.constantGeq(sum, f.min)
+        if (f.max < f.literals.size) parts += b.constantLeq(sum, f.max)
+        val inRangeLit = if (parts.isEmpty()) b.trueLit()
+        else if (parts.size == 1) parts[0]
+        else b.tseitinAnd(parts.toIntArray())
+        b.addClause(intArrayOf(Lit.negate(cnfAux), inRangeLit))
+        b.addClause(intArrayOf(cnfAux, Lit.negate(inRangeLit)))
     }
 
     private fun emitReifiedLinear(
