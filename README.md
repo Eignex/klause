@@ -90,6 +90,7 @@ suitable for any external propositional SAT engine.
 
 ## TODO
 
+- Make/break delta cache: incremental per-variable scoring across accepted moves instead of recomputing each step.
 - More search strategies: probSAT, SAPS, tabu, simulated annealing.
 - Pseudo-Boolean and XOR factors; general `Cardinality(min, max)` beyond k=1.
 - Reified linear constraints for non-top-level positions.
