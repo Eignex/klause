@@ -16,10 +16,12 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntAbs
+import com.eignex.klause.ast.IntDiv
 import com.eignex.klause.ast.IntElement
 import com.eignex.klause.ast.IntIfThenElse
 import com.eignex.klause.ast.IntMax
 import com.eignex.klause.ast.IntMin
+import com.eignex.klause.ast.IntMod
 import com.eignex.klause.ast.IntMul
 import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntScale
@@ -438,6 +440,38 @@ class Compiler {
             is IntIfThenElse -> liftIfThenElse(expr.cond, expr.thenE, expr.elseE)
             is IntElement -> liftElement(expr.index, expr.items)
             is IntMul -> liftMul(expr.left, expr.right)
+            is IntDiv -> liftDivMod(expr.num, expr.den, returnRemainder = false)
+            is IntMod -> liftDivMod(expr.num, expr.den, returnRemainder = true)
+        }
+
+        /**
+         * Lower `n div d` and `n mod d` together. Truncated semantics on non-negative operands:
+         * `q * d + r = n`, with `0 ≤ r < d`. v1 requires `n.min ≥ 0` and `d.min ≥ 1`.
+         */
+        private fun liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
+            val nLifted = lift(num)
+            val dLifted = lift(den)
+            val nDom = domainOf(nLifted)
+            val dDom = domainOf(dLifted)
+            require(nDom.min >= 0) { "div/mod v1 requires numerator domain min ≥ 0; got $nDom" }
+            require(dDom.min >= 1) { "div/mod v1 requires denominator domain min ≥ 1; got $dDom" }
+            val nRef = materializeIntVar(nLifted)
+            val dRef = materializeIntVar(dLifted)
+            val qDomain = IntDomain(0, nDom.max / dDom.min)
+            val rDomain = IntDomain(0, dDom.max - 1)
+            val qName = newAuxIntVar(qDomain)
+            val rName = newAuxIntVar(rDomain)
+            val dqDomain = IntDomain(0, qDomain.max * dDom.max)
+            val dqName = newAuxIntVar(dqDomain)
+            factors += Product(intVarOf(dRef.name), intVarOf(qName), intVarOf(dqName))
+            // dq + r = n.
+            assertExpr(
+                IntCompare(IntSum(listOf(IntRef(dqName), IntRef(rName))), IntCmpOp.EQ, nRef),
+                isHard = true, weight = 1.0,
+            )
+            // r < d.
+            assertExpr(IntCompare(IntRef(rName), IntCmpOp.LT, dRef), isHard = true, weight = 1.0)
+            return if (returnRemainder) IntRef(rName) else IntRef(qName)
         }
 
         private fun liftMul(left: IntExpr, right: IntExpr): IntExpr {

@@ -19,6 +19,9 @@ operator fun IntTerm.times(other: IntTerm): IntExpr {
     return IntMul(l, r)
 }
 
+operator fun IntTerm.div(other: IntTerm): IntExpr = IntDiv(toIntExpr(), other.toIntExpr())
+operator fun IntTerm.rem(other: IntTerm): IntExpr = IntMod(toIntExpr(), other.toIntExpr())
+
 infix fun IntTerm.le(other: IntTerm): BoolExpr = IntCompare(toIntExpr(), IntCmpOp.LE, other.toIntExpr())
 infix fun IntTerm.le(c: Int): BoolExpr = IntCompare(toIntExpr(), IntCmpOp.LE, IntLit(c))
 infix fun Int.le(t: IntTerm): BoolExpr = IntCompare(IntLit(this), IntCmpOp.LE, t.toIntExpr())
