@@ -1,0 +1,77 @@
+package com.eignex.klause.compile
+
+import com.eignex.klause.ast.atLeast
+import com.eignex.klause.ast.atMost
+import com.eignex.klause.ast.cardinality
+import com.eignex.klause.ast.implies
+import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.ReifiedCardinality
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class CardinalityDslTest {
+
+    @Test
+    fun atMostThreeAtTopLevelEmitsCardinality() {
+        class S : VariableSchema() {
+            val a by boolVar(); val b by boolVar(); val c by boolVar(); val d by boolVar()
+            val cap by constraint { atMost(2, a, b, c, d) }
+        }
+        val compiled = S().compile()
+        val card = compiled.problem.factors.single { it is Cardinality } as Cardinality
+        assertEquals(0, card.min)
+        assertEquals(2, card.max)
+    }
+
+    @Test
+    fun atLeastNestedReifies() {
+        class S : VariableSchema() {
+            val flag by boolVar()
+            val a by boolVar(); val b by boolVar(); val c by boolVar(); val d by boolVar()
+            val rule by constraint { flag implies atLeast(2, a, b, c, d) }
+        }
+        val compiled = S().compile()
+        assertTrue(compiled.problem.factors.any { it is ReifiedCardinality })
+    }
+
+    @Test
+    fun reifiedRangeEndToEndSolve() {
+        class S : VariableSchema() {
+            val flag by boolVar()
+            val a by boolVar(); val b by boolVar(); val c by boolVar(); val d by boolVar()
+            val rule by constraint { flag implies cardinality(2, 3, a, b, c, d) }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.sample(maxFlips = 5_000, randomSeed = 7).take(8).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val flagSet = compiled.decodeBool("flag", s)
+            val truthCount = listOf("a", "b", "c", "d").count { compiled.decodeBool(it, s) }
+            if (flagSet) assertTrue(truthCount in 2..3,
+                "flag set should force count∈[2,3], got $truthCount")
+        }
+    }
+
+    @Test
+    fun atMostFourOfFiveCardinalitySolves() {
+        class S : VariableSchema() {
+            val a by boolVar(); val b by boolVar(); val c by boolVar()
+            val d by boolVar(); val e by boolVar()
+            val cap by constraint { atMost(4, a, b, c, d, e) }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.sample(maxFlips = 3_000, randomSeed = 19).take(20).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val truthCount = listOf("a", "b", "c", "d", "e").count { compiled.decodeBool(it, s) }
+            assertTrue(truthCount <= 4, "got $truthCount true")
+        }
+    }
+}
