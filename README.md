@@ -94,10 +94,12 @@ suitable for any external propositional SAT engine.
 
 ## TODO
 
-- Make/break delta cache: incremental per-variable scoring across accepted moves instead of recomputing each step.
-- More search strategies: probSAT, SAPS, tabu, simulated annealing.
+- Per-variable make/break cache for incremental scoring instead of recomputing each step.
+- Additional search strategies: probSAT, SAPS, tabu, simulated annealing, restart schedules.
+- Diversification beyond the rolling window: Hamming and XOR blocking factors.
 - Pseudo-Boolean and XOR factors; general `Cardinality(min, max)` beyond k=1.
-- Solution-pool diversification: Hamming and XOR-slice blocking factors.
-- Soft constraints with weights surfaced in the DSL.
-- External SAT adapter (LogicNG) for cross-checks and UNSAT proofs.
+- Soft constraints surfaced in the DSL with weights.
+- Typed handle-based decode API to replace name-string lookups.
+- LogicNG adapter (jvmMain) for SAT-engine cross-checks and UNSAT proofs.
+- Bit-blaster cross-check oracle wired into the test suite.
 - Benchmark suite, Maven Central publishing, CI.
