@@ -36,6 +36,7 @@ import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 
@@ -260,8 +261,16 @@ class Compiler {
                 tseitinIff(l, r)
             }
             is IntCompare -> reifyIntCompare(expr)
-            is AtMost, is AtLeast, is CardinalityExpr ->
-                error("Nested cardinality expressions are not yet supported")
+            is AtMost -> reifyCardinality(expr.children, 0, expr.k)
+            is AtLeast -> reifyCardinality(expr.children, expr.k, expr.children.size)
+            is CardinalityExpr -> reifyCardinality(expr.children, expr.min, expr.max)
+        }
+
+        fun reifyCardinality(children: List<BoolExpr>, min: Int, max: Int): Int {
+            val lits = lowerAllBool(children)
+            val aux = newBoolVar()
+            factors += ReifiedCardinality(aux, lits, min, max)
+            return Lit.make(aux, positive = true)
         }
 
         fun reifyIntCompare(expr: IntCompare): Int {
