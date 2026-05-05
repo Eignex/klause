@@ -85,12 +85,17 @@ class ReifiedPseudoBoolean(
         if (aux == predHolds(sum)) return
         sink.addBoolFlip(auxBoolVar)
         val wantHolds = aux
+        val curDist = distanceToInRange(sum)
         for (i in literals.indices) {
             val lit = literals[i]
             val v = Lit.variable(lit)
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val change = if (isTrue) -weights[i] else weights[i]
-            if (predHolds(sum + change) == wantHolds) sink.addBoolFlip(v)
+            val newDist = distanceToInRange(sum + change)
+            // wantHolds=true: drive sum toward the satisfying region (newDist < curDist).
+            // wantHolds=false: drive sum away from it (newDist > curDist).
+            val improves = if (wantHolds) newDist < curDist else newDist > curDist
+            if (improves) sink.addBoolFlip(v)
         }
     }
 
@@ -98,6 +103,12 @@ class ReifiedPseudoBoolean(
         PbOp.LE -> sum <= bound
         PbOp.GE -> sum >= bound
         PbOp.EQ -> sum == bound
+    }
+
+    private fun distanceToInRange(sum: Int): Int = when (op) {
+        PbOp.LE -> if (sum > bound) sum - bound else 0
+        PbOp.GE -> if (sum < bound) bound - sum else 0
+        PbOp.EQ -> if (sum >= bound) sum - bound else bound - sum
     }
 
     private fun changeOnFlip(state: SolverState, boolVar: Int, current: Boolean): Int {

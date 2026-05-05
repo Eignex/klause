@@ -64,12 +64,16 @@ class PseudoBoolean(
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
         if (!violates(sum)) return
+        val curDist = distance(sum)
         for (i in literals.indices) {
             val lit = literals[i]
             val v = Lit.variable(lit)
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val change = if (isTrue) -weights[i] else weights[i]
-            if (!violates(sum + change)) sink.addBoolFlip(v)
+            // Propose any flip that strictly reduces the violation distance, even if it doesn't
+            // fully repair the constraint. This keeps the solver making progress on tight PB
+            // constraints where no single literal can flip across the boundary in one step.
+            if (distance(sum + change) < curDist) sink.addBoolFlip(v)
         }
     }
 
@@ -77,6 +81,12 @@ class PseudoBoolean(
         PbOp.LE -> sum > bound
         PbOp.GE -> sum < bound
         PbOp.EQ -> sum != bound
+    }
+
+    private fun distance(sum: Int): Int = when (op) {
+        PbOp.LE -> if (sum > bound) sum - bound else 0
+        PbOp.GE -> if (sum < bound) bound - sum else 0
+        PbOp.EQ -> if (sum >= bound) sum - bound else bound - sum
     }
 
     private fun changeOnFlip(state: SolverState, boolVar: Int, current: Boolean): Int {
