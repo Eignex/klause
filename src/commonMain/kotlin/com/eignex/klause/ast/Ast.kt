@@ -147,6 +147,10 @@ data class IntElement(val index: IntExpr, val items: List<IntExpr>) : IntExpr {
 }
 
 @Serializable
+@SerialName("intmul")
+data class IntMul(val left: IntExpr, val right: IntExpr) : IntExpr
+
+@Serializable
 enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 
 @Serializable

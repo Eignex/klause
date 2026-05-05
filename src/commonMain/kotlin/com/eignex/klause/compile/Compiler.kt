@@ -20,6 +20,7 @@ import com.eignex.klause.ast.IntElement
 import com.eignex.klause.ast.IntIfThenElse
 import com.eignex.klause.ast.IntMax
 import com.eignex.klause.ast.IntMin
+import com.eignex.klause.ast.IntMul
 import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntScale
 import com.eignex.klause.ast.IntSpec
@@ -42,6 +43,7 @@ import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
@@ -435,6 +437,41 @@ class Compiler {
             is IntAbs -> liftAbs(expr.child)
             is IntIfThenElse -> liftIfThenElse(expr.cond, expr.thenE, expr.elseE)
             is IntElement -> liftElement(expr.index, expr.items)
+            is IntMul -> liftMul(expr.left, expr.right)
+        }
+
+        private fun liftMul(left: IntExpr, right: IntExpr): IntExpr {
+            val l = lift(left); val r = lift(right)
+            // Constant folding: const * x or x * const → IntScale.
+            if (l is IntLit) return IntScale(l.value, r)
+            if (r is IntLit) return IntScale(r.value, l)
+            // Both sides are real variables. Materialise each side as a single int var (Product
+            // factor takes raw int var ids), then emit Product on aux vars wrapping the affine
+            // residuals.
+            val aRef = materializeIntVar(l)
+            val bRef = materializeIntVar(r)
+            val aDom = intDomains[intVarOf(aRef.name)]
+            val bDom = intDomains[intVarOf(bRef.name)]
+            require(aDom.min >= 0 && bDom.min >= 0) {
+                "IntMul v1 requires non-negative operand domains; got $aDom and $bDom"
+            }
+            val productDomain = IntDomain(aDom.min * bDom.min, aDom.max * bDom.max)
+            val resultName = newAuxIntVar(productDomain)
+            factors += Product(intVarOf(aRef.name), intVarOf(bRef.name), intVarOf(resultName))
+            return IntRef(resultName)
+        }
+
+        /** Force [expr] into a single [IntRef] so a factor that takes raw int var ids (like
+         *  [Product]) can reference it. Affine `IntScale`/`IntSum` get pinned to a fresh aux. */
+        private fun materializeIntVar(expr: IntExpr): IntRef = when (expr) {
+            is IntRef -> expr
+            else -> {
+                val d = domainOf(expr)
+                val name = newAuxIntVar(d)
+                val ref = IntRef(name)
+                assertExpr(IntCompare(ref, IntCmpOp.EQ, expr), isHard = true, weight = 1.0)
+                ref
+            }
         }
 
         private fun liftElement(index: IntExpr, items: List<IntExpr>): IntExpr {

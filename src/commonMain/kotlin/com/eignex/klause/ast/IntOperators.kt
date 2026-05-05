@@ -12,6 +12,12 @@ operator fun IntTerm.unaryMinus(): IntExpr = negate(this.toIntExpr())
 
 operator fun IntTerm.times(c: Int): IntExpr = scale(c, this.toIntExpr())
 operator fun Int.times(t: IntTerm): IntExpr = scale(this, t.toIntExpr())
+operator fun IntTerm.times(other: IntTerm): IntExpr {
+    val l = this.toIntExpr(); val r = other.toIntExpr()
+    if (l is IntLit) return scale(l.value, r)
+    if (r is IntLit) return scale(r.value, l)
+    return IntMul(l, r)
+}
 
 infix fun IntTerm.le(other: IntTerm): BoolExpr = IntCompare(toIntExpr(), IntCmpOp.LE, other.toIntExpr())
 infix fun IntTerm.le(c: Int): BoolExpr = IntCompare(toIntExpr(), IntCmpOp.LE, IntLit(c))
