@@ -27,28 +27,37 @@ class SolverTest {
     }
 
     @Test
-    fun samplesMultipleAssignments() {
+    fun samplesAreUniqueByDefault() {
+        // (x0 ∨ x1) ∧ (x0 ∨ ¬x1) has only two solutions: (T,T) and (T,F).
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
         )
         val problem = Problem(2, 0, emptyArray(), clauses)
         val solver = Solver(problem, randomSeed = 1, maxFlipsBeforeRestart = 10)
-        val samples = solver.sample(maxFlips = 5_000).take(20).toList()
-        assertEquals(20, samples.size)
+        val samples = solver.sample(maxFlips = 5_000).take(10).toList()
+        assertEquals(2, samples.size, "Only two distinct solutions exist")
+        assertEquals(samples.toSet().size, samples.size, "All yielded samples must be unique")
         for (s in samples) assertTrue(s.bools[0])
     }
 
     @Test
-    fun exactlyOneNominalLikeProblem() {
+    fun exactlyOneFactorYieldsAllThreeSolutions() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val solver = Solver(problem, randomSeed = 13)
-        val samples = solver.sample(maxFlips = 5_000).take(30).toList()
-        assertEquals(30, samples.size)
-        for (s in samples) {
-            val n = s.bools.count { it }
-            assertEquals(1, n, "Expected exactly one true, got ${s.bools.toList()}")
-        }
+        val samples = solver.sample(maxFlips = 5_000).take(10).toList()
+        assertEquals(3, samples.size, "ExactlyOne over 3 vars has exactly 3 solutions")
+        assertEquals(samples.toSet().size, samples.size)
+        for (s in samples) assertEquals(1, s.bools.count { it })
+    }
+
+    @Test
+    fun duplicatesAllowedWhenDistanceZero() {
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
+        val problem = Problem(3, 0, emptyArray(), listOf(factor))
+        val solver = Solver(problem, randomSeed = 13, minHammingDistance = 0)
+        val samples = solver.sample(maxFlips = 5_000).take(20).toList()
+        assertEquals(20, samples.size)
     }
 }

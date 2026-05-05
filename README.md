@@ -87,11 +87,16 @@ solver.sample(maxFlips = 100_000).take(20).forEach { sample ->
 
 `Solver.sample` returns a lazy `Sequence<Sample>` where each sample carries a
 `bools: BooleanArray` and an `ints: IntArray`. After each yielded sample the
-search restarts from a randomized state, so callers take as many samples as
-they want with no formal uniformity guarantee. The default strategy is
-`WalkSat(noise)`: pick a violated factor, ask it for repair-move suggestions,
-then either flip a random suggestion (probability `noise`) or pick the
-suggestion with the smallest break count, ties broken uniformly at random.
+search restarts from a randomized state. Yielded samples are deduplicated by
+default; raise `minHammingDistance` to require samples to differ in at least
+that many primitive variables (Boolean flips and integer-value differences
+both count as one), or set it to `0` to allow duplicates. If the solution
+space is exhausted before the iteration budget, the sequence ends.
+
+The default strategy is `WalkSat(noise)`: pick a violated factor, ask it for
+repair-move suggestions, then either flip a random suggestion (probability
+`noise`) or pick the suggestion with the smallest break count, ties broken
+uniformly at random.
 
 `compiled.boolVarIdByName`, `compiled.intVarIdByName`, `compiled.nominalIndicators`,
 and `compiled.floatDecoders` map schema names back to solver-side ids for any

@@ -42,11 +42,13 @@ class CompileTest {
 
     @Test
     fun endToEndSolveDecodesValidAssignments() {
+        // TinyCampaign solutions: type=a forces premium=false (1), type=b/c free (4). 5 unique.
         val schema = TinyCampaign()
         val compiled = schema.compile()
         val solver = Solver(compiled.problem, randomSeed = 11, maxFlipsBeforeRestart = 200)
         val samples = solver.sample(maxFlips = 5_000).take(20).toList()
-        assertEquals(20, samples.size)
+        assertEquals(5, samples.size)
+        assertEquals(samples.toSet().size, samples.size)
         for (s in samples) {
             val type = compiled.decodeNominal("type", s)
             val premium = compiled.decodeBool("premium", s)
@@ -84,6 +86,7 @@ class CompileTest {
         val solver = Solver(compiled.problem, randomSeed = 5, maxFlipsBeforeRestart = 500)
         val samples = solver.sample(maxFlips = 20_000).take(15).toList()
         assertEquals(15, samples.size)
+        assertEquals(samples.toSet().size, samples.size, "Samples must be unique")
         for (s in samples) {
             val type = compiled.decodeNominal("type", s)
             val budget = compiled.decodeInt("budget", s)
@@ -104,7 +107,10 @@ class CompileTest {
         val schema = FloatTune()
         val compiled = schema.compile()
         val solver = Solver(compiled.problem, randomSeed = 99, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000).take(10).toList()
+        // 11 buckets, ge 0.5 leaves buckets 5..10 → 6 unique solutions.
+        val samples = solver.sample(maxFlips = 5_000).take(20).toList()
+        assertEquals(6, samples.size)
+        assertEquals(samples.toSet().size, samples.size)
         for (s in samples) {
             val rate = compiled.decodeFloat("rate", s)
             assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
