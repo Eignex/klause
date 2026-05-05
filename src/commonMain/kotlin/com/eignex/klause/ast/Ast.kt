@@ -172,6 +172,22 @@ data class AllDifferent(val terms: List<IntExpr>) : BoolExpr {
 }
 
 @Serializable
+@SerialName("table")
+data class TableConstraint(
+    val terms: List<IntExpr>,
+    val tuples: List<List<Int>>,
+    val negative: Boolean = false,
+) : BoolExpr {
+    init {
+        require(terms.isNotEmpty()) { "TableConstraint must have at least one term" }
+        require(tuples.isNotEmpty()) { "TableConstraint must have at least one tuple" }
+        require(tuples.all { it.size == terms.size }) {
+            "TableConstraint: every tuple must match arity ${terms.size}"
+        }
+    }
+}
+
+@Serializable
 data class NamedConstraint(
     val name: String,
     val expr: BoolExpr,

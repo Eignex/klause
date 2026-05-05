@@ -26,6 +26,18 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
 }
 
 /**
+ * Extensional positive table: `vars` must equal one of the listed `allowed` tuples.
+ */
+fun table(vars: List<IntTerm>, allowed: List<List<Int>>): BoolExpr =
+    TableConstraint(vars.map { it.toIntExpr() }, allowed, negative = false)
+
+/**
+ * Extensional negative table: `vars` must not equal any of the listed `forbidden` tuples.
+ */
+fun notTable(vars: List<IntTerm>, forbidden: List<List<Int>>): BoolExpr =
+    TableConstraint(vars.map { it.toIntExpr() }, forbidden, negative = true)
+
+/**
  * Global cardinality constraint. For each `(value, range)` entry, the count of `vars` taking
  * that value must lie inside `range`. Decomposes into one [CardinalityExpr] per entry.
  */

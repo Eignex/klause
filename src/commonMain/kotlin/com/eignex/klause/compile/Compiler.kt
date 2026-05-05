@@ -4,6 +4,7 @@ import com.eignex.klause.ast.AllDifferent
 import com.eignex.klause.ast.And
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
+import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.BoolSpec
@@ -135,6 +136,21 @@ class Compiler {
                 }
                 is IntCompare -> assertIntCompare(expr, isHard, weight)
                 is AllDifferent -> assertAllDifferent(expr.terms, isHard, weight)
+                is TableConstraint -> assertExpr(expandTable(expr), isHard, weight)
+            }
+        }
+
+        private fun expandTable(t: TableConstraint): BoolExpr {
+            val lifted = t.terms.map { lift(it) }
+            val tuples = t.tuples.map { tup ->
+                And(lifted.indices.map { i ->
+                    IntCompare(lifted[i], IntCmpOp.EQ, IntLit(tup[i]))
+                })
+            }
+            return if (t.negative) {
+                And(tuples.map { Not(it) })
+            } else {
+                if (tuples.size == 1) tuples[0] else Or(tuples)
             }
         }
 
@@ -291,6 +307,7 @@ class Compiler {
                 }
                 tseitinAnd(pairs)
             }
+            is TableConstraint -> lowerToLit(expandTable(expr))
         }
 
         fun reifyCardinality(children: List<BoolExpr>, min: Int, max: Int): Int {
