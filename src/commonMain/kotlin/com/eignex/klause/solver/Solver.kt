@@ -5,64 +5,93 @@ import com.eignex.klause.solver.strategy.WalkSat
 import kotlin.random.Random
 
 /**
- * Local-search solver around a [Problem]. [sample] is a lazy sequence of hard-feasible
- * assignments; after each yield the search restarts from a freshly randomized state.
- *
- * Diversity is enforced by [minHammingDistance]: a fresh hard-feasible assignment is yielded
- * only when it differs from every prior yielded assignment by at least this many primitive
- * variables (Boolean bit flips and integer-value differences both count as one). The default
- * (1) gives plain deduplication; raise it for UUID-style diverse sampling, or set to 0 to
- * allow duplicates. If a hard-feasible state is rejected for being too close to a prior
- * sample the search restarts and retries; once the iteration budget is exhausted (or the
- * solution space is exhausted) the sequence ends.
+ * Local-search solver around a [Problem]. The solver itself only carries configuration
+ * (problem, strategy, restart cadence). All per-draw state — RNG, assignment, factor
+ * payloads, the dedup window — lives inside the [sample] sequence so two concurrent draws
+ * never share state.
  */
 class Solver(
     val problem: Problem,
-    val randomSeed: Long = 0L,
     val strategy: Strategy = WalkSat(),
     val maxFlipsBeforeRestart: Int = 10_000,
-    val minHammingDistance: Int = 1,
 ) {
 
-    fun sample(maxFlips: Long = Long.MAX_VALUE): Sequence<Sample> = sequence {
-        val state = SolverState(problem, Random(randomSeed))
-        val seen = mutableListOf<Sample>()
-        state.restart()
-        var flipsSinceRestart = 0
-        var totalFlips = 0L
+    /**
+     * Lazy sequence of hard-feasible assignments. After each yield the search restarts from
+     * a freshly randomized state.
+     *
+     * Diversity is enforced against a rolling window of the [recentWindow] most recently
+     * yielded samples: a fresh hard-feasible assignment is yielded only when it differs from
+     * every sample in that window by at least [minHammingDistance] primitive variables
+     * (Boolean bit flips and integer-value differences each count as one). The defaults
+     * (`minHammingDistance=1`, `recentWindow=16`) give a sliding-window deduplication that
+     * keeps memory and per-yield work bounded; raise [minHammingDistance] for UUID-style
+     * diverse sampling, raise [recentWindow] toward [Int.MAX_VALUE] for global uniqueness,
+     * or set [minHammingDistance] to 0 to allow duplicates.
+     *
+     * If [randomSeed] is null a fresh seed is drawn from [Random.Default] so independent
+     * `sample()` calls from the same [Solver] instance produce independent draws. Pass an
+     * explicit seed to make a draw reproducible.
+     *
+     * If the local solution space within the window is exhausted before the iteration
+     * budget the sequence ends.
+     */
+    fun sample(
+        maxFlips: Long = Long.MAX_VALUE,
+        randomSeed: Long? = null,
+        minHammingDistance: Int = 1,
+        recentWindow: Int = 16,
+    ): Sequence<Sample> {
+        require(recentWindow >= 0) { "recentWindow must be non-negative, got $recentWindow" }
+        val seed = randomSeed ?: Random.Default.nextLong()
+        return sequence {
+            val state = SolverState(problem, Random(seed))
+            val window = ArrayDeque<Sample>()
+            state.restart()
+            var flipsSinceRestart = 0
+            var totalFlips = 0L
 
-        while (totalFlips < maxFlips) {
-            if (state.hardCost == 0) {
-                val snap = state.assignment.snapshot()
-                if (farEnough(snap, seen)) {
-                    seen += snap
-                    yield(snap)
+            while (totalFlips < maxFlips) {
+                if (state.hardCost == 0) {
+                    val snap = state.assignment.snapshot()
+                    if (farEnough(snap, window, minHammingDistance, recentWindow)) {
+                        yield(snap)
+                        if (recentWindow > 0) {
+                            if (window.size >= recentWindow) window.removeFirst()
+                            window.addLast(snap)
+                        }
+                    }
+                    state.restart()
+                    flipsSinceRestart = 0
+                    continue
                 }
-                state.restart()
-                flipsSinceRestart = 0
-                continue
+                if (flipsSinceRestart >= maxFlipsBeforeRestart) {
+                    state.restart()
+                    flipsSinceRestart = 0
+                    continue
+                }
+                val move = strategy.pickMove(state)
+                if (move == null) {
+                    state.restart()
+                    flipsSinceRestart = 0
+                    continue
+                }
+                state.apply(move)
+                flipsSinceRestart++
+                totalFlips++
             }
-            if (flipsSinceRestart >= maxFlipsBeforeRestart) {
-                state.restart()
-                flipsSinceRestart = 0
-                continue
-            }
-            val move = strategy.pickMove(state)
-            if (move == null) {
-                state.restart()
-                flipsSinceRestart = 0
-                continue
-            }
-            state.apply(move)
-            flipsSinceRestart++
-            totalFlips++
         }
     }
 
-    private fun farEnough(candidate: Sample, prior: List<Sample>): Boolean {
-        if (minHammingDistance <= 0) return true
-        for (p in prior) {
-            if (hammingDistance(candidate, p) < minHammingDistance) return false
+    private fun farEnough(
+        candidate: Sample,
+        window: ArrayDeque<Sample>,
+        minDistance: Int,
+        windowSize: Int,
+    ): Boolean {
+        if (minDistance <= 0 || windowSize == 0) return true
+        for (p in window) {
+            if (hammingDistance(candidate, p) < minDistance) return false
         }
         return true
     }

@@ -86,12 +86,18 @@ solver.sample(maxFlips = 100_000).take(20).forEach { sample ->
 ```
 
 `Solver.sample` returns a lazy `Sequence<Sample>` where each sample carries a
-`bools: BooleanArray` and an `ints: IntArray`. After each yielded sample the
-search restarts from a randomized state. Yielded samples are deduplicated by
-default; raise `minHammingDistance` to require samples to differ in at least
-that many primitive variables (Boolean flips and integer-value differences
-both count as one), or set it to `0` to allow duplicates. If the solution
-space is exhausted before the iteration budget, the sequence ends.
+`bools: BooleanArray` and an `ints: IntArray`. The diversity knobs
+(`randomSeed`, `minHammingDistance`, `recentWindow`) are parameters of
+`sample`, not the `Solver`, so independent draws never share state. After
+each yielded sample the search restarts from a randomized state.
+
+Yielded samples are deduplicated against a rolling window of the most recent
+ones, sized by `recentWindow` (default 16). `minHammingDistance` (default 1)
+is the minimum number of primitive variable differences a new sample must
+have from each sample in the window; raise it for UUID-style diversity, set
+it to 0 to allow duplicates, or raise `recentWindow` toward `Int.MAX_VALUE`
+for global uniqueness. If the local solution space within the window is
+exhausted before the iteration budget, the sequence ends.
 
 The default strategy is `WalkSat(noise)`: pick a violated factor, ask it for
 repair-move suggestions, then either flip a random suggestion (probability

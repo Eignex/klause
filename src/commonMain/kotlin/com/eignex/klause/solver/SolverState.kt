@@ -15,6 +15,7 @@ class SolverState(
     val violated: IntSwapSet = IntSwapSet(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
+    val moveSink: MoveSink = MoveSink()
 
     var hardCost: Int = 0
         internal set
