@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.ast.IntCmpOp
 
 /**
@@ -77,6 +78,7 @@ object BitBlaster {
                 }
                 is Linear -> emitLinear(b, factor, intBits, intMin)
                 is ReifiedIntCompare -> emitReifiedIntCompare(b, factor, boolMap, intBits, intMin)
+                is ReifiedLinear -> emitReifiedLinear(b, factor, boolMap, intBits, intMin)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -122,17 +124,29 @@ object BitBlaster {
     }
 
     private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray) {
+        b.addClause(intArrayOf(buildLinearComparator(b, f.coeffs, f.vars, f.op, f.bound, intBits, intMin)))
+    }
+
+    private fun buildLinearComparator(
+        b: CnfBuilder,
+        coeffs: IntArray,
+        vars: IntArray,
+        op: LinearOp,
+        bound: Int,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+    ): Int {
         // Substitute x_i = x_i' + min_i; new bound b' = bound - Σ c_i min_i.
-        var bPrime: Long = f.bound.toLong()
-        for (i in f.vars.indices) bPrime -= f.coeffs[i].toLong() * intMin[f.vars[i]].toLong()
+        var bPrime: Long = bound.toLong()
+        for (i in vars.indices) bPrime -= coeffs[i].toLong() * intMin[vars[i]].toLong()
 
         // Split positive and negative contributions, both as non-negative coefficient × x_i'.
         val posTerms = mutableListOf<IntArray>()
         val negTerms = mutableListOf<IntArray>()
-        for (i in f.vars.indices) {
-            val c = f.coeffs[i]
+        for (i in vars.indices) {
+            val c = coeffs[i]
             if (c == 0) continue
-            val term = b.multiplyByConstant(bitsToLits(intBits[f.vars[i]]), kotlin.math.abs(c))
+            val term = b.multiplyByConstant(bitsToLits(intBits[vars[i]]), kotlin.math.abs(c))
             if (c > 0) posTerms += term else negTerms += term
         }
         val pSum = sumAll(b, posTerms)
@@ -149,12 +163,24 @@ object BitBlaster {
             rhs = nSum
         }
 
-        val resultLit = when (f.op) {
+        return when (op) {
             LinearOp.LE -> b.unsignedLeq(lhs, rhs)
             LinearOp.GE -> b.unsignedLeq(rhs, lhs)
             LinearOp.EQ -> b.unsignedEq(lhs, rhs)
         }
-        b.addClause(intArrayOf(resultLit))
+    }
+
+    private fun emitReifiedLinear(
+        b: CnfBuilder,
+        f: ReifiedLinear,
+        boolMap: IntArray,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+    ) {
+        val cnfAux = Lit.make(boolMap[f.auxBoolVar], positive = true)
+        val cmp = buildLinearComparator(b, f.coeffs, f.vars, f.op, f.bound, intBits, intMin)
+        b.addClause(intArrayOf(Lit.negate(cnfAux), cmp))
+        b.addClause(intArrayOf(cnfAux, Lit.negate(cmp)))
     }
 
     private fun emitReifiedIntCompare(
