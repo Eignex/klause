@@ -43,18 +43,22 @@ and core library are also required.
 class CampaignSchema : VariableSchema() {
     val type    by nominal("a", "b", "c")
     val budget  by intVar(min = 1000, max = 4000)
+    val bonus   by intVar(min = 0, max = 500)
     val rate    by floatVar(min = 0.0, max = 1.0, buckets = 21)
 
-    val capWhenA by constraint { (type eq "a") implies (budget le 2000) }
-    val highRate by constraint { rate ge 0.5 }
+    val capWhenA   by constraint { (type eq "a") implies (budget + bonus le 2000) }
+    val proportion by constraint { 2 * bonus le budget }
+    val highRate   by constraint { rate ge 0.5 }
 }
 ```
 
 The constraint DSL covers `and`, `or`, `implies`, `iff`, `!` for the Boolean
-side; `eq` / `ne` against label literals on nominals; `le`, `lt`, `ge`, `gt`,
-`eq`, `ne` against integer or float literals (and against another variable of
-the same kind); and top-level `atMost`, `atLeast`, `cardinality` for counting
-constraints.
+side; `eq` / `ne` against label literals on nominals; full integer arithmetic
+through `+`, `-`, unary `-`, and `*` by constant; the comparators `le`, `lt`,
+`ge`, `gt`, `eq`, `ne` over arbitrary integer expressions on either side;
+the same comparators against float literals on `floatVar` (resolved to
+bucket-index comparisons at construction time); and top-level `atMost`,
+`atLeast`, `cardinality` for counting constraints.
 
 ---
 
@@ -93,8 +97,7 @@ suitable for any external propositional SAT engine.
 - Make/break delta cache: incremental per-variable scoring across accepted moves instead of recomputing each step.
 - More search strategies: probSAT, SAPS, tabu, simulated annealing.
 - Pseudo-Boolean and XOR factors; general `Cardinality(min, max)` beyond k=1.
-- Reified linear constraints for non-top-level positions.
 - Solution-pool diversification: Hamming and XOR-slice blocking factors.
-- Linear arithmetic in the DSL (sums, scales, soft constraints with weights).
+- Soft constraints with weights surfaced in the DSL.
 - External SAT adapter (LogicNG) for cross-checks and UNSAT proofs.
 - Benchmark suite, Maven Central publishing, CI.
