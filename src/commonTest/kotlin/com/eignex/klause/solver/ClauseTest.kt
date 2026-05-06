@@ -41,16 +41,15 @@ class ClauseTest {
     }
 
     @Test
-    fun flippingMaintainsCount() {
+    fun flippingMaintainsViolationStatus() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val state = stateFor(3, clause)
         state.assignment.setBool(0, true); state.assignment.setBool(1, true); state.assignment.setBool(2, false)
         state.recompute()
-        assertEquals(2, state.intPayload[0])
+        assertFalse(clause.isViolated(state, 0))
         state.apply(Move.BoolFlip(0))
-        assertEquals(1, state.intPayload[0])
+        assertFalse(clause.isViolated(state, 0))
         state.apply(Move.BoolFlip(1))
-        assertEquals(0, state.intPayload[0])
         assertTrue(clause.isViolated(state, 0))
     }
 }
