@@ -56,9 +56,11 @@ class Z3Bench(
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }
 
-/** All backends currently shipping with the harness. */
-fun defaultSamplers(problem: Problem): List<BenchSampler> = listOf(
-    LocalSearchBench(problem),
-    LogicNGBench(problem),
-    Z3Bench(problem),
-)
+/** All backends currently shipping with the harness. The brute-force ground-truth
+ *  enumerator is added only when the assignment space fits — see [BruteForceSampler.fits]. */
+fun defaultSamplers(problem: Problem): List<BenchSampler> = buildList {
+    add(LocalSearchBench(problem))
+    add(LogicNGBench(problem))
+    add(Z3Bench(problem))
+    if (BruteForceSampler.fits(problem)) add(BruteForceBench(problem))
+}
