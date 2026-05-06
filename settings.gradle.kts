@@ -7,4 +7,4 @@ pluginManagement {
     }
 }
 
-include(":klause", ":klause-logicng")
+include(":klause", ":klause-logicng", ":klause-z3", ":klause-bench")
