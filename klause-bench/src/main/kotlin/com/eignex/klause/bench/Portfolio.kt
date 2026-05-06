@@ -77,54 +77,31 @@ object Portfolio {
                 )),
             expectedSat = true,
         ),
-        // Approximation of combo TestModels.MODEL6 ("All Cardinality Options except NE"):
-        // overlapping cardinality bounds plus an excludes pair, scaled to 8 bool vars.
+        // Cardinality stress (combo MODEL6, scaled down).
         Entry("cardinalityStress",
             Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
-                // atMost(3) over the first 6 flags
-                Cardinality(literals = (0..5).map { Lit.make(it, true) }.toIntArray(),
-                    min = 0, max = 3),
-                // atLeast(3) over all 8
-                Cardinality(literals = (0..7).map { Lit.make(it, true) }.toIntArray(),
-                    min = 3, max = 8),
-                // exactly(2) on first three
-                Cardinality(literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-                    min = 2, max = 2),
-                // excludes(flag2, flag3) — at-most-one of these two
-                Cardinality(literals = intArrayOf(Lit.make(2, true), Lit.make(3, true)),
-                    min = 0, max = 1),
-                // cardinality(2, GT) over all 8 — strictly more than 2 true
-                Cardinality(literals = (0..7).map { Lit.make(it, true) }.toIntArray(),
-                    min = 3, max = 8),
-                // cardinality(6, LT) over all 8 — strictly less than 6 true
-                Cardinality(literals = (0..7).map { Lit.make(it, true) }.toIntArray(),
-                    min = 0, max = 5),
+                Cardinality((0..5).map { Lit.make(it, true) }.toIntArray(), min = 0, max = 3),
+                Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 3, max = 8),
+                Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
+                Cardinality(intArrayOf(Lit.make(2, true), Lit.make(3, true)), min = 0, max = 1),
+                Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 3, max = 8),
+                Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 0, max = 5),
             )),
             expectedSat = true,
         ),
-        // Approximation of combo TestModels.CSP1 ("All kinds of PB constraints"): reified
-        // implications, a cardinality bound, and a weighted PB inequality interacting on the
-        // same 4 bool vars. Stresses the reified-aux coordination across factor types.
+        // Reified implication + cardinality + weighted PB on the same flags (combo CSP1).
         Entry("pbReifiedMix",
-            // 4 base flags (0..3) + 2 aux bools (4, 5) for the reified conjunction/disjunction.
             Problem(numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
-                // aux4 ↔ (#true(f2,f3) ≥ 2) — i.e. f2 ∧ f3
                 ReifiedCardinality(auxBoolVar = 4,
-                    literals = intArrayOf(Lit.make(1, true), Lit.make(2, true)),
-                    min = 2, max = 2),
-                // f1 → aux4 (i.e. f1 reifiedImplies (f2 ∧ f3))
+                    literals = intArrayOf(Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(4, true))),
-                // aux5 ↔ (#true(f1,f2,f3) ≥ 1) — disjunction
                 ReifiedCardinality(auxBoolVar = 5,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
                     min = 1, max = 3),
-                // f4 → aux5
                 Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
-                // cardinality(3, LT) over (¬f1, f2, f3, ¬f4)
-                Cardinality(literals = intArrayOf(
+                Cardinality(intArrayOf(
                     Lit.make(0, false), Lit.make(1, true), Lit.make(2, true), Lit.make(3, false),
                 ), min = 0, max = 2),
-                // weighted PB: 1*f1 + 2*f2 + 3*f3 + 4*f4 > 2 → ≥ 3
                 PseudoBoolean(
                     weights = intArrayOf(1, 2, 3, 4),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
@@ -133,9 +110,7 @@ object Portfolio {
             )),
             expectedSat = true,
         ),
-        // Approximation of combo TestModels.LARGE4 ("Random Disjunctions") shrunk to 12 vars
-        // and ~30 hand-crafted 3-SAT clauses. Hits clause-density ratios where local search
-        // is still trivially fast but enough structure to exercise watched literals + tabu.
+        // Hand-rolled 3-SAT, 12 vars / 30 clauses (combo LARGE4 at portfolio scale).
         Entry("smallRandom3sat",
             Problem(numBoolVars = 12, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(7, true))),
@@ -171,29 +146,19 @@ object Portfolio {
             )),
             expectedSat = true,
         ),
-        // Realistic small "budget" problem: a nominal type drives a unit cost; choice must
-        // stay under a budget. 3 nominal one-hot bools + 1 int cost. Each type pegs the cost
-        // via a reified equality; exactlyOne on the indicators; cost ≤ budget caps the
-        // feasible types.
+        // Nominal type pegs an int cost (a=30, b=50, c=80); cap excludes c.
         Entry("budgetCampaign",
             Problem(numBoolVars = 3, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 100)),
                 factors = listOf(
                     Cardinality.exactlyOne(intArrayOf(
                         Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
                     )),
-                    // type=a (bool 0) ↔ cost = 30
                     ReifiedLinear(auxBoolVar = 0,
-                        coeffs = intArrayOf(1), vars = intArrayOf(0),
-                        op = LinearOp.EQ, bound = 30),
-                    // type=b (bool 1) ↔ cost = 50
+                        coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 30),
                     ReifiedLinear(auxBoolVar = 1,
-                        coeffs = intArrayOf(1), vars = intArrayOf(0),
-                        op = LinearOp.EQ, bound = 50),
-                    // type=c (bool 2) ↔ cost = 80
+                        coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 50),
                     ReifiedLinear(auxBoolVar = 2,
-                        coeffs = intArrayOf(1), vars = intArrayOf(0),
-                        op = LinearOp.EQ, bound = 80),
-                    // budget cap: only types a, b survive.
+                        coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 80),
                     IntLeq(intVar = 0, bound = 60),
                 )),
             expectedSat = true,
