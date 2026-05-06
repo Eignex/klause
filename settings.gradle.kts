@@ -6,3 +6,5 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
+include(":klause", ":klause-logicng")
