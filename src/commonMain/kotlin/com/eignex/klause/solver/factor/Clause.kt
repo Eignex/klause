@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -59,6 +60,14 @@ class Clause(
         val newSat = oldSat + change
         state.intPayload[factorId] = newSat
         return (if (newSat == 0) 1 else 0) - (if (oldSat == 0) 1 else 0)
+    }
+
+    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+        // A clause is violated iff every literal is false. In that case flipping any of the
+        // clause's variables makes its literal true, so every var in [boolVars] is a valid
+        // repair candidate. When not violated we have nothing to propose.
+        if (state.intPayload[factorId] != 0) return
+        for (v in boolVars) sink.addBoolFlip(v)
     }
 
     private companion object {
