@@ -17,6 +17,15 @@ class SolverState(
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
     val moveSink: MoveSink = MoveSink()
 
+    /** Step counter incremented on every accepted move. Strategies use this together with
+     *  [lastTouched] to enforce a tabu list. */
+    var step: Long = 0L
+        private set
+
+    /** Step at which each variable was last flipped or set. Index is the bool var id for
+     *  Boolean vars (`[0, numBoolVars)`); int var ids are offset by `numBoolVars`. */
+    val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars)
+
     var hardCost: Int = 0
         internal set
 
@@ -25,6 +34,8 @@ class SolverState(
 
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
+        for (i in lastTouched.indices) lastTouched[i] = 0L
+        step = 0L
         recompute()
     }
 
@@ -78,6 +89,8 @@ class SolverState(
             val factor = problem.factors[factorId]
             updateViolation(factor, factorId, factor.applyBoolFlip(this, factorId, boolVar))
         }
+        step++
+        lastTouched[boolVar] = step
     }
 
     private fun applyIntSet(intVar: Int, newValue: Int) {
@@ -88,6 +101,20 @@ class SolverState(
             val factor = problem.factors[factorId]
             updateViolation(factor, factorId, factor.applyIntSet(this, factorId, intVar, old))
         }
+        step++
+        lastTouched[problem.numBoolVars + intVar] = step
+    }
+
+    /** True iff [move]'s var was touched within the last [tenure] accepted moves. */
+    fun isTaboo(move: Move, tenure: Int): Boolean {
+        if (tenure <= 0) return false
+        val slot = when (move) {
+            is Move.BoolFlip -> move.varId
+            is Move.IntSet -> problem.numBoolVars + move.varId
+        }
+        val touched = lastTouched[slot]
+        if (touched == 0L) return false   // never touched (lastTouched is reset on restart)
+        return step - touched < tenure
     }
 
     private fun updateViolation(factor: Factor, factorId: Int, deltaViolated: Int) {

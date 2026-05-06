@@ -17,6 +17,7 @@ import kotlin.math.pow
 class ProbSat(
     val cb: Double = 2.06,
     val eps: Double = 1.0,
+    val tabuTenure: Int = 10,
 ) : Strategy {
 
     override fun pickMove(state: SolverState): Move? {
@@ -25,8 +26,12 @@ class ProbSat(
         val factor = state.problem.factors[factorId]
         state.moveSink.clear()
         factor.proposeRepairMoves(state, factorId, state.moveSink)
-        val moves = state.moveSink.list
-        if (moves.isEmpty()) return null
+        val raw = state.moveSink.list
+        if (raw.isEmpty()) return null
+        val moves = if (tabuTenure > 0) {
+            val nonTaboo = raw.filter { !state.isTaboo(it, tabuTenure) }
+            if (nonTaboo.isEmpty()) raw else nonTaboo
+        } else raw
         if (moves.size == 1) return moves[0]
 
         var totalWeight = 0.0
