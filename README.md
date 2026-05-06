@@ -105,6 +105,4 @@ suitable for any external propositional SAT engine.
 - Diversification beyond the rolling window: Hamming and XOR blocking factors.
 - Global GCC factor with a HashMap-of-counts payload, sharper than the current per-value cardinality decomposition.
 - Typed handle-based decode API to replace name-string lookups.
-- LogicNG adapter (jvmMain) for SAT-engine cross-checks and UNSAT proofs.
-- Bit-blaster cross-check oracle wired into the test suite.
 - Benchmark suite, Maven Central publishing, CI.
