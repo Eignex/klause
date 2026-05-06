@@ -22,28 +22,25 @@ fun main() {
     if (disagreements > 0) error("$disagreements portfolio entries disagreed across backends")
 
     println()
-    println("=== benchmark (first sat entry) ===")
-    val benchEntry = Portfolio.sat.first()
-    val report = Benchmarker.bench(benchEntry.problem, repetitions = 3, sampleCount = 5)
-    for ((name, t) in report.timings) {
-        println("  $name: " +
-            "solve=${summarize(t.solveNanos)} " +
-            "sample=${summarize(t.sampleNanos)} " +
-            "enumerate=${summarize(t.enumerateNanos)}")
+    println("=== benchmark (per entry, median of 3 reps × 5 samples) ===")
+    for (entry in Portfolio.sat) {
+        val report = Benchmarker.bench(entry.problem, repetitions = 3, sampleCount = 5)
+        val cells = report.timings.entries.joinToString(" | ") { (name, t) ->
+            "$name solve=${formatNs(median(t.solveNanos))} " +
+                "sample=${formatNs(median(t.sampleNanos))} " +
+                "enum=${formatNs(median(t.enumerateNanos))}"
+        }
+        println("[${entry.name}] $cells")
     }
 }
+
+private fun median(times: LongArray): Long =
+    if (times.isEmpty()) 0 else times.sortedArray()[times.size / 2]
 
 private fun formatVerdict(v: SolveResult): String = when (v) {
     is SolveResult.Sat -> "Sat"
     SolveResult.Unsat -> "Unsat"
     SolveResult.Unknown -> "Unknown"
-}
-
-private fun summarize(times: LongArray): String {
-    if (times.isEmpty()) return "-"
-    val sorted = times.sortedArray()
-    val median = sorted[sorted.size / 2]
-    return "${formatNs(sorted.first())}-${formatNs(sorted.last())} (median ${formatNs(median)})"
 }
 
 private fun formatNs(ns: Long): String = when {
