@@ -29,6 +29,8 @@ class Linear(
     override val boolVars: IntArray = IntArray(0)
     override val intVars: IntArray = vars
 
+    private val coeffLookup: CoeffLookup = CoeffLookup.build(vars, coeffs)
+
     override fun initialize(state: SolverState, factorId: Int) {
         var sum = 0
         for (i in vars.indices) sum += coeffs[i] * state.assignment.intValue(vars[i])
@@ -76,10 +78,7 @@ class Linear(
         LinearOp.GE -> sum < bound
     }
 
-    private fun coeffOf(intVar: Int): Int {
-        for (i in vars.indices) if (vars[i] == intVar) return coeffs[i]
-        return 0
-    }
+    private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
 
     private fun snapTarget(coeff: Int, sumWithout: Int): Int? {
         val numerator = bound - sumWithout
