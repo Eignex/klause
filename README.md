@@ -100,8 +100,8 @@ suitable for any external propositional SAT engine.
 
 ## TODO
 
-- Per-variable make/break cache for incremental scoring instead of recomputing each step.
-- Additional search strategies: probSAT, SAPS, tabu, simulated annealing, restart schedules.
+- Incrementally maintained per-variable make/break cache, so strategies don't recompute break scores by walking occurrence lists each step.
+- Additional search strategies: SAPS, simulated annealing, restart schedules.
 - Diversification beyond the rolling window: Hamming and XOR blocking factors.
 - Global GCC factor with a HashMap-of-counts payload, sharper than the current per-value cardinality decomposition.
 - Typed handle-based decode API to replace name-string lookups.
