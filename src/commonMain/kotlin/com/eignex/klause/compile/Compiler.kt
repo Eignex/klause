@@ -184,7 +184,14 @@ class Compiler {
             if (lifted.all { it is IntRef }) {
                 val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
                 if (ids.toSet().size == ids.size) {
-                    factors += AllDifferentFactor(ids, isHard, weight)
+                    var dMin = intDomains[ids[0]].min
+                    var dMax = intDomains[ids[0]].max
+                    for (id in ids) {
+                        val d = intDomains[id]
+                        if (d.min < dMin) dMin = d.min
+                        if (d.max > dMax) dMax = d.max
+                    }
+                    factors += AllDifferentFactor(ids, dMin, dMax - dMin + 1, isHard, weight)
                     return
                 }
             }

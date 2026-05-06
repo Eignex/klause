@@ -4,13 +4,14 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Solver
 import kotlin.test.Test
+import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 class AllDifferentTest {
 
     @Test
     fun fourVarsPermutationOverFourValues() {
-        val factor = AllDifferent(intArrayOf(0, 1, 2, 3))
+        val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -28,7 +29,7 @@ class AllDifferentTest {
     @Test
     fun threeVarsRoomForOneDuplicateRequiresUniqueValues() {
         // 3 vars over [0..3]: easy to satisfy.
-        val factor = AllDifferent(intArrayOf(0, 1, 2))
+        val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -40,6 +41,22 @@ class AllDifferentTest {
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             assertTrue(s.ints.toSet().size == 3, "duplicates in ${s.ints.toList()}")
+        }
+    }
+
+    @Test
+    fun mismatchedDomainBoundsFailAtInitialize() {
+        // Declared union [0..2] is too tight for an operand with domain [0..5].
+        val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 2)),
+            factors = listOf(factor),
+        )
+        // initialize() runs at the first restart; attempting to sample triggers it.
+        assertFails {
+            Solver(problem, maxFlipsBeforeRestart = 50).sample(maxFlips = 100, randomSeed = 1).take(1).toList()
         }
     }
 }
