@@ -25,7 +25,7 @@ interface BenchSampler {
 
 class LocalSearchBench(
     override val problem: Problem,
-    private val params: LocalSearchParams = LocalSearchParams(maxFlips = 100_000L, randomSeed = 0L),
+    private val params: LocalSearchParams = LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L),
 ) : BenchSampler {
     private val s = LocalSearchSolver(problem)
     override val name = "local-search"

@@ -54,9 +54,12 @@ class LocalSearchSolver(
             val window = ArrayDeque<Sample>()
             state.restart()
             var flipsSinceRestart = 0
-            var totalFlips = 0L
+            // Bound per yield, not per session: when [maxFlips] elapses without producing a
+            // fresh sample, we've effectively exhausted the search neighbourhood — end the
+            // sequence rather than spinning forever rejecting via [farEnough].
+            var flipsSinceYield = 0L
 
-            while (totalFlips < maxFlips) {
+            while (flipsSinceYield < maxFlips) {
                 if (state.hardCost == 0) {
                     val snap = state.assignment.snapshot()
                     if (farEnough(snap, window, minHammingDistance, recentWindow)) {
@@ -65,6 +68,7 @@ class LocalSearchSolver(
                             if (window.size >= recentWindow) window.removeFirst()
                             window.addLast(snap)
                         }
+                        flipsSinceYield = 0
                     }
                     state.restart()
                     flipsSinceRestart = 0
@@ -83,7 +87,7 @@ class LocalSearchSolver(
                 }
                 state.apply(move)
                 flipsSinceRestart++
-                totalFlips++
+                flipsSinceYield++
             }
         }
     }
