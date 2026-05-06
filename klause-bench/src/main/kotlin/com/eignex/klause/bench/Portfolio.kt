@@ -13,6 +13,7 @@ import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
 
@@ -74,6 +75,100 @@ object Portfolio {
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     IntLeq(intVar = 0, bound = 2),
                 )),
+            expectedSat = true,
+        ),
+        // Approximation of combo TestModels.MODEL6 ("All Cardinality Options except NE"):
+        // overlapping cardinality bounds plus an excludes pair, scaled to 8 bool vars.
+        Entry("cardinalityStress",
+            Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+                // atMost(3) over the first 6 flags
+                Cardinality(literals = (0..5).map { Lit.make(it, true) }.toIntArray(),
+                    min = 0, max = 3),
+                // atLeast(3) over all 8
+                Cardinality(literals = (0..7).map { Lit.make(it, true) }.toIntArray(),
+                    min = 3, max = 8),
+                // exactly(2) on first three
+                Cardinality(literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
+                    min = 2, max = 2),
+                // excludes(flag2, flag3) — at-most-one of these two
+                Cardinality(literals = intArrayOf(Lit.make(2, true), Lit.make(3, true)),
+                    min = 0, max = 1),
+                // cardinality(2, GT) over all 8 — strictly more than 2 true
+                Cardinality(literals = (0..7).map { Lit.make(it, true) }.toIntArray(),
+                    min = 3, max = 8),
+                // cardinality(6, LT) over all 8 — strictly less than 6 true
+                Cardinality(literals = (0..7).map { Lit.make(it, true) }.toIntArray(),
+                    min = 0, max = 5),
+            )),
+            expectedSat = true,
+        ),
+        // Approximation of combo TestModels.CSP1 ("All kinds of PB constraints"): reified
+        // implications, a cardinality bound, and a weighted PB inequality interacting on the
+        // same 4 bool vars. Stresses the reified-aux coordination across factor types.
+        Entry("pbReifiedMix",
+            // 4 base flags (0..3) + 2 aux bools (4, 5) for the reified conjunction/disjunction.
+            Problem(numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+                // aux4 ↔ (#true(f2,f3) ≥ 2) — i.e. f2 ∧ f3
+                ReifiedCardinality(auxBoolVar = 4,
+                    literals = intArrayOf(Lit.make(1, true), Lit.make(2, true)),
+                    min = 2, max = 2),
+                // f1 → aux4 (i.e. f1 reifiedImplies (f2 ∧ f3))
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(4, true))),
+                // aux5 ↔ (#true(f1,f2,f3) ≥ 1) — disjunction
+                ReifiedCardinality(auxBoolVar = 5,
+                    literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
+                    min = 1, max = 3),
+                // f4 → aux5
+                Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
+                // cardinality(3, LT) over (¬f1, f2, f3, ¬f4)
+                Cardinality(literals = intArrayOf(
+                    Lit.make(0, false), Lit.make(1, true), Lit.make(2, true), Lit.make(3, false),
+                ), min = 0, max = 2),
+                // weighted PB: 1*f1 + 2*f2 + 3*f3 + 4*f4 > 2 → ≥ 3
+                PseudoBoolean(
+                    weights = intArrayOf(1, 2, 3, 4),
+                    literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+                    op = PbOp.GE, bound = 3,
+                ),
+            )),
+            expectedSat = true,
+        ),
+        // Approximation of combo TestModels.LARGE4 ("Random Disjunctions") shrunk to 12 vars
+        // and ~30 hand-crafted 3-SAT clauses. Hits clause-density ratios where local search
+        // is still trivially fast but enough structure to exercise watched literals + tabu.
+        Entry("smallRandom3sat",
+            Problem(numBoolVars = 12, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(7, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(4, true), Lit.make(8, false))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(5, false), Lit.make(9, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(6, true), Lit.make(10, false))),
+                Clause(intArrayOf(Lit.make(3, true), Lit.make(7, false), Lit.make(11, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(5, true), Lit.make(9, false))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(4, false), Lit.make(11, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(8, true), Lit.make(10, true))),
+                Clause(intArrayOf(Lit.make(6, false), Lit.make(7, true), Lit.make(8, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(4, true), Lit.make(5, true), Lit.make(6, true))),
+                Clause(intArrayOf(Lit.make(7, false), Lit.make(9, false), Lit.make(11, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(5, true))),
+                Clause(intArrayOf(Lit.make(3, false), Lit.make(8, true), Lit.make(10, false))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(6, false), Lit.make(11, false))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(4, false), Lit.make(9, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(7, true), Lit.make(10, false))),
+                Clause(intArrayOf(Lit.make(3, true), Lit.make(5, false), Lit.make(8, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(6, true), Lit.make(11, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false), Lit.make(11, true))),
+                Clause(intArrayOf(Lit.make(4, true), Lit.make(7, false), Lit.make(9, false))),
+                Clause(intArrayOf(Lit.make(5, true), Lit.make(8, true), Lit.make(10, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true), Lit.make(6, false))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(5, false), Lit.make(7, false))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(8, true), Lit.make(11, false))),
+                Clause(intArrayOf(Lit.make(3, false), Lit.make(6, true), Lit.make(9, true))),
+                Clause(intArrayOf(Lit.make(4, false), Lit.make(10, true), Lit.make(11, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(8, false))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false), Lit.make(4, true))),
+                Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true), Lit.make(7, true))),
+            )),
             expectedSat = true,
         ),
         // Realistic small "budget" problem: a nominal type drives a unit cost; choice must
