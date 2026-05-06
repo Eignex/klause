@@ -66,19 +66,25 @@ class Product(
         if (av * bv == rv) return
         // Candidate 1: snap result = a*b.
         val rTarget = av * bv
-        val rClamped = state.problem.intDomains[result].clamp(rTarget)
+        val rDomain = state.problem.intDomains[result]
+        val rClamped = rDomain.clamp(rTarget)
         if (rClamped == rTarget && rClamped != rv) sink.addIntSet(result, rClamped)
         // Candidate 2: if b ≠ 0 and result divisible by b, snap a = result/b.
         if (bv != 0 && rv % bv == 0) {
             val aTarget = rv / bv
             val aClamped = state.problem.intDomains[a].clamp(aTarget)
             if (aClamped == aTarget && aClamped != av) sink.addIntSet(a, aClamped)
+        } else if (bv != 0) {
+            // Secondary candidate: closest a in domain whose product with b approaches result.
+            proposeClosestOperand(state, operandVar = a, otherValue = bv, currentValue = av, sink)
         }
         // Candidate 3: if a ≠ 0 and result divisible by a, snap b = result/a.
         if (av != 0 && rv % av == 0) {
             val bTarget = rv / av
             val bClamped = state.problem.intDomains[b].clamp(bTarget)
             if (bClamped == bTarget && bClamped != bv) sink.addIntSet(b, bClamped)
+        } else if (av != 0) {
+            proposeClosestOperand(state, operandVar = b, otherValue = av, currentValue = bv, sink)
         }
         // Fall back to ±1 nudges if none of the snap candidates apply.
         for (v in intArrayOf(a, b, result)) {
@@ -87,6 +93,36 @@ class Product(
             if (cur < d.max) sink.addIntSet(v, cur + 1)
             if (cur > d.min) sink.addIntSet(v, cur - 1)
         }
+    }
+
+    /**
+     * Propose snapping [operandVar] to the value in its domain whose product with [otherValue]
+     * is closest to the current `result`. Walks a small window around `result / otherValue` so
+     * the search stays O(1).
+     */
+    private fun proposeClosestOperand(
+        state: SolverState,
+        operandVar: Int,
+        otherValue: Int,
+        currentValue: Int,
+        sink: MoveSink,
+    ) {
+        if (otherValue == 0) return
+        val rv = state.assignment.intValue(result)
+        val center = rv / otherValue   // truncated
+        val domain = state.problem.intDomains[operandVar]
+        var bestCandidate = currentValue
+        var bestError = kotlin.math.abs(currentValue.toLong() * otherValue - rv)
+        for (delta in -2..2) {
+            val cand = center + delta
+            if (cand !in domain.min..domain.max) continue
+            val error = kotlin.math.abs(cand.toLong() * otherValue - rv)
+            if (error < bestError) {
+                bestError = error
+                bestCandidate = cand
+            }
+        }
+        if (bestCandidate != currentValue) sink.addIntSet(operandVar, bestCandidate)
     }
 
     private companion object {
