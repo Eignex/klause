@@ -108,30 +108,44 @@ class AllDifferent(
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
         val s = state.refPayload[factorId] as State
         if (s.duplicateCount == 0) return
-        // Find a duplicated value, pick one of its occupants, propose snapping it to a value
-        // currently absent from the assignment.
+        // Reservoir-sample a duplicated value (uniform across all values whose count > 1).
+        var pickedIdx = -1
+        var seenDups = 0
         for (idx in s.counts.indices) {
-            val count = s.counts[idx]
-            if (count <= 1) continue
-            val value = idx + domainMin
-            var occupant = -1
-            for (v in vars) if (state.assignment.intValue(v) == value) { occupant = v; break }
-            if (occupant == -1) continue
-            val d = state.problem.intDomains[occupant]
-            for (target in d.min..d.max) {
-                if (target == value) continue
-                val tIdx = target - domainMin
-                if (tIdx in s.counts.indices && s.counts[tIdx] == 0) {
-                    sink.addIntSet(occupant, target)
-                    return
-                }
-            }
-            // Fallback: nudge occupant by ±1.
-            val cur = state.assignment.intValue(occupant)
-            if (cur < d.max) sink.addIntSet(occupant, cur + 1)
-            if (cur > d.min) sink.addIntSet(occupant, cur - 1)
+            if (s.counts[idx] <= 1) continue
+            seenDups++
+            if (state.rng.nextInt(seenDups) == 0) pickedIdx = idx
+        }
+        if (pickedIdx == -1) return
+        val value = pickedIdx + domainMin
+        // Reservoir-sample one of its occupants.
+        var occupant = -1
+        var seenOccupants = 0
+        for (v in vars) {
+            if (state.assignment.intValue(v) != value) continue
+            seenOccupants++
+            if (state.rng.nextInt(seenOccupants) == 0) occupant = v
+        }
+        if (occupant == -1) return
+        val d = state.problem.intDomains[occupant]
+        // Reservoir-sample a target value not currently used.
+        var pickedTarget = Int.MIN_VALUE
+        var seenTargets = 0
+        for (target in d.min..d.max) {
+            if (target == value) continue
+            val tIdx = target - domainMin
+            if (tIdx !in s.counts.indices || s.counts[tIdx] != 0) continue
+            seenTargets++
+            if (state.rng.nextInt(seenTargets) == 0) pickedTarget = target
+        }
+        if (pickedTarget != Int.MIN_VALUE) {
+            sink.addIntSet(occupant, pickedTarget)
             return
         }
+        // Fallback: nudge occupant by ±1.
+        val cur = state.assignment.intValue(occupant)
+        if (cur < d.max) sink.addIntSet(occupant, cur + 1)
+        if (cur > d.min) sink.addIntSet(occupant, cur - 1)
     }
 
     private companion object {
