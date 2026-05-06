@@ -27,7 +27,7 @@ class WalkSat(val noise: Double = 0.5) : Strategy {
         var bestCount = 0
         var pick: Move? = null
         for (m in moves) {
-            val brk = breakCount(state, m)
+            val brk = state.breakScore(m)
             if (brk < bestBreak) {
                 bestBreak = brk
                 bestCount = 1
@@ -38,24 +38,5 @@ class WalkSat(val noise: Double = 0.5) : Strategy {
             }
         }
         return pick
-    }
-
-    private fun breakCount(state: SolverState, move: Move): Int = when (move) {
-        is Move.BoolFlip -> {
-            var count = 0
-            for (factorId in state.problem.boolOccurrences[move.varId]) {
-                val f = state.problem.factors[factorId]
-                if (f.isHard && f.deltaIfBoolFlipped(state, factorId, move.varId) > 0) count++
-            }
-            count
-        }
-        is Move.IntSet -> {
-            var count = 0
-            for (factorId in state.problem.intOccurrences[move.varId]) {
-                val f = state.problem.factors[factorId]
-                if (f.isHard && f.deltaIfIntSet(state, factorId, move.varId, move.newValue) > 0) count++
-            }
-            count
-        }
     }
 }

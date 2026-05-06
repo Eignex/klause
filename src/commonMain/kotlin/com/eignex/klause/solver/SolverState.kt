@@ -46,6 +46,32 @@ class SolverState(
         is Move.IntSet -> applyIntSet(move.varId, move.newValue)
     }
 
+    /**
+     * Number of currently-satisfied hard factors that would become violated if [move] were
+     * applied. Used by strategies (WalkSAT-style noise/greedy, probSAT-style weighting) to
+     * score repair candidates. Computed on demand by walking the var's occurrence list and
+     * asking each factor for its `deltaIf*` — soft factors are skipped since they don't count
+     * toward `hardCost`.
+     */
+    fun breakScore(move: Move): Int = when (move) {
+        is Move.BoolFlip -> {
+            var count = 0
+            for (factorId in problem.boolOccurrences[move.varId]) {
+                val f = problem.factors[factorId]
+                if (f.isHard && f.deltaIfBoolFlipped(this, factorId, move.varId) > 0) count++
+            }
+            count
+        }
+        is Move.IntSet -> {
+            var count = 0
+            for (factorId in problem.intOccurrences[move.varId]) {
+                val f = problem.factors[factorId]
+                if (f.isHard && f.deltaIfIntSet(this, factorId, move.varId, move.newValue) > 0) count++
+            }
+            count
+        }
+    }
+
     private fun applyBoolFlip(boolVar: Int) {
         assignment.flipBool(boolVar)
         for (factorId in problem.boolOccurrences[boolVar]) {
