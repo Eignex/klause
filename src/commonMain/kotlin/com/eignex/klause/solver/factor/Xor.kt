@@ -33,6 +33,18 @@ class Xor(
     }
     override val intVars: IntArray = EMPTY
 
+    /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`.
+     *  Flipping a var toggles factor parity by exactly this amount. */
+    private val parityByVar: CoeffLookup = run {
+        val parities = IntArray(boolVars.size)
+        for (i in boolVars.indices) {
+            var n = 0
+            for (lit in literals) if (Lit.variable(lit) == boolVars[i]) n++
+            parities[i] = n and 1
+        }
+        CoeffLookup.build(boolVars, parities)
+    }
+
     override fun initialize(state: SolverState, factorId: Int) {
         var parity = 0
         for (lit in literals) {
@@ -46,8 +58,7 @@ class Xor(
 
     override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
         val parity = state.intPayload[factorId]
-        val toggles = countOccurrences(boolVar)
-        val newParity = parity xor (toggles and 1)
+        val newParity = parity xor parityByVar.coeffOf(boolVar)
         val wasViolated = parity != targetParity
         val willViolate = newParity != targetParity
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
@@ -55,8 +66,7 @@ class Xor(
 
     override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
         val oldParity = state.intPayload[factorId]
-        val toggles = countOccurrences(boolVar)
-        val newParity = oldParity xor (toggles and 1)
+        val newParity = oldParity xor parityByVar.coeffOf(boolVar)
         state.intPayload[factorId] = newParity
         val wasViolated = oldParity != targetParity
         val nowViolated = newParity != targetParity
@@ -68,14 +78,8 @@ class Xor(
         // Flipping any literal whose variable appears an odd number of times in the list toggles
         // parity. In typical use each variable appears once, so any flip works.
         for (v in boolVars) {
-            if ((countOccurrences(v) and 1) == 1) sink.addBoolFlip(v)
+            if (parityByVar.coeffOf(v) == 1) sink.addBoolFlip(v)
         }
-    }
-
-    private fun countOccurrences(boolVar: Int): Int {
-        var n = 0
-        for (lit in literals) if (Lit.variable(lit) == boolVar) n++
-        return n
     }
 
     private companion object {
