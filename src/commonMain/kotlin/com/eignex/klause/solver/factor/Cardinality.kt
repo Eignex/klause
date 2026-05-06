@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -71,6 +72,33 @@ class Cardinality(
         val wasViolated = oldN < min || oldN > max
         val willViolate = newN < min || newN > max
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+        val n = state.intPayload[factorId]
+        if (n in min..max) return
+        val wantIncrease = n < min
+        if (boolVars.size == literals.size) {
+            // Fast path: each variable appears in exactly one literal. The flip's effect on
+            // the count is +1 iff the lit is currently false.
+            for (lit in literals) {
+                val v = Lit.variable(lit)
+                val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
+                val helpsIncrease = !isTrue
+                if (wantIncrease == helpsIncrease) sink.addBoolFlip(v)
+            }
+            return
+        }
+        // Slow path: a variable may appear in multiple literals; aggregate the net change.
+        for (v in boolVars) {
+            var netChange = 0
+            for (lit in literals) {
+                if (Lit.variable(lit) != v) continue
+                netChange += if (Lit.evaluate(lit, state.assignment.boolValue(v))) -1 else +1
+            }
+            if (wantIncrease && netChange > 0) sink.addBoolFlip(v)
+            else if (!wantIncrease && netChange < 0) sink.addBoolFlip(v)
+        }
     }
 
     companion object {
