@@ -100,7 +100,7 @@ suitable for any external propositional SAT engine.
 
 ## TODO
 
-- Incrementally maintained per-variable make/break cache, so strategies don't recompute break scores by walking occurrence lists each step.
+- Eager, factor-side make/break update hooks so each accepted move propagates contributions through the factor's neighbourhood instead of bumping a lazy invalidation bit. Needs a benchmark harness to justify the surface area.
 - Additional search strategies: SAPS, simulated annealing, restart schedules.
 - Diversification beyond the rolling window: Hamming and XOR blocking factors.
 - Global GCC factor with a HashMap-of-counts payload, sharper than the current per-value cardinality decomposition.

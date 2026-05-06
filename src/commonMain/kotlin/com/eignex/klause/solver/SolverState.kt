@@ -26,6 +26,14 @@ class SolverState(
      *  Boolean vars (`[0, numBoolVars)`); int var ids are offset by `numBoolVars`. */
     val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars)
 
+    /** Lazy cache for [breakScore] of `Move.BoolFlip`. Entry `v` is fresh iff
+     *  `boolBreakValid[v]`; otherwise the cached value is stale and must be recomputed. The
+     *  cache is invalidated for every variable in the factor-neighbourhood of an applied
+     *  move (so a flip of `u` invalidates `u` itself plus every other var sharing a factor
+     *  with `u`). `IntSet` break scores are not cached — the target value widens the key. */
+    private val boolBreakCache: IntArray = IntArray(problem.numBoolVars)
+    private val boolBreakValid: BooleanArray = BooleanArray(problem.numBoolVars)
+
     var hardCost: Int = 0
         internal set
 
@@ -43,6 +51,7 @@ class SolverState(
         for (i in 0 until problem.numFactors) violated.remove(i)
         hardCost = 0
         softCost = 0.0
+        for (v in boolBreakValid.indices) boolBreakValid[v] = false
         problem.factors.forEachIndexed { id, factor ->
             factor.initialize(this, id)
             if (factor.isViolated(this, id)) {
@@ -66,12 +75,19 @@ class SolverState(
      */
     fun breakScore(move: Move): Int = when (move) {
         is Move.BoolFlip -> {
-            var count = 0
-            for (factorId in problem.boolOccurrences[move.varId]) {
-                val f = problem.factors[factorId]
-                if (f.isHard && f.deltaIfBoolFlipped(this, factorId, move.varId) > 0) count++
+            val v = move.varId
+            if (boolBreakValid[v]) {
+                boolBreakCache[v]
+            } else {
+                var count = 0
+                for (factorId in problem.boolOccurrences[v]) {
+                    val f = problem.factors[factorId]
+                    if (f.isHard && f.deltaIfBoolFlipped(this, factorId, v) > 0) count++
+                }
+                boolBreakCache[v] = count
+                boolBreakValid[v] = true
+                count
             }
-            count
         }
         is Move.IntSet -> {
             var count = 0
@@ -85,10 +101,12 @@ class SolverState(
 
     private fun applyBoolFlip(boolVar: Int) {
         assignment.flipBool(boolVar)
-        for (factorId in problem.boolOccurrences[boolVar]) {
+        val touchedFactors = problem.boolOccurrences[boolVar]
+        for (factorId in touchedFactors) {
             val factor = problem.factors[factorId]
             updateViolation(factor, factorId, factor.applyBoolFlip(this, factorId, boolVar))
         }
+        invalidateBoolBreakNeighbourhood(touchedFactors)
         step++
         lastTouched[boolVar] = step
     }
@@ -97,12 +115,21 @@ class SolverState(
         val old = assignment.intValue(intVar)
         if (old == newValue) return
         assignment.setInt(intVar, newValue)
-        for (factorId in problem.intOccurrences[intVar]) {
+        val touchedFactors = problem.intOccurrences[intVar]
+        for (factorId in touchedFactors) {
             val factor = problem.factors[factorId]
             updateViolation(factor, factorId, factor.applyIntSet(this, factorId, intVar, old))
         }
+        invalidateBoolBreakNeighbourhood(touchedFactors)
         step++
         lastTouched[problem.numBoolVars + intVar] = step
+    }
+
+    private fun invalidateBoolBreakNeighbourhood(factorIds: IntArray) {
+        for (factorId in factorIds) {
+            val f = problem.factors[factorId]
+            for (v in f.boolVars) boolBreakValid[v] = false
+        }
     }
 
     /** True iff [move]'s var was touched within the last [tenure] accepted moves. */
