@@ -70,10 +70,10 @@ class PseudoBoolean(
             val v = Lit.variable(lit)
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val change = if (isTrue) -weights[i] else weights[i]
-            // Propose any flip that strictly reduces the violation distance, even if it doesn't
-            // fully repair the constraint. This keeps the solver making progress on tight PB
-            // constraints where no single literal can flip across the boundary in one step.
-            if (distance(sum + change) < curDist) sink.addBoolFlip(v)
+            // Propose any flip that doesn't worsen the violation distance, even neutral flips.
+            // Strict reduction is too restrictive on tight constraints where no single flip
+            // crosses the boundary; tabu and probSAT scoring break the resulting cycles.
+            if (distance(sum + change) <= curDist) sink.addBoolFlip(v)
         }
     }
 

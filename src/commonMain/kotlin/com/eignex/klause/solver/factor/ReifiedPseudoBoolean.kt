@@ -92,9 +92,10 @@ class ReifiedPseudoBoolean(
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val change = if (isTrue) -weights[i] else weights[i]
             val newDist = distanceToInRange(sum + change)
-            // wantHolds=true: drive sum toward the satisfying region (newDist < curDist).
-            // wantHolds=false: drive sum away from it (newDist > curDist).
-            val improves = if (wantHolds) newDist < curDist else newDist > curDist
+            // wantHolds=true: drive sum toward the satisfying region (newDist ≤ curDist).
+            // wantHolds=false: drive sum away from it (newDist ≥ curDist).
+            // Allow neutral flips so tight constraints don't stall; tabu / probSAT scoring break cycles.
+            val improves = if (wantHolds) newDist <= curDist else newDist >= curDist
             if (improves) sink.addBoolFlip(v)
         }
     }
