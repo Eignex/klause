@@ -1,8 +1,9 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.gcc
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -23,8 +24,8 @@ class GccDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 14).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 14)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val vs = listOf("a", "b", "c", "d").map { compiled.decodeInt(it, s) }
@@ -48,8 +49,8 @@ class GccDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 33).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 33)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val vs = listOf("a", "b", "c").map { compiled.decodeInt(it, s) }

@@ -1,12 +1,13 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.div
 import com.eignex.klause.ast.eq
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.rem
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -22,8 +23,8 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 27).take(15).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 27)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val nv = compiled.decodeInt("n", s)
@@ -43,8 +44,8 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 41).take(15).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 41)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val nv = compiled.decodeInt("n", s)
@@ -75,8 +76,8 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 61).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 61)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val nv = compiled.decodeInt("n", s)
@@ -95,8 +96,8 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 71).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 71)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val nv = compiled.decodeInt("n", s)
@@ -115,8 +116,8 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 20_000, randomSeed = 47).take(5).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 47)).take(5).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val nv = compiled.decodeInt("n", s)

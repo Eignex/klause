@@ -1,11 +1,12 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.pbAtLeast
 import com.eignex.klause.ast.pbAtMost
 import com.eignex.klause.ast.pbExactly
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import kotlin.test.Test
@@ -37,8 +38,8 @@ class PseudoBooleanDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 20_000, randomSeed = 31).take(15).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 31)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val av = if (compiled.decodeBool("a", s)) 3 else 0
@@ -60,8 +61,8 @@ class PseudoBooleanDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 20_000, randomSeed = 13).take(15).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 13)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val sum = (if (compiled.decodeBool("a", s)) 2 else 0) +
@@ -82,8 +83,8 @@ class PseudoBooleanDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 20_000, randomSeed = 41).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 41)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val sum = (if (compiled.decodeBool("a", s)) 2 else 0) +

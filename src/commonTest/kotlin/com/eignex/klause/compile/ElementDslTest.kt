@@ -1,10 +1,11 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.element
 import com.eignex.klause.ast.eq
 import com.eignex.klause.ast.ge
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -21,8 +22,8 @@ class ElementDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 5).take(8).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 5)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val i = compiled.decodeInt("idx", s)
@@ -44,8 +45,8 @@ class ElementDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 13).take(8).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 13)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val i = compiled.decodeInt("idx", s)

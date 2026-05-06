@@ -1,10 +1,11 @@
 package com.eignex.klause.solver.strategy
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.atLeast
 import com.eignex.klause.ast.atMost
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -24,8 +25,8 @@ class ProbSatTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, strategy = ProbSat(), maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 23).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, strategy = ProbSat(), maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 23)).take(10).toList()
         assertTrue(samples.isNotEmpty(), "ProbSat produced no samples on a satisfiable schema")
         for (s in samples) {
             val count = listOf("a", "b", "c", "d", "e").count { compiled.decodeBool(it, s) }

@@ -1,8 +1,9 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertFails
 import kotlin.test.assertTrue
@@ -18,8 +19,8 @@ class AllDifferentTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(factor),
         )
-        val solver = Solver(problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 7).take(20).toList()
+        val solver = LocalSearchSolver(problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             assertTrue(s.ints.toSet().size == 4, "duplicates in ${s.ints.toList()}")
@@ -36,8 +37,8 @@ class AllDifferentTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(factor),
         )
-        val solver = Solver(problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 13).take(15).toList()
+        val solver = LocalSearchSolver(problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             assertTrue(s.ints.toSet().size == 3, "duplicates in ${s.ints.toList()}")
@@ -56,7 +57,7 @@ class AllDifferentTest {
         )
         // initialize() runs at the first restart; attempting to sample triggers it.
         assertFails {
-            Solver(problem, maxFlipsBeforeRestart = 50).sample(maxFlips = 100, randomSeed = 1).take(1).toList()
+            LocalSearchSolver(problem, maxFlipsBeforeRestart = 50).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
         }
     }
 }

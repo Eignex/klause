@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.IntLeq
@@ -17,9 +18,9 @@ class SampleLoopTest {
     @Test
     fun sameSeedYieldsIdenticalSequence() {
         val problem = exactlyOneOver4()
-        val solver = Solver(problem)
-        val a = solver.sample(maxFlips = 10_000, randomSeed = 42, recentWindow = 2).take(10).toList()
-        val b = solver.sample(maxFlips = 10_000, randomSeed = 42, recentWindow = 2).take(10).toList()
+        val solver = LocalSearchSolver(problem)
+        val a = solver.enumerate(LocalSearchParams(maxFlips = 10_000, randomSeed = 42, recentWindow = 2)).take(10).toList()
+        val b = solver.enumerate(LocalSearchParams(maxFlips = 10_000, randomSeed = 42, recentWindow = 2)).take(10).toList()
         assertEquals(a, b, "Same Solver, same seed, same params → identical sequence")
     }
 
@@ -28,9 +29,9 @@ class SampleLoopTest {
         // Soft check: at least one element differs across two seeds. Two random sequences over
         // 4 solutions colliding entirely is astronomically unlikely.
         val problem = exactlyOneOver4()
-        val solver = Solver(problem)
-        val a = solver.sample(maxFlips = 10_000, randomSeed = 1, recentWindow = 2).take(8).toList()
-        val b = solver.sample(maxFlips = 10_000, randomSeed = 9, recentWindow = 2).take(8).toList()
+        val solver = LocalSearchSolver(problem)
+        val a = solver.enumerate(LocalSearchParams(maxFlips = 10_000, randomSeed = 1, recentWindow = 2)).take(8).toList()
+        val b = solver.enumerate(LocalSearchParams(maxFlips = 10_000, randomSeed = 9, recentWindow = 2)).take(8).toList()
         assertTrue(a != b, "Different seeds should produce different sample sequences")
     }
 
@@ -41,8 +42,8 @@ class SampleLoopTest {
         // sequence must end (rather than hang) and yield at most 3 samples.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val solver = Solver(problem)
-        val samples = solver.sample(maxFlips = 20_000L, randomSeed = 0L, recentWindow = 10).take(20).toList()
+        val solver = LocalSearchSolver(problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000L, randomSeed = 0L, recentWindow = 10)).take(20).toList()
         assertTrue(samples.size <= 3, "At most 3 distinct solutions exist; got ${samples.size}")
         assertEquals(samples.toSet().size, samples.size, "Window=10 forbids duplicates")
     }
@@ -56,11 +57,11 @@ class SampleLoopTest {
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val solver = Solver(problem)
-        val samples = solver.sample(
+        val solver = LocalSearchSolver(problem)
+        val samples = solver.enumerate(LocalSearchParams(
             maxFlips = 30_000L, randomSeed = 5L,
             minHammingDistance = 3, recentWindow = 8,
-        ).take(8).toList()
+        )).take(8).toList()
         // Every pair within the window-eligible run must satisfy distance ≥ 3.
         for (i in samples.indices) {
             for (j in (i + 1) until samples.size) {
@@ -81,9 +82,9 @@ class SampleLoopTest {
         )
         val problem = Problem(numBoolVars = 1, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 3)), factors = factors)
-        val solver = Solver(problem)
-        val samples = solver.sample(maxFlips = 20_000L, randomSeed = 11L,
-            minHammingDistance = 1, recentWindow = 8).take(4).toList()
+        val solver = LocalSearchSolver(problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000L, randomSeed = 11L,
+            minHammingDistance = 1, recentWindow = 8)).take(4).toList()
         // Only 4 solutions, all should be reachable (and unique under window=8).
         assertEquals(samples.toSet().size, samples.size)
         for (s in samples) assertTrue(s.bools[0], "Clause forces bool 0 = true")
@@ -95,9 +96,9 @@ class SampleLoopTest {
         // expect the requested count to be produced, including duplicates.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val solver = Solver(problem)
-        val samples = solver.sample(maxFlips = 10_000L, randomSeed = 0L,
-            minHammingDistance = 0, recentWindow = 16).take(10).toList()
+        val solver = LocalSearchSolver(problem)
+        val samples = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L,
+            minHammingDistance = 0, recentWindow = 16)).take(10).toList()
         assertEquals(10, samples.size, "minHammingDistance=0 should allow duplicates freely")
     }
 

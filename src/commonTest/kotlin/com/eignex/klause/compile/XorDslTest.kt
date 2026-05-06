@@ -1,10 +1,11 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.not
 import com.eignex.klause.ast.xor
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -34,8 +35,8 @@ class XorDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 7).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val count = listOf("a", "b", "c").count { compiled.decodeBool(it, s) }
@@ -53,8 +54,8 @@ class XorDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 19).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 19)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val count = listOf("a", "b", "c").count { compiled.decodeBool(it, s) }
@@ -73,8 +74,8 @@ class XorDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 23).take(20).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 23)).take(20).toList()
         for (s in samples) {
             val flag = compiled.decodeBool("flag", s)
             if (!flag) continue

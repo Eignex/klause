@@ -1,11 +1,12 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.atLeast
 import com.eignex.klause.ast.atMost
 import com.eignex.klause.ast.cardinality
 import com.eignex.klause.ast.implies
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import kotlin.test.Test
@@ -46,8 +47,8 @@ class CardinalityDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 7).take(8).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val flagSet = compiled.decodeBool("flag", s)
@@ -66,8 +67,8 @@ class CardinalityDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 3_000, randomSeed = 19).take(20).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 19)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val truthCount = listOf("a", "b", "c", "d", "e").count { compiled.decodeBool(it, s) }

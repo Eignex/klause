@@ -1,11 +1,12 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.allDifferent
 import com.eignex.klause.ast.gcc
 import com.eignex.klause.ast.notTable
 import com.eignex.klause.ast.table
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertFails
 
@@ -70,8 +71,8 @@ class DslValidationTest {
             val b by boolVar()
         }
         val compiled = S().compile()
-        val solver = Solver(compiled.problem)
+        val solver = LocalSearchSolver(compiled.problem)
         // totalBits = 2; demanding distance 3 is impossible.
-        assertFails { solver.sample(minHammingDistance = 3).take(1).toList() }
+        assertFails { solver.enumerate(LocalSearchParams(minHammingDistance = 3)).take(1).toList() }
     }
 }

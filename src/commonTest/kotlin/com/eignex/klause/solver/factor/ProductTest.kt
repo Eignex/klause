@@ -1,8 +1,9 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -18,8 +19,8 @@ class ProductTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 16)),
             factors = listOf(factor),
         )
-        val solver = Solver(problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 17).take(20).toList()
+        val solver = LocalSearchSolver(problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 17)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val a = s.ints[0]; val b = s.ints[1]; val r = s.ints[2]

@@ -1,11 +1,12 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.eq
 import com.eignex.klause.ast.le
 import com.eignex.klause.ast.times
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.factor.Product
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -32,8 +33,8 @@ class IntMulDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 30_000, randomSeed = 19).take(15).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 19)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val xv = compiled.decodeInt("x", s)

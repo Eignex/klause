@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.le
@@ -10,7 +11,7 @@ import com.eignex.klause.ast.unaryMinus
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -111,8 +112,8 @@ class ArithmeticDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 20_000, randomSeed = 17).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 17)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val xv = compiled.decodeInt("x", s)
@@ -145,8 +146,8 @@ class ArithmeticDslTest {
             val nonZero by constraint { -x le -1 }
         }
         val compiled = S().compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 200)
-        val samples = solver.sample(maxFlips = 5_000, randomSeed = 3).take(5).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 3)).take(5).toList()
         for (s in samples) {
             val xv = compiled.decodeInt("x", s)
             assertTrue(xv >= 1, "Expected x≥1, got $xv")

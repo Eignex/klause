@@ -1,8 +1,9 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.channel
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -20,8 +21,8 @@ class ChannelDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 20_000, randomSeed = 21).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 21)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val i = compiled.decodeInt("idx", s)
@@ -43,8 +44,8 @@ class ChannelDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = Solver(compiled.problem, maxFlipsBeforeRestart = 500)
-        val samples = solver.sample(maxFlips = 20_000, randomSeed = 6).take(10).toList()
+        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 6)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val i = compiled.decodeInt("idx", s)

@@ -1,11 +1,12 @@
 package com.eignex.klause.cnf
 
+import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -36,9 +37,9 @@ class SolverVsBitBlasterTest {
     fun solverSatisfyingAssignmentsAreSatUnderBitBlast() {
         for (case in satPortfolio()) {
             val cnf = BitBlaster.compile(case.problem)
-            val solver = Solver(case.problem)
-            val samples = solver.sample(maxFlips = 200_000L, randomSeed = 0L,
-                minHammingDistance = 0, recentWindow = 0).take(1).toList()
+            val solver = LocalSearchSolver(case.problem)
+            val samples = solver.sample(LocalSearchParams(maxFlips = 200_000L, randomSeed = 0L,
+                minHammingDistance = 0, recentWindow = 0)).take(1).toList()
             assertTrue(samples.isNotEmpty(), "${case.name}: solver found no sample within budget")
             val sample = samples.first()
             val pins = pinSampleIntoCnf(cnf, case.problem, sample)
@@ -53,11 +54,11 @@ class SolverVsBitBlasterTest {
             val cnf = BitBlaster.compile(case.problem)
             assertTrue(!SatCheck.isSat(cnf.numVars, cnf.clauses, IntArray(0)),
                 "${case.name}: expected UNSAT under bit-blast but oracle says SAT")
-            val solver = Solver(case.problem)
+            val solver = LocalSearchSolver(case.problem)
             // Tight budget: enough that a SAT problem would converge, small enough that an
             // UNSAT one terminates fast.
-            val samples = solver.sample(maxFlips = 5_000L, randomSeed = 0L,
-                minHammingDistance = 0, recentWindow = 0).take(1).toList()
+            val samples = solver.sample(LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L,
+                minHammingDistance = 0, recentWindow = 0)).take(1).toList()
             assertTrue(samples.isEmpty(), "${case.name}: UNSAT problem yielded a sample")
         }
     }
