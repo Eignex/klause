@@ -13,6 +13,7 @@ import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
 
 /**
@@ -72,6 +73,33 @@ object Portfolio {
                 factors = listOf(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     IntLeq(intVar = 0, bound = 2),
+                )),
+            expectedSat = true,
+        ),
+        // Realistic small "budget" problem: a nominal type drives a unit cost; choice must
+        // stay under a budget. 3 nominal one-hot bools + 1 int cost. Each type pegs the cost
+        // via a reified equality; exactlyOne on the indicators; cost ≤ budget caps the
+        // feasible types.
+        Entry("budgetCampaign",
+            Problem(numBoolVars = 3, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 100)),
+                factors = listOf(
+                    Cardinality.exactlyOne(intArrayOf(
+                        Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
+                    )),
+                    // type=a (bool 0) ↔ cost = 30
+                    ReifiedLinear(auxBoolVar = 0,
+                        coeffs = intArrayOf(1), vars = intArrayOf(0),
+                        op = LinearOp.EQ, bound = 30),
+                    // type=b (bool 1) ↔ cost = 50
+                    ReifiedLinear(auxBoolVar = 1,
+                        coeffs = intArrayOf(1), vars = intArrayOf(0),
+                        op = LinearOp.EQ, bound = 50),
+                    // type=c (bool 2) ↔ cost = 80
+                    ReifiedLinear(auxBoolVar = 2,
+                        coeffs = intArrayOf(1), vars = intArrayOf(0),
+                        op = LinearOp.EQ, bound = 80),
+                    // budget cap: only types a, b survive.
+                    IntLeq(intVar = 0, bound = 60),
                 )),
             expectedSat = true,
         ),
