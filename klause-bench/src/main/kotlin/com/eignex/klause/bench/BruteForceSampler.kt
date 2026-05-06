@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Sampler
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.SolverState
+import com.eignex.kpermute.LongPermutation
 import com.eignex.kpermute.longPermutation
 import kotlin.random.Random
 
@@ -22,46 +23,43 @@ data class BruteForceParams(
 
 /**
  * Ground-truth [Sampler] for testing. Walks the entire assignment space in a permuted order
- * (via kpermute's [longPermutation]) and yields every assignment that satisfies the problem.
+ * and yields every assignment that satisfies the problem.
  *
- * Use this to cross-check stochastic / SAT backends on small problems: any sample they
- * produce should be in this enumerator's output, and any verdict (Sat/Unsat) should match.
- *
- * Construction throws if the assignment space exceeds [maxSpaceSize] — the engine is O(N)
- * over the space and trivially refuses to enumerate billions of assignments.
+ * Spaces larger than [Long.MAX_VALUE] are supported by splitting variables into "chunks"
+ * whose per-chunk product fits in a `Long`. Each chunk gets its own [LongPermutation]; the
+ * walker traverses the cartesian product of chunk permutations as a nested loop. Within a
+ * chunk the iteration is shuffled (the kpermute output); across chunks it's
+ * lexicographic. For problems with many variables but few constraints, the satisfaction
+ * density is high enough that a satisfying assignment falls out within a handful of inner
+ * iterations regardless.
  */
-class BruteForceSampler(
-    override val problem: Problem,
-    private val maxSpaceSize: Long = DEFAULT_MAX_SPACE,
-) : Sampler<BruteForceParams> {
+class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParams> {
 
-    private val totalSize: Long = computeSpaceSize(problem)
-    private val intRadices: LongArray = LongArray(problem.numIntVars) {
-        problem.intDomains[it].size.toLong()
-    }
-
-    init {
-        require(totalSize in 1..maxSpaceSize) {
-            "BruteForceSampler space size $totalSize exceeds cap $maxSpaceSize " +
-                "(boolVars=${problem.numBoolVars}, intVars=${problem.numIntVars})"
-        }
-    }
+    private val chunks: List<Chunk> = buildChunks(problem)
 
     override fun solve(params: BruteForceParams): SolveResult {
-        for (sample in walkPermutation(params.randomSeed ?: 0L)) {
+        for (sample in walk(params.randomSeed ?: 0L)) {
             return SolveResult.Sat(sample)
         }
         return SolveResult.Unsat
     }
 
-    /** With replacement is the same walk as [enumerate] for a brute-force engine; the
-     *  permutation already produces every satisfying assignment exactly once. */
-    override fun sample(params: BruteForceParams): Sequence<Sample> =
-        walkPermutation(params.randomSeed ?: 0L)
+    /** With replacement: each yield is the first satisfying assignment of a freshly-seeded
+     *  permutation walk. Different seeds give different "first hit" positions, so the
+     *  sequence behaves like independent draws — duplicates can reappear, as the contract
+     *  requires. */
+    override fun sample(params: BruteForceParams): Sequence<Sample> = sequence {
+        var seed = params.randomSeed ?: 0L
+        while (true) {
+            val first = walk(seed).firstOrNull() ?: return@sequence
+            yield(first)
+            seed += 0x9E3779B97F4A7C15uL.toLong()
+        }
+    }
 
     override fun enumerate(params: BruteForceParams): Sequence<Sample> = sequence {
         val window = ArrayDeque<Sample>()
-        for (s in walkPermutation(params.randomSeed ?: 0L)) {
+        for (s in walk(params.randomSeed ?: 0L)) {
             if (farEnough(s, window, params.minHammingDistance)) {
                 yield(s)
                 if (params.recentWindow > 0) {
@@ -72,28 +70,53 @@ class BruteForceSampler(
         }
     }
 
-    /** All satisfying assignments, in a permuted order keyed by [seed]. */
-    private fun walkPermutation(seed: Long): Sequence<Sample> = sequence {
-        val perm = longPermutation(size = totalSize, seed = seed)
+    private fun walk(seed: Long): Sequence<Sample> {
         val state = SolverState(problem, Random(seed))
-        for (idx in perm) {
-            decodeIntoState(idx, state)
+        if (chunks.isEmpty()) {
+            // No variables — there's exactly one assignment to test.
+            return sequence {
+                state.recompute()
+                if (state.hardCost == 0) yield(state.assignment.snapshot())
+            }
+        }
+        // Use a different sub-seed per chunk so two chunks with the same size don't walk
+        // in lock-step. Overflow is irrelevant — kpermute accepts any Long seed.
+        val perms = chunks.mapIndexed { i, c ->
+            longPermutation(size = c.totalSize, seed = seed + i * 0x9E3779B97F4A7C15uL.toLong())
+        }
+        return walkChunks(perms, depth = 0, state = state)
+    }
+
+    private fun walkChunks(
+        perms: List<LongPermutation>,
+        depth: Int,
+        state: SolverState,
+    ): Sequence<Sample> = sequence {
+        if (depth == perms.size) {
             state.recompute()
             if (state.hardCost == 0) yield(state.assignment.snapshot())
+            return@sequence
+        }
+        for (idx in perms[depth]) {
+            applyChunkIndex(chunks[depth], idx, state)
+            yieldAll(walkChunks(perms, depth + 1, state))
         }
     }
 
-    private fun decodeIntoState(idx: Long, state: SolverState) {
+    /** Decode [idx] into the variables held by [chunk] and write them into [state]'s
+     *  assignment. Mixed-radix: each dim consumes its radix from the running quotient. */
+    private fun applyChunkIndex(chunk: Chunk, idx: Long, state: SolverState) {
         var remaining = idx
-        for (b in 0 until problem.numBoolVars) {
-            state.assignment.setBool(b, (remaining and 1L) == 1L)
-            remaining = remaining ushr 1
-        }
-        for (i in 0 until problem.numIntVars) {
-            val radix = intRadices[i]
-            val digit = (remaining % radix).toInt()
-            state.assignment.setInt(i, problem.intDomains[i].min + digit)
-            remaining /= radix
+        for (dim in chunk.dims) {
+            val digit = (remaining % dim.radix).toInt()
+            remaining /= dim.radix
+            when (dim.kind) {
+                DimKind.BOOL -> state.assignment.setBool(dim.varId, digit == 1)
+                DimKind.INT -> state.assignment.setInt(
+                    dim.varId,
+                    problem.intDomains[dim.varId].min + digit,
+                )
+            }
         }
     }
 
@@ -110,17 +133,33 @@ class BruteForceSampler(
         return d
     }
 
+    // ---- chunked-space layout ----
+
+    private enum class DimKind { BOOL, INT }
+    private data class Dim(val kind: DimKind, val varId: Int, val radix: Long)
+    private data class Chunk(val dims: List<Dim>, val totalSize: Long)
+
     companion object {
+        /** Largest per-chunk product. Stays well below [Long.MAX_VALUE] so adding one more
+         *  dim's worth of multiplication can't overflow even for radix = Int.MAX_VALUE. */
+        const val CHUNK_CAP: Long = 1L shl 60
+
+        /** Heuristic cap used by the bench harness's [fits] gate. Brute-force walking is
+         *  exact, but exhausting a 10¹²-assignment space takes longer than the user wants
+         *  to wait for a verification run. */
         const val DEFAULT_MAX_SPACE: Long = 1_000_000L
 
+        /** True when the total assignment space fits the harness's heuristic cap. The
+         *  sampler itself accepts any size; this is purely a gating decision for callers
+         *  that want brute force only when it'll finish quickly. */
         fun fits(problem: Problem, cap: Long = DEFAULT_MAX_SPACE): Boolean {
             val size = computeSpaceSize(problem)
             return size in 1..cap
         }
 
+        /** Total space size, or [Long.MAX_VALUE] if it overflows. */
         private fun computeSpaceSize(problem: Problem): Long {
             var size = 1L
-            // 2^numBoolVars
             repeat(problem.numBoolVars) {
                 if (size > Long.MAX_VALUE / 2) return Long.MAX_VALUE
                 size *= 2
@@ -132,6 +171,35 @@ class BruteForceSampler(
                 size *= r
             }
             return size
+        }
+
+        /** Build chunks sized so each per-chunk product stays under [CHUNK_CAP]. Bools
+         *  come first, then ints — order doesn't affect correctness, only iteration
+         *  shape. */
+        private fun buildChunks(problem: Problem): List<Chunk> {
+            val dims = ArrayList<Dim>(problem.numBoolVars + problem.numIntVars)
+            for (b in 0 until problem.numBoolVars) dims.add(Dim(DimKind.BOOL, b, 2L))
+            for (i in 0 until problem.numIntVars) {
+                dims.add(Dim(DimKind.INT, i, problem.intDomains[i].size.toLong()))
+            }
+            val chunks = ArrayList<Chunk>()
+            var current = ArrayList<Dim>()
+            var currentSize = 1L
+            for (dim in dims) {
+                require(dim.radix in 1..CHUNK_CAP) {
+                    "Variable radix ${dim.radix} (varId ${dim.varId}, kind ${dim.kind}) " +
+                        "exceeds per-chunk cap $CHUNK_CAP"
+                }
+                if (currentSize > CHUNK_CAP / dim.radix) {
+                    chunks.add(Chunk(current, currentSize))
+                    current = ArrayList()
+                    currentSize = 1L
+                }
+                current.add(dim)
+                currentSize *= dim.radix
+            }
+            if (current.isNotEmpty()) chunks.add(Chunk(current, currentSize))
+            return chunks
         }
     }
 }
