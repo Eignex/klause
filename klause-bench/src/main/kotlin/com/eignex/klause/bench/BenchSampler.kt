@@ -7,6 +7,8 @@ import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.z3.Z3Params
+import com.eignex.klause.z3.Z3Sampler
 
 /**
  * Type-erased wrapper over [com.eignex.klause.solver.Sampler] so the harness can hold a
@@ -43,8 +45,20 @@ class LogicNGBench(
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }
 
-/** All backends currently shipping with the harness. Z3 lands in step 3 of the plan. */
+class Z3Bench(
+    override val problem: Problem,
+    private val params: Z3Params = Z3Params(),
+) : BenchSampler {
+    private val s = Z3Sampler(problem)
+    override val name = "z3"
+    override fun solve() = s.solve(params)
+    override fun samples(n: Int) = s.sample(params).take(n).toList()
+    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+}
+
+/** All backends currently shipping with the harness. */
 fun defaultSamplers(problem: Problem): List<BenchSampler> = listOf(
     LocalSearchBench(problem),
     LogicNGBench(problem),
+    Z3Bench(problem),
 )

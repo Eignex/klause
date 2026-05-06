@@ -10,7 +10,7 @@ repositories {
 dependencies {
     implementation(project(":klause"))
     implementation(project(":klause-logicng"))
-    // klause-z3 wired in step 3 of the plan.
+    implementation(project(":klause-z3"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
 
     testImplementation(kotlin("test"))
