@@ -20,6 +20,11 @@ import kotlin.properties.ReadOnlyProperty
  * Constraint delegates execute their build lambda *during class initialization*, so any
  * handles referenced inside `constraint { ... }` must be declared earlier in the class.
  */
+/** Default bucket count for [VariableSchema.floatVar] when the caller doesn't specify one.
+ *  10-bit precision is enough for typical config-style fractions; bump it explicitly when
+ *  the constraint set needs finer granularity. */
+const val DEFAULT_FLOAT_BUCKETS: Int = 1024
+
 abstract class VariableSchema {
     private val _vars = mutableListOf<VarSpec>()
     private val _constraints = mutableListOf<NamedConstraint>()
@@ -51,7 +56,7 @@ abstract class VariableSchema {
             ReadOnlyProperty { _, _ -> handle }
         }
 
-    protected fun floatVar(min: Double, max: Double, buckets: Int) =
+    protected fun floatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
         PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, FloatHandle>> { _, prop ->
             _vars += FloatSpec(prop.name, min, max, buckets)
             val handle = FloatHandle(prop.name, min, max, buckets)
