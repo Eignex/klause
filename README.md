@@ -123,16 +123,9 @@ klause-logicng bit-blasts the problem to CNF and hands it to LogicNG's
 MiniSat. klause-z3 translates each factor directly to Z3 SMT expressions
 without bit-blasting and uses Z3's native Optimize solver for argmin
 queries. Both adapters implement Sampler and Optimizer, so the same caller
-can swap backends.
-
-A third backend, BruteForceSampler, ships in core. It walks the entire
-assignment space in a kpermute-shuffled order using mixed-radix index
-decoding, supports spaces beyond 2^63 by chunking variables across nested
-permutations, and is exact when the step budget is generous enough. It's
-the natural ground-truth oracle for verifying the stochastic and SMT
-backends on small problems.
-
-An internal klause-bench module runs all four backends on a portfolio of
+can swap backends. A third backend, BruteForceSampler, ships in core as a
+ground-truth oracle that walks the assignment space in a kpermute-shuffled
+order. An internal klause-bench module runs all four on a portfolio of
 problems, asserts they agree on satisfiability and that any sample they
 produce satisfies the original Problem, and reports per-backend timings.
 

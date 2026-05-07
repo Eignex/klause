@@ -8,7 +8,7 @@ plugins {
 }
 
 eignexPublish {
-    description.set("Local-search MaxSAT/Max-CSP solver for mixed integer-Boolean schemas.")
+    description.set("Stochastic local-search constraint solver for mixed Boolean and bounded-integer schemas. Samples diverse satisfying assignments and minimises linear objectives.")
     githubRepo.set("Eignex/klause")
 }
 
