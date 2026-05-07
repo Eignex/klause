@@ -28,9 +28,8 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
 
     protected fun boolVar() = register(BoolSpec) { BoolHandle(it) }
 
-    protected fun nominal(vararg labels: String): PropertyDelegateProvider<Schema<SchemaEntry>, ReadOnlyProperty<Schema<SchemaEntry>, NominalHandle>> {
-        val labelList = labels.toList()
-        return register(NominalSpec(labelList)) { NominalHandle(it, labelList) }
+    protected fun nominal(vararg labels: String) = labels.toList().let { ls ->
+        register(NominalSpec(ls)) { NominalHandle(it, ls) }
     }
 
     protected fun intVar(min: Int, max: Int) =
