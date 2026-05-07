@@ -40,7 +40,7 @@ class Z3Sampler(override val problem: Problem) : Sampler<Z3Params> {
         }
     }
 
-    override fun sample(params: Z3Params): Sequence<Sample> = sequence {
+    override fun samples(params: Z3Params): Sequence<Sample> = sequence {
         var attempts = 0L
         var seed = params.randomSeed ?: 0L
         val deadline = params.timeoutMillis?.let { System.currentTimeMillis() + it }

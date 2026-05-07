@@ -38,7 +38,7 @@ class SolverVsBitBlasterTest {
         for (case in satPortfolio()) {
             val cnf = BitBlaster.compile(case.problem)
             val solver = LocalSearchSolver(case.problem)
-            val samples = solver.sample(LocalSearchParams(maxFlips = 200_000L, randomSeed = 0L,
+            val samples = solver.samples(LocalSearchParams(maxFlips = 200_000L, randomSeed = 0L,
                 minHammingDistance = 0, recentWindow = 0)).take(1).toList()
             assertTrue(samples.isNotEmpty(), "${case.name}: solver found no sample within budget")
             val sample = samples.first()
@@ -57,7 +57,7 @@ class SolverVsBitBlasterTest {
             val solver = LocalSearchSolver(case.problem)
             // Tight budget: enough that a SAT problem would converge, small enough that an
             // UNSAT one terminates fast.
-            val samples = solver.sample(LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L,
+            val samples = solver.samples(LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L,
                 minHammingDistance = 0, recentWindow = 0)).take(1).toList()
             assertTrue(samples.isEmpty(), "${case.name}: UNSAT problem yielded a sample")
         }

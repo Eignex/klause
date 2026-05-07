@@ -29,18 +29,21 @@ interface Solver<P : SolverParams> {
 }
 
 /**
- * A [Solver] that also produces a stream of satisfying assignments. Two streaming methods
- * with different semantics:
+ * A [Solver] that also produces satisfying assignments. Three flavors:
  *
- *  - [sample] — *with replacement*. Each yield is an independent draw; the same assignment
- *    can reappear. Dedup-related fields on [P] (e.g. `minHammingDistance`, `recentWindow`)
- *    are ignored on this path.
+ *  - [sample] — single satisfying assignment, or `null` if the engine couldn't find one
+ *    within its budget. Default implementation takes the first yield of [samples];
+ *    backends with a cheaper one-shot path may override.
+ *  - [samples] — *with replacement*. Each yield is an independent draw; the same
+ *    assignment can reappear. Dedup-related fields on [P] (`minHammingDistance`,
+ *    `recentWindow`) are ignored on this path.
  *  - [enumerate] — *without replacement*. Distinct satisfying assignments. For complete
  *    backends this is true model enumeration (every assignment exactly once); for the
- *    local-search backend the rolling-window dedup honours `params.minHammingDistance` and
- *    `params.recentWindow`.
+ *    local-search backend the rolling-window dedup honours `params.minHammingDistance`
+ *    and `params.recentWindow`.
  */
 interface Sampler<P : SolverParams> : Solver<P> {
-    fun sample(params: P): Sequence<Sample>
+    fun sample(params: P): Sample? = samples(params).firstOrNull()
+    fun samples(params: P): Sequence<Sample>
     fun enumerate(params: P): Sequence<Sample>
 }

@@ -48,7 +48,7 @@ class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParam
      *  permutation walk. Different seeds give different "first hit" positions, so the
      *  sequence behaves like independent draws — duplicates can reappear, as the contract
      *  requires. */
-    override fun sample(params: BruteForceParams): Sequence<Sample> = sequence {
+    override fun samples(params: BruteForceParams): Sequence<Sample> = sequence {
         var seed = params.randomSeed ?: 0L
         while (true) {
             val first = walk(seed).firstOrNull() ?: return@sequence
@@ -212,6 +212,6 @@ class BruteForceBench(
     private val s = BruteForceSampler(problem)
     override val name = "brute-force"
     override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.sample(params).take(n).toList()
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }

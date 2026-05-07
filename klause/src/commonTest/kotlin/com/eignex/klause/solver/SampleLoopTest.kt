@@ -97,7 +97,7 @@ class SampleLoopTest {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val solver = LocalSearchSolver(problem)
-        val samples = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L,
+        val samples = solver.samples(LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L,
             minHammingDistance = 0, recentWindow = 16)).take(10).toList()
         assertEquals(10, samples.size, "minHammingDistance=0 should allow duplicates freely")
     }

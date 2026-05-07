@@ -62,7 +62,7 @@ class Z3SamplerTest {
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val samples = Z3Sampler(problem).sample(Z3Params(maxModels = 5)).toList()
+        val samples = Z3Sampler(problem).samples(Z3Params(maxModels = 5)).toList()
         assertEquals(5, samples.size, "with-replacement honours maxModels")
         assertTrue(samples.toSet().size <= 4, "all draws must come from the 4 solutions")
     }

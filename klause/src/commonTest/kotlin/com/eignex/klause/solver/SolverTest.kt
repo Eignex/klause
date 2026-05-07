@@ -58,7 +58,7 @@ class SolverTest {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val solver = LocalSearchSolver(problem)
-        val samples = solver.sample(LocalSearchParams(maxFlips = 5_000, randomSeed = 13, minHammingDistance = 0)).take(20).toList()
+        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 13, minHammingDistance = 0)).take(20).toList()
         assertEquals(20, samples.size)
     }
 

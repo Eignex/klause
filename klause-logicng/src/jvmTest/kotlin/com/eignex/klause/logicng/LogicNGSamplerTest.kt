@@ -77,7 +77,7 @@ class LogicNGSamplerTest {
             )
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val samples = LogicNGSampler(problem).sample(LogicNGParams(maxModels = 5)).toList()
+        val samples = LogicNGSampler(problem).samples(LogicNGParams(maxModels = 5)).toList()
         assertEquals(5, samples.size, "with-replacement honours maxModels")
         assertTrue(samples.toSet().size <= 4, "all draws must come from the 4 solutions")
     }

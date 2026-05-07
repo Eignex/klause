@@ -23,17 +23,17 @@ class LocalSearchSolver(
 ) : Sampler<LocalSearchParams> {
 
     override fun solve(params: LocalSearchParams): SolveResult =
-        sample(params).firstOrNull()?.let(SolveResult::Sat)
-            ?: SolveResult.Unknown
+        sample(params)?.let(SolveResult::Sat) ?: SolveResult.Unknown
 
-    override fun sample(params: LocalSearchParams): Sequence<Sample> =
+    override fun samples(params: LocalSearchParams): Sequence<Sample> =
         streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0))
 
     override fun enumerate(params: LocalSearchParams): Sequence<Sample> =
         streamImpl(params)
 
     fun solve(): SolveResult = solve(LocalSearchParams())
-    fun sample(): Sequence<Sample> = sample(LocalSearchParams())
+    fun sample(): Sample? = sample(LocalSearchParams())
+    fun samples(): Sequence<Sample> = samples(LocalSearchParams())
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
 
     private fun streamImpl(params: LocalSearchParams): Sequence<Sample> {

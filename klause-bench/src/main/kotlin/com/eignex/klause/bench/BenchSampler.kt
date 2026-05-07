@@ -30,7 +30,7 @@ class LocalSearchBench(
     private val s = LocalSearchSolver(problem)
     override val name = "local-search"
     override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.sample(params).take(n).toList()
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }
 
@@ -41,7 +41,7 @@ class LogicNGBench(
     private val s = LogicNGSampler(problem)
     override val name = "logicng"
     override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.sample(params).take(n).toList()
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }
 
@@ -52,7 +52,7 @@ class Z3Bench(
     private val s = Z3Sampler(problem)
     override val name = "z3"
     override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.sample(params).take(n).toList()
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }
 

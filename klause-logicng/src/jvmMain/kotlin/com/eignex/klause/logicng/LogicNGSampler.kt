@@ -42,7 +42,7 @@ class LogicNGSampler(override val problem: Problem) : Sampler<LogicNGParams> {
         }
     }
 
-    override fun sample(params: LogicNGParams): Sequence<Sample> = sequence {
+    override fun samples(params: LogicNGParams): Sequence<Sample> = sequence {
         var attempts = 0L
         val deadline = params.timeoutMillis?.let { System.currentTimeMillis() + it }
         while (attempts < params.maxModels) {
