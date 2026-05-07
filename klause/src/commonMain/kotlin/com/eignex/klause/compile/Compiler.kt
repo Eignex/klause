@@ -35,8 +35,10 @@ import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.SchemaDef
+import com.eignex.klause.ast.NamedConstraint
+import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.skema.SchemaDef
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -60,7 +62,7 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 
 class Compiler {
 
-    fun compile(def: SchemaDef): CompiledProblem = Build().run(def)
+    fun compile(def: SchemaDef<SchemaEntry>): CompiledProblem = Build().run(def)
 
     private class Build {
         val factors = mutableListOf<Factor>()
@@ -73,28 +75,31 @@ class Compiler {
         var numIntVars = 0
         private var auxIntCounter = 0
 
-        fun run(def: SchemaDef): CompiledProblem {
-            for (spec in def.vars) {
-                when (spec) {
-                    is BoolSpec -> boolVarIdByName[spec.name] = newBoolVar()
+        fun run(def: SchemaDef<SchemaEntry>): CompiledProblem {
+            for ((name, entry) in def.entries) {
+                when (entry) {
+                    is BoolSpec -> boolVarIdByName[name] = newBoolVar()
                     is NominalSpec -> {
                         val ids = LinkedHashMap<String, Int>()
-                        for (label in spec.labels) ids[label] = newBoolVar()
-                        nominalIndicators[spec.name] = ids
+                        for (label in entry.labels) ids[label] = newBoolVar()
+                        nominalIndicators[name] = ids
                         val lits = IntArray(ids.size)
                         var i = 0
                         for (id in ids.values) lits[i++] = Lit.make(id, positive = true)
                         factors += Cardinality.exactlyOne(lits)
                     }
-                    is IntSpec -> intVarIdByName[spec.name] = newIntVar(IntDomain(spec.min, spec.max))
+                    is IntSpec -> intVarIdByName[name] = newIntVar(IntDomain(entry.min, entry.max))
                     is FloatSpec -> {
-                        intVarIdByName[spec.name] = newIntVar(IntDomain(0, spec.buckets - 1))
-                        floatDecoders[spec.name] = spec
+                        intVarIdByName[name] = newIntVar(IntDomain(0, entry.buckets - 1))
+                        floatDecoders[name] = entry
                     }
+                    is NamedConstraint -> {} // handled in a second pass once all vars are registered
                 }
             }
 
-            for (nc in def.constraints) assertExpr(nc.expr)
+            for ((_, entry) in def.entries) {
+                if (entry is NamedConstraint) assertExpr(entry.expr)
+            }
 
             return CompiledProblem(
                 problem = Problem(numBoolVars, numIntVars, intDomains.toTypedArray(), factors.toList()),

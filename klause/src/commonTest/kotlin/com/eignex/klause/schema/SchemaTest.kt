@@ -2,10 +2,12 @@ package com.eignex.klause.schema
 
 import com.eignex.klause.ast.BoolSpec
 import com.eignex.klause.ast.Implies
+import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.NominalSpec
-import com.eignex.klause.ast.SchemaDef
+import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.not
+import com.eignex.skema.SchemaDef
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,12 +24,16 @@ class SchemaTest {
     @Test
     fun delegateRegistersVarsAndConstraints() {
         val schema = CampaignSchema()
-        assertEquals(2, schema.vars.size)
-        assertTrue(schema.vars[0] is BoolSpec && (schema.vars[0] as BoolSpec).name == "premium")
-        assertTrue(schema.vars[1] is NominalSpec && (schema.vars[1] as NominalSpec).name == "type")
-        assertEquals(1, schema.constraints.size)
-        assertEquals("noPremiumForA", schema.constraints[0].name)
-        assertTrue(schema.constraints[0].expr is Implies)
+        val entries = schema.entries.entries.toList()
+        assertEquals(3, entries.size)
+        assertEquals("premium", entries[0].key)
+        assertTrue(entries[0].value is BoolSpec)
+        assertEquals("type", entries[1].key)
+        assertTrue(entries[1].value is NominalSpec)
+        assertEquals("noPremiumForA", entries[2].key)
+        val nc = entries[2].value
+        assertTrue(nc is NamedConstraint)
+        assertTrue(nc.expr is Implies)
     }
 
     @Test
@@ -35,18 +41,17 @@ class SchemaTest {
         val schema = CampaignSchema()
         val def = schema.definition()
         val json = Json { prettyPrint = false }
-        val encoded = json.encodeToString(SchemaDef.serializer(), def)
-        val decoded = json.decodeFromString(SchemaDef.serializer(), encoded)
+        val serializer = SchemaDef.serializer(SchemaEntry.serializer())
+        val encoded = json.encodeToString(serializer, def)
+        val decoded = json.decodeFromString(serializer, encoded)
         assertEquals(def, decoded)
     }
 
     @Test
     fun handleOperatorsBuildExpectedTree() {
         val schema = CampaignSchema()
-        val nc = schema.constraints[0]
+        val nc = schema.entries["noPremiumForA"] as NamedConstraint
         val imp = nc.expr as Implies
-        // left: NominalEq(type, a)
-        // right: BoolRef(premium, negated=true)  (because !premium folds the Not into the ref)
         val right = imp.right
         assertTrue(right is com.eignex.klause.ast.BoolRef)
         assertTrue(right.negated)

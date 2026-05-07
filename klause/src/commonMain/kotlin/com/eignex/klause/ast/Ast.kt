@@ -3,22 +3,28 @@ package com.eignex.klause.ast
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * One row of a klause schema. Variables and named constraints are siblings under
+ * [com.eignex.skema.SchemaDef]'s entries map; the map key is the entry's name, so
+ * spec types don't carry a redundant `name` field.
+ */
 @Serializable
-sealed interface VarSpec {
-    val name: String
-}
+sealed interface SchemaEntry
+
+@Serializable
+sealed interface VarSpec : SchemaEntry
 
 @Serializable
 @SerialName("bool")
-data class BoolSpec(override val name: String) : VarSpec
+data object BoolSpec : VarSpec
 
 @Serializable
 @SerialName("nominal")
-data class NominalSpec(override val name: String, val labels: List<String>) : VarSpec
+data class NominalSpec(val labels: List<String>) : VarSpec
 
 @Serializable
 @SerialName("int")
-data class IntSpec(override val name: String, val min: Int, val max: Int) : VarSpec
+data class IntSpec(val min: Int, val max: Int) : VarSpec
 
 /**
  * Float variable bucketed to [buckets] uniformly-spaced values across `[min, max]`. The
@@ -28,7 +34,6 @@ data class IntSpec(override val name: String, val min: Int, val max: Int) : VarS
 @Serializable
 @SerialName("float")
 data class FloatSpec(
-    override val name: String,
     val min: Double,
     val max: Double,
     val buckets: Int,
@@ -211,13 +216,5 @@ data class PseudoBooleanExpr(
 }
 
 @Serializable
-data class NamedConstraint(
-    val name: String,
-    val expr: BoolExpr,
-)
-
-@Serializable
-data class SchemaDef(
-    val vars: List<VarSpec>,
-    val constraints: List<NamedConstraint>,
-)
+@SerialName("constraint")
+data class NamedConstraint(val expr: BoolExpr) : SchemaEntry
