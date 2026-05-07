@@ -8,7 +8,7 @@ plugins {
 }
 
 eignexPublish {
-    description.set("Stochastic local-search constraint solver for mixed Boolean and bounded-integer schemas. Samples diverse satisfying assignments and minimises linear objectives.")
+    description.set("Stochastic local-search constraint solver for mixed Boolean and bounded-integer schemas. Samples diverse satisfying assignments, minimises linear objectives, and bit-blasts to CNF.")
     githubRepo.set("Eignex/klause")
 }
 
