@@ -40,6 +40,12 @@ class SolverState(
     var softCost: Double = 0.0
         internal set
 
+    /** Per-factor weight read by [updateViolation] when a soft factor's violation status
+     *  toggles. Initialised from each [Factor.weight] at construction; mutable thereafter so
+     *  weight-modulating strategies (e.g. SAPS) can reweight stuck factors during search.
+     *  Hard factors ignore this; their contribution is always +1/-1 to [hardCost]. */
+    val factorWeights: DoubleArray = DoubleArray(problem.numFactors) { problem.factors[it].weight }
+
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
         for (i in lastTouched.indices) lastTouched[i] = 0L
@@ -56,7 +62,7 @@ class SolverState(
             factor.initialize(this, id)
             if (factor.isViolated(this, id)) {
                 violated.add(id)
-                if (factor.isHard) hardCost++ else softCost += factor.weight
+                if (factor.isHard) hardCost++ else softCost += factorWeights[id]
             }
         }
     }
@@ -148,11 +154,11 @@ class SolverState(
         when (deltaViolated) {
             +1 -> {
                 violated.add(factorId)
-                if (factor.isHard) hardCost++ else softCost += factor.weight
+                if (factor.isHard) hardCost++ else softCost += factorWeights[factorId]
             }
             -1 -> {
                 violated.remove(factorId)
-                if (factor.isHard) hardCost-- else softCost -= factor.weight
+                if (factor.isHard) hardCost-- else softCost -= factorWeights[factorId]
             }
         }
     }
