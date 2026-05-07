@@ -74,5 +74,6 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-- SAPS-style strategy that mutates `SolverState.factorWeights` to escape stuck regions (the field exists; only the weight-update logic is missing).
+- Luby restart schedule for stagnation-resistant restart cadence.
+- Configuration Checking (CCASat-style) per-variable diversification.
 - Benchmark suite, Maven Central publishing, CI.

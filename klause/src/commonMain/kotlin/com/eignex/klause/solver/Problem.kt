@@ -24,6 +24,18 @@ class Problem(
     val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
     val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }
 
+    /**
+     * For each factor, the ids of every other factor sharing at least one variable.
+     * Used by clause-weighting strategies (DDFW) to find candidate weight donors.
+     */
+    val factorNeighbors: Array<IntArray> = Array(factors.size) { fid ->
+        val seen = HashSet<Int>()
+        val f = factors[fid]
+        for (v in f.boolVars) for (o in boolOccurrences[v]) if (o != fid) seen.add(o)
+        for (v in f.intVars) for (o in intOccurrences[v]) if (o != fid) seen.add(o)
+        seen.toIntArray()
+    }
+
     val numFactors: Int get() = factors.size
 
     private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {
