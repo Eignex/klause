@@ -11,7 +11,6 @@ dependencies {
     implementation(project(":klause"))
     implementation(project(":klause-logicng"))
     implementation(project(":klause-z3"))
-    implementation("com.eignex:kpermute:1.1.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
 
     testImplementation(kotlin("test"))

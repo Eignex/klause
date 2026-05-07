@@ -47,3 +47,21 @@ interface Sampler<P : SolverParams> : Solver<P> {
     fun samples(params: P): Sequence<Sample>
     fun enumerate(params: P): Sequence<Sample>
 }
+
+/**
+ * A [Solver] that returns a feasible assignment minimising a linear (or other) objective.
+ *
+ * Calls carry the [Objective] per-invocation so the same backend can be reused across
+ * differently-weighted optimisation queries (e.g. Thompson-sampled weight vectors).
+ *
+ * Backends typically specialise on [LinearObjective] for a fast path (incremental delta in
+ * local search, native `mkAdd` translation in Z3) and either fall back to
+ * [Objective.evaluate] for arbitrary subtypes or refuse to optimise them.
+ */
+interface Optimizer<P : SolverParams> : Solver<P> {
+    /**
+     * Return the lowest-objective assignment that satisfies all hard constraints, or
+     * `null` if no feasible assignment was found within [params]'s budget.
+     */
+    fun minimize(objective: Objective, params: P): Sample?
+}

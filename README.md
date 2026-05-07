@@ -100,6 +100,7 @@ suitable for any external propositional SAT engine.
 
 ## TODO
 
+- New `Optimizer<P>` interface alongside `Sampler<P>` for linear-objective minimisation: `minimize(objective, params): Sample?`. Each call carries Thompson-sampled per-variable weights (bool / nominal-label / int / float coefficients); search returns the constrained-feasible argmin. Local search + Z3 backends.
 - Typed handle-based decode API to replace name-string lookups (`compiled.decodeFloat(handle, sample)` instead of `compiled.decodeFloat("rate", sample)`).
 - Wire-format problem loading; hook into `:klause-bench` once the format ships.
 - Multi-float linear arithmetic across distinct `FloatHandle`s. Single-handle linear ops work; cross-handle currently throws at expression-build time. Needs scale unification in the compiler.

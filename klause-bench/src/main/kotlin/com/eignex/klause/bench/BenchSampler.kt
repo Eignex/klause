@@ -62,5 +62,5 @@ fun defaultSamplers(problem: Problem): List<BenchSampler> = buildList {
     add(LocalSearchBench(problem))
     add(LogicNGBench(problem))
     add(Z3Bench(problem))
-    if (BruteForceSampler.fits(problem)) add(BruteForceBench(problem))
+    if (com.eignex.klause.solver.BruteForceSampler.fits(problem)) add(BruteForceBench(problem))
 }

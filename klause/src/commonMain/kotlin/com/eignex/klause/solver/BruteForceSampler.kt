@@ -1,47 +1,74 @@
-package com.eignex.klause.bench
+package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.Sampler
-import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.SolverState
 import com.eignex.kpermute.LongPermutation
 import com.eignex.kpermute.longPermutation
 import kotlin.random.Random
 
 /**
- * Per-call params for [BruteForceSampler]. The brute-force engine is exact, so the only
- * stochastic knob is [randomSeed] (controls the iteration order via kpermute). Distance /
- * window filtering applies on top, identical to other backends.
+ * Per-call params for [BruteForceSampler]. The brute-force engine is exact within its
+ * step budget; [maxSteps] caps the number of assignments the walker will check before
+ * giving up. The default [Long.MAX_VALUE] means "exhaust the entire space", but for
+ * problems with billions of assignments and few satisfying ones, callers should set a
+ * finite budget.
+ *
+ *  - [randomSeed] — controls the iteration order via kpermute.
+ *  - [minHammingDistance] / [recentWindow] — distance / window filtering on
+ *    [BruteForceSampler.enumerate], identical to other backends.
+ *  - [maxSteps] — global cap on assignments visited per call. When the walker hits the
+ *    cap, the sequence ends; for [BruteForceSampler.minimize] this means the returned
+ *    sample is the best seen so far rather than guaranteed-optimal.
  */
 data class BruteForceParams(
     val randomSeed: Long? = null,
     val minHammingDistance: Int = 1,
     val recentWindow: Int = 16,
+    val maxSteps: Long = Long.MAX_VALUE,
 ) : SolverParams
 
 /**
- * Ground-truth [Sampler] for testing. Walks the entire assignment space in a permuted order
- * and yields every assignment that satisfies the problem.
+ * Ground-truth [Sampler] / [Optimizer] for testing. Walks the entire assignment space in a
+ * permuted order and yields every assignment that satisfies the problem.
  *
  * Spaces larger than [Long.MAX_VALUE] are supported by splitting variables into "chunks"
  * whose per-chunk product fits in a `Long`. Each chunk gets its own [LongPermutation]; the
  * walker traverses the cartesian product of chunk permutations as a nested loop. Within a
- * chunk the iteration is shuffled (the kpermute output); across chunks it's
- * lexicographic. For problems with many variables but few constraints, the satisfaction
- * density is high enough that a satisfying assignment falls out within a handful of inner
- * iterations regardless.
+ * chunk the iteration is shuffled (the kpermute output); across chunks it's lexicographic.
+ * For problems with many variables but few constraints, the satisfaction density is high
+ * enough that a satisfying assignment falls out within a handful of inner iterations
+ * regardless.
+ *
+ * As an [Optimizer] the implementation is the obvious "walk every assignment, return the
+ * one with the lowest objective". Trivially correct and useful as a ground-truth oracle
+ * for stochastic / SMT-based optimisation backends on small problems.
  */
-class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParams> {
+class BruteForceSampler(override val problem: Problem) :
+    Sampler<BruteForceParams>, Optimizer<BruteForceParams> {
 
     private val chunks: List<Chunk> = buildChunks(problem)
 
     override fun solve(params: BruteForceParams): SolveResult {
-        for (sample in walk(params.randomSeed ?: 0L)) {
+        for (sample in walk(params)) {
             return SolveResult.Sat(sample)
         }
         return SolveResult.Unsat
+    }
+
+    /**
+     * Lowest-objective assignment found within [params.maxSteps] iterations of the walker.
+     * If the cap is generous enough to exhaust the assignment space, the result is the
+     * exact global minimum; otherwise it's the best-seen-so-far.
+     */
+    override fun minimize(objective: Objective, params: BruteForceParams): Sample? {
+        var bestObj = Double.POSITIVE_INFINITY
+        var best: Sample? = null
+        for (s in walk(params)) {
+            val obj = objective.evaluate(s)
+            if (obj < bestObj) {
+                bestObj = obj
+                best = s
+            }
+        }
+        return best
     }
 
     /** With replacement: each yield is the first satisfying assignment of a freshly-seeded
@@ -51,7 +78,7 @@ class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParam
     override fun samples(params: BruteForceParams): Sequence<Sample> = sequence {
         var seed = params.randomSeed ?: 0L
         while (true) {
-            val first = walk(seed).firstOrNull() ?: return@sequence
+            val first = walk(params.copy(randomSeed = seed)).firstOrNull() ?: return@sequence
             yield(first)
             seed += 0x9E3779B97F4A7C15uL.toLong()
         }
@@ -59,7 +86,7 @@ class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParam
 
     override fun enumerate(params: BruteForceParams): Sequence<Sample> = sequence {
         val window = ArrayDeque<Sample>()
-        for (s in walk(params.randomSeed ?: 0L)) {
+        for (s in walk(params)) {
             if (farEnough(s, window, params.minHammingDistance)) {
                 yield(s)
                 if (params.recentWindow > 0) {
@@ -70,11 +97,20 @@ class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParam
         }
     }
 
-    private fun walk(seed: Long): Sequence<Sample> {
+    /**
+     * Walk the assignment space, capped at [params.maxSteps] total assignments visited.
+     * Yields satisfying assignments in kpermute-shuffled order across nested chunk
+     * permutations. When [params.maxSteps] is [Long.MAX_VALUE] (the default) the walk is
+     * effectively unbounded.
+     */
+    private fun walk(params: BruteForceParams): Sequence<Sample> {
+        val seed = params.randomSeed ?: 0L
         val state = SolverState(problem, Random(seed))
+        val budget = StepBudget(params.maxSteps)
         if (chunks.isEmpty()) {
             // No variables — there's exactly one assignment to test.
             return sequence {
+                if (!budget.consume()) return@sequence
                 state.recompute()
                 if (state.hardCost == 0) yield(state.assignment.snapshot())
             }
@@ -84,22 +120,36 @@ class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParam
         val perms = chunks.mapIndexed { i, c ->
             longPermutation(size = c.totalSize, seed = seed + i * 0x9E3779B97F4A7C15uL.toLong())
         }
-        return walkChunks(perms, depth = 0, state = state)
+        return walkChunks(perms, depth = 0, state = state, budget = budget)
+    }
+
+    /** Mutable counter so the recursive [walkChunks] decrements one shared budget across
+     *  the cartesian-product walk rather than each depth holding its own. */
+    private class StepBudget(var remaining: Long) {
+        /** Decrement the budget; return `false` if it's exhausted (caller should stop). */
+        fun consume(): Boolean {
+            if (remaining <= 0) return false
+            remaining--
+            return true
+        }
     }
 
     private fun walkChunks(
         perms: List<LongPermutation>,
         depth: Int,
         state: SolverState,
+        budget: StepBudget,
     ): Sequence<Sample> = sequence {
         if (depth == perms.size) {
+            if (!budget.consume()) return@sequence
             state.recompute()
             if (state.hardCost == 0) yield(state.assignment.snapshot())
             return@sequence
         }
         for (idx in perms[depth]) {
+            if (budget.remaining <= 0) return@sequence
             applyChunkIndex(chunks[depth], idx, state)
-            yieldAll(walkChunks(perms, depth + 1, state))
+            yieldAll(walkChunks(perms, depth + 1, state, budget))
         }
     }
 
@@ -144,12 +194,12 @@ class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParam
          *  dim's worth of multiplication can't overflow even for radix = Int.MAX_VALUE. */
         const val CHUNK_CAP: Long = 1L shl 60
 
-        /** Heuristic cap used by the bench harness's [fits] gate. Brute-force walking is
-         *  exact, but exhausting a 10¹²-assignment space takes longer than the user wants
-         *  to wait for a verification run. */
+        /** Heuristic cap used by callers gating brute-force inclusion. Brute-force walking
+         *  is exact, but exhausting a 10¹²-assignment space takes longer than typical use
+         *  cases want to wait. */
         const val DEFAULT_MAX_SPACE: Long = 1_000_000L
 
-        /** True when the total assignment space fits the harness's heuristic cap. The
+        /** True when the total assignment space fits the caller's heuristic cap. The
          *  sampler itself accepts any size; this is purely a gating decision for callers
          *  that want brute force only when it'll finish quickly. */
         fun fits(problem: Problem, cap: Long = DEFAULT_MAX_SPACE): Boolean {
@@ -202,16 +252,4 @@ class BruteForceSampler(override val problem: Problem) : Sampler<BruteForceParam
             return chunks
         }
     }
-}
-
-/** [BenchSampler] adapter so the brute-force enumerator joins the harness alongside LS / LogicNG / Z3. */
-class BruteForceBench(
-    override val problem: Problem,
-    private val params: BruteForceParams = BruteForceParams(randomSeed = 0L),
-) : BenchSampler {
-    private val s = BruteForceSampler(problem)
-    override val name = "brute-force"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }

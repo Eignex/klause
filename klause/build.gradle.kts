@@ -24,6 +24,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
+            implementation("com.eignex:kpermute:1.1.2")
         }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")

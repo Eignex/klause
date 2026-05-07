@@ -20,7 +20,7 @@ class LocalSearchSolver(
     override val problem: Problem,
     val strategy: Strategy = WalkSat(),
     val maxFlipsBeforeRestart: Int = 10_000,
-) : Sampler<LocalSearchParams> {
+) : Sampler<LocalSearchParams>, Optimizer<LocalSearchParams> {
 
     override fun solve(params: LocalSearchParams): SolveResult =
         sample(params)?.let(SolveResult::Sat) ?: SolveResult.Unknown
@@ -31,10 +31,26 @@ class LocalSearchSolver(
     override fun enumerate(params: LocalSearchParams): Sequence<Sample> =
         streamImpl(params)
 
+    /**
+     * Best-effort linear-objective minimisation under hard constraints. Reaches feasibility
+     * via the configured [strategy] (WalkSat/probSAT-style), then descends on the objective
+     * by greedy single-flip / single-set moves that keep `hardCost == 0`. Whenever the
+     * descent stalls or the budget per attempt elapses, the search restarts with a fresh
+     * randomized assignment; the best feasible objective seen across all attempts is
+     * returned.
+     *
+     * Specialises on [LinearObjective] for an O(arity) per-move delta. Other [Objective]
+     * subtypes fall back to a full [Objective.evaluate] re-score per candidate move, which
+     * is correct but slow.
+     */
+    override fun minimize(objective: Objective, params: LocalSearchParams): Sample? =
+        minimizeImpl(objective, params)
+
     fun solve(): SolveResult = solve(LocalSearchParams())
     fun sample(): Sample? = sample(LocalSearchParams())
     fun samples(): Sequence<Sample> = samples(LocalSearchParams())
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
+    fun minimize(objective: Objective): Sample? = minimize(objective, LocalSearchParams())
 
     private fun streamImpl(params: LocalSearchParams): Sequence<Sample> {
         require(params.recentWindow >= 0) {
@@ -90,6 +106,120 @@ class LocalSearchSolver(
                 flipsSinceYield++
             }
         }
+    }
+
+    /**
+     * Two-phase search per restart attempt: WalkSat-style fight to feasibility, then a
+     * greedy descent on the objective restricted to feasibility-preserving moves. When the
+     * descent reaches a local minimum (no neighbour both keeps `hardCost == 0` and lowers
+     * the objective), restart and try again. Best-feasible-objective state lives across
+     * restarts so we monotonically improve.
+     */
+    private fun minimizeImpl(objective: Objective, params: LocalSearchParams): Sample? {
+        val totalBits = problem.numBoolVars + problem.numIntVars
+        require(params.minHammingDistance <= totalBits) {
+            "minHammingDistance (${params.minHammingDistance}) exceeds the total variable " +
+                "count ($totalBits)"
+        }
+        val seed = params.randomSeed ?: Random.Default.nextLong()
+        val state = SolverState(problem, Random(seed))
+        state.restart()
+
+        var bestObj = Double.POSITIVE_INFINITY
+        var bestSample: Sample? = null
+        var flipsSinceRestart = 0
+        var totalFlips = 0L
+        val maxFlips = params.maxFlips
+
+        while (totalFlips < maxFlips) {
+            if (state.hardCost == 0) {
+                // Score the current feasible assignment, record if best.
+                val snap = state.assignment.snapshot()
+                val obj = objective.evaluate(snap)
+                if (obj < bestObj) {
+                    bestObj = obj
+                    bestSample = snap
+                }
+                // Try to descend on the objective via a single feasibility-preserving move.
+                val descended = greedyObjectiveStep(state, objective)
+                if (descended) {
+                    flipsSinceRestart++
+                    totalFlips++
+                    continue
+                }
+                // Local minimum on the objective — restart and try a different basin.
+                state.restart()
+                flipsSinceRestart = 0
+                continue
+            }
+            if (flipsSinceRestart >= maxFlipsBeforeRestart) {
+                state.restart()
+                flipsSinceRestart = 0
+                continue
+            }
+            val move = strategy.pickMove(state)
+            if (move == null) {
+                state.restart()
+                flipsSinceRestart = 0
+                continue
+            }
+            state.apply(move)
+            flipsSinceRestart++
+            totalFlips++
+        }
+        return bestSample
+    }
+
+    /**
+     * Greedy hill-climbing on the objective among feasibility-preserving single-variable
+     * moves. Considers a flip on each bool var and a ±1 step on each int var (clamped to
+     * the int's domain). Picks the candidate that strictly lowers the objective the most
+     * while keeping `hardCost == 0`. Returns `true` if it advanced.
+     *
+     * Bool flips are evaluated by applying-then-reverting on the live state so the
+     * incremental hardCost path runs naturally; int sets do the same with the saved old
+     * value.
+     */
+    private fun greedyObjectiveStep(state: SolverState, objective: Objective): Boolean {
+        val baselineSnap = state.assignment.snapshot()
+        val baselineObj = objective.evaluate(baselineSnap)
+        var bestDelta = 0.0
+        var bestMove: Move? = null
+
+        for (b in 0 until problem.numBoolVars) {
+            state.apply(Move.BoolFlip(b))
+            if (state.hardCost == 0) {
+                val obj = objective.evaluate(state.assignment.snapshot())
+                val delta = obj - baselineObj
+                if (delta < bestDelta) {
+                    bestDelta = delta
+                    bestMove = Move.BoolFlip(b)
+                }
+            }
+            state.apply(Move.BoolFlip(b)) // revert
+        }
+
+        for (i in 0 until problem.numIntVars) {
+            val cur = state.assignment.intValue(i)
+            val d = problem.intDomains[i]
+            for (target in intArrayOf(cur - 1, cur + 1)) {
+                if (target !in d.min..d.max) continue
+                state.apply(Move.IntSet(i, target))
+                if (state.hardCost == 0) {
+                    val obj = objective.evaluate(state.assignment.snapshot())
+                    val delta = obj - baselineObj
+                    if (delta < bestDelta) {
+                        bestDelta = delta
+                        bestMove = Move.IntSet(i, target)
+                    }
+                }
+                state.apply(Move.IntSet(i, cur)) // revert
+            }
+        }
+
+        if (bestMove == null) return false
+        state.apply(bestMove)
+        return true
     }
 
     private fun farEnough(

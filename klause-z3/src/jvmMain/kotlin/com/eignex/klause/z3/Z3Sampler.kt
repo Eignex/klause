@@ -1,13 +1,18 @@
 package com.eignex.klause.z3
 
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Sampler
 import com.eignex.klause.solver.SolveResult
+import com.microsoft.z3.ArithExpr
 import com.microsoft.z3.BoolExpr
 import com.microsoft.z3.Context
 import com.microsoft.z3.IntNum
 import com.microsoft.z3.Model
+import com.microsoft.z3.RealSort
 import com.microsoft.z3.Solver
 import com.microsoft.z3.Status
 
@@ -22,7 +27,69 @@ import com.microsoft.z3.Status
  *  - [enumerate] — *without replacement*. One context, blocking clause per yielded model.
  *    `params.minHammingDistance` / `params.recentWindow` apply on top as a post-filter.
  */
-class Z3Sampler(override val problem: Problem) : Sampler<Z3Params> {
+class Z3Sampler(override val problem: Problem) : Sampler<Z3Params>, Optimizer<Z3Params> {
+
+    /**
+     * Linear-objective minimisation via Z3's native [com.microsoft.z3.Optimize] solver.
+     * Translates a [LinearObjective] to `Σ wᵢ · bᵢ + Σ cᵢ · iᵢ + constant` over Z3 reals
+     * (bool indicators lifted via `mkITE`); other [Objective] subtypes are not supported
+     * and throw at runtime.
+     */
+    override fun minimize(objective: Objective, params: Z3Params): Sample? {
+        require(objective is LinearObjective) {
+            "Z3 backend only supports LinearObjective; got ${objective::class.simpleName}"
+        }
+        val ctx = newContext(params)
+        try {
+            val (encoding, constraints) = Z3Translator.translate(problem, ctx)
+            val opt = ctx.mkOptimize()
+            params.timeoutMillis?.let { ms ->
+                val p = ctx.mkParams()
+                p.add("timeout", ms.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt())
+                opt.setParameters(p)
+            }
+            for (c in constraints) opt.Add(c)
+            val objExpr = buildObjective(objective, encoding, ctx)
+            opt.MkMinimize(objExpr)
+            return when (opt.Check()) {
+                Status.SATISFIABLE -> decode(opt.model, encoding)
+                else -> null
+            }
+        } finally {
+            ctx.close()
+        }
+    }
+
+    private fun buildObjective(
+        obj: LinearObjective,
+        encoding: Z3Encoding,
+        ctx: Context,
+    ): ArithExpr<RealSort> {
+        val terms = ArrayList<ArithExpr<RealSort>>()
+        if (obj.constant != 0.0) terms.add(realLit(obj.constant, ctx))
+        for (b in obj.boolWeights.indices) {
+            val w = obj.boolWeights[b]
+            if (w == 0.0) continue
+            // `bool ? w : 0` as a real expression.
+            @Suppress("UNCHECKED_CAST")
+            val term = ctx.mkITE(encoding.boolExprs[b], realLit(w, ctx), realLit(0.0, ctx))
+                as ArithExpr<RealSort>
+            terms.add(term)
+        }
+        for (i in obj.intCoefficients.indices) {
+            val c = obj.intCoefficients[i]
+            if (c == 0.0) continue
+            @Suppress("UNCHECKED_CAST")
+            val asReal = ctx.mkInt2Real(encoding.intExprs[i]) as ArithExpr<RealSort>
+            terms.add(ctx.mkMul(realLit(c, ctx), asReal))
+        }
+        if (terms.isEmpty()) return realLit(0.0, ctx)
+        @Suppress("UNCHECKED_CAST")
+        return ctx.mkAdd(*terms.toTypedArray()) as ArithExpr<RealSort>
+    }
+
+    private fun realLit(value: Double, ctx: Context): ArithExpr<RealSort> =
+        ctx.mkReal(value.toString())
 
     override fun solve(params: Z3Params): SolveResult {
         val ctx = newContext(params)
