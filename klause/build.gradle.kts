@@ -8,7 +8,7 @@ plugins {
 }
 
 eignexPublish {
-    description.set("Stochastic local-search constraint solver for mixed Boolean and bounded-integer schemas. Samples diverse satisfying assignments, minimises linear objectives, and bit-blasts to CNF.")
+    description.set("Kotlin solver for Boolean and integer constraint problems. Finds and samples satisfying solutions, picks the best under a weighted objective, and exports to CNF for external SAT engines.")
     githubRepo.set("Eignex/klause")
 }
 
