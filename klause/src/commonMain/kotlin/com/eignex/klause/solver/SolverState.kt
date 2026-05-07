@@ -43,9 +43,21 @@ class SolverState(
      *  array between picks. */
     val factorWeights: DoubleArray = DoubleArray(problem.numFactors) { 1.0 }
 
+    /** Configuration-Checking flag per Boolean variable. `true` means a neighboring
+     *  variable has been touched since this var was last flipped (or since restart) — the
+     *  var is "eligible to re-flip" by CCASat-style strategies. `false` means this var was
+     *  the most recent flip in its neighborhood; flipping it again would be a no-progress
+     *  cycle. */
+    val boolConfChange: BooleanArray = BooleanArray(problem.numBoolVars) { true }
+
+    /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
+    val intConfChange: BooleanArray = BooleanArray(problem.numIntVars) { true }
+
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
         for (i in lastTouched.indices) lastTouched[i] = 0L
+        for (i in boolConfChange.indices) boolConfChange[i] = true
+        for (i in intConfChange.indices) intConfChange[i] = true
         step = 0L
         recompute()
     }
@@ -108,6 +120,8 @@ class SolverState(
             updateViolation(factor, factorId, factor.applyBoolFlip(this, factorId, boolVar))
         }
         invalidateBoolBreakNeighbourhood(touchedFactors)
+        markNeighborConfChange(touchedFactors)
+        boolConfChange[boolVar] = false
         step++
         lastTouched[boolVar] = step
     }
@@ -122,6 +136,8 @@ class SolverState(
             updateViolation(factor, factorId, factor.applyIntSet(this, factorId, intVar, old))
         }
         invalidateBoolBreakNeighbourhood(touchedFactors)
+        markNeighborConfChange(touchedFactors)
+        intConfChange[intVar] = false
         step++
         lastTouched[problem.numBoolVars + intVar] = step
     }
@@ -130,6 +146,14 @@ class SolverState(
         for (factorId in factorIds) {
             val f = problem.factors[factorId]
             for (v in f.boolVars) boolBreakValid[v] = false
+        }
+    }
+
+    private fun markNeighborConfChange(factorIds: IntArray) {
+        for (factorId in factorIds) {
+            val f = problem.factors[factorId]
+            for (v in f.boolVars) boolConfChange[v] = true
+            for (v in f.intVars) intConfChange[v] = true
         }
     }
 

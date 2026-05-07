@@ -74,5 +74,4 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-- Configuration Checking (CCASat-style) per-variable diversification.
 - Benchmark suite, Maven Central publishing, CI.
