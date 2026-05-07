@@ -1,7 +1,7 @@
 package com.eignex.klause.bench
 
 import com.eignex.klause.solver.BruteForceParams
-import com.eignex.klause.solver.BruteForceSampler
+import com.eignex.klause.solver.BruteForceSolver
 import com.eignex.klause.solver.Problem
 
 /** [BenchSampler] adapter so the brute-force enumerator joins the harness alongside
@@ -11,7 +11,7 @@ class BruteForceBench(
     override val problem: Problem,
     private val params: BruteForceParams = BruteForceParams(randomSeed = 0L),
 ) : BenchSampler {
-    private val s = BruteForceSampler(problem)
+    private val s = BruteForceSolver(problem)
     override val name = "brute-force"
     override fun solve() = s.solve(params)
     override fun samples(n: Int) = s.samples(params).take(n).toList()

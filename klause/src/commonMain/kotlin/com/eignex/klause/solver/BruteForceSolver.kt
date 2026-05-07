@@ -5,7 +5,7 @@ import com.eignex.kpermute.longPermutation
 import kotlin.random.Random
 
 /**
- * Per-call params for [BruteForceSampler]. The brute-force engine is exact within its
+ * Per-call params for [BruteForceSolver]. The brute-force engine is exact within its
  * step budget; [maxSteps] caps the number of assignments the walker will check before
  * giving up. The default [Long.MAX_VALUE] means "exhaust the entire space", but for
  * problems with billions of assignments and few satisfying ones, callers should set a
@@ -13,9 +13,9 @@ import kotlin.random.Random
  *
  *  - [randomSeed] — controls the iteration order via kpermute.
  *  - [minHammingDistance] / [recentWindow] — distance / window filtering on
- *    [BruteForceSampler.enumerate], identical to other backends.
+ *    [BruteForceSolver.enumerate], identical to other backends.
  *  - [maxSteps] — global cap on assignments visited per call. When the walker hits the
- *    cap, the sequence ends; for [BruteForceSampler.minimize] this means the returned
+ *    cap, the sequence ends; for [BruteForceSolver.minimize] this means the returned
  *    sample is the best seen so far rather than guaranteed-optimal.
  */
 data class BruteForceParams(
@@ -41,7 +41,7 @@ data class BruteForceParams(
  * one with the lowest objective". Trivially correct and useful as a ground-truth oracle
  * for stochastic / SMT-based optimisation backends on small problems.
  */
-class BruteForceSampler(override val problem: Problem) :
+class BruteForceSolver(override val problem: Problem) :
     Sampler<BruteForceParams>, Optimizer<BruteForceParams> {
 
     private val chunks: List<Chunk> = buildChunks(problem)

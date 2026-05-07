@@ -57,10 +57,10 @@ class Z3Bench(
 }
 
 /** All backends currently shipping with the harness. The brute-force ground-truth
- *  enumerator is added only when the assignment space fits — see [BruteForceSampler.fits]. */
+ *  enumerator is added only when the assignment space fits — see [BruteForceSolver.fits]. */
 fun defaultSamplers(problem: Problem): List<BenchSampler> = buildList {
     add(LocalSearchBench(problem))
     add(LogicNGBench(problem))
     add(Z3Bench(problem))
-    if (com.eignex.klause.solver.BruteForceSampler.fits(problem)) add(BruteForceBench(problem))
+    if (com.eignex.klause.solver.BruteForceSolver.fits(problem)) add(BruteForceBench(problem))
 }
