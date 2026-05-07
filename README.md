@@ -74,6 +74,5 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-- Luby restart schedule for stagnation-resistant restart cadence.
 - Configuration Checking (CCASat-style) per-variable diversification.
 - Benchmark suite, Maven Central publishing, CI.

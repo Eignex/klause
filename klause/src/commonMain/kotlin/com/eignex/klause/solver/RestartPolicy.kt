@@ -69,3 +69,38 @@ class AdaptivePerturbationRestart(
         state.recompute()
     }
 }
+
+/**
+ * Luby–Sinclair–Zuckerman restart schedule: cadence follows the Luby sequence
+ * `1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, …`, each term scaled by [unit] flips.
+ * Universally optimal in expectation for Las Vegas algorithms with unknown runtime
+ * distribution — short bursts dominate, but occasional long runs let a hard subproblem
+ * converge.
+ *
+ * `factorWeights` and DDFW-style learnt state survive (`state.restart()` doesn't touch
+ * them); only the assignment, `lastTouched`, and `step` reset.
+ */
+class LubyRestart(val unit: Int = 100) : RestartPolicy {
+    private var u: Int = 1
+    private var v: Int = 1
+    private var cadence: Int = unit
+
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
+        stepsSinceLastRestart >= cadence
+
+    override fun restart(state: SolverState, bestSoFar: Sample?) {
+        state.restart()
+        advance()
+    }
+
+    /** Knuth's O(1) iterative form of the Luby sequence. */
+    private fun advance() {
+        if ((u and -u) == v) {
+            u += 1
+            v = 1
+        } else {
+            v *= 2
+        }
+        cadence = unit * v
+    }
+}

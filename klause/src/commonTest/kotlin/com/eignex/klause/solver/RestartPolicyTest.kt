@@ -84,4 +84,49 @@ class RestartPolicyTest {
         assertNotNull(b)
         assertEquals(objective.evaluate(a), objective.evaluate(b))
     }
+
+    @Test
+    fun lubyTriggersAtCadenceBoundary() {
+        val p = LubyRestart(unit = 100)
+        assertEquals(false, p.shouldRestart(0))
+        assertEquals(false, p.shouldRestart(99))
+        assertEquals(true, p.shouldRestart(100))
+        assertEquals(true, p.shouldRestart(1_000_000))
+    }
+
+    @Test
+    fun lubySequenceMatchesKnuth() {
+        val p = LubyRestart(unit = 1)
+        val problem = Problem(1, 0, emptyArray(), emptyList())
+        val state = SolverState(problem, Random(0))
+        state.restart()
+        // Capture the cadence emitted by `shouldRestart` after each `restart()` call by
+        // probing at exactly the cadence boundary (shouldRestart returns true iff
+        // stepsSinceLastRestart >= cadence). Using unit=1 lets us read each term as `n`
+        // such that shouldRestart(n) is the first true for that interval.
+        val emitted = mutableListOf<Int>()
+        repeat(15) {
+            // First n at which shouldRestart returns true is the current cadence.
+            var n = 1
+            while (!p.shouldRestart(n)) n++
+            emitted += n
+            p.restart(state, bestSoFar = null)
+        }
+        // Canonical Luby sequence prefix.
+        assertEquals(listOf(1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8), emitted)
+    }
+
+    @Test
+    fun lubyIntegratesWithLocalSearchSolver() {
+        // Same 3-SAT smoke setup the strategy tests use.
+        val clauses = listOf(
+            com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+            com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+        )
+        val problem = Problem(3, 0, emptyArray(), clauses)
+        val solver = LocalSearchSolver(problem, restartPolicy = LubyRestart(unit = 50))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 9L))
+        assertNotNull(sample)
+    }
 }
