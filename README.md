@@ -102,7 +102,6 @@ suitable for any external propositional SAT engine.
 
 - Typed handle-based decode API to replace name-string lookups (`compiled.decodeFloat(handle, sample)` instead of `compiled.decodeFloat("rate", sample)`).
 - Wire-format problem loading; hook into `:klause-bench` once the format ships.
-- Soft constraints surfaced through `Sampler` — DSL already takes `isHard = false`/`weight`, runtime tracks `softCost`, but no API exposes optimisation. All four backends currently skip soft factors.
 - Multi-float linear arithmetic across distinct `FloatHandle`s. Single-handle linear ops work; cross-handle currently throws at expression-build time. Needs scale unification in the compiler.
 - `IntLeq` / `IntGeq` / `IntEq` repair-move clamping — proposed targets aren't bounded to the int's domain. Latent footgun when the bound itself is out-of-domain (the "always-false" path).
 - Global GCC factor with a HashMap-of-counts payload, sharper than the current per-value cardinality decomposition.
