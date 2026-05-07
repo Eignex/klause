@@ -28,8 +28,8 @@ class IntDivModDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 27)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val nv = compiled.decodeInt("n", s)
-            val dv = compiled.decodeInt("d", s)
+            val nv = compiled.decode(schema.n, s)
+            val dv = compiled.decode(schema.d, s)
             assertTrue(dv >= 1, "d=$dv must be positive")
             assertTrue(nv / dv == 3, "n=$nv d=$dv n/d=${nv / dv}, expected 3")
         }
@@ -49,8 +49,8 @@ class IntDivModDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 41)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val nv = compiled.decodeInt("n", s)
-            val dv = compiled.decodeInt("d", s)
+            val nv = compiled.decode(schema.n, s)
+            val dv = compiled.decode(schema.d, s)
             assertTrue(nv % dv == 1, "n=$nv d=$dv n%d=${nv % dv}, expected 1")
         }
     }
@@ -81,8 +81,8 @@ class IntDivModDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 61)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val nv = compiled.decodeInt("n", s)
-            val dv = compiled.decodeInt("d", s)
+            val nv = compiled.decode(schema.n, s)
+            val dv = compiled.decode(schema.d, s)
             assertTrue(nv / dv == -2, "n=$nv d=$dv n/d=${nv / dv}")
         }
     }
@@ -101,8 +101,8 @@ class IntDivModDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 71)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val nv = compiled.decodeInt("n", s)
-            val dv = compiled.decodeInt("d", s)
+            val nv = compiled.decode(schema.n, s)
+            val dv = compiled.decode(schema.d, s)
             assertTrue(nv / dv == -2, "n=$nv d=$dv n/d=${nv / dv}")
         }
     }
@@ -121,8 +121,8 @@ class IntDivModDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 47)).take(5).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val nv = compiled.decodeInt("n", s)
-            val dv = compiled.decodeInt("d", s)
+            val nv = compiled.decode(schema.n, s)
+            val dv = compiled.decode(schema.d, s)
             assertTrue(nv == -10 && dv == 3 && nv % dv == -1, "n=$nv d=$dv n%d=${nv % dv}")
         }
     }

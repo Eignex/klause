@@ -40,7 +40,7 @@ class XorDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val count = listOf("a", "b", "c").count { compiled.decodeBool(it, s) }
+            val count = listOf(schema.a, schema.b, schema.c).count { compiled.decode(it, s) }
             assertTrue(count % 2 == 1, "count=$count")
         }
     }
@@ -59,7 +59,7 @@ class XorDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 19)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val count = listOf("a", "b", "c").count { compiled.decodeBool(it, s) }
+            val count = listOf(schema.a, schema.b, schema.c).count { compiled.decode(it, s) }
             assertTrue(count % 2 == 0, "count=$count")
         }
     }
@@ -78,9 +78,9 @@ class XorDslTest {
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 23)).take(20).toList()
         for (s in samples) {
-            val flag = compiled.decodeBool("flag", s)
+            val flag = compiled.decode(schema.flag, s)
             if (!flag) continue
-            val count = listOf("a", "b", "c").count { compiled.decodeBool(it, s) }
+            val count = listOf(schema.a, schema.b, schema.c).count { compiled.decode(it, s) }
             assertTrue(count % 2 == 1, "flag set, count=$count")
         }
     }

@@ -43,10 +43,10 @@ class PseudoBooleanDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 31)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val av = if (compiled.decodeBool("a", s)) 3 else 0
-            val bv = if (compiled.decodeBool("b", s)) 2 else 0
-            val cv = if (compiled.decodeBool("c", s)) 5 else 0
-            val dv = if (compiled.decodeBool("d", s)) 1 else 0
+            val av = if (compiled.decode(schema.a, s)) 3 else 0
+            val bv = if (compiled.decode(schema.b, s)) 2 else 0
+            val cv = if (compiled.decode(schema.c, s)) 5 else 0
+            val dv = if (compiled.decode(schema.d, s)) 1 else 0
             assertTrue(av + bv + cv + dv <= 6, "sum=${av + bv + cv + dv}")
         }
     }
@@ -66,9 +66,9 @@ class PseudoBooleanDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 13)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val sum = (if (compiled.decodeBool("a", s)) 2 else 0) +
-                (if (compiled.decodeBool("b", s)) 3 else 0) +
-                (if (compiled.decodeBool("c", s)) 4 else 0)
+            val sum = (if (compiled.decode(schema.a, s)) 2 else 0) +
+                (if (compiled.decode(schema.b, s)) 3 else 0) +
+                (if (compiled.decode(schema.c, s)) 4 else 0)
             assertTrue(sum >= 5, "sum=$sum")
         }
     }
@@ -88,9 +88,9 @@ class PseudoBooleanDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 41)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val sum = (if (compiled.decodeBool("a", s)) 2 else 0) +
-                (if (compiled.decodeBool("b", s)) 3 else 0) +
-                (if (compiled.decodeBool("c", s)) 5 else 0)
+            val sum = (if (compiled.decode(schema.a, s)) 2 else 0) +
+                (if (compiled.decode(schema.b, s)) 3 else 0) +
+                (if (compiled.decode(schema.c, s)) 5 else 0)
             assertTrue(sum == 5, "sum=$sum")
         }
     }

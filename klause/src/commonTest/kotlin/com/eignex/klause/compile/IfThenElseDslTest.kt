@@ -26,9 +26,9 @@ class IfThenElseDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 42)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val flag = compiled.decodeBool("flag", s)
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            val flag = compiled.decode(schema.flag, s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             val picked = if (flag) xv else yv
             assertTrue(picked == 5, "flag=$flag x=$xv y=$yv selected=$picked, expected 5")
         }
@@ -49,9 +49,9 @@ class IfThenElseDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 99)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val flag = compiled.decodeBool("flag", s)
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            val flag = compiled.decode(schema.flag, s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             val picked = if (flag) xv else yv
             assertTrue(picked <= 2, "selected=$picked > 2")
         }

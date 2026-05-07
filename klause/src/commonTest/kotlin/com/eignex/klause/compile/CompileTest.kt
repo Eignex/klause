@@ -54,8 +54,8 @@ class CompileTest {
         assertEquals(5, samples.size)
         assertEquals(samples.toSet().size, samples.size)
         for (s in samples) {
-            val type = compiled.decodeNominal("type", s)
-            val premium = compiled.decodeBool("premium", s)
+            val type = compiled.decode(schema.type, s)
+            val premium = compiled.decode(schema.premium, s)
             assertTrue(!(type == "a" && premium),
                 "Constraint violated: type=$type premium=$premium")
         }
@@ -92,8 +92,8 @@ class CompileTest {
         assertEquals(15, samples.size)
         assertEquals(samples.toSet().size, samples.size, "Samples must be unique")
         for (s in samples) {
-            val type = compiled.decodeNominal("type", s)
-            val budget = compiled.decodeInt("budget", s)
+            val type = compiled.decode(schema.type, s)
+            val budget = compiled.decode(schema.budget, s)
             assertTrue(budget in 1000..4000, "budget out of domain: $budget")
             if (type == "a") {
                 assertTrue(budget <= 2000,
@@ -116,7 +116,7 @@ class CompileTest {
         assertEquals(6, samples.size)
         assertEquals(samples.toSet().size, samples.size)
         for (s in samples) {
-            val rate = compiled.decodeFloat("rate", s)
+            val rate = compiled.decode(schema.rate, s)
             assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
             assertTrue(rate <= 1.0 + 1e-9 && rate >= 0.0 - 1e-9, "rate=$rate out of [0,1]")
         }

@@ -30,7 +30,7 @@ class ProbSatTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 23)).take(10).toList()
         assertTrue(samples.isNotEmpty(), "ProbSat produced no samples on a satisfiable schema")
         for (s in samples) {
-            val count = listOf("a", "b", "c", "d", "e").count { compiled.decodeBool(it, s) }
+            val count = listOf(schema.a, schema.b, schema.c, schema.d, schema.e).count { compiled.decode(it, s) }
             assertTrue(count in 2..3, "count=$count violates 2..3")
         }
     }

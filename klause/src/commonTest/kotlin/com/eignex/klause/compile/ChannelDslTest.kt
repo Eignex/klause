@@ -26,8 +26,8 @@ class ChannelDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 21)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val i = compiled.decodeInt("idx", s)
-            val flags = listOf("b0", "b1", "b2", "b3").map { compiled.decodeBool(it, s) }
+            val i = compiled.decode(schema.idx, s)
+            val flags = listOf(schema.b0, schema.b1, schema.b2, schema.b3).map { compiled.decode(it, s) }
             for (j in flags.indices) {
                 assertTrue(flags[j] == (i == j), "i=$i flags=$flags mismatch at j=$j")
             }
@@ -49,8 +49,8 @@ class ChannelDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 6)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val i = compiled.decodeInt("idx", s)
-            val flags = listOf("a", "b", "c").map { compiled.decodeBool(it, s) }
+            val i = compiled.decode(schema.idx, s)
+            val flags = listOf(schema.a, schema.b, schema.c).map { compiled.decode(it, s) }
             for (j in flags.indices) {
                 assertTrue(flags[j] == (i == 5 + j), "i=$i flags=$flags mismatch at j=$j")
             }

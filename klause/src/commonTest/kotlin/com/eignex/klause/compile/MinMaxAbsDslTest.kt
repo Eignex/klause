@@ -29,8 +29,8 @@ class MinMaxAbsDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 11)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             assertTrue(kotlin.math.min(xv, yv) <= 2, "min($xv,$yv)>2")
         }
     }
@@ -49,9 +49,9 @@ class MinMaxAbsDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 7)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
-            val zv = compiled.decodeInt("z", s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
+            val zv = compiled.decode(schema.z, s)
             assertTrue(maxOf(xv, yv, zv) >= 3, "max($xv,$yv,$zv)<3")
         }
     }
@@ -68,7 +68,7 @@ class MinMaxAbsDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 23)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
+            val xv = compiled.decode(schema.x, s)
             assertTrue(kotlin.math.abs(xv) <= 2, "|$xv|>2")
         }
     }

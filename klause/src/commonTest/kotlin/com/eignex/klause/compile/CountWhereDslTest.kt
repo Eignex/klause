@@ -29,9 +29,9 @@ class CountWhereDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 17)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
-            val zv = compiled.decodeInt("z", s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
+            val zv = compiled.decode(schema.z, s)
             val count = listOf(xv, yv, zv).count { it <= 1 }
             assertTrue(count in 2..3, "x=$xv y=$yv z=$zv count=$count")
         }
@@ -52,9 +52,9 @@ class CountWhereDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 22)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val av = compiled.decodeInt("a", s)
-            val bv = compiled.decodeInt("b", s)
-            val cv = compiled.decodeInt("c", s)
+            val av = compiled.decode(schema.a, s)
+            val bv = compiled.decode(schema.b, s)
+            val cv = compiled.decode(schema.c, s)
             val count = listOf(av, bv, cv).count { it == 0 }
             assertTrue(count == 1, "a=$av b=$bv c=$cv count=$count")
         }

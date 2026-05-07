@@ -36,8 +36,8 @@ class IntDisequalityDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 31)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             assertTrue(xv != yv, "x=$xv y=$yv equal")
         }
     }

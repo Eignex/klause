@@ -29,7 +29,7 @@ class GccDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 14)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val vs = listOf("a", "b", "c", "d").map { compiled.decodeInt(it, s) }
+            val vs = listOf(schema.a, schema.b, schema.c, schema.d).map { compiled.decode(it, s) }
             val c0 = vs.count { it == 0 }
             val c1 = vs.count { it == 1 }
             val c2 = vs.count { it == 2 }
@@ -54,7 +54,7 @@ class GccDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 33)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val vs = listOf("a", "b", "c").map { compiled.decodeInt(it, s) }
+            val vs = listOf(schema.a, schema.b, schema.c).map { compiled.decode(it, s) }
             assertTrue(vs.toSet() == setOf(0, 1, 2), "not a permutation: $vs")
         }
     }

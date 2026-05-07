@@ -20,12 +20,13 @@ class FloatArithmeticTest {
             // rate + 0.1 ≤ 0.6  ↔  rate ≤ 0.5
             val c by constraint { (rate + 0.1) le 0.6 }
         }
-        val compiled = S().compile()
+        val schema = S()
+        val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem)
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 1)).take(50).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val rate = compiled.decodeFloat("rate", s)
+            val rate = compiled.decode(schema.rate, s)
             assertTrue(rate <= 0.5 + 1e-9, "rate=$rate violated rate + 0.1 ≤ 0.6")
         }
     }
@@ -37,12 +38,13 @@ class FloatArithmeticTest {
             // 2 * rate ≥ 0.6  ↔  rate ≥ 0.3
             val c by constraint { (2 * rate) ge 0.6 }
         }
-        val compiled = S().compile()
+        val schema = S()
+        val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem)
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 2)).take(50).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val rate = compiled.decodeFloat("rate", s)
+            val rate = compiled.decode(schema.rate, s)
             assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2 * rate ≥ 0.6")
         }
     }
@@ -54,12 +56,13 @@ class FloatArithmeticTest {
             // -rate ≤ -0.4  ↔  rate ≥ 0.4
             val c by constraint { -rate le -0.4 }
         }
-        val compiled = S().compile()
+        val schema = S()
+        val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem)
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 3)).take(50).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val rate = compiled.decodeFloat("rate", s)
+            val rate = compiled.decode(schema.rate, s)
             assertTrue(rate >= 0.4 - 1e-9, "rate=$rate violated -rate ≤ -0.4")
         }
     }
@@ -71,12 +74,13 @@ class FloatArithmeticTest {
             // 2 * rate ≥ rate + 0.3  ↔  rate ≥ 0.3
             val c by constraint { (2 * rate) ge (rate + 0.3) }
         }
-        val compiled = S().compile()
+        val schema = S()
+        val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem)
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 4)).take(50).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val rate = compiled.decodeFloat("rate", s)
+            val rate = compiled.decode(schema.rate, s)
             assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2*rate ≥ rate+0.3")
         }
     }

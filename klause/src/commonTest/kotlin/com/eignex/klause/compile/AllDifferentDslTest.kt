@@ -28,9 +28,9 @@ class AllDifferentDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 4)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val av = compiled.decodeInt("a", s)
-            val bv = compiled.decodeInt("b", s)
-            val cv = compiled.decodeInt("c", s)
+            val av = compiled.decode(schema.a, s)
+            val bv = compiled.decode(schema.b, s)
+            val cv = compiled.decode(schema.c, s)
             assertTrue(setOf(av, bv, cv).size == 3, "duplicates: a=$av b=$bv c=$cv")
         }
     }
@@ -51,12 +51,12 @@ class AllDifferentDslTest {
         assertTrue(samples.isNotEmpty())
         var sawFlagSet = false
         for (s in samples) {
-            val flag = compiled.decodeBool("flag", s)
+            val flag = compiled.decode(schema.flag, s)
             if (!flag) continue
             sawFlagSet = true
-            val av = compiled.decodeInt("a", s)
-            val bv = compiled.decodeInt("b", s)
-            val cv = compiled.decodeInt("c", s)
+            val av = compiled.decode(schema.a, s)
+            val bv = compiled.decode(schema.b, s)
+            val cv = compiled.decode(schema.c, s)
             assertTrue(setOf(av, bv, cv).size == 3, "flag set but a=$av b=$bv c=$cv")
         }
         // Reification soundness covered above; sawFlagSet just confirms the constraint isn't

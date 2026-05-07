@@ -28,8 +28,8 @@ class TableDslTest {
         assertTrue(samples.isNotEmpty())
         val allowed = setOf(0 to 1, 2 to 2, 3 to 0)
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             assertTrue((xv to yv) in allowed, "($xv, $yv) not in allowed table")
         }
     }
@@ -51,8 +51,8 @@ class TableDslTest {
         assertTrue(samples.isNotEmpty())
         val forbidden = setOf(1 to 1, 2 to 2)
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             assertTrue((xv to yv) !in forbidden, "($xv, $yv) should be forbidden")
         }
     }
@@ -74,9 +74,9 @@ class TableDslTest {
         assertTrue(samples.isNotEmpty())
         val allowed = setOf(0 to 0, 2 to 1)
         for (s in samples) {
-            if (!compiled.decodeBool("flag", s)) continue
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            if (!compiled.decode(schema.flag, s)) continue
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             assertTrue((xv to yv) in allowed, "flag set, ($xv,$yv) not in $allowed")
         }
     }

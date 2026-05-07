@@ -24,8 +24,8 @@ class SignedMulDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 53)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val xv = compiled.decodeInt("x", s)
-            val yv = compiled.decodeInt("y", s)
+            val xv = compiled.decode(schema.x, s)
+            val yv = compiled.decode(schema.y, s)
             assertTrue(xv * yv == -6, "x=$xv y=$yv x*y=${xv * yv}")
         }
     }

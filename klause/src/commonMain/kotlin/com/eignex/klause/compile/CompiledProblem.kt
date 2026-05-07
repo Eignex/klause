@@ -1,6 +1,10 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.FloatSpec
+import com.eignex.klause.schema.BoolHandle
+import com.eignex.klause.schema.FloatHandle
+import com.eignex.klause.schema.IntHandle
+import com.eignex.klause.schema.NominalHandle
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 
@@ -19,25 +23,30 @@ class CompiledProblem(
     val nominalIndicators: Map<String, Map<String, Int>>,
     val floatDecoders: Map<String, FloatSpec>,
 ) {
-    fun decodeBool(name: String, sample: Sample): Boolean {
-        val id = boolVarIdByName[name] ?: error("No Boolean variable named '$name'")
+    fun decode(handle: BoolHandle, sample: Sample): Boolean {
+        val id = boolVarIdByName[handle.name]
+            ?: error("No Boolean variable named '${handle.name}'")
         return sample.bools[id]
     }
 
-    fun decodeNominal(name: String, sample: Sample): String {
-        val map = nominalIndicators[name] ?: error("No nominal variable named '$name'")
+    fun decode(handle: NominalHandle, sample: Sample): String {
+        val map = nominalIndicators[handle.name]
+            ?: error("No nominal variable named '${handle.name}'")
         return map.entries.firstOrNull { sample.bools[it.value] }?.key
-            ?: error("Nominal '$name' has no label set in assignment")
+            ?: error("Nominal '${handle.name}' has no label set in assignment")
     }
 
-    fun decodeInt(name: String, sample: Sample): Int {
-        val id = intVarIdByName[name] ?: error("No integer variable named '$name'")
+    fun decode(handle: IntHandle, sample: Sample): Int {
+        val id = intVarIdByName[handle.name]
+            ?: error("No integer variable named '${handle.name}'")
         return sample.ints[id]
     }
 
-    fun decodeFloat(name: String, sample: Sample): Double {
-        val spec = floatDecoders[name] ?: error("No float variable named '$name'")
-        val id = intVarIdByName[name] ?: error("Float '$name' has no int-side id")
+    fun decode(handle: FloatHandle, sample: Sample): Double {
+        val spec = floatDecoders[handle.name]
+            ?: error("No float variable named '${handle.name}'")
+        val id = intVarIdByName[handle.name]
+            ?: error("Float '${handle.name}' has no int-side id")
         val bucket = sample.ints[id]
         return spec.min + (bucket.toDouble() / (spec.buckets - 1)) * (spec.max - spec.min)
     }

@@ -52,8 +52,8 @@ class CardinalityDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val flagSet = compiled.decodeBool("flag", s)
-            val truthCount = listOf("a", "b", "c", "d").count { compiled.decodeBool(it, s) }
+            val flagSet = compiled.decode(schema.flag, s)
+            val truthCount = listOf(schema.a, schema.b, schema.c, schema.d).count { compiled.decode(it, s) }
             if (flagSet) assertTrue(truthCount in 2..3,
                 "flag set should force count∈[2,3], got $truthCount")
         }
@@ -72,7 +72,7 @@ class CardinalityDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 19)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val truthCount = listOf("a", "b", "c", "d", "e").count { compiled.decodeBool(it, s) }
+            val truthCount = listOf(schema.a, schema.b, schema.c, schema.d, schema.e).count { compiled.decode(it, s) }
             assertTrue(truthCount <= 4, "got $truthCount true")
         }
     }

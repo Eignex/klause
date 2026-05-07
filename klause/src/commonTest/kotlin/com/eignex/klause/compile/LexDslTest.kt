@@ -26,8 +26,8 @@ class LexDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 8)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val a = listOf(compiled.decodeInt("a0", s), compiled.decodeInt("a1", s))
-            val b = listOf(compiled.decodeInt("b0", s), compiled.decodeInt("b1", s))
+            val a = listOf(compiled.decode(schema.a0, s), compiled.decode(schema.a1, s))
+            val b = listOf(compiled.decode(schema.b0, s), compiled.decode(schema.b1, s))
             val ok = a[0] < b[0] || (a[0] == b[0] && a[1] <= b[1])
             assertTrue(ok, "a=$a b=$b violates lexLeq")
         }
@@ -48,8 +48,8 @@ class LexDslTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 12)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            val a = listOf(compiled.decodeInt("a0", s), compiled.decodeInt("a1", s))
-            val b = listOf(compiled.decodeInt("b0", s), compiled.decodeInt("b1", s))
+            val a = listOf(compiled.decode(schema.a0, s), compiled.decode(schema.a1, s))
+            val b = listOf(compiled.decode(schema.b0, s), compiled.decode(schema.b1, s))
             val ok = a[0] < b[0] || (a[0] == b[0] && a[1] < b[1])
             assertTrue(ok, "a=$a b=$b not strictly lex-less")
         }

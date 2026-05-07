@@ -46,11 +46,12 @@ The DSL covers:
 ## Solving
 
 ```kotlin
-val compiled = CampaignSchema().compile()
+val schema = CampaignSchema()
+val compiled = schema.compile()
 val solver = LocalSearchSolver(compiled.problem)
 
 solver.enumerate(LocalSearchParams(maxFlips = 100_000)).take(20).forEach { s ->
-    println("type=${compiled.decodeNominal("type", s)} budget=${compiled.decodeInt("budget", s)}")
+    println("type=${compiled.decode(schema.type, s)} budget=${compiled.decode(schema.budget, s)}")
 }
 
 val weights = LinearObjective(boolWeights = doubleArrayOf(/* ... */))
@@ -73,7 +74,6 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-- Typed handle-based decode API to replace name-string lookups.
 - Multi-float linear arithmetic across distinct `FloatHandle`s.
 - `IntLeq` / `IntGeq` / `IntEq` repair-move clamping.
 - Global GCC factor with a HashMap-of-counts payload.
