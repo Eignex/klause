@@ -74,7 +74,6 @@ val text = cnf.toDimacs()
 ## TODO
 
 - Typed handle-based decode API to replace name-string lookups.
-- Wire-format problem loading.
 - Multi-float linear arithmetic across distinct `FloatHandle`s.
 - `IntLeq` / `IntGeq` / `IntEq` repair-move clamping.
 - Global GCC factor with a HashMap-of-counts payload.
