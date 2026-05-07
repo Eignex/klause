@@ -78,6 +78,5 @@ val text = cnf.toDimacs()
 - Multi-float linear arithmetic across distinct `FloatHandle`s.
 - `IntLeq` / `IntGeq` / `IntEq` repair-move clamping.
 - Global GCC factor with a HashMap-of-counts payload.
-- Local-search optimiser: adaptive restart that perturbs the best-so-far on plateau instead of randomising fully.
-- Local-search optimiser: simulated-annealing accept rule to pass through worse regions and escape local minima.
+- SAPS-style strategy that mutates `SolverState.factorWeights` to escape stuck regions (the field exists; only the weight-update logic is missing).
 - Benchmark suite, Maven Central publishing, CI.
