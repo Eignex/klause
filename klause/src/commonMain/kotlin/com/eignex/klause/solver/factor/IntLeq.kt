@@ -36,7 +36,10 @@ class IntLeq(
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
         val cur = state.assignment.intValue(intVar)
-        if (cur > bound) sink.addIntSet(intVar, bound)
+        if (cur > bound) {
+            val clamped = state.problem.intDomains[intVar].clamp(bound)
+            if (clamped != cur) sink.addIntSet(intVar, clamped)
+        }
     }
 
     private companion object {

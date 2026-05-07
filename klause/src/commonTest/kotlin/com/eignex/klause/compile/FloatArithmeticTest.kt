@@ -108,15 +108,64 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun crossHandleArithmeticThrows() {
-        // Same-source linear arithmetic works, but combining two distinct floats does not.
-        assertFails {
-            class S : VariableSchema() {
-                val a by floatVar(min = 0.0, max = 1.0, buckets = 11)
-                val b by floatVar(min = 0.0, max = 1.0, buckets = 11)
-                val c by constraint { (a.toExpr() + b.toExpr()) le 1.0 }
-            }
-            S().compile()
+    fun crossHandleSumComparesAcrossDistinctFloats() {
+        class S : VariableSchema() {
+            val a by floatVar(min = 0.0, max = 1.0, buckets = 11)
+            val b by floatVar(min = 0.0, max = 1.0, buckets = 11)
+            val c by constraint { (a.toExpr() + b.toExpr()) le 1.0 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 5)).take(50).toList()
+        assertTrue(samples.isNotEmpty())
+        // Two 11-bucket grids over [0,1]: bucket step is 0.1, so allow a 0.1 slack for
+        // the rationalised lowering.
+        for (s in samples) {
+            val av = compiled.decode(schema.a, s)
+            val bv = compiled.decode(schema.b, s)
+            assertTrue(av + bv <= 1.0 + 0.1 + 1e-9, "a=$av b=$bv violated a+b ≤ 1.0")
+        }
+    }
+
+    @Test
+    fun crossHandleSubtractionEnforcesAtLeastDifference() {
+        class S : VariableSchema() {
+            val a by floatVar(min = 0.0, max = 1.0, buckets = 11)
+            val b by floatVar(min = 0.0, max = 1.0, buckets = 11)
+            val c by constraint { (a.toExpr() - b.toExpr()) ge 0.5 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 6)).take(50).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val av = compiled.decode(schema.a, s)
+            val bv = compiled.decode(schema.b, s)
+            assertTrue(av - bv >= 0.5 - 0.1 - 1e-9, "a=$av b=$bv violated a-b ≥ 0.5")
+        }
+    }
+
+    @Test
+    fun mixedHandleScalingComparesCorrectly() {
+        class S : VariableSchema() {
+            // Asymmetric domains and bucket counts.
+            val a by floatVar(min = 0.0, max = 2.0, buckets = 21)
+            val b by floatVar(min = -1.0, max = 1.0, buckets = 11)
+            val c by constraint { (2 * a + 3 * b.toExpr()) le 5.0 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(50).toList()
+        assertTrue(samples.isNotEmpty())
+        // Slack: 2 * 0.1 (a's bucket step) + 3 * 0.2 (b's bucket step) = 0.8.
+        for (s in samples) {
+            val av = compiled.decode(schema.a, s)
+            val bv = compiled.decode(schema.b, s)
+            assertTrue(2 * av + 3 * bv <= 5.0 + 0.8 + 1e-9,
+                "a=$av b=$bv violated 2a + 3b ≤ 5.0")
         }
     }
 

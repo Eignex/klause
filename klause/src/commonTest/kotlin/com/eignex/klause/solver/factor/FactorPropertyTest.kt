@@ -246,6 +246,10 @@ class FactorPropertyTest {
             IntGeq(intVar = 0, bound = 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
             IntLeq(intVar = 0, bound = 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
             IntNeq(intVar = 0, value = 0) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
+            // Bounds outside the domain — the proposeRepair path must clamp.
+            IntLeq(intVar = 0, bound = -10) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
+            IntGeq(intVar = 0, bound = 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
+            IntEq(intVar = 0, value = 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
             ReifiedLinear(
                 auxBoolVar = 0,
                 coeffs = intArrayOf(2, -1),

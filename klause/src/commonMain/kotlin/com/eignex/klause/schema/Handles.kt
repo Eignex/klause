@@ -8,6 +8,8 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
+import com.eignex.klause.ast.IntScale
+import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.IntTerm
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.not
@@ -79,44 +81,53 @@ operator fun Int.times(expr: FloatExpr): FloatExpr = expr * this
 operator fun Double.times(expr: FloatExpr): FloatExpr = expr * this
 
 /**
- * Linear expression `coeff · handle + offset`, with both terms tracked in real (Double)
- * space. Arithmetic operators chain by folding the coefficient and offset; comparison
- * operators rearrange `coeff · h + offset OP threshold` to `h OP (threshold - offset) /
- * coeff`, then drop into the handle's bucket grid.
+ * Linear expression `Σ c_i · h_i + offset` over one or more [FloatHandle]s, all tracked
+ * in real (Double) space. Arithmetic operators fold by merging coefficient maps;
+ * comparisons against a Double or another [FloatExpr] lower to a single integer
+ * comparison on the handles' bucket-int variables.
  *
- * All operations preserve the underlying [FloatHandle] reference. Combining two
- * `FloatExpr`s that name different handles requires the cross-variable linear arithmetic
- * path, which isn't yet implemented; doing so throws at expression-build time.
+ * Single-handle expressions take the precise per-handle quantization path
+ * (folding offset/coeff into the threshold and using [FloatHandle.bucketOf]).
+ * Multi-handle expressions take a rationalised path: each real coefficient is scaled by
+ * a fixed precision factor and rounded to an integer, then the comparison is emitted
+ * as `IntCompare(IntSum(IntScale(...)), op, IntLit(K))` for the existing affine
+ * lowering in `Compiler` to turn into a `Linear` factor.
  */
 class FloatExpr internal constructor(
-    private val handle: FloatHandle,
-    private val coeff: Double,
+    private val terms: Map<FloatHandle, Double>,
     private val offset: Double,
 ) {
 
-    operator fun plus(d: Double): FloatExpr = FloatExpr(handle, coeff, offset + d)
-    operator fun minus(d: Double): FloatExpr = FloatExpr(handle, coeff, offset - d)
-    operator fun times(c: Int): FloatExpr = FloatExpr(handle, coeff * c, offset * c)
-    operator fun times(c: Double): FloatExpr = FloatExpr(handle, coeff * c, offset * c)
-    operator fun unaryMinus(): FloatExpr = FloatExpr(handle, -coeff, -offset)
+    internal constructor(handle: FloatHandle, coeff: Double, offset: Double) :
+        this(if (coeff == 0.0) emptyMap() else mapOf(handle to coeff), offset)
+
+    operator fun plus(d: Double): FloatExpr = FloatExpr(terms, offset + d)
+    operator fun minus(d: Double): FloatExpr = FloatExpr(terms, offset - d)
+    operator fun times(c: Int): FloatExpr = times(c.toDouble())
+    operator fun times(c: Double): FloatExpr {
+        if (c == 0.0) return FloatExpr(emptyMap(), 0.0)
+        return FloatExpr(terms.mapValues { it.value * c }, offset * c)
+    }
+    operator fun unaryMinus(): FloatExpr = times(-1.0)
 
     operator fun plus(other: FloatExpr): FloatExpr {
-        requireSameHandle(other)
-        return FloatExpr(handle, coeff + other.coeff, offset + other.offset)
+        val merged = LinkedHashMap<FloatHandle, Double>(terms)
+        for ((h, c) in other.terms) {
+            val sum = (merged[h] ?: 0.0) + c
+            if (sum == 0.0) merged.remove(h) else merged[h] = sum
+        }
+        return FloatExpr(merged, offset + other.offset)
     }
-    operator fun minus(other: FloatExpr): FloatExpr {
-        requireSameHandle(other)
-        return FloatExpr(handle, coeff - other.coeff, offset - other.offset)
-    }
+    operator fun minus(other: FloatExpr): FloatExpr = this + (-other)
 
-    infix fun le(threshold: Double): BoolExpr = bucketCompare(threshold, IntCmpOp.LE, IntCmpOp.GE)
-    infix fun lt(threshold: Double): BoolExpr = bucketCompare(threshold, IntCmpOp.LT, IntCmpOp.GT)
-    infix fun ge(threshold: Double): BoolExpr = bucketCompare(threshold, IntCmpOp.GE, IntCmpOp.LE)
-    infix fun gt(threshold: Double): BoolExpr = bucketCompare(threshold, IntCmpOp.GT, IntCmpOp.LT)
-    infix fun eq(threshold: Double): BoolExpr = bucketCompare(threshold, IntCmpOp.EQ, IntCmpOp.EQ)
-    infix fun ne(threshold: Double): BoolExpr = bucketCompare(threshold, IntCmpOp.NE, IntCmpOp.NE)
+    infix fun le(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LE, IntCmpOp.GE)
+    infix fun lt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LT, IntCmpOp.GT)
+    infix fun ge(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GE, IntCmpOp.LE)
+    infix fun gt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GT, IntCmpOp.LT)
+    infix fun eq(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.EQ, IntCmpOp.EQ)
+    infix fun ne(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.NE, IntCmpOp.NE)
 
-    /** Same-handle expression comparison: rewrite `lhs OP rhs` as `(lhs - rhs) OP 0`. */
+    /** Expression-vs-expression comparison: rewrite `lhs OP rhs` as `(lhs - rhs) OP 0`. */
     infix fun le(other: FloatExpr): BoolExpr = (this - other) le 0.0
     infix fun lt(other: FloatExpr): BoolExpr = (this - other) lt 0.0
     infix fun ge(other: FloatExpr): BoolExpr = (this - other) ge 0.0
@@ -124,57 +135,92 @@ class FloatExpr internal constructor(
     infix fun eq(other: FloatExpr): BoolExpr = (this - other) eq 0.0
     infix fun ne(other: FloatExpr): BoolExpr = (this - other) ne 0.0
 
-    private fun requireSameHandle(other: FloatExpr) {
-        require(handle === other.handle) {
-            "Cross-variable float arithmetic between '${handle.name}' and '${other.handle.name}' " +
-                "is not yet supported"
+    private fun compare(threshold: Double, op: IntCmpOp, flippedOp: IntCmpOp): BoolExpr =
+        when {
+            terms.isEmpty() -> constantBool(evalConstant(op, threshold))
+            terms.size == 1 -> {
+                val entry = terms.entries.first()
+                singleHandleBucketCompare(entry.key, entry.value, threshold, op, flippedOp)
+            }
+            else -> multiHandleBucketCompare(threshold, op)
         }
+
+    private fun evalConstant(op: IntCmpOp, threshold: Double): Boolean = when (op) {
+        IntCmpOp.LE -> offset <= threshold
+        IntCmpOp.LT -> offset < threshold
+        IntCmpOp.GE -> offset >= threshold
+        IntCmpOp.GT -> offset > threshold
+        IntCmpOp.EQ -> offset == threshold
+        IntCmpOp.NE -> offset != threshold
     }
 
     /**
-     * Reduce `coeff · h + offset OP threshold` to a bucket-index integer comparison.
-     * [op] is the operator the original expression carries; [flippedOp] is its
-     * counterpart for when [coeff] is negative (the comparison flips when both sides are
-     * divided by a negative).
-     *
-     * Out-of-handle-range thresholds become tautologies / contradictions encoded as
-     * comparisons against `IntLit(0)` or `IntLit(-1)` — bucket values can never be
-     * negative, so `bucket < 0` is reliably unsatisfiable and `bucket >= 0` reliably true.
+     * Single-handle path: fold coeff and offset into the threshold in float space, then
+     * round to a bucket index via [FloatHandle.bucketOf]. Out-of-range thresholds collapse
+     * to tautology / contradiction. [flippedOp] kicks in when [coeff] is negative because
+     * dividing both sides by a negative reverses the comparison direction.
      */
-    private fun bucketCompare(threshold: Double, op: IntCmpOp, flippedOp: IntCmpOp): BoolExpr {
+    private fun singleHandleBucketCompare(
+        handle: FloatHandle,
+        coeff: Double,
+        threshold: Double,
+        op: IntCmpOp,
+        flippedOp: IntCmpOp,
+    ): BoolExpr {
         val ref = IntRef(handle.name)
-        if (coeff == 0.0) {
-            val holds = when (op) {
-                IntCmpOp.LE -> offset <= threshold
-                IntCmpOp.LT -> offset < threshold
-                IntCmpOp.GE -> offset >= threshold
-                IntCmpOp.GT -> offset > threshold
-                IntCmpOp.EQ -> offset == threshold
-                IntCmpOp.NE -> offset != threshold
-            }
-            return constantBool(ref, holds)
-        }
         val effectiveThreshold = (threshold - offset) / coeff
         val finalOp = if (coeff < 0) flippedOp else op
         return when {
             effectiveThreshold < handle.min -> when (finalOp) {
-                IntCmpOp.LE, IntCmpOp.LT, IntCmpOp.EQ -> constantBool(ref, false)
-                IntCmpOp.GE, IntCmpOp.GT, IntCmpOp.NE -> constantBool(ref, true)
+                IntCmpOp.LE, IntCmpOp.LT, IntCmpOp.EQ -> constantBool(false)
+                IntCmpOp.GE, IntCmpOp.GT, IntCmpOp.NE -> constantBool(true)
             }
             effectiveThreshold > handle.max -> when (finalOp) {
-                IntCmpOp.LE, IntCmpOp.LT, IntCmpOp.NE -> constantBool(ref, true)
-                IntCmpOp.GE, IntCmpOp.GT, IntCmpOp.EQ -> constantBool(ref, false)
+                IntCmpOp.LE, IntCmpOp.LT, IntCmpOp.NE -> constantBool(true)
+                IntCmpOp.GE, IntCmpOp.GT, IntCmpOp.EQ -> constantBool(false)
             }
             else -> IntCompare(ref, finalOp, IntLit(handle.bucketOf(effectiveThreshold)))
         }
     }
 
-    private fun constantBool(ref: IntRef, value: Boolean): BoolExpr =
-        // `x = x` reduces to a no-op in the compiler (coeffs cancel, constant 0 == 0).
-        // `x != x` reduces to a constant-false IllegalStateException at compile time —
-        // matching how the compiler already surfaces user-written contradictions like
-        // `(x - x) eq 5`. Either path keeps the AST integer-only and avoids needing a
-        // dedicated boolean-literal node.
-        if (value) IntCompare(ref, IntCmpOp.EQ, ref)
-        else IntCompare(ref, IntCmpOp.NE, ref)
+    /**
+     * Multi-handle path: substitute `real_i = h_i.min + (b_i / (h_i.buckets - 1)) ·
+     * (h_i.max - h_i.min)` for each handle and rearrange so the comparison reads
+     * `Σ s_i · b_i  OP  K` where `s_i = c_i · (h_i.max - h_i.min) / (h_i.buckets - 1)`
+     * and `K = threshold - offset - Σ c_i · h_i.min`. Multiply both sides by [SCALE] and
+     * round to integers; emit through the existing affine-lowering pipeline.
+     *
+     * Discretisation error is bounded by 1 / [SCALE] per term — orders of magnitude below
+     * the per-handle bucket grid for realistic [SCALE] values.
+     */
+    private fun multiHandleBucketCompare(threshold: Double, op: IntCmpOp): BoolExpr {
+        var constSum = offset
+        val children = mutableListOf<IntExpr>()
+        for ((h, c) in terms) {
+            val realStep = c * (h.max - h.min) / (h.buckets - 1)
+            val k = (SCALE * realStep).roundToInt()
+            if (k != 0) children.add(IntScale(k, IntRef(h.name)))
+            constSum += c * h.min
+        }
+        val K = (SCALE * (threshold - constSum)).roundToInt()
+        val sum: IntExpr = when (children.size) {
+            0 -> IntLit(0)
+            1 -> children[0]
+            else -> IntSum(children)
+        }
+        return IntCompare(sum, op, IntLit(K))
+    }
+
+    /**
+     * `0 = 0` for true and `0 ≠ 0` for false: the compiler's affine pass folds these to
+     * a no-op or a compile-time-false [IllegalStateException] respectively, matching how
+     * user-written contradictions like `(x - x) eq 5` already surface.
+     */
+    private fun constantBool(value: Boolean): BoolExpr =
+        if (value) IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
+        else IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
+
+    private companion object {
+        const val SCALE: Double = 1_000_000.0
+    }
 }

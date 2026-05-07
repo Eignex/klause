@@ -74,7 +74,5 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-- Multi-float linear arithmetic across distinct `FloatHandle`s.
-- `IntLeq` / `IntGeq` / `IntEq` repair-move clamping.
 - SAPS-style strategy that mutates `SolverState.factorWeights` to escape stuck regions (the field exists; only the weight-update logic is missing).
 - Benchmark suite, Maven Central publishing, CI.

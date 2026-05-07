@@ -33,7 +33,11 @@ class IntEq(
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
-        if (state.assignment.intValue(intVar) != value) sink.addIntSet(intVar, value)
+        val cur = state.assignment.intValue(intVar)
+        if (cur != value) {
+            val clamped = state.problem.intDomains[intVar].clamp(value)
+            if (clamped != cur) sink.addIntSet(intVar, clamped)
+        }
     }
 
     private companion object {
