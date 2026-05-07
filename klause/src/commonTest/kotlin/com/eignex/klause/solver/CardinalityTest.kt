@@ -32,6 +32,6 @@ class CardinalityTest {
         assertEquals(1, deltaPredicted)
         state.apply(Move.BoolFlip(1))
         assertTrue(one.isViolated(state, 0))
-        assertEquals(1, state.hardCost)
+        assertEquals(1, state.cost)
     }
 }

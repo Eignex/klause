@@ -64,11 +64,9 @@ abstract class VariableSchema {
         }
 
     protected fun constraint(
-        isHard: Boolean = true,
-        weight: Double = 1.0,
         build: () -> BoolExpr,
     ) = PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, NamedConstraint>> { _, prop ->
-        val nc = NamedConstraint(prop.name, build(), isHard, weight)
+        val nc = NamedConstraint(prop.name, build())
         _constraints += nc
         ReadOnlyProperty { _, _ -> nc }
     }

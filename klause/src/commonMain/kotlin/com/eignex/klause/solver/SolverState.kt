@@ -5,7 +5,7 @@ import kotlin.random.Random
 
 /**
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
- * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard/soft cost.
+ * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard cost.
  */
 class SolverState(
     val problem: Problem,
@@ -34,17 +34,14 @@ class SolverState(
     private val boolBreakCache: IntArray = IntArray(problem.numBoolVars)
     private val boolBreakValid: BooleanArray = BooleanArray(problem.numBoolVars)
 
-    var hardCost: Int = 0
+    var cost: Int = 0
         internal set
 
-    var softCost: Double = 0.0
-        internal set
-
-    /** Per-factor weight read by [updateViolation] when a soft factor's violation status
-     *  toggles. Initialised from each [Factor.weight] at construction; mutable thereafter so
-     *  weight-modulating strategies (e.g. SAPS) can reweight stuck factors during search.
-     *  Hard factors ignore this; their contribution is always +1/-1 to [hardCost]. */
-    val factorWeights: DoubleArray = DoubleArray(problem.numFactors) { problem.factors[it].weight }
+    /** Per-factor weight, default 1.0. Not read by the engine itself — every violation
+     *  contributes +1/-1 to [cost] regardless. Strategies that want to bias the search
+     *  toward repairing persistently-violated factors (e.g. SAPS) read and mutate this
+     *  array between picks. */
+    val factorWeights: DoubleArray = DoubleArray(problem.numFactors) { 1.0 }
 
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
@@ -55,14 +52,13 @@ class SolverState(
 
     fun recompute() {
         for (i in 0 until problem.numFactors) violated.remove(i)
-        hardCost = 0
-        softCost = 0.0
+        cost = 0
         for (v in boolBreakValid.indices) boolBreakValid[v] = false
         problem.factors.forEachIndexed { id, factor ->
             factor.initialize(this, id)
             if (factor.isViolated(this, id)) {
                 violated.add(id)
-                if (factor.isHard) hardCost++ else softCost += factorWeights[id]
+                cost++
             }
         }
     }
@@ -73,11 +69,10 @@ class SolverState(
     }
 
     /**
-     * Number of currently-satisfied hard factors that would become violated if [move] were
+     * Number of currently-satisfied factors that would become violated if [move] were
      * applied. Used by strategies (WalkSAT-style noise/greedy, probSAT-style weighting) to
      * score repair candidates. Computed on demand by walking the var's occurrence list and
-     * asking each factor for its `deltaIf*` — soft factors are skipped since they don't count
-     * toward `hardCost`.
+     * asking each factor for its `deltaIf*`.
      */
     fun breakScore(move: Move): Int = when (move) {
         is Move.BoolFlip -> {
@@ -88,7 +83,7 @@ class SolverState(
                 var count = 0
                 for (factorId in problem.boolOccurrences[v]) {
                     val f = problem.factors[factorId]
-                    if (f.isHard && f.deltaIfBoolFlipped(this, factorId, v) > 0) count++
+                    if (f.deltaIfBoolFlipped(this, factorId, v) > 0) count++
                 }
                 boolBreakCache[v] = count
                 boolBreakValid[v] = true
@@ -99,7 +94,7 @@ class SolverState(
             var count = 0
             for (factorId in problem.intOccurrences[move.varId]) {
                 val f = problem.factors[factorId]
-                if (f.isHard && f.deltaIfIntSet(this, factorId, move.varId, move.newValue) > 0) count++
+                if (f.deltaIfIntSet(this, factorId, move.varId, move.newValue) > 0) count++
             }
             count
         }
@@ -150,15 +145,15 @@ class SolverState(
         return step - touched < tenure
     }
 
-    private fun updateViolation(factor: Factor, factorId: Int, deltaViolated: Int) {
+    private fun updateViolation(@Suppress("UNUSED_PARAMETER") factor: Factor, factorId: Int, deltaViolated: Int) {
         when (deltaViolated) {
             +1 -> {
                 violated.add(factorId)
-                if (factor.isHard) hardCost++ else softCost += factorWeights[factorId]
+                cost++
             }
             -1 -> {
                 violated.remove(factorId)
-                if (factor.isHard) hardCost-- else softCost -= factorWeights[factorId]
+                cost--
             }
         }
     }

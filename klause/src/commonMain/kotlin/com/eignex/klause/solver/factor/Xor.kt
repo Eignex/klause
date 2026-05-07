@@ -14,8 +14,6 @@ import com.eignex.klause.solver.SolverState
 class Xor(
     val literals: IntArray,
     val targetParity: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     init {

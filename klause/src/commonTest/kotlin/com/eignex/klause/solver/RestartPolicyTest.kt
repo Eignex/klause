@@ -35,16 +35,16 @@ class RestartPolicyTest {
         AdaptivePerturbationRestart().restart(state, bestSoFar = null)
         // Falling back to state.restart() randomises the assignment; the bool values are
         // now drawn from rng. We can't predict the exact result, but the recompute must
-        // have run (hardCost reflects the fresh assignment).
-        // Indirect check: hardCost is well-defined and consistent with the current bools.
+        // have run (cost reflects the fresh assignment).
+        // Indirect check: cost is well-defined and consistent with the current bools.
         val countTrue = (0..2).count { state.assignment.boolValue(it) }
         val expectedHard = if (countTrue == 1) 0 else 1
-        assertEquals(expectedHard, state.hardCost)
+        assertEquals(expectedHard, state.cost)
     }
 
     @Test
     fun adaptivePerturbationAnchorsToBestThenPerturbs() {
-        // 6-bool problem, no factors — hardCost is always 0 so we can isolate the
+        // 6-bool problem, no factors — cost is always 0 so we can isolate the
         // perturbation-distance check.
         val problem = Problem(6, 0, emptyArray(), emptyList())
         val state = SolverState(problem, Random(0))

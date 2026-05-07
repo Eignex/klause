@@ -34,7 +34,7 @@ class LocalSearchSolver(
     /**
      * Best-effort linear-objective minimisation under hard constraints. Reaches feasibility
      * via the configured [strategy] (WalkSat/probSAT-style), then descends on the objective
-     * by greedy single-flip / single-set moves that keep `hardCost == 0`. Whenever the
+     * by greedy single-flip / single-set moves that keep `cost == 0`. Whenever the
      * descent stalls or the budget per attempt elapses, the search restarts with a fresh
      * randomized assignment; the best feasible objective seen across all attempts is
      * returned.
@@ -79,7 +79,7 @@ class LocalSearchSolver(
             var flipsSinceYield = 0L
 
             while (flipsSinceYield < maxFlips) {
-                if (state.hardCost == 0) {
+                if (state.cost == 0) {
                     val snap = state.assignment.snapshot()
                     if (farEnough(snap, window, minHammingDistance, recentWindow)) {
                         yield(snap)
@@ -114,7 +114,7 @@ class LocalSearchSolver(
     /**
      * Two-phase search per restart attempt: WalkSat-style fight to feasibility, then a
      * greedy descent on the objective restricted to feasibility-preserving moves. When the
-     * descent reaches a local minimum (no neighbour both keeps `hardCost == 0` and lowers
+     * descent reaches a local minimum (no neighbour both keeps `cost == 0` and lowers
      * the objective), restart and try again. Best-feasible-objective state lives across
      * restarts so we monotonically improve.
      */
@@ -136,7 +136,7 @@ class LocalSearchSolver(
         val maxFlips = params.maxFlips
 
         while (totalFlips < maxFlips) {
-            if (state.hardCost == 0) {
+            if (state.cost == 0) {
                 // Score the current feasible assignment, record if best.
                 val snap = state.assignment.snapshot()
                 val obj = objective.evaluate(snap)
@@ -178,10 +178,10 @@ class LocalSearchSolver(
      * Greedy hill-climbing on the objective among feasibility-preserving single-variable
      * moves. Considers a flip on each bool var and a ±1 step on each int var (clamped to
      * the int's domain). Picks the candidate that strictly lowers the objective the most
-     * while keeping `hardCost == 0`. Returns `true` if it advanced.
+     * while keeping `cost == 0`. Returns `true` if it advanced.
      *
      * Bool flips are evaluated by applying-then-reverting on the live state so the
-     * incremental hardCost path runs naturally; int sets do the same with the saved old
+     * incremental cost path runs naturally; int sets do the same with the saved old
      * value.
      */
     private fun greedyObjectiveStep(state: SolverState, objective: Objective): Boolean {
@@ -192,7 +192,7 @@ class LocalSearchSolver(
 
         for (b in 0 until problem.numBoolVars) {
             state.apply(Move.BoolFlip(b))
-            if (state.hardCost == 0) {
+            if (state.cost == 0) {
                 val obj = objective.evaluate(state.assignment.snapshot())
                 val delta = obj - baselineObj
                 if (delta < bestDelta) {
@@ -209,7 +209,7 @@ class LocalSearchSolver(
             for (target in intArrayOf(cur - 1, cur + 1)) {
                 if (target !in d.min..d.max) continue
                 state.apply(Move.IntSet(i, target))
-                if (state.hardCost == 0) {
+                if (state.cost == 0) {
                     val obj = objective.evaluate(state.assignment.snapshot())
                     val delta = obj - baselineObj
                     if (delta < bestDelta) {

@@ -15,8 +15,6 @@ class Product(
     val a: Int,
     val b: Int,
     val result: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     override val boolVars: IntArray = EMPTY

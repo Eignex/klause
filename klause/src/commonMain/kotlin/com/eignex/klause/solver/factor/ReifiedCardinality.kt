@@ -16,8 +16,6 @@ class ReifiedCardinality(
     val literals: IntArray,
     val min: Int,
     val max: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     init {

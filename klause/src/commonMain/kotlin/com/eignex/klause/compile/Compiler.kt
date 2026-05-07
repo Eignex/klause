@@ -94,7 +94,7 @@ class Compiler {
                 }
             }
 
-            for (nc in def.constraints) assertExpr(nc.expr, isHard = nc.isHard, weight = nc.weight)
+            for (nc in def.constraints) assertExpr(nc.expr)
 
             return CompiledProblem(
                 problem = Problem(numBoolVars, numIntVars, intDomains.toTypedArray(), factors.toList()),
@@ -113,37 +113,37 @@ class Compiler {
             return id
         }
 
-        fun assertExpr(expr: BoolExpr, isHard: Boolean, weight: Double) {
+        fun assertExpr(expr: BoolExpr) {
             when (expr) {
-                is And -> for (c in expr.children) assertExpr(c, isHard, weight)
-                is Implies -> assertExpr(Or(listOf(negate(expr.left), expr.right)), isHard, weight)
+                is And -> for (c in expr.children) assertExpr(c)
+                is Implies -> assertExpr(Or(listOf(negate(expr.left), expr.right)))
                 is Iff -> {
-                    assertExpr(Implies(expr.left, expr.right), isHard, weight)
-                    assertExpr(Implies(expr.right, expr.left), isHard, weight)
+                    assertExpr(Implies(expr.left, expr.right))
+                    assertExpr(Implies(expr.right, expr.left))
                 }
                 is Or -> {
                     val lits = IntArray(expr.children.size)
                     for (i in expr.children.indices) lits[i] = lowerToLit(expr.children[i])
-                    factors += Clause(lits, isHard, weight)
+                    factors += Clause(lits)
                 }
                 is AtMost -> {
                     val lits = lowerAllBool(expr.children)
-                    factors += Cardinality(lits, 0, expr.k, isHard, weight)
+                    factors += Cardinality(lits, 0, expr.k)
                 }
                 is AtLeast -> {
                     val lits = lowerAllBool(expr.children)
-                    factors += Cardinality(lits, expr.k, lits.size, isHard, weight)
+                    factors += Cardinality(lits, expr.k, lits.size)
                 }
                 is CardinalityExpr -> {
                     val lits = lowerAllBool(expr.children)
-                    factors += Cardinality(lits, expr.min, expr.max, isHard, weight)
+                    factors += Cardinality(lits, expr.min, expr.max)
                 }
                 is Not, is BoolRef, is NominalEq -> {
-                    factors += Clause(intArrayOf(lowerToLit(expr)), isHard, weight)
+                    factors += Clause(intArrayOf(lowerToLit(expr)))
                 }
-                is IntCompare -> assertIntCompare(expr, isHard, weight)
-                is AllDifferent -> assertAllDifferent(expr.terms, isHard, weight)
-                is TableConstraint -> assertExpr(expandTable(expr), isHard, weight)
+                is IntCompare -> assertIntCompare(expr)
+                is AllDifferent -> assertAllDifferent(expr.terms)
+                is TableConstraint -> assertExpr(expandTable(expr))
                 is PseudoBooleanExpr -> {
                     val lits = lowerAllBool(expr.lits)
                     factors += PseudoBoolean(
@@ -151,13 +151,11 @@ class Compiler {
                         literals = lits,
                         op = expr.op,
                         bound = expr.bound,
-                        isHard = isHard,
-                        weight = weight,
-                    )
+)
                 }
                 is XorExpr -> {
                     val lits = lowerAllBool(expr.children)
-                    factors += Xor(lits, targetParity = 1, isHard = isHard, weight = weight)
+                    factors += Xor(lits, targetParity = 1)
                 }
             }
         }
@@ -176,7 +174,7 @@ class Compiler {
             }
         }
 
-        private fun assertAllDifferent(terms: List<IntExpr>, isHard: Boolean, weight: Double) {
+        private fun assertAllDifferent(terms: List<IntExpr>) {
             val lifted = terms.map { lift(it) }
             // Specialisation: when every operand is a bare IntRef (no arithmetic residual), emit
             // the global factor. Otherwise fall back to pairwise NE through the existing
@@ -191,29 +189,27 @@ class Compiler {
                         if (d.min < dMin) dMin = d.min
                         if (d.max > dMax) dMax = d.max
                     }
-                    factors += AllDifferentFactor(ids, dMin, dMax - dMin + 1, isHard, weight)
+                    factors += AllDifferentFactor(ids, dMin, dMax - dMin + 1)
                     return
                 }
             }
             for (i in lifted.indices) for (j in i + 1 until lifted.size) {
-                assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]), isHard, weight)
+                assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]))
             }
         }
 
-        fun assertIntCompare(expr: IntCompare, isHard: Boolean, weight: Double) {
+        fun assertIntCompare(expr: IntCompare) {
             val (op, normBound) = normalize(expr.op, 0)
             val combined = subtract(affine(lift(expr.left)), affine(lift(expr.right)))
             val coeffs = combined.coeffs
             val bound = normBound - combined.constant
-            emitTopLevelCmp(coeffs, op, bound, isHard, weight)
+            emitTopLevelCmp(coeffs, op, bound)
         }
 
         private fun emitTopLevelCmp(
             coeffs: Map<String, Int>,
             op: IntCmpOp,
             bound: Int,
-            isHard: Boolean,
-            weight: Double,
         ) {
             if (coeffs.isEmpty()) {
                 // 0 op bound: trivially true or false at compile time.
@@ -234,19 +230,19 @@ class Compiler {
             }
             if (coeffs.size == 1) {
                 val (name, c) = coeffs.entries.first()
-                emitSingleVar(name, c, op, bound, isHard, weight)
+                emitSingleVar(name, c, op, bound)
                 return
             }
             val (varIds, coeffArr) = coeffsToArrays(coeffs)
             when (op) {
-                IntCmpOp.LE -> factors += Linear(coeffArr, varIds, LinearOp.LE, bound, isHard, weight)
-                IntCmpOp.GE -> factors += Linear(coeffArr, varIds, LinearOp.GE, bound, isHard, weight)
-                IntCmpOp.EQ -> factors += Linear(coeffArr, varIds, LinearOp.EQ, bound, isHard, weight)
+                IntCmpOp.LE -> factors += Linear(coeffArr, varIds, LinearOp.LE, bound)
+                IntCmpOp.GE -> factors += Linear(coeffArr, varIds, LinearOp.GE, bound)
+                IntCmpOp.EQ -> factors += Linear(coeffArr, varIds, LinearOp.EQ, bound)
                 IntCmpOp.NE -> {
                     // Reify equality and negate: aux ↔ Σ = bound; assert ¬aux.
                     val aux = newBoolVar()
-                    factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, bound, isHard, weight)
-                    factors += Clause(intArrayOf(Lit.make(aux, positive = false)), isHard, weight)
+                    factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, bound)
+                    factors += Clause(intArrayOf(Lit.make(aux, positive = false)))
                 }
                 IntCmpOp.LT, IntCmpOp.GT -> error("LT/GT should have been normalized away")
             }
@@ -257,13 +253,11 @@ class Compiler {
             coeff: Int,
             op: IntCmpOp,
             bound: Int,
-            isHard: Boolean,
-            weight: Double,
         ) {
             // Σ c x ⟨op⟩ b reduces to x ⟨op'⟩ b/c (assuming exact division). Avoid the division
             // by lowering through the Linear factor when c isn't ±1.
             if (coeff == 1) {
-                emitSingleVarCanonical(name, op, bound, isHard, weight)
+                emitSingleVarCanonical(name, op, bound)
                 return
             }
             if (coeff == -1) {
@@ -275,7 +269,7 @@ class Compiler {
                     IntCmpOp.NE -> IntCmpOp.NE
                     IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
                 }
-                emitSingleVarCanonical(name, flipped, -bound, isHard, weight)
+                emitSingleVarCanonical(name, flipped, -bound)
                 return
             }
             // General coeff: emit as Linear over one variable.
@@ -286,24 +280,24 @@ class Compiler {
                 IntCmpOp.EQ -> LinearOp.EQ
                 IntCmpOp.NE -> {
                     val aux = newBoolVar()
-                    factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), LinearOp.EQ, bound, isHard, weight)
-                    factors += Clause(intArrayOf(Lit.make(aux, positive = false)), isHard, weight)
+                    factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), LinearOp.EQ, bound)
+                    factors += Clause(intArrayOf(Lit.make(aux, positive = false)))
                     return
                 }
                 IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
             }
-            factors += Linear(intArrayOf(coeff), intArrayOf(varId), linOp, bound, isHard, weight)
+            factors += Linear(intArrayOf(coeff), intArrayOf(varId), linOp, bound)
         }
 
         private fun emitSingleVarCanonical(
-            name: String, op: IntCmpOp, bound: Int, isHard: Boolean, weight: Double,
+            name: String, op: IntCmpOp, bound: Int,
         ) {
             val v = intVarOf(name)
             factors += when (op) {
-                IntCmpOp.LE -> IntLeq(v, bound, isHard, weight)
-                IntCmpOp.GE -> IntGeq(v, bound, isHard, weight)
-                IntCmpOp.EQ -> IntEq(v, bound, isHard, weight)
-                IntCmpOp.NE -> IntNeq(v, bound, isHard, weight)
+                IntCmpOp.LE -> IntLeq(v, bound)
+                IntCmpOp.GE -> IntGeq(v, bound)
+                IntCmpOp.EQ -> IntEq(v, bound)
+                IntCmpOp.NE -> IntNeq(v, bound)
                 IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
             }
         }
@@ -550,17 +544,14 @@ class Compiler {
             // dq + r = n.
             assertExpr(
                 IntCompare(IntSum(listOf(IntRef(dqName), IntRef(rName))), IntCmpOp.EQ, nRef),
-                isHard = true, weight = 1.0,
             )
             // |r| < |d| → lift turns IntAbs into aux non-negative ints with the right semantics.
             assertExpr(
                 IntCompare(IntAbs(IntRef(rName)), IntCmpOp.LT, IntAbs(dRef)),
-                isHard = true, weight = 1.0,
             )
             // r * n ≥ 0 enforces sign(r) = sign(n) when r ≠ 0; trivially holds when r = 0.
             assertExpr(
                 IntCompare(IntMul(IntRef(rName), nRef), IntCmpOp.GE, IntLit(0)),
-                isHard = true, weight = 1.0,
             )
             // d ≠ 0 is required regardless of domain; emit an explicit guard if the domain spans 0.
             // (Handled implicitly by the require above when 0 ∉ dDom.)
@@ -600,7 +591,7 @@ class Compiler {
                 val d = domainOf(expr)
                 val name = newAuxIntVar(d)
                 val ref = IntRef(name)
-                assertExpr(IntCompare(ref, IntCmpOp.EQ, expr), isHard = true, weight = 1.0)
+                assertExpr(IntCompare(ref, IntCmpOp.EQ, expr))
                 ref
             }
         }
@@ -622,10 +613,9 @@ class Compiler {
                             IntCompare(idxLifted, IntCmpOp.EQ, IntLit(j)),
                             IntCompare(auxRef, IntCmpOp.EQ, itemsLifted[j]),
                         ),
-                        isHard = true, weight = 1.0,
                     )
                 } else {
-                    assertExpr(IntCompare(idxLifted, IntCmpOp.NE, IntLit(j)), isHard = true, weight = 1.0)
+                    assertExpr(IntCompare(idxLifted, IntCmpOp.NE, IntLit(j)))
                 }
             }
             return auxRef
@@ -639,8 +629,8 @@ class Compiler {
             val auxName = newAuxIntVar(IntDomain(minOf(tDom.min, eDom.min), maxOf(tDom.max, eDom.max)))
             val auxRef = IntRef(auxName)
             // cond ⇒ aux = thenE; ¬cond ⇒ aux = elseE.
-            assertExpr(Implies(cond, IntCompare(auxRef, IntCmpOp.EQ, tLifted)), isHard = true, weight = 1.0)
-            assertExpr(Implies(Not(cond), IntCompare(auxRef, IntCmpOp.EQ, eLifted)), isHard = true, weight = 1.0)
+            assertExpr(Implies(cond, IntCompare(auxRef, IntCmpOp.EQ, tLifted)))
+            assertExpr(Implies(Not(cond), IntCompare(auxRef, IntCmpOp.EQ, eLifted)))
             return auxRef
         }
 
@@ -655,9 +645,9 @@ class Compiler {
             val auxName = newAuxIntVar(auxDomain)
             val auxRef = IntRef(auxName)
             val op = if (isMin) IntCmpOp.LE else IntCmpOp.GE
-            for (c in lifted) assertExpr(IntCompare(auxRef, op, c), isHard = true, weight = 1.0)
+            for (c in lifted) assertExpr(IntCompare(auxRef, op, c))
             val orChildren = lifted.map { IntCompare(auxRef, IntCmpOp.EQ, it) as BoolExpr }
-            assertExpr(if (orChildren.size == 1) orChildren[0] else Or(orChildren), isHard = true, weight = 1.0)
+            assertExpr(if (orChildren.size == 1) orChildren[0] else Or(orChildren))
             return auxRef
         }
 
@@ -668,16 +658,14 @@ class Compiler {
             val auxName = newAuxIntVar(IntDomain(0, absMax))
             val auxRef = IntRef(auxName)
             // z >= 0; z >= x; z >= -x; (z = x) ∨ (z = -x).
-            assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntLit(0)), isHard = true, weight = 1.0)
-            assertExpr(IntCompare(auxRef, IntCmpOp.GE, lifted), isHard = true, weight = 1.0)
-            assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntScale(-1, lifted)), isHard = true, weight = 1.0)
+            assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntLit(0)))
+            assertExpr(IntCompare(auxRef, IntCmpOp.GE, lifted))
+            assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntScale(-1, lifted)))
             assertExpr(
                 Or(listOf(
                     IntCompare(auxRef, IntCmpOp.EQ, lifted),
                     IntCompare(auxRef, IntCmpOp.EQ, IntScale(-1, lifted)),
                 )),
-                isHard = true,
-                weight = 1.0,
             )
             return auxRef
         }

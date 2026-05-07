@@ -16,8 +16,6 @@ class ReifiedPseudoBoolean(
     val literals: IntArray,
     val op: PbOp,
     val bound: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     init {

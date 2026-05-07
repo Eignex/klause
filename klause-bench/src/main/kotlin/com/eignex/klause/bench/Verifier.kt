@@ -59,11 +59,11 @@ object Verifier {
     }
 
     private fun satisfiesProblem(problem: Problem, sample: Sample): Boolean {
-        // Build a SolverState in the sample's assignment, recompute, and read off hardCost.
+        // Build a SolverState in the sample's assignment, recompute, and read off cost.
         val state = SolverState(problem, Random(0))
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
         state.recompute()
-        return state.hardCost == 0
+        return state.cost == 0
     }
 }

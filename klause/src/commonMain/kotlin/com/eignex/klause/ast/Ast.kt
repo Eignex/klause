@@ -214,8 +214,6 @@ data class PseudoBooleanExpr(
 data class NamedConstraint(
     val name: String,
     val expr: BoolExpr,
-    val isHard: Boolean = true,
-    val weight: Double = 1.0,
 )
 
 @Serializable

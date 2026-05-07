@@ -15,7 +15,7 @@ class BreakCacheTest {
         var count = 0
         for (factorId in state.problem.boolOccurrences[boolVar]) {
             val f = state.problem.factors[factorId]
-            if (f.isHard && f.deltaIfBoolFlipped(state, factorId, boolVar) > 0) count++
+            if (f.deltaIfBoolFlipped(state, factorId, boolVar) > 0) count++
         }
         return count
     }

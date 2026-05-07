@@ -16,8 +16,6 @@ class ReifiedLinear(
     val vars: IntArray,
     val op: LinearOp,
     val bound: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     init {

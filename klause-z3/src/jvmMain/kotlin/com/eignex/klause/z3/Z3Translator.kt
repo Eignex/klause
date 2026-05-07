@@ -64,10 +64,7 @@ internal object Z3Translator {
                 ctx.mkLe(intExprs[i], ctx.mkInt(d.max)),
             ))
         }
-        // Per-factor constraints. Soft factors are skipped; the Sampler API doesn't
-        // currently surface softCost so this matches LogicNGSampler's scope decision.
         for (factor in problem.factors) {
-            if (!factor.isHard) continue
             constraints.add(translateFactor(factor, encoding, ctx))
         }
         return encoding to constraints

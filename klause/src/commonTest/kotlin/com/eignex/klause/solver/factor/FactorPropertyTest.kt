@@ -22,11 +22,11 @@ import kotlin.test.assertTrue
  *     equal the change in `isViolated()` actually observed after `state.apply(move)`.
  *  2. **Incremental state matches a fresh recompute.** After each accepted move, building a
  *     sibling [SolverState] over the same assignment and calling `recompute()` must yield the
- *     same `intPayload[factorId]`, `hardCost`, and violation membership.
+ *     same `intPayload[factorId]`, `cost`, and violation membership.
  *
  * Repair-move validity is checked in a sibling test [proposeRepairMovesAreValid]: every move
  * emitted by `proposeRepairMoves` must (a) name a var in the factor's var arrays, (b) lie in
- * domain (for IntSet), (c) not be a no-op, and (d) when applied, never *increase* `hardCost`.
+ * domain (for IntSet), (c) not be a no-op, and (d) when applied, never *increase* `cost`.
  */
 class FactorPropertyTest {
 
@@ -214,7 +214,7 @@ class FactorPropertyTest {
     @Test fun proposeRepairMovesAreValid() {
         // For each factor, iterate ~50 random assignments and any time the factor is violated,
         // (a) verify every emitted move is in-domain and non-trivial, and (b) verify applying
-        // the move never increases hardCost.
+        // the move never increases cost.
         val cases: List<Pair<Factor, FactorEnv>> = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)))
                 to FactorEnv(numBoolVars = 3),
@@ -303,15 +303,15 @@ class FactorPropertyTest {
                             "${factor::class.simpleName} proposed no-op IntSet at ${move.newValue}")
                     }
                 }
-                // Apply on a sibling to verify hardCost never increases.
+                // Apply on a sibling to verify cost never increases.
                 val sibling = SolverState(problem, Random(iter.toLong()))
                 copyAssignment(state, sibling)
                 sibling.recompute()
-                val before = sibling.hardCost
+                val before = sibling.cost
                 sibling.apply(move)
-                val after = sibling.hardCost
+                val after = sibling.cost
                 assertTrue(after <= before,
-                    "${factor::class.simpleName} repair $move increased hardCost $before → $after")
+                    "${factor::class.simpleName} repair $move increased cost $before → $after")
             }
         }
     }
@@ -338,14 +338,14 @@ class FactorPropertyTest {
                 is Move.IntSet -> factor.deltaIfIntSet(state, 0, move.varId, move.newValue)
             }
             val violatedBefore = factor.isViolated(state, 0)
-            val hardCostBefore = state.hardCost
+            val costBefore = state.cost
             state.apply(move)
             val violatedAfter = factor.isViolated(state, 0)
             val observedDelta = (if (violatedAfter) 1 else 0) - (if (violatedBefore) 1 else 0)
             assertEquals(predicted, observedDelta,
                 "${factor::class.simpleName}: predicted Δ != observed Δ on iter=$i move=$move")
-            assertEquals(hardCostBefore + predicted, state.hardCost,
-                "${factor::class.simpleName}: hardCost drift after $move on iter=$i")
+            assertEquals(costBefore + predicted, state.cost,
+                "${factor::class.simpleName}: cost drift after $move on iter=$i")
             assertEquals(violatedAfter, state.violated.contains(0),
                 "${factor::class.simpleName}: violated set drift after $move on iter=$i")
 
@@ -355,8 +355,8 @@ class FactorPropertyTest {
             sibling.recompute()
             assertEquals(sibling.intPayload[0], state.intPayload[0],
                 "${factor::class.simpleName}: intPayload drift after $move on iter=$i")
-            assertEquals(sibling.hardCost, state.hardCost,
-                "${factor::class.simpleName}: hardCost drift vs recompute on iter=$i")
+            assertEquals(sibling.cost, state.cost,
+                "${factor::class.simpleName}: cost drift vs recompute on iter=$i")
             assertEquals(sibling.violated.contains(0), state.violated.contains(0),
                 "${factor::class.simpleName}: violation drift vs recompute on iter=$i")
 

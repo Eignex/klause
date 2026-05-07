@@ -19,8 +19,6 @@ import com.eignex.klause.solver.SolverState
  */
 class Clause(
     val literals: IntArray,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     init { require(literals.isNotEmpty()) { "Clause must have at least one literal" } }

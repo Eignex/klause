@@ -39,7 +39,7 @@ class IntFactorTest {
 
         state.apply(move)
         assertFalse(factor.isViolated(state, 0))
-        assertEquals(0, state.hardCost)
+        assertEquals(0, state.cost)
     }
 
     @Test

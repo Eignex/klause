@@ -6,15 +6,13 @@ package com.eignex.klause.solver
  * [boolVars] and integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty;
  * pure-integer factors leave [boolVars] empty; reified or mixed factors populate both.
  *
- * A factor's contribution to the global cost: violating a hard factor adds 1 to `hardCost`,
- * violating a soft factor adds [weight] to `softCost`.
+ * Every factor is hard: a violation adds 1 to [SolverState.cost]. Per-factor weights
+ * usable by weight-modulating strategies (e.g. SAPS) live mutably on
+ * [SolverState.factorWeights] rather than on the factor itself.
  */
 interface Factor {
     val boolVars: IntArray
     val intVars: IntArray
-
-    val isHard: Boolean
-    val weight: Double
 
     /** Build this factor's payload from the current assignment. Called once per restart. */
     fun initialize(state: SolverState, factorId: Int)

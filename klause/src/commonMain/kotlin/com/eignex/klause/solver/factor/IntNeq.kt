@@ -8,8 +8,6 @@ import com.eignex.klause.solver.SolverState
 class IntNeq(
     val intVar: Int,
     val value: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     override val boolVars: IntArray = EMPTY

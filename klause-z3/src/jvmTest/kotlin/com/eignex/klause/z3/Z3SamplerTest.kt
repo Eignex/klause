@@ -164,7 +164,7 @@ class Z3SamplerTest {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
         state.recompute()
-        assertEquals(0, state.hardCost,
+        assertEquals(0, state.cost,
             "$label: sample $sample violates ${state.violated.size} hard factor(s)")
     }
 

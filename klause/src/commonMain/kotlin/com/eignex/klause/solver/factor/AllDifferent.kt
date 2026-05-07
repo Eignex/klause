@@ -17,8 +17,6 @@ class AllDifferent(
     val vars: IntArray,
     val domainMin: Int,
     val domainSize: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     init {

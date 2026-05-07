@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 
 /**
  * After a sequence of accepted moves, an incrementally-maintained [SolverState] must agree
- * with a fresh [SolverState] over the same final assignment on every observable: `hardCost`,
+ * with a fresh [SolverState] over the same final assignment on every observable: `cost`,
  * the violated factor set, and per-factor `intPayload`. This catches drift in the incremental
  * payload arithmetic that would otherwise only show up as a wrong sample distribution far
  * downstream.
@@ -52,10 +52,8 @@ class SolverStateRecomputeTest {
                 copyAssignment(state, sibling)
                 sibling.recompute()
 
-                assertEquals(sibling.hardCost, state.hardCost,
-                    "${case.name} seed=$seed: hardCost drifted from recompute")
-                assertEquals(sibling.softCost, state.softCost,
-                    "${case.name} seed=$seed: softCost drifted from recompute")
+                assertEquals(sibling.cost, state.cost,
+                    "${case.name} seed=$seed: cost drifted from recompute")
                 assertEquals(sibling.violated.toIntArray().sortedArray().toList(),
                     state.violated.toIntArray().sortedArray().toList(),
                     "${case.name} seed=$seed: violated set drifted")

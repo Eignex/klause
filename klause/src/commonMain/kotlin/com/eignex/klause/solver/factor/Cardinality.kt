@@ -13,8 +13,6 @@ class Cardinality(
     val literals: IntArray,
     val min: Int,
     val max: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     init {
@@ -102,14 +100,14 @@ class Cardinality(
     }
 
     companion object {
-        fun atMostOne(literals: IntArray, isHard: Boolean = true, weight: Double = 1.0): Cardinality =
-            Cardinality(literals, min = 0, max = 1, isHard = isHard, weight = weight)
+        fun atMostOne(literals: IntArray): Cardinality =
+            Cardinality(literals, min = 0, max = 1)
 
-        fun atLeastOne(literals: IntArray, isHard: Boolean = true, weight: Double = 1.0): Cardinality =
-            Cardinality(literals, min = 1, max = literals.size, isHard = isHard, weight = weight)
+        fun atLeastOne(literals: IntArray): Cardinality =
+            Cardinality(literals, min = 1, max = literals.size)
 
-        fun exactlyOne(literals: IntArray, isHard: Boolean = true, weight: Double = 1.0): Cardinality =
-            Cardinality(literals, min = 1, max = 1, isHard = isHard, weight = weight)
+        fun exactlyOne(literals: IntArray): Cardinality =
+            Cardinality(literals, min = 1, max = 1)
 
         private val EMPTY: IntArray = IntArray(0)
     }

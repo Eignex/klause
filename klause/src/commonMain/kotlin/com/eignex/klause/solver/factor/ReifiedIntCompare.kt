@@ -15,8 +15,6 @@ class ReifiedIntCompare(
     val intVar: Int,
     val op: IntCmpOp,
     val bound: Int,
-    override val isHard: Boolean = true,
-    override val weight: Double = 1.0,
 ) : Factor {
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)

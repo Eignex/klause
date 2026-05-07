@@ -230,7 +230,7 @@ class LogicNGSamplerTest {
         state.recompute()
         assertEquals(
             0,
-            state.hardCost,
+            state.cost,
             "$label: sample $sample violates ${state.violated.size} hard factor(s)"
         )
     }
