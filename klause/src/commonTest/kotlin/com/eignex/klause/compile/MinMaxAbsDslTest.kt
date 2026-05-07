@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.abs
 import com.eignex.klause.ast.eq
@@ -24,7 +25,7 @@ class MinMaxAbsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 11)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -44,7 +45,7 @@ class MinMaxAbsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 7)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -63,7 +64,7 @@ class MinMaxAbsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 23)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.not
@@ -35,7 +36,7 @@ class XorDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -54,7 +55,7 @@ class XorDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 19)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -74,7 +75,7 @@ class XorDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 23)).take(20).toList()
         for (s in samples) {
             val flag = compiled.decodeBool("flag", s)

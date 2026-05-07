@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.implies
@@ -112,7 +113,7 @@ class ArithmeticDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 17)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -146,7 +147,7 @@ class ArithmeticDslTest {
             val nonZero by constraint { -x le -1 }
         }
         val compiled = S().compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 3)).take(5).toList()
         for (s in samples) {
             val xv = compiled.decodeInt("x", s)

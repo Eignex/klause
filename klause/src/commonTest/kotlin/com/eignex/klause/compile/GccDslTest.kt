@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.gcc
 import com.eignex.klause.schema.VariableSchema
@@ -24,7 +25,7 @@ class GccDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 14)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -49,7 +50,7 @@ class GccDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 33)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

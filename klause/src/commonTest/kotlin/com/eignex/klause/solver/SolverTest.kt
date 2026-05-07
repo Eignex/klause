@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -35,7 +36,7 @@ class SolverTest {
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
         )
         val problem = Problem(2, 0, emptyArray(), clauses)
-        val solver = LocalSearchSolver(problem, maxFlipsBeforeRestart = 10)
+        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 10))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 1)).take(10).toList()
         assertEquals(2, samples.size, "Only two distinct solutions exist")
         assertEquals(samples.toSet().size, samples.size, "All yielded samples must be unique")

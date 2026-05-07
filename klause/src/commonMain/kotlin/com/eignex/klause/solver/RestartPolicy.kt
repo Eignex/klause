@@ -1,0 +1,71 @@
+package com.eignex.klause.solver
+
+/**
+ * Pluggable restart logic for [LocalSearchSolver]. Decouples *when* to restart
+ * ([shouldRestart]) from *how* ([restart]) so callers can swap a fixed cadence for
+ * adaptive perturbation, Luby-sequence schedules, stagnation detection, etc., without
+ * touching the engine.
+ */
+interface RestartPolicy {
+    /** Called once per accepted move with the count of moves applied since the last
+     *  restart. Return true to trigger a restart at the engine's next iteration. */
+    fun shouldRestart(stepsSinceLastRestart: Int): Boolean
+
+    /** Carry out the restart. Default behaviour is a fresh random assignment via
+     *  [SolverState.restart]; policies that anchor to good regions override using
+     *  [bestSoFar]. The optimiser path supplies the running best feasible sample;
+     *  streaming paths (sample / enumerate) pass null. */
+    fun restart(state: SolverState, bestSoFar: Sample?)
+}
+
+/** Current klause behaviour: a full random restart at a fixed flip cadence. */
+class FixedCadenceRestart(val maxFlipsBeforeRestart: Int = 10_000) : RestartPolicy {
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
+        stepsSinceLastRestart >= maxFlipsBeforeRestart
+    override fun restart(state: SolverState, bestSoFar: Sample?) = state.restart()
+}
+
+/**
+ * Restart from a perturbation of [bestSoFar] instead of randomising fully — keeps the
+ * search anchored to good regions, helping `minimize` escape plateaus without throwing
+ * away progress.
+ *
+ *  - [maxFlipsBeforeRestart] — cadence; identical knob to [FixedCadenceRestart].
+ *  - [perturbationStrength] — how many random variables to flip / re-set when anchoring
+ *    to [bestSoFar]. Higher values widen the search neighbourhood (closer to a full
+ *    restart); lower values stay close to the anchor.
+ *
+ *  Falls back to a full random restart when [bestSoFar] is null (i.e. no feasible
+ *  sample has been seen yet — we have nothing to anchor to).
+ */
+class AdaptivePerturbationRestart(
+    val maxFlipsBeforeRestart: Int = 10_000,
+    val perturbationStrength: Int = 5,
+) : RestartPolicy {
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
+        stepsSinceLastRestart >= maxFlipsBeforeRestart
+
+    override fun restart(state: SolverState, bestSoFar: Sample?) {
+        if (bestSoFar == null) {
+            state.restart()
+            return
+        }
+        val problem = state.problem
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, bestSoFar.bools[b])
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, bestSoFar.ints[i])
+        val totalVars = problem.numBoolVars + problem.numIntVars
+        if (totalVars > 0) {
+            repeat(perturbationStrength) {
+                val pick = state.rng.nextInt(totalVars)
+                if (pick < problem.numBoolVars) {
+                    state.assignment.flipBool(pick)
+                } else {
+                    val v = pick - problem.numBoolVars
+                    val d = problem.intDomains[v]
+                    state.assignment.setInt(v, d.min + state.rng.nextInt(d.size))
+                }
+            }
+        }
+        state.recompute()
+    }
+}

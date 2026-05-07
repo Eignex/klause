@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.implies
@@ -48,7 +49,7 @@ class CompileTest {
         // TinyCampaign solutions: type=a forces premium=false (1), type=b/c free (4). 5 unique.
         val schema = TinyCampaign()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(20).toList()
         assertEquals(5, samples.size)
         assertEquals(samples.toSet().size, samples.size)
@@ -86,7 +87,7 @@ class CompileTest {
     fun intSchemaSolvesAndDecodes() {
         val schema = IntCampaign()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 500)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
         assertEquals(15, samples.size)
         assertEquals(samples.toSet().size, samples.size, "Samples must be unique")
@@ -109,7 +110,7 @@ class CompileTest {
         }
         val schema = FloatTune()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         // 11 buckets, ge 0.5 leaves buckets 5..10 → 6 unique solutions.
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 99)).take(20).toList()
         assertEquals(6, samples.size)

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -19,7 +20,7 @@ class AllDifferentTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(factor),
         )
-        val solver = LocalSearchSolver(problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -37,7 +38,7 @@ class AllDifferentTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(factor),
         )
-        val solver = LocalSearchSolver(problem, maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -57,7 +58,7 @@ class AllDifferentTest {
         )
         // initialize() runs at the first restart; attempting to sample triggers it.
         assertFails {
-            LocalSearchSolver(problem, maxFlipsBeforeRestart = 50).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
+            LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50)).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
         }
     }
 }

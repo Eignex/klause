@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.strategy
 
+import com.eignex.klause.solver.FixedCadenceRestart
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.ast.atLeast
 import com.eignex.klause.ast.atMost
@@ -25,7 +26,7 @@ class ProbSatTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, strategy = ProbSat(), maxFlipsBeforeRestart = 200)
+        val solver = LocalSearchSolver(compiled.problem, strategy = ProbSat(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 23)).take(10).toList()
         assertTrue(samples.isNotEmpty(), "ProbSat produced no samples on a satisfiable schema")
         for (s in samples) {

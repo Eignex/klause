@@ -1,9 +1,10 @@
 package com.eignex.klause.solver
 
 /**
- * Per-call params for the local-search [LocalSearchSolver]. Engine setup ([LocalSearchSolver.strategy],
- * [LocalSearchSolver.maxFlipsBeforeRestart]) lives on the constructor; this data class
- * carries the knobs that vary per `sample` / `enumerate` / `solve` call.
+ * Per-call params for the local-search [LocalSearchSolver]. Engine setup
+ * ([LocalSearchSolver.strategy], [LocalSearchSolver.restartPolicy]) lives on the
+ * constructor; this data class carries the knobs that vary per `sample` / `enumerate` /
+ * `solve` call.
  *
  *  - [maxFlips] — flip budget *per yield attempt*. After this many flips elapse without
  *    producing a fresh sample, the sequence ends. Counter resets on every yield. Leave at

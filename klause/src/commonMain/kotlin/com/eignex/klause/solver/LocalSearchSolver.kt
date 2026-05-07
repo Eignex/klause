@@ -19,7 +19,7 @@ import kotlin.random.Random
 class LocalSearchSolver(
     override val problem: Problem,
     val strategy: Strategy = WalkSat(),
-    val maxFlipsBeforeRestart: Int = 10_000,
+    val restartPolicy: RestartPolicy = FixedCadenceRestart(),
 ) : Sampler<LocalSearchParams>, Optimizer<LocalSearchParams> {
 
     override fun solve(params: LocalSearchParams): SolveResult =
@@ -68,7 +68,10 @@ class LocalSearchSolver(
         return sequence {
             val state = SolverState(problem, Random(seed))
             val window = ArrayDeque<Sample>()
-            state.restart()
+            // Streaming has no notion of "best so far" to anchor an adaptive restart
+            // around — pass null so policies that need a sample fall back to a fresh
+            // random restart.
+            restartPolicy.restart(state, bestSoFar = null)
             var flipsSinceRestart = 0
             // Bound per yield, not per session: when [maxFlips] elapses without producing a
             // fresh sample, we've effectively exhausted the search neighbourhood — end the
@@ -86,18 +89,18 @@ class LocalSearchSolver(
                         }
                         flipsSinceYield = 0
                     }
-                    state.restart()
+                    restartPolicy.restart(state, bestSoFar = null)
                     flipsSinceRestart = 0
                     continue
                 }
-                if (flipsSinceRestart >= maxFlipsBeforeRestart) {
-                    state.restart()
+                if (restartPolicy.shouldRestart(flipsSinceRestart)) {
+                    restartPolicy.restart(state, bestSoFar = null)
                     flipsSinceRestart = 0
                     continue
                 }
                 val move = strategy.pickMove(state)
                 if (move == null) {
-                    state.restart()
+                    restartPolicy.restart(state, bestSoFar = null)
                     flipsSinceRestart = 0
                     continue
                 }
@@ -123,7 +126,8 @@ class LocalSearchSolver(
         }
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = SolverState(problem, Random(seed))
-        state.restart()
+        // No bestSample yet — first restart is always full random.
+        restartPolicy.restart(state, bestSoFar = null)
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
@@ -148,18 +152,18 @@ class LocalSearchSolver(
                     continue
                 }
                 // Local minimum on the objective — restart and try a different basin.
-                state.restart()
+                restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
                 continue
             }
-            if (flipsSinceRestart >= maxFlipsBeforeRestart) {
-                state.restart()
+            if (restartPolicy.shouldRestart(flipsSinceRestart)) {
+                restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
                 continue
             }
             val move = strategy.pickMove(state)
             if (move == null) {
-                state.restart()
+                restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
                 continue
             }
