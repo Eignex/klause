@@ -6,7 +6,8 @@ fun main() {
     val dimacs = DimacsLoader.loadBundled()
     val opb = OpbLoader.loadBundled()
     val jsonSchema = JsonSchemaLoader.loadBundled()
-    val externals = dimacs + opb + jsonSchema
+    val satlib = SatlibLoader.discover()
+    val externals = dimacs + opb + jsonSchema + satlib
     val verifyEntries = Portfolio.all + externals
     val benchEntries = Portfolio.sat + externals.filter { it.expectedSat }
 
@@ -15,7 +16,10 @@ fun main() {
             "${Portfolio.all.size} hard-coded, " +
             "${dimacs.size} DIMACS, " +
             "${opb.size} OPB, " +
-            "${jsonSchema.size} JSON-Schema) ==="
+            "${jsonSchema.size} JSON-Schema, " +
+            "${satlib.size} SATLIB" +
+            (if (satlib.isEmpty()) " — run :klause-bench:downloadSatlib to enable" else "") +
+            ") ==="
     )
     var disagreements = 0
     for (entry in verifyEntries) {

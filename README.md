@@ -63,7 +63,12 @@ val best = solver.minimize(weights, LocalSearchParams(maxFlips = 100_000))
 implement the same `Sampler` and `Optimizer` interfaces. A
 `BruteForceSolver` in core walks the assignment space exhaustively as a
 ground-truth oracle for small problems. `:klause-bench` cross-checks all
-four.
+four against a hard-coded portfolio plus pre-made problem instances
+loaded from DIMACS, OPB, and JSON-SchemaDef files. Run
+`./gradlew :klause-bench:downloadSatlib` once to fetch the SATLIB
+uf20-91 (sat) and uuf50-218 (unsat) sets — `:klause-bench:run` will
+include them automatically (sample size capped via
+`-Dklause.bench.satlib.max=N`, default 10 per set).
 
 ## Bit-blasting
 
