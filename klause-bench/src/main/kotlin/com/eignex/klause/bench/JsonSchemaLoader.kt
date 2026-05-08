@@ -6,12 +6,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.skema.SchemaDef
 import kotlinx.serialization.json.Json
 
-/**
- * Loads pre-made JSON-SchemaDef instances bundled in
- * `klause-bench/src/main/resources/schema/`. Each entry is decoded as
- * `SchemaDef<SchemaEntry>` (skema's wire shape), compiled into a [Problem] via the
- * core [Compiler], and wrapped in a [Portfolio.Entry].
- */
+/** Loads bundled JSON `SchemaDef<SchemaEntry>` instances from
+ *  `klause-bench/src/main/resources/schema/`, compiling each via [Compiler]. */
 object JsonSchemaLoader {
 
     private val json: Json = Json { ignoreUnknownKeys = true }

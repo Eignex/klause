@@ -20,15 +20,8 @@ import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * Cross-check the local-search solver against the bit-blast oracle. For each portfolio
- * problem the solver finds a hard-feasible assignment; the assignment is then pinned into
- * the CNF and `SatCheck.isSat` must agree it's satisfiable. Conversely, for known-UNSAT
- * problems the solver must produce zero samples within a tight flip budget.
- *
- * `SatCheck` brute-forces over up to 20 unassigned vars after unit propagation, so the
- * portfolio is sized accordingly: small bool spaces and narrow int domains.
- */
+/** Cross-check: every solver-found sample must be SAT under the bit-blasted CNF, and known-
+ *  UNSAT problems must yield no samples and an UNSAT CNF. */
 class SolverVsBitBlasterTest {
 
     private data class SatCase(val name: String, val problem: Problem)

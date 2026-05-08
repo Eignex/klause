@@ -80,14 +80,6 @@ class Ddfw(
         }
     }
 
-    /**
-     * For each currently violated factor, pull weight from its highest-weighted satisfied
-     * neighbor. If the neighbor is at or below `initWeight + increment`, only half the
-     * increment transfers — keeps seeded weight from draining when one factor dominates.
-     * If no satisfied neighbor exists, the violated factor's weight just bumps without a
-     * donor; this drifts total weight up by [increment] per orphan-step, bounded by
-     * neighborhood density.
-     */
     private fun updateWeights(state: SolverState) {
         val w = state.factorWeights
         val violated = state.violated.toIntArray()

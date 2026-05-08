@@ -6,16 +6,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverState
 import kotlin.random.Random
 
-/**
- * Outcome of running every backend in [BenchSampler] on one [Problem]:
- *
- *  - [verdicts] — what each backend's `solve()` returned.
- *  - [agreement] — `Agree` if every exact backend (LogicNG / Z3) returns the same Sat/Unsat
- *    verdict; `Disagree` if two exact backends contradict; `OnlyLocalSearch` if the only
- *    response was an LS `Unknown` (nothing to compare against).
- *  - [sampleChecks] — per backend, for each sample we asked the backend to produce, whether
- *    it actually satisfies the problem. A `false` here is always a bug in that backend.
- */
+/** Per-backend solve verdicts + per-sample satisfaction checks for one [Problem]. */
 data class VerificationReport(
     val problem: Problem,
     val verdicts: Map<String, SolveResult>,
@@ -31,11 +22,6 @@ enum class Agreement { Agree, Disagree, OnlyLocalSearch }
 data class SampleCheck(val sample: Sample, val satisfies: Boolean)
 
 object Verifier {
-    /**
-     * Run every backend, collect verdicts and sample-validity checks, return a report.
-     * Doesn't throw on disagreement — caller decides how to react. [sampleCount] is how
-     * many `samples()` (with-replacement) draws to verify per backend.
-     */
     fun verify(
         problem: Problem,
         samplers: List<BenchSampler> = defaultSamplers(problem),
@@ -59,7 +45,6 @@ object Verifier {
     }
 
     private fun satisfiesProblem(problem: Problem, sample: Sample): Boolean {
-        // Build a SolverState in the sample's assignment, recompute, and read off cost.
         val state = SolverState(problem, Random(0))
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])

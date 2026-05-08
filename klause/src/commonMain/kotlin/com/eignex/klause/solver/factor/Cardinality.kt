@@ -77,8 +77,7 @@ class Cardinality(
         if (n in min..max) return
         val wantIncrease = n < min
         if (boolVars.size == literals.size) {
-            // Fast path: each variable appears in exactly one literal. The flip's effect on
-            // the count is +1 iff the lit is currently false.
+            // Each var appears in exactly one literal — flip helps iff the lit is currently false.
             for (lit in literals) {
                 val v = Lit.variable(lit)
                 val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
@@ -87,7 +86,7 @@ class Cardinality(
             }
             return
         }
-        // Slow path: a variable may appear in multiple literals; aggregate the net change.
+        // Repeated-var fallback — aggregate the per-variable net change.
         for (v in boolVars) {
             var netChange = 0
             for (lit in literals) {

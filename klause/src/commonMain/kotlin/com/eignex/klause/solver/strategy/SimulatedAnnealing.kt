@@ -39,9 +39,6 @@ class SimulatedAnnealing(
             if (nonTaboo.isEmpty()) raw else nonTaboo
         } else raw
 
-        // Try to find an acceptable move: improving moves accept unconditionally; worsening
-        // moves accept with `exp(-Δ / T)`. Bounded sampling — give up after `moves.size`
-        // attempts and just take a random pick (rare under typical T).
         repeat(moves.size) {
             val move = moves[state.rng.nextInt(moves.size)]
             val delta = state.breakScore(move)

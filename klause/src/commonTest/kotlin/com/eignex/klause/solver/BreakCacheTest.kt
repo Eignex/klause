@@ -30,26 +30,19 @@ class BreakCacheTest {
 
     @Test
     fun cacheMatchesScanAfterRandomMoveSequenceOnMixedProblem() {
-        // 4 bool vars + 2 int vars, factors stress all three apply paths:
-        //  - Clause: bool-only.
-        //  - Cardinality: bool-only with shared bool vars.
-        //  - ReifiedLinear: mixes a bool aux + int vars; an int set must invalidate
-        //    the aux's break score.
+        // Mixed problem stressing all three apply paths; the ReifiedLinear factor crosses
+        // bool/int spaces so an int-set must invalidate the aux's bool break score.
         val numBool = 4
         val numInt = 2
         val intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5))
         val factors = listOf(
-            // (b0 ∨ ¬b1 ∨ b2)
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true))),
-            // (¬b1 ∨ b3)
             Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
-            // 1 ≤ #true(b0,b2,b3) ≤ 2
             Cardinality(
                 literals = intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(3, true)),
                 min = 1,
                 max = 2,
             ),
-            // b1 ↔ (i0 + 2*i1 ≤ 4) — bool aux shares bit-space with the clauses above.
             ReifiedLinear(
                 auxBoolVar = 1,
                 coeffs = intArrayOf(1, 2),

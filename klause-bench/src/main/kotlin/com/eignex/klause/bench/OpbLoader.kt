@@ -3,12 +3,8 @@ package com.eignex.klause.bench
 import com.eignex.klause.cnf.Opb
 import com.eignex.klause.cnf.OpbProblem
 
-/**
- * Loads pre-made OPB (Pseudo-Boolean Optimization) problem instances bundled in
- * `klause-bench/src/main/resources/opb/`. Returns [Portfolio.Entry]s for the verify
- * + sample workflow. The optional `LinearObjective` carried by an OPB file is
- * available via [loadOpb] when the bench harness needs it for `minimize` runs.
- */
+/** Loads bundled OPB instances from `klause-bench/src/main/resources/opb/`.
+ *  Use [loadOpb] when the harness needs the carried objective for `minimize`. */
 object OpbLoader {
 
     private val bundled: List<Bundled> = listOf(

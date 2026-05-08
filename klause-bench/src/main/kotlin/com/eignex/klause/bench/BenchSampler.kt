@@ -10,11 +10,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.z3.Z3Params
 import com.eignex.klause.z3.Z3Sampler
 
-/**
- * Type-erased wrapper over [com.eignex.klause.solver.Sampler] so the harness can hold a
- * heterogeneous list of backends in one collection. Each implementation pre-binds whatever
- * params data class its underlying sampler requires; callers don't need to care.
- */
+/** Type-erased sampler wrapper for the harness. Each impl pre-binds its params. */
 interface BenchSampler {
     val name: String
     val problem: Problem
@@ -56,8 +52,7 @@ class Z3Bench(
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }
 
-/** All backends currently shipping with the harness. The brute-force ground-truth
- *  enumerator is added only when the assignment space fits — see [BruteForceSolver.fits]. */
+/** Brute force is added only when the assignment space fits — see [BruteForceSolver.fits]. */
 fun defaultSamplers(problem: Problem): List<BenchSampler> = buildList {
     add(LocalSearchBench(problem))
     add(LogicNGBench(problem))

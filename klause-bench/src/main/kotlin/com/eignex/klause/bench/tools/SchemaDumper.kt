@@ -8,13 +8,7 @@ import com.eignex.klause.schema.VariableSchema
 import com.eignex.skema.SchemaDef
 import kotlinx.serialization.json.Json
 
-/**
- * One-shot generator for the bundled JSON-SchemaDef instance under
- * `klause-bench/src/main/resources/schema/`. Run as
- * `./gradlew :klause-bench:run -PtoolsMain=com.eignex.klause.bench.tools.SchemaDumperKt`
- * (or pipe directly via `gradle run` and the bundled-resource path) to refresh the
- * canonical sample. Kept around so the JSON file stays reproducible.
- */
+/** Source of the bundled JSON instance — regenerate via `:klause-bench:dumpSchema`. */
 private class CampaignSchema : VariableSchema() {
     val premium by boolVar()
     val type by nominal("a", "b", "c")

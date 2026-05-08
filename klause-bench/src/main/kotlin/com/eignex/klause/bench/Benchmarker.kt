@@ -2,12 +2,7 @@ package com.eignex.klause.bench
 
 import com.eignex.klause.solver.Problem
 
-/**
- * Wall-clock timings for one backend's three call kinds. Each array holds one entry per
- * repetition; callers can compute min/median/mean/etc. as needed. Plain `System.nanoTime()`
- * — adequate for "is one backend an order of magnitude slower" sanity checks. Swap in JMH
- * if/when finer-grained measurements matter.
- */
+/** Per-rep `nanoTime` deltas for one backend's three call kinds. */
 data class BackendTimings(
     val solveNanos: LongArray,
     val sampleNanos: LongArray,

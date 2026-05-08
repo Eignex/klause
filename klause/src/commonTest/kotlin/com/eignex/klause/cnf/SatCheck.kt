@@ -2,11 +2,7 @@ package com.eignex.klause.cnf
 
 import com.eignex.klause.solver.Lit
 
-/**
- * Test-only complete SAT decision procedure: unit propagation to a fixpoint, then brute-force
- * over whatever variables are still unassigned. Tseitin-encoded gadgets typically resolve
- * fully in propagation when all inputs are pinned, so the brute-force tail stays small.
- */
+/** Test-only SAT oracle: unit propagation + brute-force over residual unassigned vars. */
 internal object SatCheck {
 
     /** [fixed] is a flat `[var, value(0|1), var, value(0|1), ...]` array. */
