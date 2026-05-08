@@ -1,0 +1,7 @@
+* tiny set-cover with PB objective
+* 4 items, 3 coverage requirements, costs 1/2/3/4 per item.
+* SAT optimum is x1=x3=1, x2=x4=0 → cost 4 (constraints all satisfied).
+min: 1 x1 +2 x2 +3 x3 +4 x4 ;
++1 x1 +1 x2 >= 1 ;
++1 x2 +1 x3 +1 x4 >= 1 ;
++1 x1 +1 x3 +1 x4 >= 2 ;

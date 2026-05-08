@@ -3,11 +3,20 @@ package com.eignex.klause.bench
 import com.eignex.klause.solver.SolveResult
 
 fun main() {
-    val bundled = DimacsLoader.loadBundled()
-    val verifyEntries = Portfolio.all + bundled
-    val benchEntries = Portfolio.sat + bundled.filter { it.expectedSat }
+    val dimacs = DimacsLoader.loadBundled()
+    val opb = OpbLoader.loadBundled()
+    val jsonSchema = JsonSchemaLoader.loadBundled()
+    val externals = dimacs + opb + jsonSchema
+    val verifyEntries = Portfolio.all + externals
+    val benchEntries = Portfolio.sat + externals.filter { it.expectedSat }
 
-    println("=== verification (${verifyEntries.size} entries: ${Portfolio.all.size} hard-coded, ${bundled.size} from DIMACS) ===")
+    println(
+        "=== verification (${verifyEntries.size} entries: " +
+            "${Portfolio.all.size} hard-coded, " +
+            "${dimacs.size} DIMACS, " +
+            "${opb.size} OPB, " +
+            "${jsonSchema.size} JSON-Schema) ==="
+    )
     var disagreements = 0
     for (entry in verifyEntries) {
         val report = Verifier.verify(entry.problem)

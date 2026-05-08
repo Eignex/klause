@@ -1,0 +1,40 @@
+package com.eignex.klause.bench
+
+import com.eignex.klause.cnf.Opb
+import com.eignex.klause.cnf.OpbProblem
+
+/**
+ * Loads pre-made OPB (Pseudo-Boolean Optimization) problem instances bundled in
+ * `klause-bench/src/main/resources/opb/`. Returns [Portfolio.Entry]s for the verify
+ * + sample workflow. The optional `LinearObjective` carried by an OPB file is
+ * available via [loadOpb] when the bench harness needs it for `minimize` runs.
+ */
+object OpbLoader {
+
+    private val bundled: List<Bundled> = listOf(
+        Bundled("setcover-tiny", expectedSat = true),
+    )
+
+    fun loadBundled(): List<Portfolio.Entry> = bundled.map { meta ->
+        val opb = loadOpb(meta.name)
+        Portfolio.Entry(meta.name, opb.problem, meta.expectedSat)
+    }
+
+    fun loadOpb(name: String): OpbProblem {
+        val text = readResource("/opb/$name.opb")
+        return Opb.parse(text)
+    }
+
+    fun loadFromPath(path: String, name: String, expectedSat: Boolean = true): Portfolio.Entry {
+        val text = java.io.File(path).readText()
+        return Portfolio.Entry(name, Opb.parse(text).problem, expectedSat)
+    }
+
+    private fun readResource(path: String): String =
+        OpbLoader::class.java.getResourceAsStream(path)
+            ?.bufferedReader()
+            ?.use { it.readText() }
+            ?: error("Bundled OPB resource not found: $path")
+
+    private data class Bundled(val name: String, val expectedSat: Boolean)
+}
