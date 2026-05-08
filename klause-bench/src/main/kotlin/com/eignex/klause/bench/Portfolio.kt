@@ -19,8 +19,9 @@ import com.eignex.klause.solver.factor.Xor
 
 /**
  * Hardcoded SAT/UNSAT problems the harness runs by default. Stays small enough that every
- * backend (LS, LogicNG, Z3) decides each entry quickly. Replace iteration over [all] with
- * a wire-format loader once that lands.
+ * backend (LS, LogicNG, Z3) decides each entry quickly. The bench harness combines [all]
+ * with [DimacsLoader.loadBundled] so externally-supplied DIMACS instances participate in
+ * the same verify + benchmark workflow.
  */
 object Portfolio {
     data class Entry(val name: String, val problem: Problem, val expectedSat: Boolean)

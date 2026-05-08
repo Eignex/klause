@@ -3,9 +3,13 @@ package com.eignex.klause.bench
 import com.eignex.klause.solver.SolveResult
 
 fun main() {
-    println("=== verification ===")
+    val bundled = DimacsLoader.loadBundled()
+    val verifyEntries = Portfolio.all + bundled
+    val benchEntries = Portfolio.sat + bundled.filter { it.expectedSat }
+
+    println("=== verification (${verifyEntries.size} entries: ${Portfolio.all.size} hard-coded, ${bundled.size} from DIMACS) ===")
     var disagreements = 0
-    for (entry in Portfolio.all) {
+    for (entry in verifyEntries) {
         val report = Verifier.verify(entry.problem)
         val verdicts = report.verdicts.entries.joinToString(", ") {
             "${it.key}=${formatVerdict(it.value)}"
@@ -23,7 +27,7 @@ fun main() {
 
     println()
     println("=== benchmark (per entry, median of 3 reps × 5 samples) ===")
-    for (entry in Portfolio.sat) {
+    for (entry in benchEntries) {
         val report = Benchmarker.bench(entry.problem, repetitions = 3, sampleCount = 5)
         val cells = report.timings.entries.joinToString(" | ") { (name, t) ->
             "$name solve=${formatNs(median(t.solveNanos))} " +

@@ -74,4 +74,4 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-- Benchmark suite, Maven Central publishing, CI.
+- Maven Central publishing, CI.
