@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 class OccurrenceDedupTest {
 
     @Test
-    fun cardinalityWithSameVarTwiceDedupsOccurrenceList() {
+    fun `cardinality with same var twice dedups occurrence list`() {
         // Cardinality literals = [+a, -a, +b]; var `a` appears twice but should be registered
         // once in the occurrence list, so applyBoolFlip is invoked once per real flip.
         val a = 0; val b = 1
@@ -33,7 +33,7 @@ class OccurrenceDedupTest {
     }
 
     @Test
-    fun clauseWithSameVarTwiceDedupsOccurrenceList() {
+    fun `clause with same var twice dedups occurrence list`() {
         val a = 0
         val factor = Clause(literals = intArrayOf(Lit.make(a, true), Lit.make(a, false)))
         val problem = Problem(1, 0, emptyArray(), listOf(factor))
@@ -41,7 +41,7 @@ class OccurrenceDedupTest {
     }
 
     @Test
-    fun pseudoBooleanWithSameVarTwiceDedupsOccurrenceList() {
+    fun `pseudo boolean with same var twice dedups occurrence list`() {
         val a = 0
         val factor = PseudoBoolean(
             weights = intArrayOf(2, 3),

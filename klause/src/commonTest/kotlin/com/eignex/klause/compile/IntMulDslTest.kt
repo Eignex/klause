@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class IntMulDslTest {
 
     @Test
-    fun varTimesVarEmitsProductFactor() {
+    fun `var times var emits product factor`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
             val y by intVar(min = 0, max = 4)
@@ -26,7 +26,7 @@ class IntMulDslTest {
     }
 
     @Test
-    fun multiplicationConstraintHoldsInSamples() {
+    fun `multiplication constraint holds in samples`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
             val y by intVar(min = 0, max = 4)
@@ -45,7 +45,7 @@ class IntMulDslTest {
     }
 
     @Test
-    fun multiplicationBitBlastsCleanly() {
+    fun `multiplication bit blasts cleanly`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 3)
             val y by intVar(min = 0, max = 3)

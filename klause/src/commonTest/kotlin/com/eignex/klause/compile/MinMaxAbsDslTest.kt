@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 class MinMaxAbsDslTest {
 
     @Test
-    fun minOfTwoIntsSamplesValidly() {
+    fun `min of two ints samples validly`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val y by intVar(min = 0, max = 5)
@@ -36,7 +36,7 @@ class MinMaxAbsDslTest {
     }
 
     @Test
-    fun maxOfThreeIntsSamplesValidly() {
+    fun `max of three ints samples validly`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
             val y by intVar(min = 0, max = 4)
@@ -57,7 +57,7 @@ class MinMaxAbsDslTest {
     }
 
     @Test
-    fun absOfSignedIntSamplesValidly() {
+    fun `abs of signed int samples validly`() {
         class S : VariableSchema() {
             val x by intVar(min = -5, max = 5)
             val capAbs by constraint { abs(x) le 2 }
@@ -74,7 +74,7 @@ class MinMaxAbsDslTest {
     }
 
     @Test
-    fun minBitBlastingSatisfiabilityAgreesWithSolver() {
+    fun `min bit blasting satisfiability agrees with solver`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 3)
             val y by intVar(min = 0, max = 3)

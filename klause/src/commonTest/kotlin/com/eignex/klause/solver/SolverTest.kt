@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class SolverTest {
 
     @Test
-    fun solvesSimple3SatInstance() {
+    fun `solves simple 3 sat instance`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
@@ -29,7 +29,7 @@ class SolverTest {
     }
 
     @Test
-    fun samplesAreUniqueByDefault() {
+    fun `samples are unique by default`() {
         // (x0 ∨ x1) ∧ (x0 ∨ ¬x1) has only two solutions: (T,T) and (T,F).
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
@@ -44,7 +44,7 @@ class SolverTest {
     }
 
     @Test
-    fun exactlyOneFactorYieldsAllThreeSolutions() {
+    fun `exactly one factor yields all three solutions`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val solver = LocalSearchSolver(problem)
@@ -55,7 +55,7 @@ class SolverTest {
     }
 
     @Test
-    fun duplicatesAllowedWhenDistanceZero() {
+    fun `duplicates allowed when distance zero`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val solver = LocalSearchSolver(problem)
@@ -64,7 +64,7 @@ class SolverTest {
     }
 
     @Test
-    fun rollingWindowAllowsReuseAfterRotation() {
+    fun `rolling window allows reuse after rotation`() {
         // ExactlyOne over 4 vars has 4 solutions; window of 2 lets older ones come back.
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),

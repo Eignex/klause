@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class IntSwapSetTest {
     @Test
-    fun addAndContains() {
+    fun `add and contains`() {
         val s = IntSwapSet(8)
         assertTrue(s.add(3))
         assertTrue(s.add(5))
@@ -20,7 +20,7 @@ class IntSwapSetTest {
     }
 
     @Test
-    fun removeMaintainsContents() {
+    fun `remove maintains contents`() {
         val s = IntSwapSet(8)
         listOf(1, 4, 7, 2).forEach { s.add(it) }
         assertTrue(s.remove(4))
@@ -30,7 +30,7 @@ class IntSwapSetTest {
     }
 
     @Test
-    fun randomDrawsFromMembers() {
+    fun `random draws from members`() {
         val s = IntSwapSet(16)
         listOf(2, 5, 9).forEach { s.add(it) }
         val rng = Random(42)

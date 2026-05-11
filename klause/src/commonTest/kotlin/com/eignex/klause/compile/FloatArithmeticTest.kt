@@ -14,7 +14,7 @@ class FloatArithmeticTest {
     /** Bucket-aware lowering: literal arithmetic against a single float collapses to a
      *  single bucket-int comparison without needing the user to compute bucket indices. */
     @Test
-    fun shiftedFloatComparison() {
+    fun `shifted float comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
             // rate + 0.1 ≤ 0.6  ↔  rate ≤ 0.5
@@ -32,7 +32,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun scaledFloatComparison() {
+    fun `scaled float comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
             // 2 * rate ≥ 0.6  ↔  rate ≥ 0.3
@@ -50,7 +50,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun negativeCoefficientFlipsComparison() {
+    fun `negative coefficient flips comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
             // -rate ≤ -0.4  ↔  rate ≥ 0.4
@@ -68,7 +68,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun sameHandleExpressionVsExpression() {
+    fun `same handle expression vs expression`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
             // 2 * rate ≥ rate + 0.3  ↔  rate ≥ 0.3
@@ -86,7 +86,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun thresholdAboveMaxIsRejectedAtCompileTime() {
+    fun `threshold above max is rejected at compile time`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
             // rate ≥ 5.0 over [0, 1]: provably unsatisfiable, surfaced as a compile-time
@@ -97,7 +97,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun thresholdAboveMaxIsTautologyAtCompileTime() {
+    fun `threshold above max is tautology at compile time`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
             // rate ≤ 5.0 → tautology; compiler drops the constraint, no factors emitted.
@@ -108,7 +108,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun crossHandleSumComparesAcrossDistinctFloats() {
+    fun `cross handle sum compares across distinct floats`() {
         class S : VariableSchema() {
             val a by floatVar(min = 0.0, max = 1.0, buckets = 11)
             val b by floatVar(min = 0.0, max = 1.0, buckets = 11)
@@ -129,7 +129,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun crossHandleSubtractionEnforcesAtLeastDifference() {
+    fun `cross handle subtraction enforces at least difference`() {
         class S : VariableSchema() {
             val a by floatVar(min = 0.0, max = 1.0, buckets = 11)
             val b by floatVar(min = 0.0, max = 1.0, buckets = 11)
@@ -148,7 +148,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun mixedHandleScalingComparesCorrectly() {
+    fun `mixed handle scaling compares correctly`() {
         class S : VariableSchema() {
             // Asymmetric domains and bucket counts.
             val a by floatVar(min = 0.0, max = 2.0, buckets = 21)
@@ -170,7 +170,7 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun defaultBucketCountIsApplied() {
+    fun `default bucket count is applied`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate ge 0.5 }

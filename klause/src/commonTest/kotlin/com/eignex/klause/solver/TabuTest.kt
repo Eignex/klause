@@ -8,14 +8,14 @@ import kotlin.test.assertTrue
 class TabuTest {
 
     @Test
-    fun freshMoveIsNotTaboo() {
+    fun `fresh move is not taboo`() {
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
         val state = SolverState(problem, Random(0))
         assertFalse(state.isTaboo(Move.BoolFlip(0), tenure = 10))
     }
 
     @Test
-    fun appliedMoveIsTabooWithinTenure() {
+    fun `applied move is taboo within tenure`() {
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
         val state = SolverState(problem, Random(0))
         state.apply(Move.BoolFlip(0))
@@ -23,7 +23,7 @@ class TabuTest {
     }
 
     @Test
-    fun tenureExpiresAfterEnoughSteps() {
+    fun `tenure expires after enough steps`() {
         val problem = Problem(numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
         val state = SolverState(problem, Random(0))
         state.apply(Move.BoolFlip(0))
@@ -38,7 +38,7 @@ class TabuTest {
     }
 
     @Test
-    fun tabuTenureZeroDisables() {
+    fun `tabu tenure zero disables`() {
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
         val state = SolverState(problem, Random(0))
         state.apply(Move.BoolFlip(0))

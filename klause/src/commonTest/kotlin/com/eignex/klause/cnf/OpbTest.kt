@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class OpbTest {
 
     @Test
-    fun parsesMixedConstraintsWithoutObjective() {
+    fun `parses mixed constraints without objective`() {
         val text = """
             * #variable= 5 #constraint= 3
             +1 x1 +4 x2 +2 x3 +5 x4 +2 x5 >= 8 ;
@@ -35,7 +35,7 @@ class OpbTest {
     }
 
     @Test
-    fun parsesNegatedLiterals() {
+    fun `parses negated literals`() {
         val text = """
             +1 ~x1 +2 x2 <= 1 ;
         """.trimIndent()
@@ -46,7 +46,7 @@ class OpbTest {
     }
 
     @Test
-    fun parsesMinObjectiveAndFoldsNegationConstant() {
+    fun `parses min objective and folds negation constant`() {
         // `min: 2 x1 +3 ~x2 ;` → minimize 2·x1 + 3·(1-x2) = 2·x1 - 3·x2 + 3.
         val text = """
             min: 2 x1 +3 ~x2 ;
@@ -61,13 +61,13 @@ class OpbTest {
     }
 
     @Test
-    fun rejectsMissingTerminator() {
+    fun `rejects missing terminator`() {
         val text = "+1 x1 >= 1"
         assertTrue(runCatching { Opb.parse(text) }.isFailure)
     }
 
     @Test
-    fun rejectsMissingOperator() {
+    fun `rejects missing operator`() {
         val text = "+1 x1 1 ;"
         assertTrue(runCatching { Opb.parse(text) }.isFailure)
     }

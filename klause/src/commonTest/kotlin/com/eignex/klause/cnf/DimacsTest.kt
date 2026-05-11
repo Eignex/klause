@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class DimacsTest {
 
     @Test
-    fun parsesSimpleSatInstance() {
+    fun `parses simple sat instance`() {
         val text = """
             c sample
             p cnf 3 3
@@ -30,7 +30,7 @@ class DimacsTest {
     }
 
     @Test
-    fun acceptsMultiLineClausesAndComments() {
+    fun `accepts multi line clauses and comments`() {
         val text = """
             c first comment
             % alt comment
@@ -45,7 +45,7 @@ class DimacsTest {
     }
 
     @Test
-    fun roundTripsThroughCnfProblem() {
+    fun `round trips through cnf problem`() {
         // Build a tiny CnfProblem, dump to DIMACS, parse back, compare clause sets.
         val cnf = CnfProblem(
             numVars = 4,
@@ -72,21 +72,21 @@ class DimacsTest {
     }
 
     @Test
-    fun rejectsMissingHeader() {
+    fun `rejects missing header`() {
         assertFails {
             Dimacs.parse("1 2 3 0\n")
         }
     }
 
     @Test
-    fun rejectsLiteralOutOfRange() {
+    fun `rejects literal out of range`() {
         assertFails {
             Dimacs.parse("p cnf 2 1\n1 2 3 0\n")
         }
     }
 
     @Test
-    fun ignoresTrailingPercentBlock() {
+    fun `ignores trailing percent block`() {
         // SATLIB instances often end with `%\n0\n` sentinels — must be ignored.
         val text = """
             p cnf 2 1

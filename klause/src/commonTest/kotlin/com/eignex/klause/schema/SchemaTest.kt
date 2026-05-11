@@ -22,7 +22,7 @@ class CampaignSchema : VariableSchema() {
 class SchemaTest {
 
     @Test
-    fun delegateRegistersVarsAndConstraints() {
+    fun `delegate registers vars and constraints`() {
         val schema = CampaignSchema()
         val entries = schema.entries.entries.toList()
         assertEquals(3, entries.size)
@@ -37,7 +37,7 @@ class SchemaTest {
     }
 
     @Test
-    fun definitionRoundTripsThroughJson() {
+    fun `definition round trips through json`() {
         val schema = CampaignSchema()
         val def = schema.definition()
         val json = Json { prettyPrint = false }
@@ -48,7 +48,7 @@ class SchemaTest {
     }
 
     @Test
-    fun handleOperatorsBuildExpectedTree() {
+    fun `handle operators build expected tree`() {
         val schema = CampaignSchema()
         val nc = schema.entries["noPremiumForA"] as NamedConstraint
         val imp = nc.expr as Implies

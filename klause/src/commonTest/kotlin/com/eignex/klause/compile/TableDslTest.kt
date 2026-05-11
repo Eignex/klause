@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class TableDslTest {
 
     @Test
-    fun positiveTableForcesOneOfAllowedTuples() {
+    fun `positive table forces one of allowed tuples`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 3)
             val y by intVar(min = 0, max = 3)
@@ -35,7 +35,7 @@ class TableDslTest {
     }
 
     @Test
-    fun negativeTableForbidsListedTuples() {
+    fun `negative table forbids listed tuples`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 2)
             val y by intVar(min = 0, max = 2)
@@ -58,7 +58,7 @@ class TableDslTest {
     }
 
     @Test
-    fun reifiedTableUnderImplies() {
+    fun `reified table under implies`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 2)

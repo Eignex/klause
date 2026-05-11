@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 class XorCoverageTest {
 
     @Test
-    fun xorOddParityMatchesEnumeration() {
+    fun `xor odd parity matches enumeration`() {
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Xor(lits, targetParity = 1)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
@@ -28,7 +28,7 @@ class XorCoverageTest {
     }
 
     @Test
-    fun xorEvenParityMatchesEnumeration() {
+    fun `xor even parity matches enumeration`() {
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Xor(lits, targetParity = 0)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))

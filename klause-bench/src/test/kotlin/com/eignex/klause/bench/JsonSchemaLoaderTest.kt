@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 class JsonSchemaLoaderTest {
 
     @Test
-    fun loadsBundledCampaignSchema() {
+    fun `loads bundled campaign schema`() {
         val entries = JsonSchemaLoader.loadBundled()
         assertEquals(1, entries.size)
         val entry = entries[0]

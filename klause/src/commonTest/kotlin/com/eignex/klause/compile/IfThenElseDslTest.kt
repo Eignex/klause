@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class IfThenElseDslTest {
 
     @Test
-    fun ifThenElseDispatchesByCondition() {
+    fun `if then else dispatches by condition`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 9)
@@ -35,7 +35,7 @@ class IfThenElseDslTest {
     }
 
     @Test
-    fun ifThenElseInsideArithmetic() {
+    fun `if then else inside arithmetic`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 4)

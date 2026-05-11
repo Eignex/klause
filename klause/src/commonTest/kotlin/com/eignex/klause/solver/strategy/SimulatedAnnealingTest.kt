@@ -13,7 +13,7 @@ class SimulatedAnnealingTest {
 
     /** SA must converge on a small 3-SAT instance — same shape as the WalkSat smoke test. */
     @Test
-    fun simulatedAnnealingSolvesSmall3Sat() {
+    fun `simulated annealing solves small 3 sat`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
@@ -34,7 +34,7 @@ class SimulatedAnnealingTest {
     /** Two cooling rates should both find a satisfying assignment within budget on a small
      *  problem — different schedules, same outcome. */
     @Test
-    fun differentCoolingSchedulesBothConverge() {
+    fun `different cooling schedules both converge`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),

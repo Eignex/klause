@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class AllDifferentTest {
 
     @Test
-    fun fourVarsPermutationOverFourValues() {
+    fun `four vars permutation over four values`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)
         val problem = Problem(
             numBoolVars = 0,
@@ -29,7 +29,7 @@ class AllDifferentTest {
     }
 
     @Test
-    fun threeVarsRoomForOneDuplicateRequiresUniqueValues() {
+    fun `three vars room for one duplicate requires unique values`() {
         // 3 vars over [0..3]: easy to satisfy.
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)
         val problem = Problem(
@@ -47,7 +47,7 @@ class AllDifferentTest {
     }
 
     @Test
-    fun mismatchedDomainBoundsFailAtInitialize() {
+    fun `mismatched domain bounds fail at initialize`() {
         // Declared union [0..2] is too tight for an operand with domain [0..5].
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
         val problem = Problem(

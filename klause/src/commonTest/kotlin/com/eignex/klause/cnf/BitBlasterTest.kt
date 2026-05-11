@@ -33,7 +33,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun intLeqMatchesOriginalSemantics() {
+    fun `int leq matches original semantics`() {
         val factor = IntLeq(intVar = 0, bound = 5)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 7)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -45,7 +45,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun intEqAndDomainConstraint() {
+    fun `int eq and domain constraint`() {
         // domain [2..5] = size 4 → 2 bits.
         val factor = IntEq(intVar = 0, value = 4)
         val problem = Problem(0, 1, arrayOf(IntDomain(2, 5)), listOf(factor))
@@ -57,7 +57,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun intEqOutOfDomainEmitsEmptyClause() {
+    fun `int eq out of domain emits empty clause`() {
         val factor = IntEq(intVar = 0, value = 99)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -66,7 +66,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun intNeqMatchesOriginalSemantics() {
+    fun `int neq matches original semantics`() {
         val factor = IntNeq(intVar = 0, value = 2)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -77,7 +77,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun linearLeOverTwoTinyVarsMatchesEnumeration() {
+    fun `linear le over two tiny vars matches enumeration`() {
         // x + y ≤ 3, x in [0..3], y in [0..3].
         val factor = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(factor))
@@ -90,7 +90,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun linearVarVsVarMatchesEnumeration() {
+    fun `linear var vs var matches enumeration`() {
         // x ≤ y as Linear([1, -1], [x, y], LE, 0).
         val factor = Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(factor))
@@ -103,7 +103,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun reifiedIntCompareTracksAuxValue() {
+    fun `reified int compare tracks aux value`() {
         // aux ↔ (x ≤ 1), x in [0..3].
         val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 1)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
@@ -118,7 +118,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun clausesAndCardinalityRoundTrip() {
+    fun `clauses and cardinality round trip`() {
         // (x0 ∨ x1) ∧ AtMostOne(x0, x1, x2)
         val problem = Problem(
             numBoolVars = 3,
@@ -145,7 +145,7 @@ class BitBlasterTest {
     }
 
     @Test
-    fun dimacsRoundTripsHeader() {
+    fun `dimacs round trips header`() {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 3)),

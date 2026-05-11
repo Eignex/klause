@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class LitTest {
 
     @Test
-    fun makeAndDecodePositiveAndNegative() {
+    fun `make and decode positive and negative`() {
         for (v in listOf(0, 1, 7, 31, 1000, Int.MAX_VALUE ushr 1)) {
             val pos = Lit.make(v, positive = true)
             assertEquals(v, Lit.variable(pos))
@@ -21,7 +21,7 @@ class LitTest {
     }
 
     @Test
-    fun negateFlipsPolarityKeepsVariable() {
+    fun `negate flips polarity keeps variable`() {
         for (v in 0..5) {
             val pos = Lit.make(v, positive = true)
             val flipped = Lit.negate(pos)
@@ -33,7 +33,7 @@ class LitTest {
     }
 
     @Test
-    fun evaluateTruthTable() {
+    fun `evaluate truth table`() {
         val pos = Lit.make(0, positive = true)
         val neg = Lit.make(0, positive = false)
         // Positive literal: true when var is true.
@@ -45,7 +45,7 @@ class LitTest {
     }
 
     @Test
-    fun differentVarsProduceDistinctLiterals() {
+    fun `different vars produce distinct literals`() {
         // Sanity: the lit encoding is injective over (var, polarity).
         val seen = HashSet<Int>()
         for (v in 0..15) {

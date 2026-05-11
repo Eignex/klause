@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class PseudoBooleanDslTest {
 
     @Test
-    fun pbAtMostEmitsFactorAtTopLevel() {
+    fun `pb at most emits factor at top level`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -28,7 +28,7 @@ class PseudoBooleanDslTest {
     }
 
     @Test
-    fun pbAtMostHoldsInSamples() {
+    fun `pb at most holds in samples`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -52,7 +52,7 @@ class PseudoBooleanDslTest {
     }
 
     @Test
-    fun pbAtLeastHoldsInSamples() {
+    fun `pb at least holds in samples`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -74,7 +74,7 @@ class PseudoBooleanDslTest {
     }
 
     @Test
-    fun pbExactlyHoldsInSamples() {
+    fun `pb exactly holds in samples`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -96,7 +96,7 @@ class PseudoBooleanDslTest {
     }
 
     @Test
-    fun pbReifiedUnderImplies() {
+    fun `pb reified under implies`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val a by boolVar()

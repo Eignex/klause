@@ -11,7 +11,7 @@ import kotlin.test.assertFails
 class CompileTimeUnsatTest {
 
     @Test
-    fun constantFalseEqualityFailsAtCompileTime() {
+    fun `constant false equality fails at compile time`() {
         // (x - x) eq 5 reduces to 0 eq 5 in affine form; the compiler should refuse rather
         // than silently emit an unrepairable empty clause.
         class S : VariableSchema() {
@@ -22,7 +22,7 @@ class CompileTimeUnsatTest {
     }
 
     @Test
-    fun constantFalseInequalityFailsAtCompileTime() {
+    fun `constant false inequality fails at compile time`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val cap by constraint { (x - x + 5) le 1 }

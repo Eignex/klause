@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class SampleLoopTest {
 
     @Test
-    fun sameSeedYieldsIdenticalSequence() {
+    fun `same seed yields identical sequence`() {
         val problem = exactlyOneOver4()
         val solver = LocalSearchSolver(problem)
         val a = solver.enumerate(LocalSearchParams(maxFlips = 10_000, randomSeed = 42, recentWindow = 2)).take(10).toList()
@@ -25,7 +25,7 @@ class SampleLoopTest {
     }
 
     @Test
-    fun differentSeedsExploreDifferentSequences() {
+    fun `different seeds explore different sequences`() {
         // Soft check: at least one element differs across two seeds. Two random sequences over
         // 4 solutions colliding entirely is astronomically unlikely.
         val problem = exactlyOneOver4()
@@ -36,7 +36,7 @@ class SampleLoopTest {
     }
 
     @Test
-    fun finiteFlipBudgetTerminatesEvenWhenWindowBlocksAllSolutions() {
+    fun `finite flip budget terminates even when window blocks all solutions`() {
         // ExactlyOne over 3 vars has 3 solutions; window=10 holds every one as soon as we've
         // seen them, so the solver loops on rejected samples until maxFlips runs out. The
         // sequence must end (rather than hang) and yield at most 3 samples.
@@ -49,7 +49,7 @@ class SampleLoopTest {
     }
 
     @Test
-    fun minHammingDistanceIsEnforcedAgainstWindowMembers() {
+    fun `min hamming distance is enforced against window members`() {
         // ExactlyOne over 4 vars has 4 solutions. Adjacent solutions differ in exactly 2 bool
         // positions (e.g. (T,F,F,F) → (F,T,F,F) is distance 2). Setting minHammingDistance=3
         // means no two consecutive samples in the window can be adjacent solutions.
@@ -72,7 +72,7 @@ class SampleLoopTest {
     }
 
     @Test
-    fun mixedBoolIntDistanceCountsBothKinds() {
+    fun `mixed bool int distance counts both kinds`() {
         // 1 bool var + 1 int var with domain [0,3]. Solutions: (true, 0..3) — int can take 4
         // values, so 4 solutions total. Distance counts bool-flip + int-value differences;
         // (true, 1) vs (true, 0) is distance 1 (only int differs).
@@ -91,7 +91,7 @@ class SampleLoopTest {
     }
 
     @Test
-    fun zeroDistanceBypassesWindow() {
+    fun `zero distance bypasses window`() {
         // minHammingDistance=0 disables the distance check; window setting is ignored. We
         // expect the requested count to be produced, including duplicates.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))

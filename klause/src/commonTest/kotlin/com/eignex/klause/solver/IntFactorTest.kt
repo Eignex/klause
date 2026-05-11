@@ -24,7 +24,7 @@ class IntFactorTest {
     }
 
     @Test
-    fun intLeqSnapsToBoundOnRepair() {
+    fun `int leq snaps to bound on repair`() {
         val factor = IntLeq(intVar = 0, bound = 10)
         val state = stateFor(1, arrayOf(IntDomain(0, 100)), factor)
         state.assignment.setInt(0, 50)
@@ -43,7 +43,7 @@ class IntFactorTest {
     }
 
     @Test
-    fun intEqAndIntNeqIncrementalUpdate() {
+    fun `int eq and int neq incremental update`() {
         val eq = IntEq(intVar = 0, value = 7)
         val state = stateFor(1, arrayOf(IntDomain(0, 20)), eq)
         state.assignment.setInt(0, 7)
@@ -57,7 +57,7 @@ class IntFactorTest {
     }
 
     @Test
-    fun linearLeRepairSnapsAVariable() {
+    fun `linear le repair snaps a variable`() {
         // x + y ≤ 10, with x in [0..20], y in [0..20], current x=8, y=8 → sum=16, violated.
         val factor = Linear(
             coeffs = intArrayOf(1, 1),
@@ -83,7 +83,7 @@ class IntFactorTest {
     }
 
     @Test
-    fun reifiedIntCompareTracksAuxFlips() {
+    fun `reified int compare tracks aux flips`() {
         // aux ↔ (x ≤ 5).
         val rfc = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 5)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), listOf(rfc))
@@ -100,7 +100,7 @@ class IntFactorTest {
     }
 
     @Test
-    fun intGeqDeltaSymmetric() {
+    fun `int geq delta symmetric`() {
         val factor = IntGeq(intVar = 0, bound = 5)
         val state = stateFor(1, arrayOf(IntDomain(0, 10)), factor)
         state.assignment.setInt(0, 2)
@@ -112,7 +112,7 @@ class IntFactorTest {
     }
 
     @Test
-    fun intNeqRepairOffersBothSides() {
+    fun `int neq repair offers both sides`() {
         val factor = IntNeq(intVar = 0, value = 7)
         val state = stateFor(1, arrayOf(IntDomain(0, 20)), factor)
         state.assignment.setInt(0, 7)

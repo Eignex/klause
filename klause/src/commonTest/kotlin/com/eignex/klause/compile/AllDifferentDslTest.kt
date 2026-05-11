@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class AllDifferentDslTest {
 
     @Test
-    fun threeIntsAllDifferentInSamples() {
+    fun `three ints all different in samples`() {
         class S : VariableSchema() {
             val a by intVar(min = 1, max = 3)
             val b by intVar(min = 1, max = 3)
@@ -36,7 +36,7 @@ class AllDifferentDslTest {
     }
 
     @Test
-    fun allDifferentReifiedUnderImplies() {
+    fun `all different reified under implies`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val a by intVar(min = 0, max = 2)

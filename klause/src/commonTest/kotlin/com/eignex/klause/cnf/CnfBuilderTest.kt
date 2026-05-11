@@ -35,7 +35,7 @@ class CnfBuilderTest {
     }
 
     @Test
-    fun tseitinAndIsExactlyAnd() {
+    fun `tseitin and is exactly and`() {
         val b = CnfBuilder()
         val a = b.newVar(); val c = b.newVar()
         val auxLit = b.tseitinAnd(intArrayOf(Lit.make(a, true), Lit.make(c, true)))
@@ -49,7 +49,7 @@ class CnfBuilderTest {
     }
 
     @Test
-    fun tseitinXor3IsParity() {
+    fun `tseitin xor 3 is parity`() {
         val b = CnfBuilder()
         val a = b.newVar(); val c = b.newVar(); val d = b.newVar()
         val auxLit = b.tseitinXor3(Lit.make(a, true), Lit.make(c, true), Lit.make(d, true))
@@ -64,7 +64,7 @@ class CnfBuilderTest {
     }
 
     @Test
-    fun tseitinMaj3IsAtLeastTwo() {
+    fun `tseitin maj 3 is at least two`() {
         val b = CnfBuilder()
         val a = b.newVar(); val c = b.newVar(); val d = b.newVar()
         val auxLit = b.tseitinMaj3(Lit.make(a, true), Lit.make(c, true), Lit.make(d, true))
@@ -79,7 +79,7 @@ class CnfBuilderTest {
     }
 
     @Test
-    fun rippleAddSumsTwoBitNumbers() {
+    fun `ripple add sums two bit numbers`() {
         val b = CnfBuilder()
         val aBits = IntArray(2) { b.newVar() }
         val bBits = IntArray(2) { b.newVar() }
@@ -103,7 +103,7 @@ class CnfBuilderTest {
     }
 
     @Test
-    fun constantLeqMatchesBound() {
+    fun `constant leq matches bound`() {
         val b = CnfBuilder()
         val bits = IntArray(3) { b.newVar() }
         val resultLit = b.constantLeq(IntArray(3) { Lit.make(bits[it], true) }, 5)
@@ -118,7 +118,7 @@ class CnfBuilderTest {
     }
 
     @Test
-    fun unsignedLeqMatchesComparison() {
+    fun `unsigned leq matches comparison`() {
         val b = CnfBuilder()
         val aBits = IntArray(2) { b.newVar() }
         val bBits = IntArray(2) { b.newVar() }

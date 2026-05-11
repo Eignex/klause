@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 class DimacsLoaderTest {
 
     @Test
-    fun loadsAllBundledInstances() {
+    fun `loads all bundled instances`() {
         val entries = DimacsLoader.loadBundled()
         // Three pre-made files: php4 (unsat), random3sat-20-80 (sat), random3sat-50-200 (sat).
         assertEquals(3, entries.size)
@@ -21,7 +21,7 @@ class DimacsLoaderTest {
     }
 
     @Test
-    fun bundledShapesMatchHeaders() {
+    fun `bundled shapes match headers`() {
         val php4 = DimacsLoader.loadProblem("php4")
         assertEquals(20, php4.numBoolVars)
         assertEquals(45, php4.factors.size)

@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class ArithmeticDslTest {
 
     @Test
-    fun sumOfTwoIntsAtTopLevelEmitsLinear() {
+    fun `sum of two ints at top level emits linear`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val y by intVar(min = 0, max = 5)
@@ -40,7 +40,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun scaledTermsCarryCoefficients() {
+    fun `scaled terms carry coefficients`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
             val y by intVar(min = 0, max = 4)
@@ -53,7 +53,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun subtractionAndUnaryMinus() {
+    fun `subtraction and unary minus`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 10)
             val y by intVar(min = 0, max = 10)
@@ -68,7 +68,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun singleVarConstraintCollapsesToIntLeq() {
+    fun `single var constraint collapses to int leq`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100)
             val y by intVar(min = 0, max = 100)
@@ -81,7 +81,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun reifiedSingleVarCompare() {
+    fun `reified single var compare`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val budget by intVar(min = 0, max = 100)
@@ -92,7 +92,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun reifiedLinearForMultiVarInsideImplies() {
+    fun `reified linear for multi var inside implies`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 10)
@@ -104,7 +104,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun arithmeticEndToEndSolveSatisfiesPredicate() {
+    fun `arithmetic end to end solve satisfies predicate`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val y by intVar(min = 0, max = 5)
@@ -125,7 +125,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun bitBlasterAcceptsArithmeticProblem() {
+    fun `bit blaster accepts arithmetic problem`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 5)
@@ -141,7 +141,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun negativeUnaryAndInequalityMatch() {
+    fun `negative unary and inequality match`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val nonZero by constraint { -x le -1 }
@@ -157,7 +157,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun symmetryHelperLitForwardsThroughCnf() {
+    fun `symmetry helper lit forwards through cnf`() {
         // Sanity: a single ReifiedIntCompare factor on a Bool aux + IntVar bit-blasts and the
         // Bool aux can be pinned independently in the CNF model.
         class S : VariableSchema() {

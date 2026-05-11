@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class ProbSatTest {
 
     @Test
-    fun probSatFindsSamplesOnSmallSat() {
+    fun `prob sat finds samples on small sat`() {
         // 5 booleans, mix of at-most-3 and at-least-2 factors. Both strategies should converge.
         class S : VariableSchema() {
             val a by boolVar()

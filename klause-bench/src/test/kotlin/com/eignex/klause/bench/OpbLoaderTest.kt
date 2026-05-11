@@ -8,7 +8,7 @@ import kotlin.test.assertNotNull
 class OpbLoaderTest {
 
     @Test
-    fun loadsBundledSetCoverInstance() {
+    fun `loads bundled set cover instance`() {
         val entries = OpbLoader.loadBundled()
         assertEquals(1, entries.size)
         val entry = entries[0]
@@ -20,7 +20,7 @@ class OpbLoaderTest {
     }
 
     @Test
-    fun bundledOpbCarriesObjective() {
+    fun `bundled opb carries objective`() {
         val opb = OpbLoader.loadOpb("setcover-tiny")
         val obj = assertNotNull(opb.objective)
         assertEquals(listOf(1.0, 2.0, 3.0, 4.0), obj.boolWeights.toList())

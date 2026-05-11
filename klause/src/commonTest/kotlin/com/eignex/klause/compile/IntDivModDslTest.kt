@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class IntDivModDslTest {
 
     @Test
-    fun divisionConstraintHoldsInSamples() {
+    fun `division constraint holds in samples`() {
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 12)
             val d by intVar(min = 1, max = 4)
@@ -36,7 +36,7 @@ class IntDivModDslTest {
     }
 
     @Test
-    fun modulusConstraintHoldsInSamples() {
+    fun `modulus constraint holds in samples`() {
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 10)
             val d by intVar(min = 1, max = 4)
@@ -56,7 +56,7 @@ class IntDivModDslTest {
     }
 
     @Test
-    fun divModBitBlastsCleanly() {
+    fun `div mod bit blasts cleanly`() {
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 7)
             val d by intVar(min = 1, max = 3)
@@ -68,7 +68,7 @@ class IntDivModDslTest {
     }
 
     @Test
-    fun signedNumeratorTruncatedDivision() {
+    fun `signed numerator truncated division`() {
         // n = -7, d ∈ {1,2,3} → q = trunc(-7/d), r = -7 % d.
         class S : VariableSchema() {
             val n by intVar(min = -7, max = -7)
@@ -88,7 +88,7 @@ class IntDivModDslTest {
     }
 
     @Test
-    fun signedDenominatorTruncatedDivision() {
+    fun `signed denominator truncated division`() {
         // d ∈ {-3,-2,-1}, n ∈ [0..6]; pin q = -2 to find feasible (n,d) pairs.
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 6)
@@ -108,7 +108,7 @@ class IntDivModDslTest {
     }
 
     @Test
-    fun signedModTruncatedSemantics() {
+    fun `signed mod truncated semantics`() {
         // -10 % 3 = -1 (Java/Kotlin truncated). Pin n=-10, d=3, expect r=-1.
         class S : VariableSchema() {
             val n by intVar(min = -10, max = -10)

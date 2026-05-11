@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 class CardinalityDslTest {
 
     @Test
-    fun atMostThreeAtTopLevelEmitsCardinality() {
+    fun `at most three at top level emits cardinality`() {
         class S : VariableSchema() {
             val a by boolVar(); val b by boolVar(); val c by boolVar(); val d by boolVar()
             val cap by constraint { atMost(2, a, b, c, d) }
@@ -29,7 +29,7 @@ class CardinalityDslTest {
     }
 
     @Test
-    fun atLeastNestedReifies() {
+    fun `at least nested reifies`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val a by boolVar(); val b by boolVar(); val c by boolVar(); val d by boolVar()
@@ -40,7 +40,7 @@ class CardinalityDslTest {
     }
 
     @Test
-    fun reifiedRangeEndToEndSolve() {
+    fun `reified range end to end solve`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val a by boolVar(); val b by boolVar(); val c by boolVar(); val d by boolVar()
@@ -60,7 +60,7 @@ class CardinalityDslTest {
     }
 
     @Test
-    fun atMostFourOfFiveCardinalitySolves() {
+    fun `at most four of five cardinality solves`() {
         class S : VariableSchema() {
             val a by boolVar(); val b by boolVar(); val c by boolVar()
             val d by boolVar(); val e by boolVar()

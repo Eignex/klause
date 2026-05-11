@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class CcaWalkSatTest {
 
     @Test
-    fun confChangeIsResetOnFlipAndPropagatedToNeighbors() {
+    fun `conf change is reset on flip and propagated to neighbors`() {
         // Three bool vars, one ternary clause — every var is a neighbor of every other.
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
@@ -34,7 +34,7 @@ class CcaWalkSatTest {
     }
 
     @Test
-    fun restartResetsConfChangeToTrue() {
+    fun `restart resets conf change to true`() {
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = SolverState(problem, Random(0))
@@ -46,7 +46,7 @@ class CcaWalkSatTest {
     }
 
     @Test
-    fun ccaWalkSatSolvesSmall3Sat() {
+    fun `cca walk sat solves small 3 sat`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),

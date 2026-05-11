@@ -16,7 +16,7 @@ import kotlin.test.assertNotNull
 class Z3OptimizerTest {
 
     @Test
-    fun z3FindsExactOptimumOnSelect() {
+    fun `z3 finds exact optimum on select`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
@@ -29,7 +29,7 @@ class Z3OptimizerTest {
     }
 
     @Test
-    fun z3MinimizesLinearIntCost() {
+    fun `z3 minimizes linear int cost`() {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
@@ -44,7 +44,7 @@ class Z3OptimizerTest {
     /** Cross-backend: LS and Z3 should agree on the global optimum (or LS finds something
      *  Z3 can also achieve) for a small permutation problem. */
     @Test
-    fun localSearchAndZ3AgreeOnAllDifferentMinimum() {
+    fun `local search and z3 agree on all different minimum`() {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
@@ -62,7 +62,7 @@ class Z3OptimizerTest {
     }
 
     @Test
-    fun z3ReturnsNullWhenInfeasible() {
+    fun `z3 returns null when infeasible`() {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),

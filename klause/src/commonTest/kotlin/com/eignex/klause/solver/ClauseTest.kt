@@ -17,7 +17,7 @@ class ClauseTest {
     }
 
     @Test
-    fun violatedWhenAllLiteralsFalse() {
+    fun `violated when all literals false`() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false)))
         val state = stateFor(2, clause)
         state.assignment.setBool(0, false)
@@ -27,7 +27,7 @@ class ClauseTest {
     }
 
     @Test
-    fun deltaIfFlippedMatchesApplyFlip() {
+    fun `delta if flipped matches apply flip`() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)))
         val state = stateFor(3, clause)
         state.assignment.setBool(0, false); state.assignment.setBool(1, true); state.assignment.setBool(2, false)
@@ -41,7 +41,7 @@ class ClauseTest {
     }
 
     @Test
-    fun flippingMaintainsViolationStatus() {
+    fun `flipping maintains violation status`() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val state = stateFor(3, clause)
         state.assignment.setBool(0, true); state.assignment.setBool(1, true); state.assignment.setBool(2, false)

@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class CountWhereDslTest {
 
     @Test
-    fun cardinalityOverArbitraryBoolExprsCounts() {
+    fun `cardinality over arbitrary bool exprs counts`() {
         // Two of three predicates must hold: each predicate is itself an int comparison.
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
@@ -38,7 +38,7 @@ class CountWhereDslTest {
     }
 
     @Test
-    fun cardinalityOverIntEqualities() {
+    fun `cardinality over int equalities`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 4)
             val b by intVar(min = 0, max = 4)

@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class CardinalityRepairTest {
 
     @Test
-    fun atMostViolatedProposesOnlyTrueLiteralFlips() {
+    fun `at most violated proposes only true literal flips`() {
         // atMost(2) over [+a, +b, +c, +d]; all four currently true → count = 4 > max.
         val a = 0; val b = 1; val c = 2; val d = 3
         val factor = Cardinality(
@@ -34,7 +34,7 @@ class CardinalityRepairTest {
     }
 
     @Test
-    fun atLeastViolatedProposesOnlyFalseLiteralFlips() {
+    fun `at least violated proposes only false literal flips`() {
         // atLeast(2) over [+a, +b, +c]; only a is true (count=1 < min=2).
         val a = 0; val b = 1; val c = 2
         val factor = Cardinality(
@@ -55,7 +55,7 @@ class CardinalityRepairTest {
     }
 
     @Test
-    fun mixedPolarityCountsCorrectly() {
+    fun `mixed polarity counts correctly`() {
         // [+a, -b]; min=2, max=2 (exactly 2 trues required). With a=true, b=true →
         // +a true (1), -b false (0), count = 1 < min → wantIncrease.
         // Flipping a: would set +a false, count = 0 — wrong direction.
@@ -79,7 +79,7 @@ class CardinalityRepairTest {
     }
 
     @Test
-    fun satisfiedCardinalityProposesNothing() {
+    fun `satisfied cardinality proposes nothing`() {
         val a = 0; val b = 1
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(a, true), Lit.make(b, true)),

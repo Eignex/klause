@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class SignedMulDslTest {
 
     @Test
-    fun signedProductHoldsInSamples() {
+    fun `signed product holds in samples`() {
         class S : VariableSchema() {
             val x by intVar(min = -3, max = 3)
             val y by intVar(min = -3, max = 3)

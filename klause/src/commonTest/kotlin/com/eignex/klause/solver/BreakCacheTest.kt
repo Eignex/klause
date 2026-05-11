@@ -29,7 +29,7 @@ class BreakCacheTest {
     }
 
     @Test
-    fun cacheMatchesScanAfterRandomMoveSequenceOnMixedProblem() {
+    fun `cache matches scan after random move sequence on mixed problem`() {
         // Mixed problem stressing all three apply paths; the ReifiedLinear factor crosses
         // bool/int spaces so an int-set must invalidate the aux's bool break score.
         val numBool = 4
@@ -74,7 +74,7 @@ class BreakCacheTest {
     }
 
     @Test
-    fun restartClearsStaleCache() {
+    fun `restart clears stale cache`() {
         // Prime the cache, then restart and verify entries are recomputed against the new
         // assignment rather than served from stale memory.
         val factors = listOf(

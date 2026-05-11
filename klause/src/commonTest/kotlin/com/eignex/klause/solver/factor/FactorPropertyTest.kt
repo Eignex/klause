@@ -34,12 +34,12 @@ class FactorPropertyTest {
 
     // ---------------------- Per-factor delta-vs-apply property tests ----------------------
 
-    @Test fun clauseDeltaMatchesApply() {
+    @Test fun `clause delta matches apply`() {
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false)))
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 1)
     }
 
-    @Test fun cardinalityDeltaMatchesApply() {
+    @Test fun `cardinality delta matches apply`() {
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, false)),
             min = 1, max = 2,
@@ -47,7 +47,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 2)
     }
 
-    @Test fun cardinalitySlowPathDeltaMatchesApply() {
+    @Test fun `cardinality slow path delta matches apply`() {
         // Variable 0 appears twice (via positive and negative lit) — exercises the slow path
         // that aggregates the net change per var rather than counting per literal.
         val factor = Cardinality(
@@ -57,7 +57,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 3, intDomains = emptyDomains, seed = 3)
     }
 
-    @Test fun pseudoBooleanDeltaMatchesApply() {
+    @Test fun `pseudo boolean delta matches apply`() {
         val factor = PseudoBoolean(
             weights = intArrayOf(3, -2, 5, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, true)),
@@ -66,7 +66,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 4)
     }
 
-    @Test fun pseudoBooleanGEDeltaMatchesApply() {
+    @Test fun `pseudo boolean ge delta matches apply`() {
         val factor = PseudoBoolean(
             weights = intArrayOf(2, 1, 1, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
@@ -75,7 +75,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 5)
     }
 
-    @Test fun xorDeltaMatchesApply() {
+    @Test fun `xor delta matches apply`() {
         val factor = Xor(
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false), Lit.make(3, true)),
             targetParity = 1,
@@ -83,7 +83,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 6)
     }
 
-    @Test fun xorRepeatedVarDeltaMatchesApply() {
+    @Test fun `xor repeated var delta matches apply`() {
         // Var 0 appears twice → parity contribution is 0 → flipping it never changes parity.
         val factor = Xor(
             literals = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true), Lit.make(2, true)),
@@ -92,7 +92,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 3, intDomains = emptyDomains, seed = 7)
     }
 
-    @Test fun linearDeltaMatchesApply() {
+    @Test fun `linear delta matches apply`() {
         val factor = Linear(
             coeffs = intArrayOf(2, -1, 3),
             vars = intArrayOf(0, 1, 2),
@@ -105,7 +105,7 @@ class FactorPropertyTest {
         )
     }
 
-    @Test fun linearEqDeltaMatchesApply() {
+    @Test fun `linear eq delta matches apply`() {
         val factor = Linear(
             coeffs = intArrayOf(1, 1, 1),
             vars = intArrayOf(0, 1, 2),
@@ -118,7 +118,7 @@ class FactorPropertyTest {
         )
     }
 
-    @Test fun productDeltaMatchesApply() {
+    @Test fun `product delta matches apply`() {
         val factor = Product(a = 0, b = 1, result = 2)
         runFactorPropertyCheck(
             factor, numBoolVars = 0,
@@ -127,7 +127,7 @@ class FactorPropertyTest {
         )
     }
 
-    @Test fun allDifferentDeltaMatchesApply() {
+    @Test fun `all different delta matches apply`() {
         val factor = AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 1, domainSize = 4)
         runFactorPropertyCheck(
             factor, numBoolVars = 0,
@@ -136,35 +136,35 @@ class FactorPropertyTest {
         )
     }
 
-    @Test fun intEqDeltaMatchesApply() {
+    @Test fun `int eq delta matches apply`() {
         runFactorPropertyCheck(
             IntEq(intVar = 0, value = 3),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(0, 5)), seed = 12,
         )
     }
 
-    @Test fun intGeqDeltaMatchesApply() {
+    @Test fun `int geq delta matches apply`() {
         runFactorPropertyCheck(
             IntGeq(intVar = 0, bound = 2),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(-3, 3)), seed = 13,
         )
     }
 
-    @Test fun intLeqDeltaMatchesApply() {
+    @Test fun `int leq delta matches apply`() {
         runFactorPropertyCheck(
             IntLeq(intVar = 0, bound = 1),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(-3, 3)), seed = 14,
         )
     }
 
-    @Test fun intNeqDeltaMatchesApply() {
+    @Test fun `int neq delta matches apply`() {
         runFactorPropertyCheck(
             IntNeq(intVar = 0, value = 0),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(-2, 2)), seed = 15,
         )
     }
 
-    @Test fun reifiedLinearDeltaMatchesApply() {
+    @Test fun `reified linear delta matches apply`() {
         // aux ↔ (2*x - y ≤ 3). aux is bool var 0; x, y are int vars 0, 1.
         val factor = ReifiedLinear(
             auxBoolVar = 0,
@@ -179,7 +179,7 @@ class FactorPropertyTest {
         )
     }
 
-    @Test fun reifiedPseudoBooleanDeltaMatchesApply() {
+    @Test fun `reified pseudo boolean delta matches apply`() {
         val factor = ReifiedPseudoBoolean(
             auxBoolVar = 0,
             weights = intArrayOf(2, 1, 3, 1),
@@ -189,7 +189,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 5, intDomains = emptyDomains, seed = 17)
     }
 
-    @Test fun reifiedCardinalityDeltaMatchesApply() {
+    @Test fun `reified cardinality delta matches apply`() {
         val factor = ReifiedCardinality(
             auxBoolVar = 0,
             literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true), Lit.make(4, false)),
@@ -198,7 +198,7 @@ class FactorPropertyTest {
         runFactorPropertyCheck(factor, numBoolVars = 5, intDomains = emptyDomains, seed = 18)
     }
 
-    @Test fun reifiedIntCompareDeltaMatchesApply() {
+    @Test fun `reified int compare delta matches apply`() {
         for (op in IntCmpOp.entries) {
             val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = op, bound = 1)
             runFactorPropertyCheck(
@@ -211,7 +211,7 @@ class FactorPropertyTest {
 
     // ---------------------- Repair-move validity ----------------------
 
-    @Test fun proposeRepairMovesAreValid() {
+    @Test fun `propose repair moves are valid`() {
         // For each factor, iterate ~50 random assignments and any time the factor is violated,
         // (a) verify every emitted move is in-domain and non-trivial, and (b) verify applying
         // the move never increases cost.

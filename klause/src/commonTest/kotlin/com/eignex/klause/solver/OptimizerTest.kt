@@ -12,7 +12,7 @@ class OptimizerTest {
 
     /** ExactlyOne over 4 bools with weights (10, 5, 8, 3): pick bool 3 (weight 3). */
     @Test
-    fun localSearchOptimizerPicksMinWeightSingleSelect() {
+    fun `local search optimizer picks min weight single select`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
@@ -29,7 +29,7 @@ class OptimizerTest {
 
     /** Linear cost on int: minimize 1·x subject to x ≥ 2 over [0..5]. Optimum: x=2. */
     @Test
-    fun localSearchOptimizerMinimizesLinearIntCost() {
+    fun `local search optimizer minimizes linear int cost`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -48,7 +48,7 @@ class OptimizerTest {
      *  Bias the objective so descent has direction: minimize 1·x[0] + 2·x[1] + 3·x[2] + 4·x[3].
      *  Optimum: x[0]=3, x[1]=2, x[2]=1, x[3]=0 → 1·3 + 2·2 + 3·1 + 4·0 = 3 + 4 + 3 + 0 = 10. */
     @Test
-    fun localSearchOptimizerOnAllDifferent() {
+    fun `local search optimizer on all different`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -65,7 +65,7 @@ class OptimizerTest {
     }
 
     @Test
-    fun linearObjectiveEvaluation() {
+    fun `linear objective evaluation`() {
         val obj = LinearObjective(
             boolWeights = doubleArrayOf(2.0, -1.0, 3.0),
             intCoefficients = doubleArrayOf(0.5),
@@ -78,7 +78,7 @@ class OptimizerTest {
 
     /** Unsatisfiable problem: no minimum, returns null. */
     @Test
-    fun localSearchOptimizerReturnsNullWhenInfeasible() {
+    fun `local search optimizer returns null when infeasible`() {
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
             factors = listOf(

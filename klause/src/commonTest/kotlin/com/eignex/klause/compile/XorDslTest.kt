@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class XorDslTest {
 
     @Test
-    fun xorEmitsOddParityFactor() {
+    fun `xor emits odd parity factor`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -27,7 +27,7 @@ class XorDslTest {
     }
 
     @Test
-    fun xorOddParityHoldsInSamples() {
+    fun `xor odd parity holds in samples`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -46,7 +46,7 @@ class XorDslTest {
     }
 
     @Test
-    fun negatedXorEnforcesEvenParity() {
+    fun `negated xor enforces even parity`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -65,7 +65,7 @@ class XorDslTest {
     }
 
     @Test
-    fun xorReifiedUnderImplies() {
+    fun `xor reified under implies`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val a by boolVar()

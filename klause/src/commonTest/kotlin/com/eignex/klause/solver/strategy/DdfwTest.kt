@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class DdfwTest {
 
     @Test
-    fun ddfwSolvesSmall3Sat() {
+    fun `ddfw solves small 3 sat`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
@@ -40,7 +40,7 @@ class DdfwTest {
      * weight learning.
      */
     @Test
-    fun weightsChangeAfterFlipsOnOverconstrainedProblem() {
+    fun `weights change after flips on overconstrained problem`() {
         // Pigeonhole-ish: three vars, four mutually-conflicting two-literal clauses. No
         // assignment satisfies all four; DDFW will keep some of them violated and re-weight.
         val factors = listOf(
@@ -64,7 +64,7 @@ class DdfwTest {
 
     /** Restart resets the assignment and step, but DDFW must keep its learned weights. */
     @Test
-    fun weightsSurviveRestart() {
+    fun `weights survive restart`() {
         val factors = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
@@ -89,7 +89,7 @@ class DdfwTest {
     /** Total weight only drifts up when a violated factor has no satisfied neighbor. On a
      *  fully-connected, mostly-satisfiable instance the drift should be small. */
     @Test
-    fun totalWeightDriftIsBoundedOnConnectedProblem() {
+    fun `total weight drift is bounded on connected problem`() {
         val factors = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),

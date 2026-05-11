@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class RestartPolicyTest {
 
     @Test
-    fun fixedCadenceTriggersAtBoundary() {
+    fun `fixed cadence triggers at boundary`() {
         val p = FixedCadenceRestart(maxFlipsBeforeRestart = 100)
         assertEquals(false, p.shouldRestart(0))
         assertEquals(false, p.shouldRestart(99))
@@ -20,7 +20,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun adaptivePerturbationFallsBackWhenNoBest() {
+    fun `adaptive perturbation falls back when no best`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
         ))
@@ -43,7 +43,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun adaptivePerturbationAnchorsToBestThenPerturbs() {
+    fun `adaptive perturbation anchors to best then perturbs`() {
         // 6-bool problem, no factors — cost is always 0 so we can isolate the
         // perturbation-distance check.
         val problem = Problem(6, 0, emptyArray(), emptyList())
@@ -64,7 +64,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun adaptivePerturbationRestartIntegratesWithLocalSearchOptimizer() {
+    fun `adaptive perturbation restart integrates with local search optimizer`() {
         // Permutation problem — small enough for the optimiser to find the global optimum.
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
@@ -86,7 +86,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun lubyTriggersAtCadenceBoundary() {
+    fun `luby triggers at cadence boundary`() {
         val p = LubyRestart(unit = 100)
         assertEquals(false, p.shouldRestart(0))
         assertEquals(false, p.shouldRestart(99))
@@ -95,7 +95,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun lubySequenceMatchesKnuth() {
+    fun `luby sequence matches knuth`() {
         val p = LubyRestart(unit = 1)
         val problem = Problem(1, 0, emptyArray(), emptyList())
         val state = SolverState(problem, Random(0))
@@ -117,7 +117,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun lubyIntegratesWithLocalSearchSolver() {
+    fun `luby integrates with local search solver`() {
         // Same 3-SAT smoke setup the strategy tests use.
         val clauses = listOf(
             com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),

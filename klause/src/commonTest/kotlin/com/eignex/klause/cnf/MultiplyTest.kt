@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 class MultiplyTest {
 
     @Test
-    fun threeBitTimesThreeBitMatchesIntegerMultiplication() {
+    fun `three bit times three bit matches integer multiplication`() {
         // a, b ∈ [0..7]. Expect a*b ∈ [0..49] in 6-bit canonical binary.
         val builder = CnfBuilder()
         val a = IntArray(3) { Lit.make(builder.newVar(), positive = true) }

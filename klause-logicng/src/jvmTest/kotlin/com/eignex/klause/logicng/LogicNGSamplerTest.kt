@@ -27,7 +27,7 @@ class LogicNGSamplerTest {
     private data class Case(val name: String, val problem: Problem)
 
     @Test
-    fun solveReturnsSatForSatPortfolio() {
+    fun `solve returns sat for sat portfolio`() {
         for (case in satPortfolio()) {
             val sampler = LogicNGSampler(case.problem)
             val verdict = sampler.solve(LogicNGParams())
@@ -38,7 +38,7 @@ class LogicNGSamplerTest {
     }
 
     @Test
-    fun solveReturnsUnsatForUnsatPortfolio() {
+    fun `solve returns unsat for unsat portfolio`() {
         for (case in unsatPortfolio()) {
             val verdict = LogicNGSampler(case.problem).solve(LogicNGParams())
             assertEquals(SolveResult.Unsat, verdict, "${case.name}: expected Unsat")
@@ -46,7 +46,7 @@ class LogicNGSamplerTest {
     }
 
     @Test
-    fun enumerateProducesAllSolutionsExactlyOnce() {
+    fun `enumerate produces all solutions exactly once`() {
         // ExactlyOne over 4 vars has exactly 4 solutions.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
@@ -63,7 +63,7 @@ class LogicNGSamplerTest {
     }
 
     @Test
-    fun sampleAllowsDuplicates() {
+    fun `sample allows duplicates`() {
         // Same problem; sample (with replacement) draws independently. With 20 draws over
         // 4 solutions and a deterministic solver, we'll get exactly the same model 20
         // times — that's the "with replacement" extreme. Assert at most 4 unique values
@@ -83,7 +83,7 @@ class LogicNGSamplerTest {
     }
 
     @Test
-    fun maxModelsCapsEnumerate() {
+    fun `max models caps enumerate`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -98,7 +98,7 @@ class LogicNGSamplerTest {
     }
 
     @Test
-    fun enumerateHonoursMinHammingDistance() {
+    fun `enumerate honours min hamming distance`() {
         // Adjacent solutions of exactlyOne over 4 vars are at Hamming distance 2; require 3.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
@@ -121,7 +121,7 @@ class LogicNGSamplerTest {
     }
 
     @Test
-    fun localSearchAndLogicNGAgreeOnSatisfiability() {
+    fun `local search and logic ng agree on satisfiability`() {
         // Both backends should agree on SAT/UNSAT for every portfolio problem.
         for (case in satPortfolio() + unsatPortfolio()) {
             val ls = LocalSearchSolver(case.problem)

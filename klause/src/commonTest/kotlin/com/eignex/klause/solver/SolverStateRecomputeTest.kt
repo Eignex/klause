@@ -36,7 +36,7 @@ class SolverStateRecomputeTest {
     )
 
     @Test
-    fun afterRandomMovesStateMatchesFreshRecompute() {
+    fun `after random moves state matches fresh recompute`() {
         for (case in cases) {
             for (seed in 0 until 8) {
                 val state = SolverState(case.problem, Random(seed.toLong()))
@@ -73,7 +73,7 @@ class SolverStateRecomputeTest {
     }
 
     @Test
-    fun violatedSetIsSubsetOfFactorSpace() {
+    fun `violated set is subset of factor space`() {
         // Sanity: the violated set never grows beyond [0, numFactors). Catches bugs in
         // updateViolation that would let stale ids leak in.
         for (case in cases) {

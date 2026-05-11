@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class CardinalityTest {
 
     @Test
-    fun atMostOneViolatedWithTwoTrue() {
+    fun `at most one violated with two true`() {
         val amo = Cardinality.atMostOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(amo))
         val state = SolverState(problem, Random(0))
@@ -21,7 +21,7 @@ class CardinalityTest {
     }
 
     @Test
-    fun exactlyOneTransitions() {
+    fun `exactly one transitions`() {
         val one = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(one))
         val state = SolverState(problem, Random(0))

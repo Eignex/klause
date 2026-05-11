@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class LexDslTest {
 
     @Test
-    fun lexLeqHoldsInSamples() {
+    fun `lex leq holds in samples`() {
         class S : VariableSchema() {
             val a0 by intVar(min = 0, max = 3)
             val a1 by intVar(min = 0, max = 3)
@@ -34,7 +34,7 @@ class LexDslTest {
     }
 
     @Test
-    fun lexLtForcesStrictOrder() {
+    fun `lex lt forces strict order`() {
         class S : VariableSchema() {
             val a0 by intVar(min = 0, max = 2)
             val a1 by intVar(min = 0, max = 2)

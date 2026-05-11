@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class ClauseRepairTest {
 
     @Test
-    fun violatedClauseProposesEveryVarOnce() {
+    fun `violated clause proposes every var once`() {
         // Clause [+a, -b, +c]. Force a=false, b=true, c=false → all three lits false → violated.
         val a = 0; val b = 1; val c = 2
         val factor = Clause(intArrayOf(Lit.make(a, true), Lit.make(b, false), Lit.make(c, true)))
@@ -33,7 +33,7 @@ class ClauseRepairTest {
     }
 
     @Test
-    fun satisfiedClauseProposesNothing() {
+    fun `satisfied clause proposes nothing`() {
         val a = 0; val b = 1
         val factor = Clause(intArrayOf(Lit.make(a, true), Lit.make(b, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))

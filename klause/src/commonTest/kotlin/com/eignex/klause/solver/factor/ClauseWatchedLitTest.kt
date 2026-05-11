@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 class ClauseWatchedLitTest {
 
     @Test
-    fun isViolatedAgreesWithBruteForceOverEveryAssignment() {
+    fun `is violated agrees with brute force over every assignment`() {
         // Mixed-polarity 5-literal clause exercises both watch placement and rewatch logic.
         val literals = intArrayOf(
             Lit.make(0, true), Lit.make(1, false), Lit.make(2, true),
@@ -29,7 +29,7 @@ class ClauseWatchedLitTest {
     }
 
     @Test
-    fun watchedLiteralsSurviveLongFlipSequence() {
+    fun `watched literals survive long flip sequence`() {
         // Apply a deterministic sequence of flips and verify isViolated stays correct after
         // each one. This exercises the rewatch path.
         val literals = intArrayOf(

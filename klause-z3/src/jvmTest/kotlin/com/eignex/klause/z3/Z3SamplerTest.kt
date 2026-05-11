@@ -27,7 +27,7 @@ class Z3SamplerTest {
     private data class Case(val name: String, val problem: Problem)
 
     @Test
-    fun solveReturnsSatForSatPortfolio() {
+    fun `solve returns sat for sat portfolio`() {
         for (case in satPortfolio()) {
             val sampler = Z3Sampler(case.problem)
             val verdict = sampler.solve(Z3Params())
@@ -38,7 +38,7 @@ class Z3SamplerTest {
     }
 
     @Test
-    fun solveReturnsUnsatForUnsatPortfolio() {
+    fun `solve returns unsat for unsat portfolio`() {
         for (case in unsatPortfolio()) {
             val verdict = Z3Sampler(case.problem).solve(Z3Params())
             assertEquals(SolveResult.Unsat, verdict, "${case.name}: expected Unsat")
@@ -46,7 +46,7 @@ class Z3SamplerTest {
     }
 
     @Test
-    fun enumerateProducesAllSolutionsExactlyOnce() {
+    fun `enumerate produces all solutions exactly once`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
@@ -57,7 +57,7 @@ class Z3SamplerTest {
     }
 
     @Test
-    fun sampleHonoursMaxModels() {
+    fun `sample honours max models`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
@@ -68,7 +68,7 @@ class Z3SamplerTest {
     }
 
     @Test
-    fun maxModelsCapsEnumerate() {
+    fun `max models caps enumerate`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
@@ -78,7 +78,7 @@ class Z3SamplerTest {
     }
 
     @Test
-    fun enumerateHonoursMinHammingDistance() {
+    fun `enumerate honours min hamming distance`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
@@ -95,7 +95,7 @@ class Z3SamplerTest {
     }
 
     @Test
-    fun localSearchAndZ3AgreeOnSatisfiability() {
+    fun `local search and z3 agree on satisfiability`() {
         for (case in satPortfolio() + unsatPortfolio()) {
             val ls = LocalSearchSolver(case.problem)
                 .solve(LocalSearchParams(maxFlips = 50_000L, randomSeed = 0L))

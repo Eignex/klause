@@ -27,7 +27,7 @@ class SolverVsBitBlasterTest {
     private data class SatCase(val name: String, val problem: Problem)
 
     @Test
-    fun solverSatisfyingAssignmentsAreSatUnderBitBlast() {
+    fun `solver satisfying assignments are sat under bit blast`() {
         for (case in satPortfolio()) {
             val cnf = BitBlaster.compile(case.problem)
             val solver = LocalSearchSolver(case.problem)
@@ -42,7 +42,7 @@ class SolverVsBitBlasterTest {
     }
 
     @Test
-    fun unsatProblemsYieldNoSamplesAndCnfIsUnsat() {
+    fun `unsat problems yield no samples and cnf is unsat`() {
         for (case in unsatPortfolio()) {
             val cnf = BitBlaster.compile(case.problem)
             assertTrue(!SatCheck.isSat(cnf.numVars, cnf.clauses, IntArray(0)),

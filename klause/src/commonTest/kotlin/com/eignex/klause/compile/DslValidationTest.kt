@@ -13,7 +13,7 @@ import kotlin.test.assertFails
 class DslValidationTest {
 
     @Test
-    fun gccRejectsNegativeRange() {
+    fun `gcc rejects negative range`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -23,7 +23,7 @@ class DslValidationTest {
     }
 
     @Test
-    fun gccRejectsRangeExceedingVarCount() {
+    fun `gcc rejects range exceeding var count`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -33,7 +33,7 @@ class DslValidationTest {
     }
 
     @Test
-    fun allDifferentPigeonholeRejected() {
+    fun `all different pigeonhole rejected`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 1)
             val b by intVar(min = 0, max = 1)
@@ -45,7 +45,7 @@ class DslValidationTest {
     }
 
     @Test
-    fun tableTupleOutOfDomainRejected() {
+    fun `table tuple out of domain rejected`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -55,7 +55,7 @@ class DslValidationTest {
     }
 
     @Test
-    fun notTableTupleOutOfDomainRejected() {
+    fun `not table tuple out of domain rejected`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -65,7 +65,7 @@ class DslValidationTest {
     }
 
     @Test
-    fun solverSampleMinHammingDistanceTooLargeRejected() {
+    fun `solver sample min hamming distance too large rejected`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()

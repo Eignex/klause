@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 class PseudoBooleanCoverageTest {
 
     @Test
-    fun pbAtMostMatchesEnumeration() {
+    fun `pb at most matches enumeration`() {
         // 3a + 2b + 5c + 1d ≤ 4 over 4 booleans.
         val weights = intArrayOf(3, 2, 5, 1)
         val lits = IntArray(4) { Lit.make(it, true) }
@@ -32,7 +32,7 @@ class PseudoBooleanCoverageTest {
     }
 
     @Test
-    fun pbExactlyMatchesEnumeration() {
+    fun `pb exactly matches enumeration`() {
         val weights = intArrayOf(2, 3, 5)
         val lits = IntArray(3) { Lit.make(it, true) }
         val factor = PseudoBoolean(weights, lits, PbOp.EQ, 5)

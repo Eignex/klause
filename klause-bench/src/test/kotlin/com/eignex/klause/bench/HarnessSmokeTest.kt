@@ -12,7 +12,7 @@ class HarnessSmokeTest {
      * Lightweight CI gate; deeper exploration runs via `./gradlew :klause-bench:run`.
      */
     @Test
-    fun verifierFindsNoDisagreementOnPortfolio() {
+    fun `verifier finds no disagreement on portfolio`() {
         for (entry in Portfolio.all) {
             val report = Verifier.verify(entry.problem)
             assertNotEquals(Agreement.Disagree, report.agreement,

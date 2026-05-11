@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class ProductConvergenceTest {
 
     @Test
-    fun productConvergesOnTighlyFactoredTarget() {
+    fun `product converges on tighly factored target`() {
         // x ∈ [1..10], y ∈ [1..10]. Pin (x*y) = 42 → factorisations (6,7), (7,6) only.
         // Without a closest-divisor secondary snap the solver often gets stuck nudging ±1 from
         // a non-divisible result.

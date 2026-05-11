@@ -32,7 +32,7 @@ private class IntCampaign : VariableSchema() {
 class CompileTest {
 
     @Test
-    fun nominalProducesExactlyOneFactorAndIndicators() {
+    fun `nominal produces exactly one factor and indicators`() {
         val schema = TinyCampaign()
         val compiled = schema.compile()
         assertEquals(4, compiled.problem.numBoolVars)
@@ -45,7 +45,7 @@ class CompileTest {
     }
 
     @Test
-    fun endToEndSolveDecodesValidAssignments() {
+    fun `end to end solve decodes valid assignments`() {
         // TinyCampaign solutions: type=a forces premium=false (1), type=b/c free (4). 5 unique.
         val schema = TinyCampaign()
         val compiled = schema.compile()
@@ -62,7 +62,7 @@ class CompileTest {
     }
 
     @Test
-    fun intCompareLowersToIntFactorAtTopLevel() {
+    fun `int compare lowers to int factor at top level`() {
         // Direct top-level int constraint without any reification.
         class Direct : VariableSchema() {
             val budget by intVar(min = 0, max = 100)
@@ -74,7 +74,7 @@ class CompileTest {
     }
 
     @Test
-    fun intCompareInsideImpliesReifies() {
+    fun `int compare inside implies reifies`() {
         val compiled = IntCampaign().compile()
         // Vars: 3 nominal indicators + at least one aux for the reified IntCompare = 4+
         assertTrue(compiled.problem.numBoolVars >= 4)
@@ -84,7 +84,7 @@ class CompileTest {
     }
 
     @Test
-    fun intSchemaSolvesAndDecodes() {
+    fun `int schema solves and decodes`() {
         val schema = IntCampaign()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
@@ -103,7 +103,7 @@ class CompileTest {
     }
 
     @Test
-    fun floatVarBucketsAndDecodes() {
+    fun `float var buckets and decodes`() {
         class FloatTune : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 11)
             val highRate by constraint { rate ge 0.5 }
@@ -123,7 +123,7 @@ class CompileTest {
     }
 
     @Test
-    fun bitBlastRoundTripsCnfHeader() {
+    fun `bit blast round trips cnf header`() {
         val schema = TinyCampaign()
         val compiled = schema.compile()
         val text = BitBlaster.compile(compiled.problem).toDimacs()

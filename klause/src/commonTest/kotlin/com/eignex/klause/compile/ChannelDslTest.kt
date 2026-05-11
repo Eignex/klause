@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class ChannelDslTest {
 
     @Test
-    fun channelLinksIntToOneHotBooleans() {
+    fun `channel links int to one hot booleans`() {
         class S : VariableSchema() {
             val idx by intVar(min = 0, max = 3)
             val b0 by boolVar()
@@ -35,7 +35,7 @@ class ChannelDslTest {
     }
 
     @Test
-    fun channelHonoursOffset() {
+    fun `channel honours offset`() {
         class S : VariableSchema() {
             val idx by intVar(min = 5, max = 7)
             val a by boolVar()

@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class IntCompareLtGtTest {
 
     @Test
-    fun ltAcceptsBoundMinusOne() {
+    fun `lt accepts bound minus one`() {
         // x < 5 must permit x = 4. Pre-fix the compiler emits x ≤ 3 (double-shift bug),
         // so this test fails until the second shift is removed.
         class S : VariableSchema() {
@@ -33,7 +33,7 @@ class IntCompareLtGtTest {
     }
 
     @Test
-    fun gtAcceptsBoundPlusOne() {
+    fun `gt accepts bound plus one`() {
         // x > 5 must permit x = 6.
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 10)

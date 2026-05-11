@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class IntDisequalityDslTest {
 
     @Test
-    fun twoIntVarsDisequalityCompilesViaReifiedLinear() {
+    fun `two int vars disequality compiles via reified linear`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val y by intVar(min = 0, max = 5)
@@ -24,7 +24,7 @@ class IntDisequalityDslTest {
     }
 
     @Test
-    fun twoIntVarsDisequalityHoldsInSamples() {
+    fun `two int vars disequality holds in samples`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
             val y by intVar(min = 0, max = 4)
