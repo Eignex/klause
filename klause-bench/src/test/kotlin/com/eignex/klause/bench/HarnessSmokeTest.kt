@@ -6,11 +6,6 @@ import kotlin.test.assertTrue
 
 class HarnessSmokeTest {
 
-    /**
-     * Runs the verifier over the full SAT/UNSAT portfolio. If any backend disagrees with
-     * the others or returns a sample that doesn't satisfy the problem, this fails loudly.
-     * Lightweight CI gate; deeper exploration runs via `./gradlew :klause-bench:run`.
-     */
     @Test
     fun `verifier finds no disagreement on portfolio`() {
         for (entry in Portfolio.all) {

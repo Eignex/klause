@@ -27,16 +27,13 @@ class RestartPolicyTest {
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = SolverState(problem, Random(0))
         state.restart()
-        // Set a known assignment so we can detect that fallback randomises it.
+
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.assignment.setBool(2, false)
 
         AdaptivePerturbationRestart().restart(state, bestSoFar = null)
-        // Falling back to state.restart() randomises the assignment; the bool values are
-        // now drawn from rng. We can't predict the exact result, but the recompute must
-        // have run (cost reflects the fresh assignment).
-        // Indirect check: cost is well-defined and consistent with the current bools.
+
         val countTrue = (0..2).count { state.assignment.boolValue(it) }
         val expectedHard = if (countTrue == 1) 0 else 1
         assertEquals(expectedHard, state.cost)
@@ -44,8 +41,7 @@ class RestartPolicyTest {
 
     @Test
     fun `adaptive perturbation anchors to best then perturbs`() {
-        // 6-bool problem, no factors — cost is always 0 so we can isolate the
-        // perturbation-distance check.
+
         val problem = Problem(6, 0, emptyArray(), emptyList())
         val state = SolverState(problem, Random(0))
         state.restart()
@@ -55,9 +51,6 @@ class RestartPolicyTest {
         val policy = AdaptivePerturbationRestart(perturbationStrength = 2)
         policy.restart(state, bestSoFar = best)
 
-        // Anchored to bestSoFar, then 2 random vars perturbed. So the result differs from
-        // bestSoFar in at most 2 positions (could be 0, 1, or 2 depending on whether the
-        // perturbation hit the same var twice).
         val differences = (0..5).count { state.assignment.boolValue(it) != best.bools[it] }
         assertTrue(differences in 0..2,
             "perturbed assignment differs from bestSoFar in $differences positions, expected 0..2")
@@ -65,16 +58,14 @@ class RestartPolicyTest {
 
     @Test
     fun `adaptive perturbation restart integrates with local search optimizer`() {
-        // Permutation problem — small enough for the optimiser to find the global optimum.
+
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
-        // Same problem with two different restart policies. Both should land on the same
-        // optimum given the budget — adaptive perturbation just gets there faster on
-        // harder problems; on this one they tie.
+
         val fixed = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart())
         val adaptive = LocalSearchSolver(problem, restartPolicy = AdaptivePerturbationRestart())
 
@@ -100,25 +91,22 @@ class RestartPolicyTest {
         val problem = Problem(1, 0, emptyArray(), emptyList())
         val state = SolverState(problem, Random(0))
         state.restart()
-        // Capture the cadence emitted by `shouldRestart` after each `restart()` call by
-        // probing at exactly the cadence boundary (shouldRestart returns true iff
-        // stepsSinceLastRestart >= cadence). Using unit=1 lets us read each term as `n`
-        // such that shouldRestart(n) is the first true for that interval.
+
         val emitted = mutableListOf<Int>()
         repeat(15) {
-            // First n at which shouldRestart returns true is the current cadence.
+
             var n = 1
             while (!p.shouldRestart(n)) n++
             emitted += n
             p.restart(state, bestSoFar = null)
         }
-        // Canonical Luby sequence prefix.
+
         assertEquals(listOf(1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8), emitted)
     }
 
     @Test
     fun `luby integrates with local search solver`() {
-        // Same 3-SAT smoke setup the strategy tests use.
+
         val clauses = listOf(
             com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),

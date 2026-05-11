@@ -10,7 +10,6 @@ import kotlin.test.assertEquals
 
 class BreakCacheTest {
 
-    /** Inline rescan that bypasses the cache, used as the oracle. */
     private fun naiveBreakScore(state: SolverState, boolVar: Int): Int {
         var count = 0
         for (factorId in state.problem.boolOccurrences[boolVar]) {
@@ -30,8 +29,7 @@ class BreakCacheTest {
 
     @Test
     fun `cache matches scan after random move sequence on mixed problem`() {
-        // Mixed problem stressing all three apply paths; the ReifiedLinear factor crosses
-        // bool/int spaces so an int-set must invalidate the aux's bool break score.
+
         val numBool = 4
         val numInt = 2
         val intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5))
@@ -75,15 +73,14 @@ class BreakCacheTest {
 
     @Test
     fun `restart clears stale cache`() {
-        // Prime the cache, then restart and verify entries are recomputed against the new
-        // assignment rather than served from stale memory.
+
         val factors = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
         )
         val problem = Problem(2, 0, emptyArray(), factors)
         val state = SolverState(problem, Random(0))
         state.restart()
-        // Force a bool flip to stamp the cache.
+
         state.apply(Move.BoolFlip(0))
         assertCacheConsistent(state, "after first flip")
         state.restart()

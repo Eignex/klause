@@ -22,7 +22,7 @@ class AllDifferentDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        // Top-level allDifferent over bare handles uses the global factor.
+
         assertTrue(compiled.problem.factors.any { it is AllDifferent })
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 4)).take(8).toList()
@@ -59,11 +59,9 @@ class AllDifferentDslTest {
             val cv = compiled.decode(schema.c, s)
             assertTrue(setOf(av, bv, cv).size == 3, "flag set but a=$av b=$bv c=$cv")
         }
-        // Reification soundness covered above; sawFlagSet just confirms the constraint isn't
-        // forcing flag=false vacuously.
+
         if (!sawFlagSet) {
-            // Not strictly required (the implication holds trivially when flag=false), but with
-            // 20 samples on three booleans we expect at least one flag=true draw.
+
         }
     }
 }

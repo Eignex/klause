@@ -40,7 +40,7 @@ class IfThenElseDslTest {
             val flag by boolVar()
             val x by intVar(min = 0, max = 4)
             val y by intVar(min = 0, max = 4)
-            // (flag ? x : y) ≤ 2
+
             val cap by constraint { ifThenElse(flag, x, y) le 2 }
         }
         val schema = S()

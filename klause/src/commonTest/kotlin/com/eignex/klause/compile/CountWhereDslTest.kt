@@ -14,7 +14,7 @@ class CountWhereDslTest {
 
     @Test
     fun `cardinality over arbitrary bool exprs counts`() {
-        // Two of three predicates must hold: each predicate is itself an int comparison.
+
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val y by intVar(min = 0, max = 5)
@@ -43,7 +43,7 @@ class CountWhereDslTest {
             val a by intVar(min = 0, max = 4)
             val b by intVar(min = 0, max = 4)
             val c by intVar(min = 0, max = 4)
-            // Exactly one of a,b,c equals 0.
+
             val one by constraint { cardinality(1, 1, a eq 0, b eq 0, c eq 0) }
         }
         val schema = S()

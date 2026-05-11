@@ -19,7 +19,7 @@ class IntDivModDslTest {
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 12)
             val d by intVar(min = 1, max = 4)
-            // n / d = 3.
+
             val pin by constraint { (n / d) eq 3 }
         }
         val schema = S()
@@ -40,7 +40,7 @@ class IntDivModDslTest {
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 10)
             val d by intVar(min = 1, max = 4)
-            // n mod d = 1.
+
             val pin by constraint { (n % d) eq 1 }
         }
         val schema = S()
@@ -69,11 +69,11 @@ class IntDivModDslTest {
 
     @Test
     fun `signed numerator truncated division`() {
-        // n = -7, d ∈ {1,2,3} → q = trunc(-7/d), r = -7 % d.
+
         class S : VariableSchema() {
             val n by intVar(min = -7, max = -7)
             val d by intVar(min = 1, max = 3)
-            val pinQ by constraint { (n / d) eq -2 }   // -7/3 = -2 (truncated), -7/2=-3 fails
+            val pinQ by constraint { (n / d) eq -2 }
         }
         val schema = S()
         val compiled = schema.compile()
@@ -89,7 +89,7 @@ class IntDivModDslTest {
 
     @Test
     fun `signed denominator truncated division`() {
-        // d ∈ {-3,-2,-1}, n ∈ [0..6]; pin q = -2 to find feasible (n,d) pairs.
+
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 6)
             val d by intVar(min = -3, max = -1)
@@ -109,7 +109,7 @@ class IntDivModDslTest {
 
     @Test
     fun `signed mod truncated semantics`() {
-        // -10 % 3 = -1 (Java/Kotlin truncated). Pin n=-10, d=3, expect r=-1.
+
         class S : VariableSchema() {
             val n by intVar(min = -10, max = -10)
             val d by intVar(min = 3, max = 3)

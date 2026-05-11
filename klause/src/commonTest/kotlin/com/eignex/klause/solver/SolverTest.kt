@@ -30,7 +30,7 @@ class SolverTest {
 
     @Test
     fun `samples are unique by default`() {
-        // (x0 ∨ x1) ∧ (x0 ∨ ¬x1) has only two solutions: (T,T) and (T,F).
+
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
@@ -65,7 +65,7 @@ class SolverTest {
 
     @Test
     fun `rolling window allows reuse after rotation`() {
-        // ExactlyOne over 4 vars has 4 solutions; window of 2 lets older ones come back.
+
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))

@@ -10,7 +10,7 @@ class ProductCoverageTest {
 
     @Test
     fun `product over three ints matches enumeration`() {
-        // a, b, result ∈ [0..3]. Result ≤ 3 means many enumerations are SAT only when a*b ∈ [0..3].
+
         val factor = Product(a = 0, b = 1, result = 2)
         val problem = Problem(
             numBoolVars = 0,

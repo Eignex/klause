@@ -46,7 +46,7 @@ class DimacsTest {
 
     @Test
     fun `round trips through cnf problem`() {
-        // Build a tiny CnfProblem, dump to DIMACS, parse back, compare clause sets.
+
         val cnf = CnfProblem(
             numVars = 4,
             clauses = listOf(
@@ -87,7 +87,7 @@ class DimacsTest {
 
     @Test
     fun `ignores trailing percent block`() {
-        // SATLIB instances often end with `%\n0\n` sentinels — must be ignored.
+
         val text = """
             p cnf 2 1
             1 -2 0

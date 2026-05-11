@@ -8,7 +8,7 @@ class MultiplyTest {
 
     @Test
     fun `three bit times three bit matches integer multiplication`() {
-        // a, b ∈ [0..7]. Expect a*b ∈ [0..49] in 6-bit canonical binary.
+
         val builder = CnfBuilder()
         val a = IntArray(3) { Lit.make(builder.newVar(), positive = true) }
         val b = IntArray(3) { Lit.make(builder.newVar(), positive = true) }
@@ -30,7 +30,7 @@ class MultiplyTest {
             for (i in b.indices) {
                 pins[p++] = Lit.variable(b[i]); pins[p++] = (bv shr i) and 1
             }
-            // Now check each product bit.
+
             for (i in product.indices) {
                 val want = (expected shr i) and 1
                 val variant = pins.copyOf(pins.size + 2)
@@ -38,7 +38,7 @@ class MultiplyTest {
                 variant[pins.size + 1] = want
                 val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, variant)
                 assertEquals(true, sat, "av=$av bv=$bv bit=$i should permit product[$i]=$want")
-                // And the opposite pin should be unsat.
+
                 val opposite = pins.copyOf(pins.size + 2)
                 opposite[pins.size] = Lit.variable(product[i])
                 opposite[pins.size + 1] = 1 - want

@@ -11,13 +11,11 @@ import kotlin.test.assertTrue
 
 class FloatArithmeticTest {
 
-    /** Bucket-aware lowering: literal arithmetic against a single float collapses to a
-     *  single bucket-int comparison without needing the user to compute bucket indices. */
     @Test
     fun `shifted float comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-            // rate + 0.1 ≤ 0.6  ↔  rate ≤ 0.5
+
             val c by constraint { (rate + 0.1) le 0.6 }
         }
         val schema = S()
@@ -35,7 +33,7 @@ class FloatArithmeticTest {
     fun `scaled float comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-            // 2 * rate ≥ 0.6  ↔  rate ≥ 0.3
+
             val c by constraint { (2 * rate) ge 0.6 }
         }
         val schema = S()
@@ -53,7 +51,7 @@ class FloatArithmeticTest {
     fun `negative coefficient flips comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-            // -rate ≤ -0.4  ↔  rate ≥ 0.4
+
             val c by constraint { -rate le -0.4 }
         }
         val schema = S()
@@ -71,7 +69,7 @@ class FloatArithmeticTest {
     fun `same handle expression vs expression`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-            // 2 * rate ≥ rate + 0.3  ↔  rate ≥ 0.3
+
             val c by constraint { (2 * rate) ge (rate + 0.3) }
         }
         val schema = S()
@@ -89,8 +87,7 @@ class FloatArithmeticTest {
     fun `threshold above max is rejected at compile time`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-            // rate ≥ 5.0 over [0, 1]: provably unsatisfiable, surfaced as a compile-time
-            // contradiction rather than a silent never-yields behaviour at solve time.
+
             val c by constraint { rate ge 5.0 }
         }
         assertFails { S().compile() }
@@ -100,7 +97,7 @@ class FloatArithmeticTest {
     fun `threshold above max is tautology at compile time`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-            // rate ≤ 5.0 → tautology; compiler drops the constraint, no factors emitted.
+
             val c by constraint { rate le 5.0 }
         }
         val compiled = S().compile()
@@ -119,8 +116,7 @@ class FloatArithmeticTest {
         val solver = LocalSearchSolver(compiled.problem)
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 5)).take(50).toList()
         assertTrue(samples.isNotEmpty())
-        // Two 11-bucket grids over [0,1]: bucket step is 0.1, so allow a 0.1 slack for
-        // the rationalised lowering.
+
         for (s in samples) {
             val av = compiled.decode(schema.a, s)
             val bv = compiled.decode(schema.b, s)
@@ -150,7 +146,7 @@ class FloatArithmeticTest {
     @Test
     fun `mixed handle scaling compares correctly`() {
         class S : VariableSchema() {
-            // Asymmetric domains and bucket counts.
+
             val a by floatVar(min = 0.0, max = 2.0, buckets = 21)
             val b by floatVar(min = -1.0, max = 1.0, buckets = 11)
             val c by constraint { (2 * a + 3 * b.toExpr()) le 5.0 }
@@ -160,7 +156,7 @@ class FloatArithmeticTest {
         val solver = LocalSearchSolver(compiled.problem)
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(50).toList()
         assertTrue(samples.isNotEmpty())
-        // Slack: 2 * 0.1 (a's bucket step) + 3 * 0.2 (b's bucket step) = 0.8.
+
         for (s in samples) {
             val av = compiled.decode(schema.a, s)
             val bv = compiled.decode(schema.b, s)
@@ -176,7 +172,7 @@ class FloatArithmeticTest {
             val c by constraint { rate ge 0.5 }
         }
         val compiled = S().compile()
-        // Default DEFAULT_FLOAT_BUCKETS = 1024 → int domain [0, 1023] for "rate".
+
         val rateDomain = compiled.problem.intDomains[0]
         assertEquals(0, rateDomain.min)
         assertEquals(1023, rateDomain.max)

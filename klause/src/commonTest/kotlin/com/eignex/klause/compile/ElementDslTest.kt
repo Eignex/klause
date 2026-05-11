@@ -36,7 +36,7 @@ class ElementDslTest {
 
     @Test
     fun `element with larger index domain constrains to valid range`() {
-        // idx domain [0..5] but only 3 items. Out-of-range indices must be excluded.
+
         class S : VariableSchema() {
             val idx by intVar(min = 0, max = 5)
             val a by intVar(min = 0, max = 5)

@@ -14,25 +14,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Property-style harness for every factor: drives a random move sequence through a one-factor
- * problem and asserts the factor's two core invariants:
- *
- *  1. **Delta agrees with apply.** `f.deltaIfXFlipped(state, F, v)` (queried pre-apply) must
- *     equal the change in `isViolated()` actually observed after `state.apply(move)`.
- *  2. **Incremental state matches a fresh recompute.** After each accepted move, building a
- *     sibling [SolverState] over the same assignment and calling `recompute()` must yield the
- *     same `intPayload[factorId]`, `cost`, and violation membership.
- *
- * Repair-move validity is checked in a sibling test [proposeRepairMovesAreValid]: every move
- * emitted by `proposeRepairMoves` must (a) name a var in the factor's var arrays, (b) lie in
- * domain (for IntSet), (c) not be a no-op, and (d) when applied, never *increase* `cost`.
- */
 class FactorPropertyTest {
 
     private val emptyDomains: Array<IntDomain> = emptyArray()
-
-    // ---------------------- Per-factor delta-vs-apply property tests ----------------------
 
     @Test fun `clause delta matches apply`() {
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false)))
@@ -48,8 +32,7 @@ class FactorPropertyTest {
     }
 
     @Test fun `cardinality slow path delta matches apply`() {
-        // Variable 0 appears twice (via positive and negative lit) — exercises the slow path
-        // that aggregates the net change per var rather than counting per literal.
+
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true), Lit.make(2, true)),
             min = 2, max = 3,
@@ -84,7 +67,7 @@ class FactorPropertyTest {
     }
 
     @Test fun `xor repeated var delta matches apply`() {
-        // Var 0 appears twice → parity contribution is 0 → flipping it never changes parity.
+
         val factor = Xor(
             literals = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true), Lit.make(2, true)),
             targetParity = 0,
@@ -165,7 +148,7 @@ class FactorPropertyTest {
     }
 
     @Test fun `reified linear delta matches apply`() {
-        // aux ↔ (2*x - y ≤ 3). aux is bool var 0; x, y are int vars 0, 1.
+
         val factor = ReifiedLinear(
             auxBoolVar = 0,
             coeffs = intArrayOf(2, -1),
@@ -209,12 +192,8 @@ class FactorPropertyTest {
         }
     }
 
-    // ---------------------- Repair-move validity ----------------------
-
     @Test fun `propose repair moves are valid`() {
-        // For each factor, iterate ~50 random assignments and any time the factor is violated,
-        // (a) verify every emitted move is in-domain and non-trivial, and (b) verify applying
-        // the move never increases cost.
+
         val cases: List<Pair<Factor, FactorEnv>> = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)))
                 to FactorEnv(numBoolVars = 3),
@@ -246,7 +225,7 @@ class FactorPropertyTest {
             IntGeq(intVar = 0, bound = 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
             IntLeq(intVar = 0, bound = 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
             IntNeq(intVar = 0, value = 0) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
-            // Bounds outside the domain — the proposeRepair path must clamp.
+
             IntLeq(intVar = 0, bound = -10) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
             IntGeq(intVar = 0, bound = 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
             IntEq(intVar = 0, value = 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
@@ -307,7 +286,7 @@ class FactorPropertyTest {
                             "${factor::class.simpleName} proposed no-op IntSet at ${move.newValue}")
                     }
                 }
-                // Apply on a sibling to verify cost never increases.
+
                 val sibling = SolverState(problem, Random(iter.toLong()))
                 copyAssignment(state, sibling)
                 sibling.recompute()
@@ -319,8 +298,6 @@ class FactorPropertyTest {
             }
         }
     }
-
-    // ---------------------- Harness internals ----------------------
 
     private fun runFactorPropertyCheck(
         factor: Factor,
@@ -353,7 +330,6 @@ class FactorPropertyTest {
             assertEquals(violatedAfter, state.violated.contains(0),
                 "${factor::class.simpleName}: violated set drift after $move on iter=$i")
 
-            // Compare against a sibling rebuilt from the same assignment.
             val sibling = SolverState(problem, Random(seed.toLong()))
             copyAssignment(state, sibling)
             sibling.recompute()
@@ -364,8 +340,6 @@ class FactorPropertyTest {
             assertEquals(sibling.violated.contains(0), state.violated.contains(0),
                 "${factor::class.simpleName}: violation drift vs recompute on iter=$i")
 
-            // Periodically re-randomise so the sequence visits both violated and satisfied
-            // regions. Using `rng` (not state.rng) keeps the random walk reproducible.
             if (i > 0 && i % 30 == 0) {
                 randomizeAssignment(state, FactorEnv(numBoolVars, intDomains), rng)
                 state.recompute()
@@ -392,8 +366,7 @@ class FactorPropertyTest {
             val v = factor.intVars[rng.nextInt(factor.intVars.size)]
             val d = intDomains[v]
             val cur = state.assignment.intValue(v)
-            // Avoid picking the current value (state.apply would short-circuit and we'd lose
-            // a delta sample). Re-roll up to a few times.
+
             var target = cur
             repeat(8) {
                 val candidate = d.min + rng.nextInt(d.size)

@@ -12,8 +12,7 @@ class GccDslTest {
 
     @Test
     fun `multi value gcc bounds hold in samples`() {
-        // 4 vars over {0,1,2}. Require: value 0 appears 1..2 times, value 1 appears 1..2 times,
-        // value 2 appears 0..2 times.
+
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -41,7 +40,7 @@ class GccDslTest {
 
     @Test
     fun `gcc can force exact distribution`() {
-        // 3 vars over {0,1,2}, each value appears exactly once → permutation.
+
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)

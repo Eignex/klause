@@ -38,7 +38,7 @@ class DslValidationTest {
             val a by intVar(min = 0, max = 1)
             val b by intVar(min = 0, max = 1)
             val c by intVar(min = 0, max = 1)
-            // 3 vars over a 2-value domain — pigeonhole UNSAT.
+
             val pin by constraint { allDifferent(a, b, c) }
         }
         assertFails { S() }
@@ -72,7 +72,7 @@ class DslValidationTest {
         }
         val compiled = S().compile()
         val solver = LocalSearchSolver(compiled.problem)
-        // totalBits = 2; demanding distance 3 is impossible.
+
         assertFails { solver.enumerate(LocalSearchParams(minHammingDistance = 3)).take(1).toList() }
     }
 }

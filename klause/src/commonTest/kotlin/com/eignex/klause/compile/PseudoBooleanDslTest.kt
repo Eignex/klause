@@ -34,7 +34,7 @@ class PseudoBooleanDslTest {
             val b by boolVar()
             val c by boolVar()
             val d by boolVar()
-            // 3a + 2b + 5c + 1d ≤ 6.
+
             val cap by constraint { pbAtMost(listOf(3, 2, 5, 1), listOf(a, b, c, d), 6) }
         }
         val schema = S()
@@ -57,7 +57,7 @@ class PseudoBooleanDslTest {
             val a by boolVar()
             val b by boolVar()
             val c by boolVar()
-            // 2a + 3b + 4c ≥ 5.
+
             val req by constraint { pbAtLeast(listOf(2, 3, 4), listOf(a, b, c), 5) }
         }
         val schema = S()
@@ -79,7 +79,7 @@ class PseudoBooleanDslTest {
             val a by boolVar()
             val b by boolVar()
             val c by boolVar()
-            // 2a + 3b + 5c = 5.
+
             val pin by constraint { pbExactly(listOf(2, 3, 5), listOf(a, b, c), 5) }
         }
         val schema = S()

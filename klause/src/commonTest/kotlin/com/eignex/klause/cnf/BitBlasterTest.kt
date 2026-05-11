@@ -46,7 +46,7 @@ class BitBlasterTest {
 
     @Test
     fun `int eq and domain constraint`() {
-        // domain [2..5] = size 4 → 2 bits.
+
         val factor = IntEq(intVar = 0, value = 4)
         val problem = Problem(0, 1, arrayOf(IntDomain(2, 5)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -61,7 +61,7 @@ class BitBlasterTest {
         val factor = IntEq(intVar = 0, value = 99)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
-        // No assignment can satisfy: empty clause makes UNSAT for every input.
+
         assertTrue(cnf.clauses.any { it.isEmpty() })
     }
 
@@ -78,7 +78,7 @@ class BitBlasterTest {
 
     @Test
     fun `linear le over two tiny vars matches enumeration`() {
-        // x + y ≤ 3, x in [0..3], y in [0..3].
+
         val factor = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -91,7 +91,7 @@ class BitBlasterTest {
 
     @Test
     fun `linear var vs var matches enumeration`() {
-        // x ≤ y as Linear([1, -1], [x, y], LE, 0).
+
         val factor = Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -104,7 +104,7 @@ class BitBlasterTest {
 
     @Test
     fun `reified int compare tracks aux value`() {
-        // aux ↔ (x ≤ 1), x in [0..3].
+
         val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 1)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -119,7 +119,7 @@ class BitBlasterTest {
 
     @Test
     fun `clauses and cardinality round trip`() {
-        // (x0 ∨ x1) ∧ AtMostOne(x0, x1, x2)
+
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,

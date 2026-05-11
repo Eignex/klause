@@ -12,7 +12,7 @@ class ProductTest {
 
     @Test
     fun `product factor repairs incrementally`() {
-        // a*b = result with a, b ∈ [0..4], result ∈ [0..16].
+
         val factor = Product(a = 0, b = 1, result = 2)
         val problem = Problem(
             numBoolVars = 0,

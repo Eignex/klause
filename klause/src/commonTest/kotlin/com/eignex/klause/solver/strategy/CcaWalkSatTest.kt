@@ -17,17 +17,16 @@ class CcaWalkSatTest {
 
     @Test
     fun `conf change is reset on flip and propagated to neighbors`() {
-        // Three bool vars, one ternary clause — every var is a neighbor of every other.
+
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = SolverState(problem, Random(0))
         state.restart()
-        // After restart all flags must be true.
+
         assertTrue(state.boolConfChange.all { it })
 
         state.apply(Move.BoolFlip(0))
-        // Var 0 just flipped → its own confChange is false; vars 1 and 2 (its neighbors
-        // through the shared clause) are now true.
+
         assertEquals(false, state.boolConfChange[0])
         assertEquals(true, state.boolConfChange[1])
         assertEquals(true, state.boolConfChange[2])

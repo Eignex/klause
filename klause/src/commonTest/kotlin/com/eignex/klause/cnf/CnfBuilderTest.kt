@@ -4,10 +4,6 @@ import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Each Tseitin gadget claims `aux ↔ f(inputs)`. The trustworthy check is:
- * for every (inputs, auxValue) tuple the CNF is SAT iff `auxValue == f(inputs)`.
- */
 class CnfBuilderTest {
 
     private fun isSat(numVars: Int, clauses: List<IntArray>, fixed: IntArray): Boolean {

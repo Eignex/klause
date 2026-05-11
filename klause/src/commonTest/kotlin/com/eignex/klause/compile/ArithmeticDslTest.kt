@@ -61,7 +61,7 @@ class ArithmeticDslTest {
         }
         val compiled = S().compile()
         val linear = compiled.problem.factors.single { it is Linear } as Linear
-        // x - y ≥ 2  ⟺  Linear([1, -1], [x, y], GE, 2).
+
         assertEquals(LinearOp.GE, linear.op)
         assertEquals(2, linear.bound)
         assertEquals(setOf(1, -1), linear.coeffs.toSet())
@@ -75,7 +75,7 @@ class ArithmeticDslTest {
             val cap by constraint { (x + y) - y le 10 }
         }
         val compiled = S().compile()
-        // After affine normalization (x + y - y → x), the compiler picks the single-var IntLeq factor.
+
         val intLeq = compiled.problem.factors.single { it is IntLeq } as IntLeq
         assertEquals(10, intLeq.bound)
     }
@@ -134,9 +134,9 @@ class ArithmeticDslTest {
         }
         val compiled = S().compile()
         val cnf = BitBlaster.compile(compiled.problem)
-        // The CNF must contain at least one clause (the implication's body).
+
         assertTrue(cnf.clauses.isNotEmpty())
-        // Decoding helpers from the CNF round-trip the var ids without crashing.
+
         cnf.decodeInt(compiled.intVarIdByName["x"]!!, BooleanArray(cnf.numVars))
     }
 
@@ -158,8 +158,7 @@ class ArithmeticDslTest {
 
     @Test
     fun `symmetry helper lit forwards through cnf`() {
-        // Sanity: a single ReifiedIntCompare factor on a Bool aux + IntVar bit-blasts and the
-        // Bool aux can be pinned independently in the CNF model.
+
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 3)
@@ -168,10 +167,10 @@ class ArithmeticDslTest {
         val compiled = S().compile()
         val cnf = BitBlaster.compile(compiled.problem)
         assertEquals(1, compiled.intVarIdByName.size)
-        // Bool-id mapping survives the bit-blast.
+
         val flagCnfVar = cnf.boolVarToCnfVar[compiled.boolVarIdByName["flag"]!!]
         assertTrue(flagCnfVar in 0 until cnf.numVars)
-        // Lit utility round-trips with the cnf var.
+
         Lit.make(flagCnfVar, true)
     }
 }

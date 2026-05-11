@@ -18,7 +18,7 @@ class CardinalityCoverageTest {
 
     @Test
     fun `at most k exactly matches enumeration`() {
-        // At most 2 of 4 booleans true.
+
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Cardinality(lits, min = 0, max = 2)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
@@ -37,7 +37,7 @@ class CardinalityCoverageTest {
 
     @Test
     fun `at least k exactly matches enumeration`() {
-        // At least 2 of 4 booleans true.
+
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Cardinality(lits, min = 2, max = 4)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
@@ -56,7 +56,7 @@ class CardinalityCoverageTest {
 
     @Test
     fun `range cardinality 2 to 3 over four`() {
-        // 2 ≤ count ≤ 3 over 4 booleans.
+
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Cardinality(lits, min = 2, max = 3)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
@@ -75,8 +75,8 @@ class CardinalityCoverageTest {
 
     @Test
     fun `reified cardinality tracks aux`() {
-        // aux ↔ (count(x0..x3) ∈ [1, 2])
-        val lits = IntArray(4) { i -> Lit.make(i + 1, true) }  // bool ids 1..4
+
+        val lits = IntArray(4) { i -> Lit.make(i + 1, true) }
         val factor = ReifiedCardinality(auxBoolVar = 0, literals = lits, min = 1, max = 2)
         val problem = Problem(5, 0, emptyArray(), listOf(factor))
         val cnf = BitBlaster.compile(problem)

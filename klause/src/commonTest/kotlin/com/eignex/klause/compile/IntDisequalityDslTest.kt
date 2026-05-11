@@ -19,7 +19,7 @@ class IntDisequalityDslTest {
             val differ by constraint { x ne y }
         }
         val compiled = S().compile()
-        // Multi-var NE compiles to a ReifiedLinear EQ + assert ¬aux.
+
         assertTrue(compiled.problem.factors.any { it is ReifiedLinear })
     }
 

@@ -17,13 +17,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * After a sequence of accepted moves, an incrementally-maintained [SolverState] must agree
- * with a fresh [SolverState] over the same final assignment on every observable: `cost`,
- * the violated factor set, and per-factor `intPayload`. This catches drift in the incremental
- * payload arithmetic that would otherwise only show up as a wrong sample distribution far
- * downstream.
- */
 class SolverStateRecomputeTest {
 
     private data class Case(val name: String, val problem: Problem)
@@ -74,8 +67,7 @@ class SolverStateRecomputeTest {
 
     @Test
     fun `violated set is subset of factor space`() {
-        // Sanity: the violated set never grows beyond [0, numFactors). Catches bugs in
-        // updateViolation that would let stale ids leak in.
+
         for (case in cases) {
             val state = SolverState(case.problem, Random(0))
             state.restart()
@@ -119,11 +111,8 @@ class SolverStateRecomputeTest {
         for (i in 0 until src.problem.numIntVars) dst.assignment.setInt(i, src.assignment.intValue(i))
     }
 
-    // ---------------------- Problem fixtures ----------------------
-
     private fun boolHeavyCase(): Case {
-        // 5 bool vars, three clauses + a cardinality + an xor + a pseudo-boolean. Some vars
-        // appear in multiple factors so the recompute path exercises occurrence dispatch.
+
         val factors = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true), Lit.make(4, true))),
@@ -143,7 +132,7 @@ class SolverStateRecomputeTest {
     }
 
     private fun intHeavyCase(): Case {
-        // 3 int vars with mixed-sign Linear constraints and a couple of bound-style int factors.
+
         val intDomains = arrayOf(IntDomain(-3, 3), IntDomain(-3, 3), IntDomain(0, 5))
         val factors = listOf(
             Linear(coeffs = intArrayOf(2, -1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.LE, bound = 4),
@@ -155,7 +144,7 @@ class SolverStateRecomputeTest {
     }
 
     private fun mixedReifiedCase(): Case {
-        // Mixed bool aux + int operands; reified linear, reified cardinality, reified compare.
+
         val intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-2, 3))
         val factors = listOf(
             ReifiedLinear(
@@ -176,7 +165,7 @@ class SolverStateRecomputeTest {
     }
 
     private fun permutationCase(): Case {
-        // AllDifferent + per-var bound to make moves frequently violating.
+
         val intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3))
         val factors = listOf(
             AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4),

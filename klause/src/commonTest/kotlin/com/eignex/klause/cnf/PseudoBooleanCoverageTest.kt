@@ -11,7 +11,7 @@ class PseudoBooleanCoverageTest {
 
     @Test
     fun `pb at most matches enumeration`() {
-        // 3a + 2b + 5c + 1d ≤ 4 over 4 booleans.
+
         val weights = intArrayOf(3, 2, 5, 1)
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = PseudoBoolean(weights, lits, PbOp.LE, 4)

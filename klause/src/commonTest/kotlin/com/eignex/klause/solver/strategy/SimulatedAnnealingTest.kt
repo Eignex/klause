@@ -11,7 +11,6 @@ import kotlin.test.assertNotNull
 
 class SimulatedAnnealingTest {
 
-    /** SA must converge on a small 3-SAT instance — same shape as the WalkSat smoke test. */
     @Test
     fun `simulated annealing solves small 3 sat`() {
         val clauses = listOf(
@@ -31,8 +30,6 @@ class SimulatedAnnealingTest {
         }
     }
 
-    /** Two cooling rates should both find a satisfying assignment within budget on a small
-     *  problem — different schedules, same outcome. */
     @Test
     fun `different cooling schedules both converge`() {
         val clauses = listOf(

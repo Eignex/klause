@@ -41,8 +41,6 @@ class Z3OptimizerTest {
         assertEquals(2, sample.ints[0])
     }
 
-    /** Cross-backend: LS and Z3 should agree on the global optimum (or LS finds something
-     *  Z3 can also achieve) for a small permutation problem. */
     @Test
     fun `local search and z3 agree on all different minimum`() {
         val problem = Problem(
@@ -56,8 +54,7 @@ class Z3OptimizerTest {
             .minimize(objective, LocalSearchParams(maxFlips = 200_000L, randomSeed = 42L))
         assertNotNull(z3Sample)
         assertNotNull(lsSample)
-        // Z3 is exact; LS is best-effort. Their objectives should match for this small
-        // problem where LS has plenty of budget.
+
         assertEquals(objective.evaluate(z3Sample), objective.evaluate(lsSample))
     }
 
@@ -67,7 +64,7 @@ class Z3OptimizerTest {
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
             factors = listOf(
-                IntGeq(intVar = 0, bound = 10), // x ≥ 10 over [0..5]: unsat
+                IntGeq(intVar = 0, bound = 10),
             ),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))

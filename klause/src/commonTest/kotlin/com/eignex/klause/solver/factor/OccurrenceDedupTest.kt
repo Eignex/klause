@@ -12,8 +12,7 @@ class OccurrenceDedupTest {
 
     @Test
     fun `cardinality with same var twice dedups occurrence list`() {
-        // Cardinality literals = [+a, -a, +b]; var `a` appears twice but should be registered
-        // once in the occurrence list, so applyBoolFlip is invoked once per real flip.
+
         val a = 0; val b = 1
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(a, true), Lit.make(a, false), Lit.make(b, true)),
@@ -22,7 +21,7 @@ class OccurrenceDedupTest {
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val occA = problem.boolOccurrences[a]
         assertEquals(1, occA.size, "var a registered ${occA.size} times in occurrence list (expected 1)")
-        // Sanity: cost stays consistent with the brute-force violation check.
+
         val state = SolverState(problem, Random(7))
         state.recompute()
         val brute = if (factor.isViolated(state, 0)) 1 else 0

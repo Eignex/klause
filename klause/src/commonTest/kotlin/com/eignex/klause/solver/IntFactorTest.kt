@@ -58,7 +58,7 @@ class IntFactorTest {
 
     @Test
     fun `linear le repair snaps a variable`() {
-        // x + y ≤ 10, with x in [0..20], y in [0..20], current x=8, y=8 → sum=16, violated.
+
         val factor = Linear(
             coeffs = intArrayOf(1, 1),
             vars = intArrayOf(0, 1),
@@ -75,7 +75,7 @@ class IntFactorTest {
         val sink = MoveSink()
         factor.proposeRepairMoves(state, 0, sink)
         assertTrue(sink.list.isNotEmpty())
-        // Pick the first proposed move; for both vars, snap target = 10 - other = 2.
+
         val move = sink.list.first() as Move.IntSet
         assertEquals(2, move.newValue)
         state.apply(move)
@@ -84,17 +84,17 @@ class IntFactorTest {
 
     @Test
     fun `reified int compare tracks aux flips`() {
-        // aux ↔ (x ≤ 5).
+
         val rfc = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 5)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), listOf(rfc))
         val state = SolverState(problem, Random(0))
         state.assignment.setBool(0, true)
-        state.assignment.setInt(0, 3)  // x = 3, aux = true: 3 ≤ 5 holds, satisfied.
+        state.assignment.setInt(0, 3)
         state.recompute()
         assertFalse(rfc.isViolated(state, 0))
 
         val deltaPred = rfc.deltaIfBoolFlipped(state, 0, 0)
-        state.apply(Move.BoolFlip(0))  // aux = false now, but 3 ≤ 5 still holds: violated.
+        state.apply(Move.BoolFlip(0))
         assertEquals(1, deltaPred)
         assertTrue(rfc.isViolated(state, 0))
     }
@@ -106,7 +106,7 @@ class IntFactorTest {
         state.assignment.setInt(0, 2)
         state.recompute()
         assertTrue(factor.isViolated(state, 0))
-        // Set to 5 makes it satisfied.
+
         val delta = factor.deltaIfIntSet(state, 0, 0, 5)
         assertEquals(-1, delta)
     }

@@ -39,7 +39,7 @@ class TableDslTest {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 2)
             val y by intVar(min = 0, max = 2)
-            // Forbid (1,1) and (2,2).
+
             val rel by constraint {
                 notTable(listOf(x, y), listOf(listOf(1, 1), listOf(2, 2)))
             }

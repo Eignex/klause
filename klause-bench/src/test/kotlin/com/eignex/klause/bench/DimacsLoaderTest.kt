@@ -9,7 +9,7 @@ class DimacsLoaderTest {
     @Test
     fun `loads all bundled instances`() {
         val entries = DimacsLoader.loadBundled()
-        // Three pre-made files: php4 (unsat), random3sat-20-80 (sat), random3sat-50-200 (sat).
+
         assertEquals(3, entries.size)
         val byName = entries.associateBy { it.name }
         assertTrue("php4" in byName)

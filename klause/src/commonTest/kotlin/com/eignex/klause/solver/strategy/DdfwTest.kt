@@ -34,15 +34,9 @@ class DdfwTest {
         }
     }
 
-    /**
-     * On a problem that's hard to satisfy (overconstrained), at least one factor weight
-     * must diverge from the all-1.0 init after enough steps — that's the whole point of
-     * weight learning.
-     */
     @Test
     fun `weights change after flips on overconstrained problem`() {
-        // Pigeonhole-ish: three vars, four mutually-conflicting two-literal clauses. No
-        // assignment satisfies all four; DDFW will keep some of them violated and re-weight.
+
         val factors = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
@@ -62,7 +56,6 @@ class DdfwTest {
             "got ${state.factorWeights.toList()}")
     }
 
-    /** Restart resets the assignment and step, but DDFW must keep its learned weights. */
     @Test
     fun `weights survive restart`() {
         val factors = listOf(
@@ -86,8 +79,6 @@ class DdfwTest {
         }
     }
 
-    /** Total weight only drifts up when a violated factor has no satisfied neighbor. On a
-     *  fully-connected, mostly-satisfiable instance the drift should be small. */
     @Test
     fun `total weight drift is bounded on connected problem`() {
         val factors = listOf(
@@ -106,9 +97,7 @@ class DdfwTest {
             state.apply(move)
         }
         val finalTotal = state.factorWeights.sum()
-        // Per-step worst case: every violated factor lacks a satisfied neighbor → bumps by
-        // `increment`. With a 3-clause connected instance and DDFW solving it quickly, the
-        // drift should stay well below `steps * factors.size * increment`.
+
         val drift = finalTotal - initialTotal
         assertTrue(drift in 0.0..(steps * factors.size * 1.0),
             "total weight drifted by $drift over $steps steps")

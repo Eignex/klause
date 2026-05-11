@@ -10,8 +10,7 @@ class LiftOverflowTest {
 
     @Test
     fun `mul product domain overflow fails at compile time`() {
-        // 100_000 * 100_000 = 10^10 > Int.MAX_VALUE. The lift pass must reject the schema rather
-        // than silently wrapping into a corrupt domain.
+
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100_000)
             val y by intVar(min = 0, max = 100_000)

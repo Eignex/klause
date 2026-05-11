@@ -12,7 +12,7 @@ class ClauseWatchedLitTest {
 
     @Test
     fun `is violated agrees with brute force over every assignment`() {
-        // Mixed-polarity 5-literal clause exercises both watch placement and rewatch logic.
+
         val literals = intArrayOf(
             Lit.make(0, true), Lit.make(1, false), Lit.make(2, true),
             Lit.make(3, false), Lit.make(4, true),
@@ -30,8 +30,7 @@ class ClauseWatchedLitTest {
 
     @Test
     fun `watched literals survive long flip sequence`() {
-        // Apply a deterministic sequence of flips and verify isViolated stays correct after
-        // each one. This exercises the rewatch path.
+
         val literals = intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, false),
             Lit.make(3, true), Lit.make(4, false), Lit.make(5, true),
@@ -39,11 +38,10 @@ class ClauseWatchedLitTest {
         val clause = Clause(literals)
         val problem = Problem(6, 0, emptyArray(), listOf(clause))
         val state = SolverState(problem, Random(0))
-        // Initial assignment all-false.
+
         for (i in 0..5) state.assignment.setBool(i, false)
         state.recompute()
 
-        // Sequence: flip 0, 0, 1, 2, 3, 0, 4, 5, 1, 2, 3, 4, 5, 0
         val seq = intArrayOf(0, 0, 1, 2, 3, 0, 4, 5, 1, 2, 3, 4, 5, 0)
         for (v in seq) {
             state.apply(Move.BoolFlip(v))

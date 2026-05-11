@@ -110,8 +110,6 @@ class Z3SamplerTest {
         }
     }
 
-    // ---------------------- Portfolio (mirrors LogicNG / bench Portfolio) ----------------------
-
     private fun satPortfolio(): List<Case> = listOf(
         Case("threeClauses",
             Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = listOf(

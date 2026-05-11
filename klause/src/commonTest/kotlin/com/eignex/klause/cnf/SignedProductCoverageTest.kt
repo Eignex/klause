@@ -10,8 +10,7 @@ class SignedProductCoverageTest {
 
     @Test
     fun `signed product at most negative boundary matches enumeration`() {
-        // a, b ∈ [-4, 3] — width 4, so -4 is the most-negative representable value. result can
-        // hold up to ±16 so we widen its domain.
+
         val factor = Product(a = 0, b = 1, result = 2)
         val problem = Problem(
             numBoolVars = 0,
@@ -39,7 +38,7 @@ class SignedProductCoverageTest {
 
     @Test
     fun `signed product matches enumeration`() {
-        // a, b ∈ [-2..2], result ∈ [-4..4].
+
         val factor = Product(a = 0, b = 1, result = 2)
         val problem = Problem(
             numBoolVars = 0,

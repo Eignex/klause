@@ -30,7 +30,7 @@ class AllDifferentTest {
 
     @Test
     fun `three vars room for one duplicate requires unique values`() {
-        // 3 vars over [0..3]: easy to satisfy.
+
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)
         val problem = Problem(
             numBoolVars = 0,
@@ -48,7 +48,7 @@ class AllDifferentTest {
 
     @Test
     fun `mismatched domain bounds fail at initialize`() {
-        // Declared union [0..2] is too tight for an operand with domain [0..5].
+
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
         val problem = Problem(
             numBoolVars = 0,
@@ -56,7 +56,7 @@ class AllDifferentTest {
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 2)),
             factors = listOf(factor),
         )
-        // initialize() runs at the first restart; attempting to sample triggers it.
+
         assertFails {
             LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50)).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
         }

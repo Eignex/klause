@@ -46,7 +46,7 @@ class CompileTest {
 
     @Test
     fun `end to end solve decodes valid assignments`() {
-        // TinyCampaign solutions: type=a forces premium=false (1), type=b/c free (4). 5 unique.
+
         val schema = TinyCampaign()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
@@ -63,7 +63,7 @@ class CompileTest {
 
     @Test
     fun `int compare lowers to int factor at top level`() {
-        // Direct top-level int constraint without any reification.
+
         class Direct : VariableSchema() {
             val budget by intVar(min = 0, max = 100)
             val cap by constraint { budget le 50 }
@@ -76,10 +76,10 @@ class CompileTest {
     @Test
     fun `int compare inside implies reifies`() {
         val compiled = IntCampaign().compile()
-        // Vars: 3 nominal indicators + at least one aux for the reified IntCompare = 4+
+
         assertTrue(compiled.problem.numBoolVars >= 4)
         assertEquals(1, compiled.problem.numIntVars)
-        // Factors include the nominal ExactlyOne, the reified IntCompare, and a clause for the implication.
+
         assertTrue(compiled.problem.factors.size >= 3)
     }
 
@@ -111,7 +111,7 @@ class CompileTest {
         val schema = FloatTune()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        // 11 buckets, ge 0.5 leaves buckets 5..10 → 6 unique solutions.
+
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 99)).take(20).toList()
         assertEquals(6, samples.size)
         assertEquals(samples.toSet().size, samples.size)

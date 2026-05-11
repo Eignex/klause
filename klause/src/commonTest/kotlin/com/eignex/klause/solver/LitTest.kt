@@ -27,7 +27,7 @@ class LitTest {
             val flipped = Lit.negate(pos)
             assertEquals(v, Lit.variable(flipped))
             assertFalse(Lit.isPositive(flipped))
-            // Double negate returns the original.
+
             assertEquals(pos, Lit.negate(flipped))
         }
     }
@@ -36,17 +36,17 @@ class LitTest {
     fun `evaluate truth table`() {
         val pos = Lit.make(0, positive = true)
         val neg = Lit.make(0, positive = false)
-        // Positive literal: true when var is true.
+
         assertTrue(Lit.evaluate(pos, value = true))
         assertFalse(Lit.evaluate(pos, value = false))
-        // Negative literal: true when var is false.
+
         assertFalse(Lit.evaluate(neg, value = true))
         assertTrue(Lit.evaluate(neg, value = false))
     }
 
     @Test
     fun `different vars produce distinct literals`() {
-        // Sanity: the lit encoding is injective over (var, polarity).
+
         val seen = HashSet<Int>()
         for (v in 0..15) {
             for (pos in listOf(true, false)) {

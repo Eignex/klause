@@ -13,8 +13,7 @@ class IntCompareLtGtTest {
 
     @Test
     fun `lt accepts bound minus one`() {
-        // x < 5 must permit x = 4. Pre-fix the compiler emits x ≤ 3 (double-shift bug),
-        // so this test fails until the second shift is removed.
+
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 10)
             val cap by constraint { x lt 5 }
@@ -34,7 +33,7 @@ class IntCompareLtGtTest {
 
     @Test
     fun `gt accepts bound plus one`() {
-        // x > 5 must permit x = 6.
+
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 10)
             val cap by constraint { x gt 5 }

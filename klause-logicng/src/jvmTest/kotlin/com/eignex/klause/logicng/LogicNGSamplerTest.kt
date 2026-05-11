@@ -47,7 +47,7 @@ class LogicNGSamplerTest {
 
     @Test
     fun `enumerate produces all solutions exactly once`() {
-        // ExactlyOne over 4 vars has exactly 4 solutions.
+
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -64,10 +64,7 @@ class LogicNGSamplerTest {
 
     @Test
     fun `sample allows duplicates`() {
-        // Same problem; sample (with replacement) draws independently. With 20 draws over
-        // 4 solutions and a deterministic solver, we'll get exactly the same model 20
-        // times — that's the "with replacement" extreme. Assert at most 4 unique values
-        // appear, and the budget is exhausted (no early termination).
+
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -99,7 +96,7 @@ class LogicNGSamplerTest {
 
     @Test
     fun `enumerate honours min hamming distance`() {
-        // Adjacent solutions of exactlyOne over 4 vars are at Hamming distance 2; require 3.
+
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -122,12 +119,12 @@ class LogicNGSamplerTest {
 
     @Test
     fun `local search and logic ng agree on satisfiability`() {
-        // Both backends should agree on SAT/UNSAT for every portfolio problem.
+
         for (case in satPortfolio() + unsatPortfolio()) {
             val ls = LocalSearchSolver(case.problem)
                 .solve(LocalSearchParams(maxFlips = 50_000L, randomSeed = 0L))
             val ng = LogicNGSampler(case.problem).solve(LogicNGParams())
-            // LS never returns Unsat; it can be Sat or Unknown. LogicNG is exact.
+
             when (ng) {
                 is SolveResult.Sat -> assertTrue(
                     ls is SolveResult.Sat,
@@ -137,12 +134,10 @@ class LogicNGSamplerTest {
                     ls is SolveResult.Unknown,
                     "${case.name}: LogicNG UNSAT but LS got $ls (LS should run out of flips)"
                 )
-                SolveResult.Unknown -> {} // skip; portfolio is sized below LogicNG timeout
+                SolveResult.Unknown -> {}
             }
         }
     }
-
-    // ---------------------- Portfolio (mirror of SolverVsBitBlasterTest) ----------------------
 
     private fun satPortfolio(): List<Case> = listOf(
         Case(
@@ -218,12 +213,8 @@ class LogicNGSamplerTest {
         ),
     )
 
-    // ---------------------- Helpers ----------------------
-
     private fun assertSatisfiesProblem(problem: Problem, sample: Sample, label: String) {
-        // Verify the sample satisfies every hard factor of the original problem (not the
-        // bit-blasted CNF — Tseitin aux vars aren't part of the sample so re-pinning would
-        // give a false negative).
+
         val state = SolverState(problem, Random(0))
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
