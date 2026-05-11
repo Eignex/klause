@@ -20,8 +20,14 @@ object Benchmarker {
         samplers: List<BenchSampler> = defaultSamplers(problem),
         repetitions: Int = 5,
         sampleCount: Int = 10,
+        warmupReps: Int = 2,
     ): BenchmarkReport {
         val timings = samplers.associate { sampler ->
+            repeat(warmupReps) {
+                sampler.solve()
+                sampler.samples(sampleCount)
+                sampler.enumerated(sampleCount)
+            }
             val solveTimes = LongArray(repetitions)
             val sampleTimes = LongArray(repetitions)
             val enumTimes = LongArray(repetitions)

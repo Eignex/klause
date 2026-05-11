@@ -83,6 +83,14 @@ tasks.register("dumpSchema", JavaExec::class) {
     }
 }
 
+tasks.register<Copy>("saveBaseline") {
+    group = "tools"
+    description = "Copy the latest bench-results.json over bench-baseline.json."
+    from(layout.buildDirectory.file("bench-results.json"))
+    into(layout.projectDirectory)
+    rename { "bench-baseline.json" }
+}
+
 kotlin {
     jvmToolchain(24)
 }

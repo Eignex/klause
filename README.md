@@ -77,6 +77,15 @@ val cnf = BitBlaster.compile(compiled.problem)
 val text = cnf.toDimacs()
 ```
 
+## Bench loop
+
+`:klause-bench:run` writes machine-readable timings to
+`klause-bench/build/bench-results.json` alongside the existing stdout. If
+`klause-bench/bench-baseline.json` exists, each cell prints a `Δ%` vs
+baseline and the run exits non-zero when any cell regresses by more than
+`-Dklause.bench.regressionThresholdPct=N` (default 25%). Accept the current
+results as the new baseline with `:klause-bench:saveBaseline`.
+
 ## TODO
 
 - Maven Central publishing, CI.
