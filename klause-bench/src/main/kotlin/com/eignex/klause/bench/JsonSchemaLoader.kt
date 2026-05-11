@@ -4,13 +4,14 @@ import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.compile.Compiler
 import com.eignex.klause.solver.Problem
 import com.eignex.skema.SchemaDef
+import com.eignex.skema.schemaJsonConfig
 import kotlinx.serialization.json.Json
 
 /** Loads bundled JSON `SchemaDef<SchemaEntry>` instances from
  *  `klause-bench/src/main/resources/schema/`, compiling each via [Compiler]. */
 object JsonSchemaLoader {
 
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val json: Json = Json { schemaJsonConfig(); ignoreUnknownKeys = true }
 
     private val bundled: List<Bundled> = listOf(
         Bundled("campaign", expectedSat = true),

@@ -1,10 +1,10 @@
 {
     "entries": {
         "premium": {
-            "type": "bool"
+            "$type": "bool"
         },
         "type": {
-            "type": "nominal",
+            "$type": "nominal",
             "labels": [
                 "a",
                 "b",
@@ -12,44 +12,44 @@
             ]
         },
         "budget": {
-            "type": "int",
+            "$type": "int",
             "min": 100,
             "max": 1000
         },
         "capWhenA": {
-            "type": "constraint",
+            "$type": "constraint",
             "expr": {
-                "type": "imp",
+                "$type": "imp",
                 "left": {
-                    "type": "nomeq",
+                    "$type": "nomeq",
                     "name": "type",
                     "label": "a"
                 },
                 "right": {
-                    "type": "intcmp",
+                    "$type": "intcmp",
                     "left": {
-                        "type": "intref",
+                        "$type": "intref",
                         "name": "budget"
                     },
                     "op": "LE",
                     "right": {
-                        "type": "intlit",
+                        "$type": "intlit",
                         "value": 500
                     }
                 }
             }
         },
         "noPremForB": {
-            "type": "constraint",
+            "$type": "constraint",
             "expr": {
-                "type": "imp",
+                "$type": "imp",
                 "left": {
-                    "type": "nomeq",
+                    "$type": "nomeq",
                     "name": "type",
                     "label": "b"
                 },
                 "right": {
-                    "type": "ref",
+                    "$type": "ref",
                     "name": "premium",
                     "negated": true
                 }

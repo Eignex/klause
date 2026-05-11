@@ -6,6 +6,7 @@ import com.eignex.klause.ast.le
 import com.eignex.klause.ast.not
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.skema.SchemaDef
+import com.eignex.skema.schemaJsonConfig
 import kotlinx.serialization.json.Json
 
 /** Source of the bundled JSON instance — regenerate via `:klause-bench:dumpSchema`. */
@@ -19,6 +20,6 @@ private class CampaignSchema : VariableSchema() {
 
 fun main() {
     val schema = CampaignSchema()
-    val json = Json { prettyPrint = true; encodeDefaults = false }
+    val json = Json { schemaJsonConfig(); prettyPrint = true }
     println(json.encodeToString(SchemaDef.serializer(SchemaEntry.serializer()), schema.definition()))
 }

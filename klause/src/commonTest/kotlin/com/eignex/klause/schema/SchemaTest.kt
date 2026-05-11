@@ -8,7 +8,7 @@ import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.not
 import com.eignex.skema.SchemaDef
-import kotlinx.serialization.json.Json
+import com.eignex.skema.SchemaJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -40,10 +40,9 @@ class SchemaTest {
     fun `definition round trips through json`() {
         val schema = CampaignSchema()
         val def = schema.definition()
-        val json = Json { prettyPrint = false }
         val serializer = SchemaDef.serializer(SchemaEntry.serializer())
-        val encoded = json.encodeToString(serializer, def)
-        val decoded = json.decodeFromString(serializer, encoded)
+        val encoded = SchemaJson.encodeToString(serializer, def)
+        val decoded = SchemaJson.decodeFromString(serializer, encoded)
         assertEquals(def, decoded)
     }
 
