@@ -10,12 +10,13 @@ import kotlin.random.Random
 class SolverState(
     val problem: Problem,
     val rng: Random,
+    var assumptions: Assumptions = Assumptions.None,
 ) {
     val assignment: Assignment = Assignment(problem.numBoolVars, problem.numIntVars)
     val violated: IntSwapSet = IntSwapSet(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
-    val moveSink: MoveSink = MoveSink()
+    val moveSink: MoveSink = MoveSink(assumptions)
 
     /** Step counter incremented on every accepted move. Strategies use this together with
      *  [lastTouched] to enforce a tabu list. */
@@ -55,6 +56,13 @@ class SolverState(
 
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
+        // Overwrite the assumed slots so the assignment starts feasible w.r.t. the caller's pins.
+        for ((id, value) in assumptions.bools) {
+            if (assignment.boolValue(id) != value) assignment.flipBool(id)
+        }
+        for ((id, value) in assumptions.ints) {
+            assignment.setInt(id, value)
+        }
         for (i in lastTouched.indices) lastTouched[i] = 0L
         for (i in boolConfChange.indices) boolConfChange[i] = true
         for (i in intConfChange.indices) intConfChange[i] = true

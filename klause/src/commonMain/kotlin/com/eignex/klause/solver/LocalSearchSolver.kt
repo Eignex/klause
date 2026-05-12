@@ -65,8 +65,9 @@ class LocalSearchSolver(
         val maxFlips = params.maxFlips
         val minHammingDistance = params.minHammingDistance
         val recentWindow = params.recentWindow
+        val assumptions = params.assumptions
         return sequence {
-            val state = SolverState(problem, Random(seed))
+            val state = SolverState(problem, Random(seed), assumptions)
             val window = ArrayDeque<Sample>()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
@@ -125,7 +126,7 @@ class LocalSearchSolver(
                 "count ($totalBits)"
         }
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = SolverState(problem, Random(seed))
+        val state = SolverState(problem, Random(seed), params.assumptions)
         // No bestSample yet — first restart is always full random.
         restartPolicy.restart(state, bestSoFar = null)
 
@@ -191,6 +192,7 @@ class LocalSearchSolver(
         var bestMove: Move? = null
 
         for (b in 0 until problem.numBoolVars) {
+            if (state.assumptions.isFrozenBool(b)) continue
             state.apply(Move.BoolFlip(b))
             if (state.cost == 0) {
                 val obj = objective.evaluate(state.assignment.snapshot())
@@ -204,6 +206,7 @@ class LocalSearchSolver(
         }
 
         for (i in 0 until problem.numIntVars) {
+            if (state.assumptions.isFrozenInt(i)) continue
             val cur = state.assignment.intValue(i)
             val d = problem.intDomains[i]
             for (target in intArrayOf(cur - 1, cur + 1)) {

@@ -16,4 +16,8 @@ data class LocalSearchParams(
     val randomSeed: Long? = null,
     val minHammingDistance: Int = 1,
     val recentWindow: Int = 16,
+    /** Variables to pin for the duration of this call. The solver initialises them to
+     *  the requested values on every restart and ignores any move that would change
+     *  them. Defaults to none. */
+    val assumptions: Assumptions = Assumptions.None,
 ) : SolverParams
