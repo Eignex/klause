@@ -136,6 +136,10 @@ class LocalSearchSolver(
         var totalFlips = 0L
         val maxFlips = params.maxFlips
 
+        // Each restart counts as one unit of work against [maxFlips]. Otherwise a
+        // degenerate objective (e.g. all-zero) on a constraint-free problem would
+        // produce an infinite loop: cost stays at 0, greedy descent never improves,
+        // and the restart path otherwise wouldn't bump [totalFlips].
         while (totalFlips < maxFlips) {
             if (state.cost == 0) {
                 // Score the current feasible assignment, record if best.
@@ -155,17 +159,20 @@ class LocalSearchSolver(
                 // Local minimum on the objective — restart and try a different basin.
                 restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
+                totalFlips++
                 continue
             }
             if (restartPolicy.shouldRestart(flipsSinceRestart)) {
                 restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
+                totalFlips++
                 continue
             }
             val move = strategy.pickMove(state)
             if (move == null) {
                 restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
+                totalFlips++
                 continue
             }
             state.apply(move)
