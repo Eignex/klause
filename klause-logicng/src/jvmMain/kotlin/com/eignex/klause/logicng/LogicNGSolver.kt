@@ -14,6 +14,7 @@ import org.logicng.formulas.Literal
 import org.logicng.solvers.MiniSat
 import org.logicng.solvers.SATSolver
 import org.logicng.datastructures.Assignment as LogicNGAssignment
+import kotlin.random.Random
 
 /**
  * [Solver] backed by LogicNG's MiniSat. The problem is bit-blasted to CNF once via
@@ -42,16 +43,50 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
         }
     }
 
+    /**
+     * Independent random samples. Raw MiniSat with default config is deterministic, so
+     * each yield pre-pins a random subset of CNF variables to random polarities, solves,
+     * and decodes. Different pin subsets produce different models. If the random pins
+     * happen to make the formula Unsat (rare for under-constrained problems), retry with
+     * a fresh random subset; after several consecutive failures, fall back to an
+     * unpinned solve so the contract isn't violated by a hostile pin set.
+     */
     override fun samples(params: LogicNGParams): Sequence<Sample> = sequence {
+        val rng = Random(params.randomSeed ?: System.nanoTime())
         var attempts = 0L
         val deadline = params.timeoutMillis?.let { System.currentTimeMillis() + it }
         while (attempts < params.maxModels) {
             if (deadline != null && System.currentTimeMillis() > deadline) break
-            val (_, satSolver) = buildSolver()
-            if (satSolver.sat() != Tristate.TRUE) break
-            yield(decode(satSolver.model()))
+            val sample = drawDiverseSample(rng)
+            if (sample == null) break
+            yield(sample)
             attempts++
         }
+    }
+
+    /**
+     * Pin a random subset of CNF vars and solve. Returns the resulting model, or null
+     * when even the unpinned solve fails (problem is Unsat or solver returned Unknown).
+     */
+    private fun drawDiverseSample(rng: Random): Sample? {
+        val pinCount = minOf(cnf.numVars / 2, RANDOM_PIN_COUNT_CAP)
+        repeat(RANDOM_PIN_RETRIES) {
+            val (factory, satSolver) = buildSolver()
+            if (pinCount > 0) {
+                val cnfVars = (0 until cnf.numVars).toMutableList().apply { shuffle(rng) }
+                for (i in 0 until pinCount) {
+                    val v = cnfVars[i]
+                    val polarity = rng.nextBoolean()
+                    satSolver.add(factory.literal(varName(v), polarity))
+                }
+            }
+            if (satSolver.sat() == Tristate.TRUE) return decode(satSolver.model())
+            // Pinned subset turned the problem Unsat — retry with a different random subset.
+        }
+        // Last resort: unpinned solve. Preserves the contract for over-constrained instances
+        // where random pins keep colliding.
+        val (_, satSolver) = buildSolver()
+        return if (satSolver.sat() == Tristate.TRUE) decode(satSolver.model()) else null
     }
 
     override fun enumerate(params: LogicNGParams): Sequence<Sample> = sequence {
@@ -85,6 +120,15 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
             solver.add(clauseToFormula(clauseLits, factory))
         }
         return factory to solver
+    }
+
+    private companion object {
+        /** Cap on the random-pin subset size used by [samples]. Larger → more diversity
+         *  but more retries when pins induce Unsat. 8 is a reasonable balance for the
+         *  small-to-medium SAT instances combo's bandit hits. */
+        const val RANDOM_PIN_COUNT_CAP: Int = 8
+        /** Retries on an Unsat-from-random-pins hit before falling back to an unpinned solve. */
+        const val RANDOM_PIN_RETRIES: Int = 5
     }
 
     private fun clauseToFormula(clauseLits: IntArray, factory: FormulaFactory): Formula {

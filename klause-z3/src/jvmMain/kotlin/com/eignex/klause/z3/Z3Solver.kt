@@ -108,29 +108,86 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         }
     }
 
+    /**
+     * Independent random samples. Z3 honours `random_seed` for branching tie-breaking but
+     * its default phase selection produces the same model across calls on most
+     * satisfiable instances. To get genuine diversity each yield pre-pins a random
+     * subset of klause vars (a mix of bools and int-domain points) before invoking the
+     * solver. Different pin subsets produce different models. Falls back to an unpinned
+     * solve when random pins induce Unsat.
+     */
     override fun samples(params: Z3Params): Sequence<Sample> = sequence {
+        val rng = kotlin.random.Random(params.randomSeed ?: System.nanoTime())
         var attempts = 0L
-        var seed = params.randomSeed ?: 0L
         val deadline = params.timeoutMillis?.let { System.currentTimeMillis() + it }
         while (attempts < params.maxModels) {
             if (deadline != null && System.currentTimeMillis() > deadline) break
-            val ctx = newContext(params.copy(randomSeed = seed))
-            var producedSample: Sample? = null
+            val sample = drawDiverseSample(params, rng) ?: break
+            yield(sample)
+            attempts++
+        }
+    }
+
+    /** Pin a random subset of vars and solve; retry with fresh pins on Unsat. */
+    private fun drawDiverseSample(params: Z3Params, rng: kotlin.random.Random): Sample? {
+        repeat(RANDOM_PIN_RETRIES) {
+            val ctx = newContext(params.copy(randomSeed = rng.nextLong()))
             try {
                 val (encoding, constraints) = Z3Translator.translate(problem, ctx)
                 val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
                 for (c in constraints) solver.add(c)
+                addRandomPins(ctx, encoding, solver, rng)
                 if (solver.check() == Status.SATISFIABLE) {
-                    producedSample = decode(solver.model, encoding)
+                    return decode(solver.model, encoding)
                 }
             } finally {
                 ctx.close()
             }
-            if (producedSample == null) break
-            yield(producedSample)
-            attempts++
-            seed++
         }
+        // Fallback: no pins, deterministic Z3 result. Keeps the contract honest.
+        val ctx = newContext(params)
+        try {
+            val (encoding, constraints) = Z3Translator.translate(problem, ctx)
+            val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
+            for (c in constraints) solver.add(c)
+            return if (solver.check() == Status.SATISFIABLE) decode(solver.model, encoding) else null
+        } finally {
+            ctx.close()
+        }
+    }
+
+    /** Add up to [RANDOM_PIN_COUNT_CAP] random unit constraints — bools to random
+     *  polarities, ints to random values within their domain. */
+    private fun addRandomPins(
+        ctx: Context,
+        encoding: Z3Encoding,
+        solver: Z3LibSolver,
+        rng: kotlin.random.Random,
+    ) {
+        val pinBools = minOf(encoding.boolExprs.size, RANDOM_PIN_COUNT_CAP / 2)
+        val pinInts = minOf(encoding.intExprs.size, RANDOM_PIN_COUNT_CAP - pinBools)
+        if (pinBools > 0) {
+            val boolIds = (0 until encoding.boolExprs.size).toMutableList().apply { shuffle(rng) }
+            for (i in 0 until pinBools) {
+                val v = boolIds[i]
+                val polarity = rng.nextBoolean()
+                solver.add(if (polarity) encoding.boolExprs[v] else ctx.mkNot(encoding.boolExprs[v]))
+            }
+        }
+        if (pinInts > 0) {
+            val intIds = (0 until encoding.intExprs.size).toMutableList().apply { shuffle(rng) }
+            for (i in 0 until pinInts) {
+                val v = intIds[i]
+                val d = problem.intDomains[v]
+                val pick = d.min + rng.nextInt(d.size)
+                solver.add(ctx.mkEq(encoding.intExprs[v], ctx.mkInt(pick)))
+            }
+        }
+    }
+
+    private companion object {
+        const val RANDOM_PIN_COUNT_CAP: Int = 8
+        const val RANDOM_PIN_RETRIES: Int = 5
     }
 
     override fun enumerate(params: Z3Params): Sequence<Sample> = sequence {
