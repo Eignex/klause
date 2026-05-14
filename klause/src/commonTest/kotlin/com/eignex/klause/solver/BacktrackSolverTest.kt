@@ -144,8 +144,8 @@ class BacktrackSolverTest {
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = emptyList(),  // 4 models total
         )
-        val models = BacktrackSolver(p).samples(BacktrackParams(randomSeed = 0L)).toList()
-        assertEquals(4, models.size)
-        assertEquals(4, models.toSet().size, "DFS enumerates each model once")
+        val models = BacktrackSolver(p).samples(BacktrackParams(randomSeed = 0L)).take(80).toList()
+        assertEquals(80, models.size, "samples is infinite for feasible problems; take(80) drains exactly 80")
+        assertEquals(4, models.toSet().size, "All 4 distinct models should be sampled with replacement")
     }
 }

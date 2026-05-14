@@ -34,6 +34,7 @@ class JsonSchemaTest {
         assertEquals(3, compiled.problem.numBoolVars, "nominal expands to 3 indicators")
         assertEquals(1, compiled.problem.numIntVars)
         // CompiledProblem retains the var/indicator maps for decoding samples.
-        assertTrue(compiled.boolVarIdByName.isNotEmpty())
+        assertEquals(setOf("a", "b", "c"), compiled.nominalIndicators["type"]?.keys)
+        assertTrue("budget" in compiled.intVarIdByName)
     }
 }
