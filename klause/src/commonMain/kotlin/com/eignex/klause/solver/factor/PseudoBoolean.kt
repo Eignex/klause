@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.PbOp
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -16,7 +16,7 @@ class PseudoBoolean(
     val literals: IntArray,
     val op: PbOp,
     val bound: Int,
-) : Factor {
+) : LocalSearchFactor {
 
     init {
         require(weights.size == literals.size) { "weights/literals length mismatch" }

@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -15,7 +15,7 @@ import com.eignex.klause.solver.localsearch.SolverState
 class Xor(
     val literals: IntArray,
     val targetParity: Int,
-) : Factor {
+) : LocalSearchFactor {
 
     init {
         require(literals.isNotEmpty()) { "Xor needs at least one literal" }

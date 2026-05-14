@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.SolverState
@@ -20,7 +20,7 @@ class Linear(
     val vars: IntArray,
     val op: LinearOp,
     val bound: Int,
-) : Factor {
+) : LocalSearchFactor {
 
     init {
         require(coeffs.size == vars.size) { "coeffs/vars length mismatch" }

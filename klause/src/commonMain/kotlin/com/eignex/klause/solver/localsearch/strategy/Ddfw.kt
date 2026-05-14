@@ -39,7 +39,7 @@ class Ddfw(
             lastUpdateStep = state.step
         }
         val factorId = state.violated.random(state.rng)
-        val factor = state.problem.factors[factorId]
+        val factor = state.factors[factorId]
         state.moveSink.clear()
         factor.proposeRepairMoves(state, factorId, state.moveSink)
         val raw = state.moveSink.list
@@ -70,7 +70,7 @@ class Ddfw(
             is Move.BoolFlip -> {
                 var sum = 0.0
                 for (fid in state.problem.boolOccurrences[move.varId]) {
-                    val f = state.problem.factors[fid]
+                    val f = state.factors[fid]
                     if (f.deltaIfBoolFlipped(state, fid, move.varId) > 0) sum += w[fid]
                 }
                 sum
@@ -78,7 +78,7 @@ class Ddfw(
             is Move.IntSet -> {
                 var sum = 0.0
                 for (fid in state.problem.intOccurrences[move.varId]) {
-                    val f = state.problem.factors[fid]
+                    val f = state.factors[fid]
                     if (f.deltaIfIntSet(state, fid, move.varId, move.newValue) > 0) sum += w[fid]
                 }
                 sum

@@ -1,63 +1,31 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.localsearch.SolverState
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
- * Immutable constraint metadata. Mutable per-factor scratch lives in the [SolverState]
- * payload arrays. Variables touched by a factor split into two id spaces: Boolean vars in
- * [boolVars] and integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty;
- * pure-integer factors leave [boolVars] empty; reified or mixed factors populate both.
+ * Constraint metadata for [Problem]. Variables touched by a factor split into two id
+ * spaces: Boolean vars in [boolVars] and integer vars in [intVars]. Pure-Boolean factors
+ * leave [intVars] empty; pure-integer factors leave [boolVars] empty; reified or mixed
+ * factors populate both.
  *
- * Every factor is hard: a violation adds 1 to [SolverState.cost]. Per-factor weights
- * usable by weight-modulating strategies (e.g. SAPS) live mutably on
- * [SolverState.factorWeights] rather than on the factor itself.
+ * This base contract carries only what every solver backend needs: the var sets and the
+ * deductive [propagate] hook (default: no-op). Factors that participate in local search
+ * additionally implement [com.eignex.klause.solver.localsearch.LocalSearchFactor], which
+ * adds the `initialize` / `isViolated` / `applyBoolFlip` / `applyIntSet` / `deltaIf*` /
+ * `proposeRepairMoves` hooks the LS engine drives.
+ *
+ * Every factor in klause today implements `LocalSearchFactor`. A factor that only
+ * propagates (no LS support) is possible but unusual; documenting the split makes
+ * propagation-only constraint kinds (e.g. expensive global constraints) safe to add.
  */
 interface Factor {
     val boolVars: IntArray
     val intVars: IntArray
 
-    /** Build this factor's payload from the current assignment. Called once per restart. */
-    fun initialize(state: SolverState, factorId: Int)
-
-    fun isViolated(state: SolverState, factorId: Int): Boolean
-
     /**
-     * Δ in this factor's violation status if the given move were applied, computed without
-     * mutating state. +1 means a satisfied factor would become violated, -1 the opposite.
-     * Default returns 0; factors override the methods relevant to the move kinds they handle.
-     */
-    fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int = 0
-    fun deltaIfIntSet(state: SolverState, factorId: Int, intVar: Int, newValue: Int): Int = 0
-
-    /**
-     * Apply a committed move to this factor's payload. The assignment has already been
-     * updated, so factors compare current values against the saved [oldValue] (for int sets)
-     * or recover the pre-flip value by inversion. Returns the same delta the deltaIf* method
-     * would have returned before the move.
-     */
-    fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int = 0
-    fun applyIntSet(state: SolverState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
-
-    /**
-     * Suggest moves that would (or might) repair this factor when violated. The default lists
-     * a Boolean flip per [boolVars] member plus an `IntSet(±1)` per [intVars] member. Factors
-     * with structural insight (e.g. a comparator can snap to its bound) override this.
-     */
-    fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
-        for (b in boolVars) sink.addBoolFlip(b)
-        for (i in intVars) {
-            val cur = state.assignment.intValue(i)
-            val d = state.problem.intDomains[i]
-            if (cur < d.max) sink.addIntSet(i, cur + 1)
-            if (cur > d.min) sink.addIntSet(i, cur - 1)
-        }
-    }
-
-    /**
-     * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything this
-     * factor implies; return `false` iff a contradiction is derived. Default is a no-op — sound
-     * but trivial. Factors override to participate in [Problem.propagate].
+     * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
+     * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
+     * — sound but trivial. Factors override to participate in [Problem.propagate].
      */
     fun propagate(state: PropagationState, factorId: Int): Boolean = true
 }

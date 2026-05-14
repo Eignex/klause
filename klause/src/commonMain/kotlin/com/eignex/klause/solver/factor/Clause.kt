@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -20,7 +20,7 @@ import com.eignex.klause.solver.localsearch.SolverState
  */
 class Clause(
     val literals: IntArray,
-) : Factor {
+) : LocalSearchFactor {
 
     init { require(literals.isNotEmpty()) { "Clause must have at least one literal" } }
 

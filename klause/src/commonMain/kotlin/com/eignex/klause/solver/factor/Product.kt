@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -19,7 +19,7 @@ class Product(
     val a: Int,
     val b: Int,
     val result: Int,
-) : Factor {
+) : LocalSearchFactor {
 
     override val boolVars: IntArray = EMPTY
     override val intVars: IntArray = intArrayOf(a, b, result)

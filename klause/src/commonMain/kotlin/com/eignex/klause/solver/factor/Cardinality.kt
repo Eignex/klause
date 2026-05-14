@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -14,7 +14,7 @@ class Cardinality(
     val literals: IntArray,
     val min: Int,
     val max: Int,
-) : Factor {
+) : LocalSearchFactor {
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }

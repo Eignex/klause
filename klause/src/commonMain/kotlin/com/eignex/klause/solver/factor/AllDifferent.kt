@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.SolverState
@@ -18,7 +18,7 @@ class AllDifferent(
     val vars: IntArray,
     val domainMin: Int,
     val domainSize: Int,
-) : Factor {
+) : LocalSearchFactor {
 
     init {
         require(vars.size >= 2) { "AllDifferent needs at least two variables" }

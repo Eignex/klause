@@ -1,10 +1,8 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.localsearch.SolverState
 
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.Problem
@@ -25,6 +23,16 @@ class SolverState(
     val intPayload: IntArray = IntArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
     val moveSink: MoveSink = MoveSink(assumptions)
+
+    /**
+     * LS-cast view over [Problem.factors]. Every factor used by [LocalSearchSolver] must
+     * implement [LocalSearchFactor]; this array is the pre-checked cast so factor-method
+     * call sites avoid `as LocalSearchFactor` noise. Throws [ClassCastException] at
+     * construction if any factor is propagation-only.
+     */
+    val factors: Array<LocalSearchFactor> = Array(problem.numFactors) {
+        problem.factors[it] as LocalSearchFactor
+    }
 
     /** Step counter incremented on every accepted move. Strategies use this together with
      *  [lastTouched] to enforce a tabu list. */
@@ -82,7 +90,7 @@ class SolverState(
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0
         for (v in boolBreakValid.indices) boolBreakValid[v] = false
-        problem.factors.forEachIndexed { id, factor ->
+        factors.forEachIndexed { id, factor ->
             factor.initialize(this, id)
             if (factor.isViolated(this, id)) {
                 violated.add(id)
@@ -110,7 +118,7 @@ class SolverState(
             } else {
                 var count = 0
                 for (factorId in problem.boolOccurrences[v]) {
-                    val f = problem.factors[factorId]
+                    val f = factors[factorId]
                     if (f.deltaIfBoolFlipped(this, factorId, v) > 0) count++
                 }
                 boolBreakCache[v] = count
@@ -121,7 +129,7 @@ class SolverState(
         is Move.IntSet -> {
             var count = 0
             for (factorId in problem.intOccurrences[move.varId]) {
-                val f = problem.factors[factorId]
+                val f = factors[factorId]
                 if (f.deltaIfIntSet(this, factorId, move.varId, move.newValue) > 0) count++
             }
             count
@@ -132,7 +140,7 @@ class SolverState(
         assignment.flipBool(boolVar)
         val touchedFactors = problem.boolOccurrences[boolVar]
         for (factorId in touchedFactors) {
-            val factor = problem.factors[factorId]
+            val factor = factors[factorId]
             updateViolation(factor, factorId, factor.applyBoolFlip(this, factorId, boolVar))
         }
         invalidateBoolBreakNeighbourhood(touchedFactors)
@@ -148,7 +156,7 @@ class SolverState(
         assignment.setInt(intVar, newValue)
         val touchedFactors = problem.intOccurrences[intVar]
         for (factorId in touchedFactors) {
-            val factor = problem.factors[factorId]
+            val factor = factors[factorId]
             updateViolation(factor, factorId, factor.applyIntSet(this, factorId, intVar, old))
         }
         invalidateBoolBreakNeighbourhood(touchedFactors)
@@ -160,14 +168,14 @@ class SolverState(
 
     private fun invalidateBoolBreakNeighbourhood(factorIds: IntArray) {
         for (factorId in factorIds) {
-            val f = problem.factors[factorId]
+            val f = factors[factorId]
             for (v in f.boolVars) boolBreakValid[v] = false
         }
     }
 
     private fun markNeighborConfChange(factorIds: IntArray) {
         for (factorId in factorIds) {
-            val f = problem.factors[factorId]
+            val f = factors[factorId]
             for (v in f.boolVars) boolConfChange[v] = true
             for (v in f.intVars) intConfChange[v] = true
         }
@@ -185,7 +193,7 @@ class SolverState(
         return step - touched < tenure
     }
 
-    private fun updateViolation(@Suppress("UNUSED_PARAMETER") factor: Factor, factorId: Int, deltaViolated: Int) {
+    private fun updateViolation(@Suppress("UNUSED_PARAMETER") factor: LocalSearchFactor, factorId: Int, deltaViolated: Int) {
         when (deltaViolated) {
             +1 -> {
                 violated.add(factorId)

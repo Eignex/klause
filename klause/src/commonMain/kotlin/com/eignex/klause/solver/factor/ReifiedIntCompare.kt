@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.IntCmpOp
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.SolverState
@@ -16,7 +16,7 @@ class ReifiedIntCompare(
     val intVar: Int,
     val op: IntCmpOp,
     val bound: Int,
-) : Factor {
+) : LocalSearchFactor {
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
     override val intVars: IntArray = intArrayOf(intVar)

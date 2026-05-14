@@ -20,7 +20,7 @@ class WalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
     override fun pickMove(state: SolverState): Move? {
         if (state.violated.isEmpty()) return null
         val factorId = state.violated.random(state.rng)
-        val factor = state.problem.factors[factorId]
+        val factor = state.factors[factorId]
         state.moveSink.clear()
         factor.proposeRepairMoves(state, factorId, state.moveSink)
         val raw = state.moveSink.list
