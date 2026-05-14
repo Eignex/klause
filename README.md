@@ -89,3 +89,10 @@ results as the new baseline with `:klause-bench:saveBaseline`.
 ## TODO
 
 - Maven Central publishing, CI.
+- Propagation: `Product` reverse direction (currently forward-only — destabilized worklist in bit-blasted division tests).
+- Propagation: full Hall-set / matching arc consistency in `AllDifferent` (currently pigeonhole + boundary shaving only).
+- Propagation: EQ-negation in `ReifiedLinear` / `ReifiedPseudoBoolean` (no clean interval form; `aux=false` on EQ is currently a no-op).
+- Propagation: conflict-set minimisation (1-UIP / proper conflict analysis). Current sets are union-of-factor-vars — sound but non-minimal.
+- `LogicNGSampler` does not implement `Optimizer` (real top-k via incremental CDCL with PB optimum constraints is future work).
+- klause-bench microbenchmark for the propagation-heavy / pinned-bool regime.
+- `PropagationSession` does a full re-propagation on every push/pop. Incremental (snapshot-based pop, dirty-only push) is a known follow-up; first attempt hung during initial-bake propagation — needs careful audit of factor-level idempotence under the new bitmap layout.
