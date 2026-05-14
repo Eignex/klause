@@ -56,66 +56,6 @@ class Problem(
      * This is the same routine the solver uses internally at init and at every sample / solve
      * call that carries non-empty assumptions.
      */
-    /**
-     * Best-effort conflict-set minimisation: when [assumptions] is jointly infeasible, drops
-     * each member in turn and re-propagates without it. Members whose removal still yields
-     * Unsat were non-essential. Worst case `O(|conflict| × propagate)`. Off by default —
-     * callers that care about minimal cores (conflict-directed backjumping in a bandit's
-     * greedy descent, for instance) pass `minimizeConflict = true`.
-     */
-    fun propagate(
-        assumptions: Assumptions,
-        minimizeConflict: Boolean,
-    ): PropagationResult {
-        val first = propagate(assumptions)
-        if (!minimizeConflict || first !is PropagationResult.Unsat) return first
-        return minimiseConflict(assumptions, first)
-    }
-
-    private fun minimiseConflict(
-        assumptions: Assumptions,
-        seed: PropagationResult.Unsat,
-    ): PropagationResult.Unsat {
-        var bools = seed.conflictBools.toMutableSet()
-        var ints = seed.conflictInts.toMutableSet()
-        // Sweep bools.
-        val boolsSnapshot = bools.toList()
-        for (b in boolsSnapshot) {
-            if (b !in bools) continue
-            val trial = buildAssumptions(assumptions, bools - b, ints)
-            val r = propagate(trial)
-            if (r is PropagationResult.Unsat) {
-                bools.remove(b)
-                // Tighten the conflict to whatever the deeper propagate returned (it may
-                // already exclude more members than just `b`).
-                bools = bools.intersect(r.conflictBools).toMutableSet()
-                ints = ints.intersect(r.conflictInts).toMutableSet()
-            }
-        }
-        val intsSnapshot = ints.toList()
-        for (i in intsSnapshot) {
-            if (i !in ints) continue
-            val trial = buildAssumptions(assumptions, bools, ints - i)
-            val r = propagate(trial)
-            if (r is PropagationResult.Unsat) {
-                ints.remove(i)
-                bools = bools.intersect(r.conflictBools).toMutableSet()
-                ints = ints.intersect(r.conflictInts).toMutableSet()
-            }
-        }
-        return PropagationResult.Unsat(bools, ints)
-    }
-
-    /** Restrict [base] to only the variables in [keepBools] / [keepInts]. */
-    private fun buildAssumptions(
-        base: Assumptions,
-        keepBools: Set<Int>,
-        keepInts: Set<Int>,
-    ): Assumptions = Assumptions(
-        bools = base.bools.filterKeys { it in keepBools },
-        ints = base.ints.filterKeys { it in keepInts },
-    )
-
     fun propagate(assumptions: Assumptions = Assumptions.None): PropagationResult {
         val state = PropagationState(this, assumptions)
         if (!state.seeded) {
