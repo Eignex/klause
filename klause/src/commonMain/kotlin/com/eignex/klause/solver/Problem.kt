@@ -58,7 +58,12 @@ class Problem(
      */
     fun propagate(assumptions: Assumptions = Assumptions.None): PropagationResult {
         val state = PropagationState(this, assumptions)
-        if (!state.seeded) return PropagationResult.Unsat
+        if (!state.seeded) {
+            return PropagationResult.Unsat(
+                state.extractConflictBools(state.conflictReason),
+                state.extractConflictInts(state.conflictReason),
+            )
+        }
 
         // Initial worklist: every factor (the seeded vars may not cover everything, and the
         // baked-once-at-init pass needs all of them anyway).
@@ -69,7 +74,16 @@ class Problem(
         while (queue.isNotEmpty()) {
             val fid = queue.removeFirst()
             pending[fid] = false
-            if (!factors[fid].propagate(state, fid)) return PropagationResult.Unsat
+            val f = factors[fid]
+            state.currentReason = state.reasonForVars(f.boolVars, f.intVars)
+            state.conflictReason = null
+            if (!f.propagate(state, fid)) {
+                val r = state.conflictReason ?: state.currentReason
+                return PropagationResult.Unsat(
+                    state.extractConflictBools(r),
+                    state.extractConflictInts(r),
+                )
+            }
 
             // Drain whatever the factor dirtied; enqueue every other factor touching those vars.
             while (true) {

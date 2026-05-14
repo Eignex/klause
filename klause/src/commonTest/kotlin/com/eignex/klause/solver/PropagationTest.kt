@@ -16,6 +16,7 @@ import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -62,7 +63,7 @@ class PropagationTest {
         // (!x0 v x1) plus assumption x0=true, x1=false → unit-prop forces x1=true, contradiction
         val p = boolProblem(2, intArrayOf(lit(0, false), lit(1, true)))
         val r = p.propagate(Assumptions(bools = mapOf(0 to true, 1 to false)))
-        assertSame(PropagationResult.Unsat, r)
+        assertIs<PropagationResult.Unsat>(r)
     }
 
     @Test
@@ -73,7 +74,7 @@ class PropagationTest {
             intArrayOf(lit(0, true)),
             intArrayOf(lit(0, false)),
         )
-        assertSame(PropagationResult.Unsat, p.propagate())
+        assertIs<PropagationResult.Unsat>(p.propagate())
     }
 
     @Test
@@ -101,7 +102,7 @@ class PropagationTest {
         // (x0 v x1) with x0=false, x1=false → empty clause, Unsat
         val p = boolProblem(2, intArrayOf(lit(0, true), lit(1, true)))
         val r = p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false)))
-        assertSame(PropagationResult.Unsat, r)
+        assertIs<PropagationResult.Unsat>(r)
     }
 
     @Test
@@ -122,7 +123,7 @@ class PropagationTest {
     @Test
     fun `IntEq with out-of-domain value is Unsat`() {
         val p = Problem(0, 1, arrayOf(IntDomain(0, 5)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 9)))
-        assertSame(PropagationResult.Unsat, p.propagate())
+        assertIs<PropagationResult.Unsat>(p.propagate())
     }
 
     @Test
@@ -135,7 +136,7 @@ class PropagationTest {
     @Test
     fun `conflicting IntLeq plus IntGeq is Unsat`() {
         val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2), Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)))
-        assertSame(PropagationResult.Unsat, p.propagate())
+        assertIs<PropagationResult.Unsat>(p.propagate())
     }
 
     @Test
@@ -149,7 +150,7 @@ class PropagationTest {
     @Test
     fun `IntNeq on singleton domain is Unsat`() {
         val p = Problem(0, 1, arrayOf(IntDomain(7, 7)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 7)))
-        assertSame(PropagationResult.Unsat, p.propagate())
+        assertIs<PropagationResult.Unsat>(p.propagate())
     }
 
     @Test
@@ -196,7 +197,7 @@ class PropagationTest {
                 min = 0, max = 1,
             )),
         )
-        assertSame(PropagationResult.Unsat, p.propagate(Assumptions(bools = mapOf(0 to true, 1 to true))))
+        assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(0 to true, 1 to true))))
     }
 
     @Test
@@ -232,7 +233,7 @@ class PropagationTest {
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
             factors = listOf(ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, 10)),
         )
-        assertSame(PropagationResult.Unsat, p.propagate(Assumptions(bools = mapOf(0 to true))))
+        assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(0 to true))))
     }
 
     @Test
@@ -283,7 +284,7 @@ class PropagationTest {
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
             factors = listOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.GE, 100)),
         )
-        assertSame(PropagationResult.Unsat, p.propagate())
+        assertIs<PropagationResult.Unsat>(p.propagate())
     }
 
     @Test
@@ -335,7 +336,7 @@ class PropagationTest {
                 op = PbOp.GE, bound = 5,
             )),
         )
-        assertSame(PropagationResult.Unsat, p.propagate(Assumptions(bools = mapOf(1 to false))))
+        assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(1 to false))))
     }
 
     @Test
@@ -371,7 +372,7 @@ class PropagationTest {
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = listOf(Xor(intArrayOf(lit(0, true), lit(1, true)), targetParity = 1)),
         )
-        assertSame(PropagationResult.Unsat, p.propagate(Assumptions(bools = mapOf(0 to true, 1 to true))))
+        assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(0 to true, 1 to true))))
     }
 
     @Test
@@ -465,10 +466,7 @@ class PropagationTest {
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 10)),
         )
-        assertSame(
-            PropagationResult.Unsat,
-            p.propagate(Assumptions(ints = mapOf(0 to 5, 1 to 5))),
-        )
+        assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(ints = mapOf(0 to 5, 1 to 5))))
     }
 
     @Test
@@ -479,7 +477,7 @@ class PropagationTest {
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
             factors = listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)),
         )
-        assertSame(PropagationResult.Unsat, p.propagate())
+        assertIs<PropagationResult.Unsat>(p.propagate())
     }
 
     @Test
