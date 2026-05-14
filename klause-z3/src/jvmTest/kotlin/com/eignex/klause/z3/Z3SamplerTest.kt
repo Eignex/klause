@@ -11,9 +11,6 @@ import com.eignex.klause.solver.SolverState
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntEq
-import com.eignex.klause.solver.factor.IntGeq
-import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import kotlin.random.Random
@@ -122,9 +119,9 @@ class Z3SamplerTest {
             Problem(numBoolVars = 0, numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
                 factors = listOf(
-                    Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, bound = 4),
-                    IntGeq(intVar = 0, bound = 1),
-                    IntLeq(intVar = 1, bound = 2),
+                    Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, 4),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                    Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
                 ),
             ),
         ),
@@ -145,8 +142,8 @@ class Z3SamplerTest {
         ),
         Case("intEqContradiction",
             Problem(numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)), factors = listOf(
-                IntEq(intVar = 0, value = 1),
-                IntEq(intVar = 0, value = 3),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
             )),
         ),
         Case("pigeonhole",

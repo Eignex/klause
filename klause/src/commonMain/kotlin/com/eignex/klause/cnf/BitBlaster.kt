@@ -4,10 +4,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntEq
-import com.eignex.klause.solver.factor.IntGeq
-import com.eignex.klause.solver.factor.IntLeq
-import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
@@ -28,9 +24,9 @@ import com.eignex.klause.ast.PbOp
  * `constantLeq` domain constraint is emitted when the domain size is not a power of two.
  *
  * Supported factor types: [Clause], [Cardinality] (only AtMostOne / AtLeastOne / ExactlyOne;
- * higher-k cardinality bounds raise), [IntLeq], [IntGeq], [IntEq], [IntNeq], [Linear],
- * [ReifiedIntCompare]. Out-of-domain `IntEq`/`IntNeq` constants are short-circuited at compile
- * time to a true/false unit clause.
+ * higher-k cardinality bounds raise), [Linear] (all four ops including NE),
+ * [ReifiedIntCompare]. Out-of-domain `Linear` constants are short-circuited at compile time
+ * to a true/false unit clause via [emitLinear].
  */
 object BitBlaster {
 
@@ -59,31 +55,7 @@ object BitBlaster {
             when (factor) {
                 is Clause -> emitClause(b, factor.literals, boolMap)
                 is Cardinality -> emitCardinality(b, factor, boolMap)
-                is IntLeq -> {
-                    val offset = factor.bound - intMin[factor.intVar]
-                    b.addClause(intArrayOf(b.constantLeq(bitsToLits(intBits[factor.intVar]), offset)))
-                }
-                is IntGeq -> {
-                    val offset = factor.bound - intMin[factor.intVar]
-                    b.addClause(intArrayOf(b.constantGeq(bitsToLits(intBits[factor.intVar]), offset)))
-                }
-                is IntEq -> {
-                    val d = problem.intDomains[factor.intVar]
-                    if (factor.value !in d) {
-                        b.addClause(IntArray(0))
-                    } else {
-                        b.addClause(intArrayOf(b.constantEq(bitsToLits(intBits[factor.intVar]), factor.value - intMin[factor.intVar])))
-                    }
-                }
-                is IntNeq -> {
-                    val d = problem.intDomains[factor.intVar]
-                    if (factor.value !in d) {
-                        // trivially true; nothing to emit
-                    } else {
-                        b.addClause(intArrayOf(b.constantNeq(bitsToLits(intBits[factor.intVar]), factor.value - intMin[factor.intVar])))
-                    }
-                }
-                is Linear -> emitLinear(b, factor, intBits, intMin)
+                is Linear -> emitLinear(b, factor, intBits, intMin, problem)
                 is Product -> emitProduct(b, factor, intBits, intMin, problem)
                 is PseudoBoolean -> emitPseudoBoolean(b, factor, boolMap)
                 is ReifiedIntCompare -> emitReifiedIntCompare(b, factor, boolMap, intBits, intMin)
@@ -325,7 +297,19 @@ object BitBlaster {
         return out
     }
 
-    private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray) {
+    private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray, problem: Problem) {
+        // Short-circuit single-var equality / disequality against an out-of-domain constant,
+        // matching the old IntEq / IntNeq behavior.
+        if (f.coeffs.size == 1 && f.coeffs[0] == 1) {
+            val v = f.vars[0]
+            val d = problem.intDomains[v]
+            val inDomain = f.bound in d
+            when (f.op) {
+                LinearOp.EQ -> if (!inDomain) { b.addClause(IntArray(0)); return }
+                LinearOp.NE -> if (!inDomain) return  // trivially true
+                else -> Unit
+            }
+        }
         b.addClause(intArrayOf(buildLinearComparator(b, f.coeffs, f.vars, f.op, f.bound, intBits, intMin)))
     }
 
@@ -369,6 +353,7 @@ object BitBlaster {
             LinearOp.LE -> b.unsignedLeq(lhs, rhs)
             LinearOp.GE -> b.unsignedLeq(rhs, lhs)
             LinearOp.EQ -> b.unsignedEq(lhs, rhs)
+            LinearOp.NE -> Lit.negate(b.unsignedEq(lhs, rhs))
         }
     }
 

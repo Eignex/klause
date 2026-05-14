@@ -45,10 +45,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntEq
-import com.eignex.klause.solver.factor.IntGeq
-import com.eignex.klause.solver.factor.IntLeq
-import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
@@ -277,34 +273,24 @@ class Compiler {
                 emitSingleVarCanonical(name, flipped, -bound)
                 return
             }
-            // General coeff: emit as Linear over one variable.
+            // All coeffs: emit as a single-term Linear.
             val varId = intVarOf(name)
-            val linOp = when (op) {
-                IntCmpOp.LE -> LinearOp.LE
-                IntCmpOp.GE -> LinearOp.GE
-                IntCmpOp.EQ -> LinearOp.EQ
-                IntCmpOp.NE -> {
-                    val aux = newBoolVar()
-                    factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), LinearOp.EQ, bound)
-                    factors += Clause(intArrayOf(Lit.make(aux, positive = false)))
-                    return
-                }
-                IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
-            }
-            factors += Linear(intArrayOf(coeff), intArrayOf(varId), linOp, bound)
+            factors += Linear(intArrayOf(coeff), intArrayOf(varId), op.toLinearOp(), bound)
         }
 
         private fun emitSingleVarCanonical(
             name: String, op: IntCmpOp, bound: Int,
         ) {
             val v = intVarOf(name)
-            factors += when (op) {
-                IntCmpOp.LE -> IntLeq(v, bound)
-                IntCmpOp.GE -> IntGeq(v, bound)
-                IntCmpOp.EQ -> IntEq(v, bound)
-                IntCmpOp.NE -> IntNeq(v, bound)
-                IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
-            }
+            factors += Linear(intArrayOf(1), intArrayOf(v), op.toLinearOp(), bound)
+        }
+
+        private fun IntCmpOp.toLinearOp(): LinearOp = when (this) {
+            IntCmpOp.LE -> LinearOp.LE
+            IntCmpOp.GE -> LinearOp.GE
+            IntCmpOp.EQ -> LinearOp.EQ
+            IntCmpOp.NE -> LinearOp.NE
+            IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
         }
 
         fun lowerAllBool(children: List<BoolExpr>): IntArray {

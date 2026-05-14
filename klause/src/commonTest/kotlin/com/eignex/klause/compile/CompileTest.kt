@@ -11,7 +11,8 @@ import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntLeq
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -70,7 +71,9 @@ class CompileTest {
         }
         val compiled = Direct().compile()
         assertEquals(1, compiled.problem.numIntVars)
-        assertTrue(compiled.problem.factors.single() is IntLeq)
+        val f = compiled.problem.factors.single() as Linear
+        assertEquals(LinearOp.LE, f.op)
+        assertEquals(50, f.bound)
     }
 
     @Test

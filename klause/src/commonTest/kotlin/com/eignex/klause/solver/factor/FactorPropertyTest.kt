@@ -121,28 +121,28 @@ class FactorPropertyTest {
 
     @Test fun `int eq delta matches apply`() {
         runFactorPropertyCheck(
-            IntEq(intVar = 0, value = 3),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(0, 5)), seed = 12,
         )
     }
 
     @Test fun `int geq delta matches apply`() {
         runFactorPropertyCheck(
-            IntGeq(intVar = 0, bound = 2),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(-3, 3)), seed = 13,
         )
     }
 
     @Test fun `int leq delta matches apply`() {
         runFactorPropertyCheck(
-            IntLeq(intVar = 0, bound = 1),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(-3, 3)), seed = 14,
         )
     }
 
     @Test fun `int neq delta matches apply`() {
         runFactorPropertyCheck(
-            IntNeq(intVar = 0, value = 0),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
             numBoolVars = 0, intDomains = arrayOf(IntDomain(-2, 2)), seed = 15,
         )
     }
@@ -183,7 +183,7 @@ class FactorPropertyTest {
 
     @Test fun `reified int compare delta matches apply`() {
         for (op in IntCmpOp.entries) {
-            val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = op, bound = 1)
+            val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = op, 1)
             runFactorPropertyCheck(
                 factor, numBoolVars = 1,
                 intDomains = arrayOf(IntDomain(-2, 3)),
@@ -221,14 +221,14 @@ class FactorPropertyTest {
             AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 1, domainSize = 3) to FactorEnv(
                 intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)),
             ),
-            IntEq(intVar = 0, value = 2) to FactorEnv(intDomains = arrayOf(IntDomain(0, 4))),
-            IntGeq(intVar = 0, bound = 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
-            IntLeq(intVar = 0, bound = 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
-            IntNeq(intVar = 0, value = 0) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 2) to FactorEnv(intDomains = arrayOf(IntDomain(0, 4))),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0) to FactorEnv(intDomains = arrayOf(IntDomain(-2, 2))),
 
-            IntLeq(intVar = 0, bound = -10) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
-            IntGeq(intVar = 0, bound = 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
-            IntEq(intVar = 0, value = 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, -10) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 99) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5))),
             ReifiedLinear(
                 auxBoolVar = 0,
                 coeffs = intArrayOf(2, -1),
@@ -246,7 +246,7 @@ class FactorPropertyTest {
                 literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
                 min = 1, max = 2,
             ) to FactorEnv(numBoolVars = 4),
-            ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 1) to
+            ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1) to
                 FactorEnv(numBoolVars = 1, intDomains = arrayOf(IntDomain(-2, 3))),
         )
         for ((factor, env) in cases) {

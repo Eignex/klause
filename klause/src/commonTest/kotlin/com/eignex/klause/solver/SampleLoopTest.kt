@@ -3,7 +3,8 @@ package com.eignex.klause.solver
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntLeq
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -66,7 +67,7 @@ class SampleLoopTest {
 
         val factors = listOf(
             Clause(intArrayOf(Lit.make(0, true))),
-            IntLeq(intVar = 0, bound = 3),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
         )
         val problem = Problem(numBoolVars = 1, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 3)), factors = factors)

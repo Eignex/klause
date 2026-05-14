@@ -8,10 +8,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntEq
-import com.eignex.klause.solver.factor.IntGeq
-import com.eignex.klause.solver.factor.IntLeq
-import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
@@ -99,10 +95,6 @@ internal object Z3Translator {
             val operands = factor.vars.map { e.intExprs[it] as ArithExpr<IntSort> }
             ctx.mkDistinct(*operands.toTypedArray())
         }
-        is IntEq -> ctx.mkEq(e.intExprs[factor.intVar], ctx.mkInt(factor.value))
-        is IntGeq -> ctx.mkGe(e.intExprs[factor.intVar], ctx.mkInt(factor.bound))
-        is IntLeq -> ctx.mkLe(e.intExprs[factor.intVar], ctx.mkInt(factor.bound))
-        is IntNeq -> ctx.mkNot(ctx.mkEq(e.intExprs[factor.intVar], ctx.mkInt(factor.value)))
         is Product -> ctx.mkEq(
             e.intExprs[factor.result],
             ctx.mkMul(e.intExprs[factor.a], e.intExprs[factor.b]),
@@ -191,6 +183,7 @@ internal object Z3Translator {
             LinearOp.LE -> ctx.mkLe(sum, b)
             LinearOp.EQ -> ctx.mkEq(sum, b)
             LinearOp.GE -> ctx.mkGe(sum, b)
+            LinearOp.NE -> ctx.mkNot(ctx.mkEq(sum, b))
         }
     }
 

@@ -1,10 +1,6 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.ast.IntCmpOp
-import com.eignex.klause.solver.factor.IntEq
-import com.eignex.klause.solver.factor.IntGeq
-import com.eignex.klause.solver.factor.IntLeq
-import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedIntCompare
@@ -25,7 +21,7 @@ class IntFactorTest {
 
     @Test
     fun `int leq snaps to bound on repair`() {
-        val factor = IntLeq(intVar = 0, bound = 10)
+        val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)
         val state = stateFor(1, arrayOf(IntDomain(0, 100)), factor)
         state.assignment.setInt(0, 50)
         state.recompute()
@@ -44,7 +40,7 @@ class IntFactorTest {
 
     @Test
     fun `int eq and int neq incremental update`() {
-        val eq = IntEq(intVar = 0, value = 7)
+        val eq = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)
         val state = stateFor(1, arrayOf(IntDomain(0, 20)), eq)
         state.assignment.setInt(0, 7)
         state.recompute()
@@ -85,7 +81,7 @@ class IntFactorTest {
     @Test
     fun `reified int compare tracks aux flips`() {
 
-        val rfc = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 5)
+        val rfc = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), listOf(rfc))
         val state = SolverState(problem, Random(0))
         state.assignment.setBool(0, true)
@@ -101,7 +97,7 @@ class IntFactorTest {
 
     @Test
     fun `int geq delta symmetric`() {
-        val factor = IntGeq(intVar = 0, bound = 5)
+        val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)
         val state = stateFor(1, arrayOf(IntDomain(0, 10)), factor)
         state.assignment.setInt(0, 2)
         state.recompute()
@@ -113,7 +109,7 @@ class IntFactorTest {
 
     @Test
     fun `int neq repair offers both sides`() {
-        val factor = IntNeq(intVar = 0, value = 7)
+        val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 7)
         val state = stateFor(1, arrayOf(IntDomain(0, 20)), factor)
         state.assignment.setInt(0, 7)
         state.recompute()

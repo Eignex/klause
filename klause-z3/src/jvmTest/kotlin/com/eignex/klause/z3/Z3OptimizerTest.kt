@@ -8,7 +8,8 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.IntGeq
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -33,7 +34,7 @@ class Z3OptimizerTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
-            factors = listOf(IntGeq(intVar = 0, bound = 2)),
+            factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val sample = Z3Sampler(problem).minimize(objective, Z3Params())
@@ -64,7 +65,7 @@ class Z3OptimizerTest {
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
             factors = listOf(
-                IntGeq(intVar = 0, bound = 10),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
             ),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))

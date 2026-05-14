@@ -3,10 +3,6 @@ package com.eignex.klause.solver
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntEq
-import com.eignex.klause.solver.factor.IntGeq
-import com.eignex.klause.solver.factor.IntLeq
-import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -118,41 +114,41 @@ class PropagationTest {
 
     @Test
     fun `IntEq forces value`() {
-        val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(IntEq(0, 7)))
+        val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)))
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to 7), r.ints)
     }
 
     @Test
     fun `IntEq with out-of-domain value is Unsat`() {
-        val p = Problem(0, 1, arrayOf(IntDomain(0, 5)), listOf(IntEq(0, 9)))
+        val p = Problem(0, 1, arrayOf(IntDomain(0, 5)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 9)))
         assertSame(PropagationResult.Unsat, p.propagate())
     }
 
     @Test
     fun `IntLeq plus IntGeq force a single value`() {
-        val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(IntLeq(0, 3), IntGeq(0, 3)))
+        val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3), Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)))
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to 3), r.ints)
     }
 
     @Test
     fun `conflicting IntLeq plus IntGeq is Unsat`() {
-        val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(IntLeq(0, 2), IntGeq(0, 5)))
+        val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2), Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)))
         assertSame(PropagationResult.Unsat, p.propagate())
     }
 
     @Test
     fun `IntNeq at domain boundary tightens`() {
         // domain 5..10, x ≠ 5 → forces x ≥ 6
-        val p = Problem(0, 1, arrayOf(IntDomain(5, 10)), listOf(IntNeq(0, 5), IntLeq(0, 6)))
+        val p = Problem(0, 1, arrayOf(IntDomain(5, 10)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 5), Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 6)))
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to 6), r.ints)
     }
 
     @Test
     fun `IntNeq on singleton domain is Unsat`() {
-        val p = Problem(0, 1, arrayOf(IntDomain(7, 7)), listOf(IntNeq(0, 7)))
+        val p = Problem(0, 1, arrayOf(IntDomain(7, 7)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 7)))
         assertSame(PropagationResult.Unsat, p.propagate())
     }
 
@@ -206,12 +202,12 @@ class PropagationTest {
     @Test
     fun `ReifiedIntCompare aux true tightens domain`() {
         // aux=true ↔ (x ≤ 5); pin aux=true → tighten max to 5.
-        // Add IntGeq(x, 5) to force a singleton outcome.
+        // Add Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 5) to force a singleton outcome.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 10)),
             factors = listOf(
-                ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 5),
-                IntGeq(intVar = 0, bound = 5),
+                ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
@@ -223,7 +219,7 @@ class PropagationTest {
         // x in [0..3], aux ↔ (x ≤ 5) → aux must be true.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 5)),
+            factors = listOf(ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)),
         )
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to true), r.bools)
@@ -234,7 +230,7 @@ class PropagationTest {
         // x in [0..3], aux ↔ (x ≥ 10), pin aux=true → never holds → Unsat.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, bound = 10)),
+            factors = listOf(ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, 10)),
         )
         assertSame(PropagationResult.Unsat, p.propagate(Assumptions(bools = mapOf(0 to true))))
     }
@@ -299,14 +295,14 @@ class PropagationTest {
             factors = listOf(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5)),
         )
         val r = implied(p.propagate())
-        // y forced to 0, x's domain narrowed: 0 already pinned for y. Force IntLeq(x, 3) to get singleton
+        // y forced to 0, x's domain narrowed: 0 already pinned for y. Force Linear(intArrayOf(1), intArrayOf(x), LinearOp.LE, 3) to get singleton
         // — instead just check x's lower bound by adding IntLeq.
         val p2 = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 0)),
             factors = listOf(
                 Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5),
-                IntLeq(0, 3),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
             ),
         )
         val r2 = implied(p2.propagate())
@@ -391,13 +387,13 @@ class PropagationTest {
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
         // x's domain is now [0..2], y is pinned at 3. y returns as 3 in Implied; x not yet singleton.
-        // Add IntGeq(x, 2) to force singleton x=2.
+        // Add Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 2) to force singleton x=2.
         val p2 = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(3, 3)),
             factors = listOf(
                 ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5),
-                IntGeq(0, 2),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
             ),
         )
         val r2 = implied(p2.propagate(Assumptions(bools = mapOf(0 to true))))
@@ -434,11 +430,11 @@ class PropagationTest {
     @Test
     fun `Product tightens result interval from operand bounds`() {
         // a in [2..3], b in [4..5], result domain [-100..100] → result in [8..15]
-        // Add IntLeq(result, 8) → singleton 8.
+        // Add Linear(intArrayOf(1), intArrayOf(result), LinearOp.LE, 8) → singleton 8.
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(2, 3), IntDomain(4, 5), IntDomain(-100, 100)),
-            factors = listOf(Product(a = 0, b = 1, result = 2), IntLeq(2, 8)),
+            factors = listOf(Product(a = 0, b = 1, result = 2), Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 8)),
         )
         val r = implied(p.propagate())
         assertEquals(8, r.ints[2])
@@ -453,8 +449,8 @@ class PropagationTest {
             intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-1, 4), IntDomain(-1000, 1000)),
             factors = listOf(
                 Product(a = 0, b = 1, result = 2),
-                IntGeq(2, 12),
-                IntLeq(2, 12),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 12),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 12),
             ),
         )
         val r = implied(p.propagate())
@@ -489,13 +485,13 @@ class PropagationTest {
     @Test
     fun `AllDifferent shaves taken value off domain boundary`() {
         // x0 pinned to 0; x1 in [0..2]; AllDifferent should tighten x1 ≥ 1.
-        // Add IntLeq(x1, 1) to force singleton 1.
+        // Add Linear(intArrayOf(1), intArrayOf(x1), LinearOp.LE, 1) to force singleton 1.
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
             factors = listOf(
                 AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3),
-                IntLeq(1, 1),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
             ),
         )
         val r = implied(p.propagate(Assumptions(ints = mapOf(0 to 0))))

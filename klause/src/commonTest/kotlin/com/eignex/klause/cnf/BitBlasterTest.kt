@@ -6,9 +6,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.IntEq
-import com.eignex.klause.solver.factor.IntLeq
-import com.eignex.klause.solver.factor.IntNeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedIntCompare
@@ -34,7 +31,7 @@ class BitBlasterTest {
 
     @Test
     fun `int leq matches original semantics`() {
-        val factor = IntLeq(intVar = 0, bound = 5)
+        val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 7)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
         for (v in 0..7) {
@@ -47,7 +44,7 @@ class BitBlasterTest {
     @Test
     fun `int eq and domain constraint`() {
 
-        val factor = IntEq(intVar = 0, value = 4)
+        val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 4)
         val problem = Problem(0, 1, arrayOf(IntDomain(2, 5)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
         for (v in 2..5) {
@@ -58,7 +55,7 @@ class BitBlasterTest {
 
     @Test
     fun `int eq out of domain emits empty clause`() {
-        val factor = IntEq(intVar = 0, value = 99)
+        val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 99)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
 
@@ -67,7 +64,7 @@ class BitBlasterTest {
 
     @Test
     fun `int neq matches original semantics`() {
-        val factor = IntNeq(intVar = 0, value = 2)
+        val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 2)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
         for (v in 0..3) {
@@ -105,7 +102,7 @@ class BitBlasterTest {
     @Test
     fun `reified int compare tracks aux value`() {
 
-        val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, bound = 1)
+        val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
         for (auxVal in 0..1) for (x in 0..3) {
@@ -149,7 +146,7 @@ class BitBlasterTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(IntLeq(0, 1)),
+            factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
         )
         val cnf = BitBlaster.compile(problem)
         val dimacs = cnf.toDimacs()

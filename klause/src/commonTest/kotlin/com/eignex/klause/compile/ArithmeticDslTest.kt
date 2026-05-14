@@ -13,7 +13,6 @@ import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.LocalSearchSolver
-import com.eignex.klause.solver.factor.IntLeq
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedIntCompare
@@ -68,7 +67,7 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun `single var constraint collapses to int leq`() {
+    fun `single var constraint collapses to single-term Linear`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100)
             val y by intVar(min = 0, max = 100)
@@ -76,8 +75,10 @@ class ArithmeticDslTest {
         }
         val compiled = S().compile()
 
-        val intLeq = compiled.problem.factors.single { it is IntLeq } as IntLeq
-        assertEquals(10, intLeq.bound)
+        val lin = compiled.problem.factors.single { it is Linear } as Linear
+        assertEquals(LinearOp.LE, lin.op)
+        assertEquals(10, lin.bound)
+        assertEquals(1, lin.vars.size)
     }
 
     @Test

@@ -3,6 +3,8 @@ package com.eignex.klause.solver
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -32,7 +34,7 @@ class OptimizerTest {
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
-            factors = listOf(com.eignex.klause.solver.factor.IntGeq(intVar = 0, bound = 2)),
+            factors = listOf(com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val sample = LocalSearchSolver(problem)

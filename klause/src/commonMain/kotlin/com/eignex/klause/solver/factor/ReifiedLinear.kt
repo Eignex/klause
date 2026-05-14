@@ -85,11 +85,13 @@ class ReifiedLinear(
             LinearOp.LE -> sumHi <= bnd
             LinearOp.GE -> sumLo >= bnd
             LinearOp.EQ -> sumLo == bnd && sumHi == bnd
+            LinearOp.NE -> sumHi < bnd || sumLo > bnd
         }
         val neverHolds = when (op) {
             LinearOp.LE -> sumLo > bnd
             LinearOp.GE -> sumHi < bnd
             LinearOp.EQ -> sumLo > bnd || sumHi < bnd
+            LinearOp.NE -> sumLo == bnd && sumHi == bnd
         }
         if (alwaysHolds) return state.pinBool(auxBoolVar, true)
         if (neverHolds) return state.pinBool(auxBoolVar, false)
@@ -103,6 +105,7 @@ class ReifiedLinear(
                 LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1)
                 LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1)
                 LinearOp.EQ -> true
+                LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd)
             }
         }
     }
@@ -130,6 +133,7 @@ class ReifiedLinear(
         LinearOp.LE -> sum <= bound
         LinearOp.EQ -> sum == bound
         LinearOp.GE -> sum >= bound
+        LinearOp.NE -> sum != bound
     }
 
     private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
@@ -156,6 +160,13 @@ class ReifiedLinear(
                 if (coeff > 0) ceilDiv(numerator, coeff) else floorDiv(numerator, coeff)
             } else {
                 if (coeff > 0) ceilDiv(numerator, coeff) - 1 else floorDiv(numerator, coeff) + 1
+            }
+            LinearOp.NE -> when {
+                // wantHolds (sum ≠ bound): bump var to either side of the equality value.
+                wantHolds -> if (numerator % coeff == 0) targetEq + 1 else null
+                // !wantHolds (sum == bound): only feasible if numerator divisible by coeff.
+                numerator % coeff == 0 -> targetEq
+                else -> null
             }
         }
     }

@@ -135,10 +135,10 @@ class SolverStateRecomputeTest {
 
         val intDomains = arrayOf(IntDomain(-3, 3), IntDomain(-3, 3), IntDomain(0, 5))
         val factors = listOf(
-            Linear(coeffs = intArrayOf(2, -1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.LE, bound = 4),
-            Linear(coeffs = intArrayOf(1, 1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.GE, bound = -1),
-            com.eignex.klause.solver.factor.IntLeq(intVar = 2, bound = 4),
-            com.eignex.klause.solver.factor.IntNeq(intVar = 0, value = 0),
+            Linear(coeffs = intArrayOf(2, -1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.LE, 4),
+            Linear(coeffs = intArrayOf(1, 1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.GE, -1),
+            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 4),
+            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
         )
         return Case("intHeavy", Problem(numBoolVars = 0, numIntVars = 3, intDomains = intDomains, factors = factors))
     }
@@ -158,7 +158,7 @@ class SolverStateRecomputeTest {
                 literals = intArrayOf(Lit.make(2, true), Lit.make(3, true), Lit.make(4, true)),
                 min = 1, max = 2,
             ),
-            ReifiedIntCompare(auxBoolVar = 5, intVar = 0, op = IntCmpOp.GE, bound = 0),
+            ReifiedIntCompare(auxBoolVar = 5, intVar = 0, op = IntCmpOp.GE, 0),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(5, false))),
         )
         return Case("mixedReified", Problem(numBoolVars = 6, numIntVars = 2, intDomains = intDomains, factors = factors))
@@ -169,8 +169,8 @@ class SolverStateRecomputeTest {
         val intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3))
         val factors = listOf(
             AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4),
-            com.eignex.klause.solver.factor.IntLeq(intVar = 0, bound = 2),
-            com.eignex.klause.solver.factor.IntGeq(intVar = 3, bound = 1),
+            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(3), LinearOp.GE, 1),
         )
         return Case("permutation", Problem(numBoolVars = 0, numIntVars = 4, intDomains = intDomains, factors = factors))
     }

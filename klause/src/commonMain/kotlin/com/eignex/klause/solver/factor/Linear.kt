@@ -7,7 +7,7 @@ import com.eignex.klause.solver.SolverState
 import com.eignex.klause.solver.ceilDivLong
 import com.eignex.klause.solver.floorDivLong
 
-enum class LinearOp { LE, EQ, GE }
+enum class LinearOp { LE, EQ, GE, NE }
 
 /**
  * `Σ coeffs[i] * intVars[i] ⟨op⟩ bound`. Payload at `intPayload[factorId]` is the current
@@ -64,6 +64,20 @@ class Linear(
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
         if (!violates(sum)) return
+        if (op == LinearOp.NE) {
+            // sum == bound; bump any non-zero-coeff variable by ±1 within its domain. Each
+            // single shift changes sum by ±|c_i| ≠ 0 → breaks the equality.
+            for (i in vars.indices) {
+                val v = vars[i]
+                val c = coeffs[i]
+                if (c == 0) continue
+                val cur = state.assignment.intValue(v)
+                val d = state.problem.intDomains[v]
+                if (cur > d.min) sink.addIntSet(v, cur - 1)
+                if (cur < d.max) sink.addIntSet(v, cur + 1)
+            }
+            return
+        }
         for (i in vars.indices) {
             val v = vars[i]
             val c = coeffs[i]
@@ -80,6 +94,7 @@ class Linear(
         LinearOp.LE -> sum > bound
         LinearOp.EQ -> sum != bound
         LinearOp.GE -> sum < bound
+        LinearOp.NE -> sum == bound
     }
 
     private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
@@ -90,6 +105,11 @@ class Linear(
             LinearOp.EQ -> if (numerator % coeff == 0) numerator / coeff else null
             LinearOp.LE -> if (coeff > 0) floorDiv(numerator, coeff) else ceilDiv(numerator, coeff)
             LinearOp.GE -> if (coeff > 0) ceilDiv(numerator, coeff) else floorDiv(numerator, coeff)
+            // NE: target is "any value such that the sum is not [bound]". Closest non-bound
+            // value to current works: shift the var by 1 in either direction (clamped). Caller
+            // re-clamps to domain; if the shifted value re-creates the bound exactly, the
+            // factor will re-fire and the next repair pass tries the other direction.
+            LinearOp.NE -> null  // proposeRepairMoves below handles NE explicitly.
         }
     }
 
@@ -136,6 +156,34 @@ internal fun propagateLinearBounds(
         LinearOp.LE -> if (sumLo > bound) return false
         LinearOp.GE -> if (sumHi < bound) return false
         LinearOp.EQ -> if (sumLo > bound || sumHi < bound) return false
+        LinearOp.NE -> if (sumLo == bound && sumHi == bound) return false
+    }
+    if (op == LinearOp.NE) {
+        // NE only propagates boundary-tightenings: if the sole free term places the bound at
+        // the var's domain endpoint, shave that endpoint. Generalises old IntNeq.
+        // Walk the terms; we can act only on terms where the "rest" of the sum collapses to
+        // a single point (sumOtherLo == sumOtherHi).
+        for (i in 0 until n) {
+            val c = coeffs[i].toLong()
+            if (c == 0L) continue
+            val otherLo = sumLo - rLo[i]
+            val otherHi = sumHi - rHi[i]
+            if (otherLo != otherHi) continue
+            // c * x ≠ bound - otherLo → x ≠ (bound - otherLo) / c (only if exact).
+            val rhs = bound - otherLo
+            if (rhs % c != 0L) continue
+            val forbidden = rhs / c
+            val v = vars[i]
+            val d = state.intDomains[v]
+            if (d.min.toLong() == forbidden && d.min < d.max) {
+                if (!state.tightenIntMin(v, d.min + 1)) return false
+            } else if (d.max.toLong() == forbidden && d.min < d.max) {
+                if (!state.tightenIntMax(v, d.max - 1)) return false
+            } else if (d.min == d.max && d.min.toLong() == forbidden) {
+                return false
+            }
+        }
+        return true
     }
     for (i in 0 until n) {
         val c = coeffs[i].toLong()
