@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 data class CompletenessResults(
     val timestamp: String,
     val gitSha: String?,
+    val env: EnvInfo,
     val budgetsMillis: LongArray,
     val entries: List<CompletenessReport>,
 )
@@ -36,7 +37,7 @@ fun main() {
     }
     BenchHarness.writeJson(
         "build/bench-completeness.json",
-        CompletenessResults(Instant.now().toString(), BenchHarness.readGitSha(), budgets, results),
+        CompletenessResults(Instant.now().toString(), BenchHarness.readGitSha(), EnvInfo.capture(), budgets, results),
     )
 }
 

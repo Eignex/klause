@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 data class UniformnessResults(
     val timestamp: String,
     val gitSha: String?,
+    val env: EnvInfo,
     val sampleCount: Int,
     val entries: List<UniformnessReport>,
 )
@@ -38,7 +39,7 @@ fun main() {
     }
     BenchHarness.writeJson(
         "build/bench-uniformness.json",
-        UniformnessResults(Instant.now().toString(), BenchHarness.readGitSha(), sampleCount, results),
+        UniformnessResults(Instant.now().toString(), BenchHarness.readGitSha(), EnvInfo.capture(), sampleCount, results),
     )
 }
 

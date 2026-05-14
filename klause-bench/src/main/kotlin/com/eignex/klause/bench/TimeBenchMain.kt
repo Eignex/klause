@@ -13,6 +13,10 @@ import kotlinx.serialization.encodeToString
 fun main() {
     val (_, benchEntries, _) = BenchHarness.loadAndVerify()
 
+    val repetitions = System.getProperty("klause.bench.repetitions")?.toIntOrNull() ?: 3
+    val sampleCount = System.getProperty("klause.bench.sampleCount")?.toIntOrNull() ?: 5
+    val warmupReps = System.getProperty("klause.bench.warmupReps")?.toIntOrNull() ?: 2
+
     val baseline = loadBaseline()
     val baselineIndex: Map<Pair<String, String>, CellResult> = baseline
         ?.entries
@@ -23,11 +27,12 @@ fun main() {
 
     println()
     val baselineNote = if (baseline == null) "no baseline" else "vs baseline @ ${baseline.timestamp}"
-    println("=== benchmark (per entry, median of 3 reps × 5 samples; $baselineNote) ===")
+    println("=== benchmark (per entry, median of $repetitions reps × $sampleCount samples; " +
+        "$warmupReps warmup reps; $baselineNote) ===")
     val results = mutableListOf<EntryResult>()
     val regressions = mutableListOf<String>()
     for (entry in benchEntries) {
-        val report = Benchmarker.bench(entry.problem, repetitions = 3, sampleCount = 5)
+        val report = Benchmarker.bench(entry.problem, repetitions = repetitions, sampleCount = sampleCount, warmupReps = warmupReps)
         val cells = mutableListOf<CellResult>()
         val cellStrings = mutableListOf<String>()
         for ((name, t) in report.timings) {
@@ -45,7 +50,15 @@ fun main() {
         results += EntryResult(entry.name, entry.expectedSat, cells)
     }
 
-    writeResults(BenchResults(timestamp = Instant.now().toString(), gitSha = BenchHarness.readGitSha(), entries = results))
+    writeResults(BenchResults(
+        timestamp = Instant.now().toString(),
+        gitSha = BenchHarness.readGitSha(),
+        env = EnvInfo.capture(),
+        repetitions = repetitions,
+        sampleCount = sampleCount,
+        warmupReps = warmupReps,
+        entries = results,
+    ))
 
     println()
     println("=== propagation microbenchmark (mean of 50 reps × 10 pins) ===")

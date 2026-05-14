@@ -1,0 +1,916 @@
+{
+    "timestamp": "2026-05-14T14:53:48.787353531Z",
+    "gitSha": "5254aaa9a7debf4191669869a0e621bd7d5fc9d9",
+    "env": {
+        "javaVersion": "24.0.2",
+        "javaVendor": "Eclipse Adoptium",
+        "osName": "Linux",
+        "osArch": "amd64",
+        "cpuCount": 20
+    },
+    "repetitions": 3,
+    "sampleCount": 5,
+    "warmupReps": 2,
+    "entries": [
+        {
+            "name": "threeClauses",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 3673,
+                    "sampleNsMedian": 9616,
+                    "enumNsMedian": 13607
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 5451,
+                    "sampleNsMedian": 32916,
+                    "enumNsMedian": 25805
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 12607,
+                    "sampleNsMedian": 54595,
+                    "enumNsMedian": 81620
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 12550015,
+                    "sampleNsMedian": 62238822,
+                    "enumNsMedian": 6794419
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 3180,
+                    "sampleNsMedian": 17973,
+                    "enumNsMedian": 12557
+                }
+            ]
+        },
+        {
+            "name": "cardXor",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 6422,
+                    "sampleNsMedian": 5522,
+                    "enumNsMedian": 2691228
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 5608,
+                    "sampleNsMedian": 32786,
+                    "enumNsMedian": 18796
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 72409,
+                    "sampleNsMedian": 929717,
+                    "enumNsMedian": 119744
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 7491282,
+                    "sampleNsMedian": 131621802,
+                    "enumNsMedian": 8252428
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 4044,
+                    "sampleNsMedian": 20671,
+                    "enumNsMedian": 13368
+                }
+            ]
+        },
+        {
+            "name": "pseudoBoolean",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 6790,
+                    "sampleNsMedian": 19354,
+                    "enumNsMedian": 33534
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 9819,
+                    "sampleNsMedian": 68481,
+                    "enumNsMedian": 34712
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 504259,
+                    "sampleNsMedian": 14655824,
+                    "enumNsMedian": 888687
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 13302306,
+                    "sampleNsMedian": 121128311,
+                    "enumNsMedian": 9280058
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 11088,
+                    "sampleNsMedian": 60513,
+                    "enumNsMedian": 39680
+                }
+            ]
+        },
+        {
+            "name": "linearLE",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 10820,
+                    "sampleNsMedian": 10812,
+                    "enumNsMedian": 30127
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 14189,
+                    "sampleNsMedian": 73987,
+                    "enumNsMedian": 40794
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 532047,
+                    "sampleNsMedian": 15909396,
+                    "enumNsMedian": 1045411
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 12694729,
+                    "sampleNsMedian": 54257371,
+                    "enumNsMedian": 7268940
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 2659,
+                    "sampleNsMedian": 13112,
+                    "enumNsMedian": 8558
+                }
+            ]
+        },
+        {
+            "name": "permutation3",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 12124,
+                    "sampleNsMedian": 28341,
+                    "enumNsMedian": 52878
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 11408,
+                    "sampleNsMedian": 69447,
+                    "enumNsMedian": 48255
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 140654,
+                    "sampleNsMedian": 2483744,
+                    "enumNsMedian": 313459
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 12852565,
+                    "sampleNsMedian": 110863165,
+                    "enumNsMedian": 8585932
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 9242,
+                    "sampleNsMedian": 30908,
+                    "enumNsMedian": 24529
+                }
+            ]
+        },
+        {
+            "name": "mixedBoolInt",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 3528,
+                    "sampleNsMedian": 3721,
+                    "enumNsMedian": 3619
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 3669,
+                    "sampleNsMedian": 19731,
+                    "enumNsMedian": 15719
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 93777,
+                    "sampleNsMedian": 2105242,
+                    "enumNsMedian": 185408
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 11912712,
+                    "sampleNsMedian": 42105096,
+                    "enumNsMedian": 7655107
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 2008,
+                    "sampleNsMedian": 10071,
+                    "enumNsMedian": 8075
+                }
+            ]
+        },
+        {
+            "name": "cardinalityStress",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 2835,
+                    "sampleNsMedian": 5004,
+                    "enumNsMedian": 4913
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 5137,
+                    "sampleNsMedian": 25845,
+                    "enumNsMedian": 18678
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 339340,
+                    "sampleNsMedian": 9277069,
+                    "enumNsMedian": 2530139
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 11595391,
+                    "sampleNsMedian": 58286089,
+                    "enumNsMedian": 7981008
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 2750,
+                    "sampleNsMedian": 21969,
+                    "enumNsMedian": 21901
+                }
+            ]
+        },
+        {
+            "name": "pbReifiedMix",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 8588,
+                    "sampleNsMedian": 7341,
+                    "enumNsMedian": 3143320
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 5964,
+                    "sampleNsMedian": 27429,
+                    "enumNsMedian": 14669
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 781618,
+                    "sampleNsMedian": 24253623,
+                    "enumNsMedian": 1158521
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 7209864,
+                    "sampleNsMedian": 111448213,
+                    "enumNsMedian": 8983583
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 6812,
+                    "sampleNsMedian": 51153,
+                    "enumNsMedian": 35483
+                }
+            ]
+        },
+        {
+            "name": "smallRandom3sat",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 8607,
+                    "sampleNsMedian": 15561,
+                    "enumNsMedian": 15817
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 6167,
+                    "sampleNsMedian": 40618,
+                    "enumNsMedian": 20153
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 104548,
+                    "sampleNsMedian": 1262909,
+                    "enumNsMedian": 139563
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 11747908,
+                    "sampleNsMedian": 99273056,
+                    "enumNsMedian": 6544432
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 293830,
+                    "sampleNsMedian": 1083010,
+                    "enumNsMedian": 789021
+                }
+            ]
+        },
+        {
+            "name": "budgetCampaign",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 12593,
+                    "sampleNsMedian": 13243,
+                    "enumNsMedian": 8611802
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 15964,
+                    "sampleNsMedian": 96028,
+                    "enumNsMedian": 33894
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 869236,
+                    "sampleNsMedian": 25295287,
+                    "enumNsMedian": 1133020
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 7041583,
+                    "sampleNsMedian": 196296897,
+                    "enumNsMedian": 7570423
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 6817,
+                    "sampleNsMedian": 200859,
+                    "enumNsMedian": 133832
+                }
+            ]
+        },
+        {
+            "name": "random3sat-20-80",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 4818,
+                    "sampleNsMedian": 39309,
+                    "enumNsMedian": 36939
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 10957,
+                    "sampleNsMedian": 66854,
+                    "enumNsMedian": 33615
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 154466,
+                    "sampleNsMedian": 2738387,
+                    "enumNsMedian": 179039
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 11556834,
+                    "sampleNsMedian": 116928594,
+                    "enumNsMedian": 8498682
+                }
+            ]
+        },
+        {
+            "name": "random3sat-50-200",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 528280,
+                    "sampleNsMedian": 862576,
+                    "enumNsMedian": 979940
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 558733,
+                    "sampleNsMedian": 1291946,
+                    "enumNsMedian": 577337
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 381685,
+                    "sampleNsMedian": 3925184,
+                    "enumNsMedian": 506283
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 11592124,
+                    "sampleNsMedian": 62635700,
+                    "enumNsMedian": 7765930
+                }
+            ]
+        },
+        {
+            "name": "setcover-tiny",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 1375,
+                    "sampleNsMedian": 2281,
+                    "enumNsMedian": 2784
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 3095,
+                    "sampleNsMedian": 13892,
+                    "enumNsMedian": 10469
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 474527,
+                    "sampleNsMedian": 12854415,
+                    "enumNsMedian": 790282
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 11552235,
+                    "sampleNsMedian": 65179191,
+                    "enumNsMedian": 7192316
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 1045,
+                    "sampleNsMedian": 4166,
+                    "enumNsMedian": 5444
+                }
+            ]
+        },
+        {
+            "name": "campaign",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 1250,
+                    "sampleNsMedian": 4597,
+                    "enumNsMedian": 2814
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 9852,
+                    "sampleNsMedian": 40657,
+                    "enumNsMedian": 18962
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 597476,
+                    "sampleNsMedian": 13566917,
+                    "enumNsMedian": 916432
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 12062596,
+                    "sampleNsMedian": 149962479,
+                    "enumNsMedian": 7966320
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 2680,
+                    "sampleNsMedian": 12635,
+                    "enumNsMedian": 8813
+                }
+            ]
+        },
+        {
+            "name": "cardinality",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 1012,
+                    "sampleNsMedian": 9327,
+                    "enumNsMedian": 43422
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 2258,
+                    "sampleNsMedian": 10423,
+                    "enumNsMedian": 9552
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 315701,
+                    "sampleNsMedian": 8289050,
+                    "enumNsMedian": 407181
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 14293973,
+                    "sampleNsMedian": 96329361,
+                    "enumNsMedian": 8120141
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 794,
+                    "sampleNsMedian": 3541,
+                    "enumNsMedian": 3831
+                }
+            ]
+        },
+        {
+            "name": "permutation4",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 3846,
+                    "sampleNsMedian": 13794,
+                    "enumNsMedian": 15020
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 4469,
+                    "sampleNsMedian": 28781,
+                    "enumNsMedian": 16448
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 115238,
+                    "sampleNsMedian": 1756939,
+                    "enumNsMedian": 168949
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 12717730,
+                    "sampleNsMedian": 115303813,
+                    "enumNsMedian": 7126051
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 926,
+                    "sampleNsMedian": 6229,
+                    "enumNsMedian": 11383
+                }
+            ]
+        },
+        {
+            "name": "small-linear",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 1158,
+                    "sampleNsMedian": 2145,
+                    "enumNsMedian": 3573
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 3153,
+                    "sampleNsMedian": 15853,
+                    "enumNsMedian": 9996
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 461572,
+                    "sampleNsMedian": 12571269,
+                    "enumNsMedian": 705171
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 12731403,
+                    "sampleNsMedian": 148769326,
+                    "enumNsMedian": 8861884
+                },
+                {
+                    "backend": "brute-force",
+                    "solveNsMedian": 782,
+                    "sampleNsMedian": 3387,
+                    "enumNsMedian": 3124
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-01",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 195034,
+                    "sampleNsMedian": 589764,
+                    "enumNsMedian": 556942
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 68216,
+                    "sampleNsMedian": 135525,
+                    "enumNsMedian": 85411
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 156132,
+                    "sampleNsMedian": 2904586,
+                    "enumNsMedian": 219497
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 12166794,
+                    "sampleNsMedian": 135677705,
+                    "enumNsMedian": 7445504
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-010",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 24476,
+                    "sampleNsMedian": 256674,
+                    "enumNsMedian": 511710
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 69469,
+                    "sampleNsMedian": 343222,
+                    "enumNsMedian": 100550
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 171794,
+                    "sampleNsMedian": 3563479,
+                    "enumNsMedian": 223524
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 11047052,
+                    "sampleNsMedian": 147773542,
+                    "enumNsMedian": 7658008
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-0100",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 74102,
+                    "sampleNsMedian": 286069,
+                    "enumNsMedian": 9280564
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 53844,
+                    "sampleNsMedian": 248089,
+                    "enumNsMedian": 78002
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 149494,
+                    "sampleNsMedian": 3987486,
+                    "enumNsMedian": 231515
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 7103999,
+                    "sampleNsMedian": 141210245,
+                    "enumNsMedian": 7301380
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-01000",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 475829,
+                    "sampleNsMedian": 2002241,
+                    "enumNsMedian": 8439411
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 28309,
+                    "sampleNsMedian": 231420,
+                    "enumNsMedian": 56008
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 190878,
+                    "sampleNsMedian": 4098760,
+                    "enumNsMedian": 149756
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 6218171,
+                    "sampleNsMedian": 129108219,
+                    "enumNsMedian": 7126677
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-0101",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 27537,
+                    "sampleNsMedian": 614278,
+                    "enumNsMedian": 1142084
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 17180,
+                    "sampleNsMedian": 214466,
+                    "enumNsMedian": 74828
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 137961,
+                    "sampleNsMedian": 3546265,
+                    "enumNsMedian": 168695
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 10703464,
+                    "sampleNsMedian": 197242159,
+                    "enumNsMedian": 7073982
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-0102",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 142259,
+                    "sampleNsMedian": 547811,
+                    "enumNsMedian": 1417386
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 51297,
+                    "sampleNsMedian": 233874,
+                    "enumNsMedian": 146827
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 186990,
+                    "sampleNsMedian": 3694383,
+                    "enumNsMedian": 328294
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 14203231,
+                    "sampleNsMedian": 239409259,
+                    "enumNsMedian": 9194442
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-0103",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 511001,
+                    "sampleNsMedian": 1931918,
+                    "enumNsMedian": 8780731
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 50069,
+                    "sampleNsMedian": 274248,
+                    "enumNsMedian": 74017
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 192434,
+                    "sampleNsMedian": 5161082,
+                    "enumNsMedian": 247671
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 7711790,
+                    "sampleNsMedian": 191170437,
+                    "enumNsMedian": 9343883
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-0104",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 61314,
+                    "sampleNsMedian": 321072,
+                    "enumNsMedian": 319460
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 8584,
+                    "sampleNsMedian": 104150,
+                    "enumNsMedian": 21843
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 187915,
+                    "sampleNsMedian": 3948661,
+                    "enumNsMedian": 235539
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 15162361,
+                    "sampleNsMedian": 148792877,
+                    "enumNsMedian": 7800307
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-0105",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 408715,
+                    "sampleNsMedian": 2510982,
+                    "enumNsMedian": 9199683
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 51609,
+                    "sampleNsMedian": 323751,
+                    "enumNsMedian": 79993
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 185381,
+                    "sampleNsMedian": 3874996,
+                    "enumNsMedian": 167026
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 7505742,
+                    "sampleNsMedian": 165761188,
+                    "enumNsMedian": 7345254
+                }
+            ]
+        },
+        {
+            "name": "uf20-91/uf20-0106",
+            "expectedSat": true,
+            "backends": [
+                {
+                    "backend": "local-search",
+                    "solveNsMedian": 341940,
+                    "sampleNsMedian": 1779913,
+                    "enumNsMedian": 8505037
+                },
+                {
+                    "backend": "backtrack",
+                    "solveNsMedian": 23745,
+                    "sampleNsMedian": 340888,
+                    "enumNsMedian": 103904
+                },
+                {
+                    "backend": "logicng",
+                    "solveNsMedian": 182431,
+                    "sampleNsMedian": 3889348,
+                    "enumNsMedian": 202296
+                },
+                {
+                    "backend": "z3",
+                    "solveNsMedian": 6952933,
+                    "sampleNsMedian": 184482480,
+                    "enumNsMedian": 7140026
+                }
+            ]
+        }
+    ]
+}
