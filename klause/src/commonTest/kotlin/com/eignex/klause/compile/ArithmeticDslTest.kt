@@ -16,7 +16,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.ReifiedLinear
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

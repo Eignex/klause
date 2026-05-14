@@ -4,8 +4,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.ceilDivLong
-import com.eignex.klause.solver.floorDivLong
+import com.eignex.klause.solver.factor.ceilDivLong
+import com.eignex.klause.solver.factor.floorDivLong
 
 enum class LinearOp { LE, EQ, GE, NE }
 
@@ -243,4 +243,16 @@ private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long): Bo
     newMax < Int.MIN_VALUE -> false
     newMax > Int.MAX_VALUE -> true
     else -> state.tightenIntMax(v, newMax.toInt())
+}
+
+/** floor(a / b) with correct handling of negative operands. */
+internal fun floorDivLong(a: Long, b: Long): Long {
+    val q = a / b
+    return if (a % b != 0L && (a xor b) < 0L) q - 1 else q
+}
+
+/** ceil(a / b) with correct handling of negative operands. */
+internal fun ceilDivLong(a: Long, b: Long): Long {
+    val q = a / b
+    return if (a % b != 0L && (a xor b) >= 0L) q + 1 else q
 }

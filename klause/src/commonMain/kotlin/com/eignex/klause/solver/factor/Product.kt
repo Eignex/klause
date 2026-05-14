@@ -5,8 +5,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.ceilDivLong
-import com.eignex.klause.solver.floorDivLong
+import com.eignex.klause.solver.factor.ceilDivLong
+import com.eignex.klause.solver.factor.floorDivLong
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
