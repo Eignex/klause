@@ -22,14 +22,48 @@ class LocalSearchSolver(
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
 ) : Sampler<LocalSearchParams>, Optimizer<LocalSearchParams> {
 
-    override fun solve(params: LocalSearchParams): SolveResult =
-        sample(params)?.let(SolveResult::Sat) ?: SolveResult.Unknown
+    override fun solve(params: LocalSearchParams): SolveResult {
+        val eff = effectiveAssumptions(params.assumptions) ?: return SolveResult.Unsat
+        return sample(params, eff)?.let(SolveResult::Sat) ?: SolveResult.Unknown
+    }
 
-    override fun samples(params: LocalSearchParams): Sequence<Sample> =
-        streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0))
+    override fun samples(params: LocalSearchParams): Sequence<Sample> {
+        val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
+        return streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff)
+    }
 
-    override fun enumerate(params: LocalSearchParams): Sequence<Sample> =
-        streamImpl(params)
+    override fun enumerate(params: LocalSearchParams): Sequence<Sample> {
+        val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
+        return streamImpl(params, eff)
+    }
+
+    private fun sample(params: LocalSearchParams, eff: Assumptions): Sample? =
+        streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff).firstOrNull()
+
+    /**
+     * Fold the bake-time propagation result + per-call assumptions into the effective pin set
+     * the search will see. Returns `null` iff propagation derived Unsat — a sound proof
+     * (translates to [SolveResult.Unsat] / empty sequence / `null` minimize result).
+     */
+    private fun effectiveAssumptions(callAssumptions: Assumptions): Assumptions? {
+        val baked = problem.baked
+        if (baked is PropagationResult.Unsat) return null
+        baked as PropagationResult.Implied
+        if (callAssumptions.isEmpty) {
+            return if (baked.isEmpty) Assumptions.None
+            else Assumptions(bools = baked.bools, ints = baked.ints)
+        }
+        return when (val r = problem.propagate(callAssumptions)) {
+            is PropagationResult.Unsat -> null
+            is PropagationResult.Implied -> {
+                val mergedBools = HashMap<Int, Boolean>(callAssumptions.bools)
+                mergedBools.putAll(r.bools)
+                val mergedInts = HashMap<Int, Int>(callAssumptions.ints)
+                mergedInts.putAll(r.ints)
+                Assumptions(mergedBools, mergedInts)
+            }
+        }
+    }
 
     /**
      * Best-effort linear-objective minimisation under hard constraints. Reaches feasibility
@@ -43,8 +77,10 @@ class LocalSearchSolver(
      * subtypes fall back to a full [Objective.evaluate] re-score per candidate move, which
      * is correct but slow.
      */
-    override fun minimize(objective: Objective, params: LocalSearchParams): Sample? =
-        minimizeImpl(objective, params)
+    override fun minimize(objective: Objective, params: LocalSearchParams): Sample? {
+        val eff = effectiveAssumptions(params.assumptions) ?: return null
+        return minimizeImpl(objective, params, eff)
+    }
 
     fun solve(): SolveResult = solve(LocalSearchParams())
     fun sample(): Sample? = sample(LocalSearchParams())
@@ -52,7 +88,7 @@ class LocalSearchSolver(
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
     fun minimize(objective: Objective): Sample? = minimize(objective, LocalSearchParams())
 
-    private fun streamImpl(params: LocalSearchParams): Sequence<Sample> {
+    private fun streamImpl(params: LocalSearchParams, effectiveAssumptions: Assumptions): Sequence<Sample> {
         require(params.recentWindow >= 0) {
             "recentWindow must be non-negative, got ${params.recentWindow}"
         }
@@ -65,9 +101,8 @@ class LocalSearchSolver(
         val maxFlips = params.maxFlips
         val minHammingDistance = params.minHammingDistance
         val recentWindow = params.recentWindow
-        val assumptions = params.assumptions
         return sequence {
-            val state = SolverState(problem, Random(seed), assumptions)
+            val state = SolverState(problem, Random(seed), effectiveAssumptions)
             val window = ArrayDeque<Sample>()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
@@ -119,14 +154,14 @@ class LocalSearchSolver(
      * the objective), restart and try again. Best-feasible-objective state lives across
      * restarts so we monotonically improve.
      */
-    private fun minimizeImpl(objective: Objective, params: LocalSearchParams): Sample? {
+    private fun minimizeImpl(objective: Objective, params: LocalSearchParams, effectiveAssumptions: Assumptions): Sample? {
         val totalBits = problem.numBoolVars + problem.numIntVars
         require(params.minHammingDistance <= totalBits) {
             "minHammingDistance (${params.minHammingDistance}) exceeds the total variable " +
                 "count ($totalBits)"
         }
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = SolverState(problem, Random(seed), params.assumptions)
+        val state = SolverState(problem, Random(seed), effectiveAssumptions)
         // No bestSample yet — first restart is always full random.
         restartPolicy.restart(state, bestSoFar = null)
 

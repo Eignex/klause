@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /** `x ≥ bound`. */
@@ -31,6 +32,9 @@ class IntGeq(
         val now = cur < bound
         return (if (now) 1 else 0) - (if (was) 1 else 0)
     }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean =
+        state.tightenIntMin(intVar, bound)
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
         val cur = state.assignment.intValue(intVar)

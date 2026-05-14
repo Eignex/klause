@@ -131,8 +131,9 @@ class LogicNGSamplerTest {
                     "${case.name}: LogicNG SAT but LS got $ls"
                 )
                 SolveResult.Unsat -> assertTrue(
-                    ls is SolveResult.Unknown,
-                    "${case.name}: LogicNG UNSAT but LS got $ls (LS should run out of flips)"
+                    ls is SolveResult.Unknown || ls is SolveResult.Unsat,
+                    "${case.name}: LogicNG UNSAT but LS got $ls " +
+                        "(LS should run out of flips, or prove Unsat via propagation)"
                 )
                 SolveResult.Unknown -> {}
             }

@@ -4,6 +4,7 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -75,6 +76,34 @@ class ReifiedPseudoBoolean(
         val wasViolated = aux != predHolds(oldSum)
         val nowViolated = aux != predHolds(newSum)
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val range = pbSumRange(state, weights, literals)
+        val sumLo = range[0]
+        val sumHi = range[1]
+        val bnd = bound.toLong()
+        val alwaysHolds = when (op) {
+            PbOp.LE -> sumHi <= bnd
+            PbOp.GE -> sumLo >= bnd
+            PbOp.EQ -> sumLo == bnd && sumHi == bnd
+        }
+        val neverHolds = when (op) {
+            PbOp.LE -> sumLo > bnd
+            PbOp.GE -> sumHi < bnd
+            PbOp.EQ -> sumLo > bnd || sumHi < bnd
+        }
+        if (alwaysHolds) return state.pinBool(auxBoolVar, true)
+        if (neverHolds) return state.pinBool(auxBoolVar, false)
+
+        val aux = state.boolValues[auxBoolVar] ?: return true
+        return if (aux) {
+            propagatePbBounds(state, weights, literals, op, bnd)
+        } else when (op) {
+            PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1)
+            PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1)
+            PbOp.EQ -> true
+        }
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

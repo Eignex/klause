@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -57,6 +58,60 @@ class ReifiedIntCompare(
         val wasViolated = aux != cmpHolds(oldValue)
         val nowViolated = aux != cmpHolds(cur)
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val d = state.intDomains[intVar]
+        val alwaysHolds = cmpHolds(d.min) && cmpHolds(d.max) && when (op) {
+            // For LE/LT/GE/GT monotone — endpoints determine "always holds".
+            IntCmpOp.LE, IntCmpOp.LT, IntCmpOp.GE, IntCmpOp.GT -> true
+            // EQ "always" only when singleton matching bound; NE "always" only when bound not in domain.
+            IntCmpOp.EQ -> d.min == bound && d.max == bound
+            IntCmpOp.NE -> bound !in d.min..d.max
+        }
+        val neverHolds = !alwaysHolds && when (op) {
+            IntCmpOp.LE -> d.min > bound
+            IntCmpOp.LT -> d.min >= bound
+            IntCmpOp.GE -> d.max < bound
+            IntCmpOp.GT -> d.max <= bound
+            IntCmpOp.EQ -> bound !in d.min..d.max
+            IntCmpOp.NE -> d.min == bound && d.max == bound
+        }
+        if (alwaysHolds) return state.pinBool(auxBoolVar, true)
+        if (neverHolds) return state.pinBool(auxBoolVar, false)
+
+        val aux = state.boolValues[auxBoolVar] ?: return true
+        // aux pinned: tighten domain to match (aux ⇒ holds) or (¬aux ⇒ ¬holds).
+        return if (aux) tightenForHolds(state) else tightenForNotHolds(state, d)
+    }
+
+    private fun tightenForHolds(state: PropagationState): Boolean = when (op) {
+        IntCmpOp.LE -> state.tightenIntMax(intVar, bound)
+        IntCmpOp.LT -> state.tightenIntMax(intVar, bound - 1)
+        IntCmpOp.GE -> state.tightenIntMin(intVar, bound)
+        IntCmpOp.GT -> state.tightenIntMin(intVar, bound + 1)
+        IntCmpOp.EQ -> state.setInt(intVar, bound)
+        IntCmpOp.NE -> {
+            val d = state.intDomains[intVar]
+            when {
+                d.min == bound -> state.tightenIntMin(intVar, bound + 1)
+                d.max == bound -> state.tightenIntMax(intVar, bound - 1)
+                else -> true
+            }
+        }
+    }
+
+    private fun tightenForNotHolds(state: PropagationState, d: com.eignex.klause.solver.IntDomain): Boolean = when (op) {
+        IntCmpOp.LE -> state.tightenIntMin(intVar, bound + 1)
+        IntCmpOp.LT -> state.tightenIntMin(intVar, bound)
+        IntCmpOp.GE -> state.tightenIntMax(intVar, bound - 1)
+        IntCmpOp.GT -> state.tightenIntMax(intVar, bound)
+        IntCmpOp.EQ -> when {
+            d.min == bound -> state.tightenIntMin(intVar, bound + 1)
+            d.max == bound -> state.tightenIntMax(intVar, bound - 1)
+            else -> true
+        }
+        IntCmpOp.NE -> state.setInt(intVar, bound)
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

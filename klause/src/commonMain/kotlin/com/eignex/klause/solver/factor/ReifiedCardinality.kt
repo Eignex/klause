@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -93,6 +94,44 @@ class ReifiedCardinality(
             delta += if (Lit.evaluate(lit, pre)) -1 else 1
         }
         return delta
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        var trueCount = 0
+        var falseCount = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            val b = state.boolValues[v] ?: continue
+            if (Lit.evaluate(lit, b)) trueCount++ else falseCount++
+        }
+        val unassigned = literals.size - trueCount - falseCount
+        val minPossible = trueCount
+        val maxPossible = trueCount + unassigned
+
+        // Fact about the body: definitely in [min, max], or definitely outside?
+        val definitelyIn = minPossible >= min && maxPossible <= max
+        val definitelyOut = maxPossible < min || minPossible > max
+        if (definitelyIn) return state.pinBool(auxBoolVar, true)
+        if (definitelyOut) return state.pinBool(auxBoolVar, false)
+
+        // When aux is pinned true, do the same forcing Cardinality does.
+        val aux = state.boolValues[auxBoolVar] ?: return true
+        if (!aux) return true  // ¬aux: forcing logic is rarely productive at this scope; skip.
+
+        if (trueCount == max && unassigned > 0) {
+            for (lit in literals) {
+                val v = Lit.variable(lit)
+                if (state.boolValues[v] != null) continue
+                if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+            }
+        } else if (trueCount + unassigned == min && unassigned > 0) {
+            for (lit in literals) {
+                val v = Lit.variable(lit)
+                if (state.boolValues[v] != null) continue
+                if (!state.pinBool(v, Lit.isPositive(lit))) return false
+            }
+        }
+        return true
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

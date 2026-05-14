@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -70,6 +71,38 @@ class Cardinality(
         val wasViolated = oldN < min || oldN > max
         val willViolate = newN < min || newN > max
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        var trueCount = 0
+        var falseCount = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            val b = state.boolValues[v] ?: continue
+            if (Lit.evaluate(lit, b)) trueCount++ else falseCount++
+        }
+        val unassigned = literals.size - trueCount - falseCount
+        if (trueCount > max) return false
+        if (trueCount + unassigned < min) return false
+        // Force remaining literals to false when at the upper bound.
+        if (trueCount == max && unassigned > 0) {
+            for (lit in literals) {
+                val v = Lit.variable(lit)
+                if (state.boolValues[v] != null) continue
+                // literal must be false → pin var to ¬positivity
+                if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+            }
+            return true
+        }
+        // Force remaining literals to true when at the lower bound.
+        if (trueCount + unassigned == min && unassigned > 0) {
+            for (lit in literals) {
+                val v = Lit.variable(lit)
+                if (state.boolValues[v] != null) continue
+                if (!state.pinBool(v, Lit.isPositive(lit))) return false
+            }
+        }
+        return true
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

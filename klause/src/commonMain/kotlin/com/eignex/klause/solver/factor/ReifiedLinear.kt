@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -73,6 +74,37 @@ class ReifiedLinear(
         val wasViolated = aux != holds(oldSum)
         val nowViolated = aux != holds(newSum)
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val range = linearSumRange(state, coeffs, vars)
+        val sumLo = range[0]
+        val sumHi = range[1]
+        val bnd = bound.toLong()
+        val alwaysHolds = when (op) {
+            LinearOp.LE -> sumHi <= bnd
+            LinearOp.GE -> sumLo >= bnd
+            LinearOp.EQ -> sumLo == bnd && sumHi == bnd
+        }
+        val neverHolds = when (op) {
+            LinearOp.LE -> sumLo > bnd
+            LinearOp.GE -> sumHi < bnd
+            LinearOp.EQ -> sumLo > bnd || sumHi < bnd
+        }
+        if (alwaysHolds) return state.pinBool(auxBoolVar, true)
+        if (neverHolds) return state.pinBool(auxBoolVar, false)
+
+        val aux = state.boolValues[auxBoolVar] ?: return true
+        return if (aux) {
+            propagateLinearBounds(state, coeffs, vars, op, bnd)
+        } else {
+            // Negate: ¬LE → GE bnd+1; ¬GE → LE bnd-1; ¬EQ has no clean interval form.
+            when (op) {
+                LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1)
+                LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1)
+                LinearOp.EQ -> true
+            }
+        }
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

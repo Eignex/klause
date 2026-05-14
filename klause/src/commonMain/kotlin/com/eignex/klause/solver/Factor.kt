@@ -50,4 +50,11 @@ interface Factor {
             if (cur > d.min) sink.addIntSet(i, cur - 1)
         }
     }
+
+    /**
+     * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything this
+     * factor implies; return `false` iff a contradiction is derived. Default is a no-op — sound
+     * but trivial. Factors override to participate in [Problem.propagate].
+     */
+    fun propagate(state: PropagationState, factorId: Int): Boolean = true
 }

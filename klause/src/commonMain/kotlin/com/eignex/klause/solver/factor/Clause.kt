@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -104,6 +105,30 @@ class Clause(
         val nowViolated = !isSatisfied
         val wasViolated = !wasSatisfied
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        // Walk literals once. Detect a satisfying literal, count unassigned literals, remember the
+        // last unassigned one. If satisfied → nothing to do. If 0 unassigned and none satisfied →
+        // Unsat. If exactly 1 unassigned and none satisfied → pin it to its required polarity.
+        var unassignedCount = 0
+        var unassignedLit = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            val b = state.boolValues[v]
+            if (b == null) {
+                unassignedCount++
+                unassignedLit = lit
+                if (unassignedCount > 1) return true  // not yet unit; no propagation possible
+            } else if (Lit.evaluate(lit, b)) {
+                return true  // clause already satisfied
+            }
+        }
+        return when (unassignedCount) {
+            0 -> false  // all literals false → contradiction
+            1 -> state.pinBool(Lit.variable(unassignedLit), Lit.isPositive(unassignedLit))
+            else -> true
+        }
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

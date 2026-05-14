@@ -38,6 +38,74 @@ class Problem(
 
     val numFactors: Int get() = factors.size
 
+    /**
+     * Result of running [propagate] once with empty assumptions at construction time. Caches
+     * literals/values forced by the constraints alone — every solver call gets a smaller
+     * residual problem with no per-call propagation cost, and trivially-Unsat problems surface
+     * here instead of after a full search budget. May be [PropagationResult.Unsat] for
+     * trivially-infeasible problems; callers that want fail-fast behavior can check this.
+     */
+    val baked: PropagationResult = propagate(Assumptions.None)
+
+    /**
+     * Run sound-but-incomplete deductive propagation against [assumptions]. Each factor's
+     * [Factor.propagate] is invoked to fixed point; pins / domain tightenings cascade through
+     * the occurrence lists. Returns the literals/values forced *beyond* [assumptions] (disjoint
+     * from the input), or [PropagationResult.Unsat] if a contradiction is derived.
+     *
+     * This is the same routine the solver uses internally at init and at every sample / solve
+     * call that carries non-empty assumptions.
+     */
+    fun propagate(assumptions: Assumptions = Assumptions.None): PropagationResult {
+        val state = PropagationState(this, assumptions)
+        if (!state.seeded) return PropagationResult.Unsat
+
+        // Initial worklist: every factor (the seeded vars may not cover everything, and the
+        // baked-once-at-init pass needs all of them anyway).
+        val pending = BooleanArray(numFactors) { true }
+        val queue: ArrayDeque<Int> = ArrayDeque(numFactors)
+        for (fid in 0 until numFactors) queue.addLast(fid)
+
+        while (queue.isNotEmpty()) {
+            val fid = queue.removeFirst()
+            pending[fid] = false
+            if (!factors[fid].propagate(state, fid)) return PropagationResult.Unsat
+
+            // Drain whatever the factor dirtied; enqueue every other factor touching those vars.
+            while (true) {
+                val v = state.pollDirtyBool()
+                if (v < 0) break
+                for (other in boolOccurrences[v]) {
+                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
+                }
+            }
+            while (true) {
+                val v = state.pollDirtyInt()
+                if (v < 0) break
+                for (other in intOccurrences[v]) {
+                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
+                }
+            }
+        }
+
+        // Diff against input: only emit newly-forced facts.
+        val bools = HashMap<Int, Boolean>()
+        for (v in 0 until numBoolVars) {
+            val b = state.boolValues[v] ?: continue
+            if (assumptions.bools[v] == b) continue
+            bools[v] = b
+        }
+        val ints = HashMap<Int, Int>()
+        for (v in 0 until numIntVars) {
+            val d = state.intDomains[v]
+            if (d.min == d.max) {
+                if (assumptions.ints[v] == d.min) continue
+                ints[v] = d.min
+            }
+        }
+        return PropagationResult.Implied(bools, ints)
+    }
+
     private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {
         val counts = IntArray(slots)
         for (f in factors) for (v in vars(f)) counts[v]++

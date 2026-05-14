@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -55,6 +57,16 @@ class Product(
             else -> return 0
         }
         return (if (now) 1 else 0) - (if (was) 1 else 0)
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        // Forward direction: result interval ⊆ corner-product range of a and b. The reverse
+        // directions (deriving a from b/result or b from a/result) need division with
+        // zero-crossing care and are deferred — TODO(propagate).
+        val da = state.intDomains[a]
+        val db = state.intDomains[b]
+        val (pLo, pHi) = cornerProductRange(da, db)
+        return tightenLong(state, result, pLo, pHi)
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
@@ -121,6 +133,28 @@ class Product(
             }
         }
         if (bestCandidate != currentValue) sink.addIntSet(operandVar, bestCandidate)
+    }
+
+    /**
+     * Min/max of the four corner products of two integer intervals. Correct under signed
+     * integer arithmetic (handles zero crossing) because all four products are evaluated;
+     * uses `Long` to dodge `Int` overflow.
+     */
+    private fun cornerProductRange(da: IntDomain, db: IntDomain): Pair<Long, Long> {
+        val p1 = da.min.toLong() * db.min
+        val p2 = da.min.toLong() * db.max
+        val p3 = da.max.toLong() * db.min
+        val p4 = da.max.toLong() * db.max
+        return minOf(p1, p2, p3, p4) to maxOf(p1, p2, p3, p4)
+    }
+
+    private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long): Boolean {
+        if (lo > Int.MAX_VALUE || hi < Int.MIN_VALUE) return false
+        val loI = if (lo < Int.MIN_VALUE) Int.MIN_VALUE else lo.toInt()
+        val hiI = if (hi > Int.MAX_VALUE) Int.MAX_VALUE else hi.toInt()
+        if (!state.tightenIntMin(v, loI)) return false
+        if (!state.tightenIntMax(v, hiI)) return false
+        return true
     }
 
     private companion object {

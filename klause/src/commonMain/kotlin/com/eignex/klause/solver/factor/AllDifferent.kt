@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -23,6 +24,10 @@ class AllDifferent(
         require(vars.size >= 2) { "AllDifferent needs at least two variables" }
         require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
     }
+
+    // TODO(propagate): full Hall-set / matching-based pruning. Current impl handles the easy
+    //  case — singleton-domain conflicts plus boundary tightening when a domain endpoint is
+    //  pinned-elsewhere — but stops short of arc consistency on the matching.
 
     override val boolVars: IntArray = EMPTY
     override val intVars: IntArray = vars
@@ -101,6 +106,31 @@ class AllDifferent(
         var n = 0
         for (v in vars) if (v == intVar) n++
         return n
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        // Build set of "taken" values: those held by any singleton-domain var. Two vars with
+        // the same singleton value → Unsat.
+        val taken = HashSet<Int>()
+        for (v in vars) {
+            val d = state.intDomains[v]
+            if (d.min != d.max) continue
+            if (!taken.add(d.min)) return false
+        }
+        if (taken.isEmpty()) return true
+        // For each non-singleton var, shave taken values off domain endpoints (repeatedly).
+        for (v in vars) {
+            val d = state.intDomains[v]
+            if (d.min == d.max) continue
+            var lo = d.min
+            var hi = d.max
+            while (lo <= hi && lo in taken) lo++
+            while (hi >= lo && hi in taken) hi--
+            if (lo > hi) return false
+            if (lo != d.min && !state.tightenIntMin(v, lo)) return false
+            if (hi != d.max && !state.tightenIntMax(v, hi)) return false
+        }
+        return true
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

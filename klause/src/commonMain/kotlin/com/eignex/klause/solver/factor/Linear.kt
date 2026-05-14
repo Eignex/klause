@@ -2,7 +2,10 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
+import com.eignex.klause.solver.ceilDivLong
+import com.eignex.klause.solver.floorDivLong
 
 enum class LinearOp { LE, EQ, GE }
 
@@ -55,6 +58,9 @@ class Linear(
         return (if (violates(newSum)) 1 else 0) - (if (violates(oldSum)) 1 else 0)
     }
 
+    override fun propagate(state: PropagationState, factorId: Int): Boolean =
+        propagateLinearBounds(state, coeffs, vars, op, bound.toLong())
+
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
         if (!violates(sum)) return
@@ -98,4 +104,95 @@ class Linear(
         val r = a % b
         return if (r != 0 && (r xor b) >= 0) q + 1 else q
     }
+}
+
+/**
+ * Shared bounds-propagation routine for `Σ coeffs[i] * vars[i] ⟨op⟩ bound`. Used by [Linear]
+ * directly and by [ReifiedLinear] when its aux Boolean is pinned. Returns `false` iff the
+ * domains became jointly infeasible.
+ */
+internal fun propagateLinearBounds(
+    state: PropagationState,
+    coeffs: IntArray,
+    vars: IntArray,
+    op: LinearOp,
+    bound: Long,
+): Boolean {
+    val n = vars.size
+    val rLo = LongArray(n)
+    val rHi = LongArray(n)
+    var sumLo = 0L
+    var sumHi = 0L
+    for (i in 0 until n) {
+        val d = state.intDomains[vars[i]]
+        val c = coeffs[i].toLong()
+        val a = c * d.min
+        val b = c * d.max
+        if (a <= b) { rLo[i] = a; rHi[i] = b } else { rLo[i] = b; rHi[i] = a }
+        sumLo += rLo[i]
+        sumHi += rHi[i]
+    }
+    when (op) {
+        LinearOp.LE -> if (sumLo > bound) return false
+        LinearOp.GE -> if (sumHi < bound) return false
+        LinearOp.EQ -> if (sumLo > bound || sumHi < bound) return false
+    }
+    for (i in 0 until n) {
+        val c = coeffs[i].toLong()
+        if (c == 0L) continue
+        val v = vars[i]
+        val otherLo = sumLo - rLo[i]
+        val otherHi = sumHi - rHi[i]
+        if (op == LinearOp.LE || op == LinearOp.EQ) {
+            val slack = bound - otherLo
+            if (c > 0) {
+                if (!tightenMaxClamped(state, v, floorDivLong(slack, c))) return false
+            } else {
+                if (!tightenMinClamped(state, v, ceilDivLong(slack, c))) return false
+            }
+        }
+        if (op == LinearOp.GE || op == LinearOp.EQ) {
+            val needed = bound - otherHi
+            if (c > 0) {
+                if (!tightenMinClamped(state, v, ceilDivLong(needed, c))) return false
+            } else {
+                if (!tightenMaxClamped(state, v, floorDivLong(needed, c))) return false
+            }
+        }
+    }
+    return true
+}
+
+/**
+ * Range `[sumLo, sumHi]` reachable by `Σ coeffs[i] * vars[i]` given current domains. Used by
+ * reified factors to decide whether the body of a linear comparison is forced one way or the
+ * other.
+ */
+internal fun linearSumRange(
+    state: PropagationState,
+    coeffs: IntArray,
+    vars: IntArray,
+): LongArray {
+    var lo = 0L
+    var hi = 0L
+    for (i in vars.indices) {
+        val d = state.intDomains[vars[i]]
+        val c = coeffs[i].toLong()
+        val a = c * d.min
+        val b = c * d.max
+        if (a <= b) { lo += a; hi += b } else { lo += b; hi += a }
+    }
+    return longArrayOf(lo, hi)
+}
+
+private fun tightenMinClamped(state: PropagationState, v: Int, newMin: Long): Boolean = when {
+    newMin > Int.MAX_VALUE -> false
+    newMin < Int.MIN_VALUE -> true
+    else -> state.tightenIntMin(v, newMin.toInt())
+}
+
+private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long): Boolean = when {
+    newMax < Int.MIN_VALUE -> false
+    newMax > Int.MAX_VALUE -> true
+    else -> state.tightenIntMax(v, newMax.toInt())
 }

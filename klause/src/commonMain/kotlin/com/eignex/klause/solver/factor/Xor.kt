@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -69,6 +70,47 @@ class Xor(
         val wasViolated = oldParity != targetParity
         val nowViolated = newParity != targetParity
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        // Walk literals once: tally parity from pinned literals, collect unassigned variables.
+        var pinnedParity = 0
+        val unassigned = LinkedHashSet<Int>()
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            val b = state.boolValues[v]
+            if (b == null) unassigned.add(v)
+            else if (Lit.evaluate(lit, b)) pinnedParity = pinnedParity xor 1
+        }
+        // Only variables with odd-count occurrences ("effective") affect parity.
+        var effective = -1
+        var effectiveCount = 0
+        for (v in unassigned) {
+            if (parityByVar.coeffOf(v) == 1) {
+                effectiveCount++
+                if (effectiveCount > 1) return true  // 2+ effective: parity not yet decidable
+                effective = v
+            }
+        }
+        if (effectiveCount == 0) return pinnedParity == targetParity
+        // Exactly one effective unassigned var: forced. Determine the value matching targetParity.
+        val v = effective
+        // Contribution when v=true: parity of "+v" occurrences (those evaluate true with v=true).
+        // When v=false: parity of "-v" occurrences (those evaluate true with v=false).
+        var posOdd = 0
+        var negOdd = 0
+        for (lit in literals) {
+            if (Lit.variable(lit) != v) continue
+            if (Lit.isPositive(lit)) posOdd = posOdd xor 1 else negOdd = negOdd xor 1
+        }
+        val parityIfTrue = pinnedParity xor posOdd
+        val parityIfFalse = pinnedParity xor negOdd
+        return when {
+            parityIfTrue == targetParity && parityIfFalse != targetParity -> state.pinBool(v, true)
+            parityIfFalse == targetParity && parityIfTrue != targetParity -> state.pinBool(v, false)
+            parityIfTrue != targetParity && parityIfFalse != targetParity -> false
+            else -> true  // both work (shouldn't happen when var has odd parity contribution)
+        }
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

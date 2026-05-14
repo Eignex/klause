@@ -4,6 +4,7 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
 
 /**
@@ -59,6 +60,9 @@ class PseudoBoolean(
         return (if (violates(newSum)) 1 else 0) - (if (violates(oldSum)) 1 else 0)
     }
 
+    override fun propagate(state: PropagationState, factorId: Int): Boolean =
+        propagatePbBounds(state, weights, literals, op, bound.toLong())
+
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
         if (!violates(sum)) return
@@ -101,4 +105,88 @@ class PseudoBoolean(
     private companion object {
         val EMPTY: IntArray = IntArray(0)
     }
+}
+
+/**
+ * Range `[sumLo, sumHi]` reachable by `Σ weights[i] * lit_i` given current pins.
+ *
+ * Per-literal contribution: `{0, w}` (or `{w, 0}` for negative weights) when unassigned;
+ * `{w}` when literal pinned true; `{0}` when pinned false.
+ */
+internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: IntArray): LongArray {
+    var lo = 0L
+    var hi = 0L
+    for (i in literals.indices) {
+        val w = weights[i].toLong()
+        val v = Lit.variable(literals[i])
+        val b = state.boolValues[v]
+        when {
+            b == null -> { lo += minOf(0L, w); hi += maxOf(0L, w) }
+            Lit.evaluate(literals[i], b) -> { lo += w; hi += w }
+            else -> { /* contributes 0 */ }
+        }
+    }
+    return longArrayOf(lo, hi)
+}
+
+/**
+ * Shared bounds-propagation routine for `Σ weights[i] * lit_i ⟨op⟩ bound`. Used by
+ * [PseudoBoolean] directly and by [ReifiedPseudoBoolean] when its aux Boolean is pinned.
+ * Returns `false` iff the constraint is infeasible.
+ */
+internal fun propagatePbBounds(
+    state: PropagationState,
+    weights: IntArray,
+    literals: IntArray,
+    op: PbOp,
+    bound: Long,
+): Boolean {
+    val n = literals.size
+    val litLo = LongArray(n)
+    val litHi = LongArray(n)
+    var sumLo = 0L
+    var sumHi = 0L
+    for (i in 0 until n) {
+        val w = weights[i].toLong()
+        val v = Lit.variable(literals[i])
+        val b = state.boolValues[v]
+        val lo: Long; val hi: Long
+        when {
+            b == null -> { lo = minOf(0L, w); hi = maxOf(0L, w) }
+            Lit.evaluate(literals[i], b) -> { lo = w; hi = w }
+            else -> { lo = 0L; hi = 0L }
+        }
+        litLo[i] = lo
+        litHi[i] = hi
+        sumLo += lo
+        sumHi += hi
+    }
+    when (op) {
+        PbOp.LE -> if (sumLo > bound) return false
+        PbOp.GE -> if (sumHi < bound) return false
+        PbOp.EQ -> if (sumLo > bound || sumHi < bound) return false
+    }
+    for (i in 0 until n) {
+        val w = weights[i].toLong()
+        if (w == 0L) continue
+        val v = Lit.variable(literals[i])
+        if (state.boolValues[v] != null) continue
+        val otherLo = sumLo - litLo[i]
+        val otherHi = sumHi - litHi[i]
+        val trueOk = pbFeasible(op, otherLo + w, otherHi + w, bound)
+        val falseOk = pbFeasible(op, otherLo, otherHi, bound)
+        if (!trueOk && !falseOk) return false
+        if (!trueOk) {
+            if (!state.pinBool(v, !Lit.isPositive(literals[i]))) return false
+        } else if (!falseOk) {
+            if (!state.pinBool(v, Lit.isPositive(literals[i]))) return false
+        }
+    }
+    return true
+}
+
+private fun pbFeasible(op: PbOp, lo: Long, hi: Long, bound: Long): Boolean = when (op) {
+    PbOp.LE -> lo <= bound
+    PbOp.GE -> hi >= bound
+    PbOp.EQ -> lo <= bound && hi >= bound
 }
