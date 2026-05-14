@@ -5,6 +5,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.PropagationState
 import com.eignex.klause.solver.SolverState
+import com.eignex.klause.solver.ceilDivLong
+import com.eignex.klause.solver.floorDivLong
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -60,14 +62,51 @@ class Product(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Forward only: result ⊆ corner product range of (a, b). The reverse direction
-        // (deriving a from b and result, with the operand divided by a non-zero divisor) is
-        // sound in principle but in practice destabilises the worklist when intermediate
-        // bit-blasted Product factors interact with Linear sums — leaving as TODO.
+        // Forward: result ⊆ corner product range of (a, b).
         val da = state.intDomains[a]
         val db = state.intDomains[b]
         val (pLo, pHi) = cornerProductRange(da, db)
-        return tightenLong(state, result, pLo, pHi)
+        if (!tightenLong(state, result, pLo, pHi)) return false
+        // Reverse, singleton-operand only. Non-singleton interval division is sound but
+        // produced unstable worklist interactions with bit-blasted Product chains in the
+        // earlier attempt; the singleton case is the high-value sub-case (constant factor
+        // arithmetic, channelled mod constraints) and is provably stable since `tighten*`
+        // is monotonic.
+        val dbAfter = state.intDomains[b]
+        val daAfter = state.intDomains[a]
+        val dr = state.intDomains[result]
+        if (dbAfter.min == dbAfter.max && dbAfter.min != 0) {
+            if (!narrowByDivisor(state, target = a, divisor = dbAfter.min.toLong(), r = dr)) return false
+        }
+        if (daAfter.min == daAfter.max && daAfter.min != 0) {
+            if (!narrowByDivisor(state, target = b, divisor = daAfter.min.toLong(), r = state.intDomains[result])) return false
+        }
+        return true
+    }
+
+    /**
+     * Narrow [target]'s domain so that `target * divisor ∈ [r.min, r.max]`. [divisor] must
+     * be non-zero. Handles signed division by flipping the bound order when [divisor] < 0.
+     */
+    private fun narrowByDivisor(
+        state: PropagationState,
+        target: Int,
+        divisor: Long,
+        r: IntDomain,
+    ): Boolean {
+        val rLo = r.min.toLong()
+        val rHi = r.max.toLong()
+        val lo: Long
+        val hi: Long
+        if (divisor > 0) {
+            lo = ceilDivLong(rLo, divisor)
+            hi = floorDivLong(rHi, divisor)
+        } else {
+            lo = ceilDivLong(rHi, divisor)
+            hi = floorDivLong(rLo, divisor)
+        }
+        if (lo > hi) return false
+        return tightenLong(state, target, lo, hi)
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
