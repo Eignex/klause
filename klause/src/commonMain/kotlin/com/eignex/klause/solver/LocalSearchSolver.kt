@@ -22,23 +22,29 @@ class LocalSearchSolver(
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
 ) : Sampler<LocalSearchParams>, Optimizer<LocalSearchParams> {
 
-    override fun solve(params: LocalSearchParams): SolveResult {
+    override fun solve(params: LocalSearchParams): SolveResult = solveInternal(params, warm = null)
+
+    override fun samples(params: LocalSearchParams): Sequence<Sample> = samplesInternal(params, warm = null)
+
+    override fun enumerate(params: LocalSearchParams): Sequence<Sample> = enumerateInternal(params, warm = null)
+
+    internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val eff = effectiveAssumptions(params.assumptions) ?: return SolveResult.Unsat
-        return sample(params, eff)?.let(SolveResult::Sat) ?: SolveResult.Unknown
+        return sampleInternal(params, eff, warm)?.let(SolveResult::Sat) ?: SolveResult.Unknown
     }
 
-    override fun samples(params: LocalSearchParams): Sequence<Sample> {
+    internal fun samplesInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
         val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
-        return streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff)
+        return streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff, warm)
     }
 
-    override fun enumerate(params: LocalSearchParams): Sequence<Sample> {
+    internal fun enumerateInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
         val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
-        return streamImpl(params, eff)
+        return streamImpl(params, eff, warm)
     }
 
-    private fun sample(params: LocalSearchParams, eff: Assumptions): Sample? =
-        streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff).firstOrNull()
+    private fun sampleInternal(params: LocalSearchParams, eff: Assumptions, warm: WarmState?): Sample? =
+        streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff, warm).firstOrNull()
 
     /**
      * Fold the bake-time propagation result + per-call assumptions into the effective pin set
@@ -77,9 +83,12 @@ class LocalSearchSolver(
      * subtypes fall back to a full [Objective.evaluate] re-score per candidate move, which
      * is correct but slow.
      */
-    override fun minimize(objective: Objective, params: LocalSearchParams): Sample? {
+    override fun minimize(objective: Objective, params: LocalSearchParams): Sample? =
+        minimizeInternal(objective, params, warm = null)
+
+    internal fun minimizeInternal(objective: Objective, params: LocalSearchParams, warm: WarmState?): Sample? {
         val eff = effectiveAssumptions(params.assumptions) ?: return null
-        return minimizeImpl(objective, params, eff)
+        return minimizeImpl(objective, params, eff, warm)
     }
 
     /**
@@ -88,10 +97,15 @@ class LocalSearchSolver(
      * returns the top [k] in order. Pool size is capped — for true k-best on a small
      * feasible space, callers should still raise `params.maxFlips` so the pool fills.
      */
-    override fun minimizeAll(objective: Objective, params: LocalSearchParams, k: Int): Sequence<Sample> {
+    override fun minimizeAll(objective: Objective, params: LocalSearchParams, k: Int): Sequence<Sample> =
+        minimizeAllInternal(objective, params, k, warm = null)
+
+    internal fun minimizeAllInternal(
+        objective: Objective, params: LocalSearchParams, k: Int, warm: WarmState?,
+    ): Sequence<Sample> {
         if (k <= 0) return emptySequence()
         val poolSize = maxOf(k * 5, k + 10)
-        val pool = enumerate(params).take(poolSize).toList()
+        val pool = enumerateInternal(params, warm).take(poolSize).toList()
         if (pool.isEmpty()) return emptySequence()
         return pool.asSequence()
             .sortedBy { objective.evaluate(it) }
@@ -104,7 +118,11 @@ class LocalSearchSolver(
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
     fun minimize(objective: Objective): Sample? = minimize(objective, LocalSearchParams())
 
-    private fun streamImpl(params: LocalSearchParams, effectiveAssumptions: Assumptions): Sequence<Sample> {
+    private fun streamImpl(
+        params: LocalSearchParams,
+        effectiveAssumptions: Assumptions,
+        warm: WarmState? = null,
+    ): Sequence<Sample> {
         require(params.recentWindow >= 0) {
             "recentWindow must be non-negative, got ${params.recentWindow}"
         }
@@ -121,6 +139,7 @@ class LocalSearchSolver(
         val hintRespects = params.hintRespectsAssumptions
         return sequence {
             val state = SolverState(problem, Random(seed), effectiveAssumptions)
+            warm?.applyTo(state)
             val window = ArrayDeque<Sample>()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
@@ -134,10 +153,14 @@ class LocalSearchSolver(
             // sequence rather than spinning forever rejecting via [farEnough].
             var flipsSinceYield = 0L
 
-            while (flipsSinceYield < maxFlips) {
+            try { while (flipsSinceYield < maxFlips) {
                 if (state.cost == 0) {
                     val snap = state.assignment.snapshot()
                     if (farEnough(snap, window, minHammingDistance, recentWindow)) {
+                        // Sync warm state on every yield so streaming consumers (which
+                        // typically take just one or a few samples and never drain the
+                        // sequence) still see captured weights.
+                        warm?.captureFrom(state)
                         yield(snap)
                         if (recentWindow > 0) {
                             if (window.size >= recentWindow) window.removeFirst()
@@ -163,6 +186,11 @@ class LocalSearchSolver(
                 state.apply(move)
                 flipsSinceRestart++
                 flipsSinceYield++
+            } } finally {
+                // Sync learned weights back into warm state when the loop exits naturally
+                // or when the consumer cancels (sequence builder closes the coroutine). On
+                // abandoned sequences this may not fire; that's accepted loss.
+                warm?.captureFrom(state)
             }
         }
     }
@@ -174,7 +202,12 @@ class LocalSearchSolver(
      * the objective), restart and try again. Best-feasible-objective state lives across
      * restarts so we monotonically improve.
      */
-    private fun minimizeImpl(objective: Objective, params: LocalSearchParams, effectiveAssumptions: Assumptions): Sample? {
+    private fun minimizeImpl(
+        objective: Objective,
+        params: LocalSearchParams,
+        effectiveAssumptions: Assumptions,
+        warm: WarmState? = null,
+    ): Sample? {
         val totalBits = problem.numBoolVars + problem.numIntVars
         require(params.minHammingDistance <= totalBits) {
             "minHammingDistance (${params.minHammingDistance}) exceeds the total variable " +
@@ -182,6 +215,7 @@ class LocalSearchSolver(
         }
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = SolverState(problem, Random(seed), effectiveAssumptions)
+        warm?.applyTo(state)
         // No bestSample yet — first attempt is hint-seeded if available, otherwise random.
         if (params.hint != null) state.seedFromHint(params.hint, params.hintRespectsAssumptions)
         else restartPolicy.restart(state, bestSoFar = null)
@@ -235,6 +269,7 @@ class LocalSearchSolver(
             flipsSinceRestart++
             totalFlips++
         }
+        warm?.captureFrom(state)
         return bestSample
     }
 
