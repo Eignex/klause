@@ -1,6 +1,6 @@
 {
-    "timestamp": "2026-05-14T16:31:31.683478672Z",
-    "gitSha": "95991e8dd7286f40aced7b4173a5c65026728b1d",
+    "timestamp": "2026-05-14T18:32:03.390596232Z",
+    "gitSha": "478e88ed7e5fcd7291c0c542454cf98181311204",
     "env": {
         "javaVersion": "24.0.2",
         "javaVendor": "Eclipse Adoptium",
@@ -8,9 +8,9 @@
         "osArch": "amd64",
         "cpuCount": 20
     },
-    "repetitions": 3,
-    "sampleCount": 5,
-    "warmupReps": 2,
+    "repetitions": 5,
+    "sampleCount": 10,
+    "warmupReps": 3,
     "entries": [
         {
             "name": "threeClauses",
@@ -18,33 +18,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 1709,
-                    "sampleNsMedian": 3757,
-                    "enumNsMedian": 3858
+                    "solveNsMedian": 1725,
+                    "sampleNsMedian": 5502,
+                    "enumNsMedian": 6185
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 4061,
-                    "sampleNsMedian": 26417,
-                    "enumNsMedian": 16803
+                    "solveNsMedian": 4252,
+                    "sampleNsMedian": 46673,
+                    "enumNsMedian": 41025
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 12149,
-                    "sampleNsMedian": 51353,
-                    "enumNsMedian": 75181
+                    "solveNsMedian": 9123,
+                    "sampleNsMedian": 105069,
+                    "enumNsMedian": 134894
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11688904,
-                    "sampleNsMedian": 78481822,
-                    "enumNsMedian": 7276146
+                    "solveNsMedian": 6969235,
+                    "sampleNsMedian": 116171648,
+                    "enumNsMedian": 7277981
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 3451,
-                    "sampleNsMedian": 25001,
-                    "enumNsMedian": 12406
+                    "solveNsMedian": 3937,
+                    "sampleNsMedian": 45667,
+                    "enumNsMedian": 32094
                 }
             ]
         },
@@ -54,33 +54,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 6878,
-                    "sampleNsMedian": 18205,
-                    "enumNsMedian": 20376
+                    "solveNsMedian": 6712,
+                    "sampleNsMedian": 33212,
+                    "enumNsMedian": 32004
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 8875,
-                    "sampleNsMedian": 73706,
-                    "enumNsMedian": 27157
+                    "solveNsMedian": 6527,
+                    "sampleNsMedian": 75033,
+                    "enumNsMedian": 20409
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 36055,
-                    "sampleNsMedian": 701972,
-                    "enumNsMedian": 145592
+                    "solveNsMedian": 32562,
+                    "sampleNsMedian": 1417548,
+                    "enumNsMedian": 134346
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 6687590,
-                    "sampleNsMedian": 104091426,
-                    "enumNsMedian": 7839887
+                    "solveNsMedian": 7050645,
+                    "sampleNsMedian": 221003441,
+                    "enumNsMedian": 8057638
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 4763,
-                    "sampleNsMedian": 26288,
-                    "enumNsMedian": 19654
+                    "solveNsMedian": 4861,
+                    "sampleNsMedian": 56005,
+                    "enumNsMedian": 18095
                 }
             ]
         },
@@ -90,33 +90,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 2863,
-                    "sampleNsMedian": 16397,
-                    "enumNsMedian": 15047
+                    "solveNsMedian": 2859,
+                    "sampleNsMedian": 23812,
+                    "enumNsMedian": 25486
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 10082,
-                    "sampleNsMedian": 57055,
-                    "enumNsMedian": 31344
+                    "solveNsMedian": 8329,
+                    "sampleNsMedian": 112492,
+                    "enumNsMedian": 29686
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 566386,
-                    "sampleNsMedian": 14831323,
-                    "enumNsMedian": 1115923
+                    "solveNsMedian": 567323,
+                    "sampleNsMedian": 32013301,
+                    "enumNsMedian": 996889
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 12025024,
-                    "sampleNsMedian": 112173064,
-                    "enumNsMedian": 7850591
+                    "solveNsMedian": 7539436,
+                    "sampleNsMedian": 199066749,
+                    "enumNsMedian": 8562173
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 4449,
-                    "sampleNsMedian": 22038,
-                    "enumNsMedian": 17724
+                    "solveNsMedian": 2201,
+                    "sampleNsMedian": 26302,
+                    "enumNsMedian": 12079
                 }
             ]
         },
@@ -126,33 +126,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 1413,
-                    "sampleNsMedian": 5642,
-                    "enumNsMedian": 5588
+                    "solveNsMedian": 1528,
+                    "sampleNsMedian": 13722,
+                    "enumNsMedian": 14198
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 12788,
-                    "sampleNsMedian": 66388,
-                    "enumNsMedian": 38346
+                    "solveNsMedian": 12977,
+                    "sampleNsMedian": 177479,
+                    "enumNsMedian": 68940
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 414239,
-                    "sampleNsMedian": 11899107,
-                    "enumNsMedian": 785868
+                    "solveNsMedian": 437917,
+                    "sampleNsMedian": 23630379,
+                    "enumNsMedian": 864327
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 14039042,
-                    "sampleNsMedian": 63699023,
-                    "enumNsMedian": 8402455
+                    "solveNsMedian": 6845855,
+                    "sampleNsMedian": 134794676,
+                    "enumNsMedian": 8281919
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 3314,
-                    "sampleNsMedian": 14919,
-                    "enumNsMedian": 10782
+                    "solveNsMedian": 2158,
+                    "sampleNsMedian": 12939,
+                    "enumNsMedian": 11749
                 }
             ]
         },
@@ -162,33 +162,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 6463,
-                    "sampleNsMedian": 20761,
-                    "enumNsMedian": 20501
+                    "solveNsMedian": 6074,
+                    "sampleNsMedian": 31089,
+                    "enumNsMedian": 33381
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 13103,
-                    "sampleNsMedian": 70147,
-                    "enumNsMedian": 55321
+                    "solveNsMedian": 11554,
+                    "sampleNsMedian": 105775,
+                    "enumNsMedian": 48302
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 157721,
-                    "sampleNsMedian": 2844309,
-                    "enumNsMedian": 261964
+                    "solveNsMedian": 133517,
+                    "sampleNsMedian": 4982679,
+                    "enumNsMedian": 250616
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 12828874,
-                    "sampleNsMedian": 105568249,
-                    "enumNsMedian": 8224134
+                    "solveNsMedian": 6771635,
+                    "sampleNsMedian": 234993758,
+                    "enumNsMedian": 8280112
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 10834,
-                    "sampleNsMedian": 38458,
-                    "enumNsMedian": 26482
+                    "solveNsMedian": 3362,
+                    "sampleNsMedian": 26843,
+                    "enumNsMedian": 15506
                 }
             ]
         },
@@ -198,33 +198,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 2970,
-                    "sampleNsMedian": 3567,
-                    "enumNsMedian": 3709
+                    "solveNsMedian": 2685,
+                    "sampleNsMedian": 7684,
+                    "enumNsMedian": 7270
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 3499,
-                    "sampleNsMedian": 32408,
-                    "enumNsMedian": 17763
+                    "solveNsMedian": 2452,
+                    "sampleNsMedian": 24196,
+                    "enumNsMedian": 18546
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 121156,
-                    "sampleNsMedian": 2193367,
-                    "enumNsMedian": 174739
+                    "solveNsMedian": 181867,
+                    "sampleNsMedian": 7120814,
+                    "enumNsMedian": 375048
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 13594918,
-                    "sampleNsMedian": 85568885,
-                    "enumNsMedian": 10353848
+                    "solveNsMedian": 7373823,
+                    "sampleNsMedian": 107136374,
+                    "enumNsMedian": 8480852
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 4736,
-                    "sampleNsMedian": 15503,
-                    "enumNsMedian": 9212
+                    "solveNsMedian": 1259,
+                    "sampleNsMedian": 9722,
+                    "enumNsMedian": 7771
                 }
             ]
         },
@@ -234,33 +234,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 15863,
-                    "sampleNsMedian": 45143,
-                    "enumNsMedian": 35593
+                    "solveNsMedian": 7333,
+                    "sampleNsMedian": 36001,
+                    "enumNsMedian": 37824
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 7051,
-                    "sampleNsMedian": 34875,
-                    "enumNsMedian": 20368
+                    "solveNsMedian": 5552,
+                    "sampleNsMedian": 52492,
+                    "enumNsMedian": 28193
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 407763,
-                    "sampleNsMedian": 9159266,
-                    "enumNsMedian": 2896023
+                    "solveNsMedian": 380049,
+                    "sampleNsMedian": 18169440,
+                    "enumNsMedian": 24006486
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 15558908,
-                    "sampleNsMedian": 73515151,
-                    "enumNsMedian": 9741295
+                    "solveNsMedian": 12022313,
+                    "sampleNsMedian": 90027874,
+                    "enumNsMedian": 8374068
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 3729,
-                    "sampleNsMedian": 31342,
-                    "enumNsMedian": 34560
+                    "solveNsMedian": 1908,
+                    "sampleNsMedian": 23581,
+                    "enumNsMedian": 19438
                 }
             ]
         },
@@ -270,33 +270,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 11221,
-                    "sampleNsMedian": 32937,
-                    "enumNsMedian": 33231
+                    "solveNsMedian": 9830,
+                    "sampleNsMedian": 65382,
+                    "enumNsMedian": 75067
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 7747,
-                    "sampleNsMedian": 44643,
-                    "enumNsMedian": 21998
+                    "solveNsMedian": 14967,
+                    "sampleNsMedian": 146277,
+                    "enumNsMedian": 32075
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 921307,
-                    "sampleNsMedian": 25902763,
-                    "enumNsMedian": 1445828
+                    "solveNsMedian": 889463,
+                    "sampleNsMedian": 47088781,
+                    "enumNsMedian": 1117891
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 7295907,
-                    "sampleNsMedian": 145713529,
-                    "enumNsMedian": 8508152
+                    "solveNsMedian": 7972798,
+                    "sampleNsMedian": 245764321,
+                    "enumNsMedian": 8448706
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 8492,
-                    "sampleNsMedian": 78326,
-                    "enumNsMedian": 51393
+                    "solveNsMedian": 5198,
+                    "sampleNsMedian": 61522,
+                    "enumNsMedian": 19302
                 }
             ]
         },
@@ -306,33 +306,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 7114,
-                    "sampleNsMedian": 16336,
-                    "enumNsMedian": 15937
+                    "solveNsMedian": 5200,
+                    "sampleNsMedian": 21115,
+                    "enumNsMedian": 21738
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 8462,
-                    "sampleNsMedian": 52790,
-                    "enumNsMedian": 22665
+                    "solveNsMedian": 7768,
+                    "sampleNsMedian": 94329,
+                    "enumNsMedian": 43066
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 63530,
-                    "sampleNsMedian": 1336121,
-                    "enumNsMedian": 116297
+                    "solveNsMedian": 35150,
+                    "sampleNsMedian": 994017,
+                    "enumNsMedian": 101487
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 10835574,
-                    "sampleNsMedian": 45809653,
-                    "enumNsMedian": 6426585
+                    "solveNsMedian": 11490376,
+                    "sampleNsMedian": 112655030,
+                    "enumNsMedian": 7710370
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 227061,
-                    "sampleNsMedian": 1031537,
-                    "enumNsMedian": 826967
+                    "solveNsMedian": 247176,
+                    "sampleNsMedian": 1197134,
+                    "enumNsMedian": 2056593
                 }
             ]
         },
@@ -342,33 +342,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 7999,
-                    "sampleNsMedian": 31319,
-                    "enumNsMedian": 28054
+                    "solveNsMedian": 4750,
+                    "sampleNsMedian": 44174,
+                    "enumNsMedian": 44991
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 9640,
-                    "sampleNsMedian": 65947,
-                    "enumNsMedian": 17376
+                    "solveNsMedian": 8284,
+                    "sampleNsMedian": 103284,
+                    "enumNsMedian": 12954
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 943793,
-                    "sampleNsMedian": 25064689,
-                    "enumNsMedian": 1531937
+                    "solveNsMedian": 853402,
+                    "sampleNsMedian": 52942579,
+                    "enumNsMedian": 1162304
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 7516854,
-                    "sampleNsMedian": 201735062,
-                    "enumNsMedian": 7841117
+                    "solveNsMedian": 7771921,
+                    "sampleNsMedian": 405474441,
+                    "enumNsMedian": 7593346
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 9497,
-                    "sampleNsMedian": 209806,
-                    "enumNsMedian": 140005
+                    "solveNsMedian": 9879,
+                    "sampleNsMedian": 493940,
+                    "enumNsMedian": 134494
                 }
             ]
         },
@@ -378,27 +378,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 9918,
-                    "sampleNsMedian": 100259,
-                    "enumNsMedian": 95037
+                    "solveNsMedian": 7766,
+                    "sampleNsMedian": 299883,
+                    "enumNsMedian": 300827
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 13389,
-                    "sampleNsMedian": 87500,
-                    "enumNsMedian": 41174
+                    "solveNsMedian": 10406,
+                    "sampleNsMedian": 150286,
+                    "enumNsMedian": 53611
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 115749,
-                    "sampleNsMedian": 2422240,
-                    "enumNsMedian": 174217
+                    "solveNsMedian": 149922,
+                    "sampleNsMedian": 5090114,
+                    "enumNsMedian": 246054
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11135773,
-                    "sampleNsMedian": 102890823,
-                    "enumNsMedian": 7553861
+                    "solveNsMedian": 11162945,
+                    "sampleNsMedian": 163742845,
+                    "enumNsMedian": 7802405
                 }
             ]
         },
@@ -408,27 +408,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 383257,
-                    "sampleNsMedian": 721662,
-                    "enumNsMedian": 774512
+                    "solveNsMedian": 387052,
+                    "sampleNsMedian": 1807605,
+                    "enumNsMedian": 1704093
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 543563,
-                    "sampleNsMedian": 1239531,
-                    "enumNsMedian": 582691
+                    "solveNsMedian": 483254,
+                    "sampleNsMedian": 2979092,
+                    "enumNsMedian": 508911
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 377416,
-                    "sampleNsMedian": 5338591,
-                    "enumNsMedian": 505946
+                    "solveNsMedian": 363787,
+                    "sampleNsMedian": 12814890,
+                    "enumNsMedian": 697333
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 12118322,
-                    "sampleNsMedian": 58403950,
-                    "enumNsMedian": 8263490
+                    "solveNsMedian": 12243637,
+                    "sampleNsMedian": 109227440,
+                    "enumNsMedian": 9273777
                 }
             ]
         },
@@ -438,33 +438,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 3408,
-                    "sampleNsMedian": 6032,
-                    "enumNsMedian": 6186
+                    "solveNsMedian": 3660,
+                    "sampleNsMedian": 12172,
+                    "enumNsMedian": 10408
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 3010,
-                    "sampleNsMedian": 12394,
-                    "enumNsMedian": 9301
+                    "solveNsMedian": 2473,
+                    "sampleNsMedian": 23751,
+                    "enumNsMedian": 8932
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 473544,
-                    "sampleNsMedian": 11209121,
-                    "enumNsMedian": 710770
+                    "solveNsMedian": 487845,
+                    "sampleNsMedian": 25881789,
+                    "enumNsMedian": 835162
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11306391,
-                    "sampleNsMedian": 61978253,
-                    "enumNsMedian": 7007820
+                    "solveNsMedian": 7107667,
+                    "sampleNsMedian": 150815119,
+                    "enumNsMedian": 7828285
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 1019,
-                    "sampleNsMedian": 3880,
-                    "enumNsMedian": 5075
+                    "solveNsMedian": 1094,
+                    "sampleNsMedian": 8672,
+                    "enumNsMedian": 4611
                 }
             ]
         },
@@ -474,33 +474,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 2052,
-                    "sampleNsMedian": 4910,
-                    "enumNsMedian": 5172
+                    "solveNsMedian": 971,
+                    "sampleNsMedian": 6625,
+                    "enumNsMedian": 6682
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 11388,
-                    "sampleNsMedian": 42491,
-                    "enumNsMedian": 19251
+                    "solveNsMedian": 7797,
+                    "sampleNsMedian": 55058,
+                    "enumNsMedian": 15273
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 460377,
-                    "sampleNsMedian": 10817923,
-                    "enumNsMedian": 726710
+                    "solveNsMedian": 588155,
+                    "sampleNsMedian": 27238675,
+                    "enumNsMedian": 1045632
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11297808,
-                    "sampleNsMedian": 136610013,
-                    "enumNsMedian": 7888287
+                    "solveNsMedian": 12412664,
+                    "sampleNsMedian": 275074208,
+                    "enumNsMedian": 8387516
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 3194,
-                    "sampleNsMedian": 19650,
-                    "enumNsMedian": 9696
+                    "solveNsMedian": 2435,
+                    "sampleNsMedian": 15046,
+                    "enumNsMedian": 16833
                 }
             ]
         },
@@ -510,33 +510,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 826,
-                    "sampleNsMedian": 8301,
-                    "enumNsMedian": 8381
+                    "solveNsMedian": 708,
+                    "sampleNsMedian": 7060,
+                    "enumNsMedian": 7516
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 2090,
-                    "sampleNsMedian": 9497,
-                    "enumNsMedian": 8795
+                    "solveNsMedian": 2652,
+                    "sampleNsMedian": 24535,
+                    "enumNsMedian": 7651
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 287135,
-                    "sampleNsMedian": 6530875,
-                    "enumNsMedian": 382265
+                    "solveNsMedian": 324351,
+                    "sampleNsMedian": 16274878,
+                    "enumNsMedian": 458590
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 10956049,
-                    "sampleNsMedian": 87221080,
-                    "enumNsMedian": 7246856
+                    "solveNsMedian": 7117210,
+                    "sampleNsMedian": 146221613,
+                    "enumNsMedian": 8495869
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 1025,
-                    "sampleNsMedian": 5929,
-                    "enumNsMedian": 5737
+                    "solveNsMedian": 975,
+                    "sampleNsMedian": 9190,
+                    "enumNsMedian": 4673
                 }
             ]
         },
@@ -546,33 +546,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 3175,
-                    "sampleNsMedian": 13267,
-                    "enumNsMedian": 12489
+                    "solveNsMedian": 3076,
+                    "sampleNsMedian": 26245,
+                    "enumNsMedian": 26331
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 5104,
-                    "sampleNsMedian": 31348,
-                    "enumNsMedian": 21680
+                    "solveNsMedian": 3421,
+                    "sampleNsMedian": 34040,
+                    "enumNsMedian": 18825
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 81448,
-                    "sampleNsMedian": 1965000,
-                    "enumNsMedian": 175920
+                    "solveNsMedian": 127276,
+                    "sampleNsMedian": 4987188,
+                    "enumNsMedian": 307396
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11068364,
-                    "sampleNsMedian": 127039823,
-                    "enumNsMedian": 7107049
+                    "solveNsMedian": 11312032,
+                    "sampleNsMedian": 329726393,
+                    "enumNsMedian": 8315789
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 978,
-                    "sampleNsMedian": 6678,
-                    "enumNsMedian": 12361
+                    "solveNsMedian": 1039,
+                    "sampleNsMedian": 11394,
+                    "enumNsMedian": 16845
                 }
             ]
         },
@@ -582,33 +582,33 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 2338,
-                    "sampleNsMedian": 8407,
-                    "enumNsMedian": 7892
+                    "solveNsMedian": 3487,
+                    "sampleNsMedian": 24211,
+                    "enumNsMedian": 25604
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 3332,
-                    "sampleNsMedian": 21031,
-                    "enumNsMedian": 12095
+                    "solveNsMedian": 4661,
+                    "sampleNsMedian": 40095,
+                    "enumNsMedian": 18224
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 452692,
-                    "sampleNsMedian": 12296245,
-                    "enumNsMedian": 770833
+                    "solveNsMedian": 489361,
+                    "sampleNsMedian": 26255229,
+                    "enumNsMedian": 1152721
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 10961216,
-                    "sampleNsMedian": 87058968,
-                    "enumNsMedian": 6824728
+                    "solveNsMedian": 11928391,
+                    "sampleNsMedian": 195639275,
+                    "enumNsMedian": 7544293
                 },
                 {
                     "backend": "brute-force",
-                    "solveNsMedian": 873,
-                    "sampleNsMedian": 3544,
-                    "enumNsMedian": 3392
+                    "solveNsMedian": 751,
+                    "sampleNsMedian": 5919,
+                    "enumNsMedian": 3772
                 }
             ]
         },
@@ -618,27 +618,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 146480,
-                    "sampleNsMedian": 400070,
-                    "enumNsMedian": 479506
+                    "solveNsMedian": 165231,
+                    "sampleNsMedian": 940942,
+                    "enumNsMedian": 931631
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 68513,
-                    "sampleNsMedian": 186880,
-                    "enumNsMedian": 112974
+                    "solveNsMedian": 68688,
+                    "sampleNsMedian": 322238,
+                    "enumNsMedian": 101295
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 150484,
-                    "sampleNsMedian": 3303607,
-                    "enumNsMedian": 208969
+                    "solveNsMedian": 210091,
+                    "sampleNsMedian": 7050213,
+                    "enumNsMedian": 311121
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11672093,
-                    "sampleNsMedian": 111007390,
-                    "enumNsMedian": 7105267
+                    "solveNsMedian": 7193193,
+                    "sampleNsMedian": 250224496,
+                    "enumNsMedian": 8024332
                 }
             ]
         },
@@ -648,27 +648,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 14727,
-                    "sampleNsMedian": 246103,
-                    "enumNsMedian": 214024
+                    "solveNsMedian": 21359,
+                    "sampleNsMedian": 510137,
+                    "enumNsMedian": 512155
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 52594,
-                    "sampleNsMedian": 244188,
-                    "enumNsMedian": 76282
+                    "solveNsMedian": 46473,
+                    "sampleNsMedian": 384592,
+                    "enumNsMedian": 102502
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 149743,
-                    "sampleNsMedian": 3427890,
-                    "enumNsMedian": 220942
+                    "solveNsMedian": 153280,
+                    "sampleNsMedian": 6419701,
+                    "enumNsMedian": 254830
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 12655233,
-                    "sampleNsMedian": 143507941,
-                    "enumNsMedian": 7554059
+                    "solveNsMedian": 6946169,
+                    "sampleNsMedian": 267166925,
+                    "enumNsMedian": 8317805
                 }
             ]
         },
@@ -678,27 +678,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 74903,
-                    "sampleNsMedian": 272930,
-                    "enumNsMedian": 278114
+                    "solveNsMedian": 76880,
+                    "sampleNsMedian": 793700,
+                    "enumNsMedian": 815348
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 49444,
-                    "sampleNsMedian": 241361,
-                    "enumNsMedian": 77614
+                    "solveNsMedian": 64721,
+                    "sampleNsMedian": 546968,
+                    "enumNsMedian": 90967
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 182383,
-                    "sampleNsMedian": 3719872,
-                    "enumNsMedian": 186269
+                    "solveNsMedian": 191435,
+                    "sampleNsMedian": 7387104,
+                    "enumNsMedian": 236567
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 7030165,
-                    "sampleNsMedian": 194355826,
-                    "enumNsMedian": 7501683
+                    "solveNsMedian": 6850761,
+                    "sampleNsMedian": 311533101,
+                    "enumNsMedian": 7688591
                 }
             ]
         },
@@ -708,27 +708,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 479308,
-                    "sampleNsMedian": 1972484,
-                    "enumNsMedian": 1898287
+                    "solveNsMedian": 443137,
+                    "sampleNsMedian": 3023237,
+                    "enumNsMedian": 3066739
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 34260,
-                    "sampleNsMedian": 239742,
-                    "enumNsMedian": 54213
+                    "solveNsMedian": 29041,
+                    "sampleNsMedian": 417240,
+                    "enumNsMedian": 59776
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 202810,
-                    "sampleNsMedian": 4155058,
-                    "enumNsMedian": 160919
+                    "solveNsMedian": 148269,
+                    "sampleNsMedian": 8204226,
+                    "enumNsMedian": 155809
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 6851082,
-                    "sampleNsMedian": 183709233,
-                    "enumNsMedian": 7814248
+                    "solveNsMedian": 6747333,
+                    "sampleNsMedian": 326886527,
+                    "enumNsMedian": 7045419
                 }
             ]
         },
@@ -738,27 +738,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 30445,
-                    "sampleNsMedian": 667601,
-                    "enumNsMedian": 599893
+                    "solveNsMedian": 30602,
+                    "sampleNsMedian": 1324419,
+                    "enumNsMedian": 1315122
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 17227,
-                    "sampleNsMedian": 234889,
-                    "enumNsMedian": 68612
+                    "solveNsMedian": 21609,
+                    "sampleNsMedian": 449200,
+                    "enumNsMedian": 92905
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 135130,
-                    "sampleNsMedian": 3397490,
-                    "enumNsMedian": 180009
+                    "solveNsMedian": 144957,
+                    "sampleNsMedian": 6954212,
+                    "enumNsMedian": 208549
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11151271,
-                    "sampleNsMedian": 159304508,
-                    "enumNsMedian": 6757731
+                    "solveNsMedian": 6703476,
+                    "sampleNsMedian": 339358319,
+                    "enumNsMedian": 7800054
                 }
             ]
         },
@@ -768,27 +768,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 102800,
-                    "sampleNsMedian": 486335,
-                    "enumNsMedian": 520531
+                    "solveNsMedian": 109106,
+                    "sampleNsMedian": 830224,
+                    "enumNsMedian": 859382
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 41960,
-                    "sampleNsMedian": 187535,
-                    "enumNsMedian": 109102
+                    "solveNsMedian": 49429,
+                    "sampleNsMedian": 508221,
+                    "enumNsMedian": 121975
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 153898,
-                    "sampleNsMedian": 3779897,
-                    "enumNsMedian": 207121
+                    "solveNsMedian": 177352,
+                    "sampleNsMedian": 8210448,
+                    "enumNsMedian": 215168
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 13022099,
-                    "sampleNsMedian": 162628076,
-                    "enumNsMedian": 7078777
+                    "solveNsMedian": 7067057,
+                    "sampleNsMedian": 324592925,
+                    "enumNsMedian": 8134239
                 }
             ]
         },
@@ -798,27 +798,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 374241,
-                    "sampleNsMedian": 1702875,
-                    "enumNsMedian": 1749541
+                    "solveNsMedian": 387810,
+                    "sampleNsMedian": 3786748,
+                    "enumNsMedian": 3744556
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 36249,
-                    "sampleNsMedian": 197272,
-                    "enumNsMedian": 47639
+                    "solveNsMedian": 41399,
+                    "sampleNsMedian": 458571,
+                    "enumNsMedian": 59337
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 126317,
-                    "sampleNsMedian": 3645856,
-                    "enumNsMedian": 171252
+                    "solveNsMedian": 144496,
+                    "sampleNsMedian": 7374251,
+                    "enumNsMedian": 166414
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 6777644,
-                    "sampleNsMedian": 173909633,
-                    "enumNsMedian": 7463433
+                    "solveNsMedian": 6687583,
+                    "sampleNsMedian": 346294582,
+                    "enumNsMedian": 7731072
                 }
             ]
         },
@@ -828,27 +828,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 62493,
-                    "sampleNsMedian": 314165,
-                    "enumNsMedian": 319225
+                    "solveNsMedian": 51875,
+                    "sampleNsMedian": 548240,
+                    "enumNsMedian": 580189
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 8289,
-                    "sampleNsMedian": 97532,
-                    "enumNsMedian": 20685
+                    "solveNsMedian": 9490,
+                    "sampleNsMedian": 322139,
+                    "enumNsMedian": 40293
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 146181,
-                    "sampleNsMedian": 3579761,
-                    "enumNsMedian": 264486
+                    "solveNsMedian": 158831,
+                    "sampleNsMedian": 7000177,
+                    "enumNsMedian": 298433
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 11228176,
-                    "sampleNsMedian": 106876162,
-                    "enumNsMedian": 7751772
+                    "solveNsMedian": 10708442,
+                    "sampleNsMedian": 232229058,
+                    "enumNsMedian": 7536363
                 }
             ]
         },
@@ -858,27 +858,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 464583,
-                    "sampleNsMedian": 2226444,
-                    "enumNsMedian": 2182831
+                    "solveNsMedian": 433705,
+                    "sampleNsMedian": 3696816,
+                    "enumNsMedian": 3687346
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 39157,
-                    "sampleNsMedian": 282604,
-                    "enumNsMedian": 66846
+                    "solveNsMedian": 43256,
+                    "sampleNsMedian": 538869,
+                    "enumNsMedian": 72272
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 145122,
-                    "sampleNsMedian": 3679085,
-                    "enumNsMedian": 138683
+                    "solveNsMedian": 156766,
+                    "sampleNsMedian": 6730988,
+                    "enumNsMedian": 137144
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 7021843,
-                    "sampleNsMedian": 205476097,
-                    "enumNsMedian": 8588179
+                    "solveNsMedian": 6802786,
+                    "sampleNsMedian": 367143572,
+                    "enumNsMedian": 7661792
                 }
             ]
         },
@@ -888,27 +888,27 @@
             "backends": [
                 {
                     "backend": "local-search",
-                    "solveNsMedian": 317722,
-                    "sampleNsMedian": 1619193,
-                    "enumNsMedian": 1622391
+                    "solveNsMedian": 349516,
+                    "sampleNsMedian": 2916664,
+                    "enumNsMedian": 3067128
                 },
                 {
                     "backend": "backtrack",
-                    "solveNsMedian": 22738,
-                    "sampleNsMedian": 321436,
-                    "enumNsMedian": 103473
+                    "solveNsMedian": 26457,
+                    "sampleNsMedian": 592455,
+                    "enumNsMedian": 107264
                 },
                 {
                     "backend": "logicng",
-                    "solveNsMedian": 168352,
-                    "sampleNsMedian": 3602763,
-                    "enumNsMedian": 179448
+                    "solveNsMedian": 140179,
+                    "sampleNsMedian": 7177334,
+                    "enumNsMedian": 151170
                 },
                 {
                     "backend": "z3",
-                    "solveNsMedian": 7063276,
-                    "sampleNsMedian": 173722468,
-                    "enumNsMedian": 7080741
+                    "solveNsMedian": 7284409,
+                    "sampleNsMedian": 353851789,
+                    "enumNsMedian": 7355927
                 }
             ]
         }

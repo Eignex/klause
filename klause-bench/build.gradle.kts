@@ -25,11 +25,25 @@ application {
     mainClass.set("com.eignex.klause.bench.TimeBenchMainKt")
 }
 
+/** Forward any `-Dklause.bench.*` props from the gradle invocation into the JavaExec
+ *  child JVM so callers can tune bench knobs (repetitions, sampleCount, regression
+ *  threshold, etc.) without editing source. Uses doFirst so the System.getProperties()
+ *  snapshot is captured at execution time — config-cache safe. */
+fun JavaExec.forwardBenchProps() {
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.bench.")) systemProperty(key, v.toString())
+        }
+    }
+}
+
 tasks.register<JavaExec>("runTime") {
     group = "bench"
     description = "Time + propagation microbench. Writes build/bench-time.json."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.eignex.klause.bench.TimeBenchMainKt")
+    forwardBenchProps()
 }
 
 tasks.register<JavaExec>("runUniformness") {
@@ -37,6 +51,7 @@ tasks.register<JavaExec>("runUniformness") {
     description = "Sampling-uniformness bench (coverage, KL, Hamming, entropy). Writes build/bench-uniformness.json."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.eignex.klause.bench.UniformnessBenchMainKt")
+    forwardBenchProps()
 }
 
 tasks.register<JavaExec>("runCompleteness") {
@@ -44,6 +59,7 @@ tasks.register<JavaExec>("runCompleteness") {
     description = "Enumeration reach-under-budget bench. Writes build/bench-completeness.json."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.eignex.klause.bench.CompletenessBenchMainKt")
+    forwardBenchProps()
 }
 
 /** One-shot task: regenerate the bundled JSON-SchemaDef sample file. Run as
