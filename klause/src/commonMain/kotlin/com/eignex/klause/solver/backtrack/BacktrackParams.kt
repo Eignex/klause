@@ -17,8 +17,11 @@ import com.eignex.klause.solver.SolverParams
  *  - [valueHeuristic] — picks the order in which to try values of the chosen variable.
  *    Defaults to [IndomainRandom]; alternatives include [IndomainMin] / [IndomainMax] /
  *    [IndomainMiddle] / [IndomainSet] for hole domains.
- *  - [minHammingDistance] / [recentWindow] — dedup filter for the [BacktrackSolver.enumerate]
- *    path. Ignored by `solve` / `samples`.
+ *  - [minHammingDistance] / [recentWindow] — opt-in diversity filter for the
+ *    [BacktrackSolver.enumerate] path; only set them when you want to *skip* models that
+ *    are within `minHammingDistance` of a previously yielded model. The DFS enumerator
+ *    never yields the same model twice on its own, so the default `0 / 0` (no filter) is
+ *    correct for all standard use. Ignored by `solve` / `samples`.
  */
 data class BacktrackParams(
     val maxDecisions: Long = Long.MAX_VALUE,
@@ -26,6 +29,6 @@ data class BacktrackParams(
     val assumptions: Assumptions = Assumptions.None,
     val variableHeuristic: VariableHeuristic = RandomVariable,
     val valueHeuristic: ValueHeuristic = IndomainRandom,
-    val minHammingDistance: Int = 1,
-    val recentWindow: Int = 16,
+    val minHammingDistance: Int = 0,
+    val recentWindow: Int = 0,
 ) : SolverParams

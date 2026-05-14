@@ -23,16 +23,17 @@ import kotlin.random.Random
  * finite budget.
  *
  *  - [randomSeed] — controls the iteration order via kpermute.
- *  - [minHammingDistance] / [recentWindow] — distance / window filtering on
- *    [BruteForceSolver.enumerate], identical to other backends.
+ *  - [minHammingDistance] / [recentWindow] — opt-in diversity filter on
+ *    [BruteForceSolver.enumerate]. Default `0 / 0` means no filter; the walker already
+ *    visits each assignment at most once.
  *  - [maxSteps] — global cap on assignments visited per call. When the walker hits the
  *    cap, the sequence ends; for [BruteForceSolver.minimize] this means the returned
  *    sample is the best seen so far rather than guaranteed-optimal.
  */
 data class BruteForceParams(
     val randomSeed: Long? = null,
-    val minHammingDistance: Int = 1,
-    val recentWindow: Int = 16,
+    val minHammingDistance: Int = 0,
+    val recentWindow: Int = 0,
     val maxSteps: Long = Long.MAX_VALUE,
 ) : SolverParams
 

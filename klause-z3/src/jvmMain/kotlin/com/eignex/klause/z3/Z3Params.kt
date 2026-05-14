@@ -9,15 +9,16 @@ import com.eignex.klause.solver.SolverParams
  *
  *  - [randomSeed] — set on Z3's `random_seed` global. Affects branching when there is
  *    actual nondeterminism; on small problems Z3 may still return the same model.
- *  - [minHammingDistance] / [recentWindow] — apply to [Z3Solver.enumerate] as a
- *    post-filter on top of the model-blocking enumeration.
+ *  - [minHammingDistance] / [recentWindow] — opt-in diversity post-filter on
+ *    [Z3Solver.enumerate]. Default `0 / 0` means no filter; model-blocking enumeration
+ *    yields each model at most once already.
  *  - [maxModels] — caps the number of model attempts before the sequence ends.
  *  - [timeoutMillis] — wall-clock cap. Checked between solves.
  */
 data class Z3Params(
     val randomSeed: Long? = null,
-    val minHammingDistance: Int = 1,
-    val recentWindow: Int = 16,
+    val minHammingDistance: Int = 0,
+    val recentWindow: Int = 0,
     val maxModels: Long = Long.MAX_VALUE,
     val timeoutMillis: Long? = null,
 ) : SolverParams

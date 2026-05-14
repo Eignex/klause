@@ -127,7 +127,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     override fun minimize(objective: Objective, params: BacktrackParams): Sample? {
         var best: Sample? = null
         var bestObj = Double.POSITIVE_INFINITY
-        for (s in samples(params)) {
+        // Must use enumerate (DFS terminates on Exhausted) rather than samples (infinite
+        // for any feasible problem).
+        for (s in enumerate(params.copy(minHammingDistance = 0, recentWindow = 0))) {
             val o = objective.evaluate(s)
             if (o < bestObj) { bestObj = o; best = s }
         }
