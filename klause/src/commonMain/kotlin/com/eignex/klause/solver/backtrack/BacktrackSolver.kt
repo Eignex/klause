@@ -1,10 +1,5 @@
 package com.eignex.klause.solver.backtrack
 
-import com.eignex.klause.solver.backtrack.MostConstrainedHeuristic
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.BranchingHeuristic
-import com.eignex.klause.solver.backtrack.BacktrackParams
-
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
@@ -18,74 +13,10 @@ import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 
 /**
- * Per-call params for [BacktrackSolver].
- *
- *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). `Long.MAX_VALUE`
- *    by default — let the search run to completion.
- *  - [randomSeed] — used by the heuristic for tie-breaking when multiple vars are equally
- *    constrained. `null` picks a fresh seed per call.
- *  - [assumptions] — variables pinned for the duration of the call. Seeded as facts (not
- *    decisions) before the search starts.
- *  - [heuristic] — branching plug-in. The default ([MostConstrainedHeuristic]) picks the
- *    smallest-domain unpinned var, bools-before-ints, with `true` / domain-min as the
- *    first value.
- *  - [minHammingDistance] / [recentWindow] — dedup filter for the [enumerate] path. Ignored
- *    by [solve] / [samples].
- */
-data class BacktrackParams(
-    val maxDecisions: Long = Long.MAX_VALUE,
-    val randomSeed: Long? = null,
-    val assumptions: Assumptions = Assumptions.None,
-    val heuristic: BranchingHeuristic = MostConstrainedHeuristic,
-    val minHammingDistance: Int = 1,
-    val recentWindow: Int = 16,
-) : SolverParams
-
-/**
- * Decision-picking strategy for [BacktrackSolver]. Returning `null` from [pick] means
- * "every variable is assigned" — the caller treats that as SAT.
- *
- * Implementations should use [PropagationSession.boolValue] and [PropagationSession.intDomain]
- * to see the propagated state (decisions + implications), not just the decision trail.
- */
-fun interface BranchingHeuristic {
-    fun pick(session: PropagationSession, rng: Random): Decision?
-}
-
-/** Which variable to branch on next. The engine handles value enumeration. */
-sealed interface Decision {
-    val varId: Int
-    data class Bool(override val varId: Int) : Decision
-    data class IntVar(override val varId: Int) : Decision
-}
-
-/**
- * Default heuristic: smallest-domain unpinned var, bools-before-ints. Looks at the
- * propagated state via [PropagationSession.boolValue] / [intDomain], so it skips vars that
- * propagation has already determined.
- */
-object MostConstrainedHeuristic : BranchingHeuristic {
-    override fun pick(session: PropagationSession, rng: Random): Decision? {
-        val problem = session.problem
-        for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) == null) return Decision.Bool(v)
-        }
-        var bestVar = -1
-        var bestSize = Int.MAX_VALUE
-        for (v in 0 until problem.numIntVars) {
-            val d = session.intDomain(v)
-            val size = d.size
-            if (size > 1 && size < bestSize) { bestSize = size; bestVar = v }
-        }
-        return if (bestVar < 0) null else Decision.IntVar(bestVar)
-    }
-}
-
-/**
  * Complete depth-first search over a [Problem]'s assignment space, driven by propagation
- * via [PropagationSession]. At each level the heuristic picks a variable; the engine
- * enumerates its values (bool: false then true; int: domain low to high), backtracking on
- * conflict. SAT-leaves are the witnesses; UNSAT is returned when the tree exhausts.
+ * via [PropagationSession]. Variable selection and value selection are plug-in heuristics
+ * via [BacktrackParams.variableHeuristic] / [BacktrackParams.valueHeuristic] — same split
+ * MiniZinc uses for `solve :: int_search(vars, var_strategy, value_strategy, complete)`.
  *
  *  - [solve] — first witness as [SolveResult.Sat], [SolveResult.Unsat] when the tree is
  *    fully explored, [SolveResult.Unknown] on [BacktrackParams.maxDecisions] exhaustion.
@@ -163,38 +94,34 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     }
 
     /**
-     * A trail frame for one variable being explored. Tracks which values have been tried;
-     * `nextValue` returns the next untried value (or null when exhausted).
+     * A trail frame for one variable being explored. The value iterator is supplied by the
+     * caller's [ValueHeuristic] at node creation; [applyNext] pulls the next value, pushes
+     * it into the session, and reports the session's response (or `null` when exhausted).
      */
     private sealed interface TrailNode {
-        val varId: Int
-        /** Apply the next-untried value to the session. Returns the session's response, or
-         *  null if all values for this var have been tried. */
+        val varRef: VarRef
         fun applyNext(session: PropagationSession): PropagationResult?
     }
 
-    private class BoolNode(override val varId: Int) : TrailNode {
-        private var index = 0  // 0 = false, 1 = true, 2 = done
-        override fun applyNext(session: PropagationSession): PropagationResult? = when (index++) {
-            0 -> session.pinBool(varId, false)
-            1 -> session.pinBool(varId, true)
-            else -> null
+    private class BoolNode(
+        override val varRef: VarRef.Bool,
+        valueSeq: Sequence<Int>,
+    ) : TrailNode {
+        private val iter = valueSeq.iterator()
+        override fun applyNext(session: PropagationSession): PropagationResult? {
+            if (!iter.hasNext()) return null
+            return session.pinBool(varRef.varId, iter.next() != 0)
         }
     }
 
-    private class IntNode(override val varId: Int) : TrailNode {
-        private var cursor: Int = Int.MIN_VALUE  // next domain value to try
-        private var started = false
+    private class IntNode(
+        override val varRef: VarRef.IntVar,
+        valueSeq: Sequence<Int>,
+    ) : TrailNode {
+        private val iter = valueSeq.iterator()
         override fun applyNext(session: PropagationSession): PropagationResult? {
-            val d = session.intDomain(varId)
-            if (!started) { cursor = d.min; started = true }
-            while (cursor <= d.max) {
-                val v = cursor++
-                val r = session.pinInt(varId, v)
-                if (r !is PropagationResult.Unsat) return r
-                // Otherwise keep going to the next value.
-            }
-            return null
+            if (!iter.hasNext()) return null
+            return session.pinInt(varRef.varId, iter.next())
         }
     }
 
@@ -216,56 +143,46 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         val rng = Random(params.randomSeed ?: Random.Default.nextLong())
         val trail: MutableList<TrailNode> = ArrayList()
         var decisionsLeft = params.maxDecisions
-        // `descend` = "look for a new variable to branch on". When false, we're retreating
-        // (top of trail just failed to advance, or we just yielded SAT and need to retry
-        // the top with its next value).
         var descend = true
 
         loop@ while (true) {
             if (descend) {
-                val pick = params.heuristic.pick(session, rng)
-                if (pick == null) {
-                    // No more decisions — current state is a SAT leaf.
+                val varRef = params.variableHeuristic.pick(session, rng)
+                if (varRef == null) {
                     yield(SearchOutcome.Found(snapshotAssignment(session)))
                     descend = false
                     continue@loop
                 }
-                val node: TrailNode = when (pick) {
-                    is Decision.Bool -> BoolNode(pick.varId)
-                    is Decision.IntVar -> IntNode(pick.varId)
-                }
-                if (!advance(node, session, decisionsRemaining = { decisionsLeft }, decrement = { decisionsLeft-- })) {
-                    // Budget capped while pushing.
+                val node = makeNode(varRef, params.valueHeuristic.values(session, varRef, rng))
+                if (!advance(node, session, { decisionsLeft }, { decisionsLeft-- })) {
                     if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
-                    // Otherwise: node exhausted on first try — retreat (no trail entry to add).
                     descend = false
                     continue@loop
                 }
                 trail.add(node)
-                // descend stays true — look for next var.
             } else {
-                // Retreat: advance the current top, or pop if it's exhausted.
                 if (trail.isEmpty()) { yield(SearchOutcome.Exhausted); return@sequence }
                 val top = trail.last()
-                // The top's active value is still in the session. Pop it to free this level
-                // so the next applyNext starts fresh at the same decision level.
                 session.popLast()
-                if (advance(top, session, decisionsRemaining = { decisionsLeft }, decrement = { decisionsLeft-- })) {
+                if (advance(top, session, { decisionsLeft }, { decisionsLeft-- })) {
                     descend = true
                 } else {
                     if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
                     trail.removeAt(trail.size - 1)
-                    // descend remains false — keep retreating.
                 }
             }
         }
     }
 
+    private fun makeNode(varRef: VarRef, values: Sequence<Int>): TrailNode = when (varRef) {
+        is VarRef.Bool -> BoolNode(varRef, values)
+        is VarRef.IntVar -> IntNode(varRef, values)
+    }
+
     /**
-     * Advance [node] by trying its next untried values until one succeeds (returns true,
-     * session has it pinned) or it exhausts (returns false). On Unsat the session
-     * self-reverts, so the engine doesn't need to compensate. Returns false if either the
-     * node ran out of values OR the decision budget was hit mid-loop.
+     * Drive [node] through its remaining values until one succeeds or it exhausts. On Unsat
+     * the session self-reverts, so the engine doesn't need to compensate. Returns `false`
+     * either when the node ran out of values OR the decision budget was hit mid-loop.
      */
     private fun advance(
         node: TrailNode,
@@ -278,14 +195,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             decrement()
             val r = node.applyNext(session) ?: return false
             if (r !is PropagationResult.Unsat) return true
-            // Unsat: session self-reverted. Try the next value.
         }
     }
 
-    /**
-     * Build a [Sample] from the session's current propagated state. After the heuristic
-     * returned null, every bool/int is determined.
-     */
     private fun snapshotAssignment(session: PropagationSession): Sample {
         val problem = session.problem
         val bools = BooleanArray(problem.numBoolVars) { v -> session.boolValue(v) ?: false }

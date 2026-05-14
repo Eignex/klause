@@ -1,0 +1,31 @@
+package com.eignex.klause.solver.backtrack
+
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.SolverParams
+
+/**
+ * Per-call params for [BacktrackSolver].
+ *
+ *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). `Long.MAX_VALUE`
+ *    by default — let the search run to completion.
+ *  - [randomSeed] — seeds the engine RNG that's threaded into [variableHeuristic] and
+ *    [valueHeuristic]. `null` picks a fresh seed per call.
+ *  - [assumptions] — variables pinned for the duration of the call.
+ *  - [variableHeuristic] — picks the next variable to branch on. Defaults to
+ *    [RandomVariable] for diverse search; CSP-typical alternatives are [SmallestDomain]
+ *    (first-fail) and [InputOrder].
+ *  - [valueHeuristic] — picks the order in which to try values of the chosen variable.
+ *    Defaults to [IndomainRandom]; alternatives include [IndomainMin] / [IndomainMax] /
+ *    [IndomainMiddle] / [IndomainSet] for hole domains.
+ *  - [minHammingDistance] / [recentWindow] — dedup filter for the [BacktrackSolver.enumerate]
+ *    path. Ignored by `solve` / `samples`.
+ */
+data class BacktrackParams(
+    val maxDecisions: Long = Long.MAX_VALUE,
+    val randomSeed: Long? = null,
+    val assumptions: Assumptions = Assumptions.None,
+    val variableHeuristic: VariableHeuristic = RandomVariable,
+    val valueHeuristic: ValueHeuristic = IndomainRandom,
+    val minHammingDistance: Int = 1,
+    val recentWindow: Int = 16,
+) : SolverParams
