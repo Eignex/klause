@@ -91,27 +91,6 @@ class LocalSearchSolver(
         return minimizeImpl(objective, params, eff, warm)
     }
 
-    /**
-     * Top-k by ascending objective. Materialises a feasible pool of size
-     * `max(k*5, k+10)` via [enumerate] (which honours the dedup window), scores each, and
-     * returns the top [k] in order. Pool size is capped — for true k-best on a small
-     * feasible space, callers should still raise `params.maxFlips` so the pool fills.
-     */
-    override fun minimizeAll(objective: Objective, params: LocalSearchParams, k: Int): Sequence<Sample> =
-        minimizeAllInternal(objective, params, k, warm = null)
-
-    internal fun minimizeAllInternal(
-        objective: Objective, params: LocalSearchParams, k: Int, warm: WarmState?,
-    ): Sequence<Sample> {
-        if (k <= 0) return emptySequence()
-        val poolSize = maxOf(k * 5, k + 10)
-        val pool = enumerateInternal(params, warm).take(poolSize).toList()
-        if (pool.isEmpty()) return emptySequence()
-        return pool.asSequence()
-            .sortedBy { objective.evaluate(it) }
-            .take(k)
-    }
-
     fun solve(): SolveResult = solve(LocalSearchParams())
     fun sample(): Sample? = sample(LocalSearchParams())
     fun samples(): Sequence<Sample> = samples(LocalSearchParams())
@@ -135,18 +114,14 @@ class LocalSearchSolver(
         val maxFlips = params.maxFlips
         val minHammingDistance = params.minHammingDistance
         val recentWindow = params.recentWindow
-        val hint = params.hint
-        val hintRespects = params.hintRespectsAssumptions
         return sequence {
             val state = SolverState(problem, Random(seed), effectiveAssumptions)
             warm?.applyTo(state)
             val window = ArrayDeque<Sample>()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
-            // random restart. When a [hint] is supplied, the first attempt is seeded
-            // from it; subsequent restarts go through the policy as usual.
-            if (hint != null) state.seedFromHint(hint, hintRespects)
-            else restartPolicy.restart(state, bestSoFar = null)
+            // random restart.
+            restartPolicy.restart(state, bestSoFar = null)
             var flipsSinceRestart = 0
             // Bound per yield, not per session: when [maxFlips] elapses without producing a
             // fresh sample, we've effectively exhausted the search neighbourhood — end the
@@ -216,9 +191,8 @@ class LocalSearchSolver(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = SolverState(problem, Random(seed), effectiveAssumptions)
         warm?.applyTo(state)
-        // No bestSample yet — first attempt is hint-seeded if available, otherwise random.
-        if (params.hint != null) state.seedFromHint(params.hint, params.hintRespectsAssumptions)
-        else restartPolicy.restart(state, bestSoFar = null)
+        // No bestSample yet — first restart is always full random.
+        restartPolicy.restart(state, bestSoFar = null)
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null

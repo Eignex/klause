@@ -64,20 +64,4 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      * `null` if no feasible assignment was found within [params]'s budget.
      */
     fun minimize(objective: Objective, params: P): Sample?
-
-    /**
-     * Return up to [k] feasible samples in ascending objective order. Backends that
-     * implement true top-k optimisation override this; the default falls back to a single
-     * [minimize] call so consumers can use this API uniformly.
-     *
-     * Diversity (Hamming distance between yields) is controlled via the [Sampler]-style
-     * `minHammingDistance` / `recentWindow` knobs on [params] where the backend honours
-     * them. Yields strictly fewer than [k] samples when the feasible space is exhausted or
-     * the budget elapses.
-     */
-    fun minimizeAll(objective: Objective, params: P, k: Int): Sequence<Sample> {
-        if (k <= 0) return emptySequence()
-        val first = minimize(objective, params) ?: return emptySequence()
-        return sequenceOf(first)
-    }
 }

@@ -20,15 +20,4 @@ data class LocalSearchParams(
      *  the requested values on every restart and ignores any move that would change
      *  them. Defaults to none. */
     val assumptions: Assumptions = Assumptions.None,
-    /**
-     * Optional starting assignment. When non-null, the solver seeds its first attempt from
-     * this sample instead of a random draw. Random restarts after that still re-randomise.
-     * Frozen assumption variables override the hint unless [hintRespectsAssumptions] is
-     * `true` (the caller asserts the hint already agrees with all pinned values, including
-     * propagation-implied ones).
-     *
-     * Size must match `problem.numBoolVars` / `problem.numIntVars`; mismatches throw.
-     */
-    val hint: Sample? = null,
-    val hintRespectsAssumptions: Boolean = false,
 ) : SolverParams

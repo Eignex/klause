@@ -60,61 +60,6 @@ class Z3Sampler(override val problem: Problem) : Sampler<Z3Params>, Optimizer<Z3
         }
     }
 
-    /**
-     * Top-k near-optima via incremental optimisation with blocking clauses. Each iteration:
-     * solve the current optimisation problem, decode the model, add a blocking clause that
-     * forbids that exact assignment, re-solve. Z3's Optimize keeps the [LinearObjective]
-     * pinned across iterations, so yielded samples are in (non-strict) ascending order.
-     *
-     * `params.minHammingDistance` and `params.recentWindow` apply as a post-filter on top of
-     * blocking — samples too close to recent yields are skipped (but still blocked, so Z3
-     * doesn't propose them again).
-     */
-    override fun minimizeAll(
-        objective: Objective,
-        params: Z3Params,
-        k: Int,
-    ): Sequence<Sample> {
-        require(objective is LinearObjective) {
-            "Z3 backend only supports LinearObjective; got ${objective::class.simpleName}"
-        }
-        if (k <= 0) return emptySequence()
-        return sequence {
-            val ctx = newContext(params)
-            try {
-                val (encoding, constraints) = Z3Translator.translate(problem, ctx)
-                val opt = ctx.mkOptimize()
-                params.timeoutMillis?.let { ms ->
-                    val p = ctx.mkParams()
-                    p.add("timeout", ms.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt())
-                    opt.setParameters(p)
-                }
-                for (c in constraints) opt.Add(c)
-                val objExpr = buildObjective(objective, encoding, ctx)
-                opt.MkMinimize(objExpr)
-                val deadline = params.timeoutMillis?.let { System.currentTimeMillis() + it }
-                val window = ArrayDeque<Sample>()
-                var yielded = 0
-                while (yielded < k) {
-                    if (deadline != null && System.currentTimeMillis() > deadline) break
-                    if (opt.Check() != Status.SATISFIABLE) break
-                    val model = opt.model
-                    val s = decode(model, encoding)
-                    opt.Add(blockingClause(model, encoding, ctx))
-                    if (farEnough(s, window, params.minHammingDistance)) {
-                        yield(s)
-                        yielded++
-                        if (params.recentWindow > 0) {
-                            if (window.size >= params.recentWindow) window.removeFirst()
-                            window.addLast(s)
-                        }
-                    }
-                }
-            } finally {
-                ctx.close()
-            }
-        }
-    }
 
     private fun buildObjective(
         obj: LinearObjective,

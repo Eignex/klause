@@ -40,11 +40,4 @@ class LocalSearchSession(val solver: LocalSearchSolver) {
 
     fun minimize(objective: Objective, params: LocalSearchParams = LocalSearchParams()): Sample? =
         solver.minimizeInternal(objective, params, warm)
-
-    fun minimizeAll(
-        objective: Objective,
-        params: LocalSearchParams = LocalSearchParams(),
-        k: Int,
-    ): Sequence<Sample> =
-        solver.minimizeAllInternal(objective, params, k, warm)
 }
