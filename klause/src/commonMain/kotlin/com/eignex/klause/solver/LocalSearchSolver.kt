@@ -101,13 +101,17 @@ class LocalSearchSolver(
         val maxFlips = params.maxFlips
         val minHammingDistance = params.minHammingDistance
         val recentWindow = params.recentWindow
+        val hint = params.hint
+        val hintRespects = params.hintRespectsAssumptions
         return sequence {
             val state = SolverState(problem, Random(seed), effectiveAssumptions)
             val window = ArrayDeque<Sample>()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
-            // random restart.
-            restartPolicy.restart(state, bestSoFar = null)
+            // random restart. When a [hint] is supplied, the first attempt is seeded
+            // from it; subsequent restarts go through the policy as usual.
+            if (hint != null) state.seedFromHint(hint, hintRespects)
+            else restartPolicy.restart(state, bestSoFar = null)
             var flipsSinceRestart = 0
             // Bound per yield, not per session: when [maxFlips] elapses without producing a
             // fresh sample, we've effectively exhausted the search neighbourhood — end the
@@ -162,8 +166,9 @@ class LocalSearchSolver(
         }
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = SolverState(problem, Random(seed), effectiveAssumptions)
-        // No bestSample yet — first restart is always full random.
-        restartPolicy.restart(state, bestSoFar = null)
+        // No bestSample yet — first attempt is hint-seeded if available, otherwise random.
+        if (params.hint != null) state.seedFromHint(params.hint, params.hintRespectsAssumptions)
+        else restartPolicy.restart(state, bestSoFar = null)
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null

@@ -70,6 +70,32 @@ class SolverState(
         recompute()
     }
 
+    /**
+     * Seed the assignment from [hint] instead of randomising. When [respectsAssumptions]
+     * is false (the default), pinned assumption values are written on top of the hint —
+     * the caller does not need to align the hint with frozen vars. When true, the hint is
+     * trusted to already agree with all pinned values and is taken verbatim.
+     */
+    fun seedFromHint(hint: Sample, respectsAssumptions: Boolean) {
+        require(hint.bools.size == problem.numBoolVars) {
+            "hint bool size ${hint.bools.size} != problem.numBoolVars ${problem.numBoolVars}"
+        }
+        require(hint.ints.size == problem.numIntVars) {
+            "hint int size ${hint.ints.size} != problem.numIntVars ${problem.numIntVars}"
+        }
+        for (b in 0 until problem.numBoolVars) assignment.setBool(b, hint.bools[b])
+        for (i in 0 until problem.numIntVars) assignment.setInt(i, hint.ints[i])
+        if (!respectsAssumptions) {
+            for ((id, value) in assumptions.bools) assignment.setBool(id, value)
+            for ((id, value) in assumptions.ints) assignment.setInt(id, value)
+        }
+        for (i in lastTouched.indices) lastTouched[i] = 0L
+        for (i in boolConfChange.indices) boolConfChange[i] = true
+        for (i in intConfChange.indices) intConfChange[i] = true
+        step = 0L
+        recompute()
+    }
+
     fun recompute() {
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0
