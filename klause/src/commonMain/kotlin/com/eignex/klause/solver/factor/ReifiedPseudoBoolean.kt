@@ -102,8 +102,64 @@ class ReifiedPseudoBoolean(
         } else when (op) {
             PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1)
             PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1)
-            PbOp.EQ -> true
+            // ¬EQ → "sum ≠ bound". No PbOp.NE exists; inline the NE bounds-check (analog
+            // of `LinearOp.NE` in `propagateLinearBounds`).
+            PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd)
         }
+    }
+
+    /**
+     * Propagate `Σ weights[i] · lit_i ≠ bound`. Returns `false` iff the constraint is
+     * infeasible — i.e. the sum is forced to be exactly [bound] regardless of remaining
+     * free literals. Otherwise prunes any single literal whose two polarities would both
+     * collapse the sum to [bound] (rare; usually nothing to prune).
+     */
+    private fun propagatePbNotEqual(
+        state: PropagationState,
+        weights: IntArray,
+        literals: IntArray,
+        bound: Long,
+    ): Boolean {
+        val n = literals.size
+        val litLo = LongArray(n)
+        val litHi = LongArray(n)
+        var sumLo = 0L
+        var sumHi = 0L
+        for (i in 0 until n) {
+            val w = weights[i].toLong()
+            val v = Lit.variable(literals[i])
+            val b = state.boolValues[v]
+            val lo: Long
+            val hi: Long
+            when {
+                b == null -> { lo = minOf(0L, w); hi = maxOf(0L, w) }
+                Lit.evaluate(literals[i], b) -> { lo = w; hi = w }
+                else -> { lo = 0L; hi = 0L }
+            }
+            litLo[i] = lo
+            litHi[i] = hi
+            sumLo += lo
+            sumHi += hi
+        }
+        if (sumLo == bound && sumHi == bound) return false
+        for (i in 0 until n) {
+            val w = weights[i].toLong()
+            if (w == 0L) continue
+            val v = Lit.variable(literals[i])
+            if (state.boolValues[v] != null) continue
+            val otherLo = sumLo - litLo[i]
+            val otherHi = sumHi - litHi[i]
+            // Polarity "literal true" contributes `w` to the sum.
+            val trueOk = !(otherLo + w == bound && otherHi + w == bound)
+            val falseOk = !(otherLo == bound && otherHi == bound)
+            if (!trueOk && !falseOk) return false
+            if (!trueOk) {
+                if (!state.pinBool(v, !Lit.isPositive(literals[i]))) return false
+            } else if (!falseOk) {
+                if (!state.pinBool(v, Lit.isPositive(literals[i]))) return false
+            }
+        }
+        return true
     }
 
     override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {

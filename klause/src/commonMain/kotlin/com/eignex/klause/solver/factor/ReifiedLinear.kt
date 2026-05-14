@@ -100,11 +100,12 @@ class ReifiedLinear(
         return if (aux) {
             propagateLinearBounds(state, coeffs, vars, op, bnd)
         } else {
-            // Negate: ¬LE → GE bnd+1; ¬GE → LE bnd-1; ¬EQ has no clean interval form.
+            // Negate: ¬LE → GE bnd+1; ¬GE → LE bnd-1; ¬EQ → NE (boundary-tightening
+            // only — propagateLinearBounds handles NE the same as Linear does); ¬NE → EQ.
             when (op) {
                 LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1)
                 LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1)
-                LinearOp.EQ -> true
+                LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd)
                 LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd)
             }
         }
