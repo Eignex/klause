@@ -24,7 +24,7 @@ class FlatZincParseTest {
         val program = parseFlatZinc(src)
         assertEquals(2, program.problem.numBoolVars)
         assertEquals(SolveDirective.Satisfy, program.solve)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams())
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(sat.assignment.bools[0] || sat.assignment.bools[1])
     }
@@ -67,7 +67,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams())!!
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L))!!
         val rendered = writeFlatZincSolution(program, sample)
         assertTrue(rendered.contains("x = true"), "got: $rendered")
         assertTrue(rendered.contains("----------"))
@@ -83,7 +83,7 @@ class FlatZincParseTest {
             output ["a=", show(a), " b=", show(b), "\n"];
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams())!!
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L))!!
         val rendered = writeFlatZincSolution(program, sample)
         // Result should look like "a=N b=M\n----------\n"
         assertTrue(rendered.startsWith("a="), "got: $rendered")
@@ -117,7 +117,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams())
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L))
         assertNotNull(sample)
         val seen = setOf(sample.ints[0], sample.ints[1], sample.ints[2])
         assertEquals(3, seen.size)
@@ -177,7 +177,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams())
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L))
         assertNotNull(sample)
         assertEquals(3, sample.ints[0])
     }

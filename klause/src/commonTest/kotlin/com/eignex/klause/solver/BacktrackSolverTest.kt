@@ -22,7 +22,7 @@ class BacktrackSolverTest {
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
-        val r = BacktrackSolver(p).solve(BacktrackParams())
+        val r = BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(sat.assignment.bools[0] || sat.assignment.bools[1],
             "witness must satisfy the clause: ${sat.assignment.bools.toList()}")
@@ -37,7 +37,7 @@ class BacktrackSolverTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        assertEquals(SolveResult.Unsat, BacktrackSolver(p).solve(BacktrackParams()))
+        assertEquals(SolveResult.Unsat, BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test
@@ -110,7 +110,7 @@ class BacktrackSolverTest {
             ))),
         )
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
-        val best = BacktrackSolver(p).minimize(obj, BacktrackParams())
+        val best = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 0L))
         assertNotNull(best)
         assertEquals(3.0, obj.evaluate(best))
         assertEquals(true, best.bools[3])
@@ -144,7 +144,7 @@ class BacktrackSolverTest {
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = emptyList(),  // 4 models total
         )
-        val models = BacktrackSolver(p).samples(BacktrackParams()).toList()
+        val models = BacktrackSolver(p).samples(BacktrackParams(randomSeed = 0L)).toList()
         assertEquals(4, models.size)
         assertEquals(4, models.toSet().size, "DFS enumerates each model once")
     }

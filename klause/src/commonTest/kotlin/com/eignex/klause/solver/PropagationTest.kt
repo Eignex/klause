@@ -203,7 +203,7 @@ class PropagationTest {
     }
 
     @Test
-    fun `ReifiedIntCompare aux true tightens domain`() {
+    fun `single-var reified linear with aux true tightens domain`() {
         // aux=true ↔ (x ≤ 5); pin aux=true → tighten max to 5.
         // Add Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 5) to force a singleton outcome.
         val p = Problem(
@@ -218,7 +218,7 @@ class PropagationTest {
     }
 
     @Test
-    fun `ReifiedIntCompare derives aux when domain forces it`() {
+    fun `single-var reified linear derives aux when domain forces it`() {
         // x in [0..3], aux ↔ (x ≤ 5) → aux must be true.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
@@ -229,7 +229,7 @@ class PropagationTest {
     }
 
     @Test
-    fun `ReifiedIntCompare conflicting aux is Unsat`() {
+    fun `single-var reified linear conflicting aux is Unsat`() {
         // x in [0..3], aux ↔ (x ≥ 10), pin aux=true → never holds → Unsat.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
