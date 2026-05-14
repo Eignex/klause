@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.BacktrackParams
 
 /**
  * Parsed FlatZinc file lifted into klause's [Problem] representation plus the metadata a
@@ -26,6 +27,13 @@ data class FlatZincProgram(
     val arraysByName: Map<String, FlatZincArray>,
     /** Output items in order; null when the file had no `output` declaration. */
     val outputItems: List<OutputItem>?,
+    /**
+     * Suggested [BacktrackParams] derived from the `solve :: int_search(...) / bool_search(...)`
+     * annotation, or `null` if no recognised search annotation was present. Callers using
+     * `BacktrackSolver` can pass this directly to honour the FlatZinc author's intended
+     * search strategy; everyone else can ignore it.
+     */
+    val defaultBacktrackParams: BacktrackParams?,
 )
 
 /** Top-level solve directive parsed from `solve satisfy ;` / `solve minimize x ;` etc. */

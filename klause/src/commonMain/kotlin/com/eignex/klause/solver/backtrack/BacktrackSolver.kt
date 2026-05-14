@@ -41,13 +41,42 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         return SolveResult.Unsat
     }
 
+    /**
+     * Independent random samples. Each yield kicks off a fresh DFS from root with a new
+     * RNG seed, returns the first SAT leaf, and discards the trail. Subsequent yields are
+     * statistically independent — useful for test / verification workloads that want
+     * diverse coverage of the search space rather than DFS-locked traversal of one
+     * subtree. May yield the same assignment twice ("with replacement" semantics, per the
+     * [com.eignex.klause.solver.Solver.samples] contract). For distinct enumeration use
+     * [enumerate].
+     *
+     * Stops if a run reports Unsat (no SAT assignments exist) or BudgetCapped without a
+     * find (the budget was too small to reach any SAT leaf this run).
+     */
     override fun samples(params: BacktrackParams): Sequence<Sample> = sequence {
+        var seed = params.randomSeed ?: Random.Default.nextLong()
+        while (true) {
+            val perCall = params.copy(randomSeed = seed)
+            when (val r = solveOnce(perCall)) {
+                is SolveResult.Sat -> yield(r.assignment)
+                SolveResult.Unsat -> return@sequence
+                SolveResult.Unknown -> return@sequence
+            }
+            // Advance the per-run seed deterministically so the parent call's seed still
+            // controls the entire stream reproducibly.
+            seed = seed * 6364136223846793005L + 1442695040888963407L
+        }
+    }
+
+    private fun solveOnce(params: BacktrackParams): SolveResult {
         for (outcome in driveSearch(params)) {
-            when (outcome) {
-                is SearchOutcome.Found -> yield(outcome.sample)
-                SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return@sequence
+            return when (outcome) {
+                is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
+                SearchOutcome.Exhausted -> SolveResult.Unsat
+                SearchOutcome.BudgetCapped -> SolveResult.Unknown
             }
         }
+        return SolveResult.Unsat
     }
 
     override fun enumerate(params: BacktrackParams): Sequence<Sample> = sequence {

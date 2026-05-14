@@ -59,7 +59,70 @@ internal class FlatZincCompiler(
             floatVarsByName = floatVars,
             arraysByName = arrays,
             outputItems = model.output?.let { compileOutput(it) },
+            defaultBacktrackParams = compileSearchAnnotation(),
         )
+    }
+
+    /**
+     * Map a `solve :: int_search(...) / bool_search(...) / seq_search([...])` annotation
+     * onto a [com.eignex.klause.solver.backtrack.BacktrackParams] with the requested
+     * heuristics. Returns `null` when no recognised search annotation is present.
+     *
+     * Klause's engine doesn't take per-variable-array search blocks today, so when the
+     * annotation lists a specific var array we still apply the strategies globally. For
+     * `seq_search([s1, s2, ...])` we adopt the first search block's strategies. Strategies
+     * we don't recognise fall through to the engine's defaults (random/random).
+     */
+    private fun compileSearchAnnotation(): com.eignex.klause.solver.backtrack.BacktrackParams? {
+        val ann = model.solve.annotations.firstOrNull(::isSearchAnnotation) ?: return null
+        val (varStr, valStr) = extractStrategies(ann) ?: return null
+        val varH = mapVariableStrategy(varStr) ?: return null
+        val valH = mapValueStrategy(valStr) ?: return null
+        return com.eignex.klause.solver.backtrack.BacktrackParams(
+            variableHeuristic = varH,
+            valueHeuristic = valH,
+        )
+    }
+
+    private fun isSearchAnnotation(a: FznAnnotation): Boolean =
+        a.name == "int_search" || a.name == "bool_search" || a.name == "seq_search"
+
+    /** Returns (var_strategy_name, value_strategy_name) for the first int_search/bool_search
+     *  block we find, or null. */
+    private fun extractStrategies(a: FznAnnotation): Pair<String, String>? = when (a.name) {
+        "int_search", "bool_search" -> {
+            // Signature: search(varArray, var_strategy, value_strategy, complete)
+            if (a.args.size < 3) null
+            else {
+                val vs = (a.args[1] as? FznExpr.Ident)?.name
+                val vls = (a.args[2] as? FznExpr.Ident)?.name
+                if (vs != null && vls != null) vs to vls else null
+            }
+        }
+        "seq_search" -> {
+            val list = (a.args.firstOrNull() as? FznExpr.ArrayLit)?.elements
+            val first = list?.firstNotNullOfOrNull { e ->
+                (e as? FznExpr.AnnCall)?.takeIf { it.name == "int_search" || it.name == "bool_search" }
+            } ?: return null
+            extractStrategies(FznAnnotation(first.name, first.args))
+        }
+        else -> null
+    }
+
+    private fun mapVariableStrategy(name: String): com.eignex.klause.solver.backtrack.VariableHeuristic? = when (name) {
+        "input_order" -> com.eignex.klause.solver.backtrack.InputOrder
+        "first_fail", "dom_w_deg" -> com.eignex.klause.solver.backtrack.SmallestDomain
+        "anti_first_fail", "occurrence" -> com.eignex.klause.solver.backtrack.LargestDomain
+        "random_order" -> com.eignex.klause.solver.backtrack.RandomVariable
+        else -> null
+    }
+
+    private fun mapValueStrategy(name: String): com.eignex.klause.solver.backtrack.ValueHeuristic? = when (name) {
+        "indomain_min", "indomain" -> com.eignex.klause.solver.backtrack.IndomainMin
+        "indomain_max" -> com.eignex.klause.solver.backtrack.IndomainMax
+        "indomain_middle", "indomain_split" -> com.eignex.klause.solver.backtrack.IndomainMiddle
+        "indomain_random" -> com.eignex.klause.solver.backtrack.IndomainRandom
+        else -> null
     }
 
     // ---- declarations -------------------------------------------------------
