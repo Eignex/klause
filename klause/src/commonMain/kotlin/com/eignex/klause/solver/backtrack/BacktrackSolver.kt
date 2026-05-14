@@ -42,16 +42,28 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     }
 
     /**
-     * Independent random samples. Each yield kicks off a fresh DFS from root with a new
-     * RNG seed, returns the first SAT leaf, and discards the trail. Subsequent yields are
-     * statistically independent — useful for test / verification workloads that want
-     * diverse coverage of the search space rather than DFS-locked traversal of one
-     * subtree. May yield the same assignment twice ("with replacement" semantics, per the
-     * [com.eignex.klause.solver.Solver.samples] contract). For distinct enumeration use
-     * [enumerate].
+     * Independent random samples ("with replacement", per the [com.eignex.klause.solver.Solver.samples]
+     * contract). Each yield kicks off a fresh DFS from root on a new [PropagationSession]
+     * with a per-call RNG seed; no engine state carries between yields, so subsequent
+     * yields are statistically independent given the random heuristic defaults.
      *
-     * Stops if a run reports Unsat (no SAT assignments exist) or BudgetCapped without a
-     * find (the budget was too small to reach any SAT leaf this run).
+     * **Reproducibility.** With a fixed [BacktrackParams.randomSeed] the per-call seeds
+     * are derived by a deterministic LCG advance, so the same parent seed produces the
+     * same sequence of samples across runs. This is reproducibility, not correlation —
+     * the per-call seeds are independent random draws as far as the search is concerned.
+     *
+     * **Duplicates.** The sequence does **not** filter duplicates. For a problem with N
+     * feasible models, the same model may be yielded multiple times; the distribution
+     * across yields is determined by the heuristics. For distinct samples use [enumerate]
+     * (complete + DFS-ordered) or `samples(p).distinct().take(n)` (random + distinct,
+     * uses memory linear in yielded count).
+     *
+     * **Termination.** The sequence is **infinite for any feasible problem** — callers
+     * must bound it with `.take(n)` or `.takeWhile(...)`. It terminates early only when:
+     *  - a run returns [SolveResult.Unsat] — the entire search tree exhausts without a
+     *    SAT (the problem is infeasible); or
+     *  - a run returns [SolveResult.Unknown] — [BacktrackParams.maxDecisions] elapsed
+     *    before any SAT was found on that run.
      */
     override fun samples(params: BacktrackParams): Sequence<Sample> = sequence {
         var seed = params.randomSeed ?: Random.Default.nextLong()
@@ -62,8 +74,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 SolveResult.Unsat -> return@sequence
                 SolveResult.Unknown -> return@sequence
             }
-            // Advance the per-run seed deterministically so the parent call's seed still
-            // controls the entire stream reproducibly.
+            // LCG advance for reproducibility: same parent seed → same per-call seed
+            // sequence → same sample sequence. The per-call seeds drive the heuristics'
+            // random choices; from the search's perspective they're independent draws.
             seed = seed * 6364136223846793005L + 1442695040888963407L
         }
     }
