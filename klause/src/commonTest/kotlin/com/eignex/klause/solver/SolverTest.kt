@@ -31,17 +31,15 @@ class SolverTest {
     }
 
     @Test
-    fun `samples are unique by default`() {
-
+    fun `samples cover all solutions on tiny problem`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
         )
         val problem = Problem(2, 0, emptyArray(), clauses)
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 10))
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 1)).take(10).toList()
-        assertEquals(2, samples.size, "Only two distinct solutions exist")
-        assertEquals(samples.toSet().size, samples.size, "All yielded samples must be unique")
+        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 1)).take(20).toList()
+        assertEquals(2, samples.toSet().size, "Both distinct solutions should be sampled")
         for (s in samples) assertTrue(s.bools[0])
     }
 
@@ -50,32 +48,8 @@ class SolverTest {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val solver = LocalSearchSolver(problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(10).toList()
-        assertEquals(3, samples.size, "ExactlyOne over 3 vars has exactly 3 solutions")
-        assertEquals(samples.toSet().size, samples.size)
-        for (s in samples) assertEquals(1, s.bools.count { it })
-    }
-
-    @Test
-    fun `duplicates allowed when distance zero`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
-        val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val solver = LocalSearchSolver(problem)
-        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 13, minHammingDistance = 0)).take(20).toList()
-        assertEquals(20, samples.size)
-    }
-
-    @Test
-    fun `rolling window allows reuse after rotation`() {
-
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val solver = LocalSearchSolver(problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 10_000, randomSeed = 21, recentWindow = 2)).take(20).toList()
-        assertEquals(20, samples.size, "Window of 2 should allow cycling through 4 solutions")
-        assertTrue(samples.toSet().size in 2..4, "Should see the 4 distinct solutions")
+        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(30).toList()
+        assertEquals(3, samples.toSet().size, "ExactlyOne over 3 vars has exactly 3 distinct solutions")
         for (s in samples) assertEquals(1, s.bools.count { it })
     }
 }

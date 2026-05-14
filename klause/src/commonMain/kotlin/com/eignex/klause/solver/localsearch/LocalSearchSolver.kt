@@ -36,9 +36,10 @@ import kotlin.random.Random
  * Three call kinds, each accepting a [LocalSearchParams]:
  *
  *  - [solve] — return a single [SolveResult]; LS never reports `Unsat`.
- *  - [sample] — *with replacement*. Independent draws; duplicates allowed.
- *  - [enumerate] — *without replacement*. Rolling-window dedup honouring
- *    `params.minHammingDistance` and `params.recentWindow`.
+ *  - [sample] / [enumerate] — both stream independent feasible draws with replacement.
+ *    Local search has no notion of a "next" model, so enumerate is just a sample stream;
+ *    duplicates may appear. Use [com.eignex.klause.solver.backtrack.BacktrackSolver] when
+ *    true without-replacement enumeration is required.
  */
 class LocalSearchSolver(
     override val problem: Problem,
@@ -59,16 +60,14 @@ class LocalSearchSolver(
 
     internal fun samplesInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
         val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
-        return streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff, warm)
-    }
-
-    internal fun enumerateInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
-        val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
         return streamImpl(params, eff, warm)
     }
 
+    internal fun enumerateInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> =
+        samplesInternal(params, warm)
+
     private fun sampleInternal(params: LocalSearchParams, eff: Assumptions, warm: WarmState?): Sample? =
-        streamImpl(params.copy(minHammingDistance = 0, recentWindow = 0), eff, warm).firstOrNull()
+        streamImpl(params, eff, warm).firstOrNull()
 
     /**
      * Fold the bake-time propagation result + per-call assumptions into the effective pin set
@@ -126,22 +125,11 @@ class LocalSearchSolver(
         effectiveAssumptions: Assumptions,
         warm: WarmState? = null,
     ): Sequence<Sample> {
-        require(params.recentWindow >= 0) {
-            "recentWindow must be non-negative, got ${params.recentWindow}"
-        }
-        val totalBits = problem.numBoolVars + problem.numIntVars
-        require(params.minHammingDistance <= totalBits) {
-            "minHammingDistance (${params.minHammingDistance}) exceeds the total variable " +
-                "count ($totalBits); no two assignments can ever satisfy that distance."
-        }
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val maxFlips = params.maxFlips
-        val minHammingDistance = params.minHammingDistance
-        val recentWindow = params.recentWindow
         return sequence {
             val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
             warm?.applyTo(state)
-            val window = ArrayDeque<Sample>()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
             // random restart.
@@ -149,24 +137,18 @@ class LocalSearchSolver(
             var flipsSinceRestart = 0
             // Bound per yield, not per session: when [maxFlips] elapses without producing a
             // fresh sample, we've effectively exhausted the search neighbourhood — end the
-            // sequence rather than spinning forever rejecting via [farEnough].
+            // sequence.
             var flipsSinceYield = 0L
 
             try { while (flipsSinceYield < maxFlips) {
                 if (state.cost == 0) {
                     val snap = state.assignment.snapshot()
-                    if (farEnough(snap, window, minHammingDistance, recentWindow)) {
-                        // Sync warm state on every yield so streaming consumers (which
-                        // typically take just one or a few samples and never drain the
-                        // sequence) still see captured weights.
-                        warm?.captureFrom(state)
-                        yield(snap)
-                        if (recentWindow > 0) {
-                            if (window.size >= recentWindow) window.removeFirst()
-                            window.addLast(snap)
-                        }
-                        flipsSinceYield = 0
-                    }
+                    // Sync warm state on every yield so streaming consumers (which
+                    // typically take just one or a few samples and never drain the
+                    // sequence) still see captured weights.
+                    warm?.captureFrom(state)
+                    yield(snap)
+                    flipsSinceYield = 0
                     restartPolicy.restart(state, bestSoFar = null)
                     flipsSinceRestart = 0
                     continue
@@ -207,11 +189,6 @@ class LocalSearchSolver(
         effectiveAssumptions: Assumptions,
         warm: WarmState? = null,
     ): Sample? {
-        val totalBits = problem.numBoolVars + problem.numIntVars
-        require(params.minHammingDistance <= totalBits) {
-            "minHammingDistance (${params.minHammingDistance}) exceeds the total variable " +
-                "count ($totalBits)"
-        }
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         warm?.applyTo(state)
@@ -325,23 +302,4 @@ class LocalSearchSolver(
         return true
     }
 
-    private fun farEnough(
-        candidate: Sample,
-        window: ArrayDeque<Sample>,
-        minDistance: Int,
-        windowSize: Int,
-    ): Boolean {
-        if (minDistance <= 0 || windowSize == 0) return true
-        for (p in window) {
-            if (hammingDistance(candidate, p) < minDistance) return false
-        }
-        return true
-    }
-
-    private fun hammingDistance(a: Sample, b: Sample): Int {
-        var d = 0
-        for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
-        for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
-        return d
-    }
 }

@@ -51,9 +51,8 @@ class CompileTest {
         val schema = TinyCampaign()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(20).toList()
-        assertEquals(5, samples.size)
-        assertEquals(samples.toSet().size, samples.size)
+        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(40).toList()
+        assertEquals(5, samples.toSet().size, "All 5 feasible solutions should be reached")
         for (s in samples) {
             val type = compiled.decode(schema.type, s)
             val premium = compiled.decode(schema.premium, s)
@@ -91,9 +90,8 @@ class CompileTest {
         val schema = IntCampaign()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
+        val samples = solver.samples(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
         assertEquals(15, samples.size)
-        assertEquals(samples.toSet().size, samples.size, "Samples must be unique")
         for (s in samples) {
             val type = compiled.decode(schema.type, s)
             val budget = compiled.decode(schema.budget, s)
@@ -115,9 +113,8 @@ class CompileTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
 
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 99)).take(20).toList()
-        assertEquals(6, samples.size)
-        assertEquals(samples.toSet().size, samples.size)
+        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 99)).take(40).toList()
+        assertEquals(6, samples.toSet().size, "All 6 feasible solutions should be reached")
         for (s in samples) {
             val rate = compiled.decode(schema.rate, s)
             assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")

@@ -64,15 +64,4 @@ class DslValidationTest {
         assertFails { S() }
     }
 
-    @Test
-    fun `solver sample min hamming distance too large rejected`() {
-        class S : VariableSchema() {
-            val a by boolVar()
-            val b by boolVar()
-        }
-        val compiled = S().compile()
-        val solver = LocalSearchSolver(compiled.problem)
-
-        assertFails { solver.enumerate(LocalSearchParams(minHammingDistance = 3)).take(1).toList() }
-    }
 }

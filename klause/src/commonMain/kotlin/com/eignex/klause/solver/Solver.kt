@@ -34,11 +34,12 @@ sealed interface SolveResult {
  *    within its budget. Default implementation takes the first yield of [samples];
  *    backends with a cheaper one-shot path may override.
  *  - [samples] — *with replacement*. Each yield is an independent draw; the same
- *    assignment may reappear. Dedup fields on [P] (`minHammingDistance`, `recentWindow`)
- *    are ignored on this path.
- *  - [enumerate] — *without replacement*. Distinct satisfying assignments. Complete
- *    backends enumerate every model exactly once; stochastic backends honour the
- *    rolling-window dedup via `params.minHammingDistance` / `params.recentWindow`.
+ *    assignment may reappear. Dedup fields on [P] (where present) are ignored.
+ *  - [enumerate] — *without replacement* for complete backends ([BacktrackSolver],
+ *    [BruteForceSolver], LogicNG, Z3): distinct satisfying assignments, with optional
+ *    rolling-window post-filter via `params.minHammingDistance` / `params.recentWindow`.
+ *    Stochastic backends ([LocalSearchSolver]) cannot enumerate; their `enumerate` is
+ *    an alias for [samples] and may yield duplicates.
  */
 interface Solver<P : SolverParams> {
     val problem: Problem

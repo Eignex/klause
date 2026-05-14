@@ -26,8 +26,7 @@ class SolverVsBitBlasterTest {
         for (case in satPortfolio()) {
             val cnf = BitBlaster.compile(case.problem)
             val solver = LocalSearchSolver(case.problem)
-            val samples = solver.samples(LocalSearchParams(maxFlips = 200_000L, randomSeed = 0L,
-                minHammingDistance = 0, recentWindow = 0)).take(1).toList()
+            val samples = solver.samples(LocalSearchParams(maxFlips = 200_000L, randomSeed = 0L)).take(1).toList()
             assertTrue(samples.isNotEmpty(), "${case.name}: solver found no sample within budget")
             val sample = samples.first()
             val pins = pinSampleIntoCnf(cnf, case.problem, sample)
@@ -44,8 +43,7 @@ class SolverVsBitBlasterTest {
                 "${case.name}: expected UNSAT under bit-blast but oracle says SAT")
             val solver = LocalSearchSolver(case.problem)
 
-            val samples = solver.samples(LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L,
-                minHammingDistance = 0, recentWindow = 0)).take(1).toList()
+            val samples = solver.samples(LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).take(1).toList()
             assertTrue(samples.isEmpty(), "${case.name}: UNSAT problem yielded a sample")
         }
     }
