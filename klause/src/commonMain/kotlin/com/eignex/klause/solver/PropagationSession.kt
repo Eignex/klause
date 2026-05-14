@@ -31,8 +31,19 @@ class PropagationSession(val problem: Problem) {
     private var lastImplied: PropagationResult.Implied =
         PropagationResult.Implied(emptyMap(), emptyMap())
 
+    /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
+     *  All session operations short-circuit to this result. */
+    private var bakedUnsat: PropagationResult.Unsat? = null
+
     init {
-        state.runToFixpoint(allFactors = true)
+        val conflict = state.runToFixpoint(allFactors = true)
+        if (conflict != null) {
+            bakedUnsat = PropagationResult.Unsat(
+                state.extractConflictBools(conflict),
+                state.extractConflictInts(conflict),
+                conflict,
+            )
+        }
         val baseline = computeImplied()
         levelStates.add(LevelState(state.snapshot(), baseline))
         lastImplied = baseline
@@ -41,12 +52,19 @@ class PropagationSession(val problem: Problem) {
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
     val decisionLevel: Int get() = trail.size
 
+    /** Current bool value: pinned by decision OR forced by propagation. `null` = free. */
+    fun boolValue(v: Int): Boolean? = state.boolValues[v]
+
+    /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
+    fun intDomain(v: Int): IntDomain = state.intDomains[v]
+
     /**
      * Seed with an initial assumption set. Resets any prior trail to level 0 first, then
      * pushes each assumption in iteration order (bools first, then ints). Each gets its own
      * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
      */
     fun seed(assumptions: Assumptions): PropagationResult {
+        bakedUnsat?.let { return it }
         state.restore(levelStates[0].snap)
         if (levelStates.size > 1) levelStates.subList(1, levelStates.size).clear()
         pinnedBools.clear()
@@ -68,6 +86,7 @@ class PropagationSession(val problem: Problem) {
 
     /** Push one bool pin at a fresh decision level. Returns newly-implied facts (diff). */
     fun pinBool(v: Int, value: Boolean): PropagationResult {
+        bakedUnsat?.let { return it }
         val r = pushBool(v, value)
         if (r !is PropagationResult.Implied) return r
         return diffAgainst(r, lastImplied).also { lastImplied = r }
@@ -75,6 +94,7 @@ class PropagationSession(val problem: Problem) {
 
     /** Push one int pin at a fresh decision level. */
     fun pinInt(v: Int, value: Int): PropagationResult {
+        bakedUnsat?.let { return it }
         val r = pushInt(v, value)
         if (r !is PropagationResult.Implied) return r
         return diffAgainst(r, lastImplied).also { lastImplied = r }
