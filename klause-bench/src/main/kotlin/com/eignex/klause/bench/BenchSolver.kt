@@ -21,6 +21,11 @@ interface BenchSolver {
     fun solve(): SolveResult
     fun samples(n: Int): List<Sample>
     fun enumerated(n: Int): List<Sample>
+    /** Lazy view onto the backend's native `enumerate` sequence. Used by benches that
+     *  consume yields under a wall-time or count budget without materialising the full set. */
+    fun enumerateSequence(): Sequence<Sample>
+    /** Lazy view onto the backend's native `samples` sequence (with replacement). */
+    fun samplesSequence(): Sequence<Sample>
 }
 
 class LocalSearchBench(
@@ -32,6 +37,8 @@ class LocalSearchBench(
     override fun solve() = s.solve(params)
     override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
 }
 
 class LogicNGBench(
@@ -43,6 +50,8 @@ class LogicNGBench(
     override fun solve() = s.solve(params)
     override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
 }
 
 class Z3Bench(
@@ -54,6 +63,8 @@ class Z3Bench(
     override fun solve() = s.solve(params)
     override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
 }
 
 class BacktrackBench(
@@ -65,6 +76,8 @@ class BacktrackBench(
     override fun solve() = s.solve(params)
     override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
 }
 
 class BruteForceBench(
@@ -76,6 +89,8 @@ class BruteForceBench(
     override fun solve() = s.solve(params)
     override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
 }
 
 /** Brute force is added only when the assignment space fits — see [BruteForceSolver.fits]. */

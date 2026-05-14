@@ -22,7 +22,28 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.eignex.klause.bench.MainKt")
+    mainClass.set("com.eignex.klause.bench.TimeBenchMainKt")
+}
+
+tasks.register<JavaExec>("runTime") {
+    group = "bench"
+    description = "Time + propagation microbench. Writes build/bench-time.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.TimeBenchMainKt")
+}
+
+tasks.register<JavaExec>("runUniformness") {
+    group = "bench"
+    description = "Sampling-uniformness bench (coverage, KL, Hamming, entropy). Writes build/bench-uniformness.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.UniformnessBenchMainKt")
+}
+
+tasks.register<JavaExec>("runCompleteness") {
+    group = "bench"
+    description = "Enumeration reach-under-budget bench. Writes build/bench-completeness.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.CompletenessBenchMainKt")
 }
 
 /** One-shot task: regenerate the bundled JSON-SchemaDef sample file. Run as
@@ -85,8 +106,8 @@ tasks.register("dumpSchema", JavaExec::class) {
 
 tasks.register<Copy>("saveBaseline") {
     group = "tools"
-    description = "Copy the latest bench-results.json over bench-baseline.json."
-    from(layout.buildDirectory.file("bench-results.json"))
+    description = "Copy the latest bench-time.json over bench-baseline.json."
+    from(layout.buildDirectory.file("bench-time.json"))
     into(layout.projectDirectory)
     rename { "bench-baseline.json" }
 }
