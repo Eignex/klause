@@ -82,6 +82,22 @@ class LocalSearchSolver(
         return minimizeImpl(objective, params, eff)
     }
 
+    /**
+     * Top-k by ascending objective. Materialises a feasible pool of size
+     * `max(k*5, k+10)` via [enumerate] (which honours the dedup window), scores each, and
+     * returns the top [k] in order. Pool size is capped — for true k-best on a small
+     * feasible space, callers should still raise `params.maxFlips` so the pool fills.
+     */
+    override fun minimizeAll(objective: Objective, params: LocalSearchParams, k: Int): Sequence<Sample> {
+        if (k <= 0) return emptySequence()
+        val poolSize = maxOf(k * 5, k + 10)
+        val pool = enumerate(params).take(poolSize).toList()
+        if (pool.isEmpty()) return emptySequence()
+        return pool.asSequence()
+            .sortedBy { objective.evaluate(it) }
+            .take(k)
+    }
+
     fun solve(): SolveResult = solve(LocalSearchParams())
     fun sample(): Sample? = sample(LocalSearchParams())
     fun samples(): Sequence<Sample> = samples(LocalSearchParams())
