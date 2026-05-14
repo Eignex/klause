@@ -24,10 +24,9 @@ class CampaignSchema : VariableSchema() {
     val bonus   by intVar(min = 0, max = 500)
     val rate    by floatVar(min = 0.0, max = 1.0)
 
-    val capWhenA   by constraint { (type eq "a") implies (budget + bonus le 2000) }
-    val proportion by constraint { 2 * bonus le budget }
-
-    init { constraint((rate ge 0.5) implies (budget ge 2000)) }
+    val capWhenA         by constraint { (type eq "a") implies (budget + bonus le 2000) }
+    val proportion       by constraint { 2 * bonus le budget }
+    val budgetForHighRate by constraint { (rate ge 0.5) implies (budget ge 2000) }
 }
 ```
 
