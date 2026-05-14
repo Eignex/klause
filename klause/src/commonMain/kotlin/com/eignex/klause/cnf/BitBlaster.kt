@@ -9,12 +9,10 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
-import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
 
 /**
@@ -24,9 +22,10 @@ import com.eignex.klause.ast.PbOp
  * `constantLeq` domain constraint is emitted when the domain size is not a power of two.
  *
  * Supported factor types: [Clause], [Cardinality] (only AtMostOne / AtLeastOne / ExactlyOne;
- * higher-k cardinality bounds raise), [Linear] (all four ops including NE),
- * [ReifiedIntCompare]. Out-of-domain `Linear` constants are short-circuited at compile time
- * to a true/false unit clause via [emitLinear].
+ * higher-k cardinality bounds raise), [Linear] (all four ops including NE), [ReifiedLinear],
+ * [ReifiedCardinality], [ReifiedPseudoBoolean], [Xor], [AllDifferent], [Product]. Out-of-domain
+ * `Linear` constants are short-circuited at compile time to a true/false unit clause via
+ * [emitLinear].
  */
 object BitBlaster {
 
@@ -58,7 +57,6 @@ object BitBlaster {
                 is Linear -> emitLinear(b, factor, intBits, intMin, problem)
                 is Product -> emitProduct(b, factor, intBits, intMin, problem)
                 is PseudoBoolean -> emitPseudoBoolean(b, factor, boolMap)
-                is ReifiedIntCompare -> emitReifiedIntCompare(b, factor, boolMap, intBits, intMin)
                 is ReifiedLinear -> emitReifiedLinear(b, factor, boolMap, intBits, intMin)
                 is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
                 is ReifiedPseudoBoolean -> emitReifiedPseudoBoolean(b, factor, boolMap)
@@ -389,30 +387,7 @@ object BitBlaster {
         b.addClause(intArrayOf(cnfAux, Lit.negate(cmp)))
     }
 
-    private fun emitReifiedIntCompare(
-        b: CnfBuilder,
-        f: ReifiedIntCompare,
-        boolMap: IntArray,
-        intBits: Array<IntArray>,
-        intMin: IntArray,
-    ) {
-        val cnfAux = Lit.make(boolMap[f.auxBoolVar], positive = true)
-        val bits = bitsToLits(intBits[f.intVar])
-        val offset = f.bound - intMin[f.intVar]
-        val cmp = when (f.op) {
-            IntCmpOp.LE -> b.constantLeq(bits, offset)
-            IntCmpOp.LT -> b.constantLeq(bits, offset - 1)
-            IntCmpOp.GE -> b.constantGeq(bits, offset)
-            IntCmpOp.GT -> b.constantGeq(bits, offset + 1)
-            IntCmpOp.EQ -> b.constantEq(bits, offset)
-            IntCmpOp.NE -> b.constantNeq(bits, offset)
-        }
-        // aux ↔ cmp:  (¬aux ∨ cmp) ∧ (aux ∨ ¬cmp).
-        b.addClause(intArrayOf(Lit.negate(cnfAux), cmp))
-        b.addClause(intArrayOf(cnfAux, Lit.negate(cmp)))
-    }
-
-    private fun sumAll(b: CnfBuilder, terms: List<IntArray>): IntArray {
+private fun sumAll(b: CnfBuilder, terms: List<IntArray>): IntArray {
         if (terms.isEmpty()) return intArrayOf(b.falseLit())
         var acc = terms[0]
         for (i in 1 until terms.size) acc = b.rippleAdd(acc, terms[i])

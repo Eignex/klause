@@ -7,7 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.solver.factor.reifiedIntCompare
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -85,7 +85,7 @@ class IntFactorTest {
     @Test
     fun `reified int compare tracks aux flips`() {
 
-        val rfc = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)
+        val rfc = reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), listOf(rfc))
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, true)

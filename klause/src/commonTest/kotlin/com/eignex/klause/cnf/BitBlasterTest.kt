@@ -8,7 +8,7 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.solver.factor.reifiedIntCompare
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -102,7 +102,7 @@ class BitBlasterTest {
     @Test
     fun `reified int compare tracks aux value`() {
 
-        val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1)
+        val factor = reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
         for (auxVal in 0..1) for (x in 0..3) {

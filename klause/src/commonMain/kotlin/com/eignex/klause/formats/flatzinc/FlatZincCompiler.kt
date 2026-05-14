@@ -10,7 +10,6 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
-import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
 import kotlin.math.roundToLong
@@ -723,10 +722,11 @@ internal class FlatZincCompiler(
         val indicators = IntArray(xs.size) {
             val auxName = "__count_${xs[it]}_eq_${v}"
             val aux = allocBool(auxName)
-            factors.add(ReifiedIntCompare(
+            factors.add(ReifiedLinear(
                 auxBoolVar = aux,
-                intVar = xs[it],
-                op = com.eignex.klause.ast.IntCmpOp.EQ,
+                coeffs = intArrayOf(1),
+                vars = intArrayOf(xs[it]),
+                op = LinearOp.EQ,
                 bound = v,
             ))
             Lit.make(aux, true)
@@ -738,10 +738,11 @@ internal class FlatZincCompiler(
         val indicators = IntArray(xs.size) {
             val auxName = "__count_${xs[it]}_eq_${v}_amost"
             val aux = allocBool(auxName)
-            factors.add(ReifiedIntCompare(
+            factors.add(ReifiedLinear(
                 auxBoolVar = aux,
-                intVar = xs[it],
-                op = com.eignex.klause.ast.IntCmpOp.EQ,
+                coeffs = intArrayOf(1),
+                vars = intArrayOf(xs[it]),
+                op = LinearOp.EQ,
                 bound = v,
             ))
             Lit.make(aux, true)

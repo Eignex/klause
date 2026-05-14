@@ -184,7 +184,7 @@ class FactorPropertyTest {
 
     @Test fun `reified int compare delta matches apply`() {
         for (op in IntCmpOp.entries) {
-            val factor = ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = op, 1)
+            val factor = reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = op, 1)
             runFactorPropertyCheck(
                 factor, numBoolVars = 1,
                 intDomains = arrayOf(IntDomain(-2, 3)),
@@ -247,7 +247,7 @@ class FactorPropertyTest {
                 literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
                 min = 1, max = 2,
             ) to FactorEnv(numBoolVars = 4),
-            ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1) to
+            reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1) to
                 FactorEnv(numBoolVars = 1, intDomains = arrayOf(IntDomain(-2, 3))),
         )
         for ((factor, env) in cases) {

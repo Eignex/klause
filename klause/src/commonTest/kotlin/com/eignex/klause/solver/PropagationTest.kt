@@ -12,7 +12,7 @@ import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.solver.factor.reifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
@@ -209,7 +209,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 10)),
             factors = listOf(
-                ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5),
+                reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
             ),
         )
@@ -222,7 +222,7 @@ class PropagationTest {
         // x in [0..3], aux ↔ (x ≤ 5) → aux must be true.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)),
+            factors = listOf(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)),
         )
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to true), r.bools)
@@ -233,7 +233,7 @@ class PropagationTest {
         // x in [0..3], aux ↔ (x ≥ 10), pin aux=true → never holds → Unsat.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(ReifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, 10)),
+            factors = listOf(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, 10)),
         )
         assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(0 to true))))
     }

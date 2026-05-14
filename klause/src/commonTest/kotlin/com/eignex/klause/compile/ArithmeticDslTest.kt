@@ -15,7 +15,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedLinear
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -89,7 +89,9 @@ class ArithmeticDslTest {
             val capWhenFlag by constraint { flag implies (budget le 50) }
         }
         val compiled = S().compile()
-        assertTrue(compiled.problem.factors.any { it is ReifiedIntCompare })
+        // After the collapse of ReifiedIntCompare into ReifiedLinear, the single-var
+        // reified compare emits a ReifiedLinear with one term.
+        assertTrue(compiled.problem.factors.any { it is ReifiedLinear && it.vars.size == 1 })
     }
 
     @Test

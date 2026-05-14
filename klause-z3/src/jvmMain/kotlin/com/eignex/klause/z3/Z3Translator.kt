@@ -1,6 +1,5 @@
 package com.eignex.klause.z3
 
-import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
@@ -13,7 +12,6 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
@@ -113,19 +111,6 @@ internal object Z3Translator {
                 ctx.mkGe(sum, ctx.mkInt(factor.min)),
                 ctx.mkLe(sum, ctx.mkInt(factor.max)),
             )
-            ctx.mkIff(e.boolExprs[factor.auxBoolVar], pred)
-        }
-        is ReifiedIntCompare -> {
-            val v = e.intExprs[factor.intVar]
-            val b = ctx.mkInt(factor.bound)
-            val pred: BoolExpr = when (factor.op) {
-                IntCmpOp.LE -> ctx.mkLe(v, b)
-                IntCmpOp.LT -> ctx.mkLt(v, b)
-                IntCmpOp.GE -> ctx.mkGe(v, b)
-                IntCmpOp.GT -> ctx.mkGt(v, b)
-                IntCmpOp.EQ -> ctx.mkEq(v, b)
-                IntCmpOp.NE -> ctx.mkNot(ctx.mkEq(v, b))
-            }
             ctx.mkIff(e.boolExprs[factor.auxBoolVar], pred)
         }
         else -> error("Z3Translator: unsupported factor type ${factor::class.simpleName}")

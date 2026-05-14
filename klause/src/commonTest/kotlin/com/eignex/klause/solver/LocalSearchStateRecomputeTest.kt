@@ -12,7 +12,7 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.ReifiedIntCompare
+import com.eignex.klause.solver.factor.reifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
 import kotlin.random.Random
@@ -161,7 +161,7 @@ class LocalSearchStateRecomputeTest {
                 literals = intArrayOf(Lit.make(2, true), Lit.make(3, true), Lit.make(4, true)),
                 min = 1, max = 2,
             ),
-            ReifiedIntCompare(auxBoolVar = 5, intVar = 0, op = IntCmpOp.GE, 0),
+            reifiedIntCompare(auxBoolVar = 5, intVar = 0, op = IntCmpOp.GE, 0),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(5, false))),
         )
         return Case("mixedReified", Problem(numBoolVars = 6, numIntVars = 2, intDomains = intDomains, factors = factors))

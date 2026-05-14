@@ -53,7 +53,6 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
-import com.eignex.klause.solver.factor.ReifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 
 class Compiler {
@@ -425,7 +424,14 @@ class Compiler {
             }
             val v = intVarOf(name)
             val aux = newBoolVar()
-            factors += ReifiedIntCompare(aux, v, effectiveOp, effectiveBound)
+            val linOp = when (effectiveOp) {
+                IntCmpOp.LE -> LinearOp.LE
+                IntCmpOp.GE -> LinearOp.GE
+                IntCmpOp.EQ -> LinearOp.EQ
+                IntCmpOp.NE -> LinearOp.NE
+                IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
+            }
+            factors += ReifiedLinear(aux, intArrayOf(1), intArrayOf(v), linOp, effectiveBound)
             return Lit.make(aux, positive = true)
         }
 
