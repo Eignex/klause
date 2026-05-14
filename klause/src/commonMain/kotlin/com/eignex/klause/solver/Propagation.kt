@@ -11,33 +11,41 @@ sealed interface PropagationResult {
     }
 
     /**
-     * Sound, incomplete proof of infeasibility. [conflictBools] / [conflictInts] are a
-     * subset of the *input* [Assumptions] (or empty when the contradiction was implied
-     * solely by the problem's constraints with no caller pins involved). The subset is
-     * jointly unsatisfiable but not guaranteed minimal — implementations are encouraged
-     * to shrink it when cheap, callers must not assume minimality.
+     * Sound, incomplete proof of infeasibility.
+     *
+     *  - [conflictLevels] is the set of *decision levels* involved in the conflict. For a
+     *    [PropagationSession], `session.pinBool(v, value)` lives at the level it was pushed
+     *    at; `seed` assigns levels `1..|assumptions|` in iteration order. Level 0 is never
+     *    in the set — it represents the problem-constraint phase, not a decision.
+     *  - [conflictBools] / [conflictInts] are the decision variables at those levels. They
+     *    are derived from [conflictLevels] for convenience; CSP-style DFS samplers typically
+     *    read [conflictLevels] directly to compute their backjump target.
+     *
+     *  The conflict subset is jointly unsatisfiable but not guaranteed minimal — callers must
+     *  not assume minimality. An empty result means the contradiction was implied by problem
+     *  constraints alone (no input was load-bearing).
      */
     data class Unsat(
         val conflictBools: Set<Int> = emptySet(),
         val conflictInts: Set<Int> = emptySet(),
+        val conflictLevels: Set<Int> = emptySet(),
     ) : PropagationResult
 }
 
 /**
  * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
- * values and the (tightened) int domains. Factors mutate it through [pinBool] / [tightenIntMin]
- * / [tightenIntMax] / [setInt]; each mutator returns `false` if the change makes the problem
- * infeasible (conflicting bool pin or empty int domain). The driver also tracks which variables
- * have changed so it can re-enqueue affected factors.
+ * values and the (tightened) int domains, plus a **decision level** per pinned variable for
+ * conflict-driven backjumping.
  *
- * Each input-assumption variable is allocated a unique bit in a reason bitmap. Every derived
- * pin / domain tightening carries a bitmap-OR of the input reasons whose joint state implied
- * it — so on infeasibility the driver can read back the subset of inputs responsible.
+ *  - Decisions (external pins from the driver / session) bump the level monotonically.
+ *  - Implied pins (from factor propagation) inherit the maximum level of the variables the
+ *    factor reads — i.e. the deepest decision that contributed.
+ *  - On contradiction, the set of decision levels touched by the failing factor is what the
+ *    driver reports as [PropagationResult.Unsat.conflictLevels].
  *
- * The driver sets [currentReason] to the union of input reasons of every variable the
- * current factor reads before invoking [Factor.propagate]; pin / tighten calls without an
- * explicit reason inherit it (over-conservative — they may include vars the factor didn't
- * actually use, but never under-include).
+ *  Factors don't see the level machinery directly — they keep calling `pinBool` /
+ *  `tightenIntMin` / `tightenIntMax` / `setInt` as before. The driver sets [currentLevel]
+ *  to the inherited level before each factor invocation; mutators read it.
  */
 class PropagationState(
     val problem: Problem,
@@ -57,108 +65,110 @@ class PropagationState(
     var seeded: Boolean = true
         private set
 
-    // Reason-bitmap plumbing. ----------------------------------------------------------------
+    // Decision-level plumbing. ---------------------------------------------------------------
 
-    /** Number of input-assumption variables (bools + ints). One bit each in the reason bitmap. */
-    internal val numInputs: Int = assumptions.bools.size + assumptions.ints.size
-    internal val reasonWords: Int = (numInputs + 63) ushr 6
-
-    /** Bit index for each input-assumption bool var; `-1` if the var isn't an input. */
-    private val boolInputBit: IntArray = IntArray(problem.numBoolVars) { -1 }
-    private val intInputBit: IntArray = IntArray(problem.numIntVars) { -1 }
-    /** Inverse: bit index → originating var id; companion array distinguishes kind. */
-    private val bitToBoolVar: IntArray = IntArray(numInputs) { -1 }
-    private val bitToIntVar: IntArray = IntArray(numInputs) { -1 }
-
-    /** Per-var reason bitmap. `null` = no input dependency (pin derived from constraints alone). */
-    private val boolReasons: Array<LongArray?> = arrayOfNulls(problem.numBoolVars)
-    private val intReasons: Array<LongArray?> = arrayOfNulls(problem.numIntVars)
+    /** Decision level when each bool was first pinned (-1 = unpinned). */
+    val boolLevel: IntArray = IntArray(problem.numBoolVars) { -1 }
+    /** Deepest decision level contributing to this int var's current domain (-1 = untouched). */
+    val intLevel: IntArray = IntArray(problem.numIntVars) { -1 }
 
     /**
-     * Default reason used by [pinBool] / [tightenIntMin] / [tightenIntMax] / [setInt] when the
-     * caller doesn't pass one explicitly. The driver sets this to the union of input reasons
-     * of every var the current factor reads before invoking [Factor.propagate].
+     * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
+     * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed.
      */
-    internal var currentReason: LongArray? = null
+    private val levelToDecisionVar: ArrayDeque<Int> = ArrayDeque()
 
-    /**
-     * Captured on the first detected contradiction; the driver reads this when forming the
-     * [PropagationResult.Unsat] return value. Cleared by the driver between successful factor
-     * invocations.
-     */
-    internal var conflictReason: LongArray? = null
+    /** Number of decisions pushed so far. Equals the maximum level. */
+    val numDecisions: Int get() = levelToDecisionVar.size
+
+    /** Level any pin created during the current factor invocation inherits. Set by the driver. */
+    internal var currentLevel: Int = 0
+
+    /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
+    internal var conflictLevels: MutableSet<Int>? = null
 
     init {
-        var bit = 0
-        for ((v, _) in assumptions.bools) {
-            boolInputBit[v] = bit; bitToBoolVar[bit] = v; bit++
-        }
-        for ((v, _) in assumptions.ints) {
-            intInputBit[v] = bit; bitToIntVar[bit] = v; bit++
-        }
         seedLoop@ for ((v, b) in assumptions.bools) {
-            if (!pinBoolWithReason(v, b, singletonReason(boolInputBit[v]))) {
-                seeded = false; break@seedLoop
-            }
+            if (!pinBoolAsDecision(v, b)) { seeded = false; break@seedLoop }
         }
         if (seeded) {
             for ((v, i) in assumptions.ints) {
-                if (!setIntWithReason(v, i, singletonReason(intInputBit[v]))) {
-                    seeded = false; break
-                }
+                if (!setIntAsDecision(v, i)) { seeded = false; break }
             }
         }
     }
 
-    fun pinBool(v: Int, value: Boolean): Boolean = pinBoolWithReason(v, value, currentReason)
+    /**
+     * Push a bool var as a new decision: bumps the level and pins it. Used by the driver to
+     * seed input assumptions and by [PropagationSession] to push branches.
+     */
+    fun pinBoolAsDecision(v: Int, value: Boolean): Boolean {
+        levelToDecisionVar.addLast(v)
+        currentLevel = levelToDecisionVar.size
+        return pinBoolImpl(v, value)
+    }
 
-    fun pinBoolWithReason(v: Int, value: Boolean, reason: LongArray?): Boolean {
+    /** Push an int var as a new decision. */
+    fun setIntAsDecision(v: Int, value: Int): Boolean {
+        levelToDecisionVar.addLast(problem.numBoolVars + v)
+        currentLevel = levelToDecisionVar.size
+        return setIntImpl(v, value)
+    }
+
+    fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value)
+    fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo)
+    fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi)
+    fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value)
+
+    private fun pinBoolImpl(v: Int, value: Boolean): Boolean {
         val cur = boolValues[v]
         if (cur != null) {
             if (cur == value) return true
-            conflictReason = unionReasons(boolReasons[v], reason)
+            // Conflict — record levels of both contributors.
+            recordConflictLevels(boolLevel[v], currentLevel)
             return false
         }
         boolValues[v] = value
-        boolReasons[v] = reason?.copyOf()
+        boolLevel[v] = currentLevel
         dirtyBools.addLast(v)
         return true
     }
 
-    fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinWithReason(v, lo, currentReason)
-
-    fun tightenIntMinWithReason(v: Int, lo: Int, reason: LongArray?): Boolean {
+    private fun tightenIntMinImpl(v: Int, lo: Int): Boolean {
         val d = intDomains[v]
         if (lo <= d.min) return true
         if (lo > d.max) {
-            conflictReason = unionReasons(intReasons[v], reason)
+            recordConflictLevels(intLevel[v], currentLevel)
             return false
         }
         intDomains[v] = IntDomain(lo, d.max)
-        intReasons[v] = unionReasons(intReasons[v], reason)
+        intLevel[v] = maxOf(intLevel[v], currentLevel)
         dirtyInts.addLast(v)
         return true
     }
 
-    fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxWithReason(v, hi, currentReason)
-
-    fun tightenIntMaxWithReason(v: Int, hi: Int, reason: LongArray?): Boolean {
+    private fun tightenIntMaxImpl(v: Int, hi: Int): Boolean {
         val d = intDomains[v]
         if (hi >= d.max) return true
         if (hi < d.min) {
-            conflictReason = unionReasons(intReasons[v], reason)
+            recordConflictLevels(intLevel[v], currentLevel)
             return false
         }
         intDomains[v] = IntDomain(d.min, hi)
-        intReasons[v] = unionReasons(intReasons[v], reason)
+        intLevel[v] = maxOf(intLevel[v], currentLevel)
         dirtyInts.addLast(v)
         return true
     }
 
-    fun setInt(v: Int, value: Int): Boolean = setIntWithReason(v, value, currentReason)
+    private fun setIntImpl(v: Int, value: Int): Boolean =
+        tightenIntMinImpl(v, value) && tightenIntMaxImpl(v, value)
 
-    fun setIntWithReason(v: Int, value: Int, reason: LongArray?): Boolean =
-        tightenIntMinWithReason(v, value, reason) && tightenIntMaxWithReason(v, value, reason)
+    private fun recordConflictLevels(a: Int, b: Int) {
+        val s = HashSet<Int>()
+        if (a > 0) s.add(a)
+        if (b > 0) s.add(b)
+        conflictLevels = s
+    }
 
     /** Pop one bool var that's been dirtied since the last call, or `-1` if none. */
     fun pollDirtyBool(): Int = if (dirtyBools.isEmpty()) -1 else dirtyBools.removeFirst()
@@ -166,58 +176,46 @@ class PropagationState(
     /** Pop one int var that's been dirtied since the last call, or `-1` if none. */
     fun pollDirtyInt(): Int = if (dirtyInts.isEmpty()) -1 else dirtyInts.removeFirst()
 
-    /** Reason bitmap for a pinned bool, or `null` if unpinned / no input deps. */
-    fun reasonForBool(v: Int): LongArray? = boolReasons[v]
-
-    /** Reason bitmap for the current int domain, or `null` if untouched / no input deps. */
-    fun reasonForInt(v: Int): LongArray? = intReasons[v]
-
-    /** Union of input reasons of every variable in [boolVars] / [intVars]. */
-    fun reasonForVars(boolVars: IntArray, intVars: IntArray): LongArray? {
-        var acc: LongArray? = null
-        for (v in boolVars) acc = unionReasons(acc, boolReasons[v])
-        for (v in intVars) acc = unionReasons(acc, intReasons[v])
-        return acc
+    /** Max decision level of any variable in [boolVars] / [intVars]. Used by the driver to
+     *  set [currentLevel] before each factor invocation. */
+    fun maxLevelForVars(boolVars: IntArray, intVars: IntArray): Int {
+        var max = 0
+        for (v in boolVars) { val l = boolLevel[v]; if (l > max) max = l }
+        for (v in intVars) { val l = intLevel[v]; if (l > max) max = l }
+        return max
     }
 
-    internal fun unionReasons(a: LongArray?, b: LongArray?): LongArray? {
-        if (reasonWords == 0) return null
-        if (a == null) return b?.copyOf()
-        if (b == null) return a.copyOf()
-        val r = LongArray(reasonWords)
-        for (i in 0 until reasonWords) r[i] = a[i] or b[i]
-        return r
-    }
-
-    private fun singletonReason(bit: Int): LongArray? {
-        if (reasonWords == 0 || bit < 0) return null
-        val r = LongArray(reasonWords)
-        r[bit ushr 6] = 1L shl (bit and 63)
-        return r
-    }
-
-    /** Decode the bool-input vars set in [reason]. */
-    internal fun extractConflictBools(reason: LongArray?): Set<Int> {
-        if (reason == null || numInputs == 0) return emptySet()
+    /** Collect every decision level touched by [boolVars] / [intVars] — the factor's view of
+     *  who's responsible. Used when a factor returns `false` without explicitly setting
+     *  [conflictLevels]. */
+    fun collectLevelsForVars(boolVars: IntArray, intVars: IntArray): Set<Int> {
         val out = HashSet<Int>()
-        for (bit in 0 until numInputs) {
-            if ((reason[bit ushr 6] ushr (bit and 63)) and 1L == 1L) {
-                val bv = bitToBoolVar[bit]
-                if (bv >= 0) out.add(bv)
-            }
+        for (v in boolVars) { val l = boolLevel[v]; if (l > 0) out.add(l) }
+        for (v in intVars) { val l = intLevel[v]; if (l > 0) out.add(l) }
+        return out
+    }
+
+    /** Decode [levels] (a subset of pushed decision levels) into the bool decision vars at
+     *  those levels. */
+    internal fun extractConflictBools(levels: Set<Int>): Set<Int> {
+        if (levels.isEmpty()) return emptySet()
+        val out = HashSet<Int>()
+        for (lvl in levels) {
+            if (lvl <= 0 || lvl > levelToDecisionVar.size) continue
+            val encoded = levelToDecisionVar[lvl - 1]
+            if (encoded < problem.numBoolVars) out.add(encoded)
         }
         return out
     }
 
-    /** Decode the int-input vars set in [reason]. */
-    internal fun extractConflictInts(reason: LongArray?): Set<Int> {
-        if (reason == null || numInputs == 0) return emptySet()
+    /** Decode [levels] into the int decision vars at those levels. */
+    internal fun extractConflictInts(levels: Set<Int>): Set<Int> {
+        if (levels.isEmpty()) return emptySet()
         val out = HashSet<Int>()
-        for (bit in 0 until numInputs) {
-            if ((reason[bit ushr 6] ushr (bit and 63)) and 1L == 1L) {
-                val iv = bitToIntVar[bit]
-                if (iv >= 0) out.add(iv)
-            }
+        for (lvl in levels) {
+            if (lvl <= 0 || lvl > levelToDecisionVar.size) continue
+            val encoded = levelToDecisionVar[lvl - 1]
+            if (encoded >= problem.numBoolVars) out.add(encoded - problem.numBoolVars)
         }
         return out
     }

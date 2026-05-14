@@ -59,9 +59,11 @@ class Problem(
     fun propagate(assumptions: Assumptions = Assumptions.None): PropagationResult {
         val state = PropagationState(this, assumptions)
         if (!state.seeded) {
+            val lvls = state.conflictLevels ?: emptySet()
             return PropagationResult.Unsat(
-                state.extractConflictBools(state.conflictReason),
-                state.extractConflictInts(state.conflictReason),
+                state.extractConflictBools(lvls),
+                state.extractConflictInts(lvls),
+                lvls,
             )
         }
 
@@ -75,13 +77,14 @@ class Problem(
             val fid = queue.removeFirst()
             pending[fid] = false
             val f = factors[fid]
-            state.currentReason = state.reasonForVars(f.boolVars, f.intVars)
-            state.conflictReason = null
+            state.currentLevel = state.maxLevelForVars(f.boolVars, f.intVars)
+            state.conflictLevels = null
             if (!f.propagate(state, fid)) {
-                val r = state.conflictReason ?: state.currentReason
+                val lvls = state.conflictLevels ?: state.collectLevelsForVars(f.boolVars, f.intVars)
                 return PropagationResult.Unsat(
-                    state.extractConflictBools(r),
-                    state.extractConflictInts(r),
+                    state.extractConflictBools(lvls),
+                    state.extractConflictInts(lvls),
+                    lvls,
                 )
             }
 

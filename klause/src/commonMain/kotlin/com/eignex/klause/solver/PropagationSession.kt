@@ -4,31 +4,46 @@ package com.eignex.klause.solver
 enum class VarKind { Bool, Int }
 
 /**
- * Stateful propagator: builds a fixpoint incrementally as the caller pins/unpins variables.
- * Mirrors the SAT-solver "trail" abstraction — push assumptions, propagate, pop on
- * backtrack. The caller never sees the trail directly; it interacts through pin/unpin and
- * gets back [PropagationResult] for each push.
+ * Stateful propagator with a decision trail. Push pins via [pinBool] / [pinInt]; each push
+ * increments [decisionLevel] and propagates. On [PropagationResult.Unsat], the result carries
+ * `conflictLevels` — the set of decision levels involved in the conflict — so a CSP-style
+ * DFS sampler can pop directly to the deepest non-conflicting level.
  *
- * This first iteration uses a *full re-propagation* on each push/pop — simpler and obviously
- * sound, slower than the reason-graph invalidation described in the design doc. The
- * consumer-visible API matches the eventual incremental version; only the engine underneath
- * is naive. Optimising to incremental fixpoint reuse (only revisit factors whose vars
- * changed; pop via reason-graph) is a follow-up.
+ * Typical DFS loop:
+ * ```
+ * val s = PropagationSession(problem)
+ * while (!allAssigned()) {
+ *   val (v, value) = chooseDecision()
+ *   when (val r = s.pinBool(v, value)) {
+ *     is Implied -> continue
+ *     is Unsat -> {
+ *       val target = (r.conflictLevels.maxOrNull() ?: 0) - 1
+ *       s.popToLevel(maxOf(0, target))
+ *       // try alternate value at the next decision
+ *     }
+ *   }
+ * }
+ * ```
  *
- * Not thread-safe. One session per search.
+ * This first iteration re-propagates on every push/pop (it builds a fresh [PropagationState]
+ * each time via [Problem.propagate]). The API is the final shape; incremental fixpoint reuse
+ * is documented as a TODO in the README. Not thread-safe.
  */
 class PropagationSession(val problem: Problem) {
     private val pinnedBools: LinkedHashMap<Int, Boolean> = LinkedHashMap()
     private val pinnedInts: LinkedHashMap<Int, Int> = LinkedHashMap()
-    /** Push order — used by [popLast] to identify the most recent pin. */
+    /** Decision trail: each entry is a (kind, var) pair in push order; index = level - 1. */
     private val trail: ArrayDeque<Pair<VarKind, Int>> = ArrayDeque()
     /** Most recent implied set, kept so push returns only newly-forced facts. */
     private var lastImplied: PropagationResult.Implied =
         PropagationResult.Implied(emptyMap(), emptyMap())
 
+    /** Current decision level — number of pins on the trail. 0 = no decisions. */
+    val decisionLevel: Int get() = trail.size
+
     /**
-     * Seed with an initial assumption set. Clears any prior trail. Returns the implied set
-     * for the seed (or [PropagationResult.Unsat] if the seed itself is infeasible).
+     * Seed with an initial assumption set. Clears any prior trail. Each assumption is
+     * assigned its own decision level in iteration order (bools first, then ints).
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         pinnedBools.clear()
@@ -44,10 +59,9 @@ class PropagationSession(val problem: Problem) {
         return runPropagate()
     }
 
-    /** Push one bool pin and propagate. Returns only the newly-forced facts. */
+    /** Push one bool pin at a fresh decision level. */
     fun pinBool(v: Int, value: Boolean): PropagationResult {
         if (pinnedBools[v] == value) {
-            // Idempotent push; no new state, no new facts.
             return PropagationResult.Implied(emptyMap(), emptyMap())
         }
         pinnedBools[v] = value
@@ -55,7 +69,7 @@ class PropagationSession(val problem: Problem) {
         return runPropagate()
     }
 
-    /** Push one int pin and propagate. Returns only the newly-forced facts. */
+    /** Push one int pin at a fresh decision level. */
     fun pinInt(v: Int, value: Int): PropagationResult {
         if (pinnedInts[v] == value) {
             return PropagationResult.Implied(emptyMap(), emptyMap())
@@ -77,13 +91,36 @@ class PropagationSession(val problem: Problem) {
             VarKind.Int -> pinnedInts.remove(v)
         }
         lastImplied = PropagationResult.Implied(emptyMap(), emptyMap())
-        // Re-propagate to refresh internal state. Result intentionally discarded.
+        runPropagate()
+    }
+
+    /**
+     * Pop until [decisionLevel] equals [level]. The pop is unconditional — even if the
+     * popped pins were not in any conflict. Used by DFS samplers to backjump.
+     *
+     * Throws [IllegalArgumentException] if [level] exceeds the current level.
+     */
+    fun popToLevel(level: Int) {
+        require(level >= 0 && level <= trail.size) {
+            "popToLevel($level): out of range [0, ${trail.size}]"
+        }
+        while (trail.size > level) {
+            val (kind, v) = trail.removeLast()
+            when (kind) {
+                VarKind.Bool -> pinnedBools.remove(v)
+                VarKind.Int -> pinnedInts.remove(v)
+            }
+        }
+        lastImplied = PropagationResult.Implied(emptyMap(), emptyMap())
         runPropagate()
     }
 
     /** Pop until [v] of [kind] is no longer pinned. No-op if [v] is already unpinned. */
     fun popUntilUnpinned(kind: VarKind, v: Int) {
-        val pinned = when (kind) { VarKind.Bool -> pinnedBools.containsKey(v); VarKind.Int -> pinnedInts.containsKey(v) }
+        val pinned = when (kind) {
+            VarKind.Bool -> pinnedBools.containsKey(v)
+            VarKind.Int -> pinnedInts.containsKey(v)
+        }
         if (!pinned) return
         while (trail.isNotEmpty()) {
             val top = trail.last()
@@ -95,6 +132,10 @@ class PropagationSession(val problem: Problem) {
     /** Snapshot the current pin set as an [Assumptions]. Maps are fresh copies. */
     fun currentAssumptions(): Assumptions =
         Assumptions(bools = pinnedBools.toMap(), ints = pinnedInts.toMap())
+
+    /** The (kind, var) decision at [level] (1-based), or `null` if [level] is out of range. */
+    fun decisionAt(level: Int): Pair<VarKind, Int>? =
+        if (level in 1..trail.size) trail.elementAt(level - 1) else null
 
     private fun runPropagate(): PropagationResult {
         val asm = Assumptions(bools = pinnedBools.toMap(), ints = pinnedInts.toMap())
