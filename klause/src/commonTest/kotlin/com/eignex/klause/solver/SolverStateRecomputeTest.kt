@@ -1,4 +1,5 @@
 package com.eignex.klause.solver
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 
 import com.eignex.klause.solver.localsearch.SolverState
 
@@ -55,7 +56,7 @@ class SolverStateRecomputeTest {
                 for (fid in 0 until case.problem.numFactors) {
                     assertEquals(sibling.intPayload[fid], state.intPayload[fid],
                         "${case.name} seed=$seed: intPayload[$fid] drifted")
-                    val fa = case.problem.factors[fid]
+                    val fa = case.problem.factors[fid] as LocalSearchFactor
                     assertEquals(
                         fa.isViolated(sibling, fid),
                         fa.isViolated(state, fid),

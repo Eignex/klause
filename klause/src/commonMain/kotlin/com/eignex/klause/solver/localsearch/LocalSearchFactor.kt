@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
  * A [Factor] that participates in local search. Adds the LS-side hooks the engine drives:

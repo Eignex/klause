@@ -1,4 +1,5 @@
 package com.eignex.klause.solver
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 
 import com.eignex.klause.solver.localsearch.SolverState
 
@@ -15,7 +16,7 @@ class BreakCacheTest {
     private fun naiveBreakScore(state: SolverState, boolVar: Int): Int {
         var count = 0
         for (factorId in state.problem.boolOccurrences[boolVar]) {
-            val f = state.problem.factors[factorId]
+            val f = state.factors[factorId]
             if (f.deltaIfBoolFlipped(state, factorId, boolVar) > 0) count++
         }
         return count

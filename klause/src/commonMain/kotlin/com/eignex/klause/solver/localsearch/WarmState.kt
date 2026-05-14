@@ -11,7 +11,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Optimizer
