@@ -1,14 +1,14 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.FixedCadenceRestart
-import com.eignex.klause.solver.LocalSearchParams
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.div
 import com.eignex.klause.ast.eq
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.rem
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

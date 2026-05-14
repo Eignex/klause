@@ -2,8 +2,8 @@ package com.eignex.klause.bench
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.PropagationResult
-import com.eignex.klause.solver.PropagationSession
+import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 
 /** Per-phase nanos for a propagation-heavy workload. */

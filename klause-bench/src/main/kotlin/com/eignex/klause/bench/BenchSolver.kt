@@ -2,12 +2,12 @@ package com.eignex.klause.bench
 
 import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
-import com.eignex.klause.solver.BacktrackParams
-import com.eignex.klause.solver.BacktrackSolver
-import com.eignex.klause.solver.BruteForceParams
-import com.eignex.klause.solver.BruteForceSolver
-import com.eignex.klause.solver.LocalSearchParams
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.brute.BruteForceParams
+import com.eignex.klause.solver.brute.BruteForceSolver
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult

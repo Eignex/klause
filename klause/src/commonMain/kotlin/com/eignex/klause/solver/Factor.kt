@@ -1,5 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.propagation.PropagationState
+
 /**
  * Immutable constraint metadata. Mutable per-factor scratch lives in the [SolverState]
  * payload arrays. Variables touched by a factor split into two id spaces: Boolean vars in

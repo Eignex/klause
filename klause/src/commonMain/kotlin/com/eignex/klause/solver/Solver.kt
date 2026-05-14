@@ -1,5 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.brute.BruteForceSolver
+
 /**
  * Marker for backend-specific solver params. Each solver backend ships its own data class
  * implementing this; the [Solver] / [Optimizer] interfaces are generic over the params type

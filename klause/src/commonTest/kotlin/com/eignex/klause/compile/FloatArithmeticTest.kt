@@ -2,8 +2,8 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.times
-import com.eignex.klause.solver.LocalSearchParams
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails

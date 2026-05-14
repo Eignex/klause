@@ -1,7 +1,9 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.FixedCadenceRestart
-import com.eignex.klause.solver.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
+
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import kotlin.test.Test

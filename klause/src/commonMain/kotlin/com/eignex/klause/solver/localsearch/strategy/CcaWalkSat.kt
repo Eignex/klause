@@ -1,7 +1,11 @@
-package com.eignex.klause.solver.strategy
+package com.eignex.klause.solver.localsearch.strategy
+
+import com.eignex.klause.solver.localsearch.strategy.Strategy
+import com.eignex.klause.solver.localsearch.strategy.CcaWalkSat
+import com.eignex.klause.solver.localsearch.strategy.WalkSat
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.SolverState
+import com.eignex.klause.solver.localsearch.SolverState
 
 /**
  * WalkSAT with CCASat-style Configuration Checking. Identical to [WalkSat] except that

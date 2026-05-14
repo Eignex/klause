@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.SolverState
+
 /**
  * A primitive change applied to a single variable. Strategies enumerate moves, score each via
  * factor delta methods, then commit one through [SolverState.apply].

@@ -1,5 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationState
+
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
  *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [Assignment].

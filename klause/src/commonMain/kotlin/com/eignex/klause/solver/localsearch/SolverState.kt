@@ -1,5 +1,13 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.localsearch
 
+import com.eignex.klause.solver.localsearch.SolverState
+
+import com.eignex.klause.solver.Assignment
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.MoveSink
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
 

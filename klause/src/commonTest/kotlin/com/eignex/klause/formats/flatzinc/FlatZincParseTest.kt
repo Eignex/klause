@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.BacktrackParams
-import com.eignex.klause.solver.BacktrackSolver
-import com.eignex.klause.solver.LocalSearchParams
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals

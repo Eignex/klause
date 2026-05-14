@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.SolverState
+
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertFalse

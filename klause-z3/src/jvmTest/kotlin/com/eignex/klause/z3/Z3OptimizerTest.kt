@@ -2,8 +2,8 @@ package com.eignex.klause.z3
 
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.LocalSearchParams
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent

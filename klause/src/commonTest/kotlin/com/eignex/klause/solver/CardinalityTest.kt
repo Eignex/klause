@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.SolverState
+
 import com.eignex.klause.solver.factor.Cardinality
 import kotlin.random.Random
 import kotlin.test.Test

@@ -1,13 +1,13 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.FixedCadenceRestart
-import com.eignex.klause.solver.LocalSearchParams
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.atLeast
 import com.eignex.klause.ast.atMost
 import com.eignex.klause.ast.cardinality
 import com.eignex.klause.ast.implies
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import kotlin.test.Test

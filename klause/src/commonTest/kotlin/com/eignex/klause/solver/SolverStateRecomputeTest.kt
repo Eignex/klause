@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.SolverState
+
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.factor.AllDifferent

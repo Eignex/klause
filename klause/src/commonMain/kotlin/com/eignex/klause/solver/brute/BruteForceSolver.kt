@@ -1,5 +1,16 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.brute
 
+import com.eignex.klause.solver.brute.BruteForceParams
+import com.eignex.klause.solver.brute.BruteForceSolver
+
+import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Optimizer
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.localsearch.SolverState
 import com.eignex.kpermute.LongPermutation
 import com.eignex.kpermute.longPermutation
 import kotlin.random.Random

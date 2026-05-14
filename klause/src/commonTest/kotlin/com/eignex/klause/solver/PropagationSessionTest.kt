@@ -1,5 +1,9 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.solver.propagation.VarKind
+import com.eignex.klause.solver.propagation.PropagationResult
+
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear

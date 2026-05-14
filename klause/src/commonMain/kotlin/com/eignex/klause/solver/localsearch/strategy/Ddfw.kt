@@ -1,7 +1,13 @@
-package com.eignex.klause.solver.strategy
+package com.eignex.klause.solver.localsearch.strategy
+
+import com.eignex.klause.solver.localsearch.strategy.Ddfw
+import com.eignex.klause.solver.localsearch.strategy.Strategy
+import com.eignex.klause.solver.localsearch.strategy.ProbSat
+import com.eignex.klause.solver.localsearch.strategy.WalkSat
+import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.SolverState
+import com.eignex.klause.solver.localsearch.SolverState
 
 /**
  * Divide and Distribute Fixed Weights (Ishtaiwi-Thornton-Sattar-Pham 2005). Maintains a

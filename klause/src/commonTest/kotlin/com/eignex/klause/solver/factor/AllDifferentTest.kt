@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.FixedCadenceRestart
-import com.eignex.klause.solver.LocalSearchParams
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertFails
 import kotlin.test.assertTrue

@@ -1,36 +1,12 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.propagation
 
-/**
- * Result of [Problem.propagate]. Either a (possibly empty) set of literals/values forced beyond
- * the input assumptions, or a sound (but incomplete) proof of infeasibility.
- */
-sealed interface PropagationResult {
-    /** [bools] and [ints] are disjoint from the input assumptions: only newly-forced facts. */
-    data class Implied(val bools: Map<Int, Boolean>, val ints: Map<Int, Int>) : PropagationResult {
-        val isEmpty: Boolean get() = bools.isEmpty() && ints.isEmpty()
-    }
+import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationState
 
-    /**
-     * Sound, incomplete proof of infeasibility.
-     *
-     *  - [conflictLevels] is the set of *decision levels* involved in the conflict. For a
-     *    [PropagationSession], `session.pinBool(v, value)` lives at the level it was pushed
-     *    at; `seed` assigns levels `1..|assumptions|` in iteration order. Level 0 is never
-     *    in the set — it represents the problem-constraint phase, not a decision.
-     *  - [conflictBools] / [conflictInts] are the decision variables at those levels. They
-     *    are derived from [conflictLevels] for convenience; CSP-style DFS samplers typically
-     *    read [conflictLevels] directly to compute their backjump target.
-     *
-     *  The conflict subset is jointly unsatisfiable but not guaranteed minimal — callers must
-     *  not assume minimality. An empty result means the contradiction was implied by problem
-     *  constraints alone (no input was load-bearing).
-     */
-    data class Unsat(
-        val conflictBools: Set<Int> = emptySet(),
-        val conflictInts: Set<Int> = emptySet(),
-        val conflictLevels: Set<Int> = emptySet(),
-    ) : PropagationResult
-}
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Problem
 
 /**
  * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
@@ -305,16 +281,4 @@ class PropagationState(
         }
         return null
     }
-}
-
-/** floor(a / b) with correct handling of negative operands. */
-internal fun floorDivLong(a: Long, b: Long): Long {
-    val q = a / b
-    return if (a % b != 0L && (a xor b) < 0L) q - 1 else q
-}
-
-/** ceil(a / b) with correct handling of negative operands. */
-internal fun ceilDivLong(a: Long, b: Long): Long {
-    val q = a / b
-    return if (a % b != 0L && (a xor b) >= 0L) q + 1 else q
 }

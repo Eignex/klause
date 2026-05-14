@@ -1,5 +1,12 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LubyRestart
+
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import kotlin.random.Random

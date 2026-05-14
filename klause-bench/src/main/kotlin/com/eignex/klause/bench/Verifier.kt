@@ -3,7 +3,7 @@ package com.eignex.klause.bench
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolverState
+import com.eignex.klause.solver.localsearch.SolverState
 import kotlin.random.Random
 
 /** Per-backend solve verdicts + per-sample satisfaction checks for one [Problem]. */

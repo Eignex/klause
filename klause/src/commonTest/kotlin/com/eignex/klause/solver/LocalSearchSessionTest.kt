@@ -1,7 +1,11 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchSession
+
 import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.strategy.Ddfw
+import com.eignex.klause.solver.localsearch.strategy.Ddfw
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

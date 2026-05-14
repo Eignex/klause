@@ -3,8 +3,8 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MoveSink
-import com.eignex.klause.solver.PropagationState
-import com.eignex.klause.solver.SolverState
+import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.localsearch.SolverState
 import com.eignex.klause.solver.ceilDivLong
 import com.eignex.klause.solver.floorDivLong
 

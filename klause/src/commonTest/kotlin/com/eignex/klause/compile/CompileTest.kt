@@ -1,14 +1,14 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.FixedCadenceRestart
-import com.eignex.klause.solver.LocalSearchParams
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.le
 import com.eignex.klause.ast.not
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear

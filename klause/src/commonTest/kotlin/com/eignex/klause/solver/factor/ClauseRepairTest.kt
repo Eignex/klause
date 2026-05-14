@@ -5,7 +5,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MoveSink
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.SolverState
+import com.eignex.klause.solver.localsearch.SolverState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
