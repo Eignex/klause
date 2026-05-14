@@ -1,6 +1,6 @@
 package com.eignex.klause.bench
 
-import com.eignex.klause.cnf.Dimacs
+import com.eignex.klause.formats.dimacs.Dimacs
 import java.io.File
 
 /** Discovers SATLIB-style DIMACS instances under `klause-bench/build/satlib/<set>/`,

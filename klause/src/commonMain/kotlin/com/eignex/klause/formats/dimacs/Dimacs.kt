@@ -1,4 +1,4 @@
-package com.eignex.klause.cnf
+package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem

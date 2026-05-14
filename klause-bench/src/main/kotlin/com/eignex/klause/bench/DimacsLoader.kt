@@ -1,6 +1,6 @@
 package com.eignex.klause.bench
 
-import com.eignex.klause.cnf.Dimacs
+import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.solver.Problem
 
 /** Loads bundled DIMACS-CNF instances from `klause-bench/src/main/resources/dimacs/`. */
