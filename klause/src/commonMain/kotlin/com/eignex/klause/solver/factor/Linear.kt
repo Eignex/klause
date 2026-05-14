@@ -3,7 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.ceilDivLong
 import com.eignex.klause.solver.floorDivLong
 
@@ -32,16 +32,16 @@ class Linear(
 
     private val coeffLookup: CoeffLookup = CoeffLookup.build(vars, coeffs)
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0
         for (i in vars.indices) sum += coeffs[i] * state.assignment.intValue(vars[i])
         state.intPayload[factorId] = sum
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean =
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         violates(state.intPayload[factorId])
 
-    override fun deltaIfIntSet(state: SolverState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val coeff = coeffOf(intVar)
         val old = state.assignment.intValue(intVar)
         val sum = state.intPayload[factorId]
@@ -49,7 +49,7 @@ class Linear(
         return (if (violates(newSum)) 1 else 0) - (if (violates(sum)) 1 else 0)
     }
 
-    override fun applyIntSet(state: SolverState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val coeff = coeffOf(intVar)
         val cur = state.assignment.intValue(intVar)
         val oldSum = state.intPayload[factorId]
@@ -61,7 +61,7 @@ class Linear(
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         propagateLinearBounds(state, coeffs, vars, op, bound.toLong())
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
         if (!violates(sum)) return
         if (op == LinearOp.NE) {

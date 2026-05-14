@@ -4,7 +4,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `XOR(lit_1, ..., lit_n) == targetParity`. `targetParity = 1` means an odd number of literals
@@ -44,7 +44,7 @@ class Xor(
         CoeffLookup.build(boolVars, parities)
     }
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         var parity = 0
         for (lit in literals) {
             if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) parity = parity xor 1
@@ -52,10 +52,10 @@ class Xor(
         state.intPayload[factorId] = parity
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean =
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         state.intPayload[factorId] != targetParity
 
-    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val parity = state.intPayload[factorId]
         val newParity = parity xor parityByVar.coeffOf(boolVar)
         val wasViolated = parity != targetParity
@@ -63,7 +63,7 @@ class Xor(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val oldParity = state.intPayload[factorId]
         val newParity = oldParity xor parityByVar.coeffOf(boolVar)
         state.intPayload[factorId] = newParity
@@ -113,7 +113,7 @@ class Xor(
         }
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (state.intPayload[factorId] == targetParity) return
         // Flipping any literal whose variable appears an odd number of times in the list toggles
         // parity. In typical use each variable appears once, so any flip works.

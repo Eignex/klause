@@ -5,7 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (Σ weights[i] * lit_i ⟨op⟩ bound)`. Payload at `intPayload[factorId]` is the
@@ -35,7 +35,7 @@ class ReifiedPseudoBoolean(
     }
     override val intVars: IntArray = EMPTY
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0
         for (i in literals.indices) {
             if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
@@ -45,12 +45,12 @@ class ReifiedPseudoBoolean(
         state.intPayload[factorId] = sum
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val aux = state.assignment.boolValue(auxBoolVar)
         return aux != predHolds(state.intPayload[factorId])
     }
 
-    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.intPayload[factorId]
         val wasViolated = aux != predHolds(sum)
@@ -63,7 +63,7 @@ class ReifiedPseudoBoolean(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val oldSum = state.intPayload[factorId]
         if (boolVar == auxBoolVar) {
@@ -162,7 +162,7 @@ class ReifiedPseudoBoolean(
         return true
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.intPayload[factorId]
         if (aux == predHolds(sum)) return
@@ -195,7 +195,7 @@ class ReifiedPseudoBoolean(
         PbOp.EQ -> if (sum >= bound) sum - bound else bound - sum
     }
 
-    private fun changeOnFlip(state: SolverState, boolVar: Int, current: Boolean): Int {
+    private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
         val pre = if (current) state.assignment.boolValue(boolVar)
         else !state.assignment.boolValue(boolVar)
         var delta = 0

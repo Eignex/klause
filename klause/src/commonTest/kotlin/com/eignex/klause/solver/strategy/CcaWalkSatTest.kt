@@ -7,7 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.factor.Clause
 import kotlin.random.Random
 import kotlin.test.Test
@@ -22,7 +22,7 @@ class CcaWalkSatTest {
 
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.restart()
 
         assertTrue(state.boolConfChange.all { it })
@@ -38,7 +38,7 @@ class CcaWalkSatTest {
     fun `restart resets conf change to true`() {
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.restart()
         state.apply(Move.BoolFlip(0))
         assertEquals(false, state.boolConfChange[0])

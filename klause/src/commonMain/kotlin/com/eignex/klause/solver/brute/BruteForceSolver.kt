@@ -10,7 +10,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.kpermute.LongPermutation
 import com.eignex.kpermute.longPermutation
 import kotlin.random.Random
@@ -116,7 +116,7 @@ class BruteForceSolver(override val problem: Problem) :
      */
     private fun walk(params: BruteForceParams): Sequence<Sample> {
         val seed = params.randomSeed ?: 0L
-        val state = SolverState(problem, Random(seed))
+        val state = LocalSearchState(problem, Random(seed))
         val budget = StepBudget(params.maxSteps)
         if (chunks.isEmpty()) {
             // No variables — there's exactly one assignment to test.
@@ -148,7 +148,7 @@ class BruteForceSolver(override val problem: Problem) :
     private fun walkChunks(
         perms: List<LongPermutation>,
         depth: Int,
-        state: SolverState,
+        state: LocalSearchState,
         budget: StepBudget,
     ): Sequence<Sample> = sequence {
         if (depth == perms.size) {
@@ -166,7 +166,7 @@ class BruteForceSolver(override val problem: Problem) :
 
     /** Decode [idx] into the variables held by [chunk] and write them into [state]'s
      *  assignment. Mixed-radix: each dim consumes its radix from the running quotient. */
-    private fun applyChunkIndex(chunk: Chunk, idx: Long, state: SolverState) {
+    private fun applyChunkIndex(chunk: Chunk, idx: Long, state: LocalSearchState) {
         var remaining = idx
         for (dim in chunk.dims) {
             val digit = (remaining % dim.radix).toInt()

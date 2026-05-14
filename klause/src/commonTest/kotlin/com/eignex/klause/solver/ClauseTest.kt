@@ -1,6 +1,6 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 import com.eignex.klause.solver.factor.Clause
 import kotlin.random.Random
@@ -11,9 +11,9 @@ import kotlin.test.assertTrue
 
 class ClauseTest {
 
-    private fun stateFor(numBoolVars: Int, factor: Factor): SolverState {
+    private fun stateFor(numBoolVars: Int, factor: Factor): LocalSearchState {
         val problem = Problem(numBoolVars, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.recompute()
         return state
     }

@@ -6,7 +6,7 @@ import com.eignex.klause.solver.localsearch.strategy.WalkSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.math.exp
 
 /**
@@ -31,7 +31,7 @@ class SimulatedAnnealing(
 
     private var temperature: Double = initialTemperature
 
-    override fun pickMove(state: SolverState): Move? {
+    override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
         val factorId = state.violated.random(state.rng)
         val factor = state.factors[factorId]

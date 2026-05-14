@@ -5,7 +5,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +22,7 @@ class CardinalityRepairTest {
             min = 0, max = 2,
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         for (v in intArrayOf(a, b, c, d)) state.assignment.setBool(v, true)
         state.recompute()
         assertTrue(factor.isViolated(state, 0))
@@ -43,7 +43,7 @@ class CardinalityRepairTest {
             min = 2, max = 3,
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(a, true)
         state.recompute()
         assertTrue(factor.isViolated(state, 0))
@@ -64,7 +64,7 @@ class CardinalityRepairTest {
             min = 2, max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(a, true)
         state.assignment.setBool(b, true)
         state.recompute()
@@ -84,7 +84,7 @@ class CardinalityRepairTest {
             min = 1, max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(a, true)
         state.recompute()
         assertTrue(!factor.isViolated(state, 0))

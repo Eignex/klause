@@ -3,7 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,7 +19,7 @@ class ClauseWatchedLitTest {
         )
         val clause = Clause(literals)
         val problem = Problem(5, 0, emptyArray(), listOf(clause))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         for (mask in 0..31) {
             for (i in 0..4) state.assignment.setBool(i, (mask shr i) and 1 == 1)
             state.recompute()
@@ -37,7 +37,7 @@ class ClauseWatchedLitTest {
         )
         val clause = Clause(literals)
         val problem = Problem(6, 0, emptyArray(), listOf(clause))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
 
         for (i in 0..5) state.assignment.setBool(i, false)
         state.recompute()
@@ -50,7 +50,7 @@ class ClauseWatchedLitTest {
         }
     }
 
-    private fun naiveIsViolated(literals: IntArray, state: SolverState): Boolean {
+    private fun naiveIsViolated(literals: IntArray, state: LocalSearchState): Boolean {
         for (lit in literals) {
             if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) return false
         }

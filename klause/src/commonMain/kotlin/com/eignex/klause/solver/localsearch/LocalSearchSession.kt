@@ -2,7 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.WarmState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 
@@ -35,7 +35,7 @@ import com.eignex.klause.solver.propagation.PropagationResult
  *
  * Sync points:
  *  - Sync-in: at the start of each call, the warm state is copied into the new
- *    [SolverState.factorWeights] (only if size matches `problem.numFactors`).
+ *    [LocalSearchState.factorWeights] (only if size matches `problem.numFactors`).
  *  - Sync-out: at the end of the search loop (or when a streaming sequence completes
  *    naturally / its iterator is cancelled). Sequences abandoned mid-iteration may not
  *    sync — accepted loss; the next call still starts from the previous capture.

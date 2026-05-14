@@ -4,7 +4,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true
@@ -31,7 +31,7 @@ class Cardinality(
     }
     override val intVars: IntArray = EMPTY
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         var count = 0
         for (lit in literals) {
             if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
@@ -39,12 +39,12 @@ class Cardinality(
         state.intPayload[factorId] = count
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val n = state.intPayload[factorId]
         return n < min || n > max
     }
 
-    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val pre = state.assignment.boolValue(boolVar)
         var change = 0
         for (lit in literals) {
@@ -58,7 +58,7 @@ class Cardinality(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val post = state.assignment.boolValue(boolVar)
         var change = 0
         for (lit in literals) {
@@ -105,7 +105,7 @@ class Cardinality(
         return true
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val n = state.intPayload[factorId]
         if (n in min..max) return
         val wantIncrease = n < min

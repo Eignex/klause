@@ -1,7 +1,7 @@
 package com.eignex.klause.solver
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
@@ -20,7 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class SolverStateRecomputeTest {
+class LocalSearchStateRecomputeTest {
 
     private data class Case(val name: String, val problem: Problem)
 
@@ -35,7 +35,7 @@ class SolverStateRecomputeTest {
     fun `after random moves state matches fresh recompute`() {
         for (case in cases) {
             for (seed in 0 until 8) {
-                val state = SolverState(case.problem, Random(seed.toLong()))
+                val state = LocalSearchState(case.problem, Random(seed.toLong()))
                 state.restart()
 
                 val rng = Random(seed.toLong() xor 0xBEEFL)
@@ -44,7 +44,7 @@ class SolverStateRecomputeTest {
                     state.apply(move)
                 }
 
-                val sibling = SolverState(case.problem, Random(seed.toLong()))
+                val sibling = LocalSearchState(case.problem, Random(seed.toLong()))
                 copyAssignment(state, sibling)
                 sibling.recompute()
 
@@ -72,7 +72,7 @@ class SolverStateRecomputeTest {
     fun `violated set is subset of factor space`() {
 
         for (case in cases) {
-            val state = SolverState(case.problem, Random(0))
+            val state = LocalSearchState(case.problem, Random(0))
             state.restart()
             val rng = Random(0xCAFEL)
             repeat(100) {
@@ -86,7 +86,7 @@ class SolverStateRecomputeTest {
         }
     }
 
-    private fun randomMove(problem: Problem, state: SolverState, rng: Random): Move? {
+    private fun randomMove(problem: Problem, state: LocalSearchState, rng: Random): Move? {
         val haveBool = problem.numBoolVars > 0
         val haveInt = problem.numIntVars > 0
         val pickBool = when {
@@ -109,7 +109,7 @@ class SolverStateRecomputeTest {
         }
     }
 
-    private fun copyAssignment(src: SolverState, dst: SolverState) {
+    private fun copyAssignment(src: LocalSearchState, dst: LocalSearchState) {
         for (b in 0 until src.problem.numBoolVars) dst.assignment.setBool(b, src.assignment.boolValue(b))
         for (i in 0 until src.problem.numIntVars) dst.assignment.setInt(i, src.assignment.intValue(i))
     }

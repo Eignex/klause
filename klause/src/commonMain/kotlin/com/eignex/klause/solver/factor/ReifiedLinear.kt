@@ -3,7 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
@@ -29,26 +29,26 @@ class ReifiedLinear(
 
     private val coeffLookup: CoeffLookup = CoeffLookup.build(vars, coeffs)
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0
         for (i in vars.indices) sum += coeffs[i] * state.assignment.intValue(vars[i])
         state.intPayload[factorId] = sum
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val aux = state.assignment.boolValue(auxBoolVar)
         val holds = holds(state.intPayload[factorId])
         return aux != holds
     }
 
-    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val holds = holds(state.intPayload[factorId])
         val wasViolated = aux != holds
         return if (wasViolated) -1 else +1
     }
 
-    override fun deltaIfIntSet(state: SolverState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.intPayload[factorId]
         val coeff = coeffOf(intVar)
@@ -58,14 +58,14 @@ class ReifiedLinear(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val holds = holds(state.intPayload[factorId])
         val nowViolated = aux != holds
         return if (nowViolated) +1 else -1
     }
 
-    override fun applyIntSet(state: SolverState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val coeff = coeffOf(intVar)
         val oldSum = state.intPayload[factorId]
@@ -111,7 +111,7 @@ class ReifiedLinear(
         }
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.intPayload[factorId]
         if (aux == holds(sum)) return

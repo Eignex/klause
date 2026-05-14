@@ -1,6 +1,6 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 import com.eignex.klause.solver.factor.Cardinality
 import kotlin.random.Random
@@ -15,7 +15,7 @@ class CardinalityTest {
     fun `at most one violated with two true`() {
         val amo = Cardinality.atMostOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(amo))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, true); state.assignment.setBool(1, true)
         state.recompute()
         assertTrue(amo.isViolated(state, 0))
@@ -26,7 +26,7 @@ class CardinalityTest {
     fun `exactly one transitions`() {
         val one = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(one))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, true)
         state.recompute()
         assertFalse(one.isViolated(state, 0))

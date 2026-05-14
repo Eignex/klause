@@ -12,7 +12,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private val moves: MutableList<Move> = ArrayList()
     val list: List<Move> get() = moves
 
-    /** Replace the [Assumptions] this sink filters against. Called by [SolverState] on
+    /** Replace the [Assumptions] this sink filters against. Called by [LocalSearchState] on
      *  init / restart so per-call assumptions take effect. */
     fun setAssumptions(a: Assumptions) { assumptions = a }
 

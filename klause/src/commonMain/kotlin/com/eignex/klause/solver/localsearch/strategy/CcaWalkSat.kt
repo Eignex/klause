@@ -5,13 +5,13 @@ import com.eignex.klause.solver.localsearch.strategy.CcaWalkSat
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * WalkSAT with CCASat-style Configuration Checking. Identical to [WalkSat] except that
  * candidate moves are first filtered to those targeting a variable whose configuration
- * has changed since its last flip — see [SolverState.boolConfChange] /
- * [SolverState.intConfChange]. This breaks short flip-unflip cycles without needing a
+ * has changed since its last flip — see [LocalSearchState.boolConfChange] /
+ * [LocalSearchState.intConfChange]. This breaks short flip-unflip cycles without needing a
  * tabu tenure long enough to be globally disruptive.
  *
  * Aspiration: when every candidate is CC-blocked, the filter is dropped (mirrors the
@@ -20,7 +20,7 @@ import com.eignex.klause.solver.localsearch.SolverState
  */
 class CcaWalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
 
-    override fun pickMove(state: SolverState): Move? {
+    override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
         val factorId = state.violated.random(state.rng)
         val factor = state.factors[factorId]
@@ -57,7 +57,7 @@ class CcaWalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
         return pick
     }
 
-    private fun confChanged(state: SolverState, move: Move): Boolean = when (move) {
+    private fun confChanged(state: LocalSearchState, move: Move): Boolean = when (move) {
         is Move.BoolFlip -> state.boolConfChange[move.varId]
         is Move.IntSet -> state.intConfChange[move.varId]
     }

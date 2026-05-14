@@ -2,7 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.WarmState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
@@ -139,7 +139,7 @@ class LocalSearchSolver(
         val minHammingDistance = params.minHammingDistance
         val recentWindow = params.recentWindow
         return sequence {
-            val state = SolverState(problem, Random(seed), effectiveAssumptions)
+            val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
             warm?.applyTo(state)
             val window = ArrayDeque<Sample>()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
@@ -213,7 +213,7 @@ class LocalSearchSolver(
                 "count ($totalBits)"
         }
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = SolverState(problem, Random(seed), effectiveAssumptions)
+        val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         warm?.applyTo(state)
         // No bestSample yet — first restart is always full random.
         restartPolicy.restart(state, bestSoFar = null)
@@ -281,7 +281,7 @@ class LocalSearchSolver(
      * incremental cost path runs naturally; int sets do the same with the saved old
      * value.
      */
-    private fun greedyObjectiveStep(state: SolverState, objective: Objective): Boolean {
+    private fun greedyObjectiveStep(state: LocalSearchState, objective: Objective): Boolean {
         val baselineSnap = state.assignment.snapshot()
         val baselineObj = objective.evaluate(baselineSnap)
         var bestDelta = 0.0

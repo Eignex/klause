@@ -4,7 +4,7 @@ import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * Reified integer comparison: `auxBoolVar ↔ (intVal ⟨op⟩ bound)`. Created by the compiler
@@ -21,22 +21,22 @@ class ReifiedIntCompare(
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
     override val intVars: IntArray = intArrayOf(intVar)
 
-    override fun initialize(state: SolverState, factorId: Int) {}
+    override fun initialize(state: LocalSearchState, factorId: Int) {}
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val aux = state.assignment.boolValue(auxBoolVar)
         val holds = cmpHolds(state.assignment.intValue(intVar))
         return aux != holds
     }
 
-    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val holds = cmpHolds(state.assignment.intValue(intVar))
         val wasViolated = aux != holds
         return if (wasViolated) -1 else +1
     }
 
-    override fun deltaIfIntSet(state: SolverState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val cur = state.assignment.intValue(this.intVar)
         val wasViolated = aux != cmpHolds(cur)
@@ -44,7 +44,7 @@ class ReifiedIntCompare(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val holds = cmpHolds(state.assignment.intValue(intVar))
         // After the flip, equivalence flips: was aux != holds becomes aux == holds.
@@ -52,7 +52,7 @@ class ReifiedIntCompare(
         return if (nowViolated) +1 else -1
     }
 
-    override fun applyIntSet(state: SolverState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val cur = state.assignment.intValue(this.intVar)
         val wasViolated = aux != cmpHolds(oldValue)
@@ -114,7 +114,7 @@ class ReifiedIntCompare(
         IntCmpOp.NE -> state.setInt(intVar, bound)
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
         val cur = state.assignment.intValue(intVar)
         if (aux == cmpHolds(cur)) return

@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.localsearch.WarmState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 
@@ -42,14 +42,14 @@ class WarmState {
 
     /** Sync warm weights into [state] before the search loop starts. Size-mismatched
      *  warm state is silently dropped — the new Problem's factor count overrides. */
-    internal fun applyTo(state: SolverState) {
+    internal fun applyTo(state: LocalSearchState) {
         val w = factorWeights ?: return
         if (w.size != state.factorWeights.size) return
         for (i in w.indices) state.factorWeights[i] = w[i]
     }
 
     /** Capture the strategy's learned weights at the end of a search session. */
-    internal fun captureFrom(state: SolverState) {
+    internal fun captureFrom(state: LocalSearchState) {
         factorWeights = state.factorWeights.copyOf()
     }
 }

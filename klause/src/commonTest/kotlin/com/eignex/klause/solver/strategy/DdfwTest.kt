@@ -6,7 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import kotlin.random.Random
@@ -46,7 +46,7 @@ class DdfwTest {
             Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 0),
         )
         val problem = Problem(3, 0, emptyArray(), factors)
-        val state = SolverState(problem, Random(42L))
+        val state = LocalSearchState(problem, Random(42L))
         state.restart()
         val ddfw = Ddfw()
         repeat(80) {
@@ -66,7 +66,7 @@ class DdfwTest {
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
         )
         val problem = Problem(2, 0, emptyArray(), factors)
-        val state = SolverState(problem, Random(0L))
+        val state = LocalSearchState(problem, Random(0L))
         state.restart()
         val ddfw = Ddfw()
         repeat(40) {
@@ -89,7 +89,7 @@ class DdfwTest {
             Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
         )
         val problem = Problem(3, 0, emptyArray(), factors)
-        val state = SolverState(problem, Random(11L))
+        val state = LocalSearchState(problem, Random(11L))
         state.restart()
         val initialTotal = state.factorWeights.sum()
         val ddfw = Ddfw()

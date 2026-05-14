@@ -4,7 +4,7 @@ import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * WalkSAT extended to mixed Boolean/integer moves. Pick a violated factor uniformly, ask it
@@ -17,7 +17,7 @@ import com.eignex.klause.solver.localsearch.SolverState
  */
 class WalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
 
-    override fun pickMove(state: SolverState): Move? {
+    override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
         val factorId = state.violated.random(state.rng)
         val factor = state.factors[factorId]

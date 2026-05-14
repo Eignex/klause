@@ -7,7 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -213,7 +213,7 @@ class LogicNGSolverTest {
 
     private fun assertSatisfiesProblem(problem: Problem, sample: Sample, label: String) {
 
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
         state.recompute()

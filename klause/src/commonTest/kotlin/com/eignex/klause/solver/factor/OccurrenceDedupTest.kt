@@ -3,7 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +22,7 @@ class OccurrenceDedupTest {
         val occA = problem.boolOccurrences[a]
         assertEquals(1, occA.size, "var a registered ${occA.size} times in occurrence list (expected 1)")
 
-        val state = SolverState(problem, Random(7))
+        val state = LocalSearchState(problem, Random(7))
         state.recompute()
         val brute = if (factor.isViolated(state, 0)) 1 else 0
         assertEquals(brute, state.cost)

@@ -15,17 +15,17 @@ import com.eignex.klause.solver.localsearch.MoveSink
  */
 interface LocalSearchFactor : Factor {
     /** Build this factor's payload from the current assignment. Called once per restart. */
-    fun initialize(state: SolverState, factorId: Int)
+    fun initialize(state: LocalSearchState, factorId: Int)
 
-    fun isViolated(state: SolverState, factorId: Int): Boolean
+    fun isViolated(state: LocalSearchState, factorId: Int): Boolean
 
     /**
      * Δ in this factor's violation status if the given move were applied, computed without
      * mutating state. +1 means a satisfied factor would become violated, -1 the opposite.
      * Default returns 0; factors override the methods relevant to the move kinds they handle.
      */
-    fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int = 0
-    fun deltaIfIntSet(state: SolverState, factorId: Int, intVar: Int, newValue: Int): Int = 0
+    fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
+    fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
 
     /**
      * Apply a committed move to this factor's payload. The assignment has already been
@@ -33,8 +33,8 @@ interface LocalSearchFactor : Factor {
      * or recover the pre-flip value by inversion. Returns the same delta the deltaIf* method
      * would have returned before the move.
      */
-    fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int = 0
-    fun applyIntSet(state: SolverState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+    fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
+    fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
     /**
      * Suggest moves that would (or might) repair this factor when violated. The default lists
@@ -42,7 +42,7 @@ interface LocalSearchFactor : Factor {
      * member. Factors with structural insight (e.g. a comparator can snap to its bound)
      * override this.
      */
-    fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         for (b in boolVars) sink.addBoolFlip(b)
         for (i in intVars) {
             val cur = state.assignment.intValue(i)

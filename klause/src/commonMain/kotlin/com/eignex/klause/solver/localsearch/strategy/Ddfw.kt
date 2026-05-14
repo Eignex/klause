@@ -7,11 +7,11 @@ import com.eignex.klause.solver.localsearch.strategy.WalkSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * Divide and Distribute Fixed Weights (Ishtaiwi-Thornton-Sattar-Pham 2005). Maintains a
- * per-factor weight in [SolverState.factorWeights]; on every step, transfers weight from
+ * per-factor weight in [LocalSearchState.factorWeights]; on every step, transfers weight from
  * the highest-weighted satisfied neighbor of each currently violated factor, conserving
  * total weight by construction. Move selection is greedy on the weighted break score
  * (Σ over factors a move would newly violate, scaled by their current weights), with a
@@ -32,7 +32,7 @@ class Ddfw(
 
     private var lastUpdateStep: Long = -1L
 
-    override fun pickMove(state: SolverState): Move? {
+    override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
         if (state.step > 0 && state.step != lastUpdateStep) {
             updateWeights(state)
@@ -64,7 +64,7 @@ class Ddfw(
         return best
     }
 
-    private fun weightedBreakScore(state: SolverState, move: Move): Double {
+    private fun weightedBreakScore(state: LocalSearchState, move: Move): Double {
         val w = state.factorWeights
         return when (move) {
             is Move.BoolFlip -> {
@@ -86,7 +86,7 @@ class Ddfw(
         }
     }
 
-    private fun updateWeights(state: SolverState) {
+    private fun updateWeights(state: LocalSearchState) {
         val w = state.factorWeights
         val violated = state.violated.toIntArray()
         for (v in violated) {

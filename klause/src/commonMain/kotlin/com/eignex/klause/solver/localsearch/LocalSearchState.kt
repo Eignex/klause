@@ -13,7 +13,7 @@ import kotlin.random.Random
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
  * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard cost.
  */
-class SolverState(
+class LocalSearchState(
     val problem: Problem,
     val rng: Random,
     var assumptions: Assumptions = Assumptions.None,

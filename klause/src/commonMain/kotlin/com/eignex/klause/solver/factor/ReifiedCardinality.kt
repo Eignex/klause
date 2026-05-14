@@ -4,7 +4,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (#true literals in [min, max])`. Created by the compiler when a
@@ -35,7 +35,7 @@ class ReifiedCardinality(
     }
     override val intVars: IntArray = EMPTY
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         var count = 0
         for (lit in literals) {
             if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
@@ -43,13 +43,13 @@ class ReifiedCardinality(
         state.intPayload[factorId] = count
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val aux = state.assignment.boolValue(auxBoolVar)
         val holds = inRange(state.intPayload[factorId])
         return aux != holds
     }
 
-    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val n = state.intPayload[factorId]
         val wasViolated = aux != inRange(n)
@@ -64,7 +64,7 @@ class ReifiedCardinality(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val oldN = state.intPayload[factorId]
         if (boolVar == auxBoolVar) {
@@ -84,7 +84,7 @@ class ReifiedCardinality(
      * holds the pre-flip value (used by [deltaIfBoolFlipped]); with `current = false` the
      * assignment has been updated (used by [applyBoolFlip]).
      */
-    private fun changeOnFlip(state: SolverState, boolVar: Int, current: Boolean): Int {
+    private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
         val pre = if (current) state.assignment.boolValue(boolVar)
         else !state.assignment.boolValue(boolVar)
         var delta = 0
@@ -134,7 +134,7 @@ class ReifiedCardinality(
         return true
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
         val n = state.intPayload[factorId]
         if (aux == inRange(n)) return

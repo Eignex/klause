@@ -1,7 +1,7 @@
 package com.eignex.klause.solver
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 
 class BreakCacheTest {
 
-    private fun naiveBreakScore(state: SolverState, boolVar: Int): Int {
+    private fun naiveBreakScore(state: LocalSearchState, boolVar: Int): Int {
         var count = 0
         for (factorId in state.problem.boolOccurrences[boolVar]) {
             val f = state.factors[factorId]
@@ -22,7 +22,7 @@ class BreakCacheTest {
         return count
     }
 
-    private fun assertCacheConsistent(state: SolverState, label: String) {
+    private fun assertCacheConsistent(state: LocalSearchState, label: String) {
         for (v in 0 until state.problem.numBoolVars) {
             val cached = state.breakScore(Move.BoolFlip(v))
             val naive = naiveBreakScore(state, v)
@@ -53,7 +53,7 @@ class BreakCacheTest {
             ),
         )
         val problem = Problem(numBool, numInt, intDomains, factors)
-        val state = SolverState(problem, Random(42))
+        val state = LocalSearchState(problem, Random(42))
         state.restart()
         assertCacheConsistent(state, "after restart")
 
@@ -81,7 +81,7 @@ class BreakCacheTest {
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
         )
         val problem = Problem(2, 0, emptyArray(), factors)
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.restart()
 
         state.apply(Move.BoolFlip(0))

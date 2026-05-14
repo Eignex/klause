@@ -9,7 +9,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -265,7 +265,7 @@ class FactorPropertyTest {
         val rng = Random(0xfeed)
         val sink = MoveSink()
         repeat(50) { iter ->
-            val state = SolverState(problem, Random(iter.toLong()))
+            val state = LocalSearchState(problem, Random(iter.toLong()))
             randomizeAssignment(state, env, rng)
             state.recompute()
             if (!factor.isViolated(state, 0)) return@repeat
@@ -288,7 +288,7 @@ class FactorPropertyTest {
                     }
                 }
 
-                val sibling = SolverState(problem, Random(iter.toLong()))
+                val sibling = LocalSearchState(problem, Random(iter.toLong()))
                 copyAssignment(state, sibling)
                 sibling.recompute()
                 val before = sibling.cost
@@ -308,7 +308,7 @@ class FactorPropertyTest {
         iters: Int = 200,
     ) {
         val problem = Problem(numBoolVars, intDomains.size, intDomains, listOf(factor))
-        val state = SolverState(problem, Random(seed.toLong()))
+        val state = LocalSearchState(problem, Random(seed.toLong()))
         val rng = Random(seed.toLong() xor 0xC0FFEEL)
         randomizeAssignment(state, FactorEnv(numBoolVars, intDomains), rng)
         state.recompute()
@@ -331,7 +331,7 @@ class FactorPropertyTest {
             assertEquals(violatedAfter, state.violated.contains(0),
                 "${factor::class.simpleName}: violated set drift after $move on iter=$i")
 
-            val sibling = SolverState(problem, Random(seed.toLong()))
+            val sibling = LocalSearchState(problem, Random(seed.toLong()))
             copyAssignment(state, sibling)
             sibling.recompute()
             assertEquals(sibling.intPayload[0], state.intPayload[0],
@@ -350,7 +350,7 @@ class FactorPropertyTest {
 
     private fun pickRandomMove(
         factor: LocalSearchFactor,
-        state: SolverState,
+        state: LocalSearchState,
         intDomains: Array<IntDomain>,
         rng: Random,
     ): Move? {
@@ -378,7 +378,7 @@ class FactorPropertyTest {
         }
     }
 
-    private fun randomizeAssignment(state: SolverState, env: FactorEnv, rng: Random) {
+    private fun randomizeAssignment(state: LocalSearchState, env: FactorEnv, rng: Random) {
         for (b in 0 until env.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in env.intDomains.indices) {
             val d = env.intDomains[i]
@@ -386,7 +386,7 @@ class FactorPropertyTest {
         }
     }
 
-    private fun copyAssignment(src: SolverState, dst: SolverState) {
+    private fun copyAssignment(src: LocalSearchState, dst: LocalSearchState) {
         for (b in 0 until src.problem.numBoolVars) dst.assignment.setBool(b, src.assignment.boolValue(b))
         for (i in 0 until src.problem.numIntVars) dst.assignment.setInt(i, src.assignment.intValue(i))
     }

@@ -1,7 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
@@ -32,7 +32,7 @@ class RestartPolicyTest {
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
         ))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.restart()
 
         state.assignment.setBool(0, false)
@@ -50,7 +50,7 @@ class RestartPolicyTest {
     fun `adaptive perturbation anchors to best then perturbs`() {
 
         val problem = Problem(6, 0, emptyArray(), emptyList())
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.restart()
         for (b in 0..5) state.assignment.setBool(b, false)
 
@@ -96,7 +96,7 @@ class RestartPolicyTest {
     fun `luby sequence matches knuth`() {
         val p = LubyRestart(unit = 1)
         val problem = Problem(1, 0, emptyArray(), emptyList())
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.restart()
 
         val emitted = mutableListOf<Int>()

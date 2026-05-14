@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -35,17 +35,17 @@ interface RestartPolicy {
     fun shouldRestart(stepsSinceLastRestart: Int): Boolean
 
     /** Carry out the restart. Default behaviour is a fresh random assignment via
-     *  [SolverState.restart]; policies that anchor to good regions override using
+     *  [LocalSearchState.restart]; policies that anchor to good regions override using
      *  [bestSoFar]. The optimiser path supplies the running best feasible sample;
      *  streaming paths (sample / enumerate) pass null. */
-    fun restart(state: SolverState, bestSoFar: Sample?)
+    fun restart(state: LocalSearchState, bestSoFar: Sample?)
 }
 
 /** Current klause behaviour: a full random restart at a fixed flip cadence. */
 class FixedCadenceRestart(val maxFlipsBeforeRestart: Int = 10_000) : RestartPolicy {
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
         stepsSinceLastRestart >= maxFlipsBeforeRestart
-    override fun restart(state: SolverState, bestSoFar: Sample?) = state.restart()
+    override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
 }
 
 /**
@@ -68,7 +68,7 @@ class AdaptivePerturbationRestart(
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
         stepsSinceLastRestart >= maxFlipsBeforeRestart
 
-    override fun restart(state: SolverState, bestSoFar: Sample?) {
+    override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         if (bestSoFar == null) {
             state.restart()
             return
@@ -111,7 +111,7 @@ class LubyRestart(val unit: Int = 100) : RestartPolicy {
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
         stepsSinceLastRestart >= cadence
 
-    override fun restart(state: SolverState, bestSoFar: Sample?) {
+    override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         state.restart()
         advance()
     }

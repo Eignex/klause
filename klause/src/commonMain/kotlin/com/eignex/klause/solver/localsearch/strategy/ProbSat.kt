@@ -5,13 +5,13 @@ import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.math.pow
 
 /**
  * Smooth-scoring local-search strategy in the spirit of Balint & Schöning 2012's "probSAT".
  * Picks among proposed repair candidates with probability `(epsilon + brk)^(-cb)` where `brk`
- * is the candidate's [SolverState.breakScore]: candidates that break few currently-satisfied
+ * is the candidate's [LocalSearchState.breakScore]: candidates that break few currently-satisfied
  * factors get exponentially more weight than ones that break many. The continuous weighting
  * scales more gracefully than [WalkSat]'s binary noise/greedy split, especially on factor
  * problems with mixed degree.
@@ -24,7 +24,7 @@ class ProbSat(
     val tabuTenure: Int = 10,
 ) : Strategy {
 
-    override fun pickMove(state: SolverState): Move? {
+    override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
         val factorId = state.violated.random(state.rng)
         val factor = state.factors[factorId]

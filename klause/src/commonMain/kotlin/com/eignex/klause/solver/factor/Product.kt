@@ -4,7 +4,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.ceilDivLong
 import com.eignex.klause.solver.floorDivLong
 
@@ -24,16 +24,16 @@ class Product(
     override val boolVars: IntArray = EMPTY
     override val intVars: IntArray = intArrayOf(a, b, result)
 
-    override fun initialize(state: SolverState, factorId: Int) {}
+    override fun initialize(state: LocalSearchState, factorId: Int) {}
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
         return av * bv != rv
     }
 
-    override fun deltaIfIntSet(state: SolverState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
@@ -47,7 +47,7 @@ class Product(
         return (if (will) 1 else 0) - (if (was) 1 else 0)
     }
 
-    override fun applyIntSet(state: SolverState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
@@ -109,7 +109,7 @@ class Product(
         return tightenLong(state, target, lo, hi)
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
@@ -151,7 +151,7 @@ class Product(
      * the search stays O(1).
      */
     private fun proposeClosestOperand(
-        state: SolverState,
+        state: LocalSearchState,
         operandVar: Int,
         otherValue: Int,
         currentValue: Int,

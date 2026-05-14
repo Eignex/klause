@@ -4,7 +4,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * Disjunction of Boolean literals.
@@ -36,7 +36,7 @@ class Clause(
 
     private class Watches(var w1: Int, var w2: Int)
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         val w = state.refPayload[factorId] as? Watches ?: Watches(0, if (literals.size > 1) 1 else -1)
         // Reseat watches: prefer two distinct true literals; fall back to two distinct indices.
         var first = -1
@@ -60,21 +60,21 @@ class Clause(
         state.refPayload[factorId] = w
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val w = state.refPayload[factorId] as Watches
         if (litTrue(state, w.w1)) return false
         if (w.w2 >= 0 && litTrue(state, w.w2)) return false
         return true
     }
 
-    override fun deltaIfBoolFlipped(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val w = state.refPayload[factorId] as Watches
         val wasViolated = isViolated(state, factorId)
         val nowViolated = !anyLitTrueAfterFlip(state, boolVar)
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyBoolFlip(state: SolverState, factorId: Int, boolVar: Int): Int {
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val w = state.refPayload[factorId] as Watches
         // Pre-flip status of each watch (assignment is already flipped; reconstruct old value).
         val w1WasTrue = wasLitTrue(state, w.w1, boolVar)
@@ -131,12 +131,12 @@ class Clause(
         }
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         for (v in boolVars) sink.addBoolFlip(v)
     }
 
-    private fun litTrue(state: SolverState, idx: Int): Boolean {
+    private fun litTrue(state: LocalSearchState, idx: Int): Boolean {
         if (idx < 0) return false
         val lit = literals[idx]
         return Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))
@@ -145,7 +145,7 @@ class Clause(
     /** Pre-flip evaluation of literal at [idx] reconstructed from the post-flip assignment.
      *  When the literal's variable matches [flippedVar], the bool's pre-flip value is the
      *  negation of its current value. */
-    private fun wasLitTrue(state: SolverState, idx: Int, flippedVar: Int): Boolean {
+    private fun wasLitTrue(state: LocalSearchState, idx: Int, flippedVar: Int): Boolean {
         if (idx < 0) return false
         val lit = literals[idx]
         val v = Lit.variable(lit)
@@ -156,7 +156,7 @@ class Clause(
 
     /** True iff at least one literal would be true if [boolVar] were flipped. Pre-flip path
      *  used by [deltaIfBoolFlipped]; the assignment hasn't been mutated yet. */
-    private fun anyLitTrueAfterFlip(state: SolverState, boolVar: Int): Boolean {
+    private fun anyLitTrueAfterFlip(state: LocalSearchState, boolVar: Int): Boolean {
         for (lit in literals) {
             val v = Lit.variable(lit)
             val pre = state.assignment.boolValue(v)
@@ -167,7 +167,7 @@ class Clause(
     }
 
     /** Find a literal index (other than [exclude1] and [exclude2]) currently evaluating true. */
-    private fun findTrueLitExcept(state: SolverState, exclude1: Int, exclude2: Int): Int {
+    private fun findTrueLitExcept(state: LocalSearchState, exclude1: Int, exclude2: Int): Int {
         for (i in literals.indices) {
             if (i == exclude1 || i == exclude2) continue
             if (litTrue(state, i)) return i

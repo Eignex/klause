@@ -3,7 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `intVars[i] != intVars[j]` for every pair `i < j`. Stored payload:
@@ -35,7 +35,7 @@ class AllDifferent(
 
     private class State(val counts: IntArray, var duplicateCount: Int)
 
-    override fun initialize(state: SolverState, factorId: Int) {
+    override fun initialize(state: LocalSearchState, factorId: Int) {
         // Sanity: every operand's domain must lie within the declared union range.
         for (v in vars) {
             val d = state.problem.intDomains[v]
@@ -55,12 +55,12 @@ class AllDifferent(
         state.refPayload[factorId] = State(counts, dups)
     }
 
-    override fun isViolated(state: SolverState, factorId: Int): Boolean {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val s = state.refPayload[factorId] as State
         return s.duplicateCount > 0
     }
 
-    override fun deltaIfIntSet(state: SolverState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return 0
@@ -70,7 +70,7 @@ class AllDifferent(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    override fun applyIntSet(state: SolverState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
@@ -138,7 +138,7 @@ class AllDifferent(
         // count is less than the number of non-pinned vars, no injective assignment exists.
         //
         // Vars can have wider domains than the declared union [domainMin, domainMin+domainSize)
-        // at Problem-construction time (full alignment is asserted only at SolverState init).
+        // at Problem-construction time (full alignment is asserted only at LocalSearchState init).
         // Clip each var's effective domain to the declared union before tallying.
         val domainMax = domainMin + domainSize - 1
         val covered = BooleanArray(domainSize)
@@ -162,7 +162,7 @@ class AllDifferent(
         return true
     }
 
-    override fun proposeRepairMoves(state: SolverState, factorId: Int, sink: MoveSink) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val s = state.refPayload[factorId] as State
         if (s.duplicateCount == 0) return
         // Reservoir-sample a duplicated value (uniform across all values whose count > 1).

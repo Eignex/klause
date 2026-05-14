@@ -3,7 +3,7 @@ package com.eignex.klause.bench
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.localsearch.SolverState
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 
 /** Per-backend solve verdicts + per-sample satisfaction checks for one [Problem]. */
@@ -45,7 +45,7 @@ object Verifier {
     }
 
     private fun satisfiesProblem(problem: Problem, sample: Sample): Boolean {
-        val state = SolverState(problem, Random(0))
+        val state = LocalSearchState(problem, Random(0))
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
         state.recompute()
