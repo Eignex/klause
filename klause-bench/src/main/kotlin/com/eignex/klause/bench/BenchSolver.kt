@@ -2,6 +2,8 @@ package com.eignex.klause.bench
 
 import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
+import com.eignex.klause.solver.BacktrackParams
+import com.eignex.klause.solver.BacktrackSolver
 import com.eignex.klause.solver.LocalSearchParams
 import com.eignex.klause.solver.LocalSearchSolver
 import com.eignex.klause.solver.Problem
@@ -52,9 +54,21 @@ class Z3Bench(
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
 }
 
+class BacktrackBench(
+    override val problem: Problem,
+    private val params: BacktrackParams = BacktrackParams(maxDecisions = 100_000L, randomSeed = 0L),
+) : BenchSolver {
+    private val s = BacktrackSolver(problem)
+    override val name = "backtrack"
+    override fun solve() = s.solve(params)
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
+    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+}
+
 /** Brute force is added only when the assignment space fits — see [BruteForceSolver.fits]. */
 fun defaultSolvers(problem: Problem): List<BenchSolver> = buildList {
     add(LocalSearchBench(problem))
+    add(BacktrackBench(problem))
     add(LogicNGBench(problem))
     add(Z3Bench(problem))
     if (com.eignex.klause.solver.BruteForceSolver.fits(problem)) add(BruteForceBench(problem))

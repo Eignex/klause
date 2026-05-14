@@ -76,6 +76,19 @@ fun main() {
 
     writeResults(BenchResults(timestamp = Instant.now().toString(), gitSha = readGitSha(), entries = results))
 
+    println()
+    println("=== propagation microbenchmark (mean of 50 reps × 10 pins) ===")
+    for (entry in benchEntries) {
+        if (entry.problem.numBoolVars < 2) continue  // need at least a few pinnable bools
+        val pinCount = minOf(10, entry.problem.numBoolVars - 1).coerceAtLeast(1)
+        val t = PropagationBench.bench(entry.problem, pinCount = pinCount)
+        println(
+            "[${entry.name}] bake=${formatNs(t.bakeNanos)} " +
+                "one-shot[${t.pinCount} pins]=${formatNs(t.oneShotPinNanos)} " +
+                "incr/pin=${formatNs(t.incrementalPinNanos)}"
+        )
+    }
+
     if (regressions.isNotEmpty()) {
         error(
             "regression(s) past ${thresholdPct}% threshold:\n  " +

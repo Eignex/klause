@@ -92,4 +92,3 @@ results as the new baseline with `:klause-bench:saveBaseline`.
 - Propagation: `Product` reverse direction (currently forward-only — destabilized worklist in bit-blasted division tests).
 - Propagation: full Hall-set / matching arc consistency in `AllDifferent` (currently pigeonhole + boundary shaving only).
 - `LogicNGSampler` does not implement `Optimizer` (real top-k via incremental CDCL with PB optimum constraints is future work).
-- klause-bench microbenchmark for the propagation-heavy / pinned-bool regime.
