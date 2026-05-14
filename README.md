@@ -91,3 +91,8 @@ results as the new baseline with `:klause-bench:saveBaseline`.
 - Maven Central publishing, CI.
 - Propagation: `Product` reverse direction for non-singleton operands. Singleton-operand reverse (`a = result / b` when b is fixed) landed; the general interval-division case is sound but historically destabilized worklist interactions with bit-blasted Product chains.
 - Propagation: full Hall-set / matching arc consistency in `AllDifferent` (currently pigeonhole + boundary shaving only).
+- Perf (post-benchmark): replace `Assumptions.bools: Map<Int, Boolean>` / `ints: Map<Int, Int>` and `PropagationResult.Implied.{bools, ints}` with parallel-array representations to avoid `Int` boxing on the propagation hot path.
+- Perf (post-benchmark): make `LocalSearchState.factorWeights` lazy — only DDFW-style strategies read it, but it's always allocated.
+- Perf (post-benchmark): audit `PropagationSession` snapshot allocation cost per push (5 array copies per snapshot). Consider pooling or a flat delta-trail.
+- Perf (post-benchmark): switch `Problem.factors: List<Factor>` to `Array<Factor>` if profiling shows virtual dispatch / list iteration cost on the propagation hot path.
+- Conflict-set tightening (1-UIP-style implication-graph walk). Current scheme reads the failing factor's direct decision levels — sound, cheap, and coincides with the walked set in most observed cases. Defer until a real consumer reports loose backjumps.
