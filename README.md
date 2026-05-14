@@ -16,24 +16,24 @@ arithmetic, comparisons, logic, and global constraints like
 allDifferent, gcc, and table. Floats lower onto bucketed integers and
 nominals lower onto Boolean indicators.
 
-The internals borrow from the SMT playbook. Bit-blasting in
-`BitBlaster` lowers integer constraints to CNF so problems can be
-shipped to external SAT engines (LogicNG in `:klause-logicng`).
-DPLL(T)-style theory propagation lives in `BacktrackSolver`, a DFS
+The internals borrow from the SMT playbook. A bit-blaster lowers
+integer constraints to CNF so problems can be shipped to external SAT
+engines, with a LogicNG adapter in the klause-logicng module.
+DPLL(T)-style theory propagation lives in the backtrack solver, a DFS
 over finite-domain integers with propagators per constraint,
 configurable variable and value heuristics, and true model-blocking
-`enumerate`. `:klause-z3` translates problems directly to Z3 for hard
-instances. `LocalSearchSolver` is a WalkSat / probSAT-style stochastic
-alternative that scales when complete methods blow up. All four
-backends implement the same `Solver` and `Optimizer` interfaces, so
+enumeration. The klause-z3 module translates problems directly to Z3
+for hard instances. A local-search solver (WalkSat / probSAT-style) is
+the stochastic alternative for when complete methods blow up. All four
+backends implement the same Solver and Optimizer interfaces, so
 consumers swap by tradeoff per problem.
 
 Unlike Z3 or CVC5, klause's theory is narrow: bounded integers and
 Booleans, no bitvectors, arrays, floats, or strings. In exchange,
-sampling is first-class. `samples()` (with replacement) and
-`enumerate()` (without replacement) are core operations, not
-afterthoughts. Klause is also not a MILP solver; objectives are linear
-over integers, not reals.
+sampling is first-class. Drawing samples with replacement and
+enumerating without replacement are core operations, not afterthoughts.
+Klause is also not a MILP solver; objectives are linear over integers,
+not reals.
 
 ## Schema
 
@@ -80,10 +80,10 @@ val weights = LinearObjective(boolWeights = doubleArrayOf(/* ... */))
 val best = solver.minimize(weights, LocalSearchParams(maxFlips = 100_000))
 ```
 
-`LocalSearchSolver` is the default. Swap in `BacktrackSolver` when you
-need completeness or true without-replacement `enumerate`, and the
-SAT or SMT adapters in `:klause-logicng` and `:klause-z3` when you
-need raw solver horsepower on hard instances.
+Local search is the default. Swap in the backtrack solver when you
+need completeness or true without-replacement enumeration, and the
+SAT or SMT adapters in klause-logicng and klause-z3 when you need raw
+solver horsepower on hard instances.
 
 ## Bit-blasting
 
