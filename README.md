@@ -10,10 +10,30 @@
 
 # Klause
 
-Kotlin solver for Boolean and integer constraint problems. Finds and
-samples satisfying solutions, picks the best under a weighted objective,
-and exports to CNF for external SAT engines. Nominal variables are
-encoded as Boolean indicators; floats are bucketed onto bounded integers.
+Klause is a Kotlin SMT-flavored solver for QF_LIA-style problems:
+quantifier-free formulas over Booleans and bounded integers, with
+arithmetic, comparisons, logic, and global constraints like
+allDifferent, gcc, and table. Floats lower onto bucketed integers and
+nominals lower onto Boolean indicators.
+
+The internals borrow from the SMT playbook. Bit-blasting in
+`BitBlaster` lowers integer constraints to CNF so problems can be
+shipped to external SAT engines (LogicNG in `:klause-logicng`).
+DPLL(T)-style theory propagation lives in `BacktrackSolver`, a DFS
+over finite-domain integers with propagators per constraint,
+configurable variable and value heuristics, and true model-blocking
+`enumerate`. `:klause-z3` translates problems directly to Z3 for hard
+instances. `LocalSearchSolver` is a WalkSat / probSAT-style stochastic
+alternative that scales when complete methods blow up. All four
+backends implement the same `Solver` and `Optimizer` interfaces, so
+consumers swap by tradeoff per problem.
+
+Unlike Z3 or CVC5, klause's theory is narrow: bounded integers and
+Booleans, no bitvectors, arrays, floats, or strings. In exchange,
+sampling is first-class. `samples()` (with replacement) and
+`enumerate()` (without replacement) are core operations, not
+afterthoughts. Klause is also not a MILP solver; objectives are linear
+over integers, not reals.
 
 ## Schema
 
@@ -60,17 +80,10 @@ val weights = LinearObjective(boolWeights = doubleArrayOf(/* ... */))
 val best = solver.minimize(weights, LocalSearchParams(maxFlips = 100_000))
 ```
 
-`LocalSearchSolver` is the default engine. Adapters in `:klause-logicng`
-(via bit-blasting to CNF) and `:klause-z3` (direct SMT translation)
-implement the same `Sampler` and `Optimizer` interfaces. A
-`BruteForceSolver` in core walks the assignment space exhaustively as a
-ground-truth oracle for small problems. `:klause-bench` cross-checks all
-four against a hard-coded portfolio plus pre-made problem instances
-loaded from DIMACS, OPB, and JSON-SchemaDef files. Run
-`./gradlew :klause-bench:downloadSatlib` once to fetch the SATLIB
-uf20-91 (sat) and uuf50-218 (unsat) sets — `:klause-bench:run` will
-include them automatically (sample size capped via
-`-Dklause.bench.satlib.max=N`, default 10 per set).
+`LocalSearchSolver` is the default. Swap in `BacktrackSolver` when you
+need completeness or true without-replacement `enumerate`, and the
+SAT or SMT adapters in `:klause-logicng` and `:klause-z3` when you
+need raw solver horsepower on hard instances.
 
 ## Bit-blasting
 
@@ -79,21 +92,12 @@ val cnf = BitBlaster.compile(compiled.problem)
 val text = cnf.toDimacs()
 ```
 
-## Bench loop
-
-`:klause-bench:run` writes machine-readable timings to
-`klause-bench/build/bench-results.json` alongside the existing stdout. If
-`klause-bench/bench-baseline.json` exists, each cell prints a `Δ%` vs
-baseline and the run exits non-zero when any cell regresses by more than
-`-Dklause.bench.regressionThresholdPct=N` (default 25%). Accept the current
-results as the new baseline with `:klause-bench:saveBaseline`.
-
 ## TODO
 
 - Maven Central publishing, CI.
 - Propagation: `Product` reverse direction for non-singleton operands. Singleton-operand reverse (`a = result / b` when b is fixed) landed; the general interval-division case is sound but historically destabilized worklist interactions with bit-blasted Product chains.
 - Propagation: full Hall-set / matching arc consistency in `AllDifferent` (currently pigeonhole + boundary shaving only).
 - Perf (post-benchmark): replace `Assumptions.bools: Map<Int, Boolean>` / `ints: Map<Int, Int>` and `PropagationResult.Implied.{bools, ints}` with parallel-array representations to avoid `Int` boxing on the propagation hot path.
-- Perf (post-benchmark): make `LocalSearchState.factorWeights` lazy — only DDFW-style strategies read it, but it's always allocated.
+- Perf (post-benchmark): make `LocalSearchState.factorWeights` lazy. Only DDFW-style strategies read it, but it's always allocated.
 - Perf (post-benchmark): audit `PropagationSession` snapshot allocation cost per push (5 array copies per snapshot). Consider pooling or a flat delta-trail.
 - Perf (post-benchmark): switch `Problem.factors: List<Factor>` to `Array<Factor>` if profiling shows virtual dispatch / list iteration cost on the propagation hot path.
