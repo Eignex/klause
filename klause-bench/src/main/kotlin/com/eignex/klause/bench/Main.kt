@@ -7,26 +7,26 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 fun main() {
-    val dimacs = DimacsLoader.loadBundled()
-    val opb = OpbLoader.loadBundled()
-    val jsonSchema = JsonSchemaLoader.loadBundled()
-    val flatzinc = FlatZincLoader.loadBundled()
-    val satlib = SatlibLoader.discover()
-    val externals = dimacs + opb + jsonSchema + flatzinc + satlib
+    val loaders: List<ProblemLoader> = listOf(
+        DimacsLoader, OpbLoader, JsonSchemaLoader, FlatZincLoader, SatlibLoader,
+    )
+    val loaded: List<Pair<ProblemLoader, List<Portfolio.Entry>>> = loaders.map { it to it.loadBundled() }
+    val externals: List<Portfolio.Entry> = loaded.flatMap { it.second }
     val verifyEntries = Portfolio.all + externals
     val benchEntries = Portfolio.sat + externals.filter { it.expectedSat }
 
-    println(
-        "=== verification (${verifyEntries.size} entries: " +
-            "${Portfolio.all.size} hard-coded, " +
-            "${dimacs.size} DIMACS, " +
-            "${opb.size} OPB, " +
-            "${jsonSchema.size} JSON-Schema, " +
-            "${flatzinc.size} FlatZinc, " +
-            "${satlib.size} SATLIB" +
-            (if (satlib.isEmpty()) " — run :klause-bench:downloadSatlib to enable" else "") +
-            ") ==="
-    )
+    val header = buildString {
+        append("=== verification (${verifyEntries.size} entries: ")
+        append("${Portfolio.all.size} hard-coded")
+        for ((loader, entries) in loaded) {
+            append(", ${entries.size} ${loader.format}")
+            if (loader is SatlibLoader && entries.isEmpty()) {
+                append(" — run :klause-bench:downloadSatlib to enable")
+            }
+        }
+        append(") ===")
+    }
+    println(header)
     var disagreements = 0
     for (entry in verifyEntries) {
         val report = Verifier.verify(entry.problem)
