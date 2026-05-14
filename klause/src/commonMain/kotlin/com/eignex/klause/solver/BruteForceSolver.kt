@@ -26,7 +26,7 @@ data class BruteForceParams(
 ) : SolverParams
 
 /**
- * Ground-truth [Sampler] / [Optimizer] for testing. Walks the entire assignment space in a
+ * Ground-truth [Solver] / [Optimizer] for testing. Walks the entire assignment space in a
  * permuted order and yields every assignment that satisfies the problem.
  *
  * Spaces larger than [Long.MAX_VALUE] are supported by splitting variables into "chunks"
@@ -42,7 +42,7 @@ data class BruteForceParams(
  * for stochastic / SMT-based optimisation backends on small problems.
  */
 class BruteForceSolver(override val problem: Problem) :
-    Sampler<BruteForceParams>, Optimizer<BruteForceParams> {
+    Solver<BruteForceParams>, Optimizer<BruteForceParams> {
 
     private val chunks: List<Chunk> = buildChunks(problem)
 

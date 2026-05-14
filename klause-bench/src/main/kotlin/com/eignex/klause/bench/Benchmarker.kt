@@ -17,12 +17,12 @@ data class BenchmarkReport(
 object Benchmarker {
     fun bench(
         problem: Problem,
-        samplers: List<BenchSampler> = defaultSamplers(problem),
+        solvers: List<BenchSolver> = defaultSolvers(problem),
         repetitions: Int = 5,
         sampleCount: Int = 10,
         warmupReps: Int = 2,
     ): BenchmarkReport {
-        val timings = samplers.associate { sampler ->
+        val timings = solvers.associate { sampler ->
             repeat(warmupReps) {
                 sampler.solve()
                 sampler.samples(sampleCount)

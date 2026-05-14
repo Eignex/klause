@@ -5,7 +5,7 @@ import com.eignex.klause.cnf.CnfProblem
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.Sampler
+import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
 import org.logicng.datastructures.Tristate
 import org.logicng.formulas.Formula
@@ -16,7 +16,7 @@ import org.logicng.solvers.SATSolver
 import org.logicng.datastructures.Assignment as LogicNGAssignment
 
 /**
- * [Sampler] backed by LogicNG's MiniSat. The problem is bit-blasted to CNF once via
+ * [Solver] backed by LogicNG's MiniSat. The problem is bit-blasted to CNF once via
  * [BitBlaster], then handed to LogicNG; each model LogicNG returns is decoded back to a
  * klause [Sample].
  *
@@ -28,7 +28,7 @@ import org.logicng.datastructures.Assignment as LogicNGAssignment
  *    blocking clause added after each yield. The `params.minHammingDistance` /
  *    `params.recentWindow` fields apply as a post-filter on top.
  */
-class LogicNGSampler(override val problem: Problem) : Sampler<LogicNGParams> {
+class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
 
     private val cnf: CnfProblem = BitBlaster.compile(problem)
 

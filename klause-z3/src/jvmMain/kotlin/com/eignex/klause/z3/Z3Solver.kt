@@ -5,7 +5,7 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.Sampler
+import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
 import com.microsoft.z3.ArithExpr
 import com.microsoft.z3.BoolExpr
@@ -13,11 +13,11 @@ import com.microsoft.z3.Context
 import com.microsoft.z3.IntNum
 import com.microsoft.z3.Model
 import com.microsoft.z3.RealSort
-import com.microsoft.z3.Solver
+import com.microsoft.z3.Solver as Z3LibSolver
 import com.microsoft.z3.Status
 
 /**
- * [Sampler] backed by Z3 via direct SMT translation (no bit-blast). Each factor in the
+ * [Solver] backed by Z3 via direct SMT translation (no bit-blast). Each factor in the
  * [Problem] is converted to a native Z3 expression in [Z3Translator]; Z3 reasons over
  * integers natively, which catches bit-blaster bugs the LogicNG path inherits.
  *
@@ -27,7 +27,7 @@ import com.microsoft.z3.Status
  *  - [enumerate] — *without replacement*. One context, blocking clause per yielded model.
  *    `params.minHammingDistance` / `params.recentWindow` apply on top as a post-filter.
  */
-class Z3Sampler(override val problem: Problem) : Sampler<Z3Params>, Optimizer<Z3Params> {
+class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Params> {
 
     /**
      * Linear-objective minimisation via Z3's native [com.microsoft.z3.Optimize] solver.
@@ -168,7 +168,7 @@ class Z3Sampler(override val problem: Problem) : Sampler<Z3Params>, Optimizer<Z3
 
     /** Apply per-solver knobs ([Z3Params.randomSeed], [Z3Params.timeoutMillis]). Z3
      *  rejects `random_seed` as a [Context] global; it has to live on the solver. */
-    private fun applyParams(solver: Solver, ctx: Context, params: Z3Params) {
+    private fun applyParams(solver: Z3LibSolver, ctx: Context, params: Z3Params) {
         if (params.randomSeed == null && params.timeoutMillis == null) return
         val p = ctx.mkParams()
         params.randomSeed?.let { p.add("random_seed", it.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) }

@@ -24,12 +24,12 @@ data class SampleCheck(val sample: Sample, val satisfies: Boolean)
 object Verifier {
     fun verify(
         problem: Problem,
-        samplers: List<BenchSampler> = defaultSamplers(problem),
+        solvers: List<BenchSolver> = defaultSolvers(problem),
         sampleCount: Int = 5,
     ): VerificationReport {
-        val verdicts = samplers.associate { it.name to it.solve() }
+        val verdicts = solvers.associate { it.name to it.solve() }
         val agreement = computeAgreement(verdicts)
-        val sampleChecks = samplers.associate { sampler ->
+        val sampleChecks = solvers.associate { sampler ->
             val produced = sampler.samples(sampleCount)
             sampler.name to produced.map { SampleCheck(it, satisfiesProblem(problem, it)) }
         }

@@ -5,7 +5,7 @@ import com.eignex.klause.solver.strategy.WalkSat
 import kotlin.random.Random
 
 /**
- * Local-search [Sampler] around a [Problem]. The solver itself only carries engine setup
+ * Local-search [Solver] around a [Problem]. The solver itself only carries engine setup
  * (strategy, restart cadence). All per-draw state — RNG, assignment, factor payloads, the
  * dedup window — lives inside the per-call sequences so concurrent draws never share state.
  *
@@ -20,7 +20,7 @@ class LocalSearchSolver(
     override val problem: Problem,
     val strategy: Strategy = WalkSat(),
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
-) : Sampler<LocalSearchParams>, Optimizer<LocalSearchParams> {
+) : Solver<LocalSearchParams>, Optimizer<LocalSearchParams> {
 
     override fun solve(params: LocalSearchParams): SolveResult = solveInternal(params, warm = null)
 

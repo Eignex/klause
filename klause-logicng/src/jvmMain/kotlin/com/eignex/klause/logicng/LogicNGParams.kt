@@ -3,11 +3,11 @@ package com.eignex.klause.logicng
 import com.eignex.klause.solver.SolverParams
 
 /**
- * Per-call params for [LogicNGSampler].
+ * Per-call params for [LogicNGSolver].
  *
  *  - [randomSeed] — currently advisory; LogicNG's MiniSat does not expose a public seed
  *    parameter on the version we pin. Documented for future use; setting it has no effect today.
- *  - [minHammingDistance] / [recentWindow] — apply to [LogicNGSampler.enumerate] as a
+ *  - [minHammingDistance] / [recentWindow] — apply to [LogicNGSolver.enumerate] as a
  *    post-filter, identical to the local-search backend's semantics.
  *  - [maxModels] — caps the number of model-enumeration attempts before the sequence ends.
  *  - [timeoutMillis] — wall-clock cap. Checked between solves; a long-running individual
