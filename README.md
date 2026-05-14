@@ -95,4 +95,3 @@ results as the new baseline with `:klause-bench:saveBaseline`.
 - Propagation: tighter conflict analysis. The current implementation reads the failing factor's direct decision levels — sound and cheap, but coarser than walking the full implication graph (1-UIP-style).
 - `LogicNGSampler` does not implement `Optimizer` (real top-k via incremental CDCL with PB optimum constraints is future work).
 - klause-bench microbenchmark for the propagation-heavy / pinned-bool regime.
-- `PropagationSession` does a full re-propagation on every push/pop. Incremental (snapshot-based pop, dirty-only push) is a known follow-up; first attempt hung during initial-bake propagation — needs careful audit of factor-level idempotence under the new bitmap layout.
