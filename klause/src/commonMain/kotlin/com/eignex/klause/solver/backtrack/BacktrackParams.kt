@@ -4,6 +4,20 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.SolverParams
 
 /**
+ * How [BacktrackSolver.enumerate] sweeps the search space.
+ *
+ *  - [Dfs] — single deterministic DFS through the tree; yields distinct SAT leaves in
+ *    DFS order, deduped via the rolling Hamming-distance window. Complete: given enough
+ *    budget, every distinct feasible assignment is yielded exactly once.
+ *  - [RandomRestart] — independent DFS runs per yield, each with a fresh seed. Diverse
+ *    coverage of the search space at the cost of completeness — the same assignment can
+ *    reappear (the Hamming window filters near-duplicates within the recent window). Use
+ *    when the test/verification budget is small and DFS-locked traversal would over-sample
+ *    one subtree.
+ */
+enum class EnumerationMode { Dfs, RandomRestart }
+
+/**
  * Per-call params for [BacktrackSolver].
  *
  *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). `Long.MAX_VALUE`
@@ -28,4 +42,10 @@ data class BacktrackParams(
     val valueHeuristic: ValueHeuristic = IndomainRandom,
     val minHammingDistance: Int = 1,
     val recentWindow: Int = 16,
+    /**
+     * Strategy for [BacktrackSolver.enumerate]. Default [EnumerationMode.Dfs] preserves
+     * complete distinct enumeration; switch to [EnumerationMode.RandomRestart] for
+     * diverse-but-non-complete sampling.
+     */
+    val enumerationMode: EnumerationMode = EnumerationMode.Dfs,
 ) : SolverParams
