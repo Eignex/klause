@@ -80,23 +80,15 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     }
 
     /**
-     * Distinct SAT assignments. Strategy controlled by [BacktrackParams.enumerationMode]:
+     * Distinct SAT assignments via single-DFS traversal of the search tree. Complete:
+     * given enough budget, every distinct feasible assignment is yielded exactly once.
+     * The optional rolling Hamming-distance window adds extra spacing between yields.
      *
-     *  - [EnumerationMode.Dfs] — single DFS through the search tree, yielding leaves as
-     *    found. Complete and distinct by construction; the Hamming-distance window adds
-     *    extra spacing if requested.
-     *  - [EnumerationMode.RandomRestart] — independent random DFS run per yield, with
-     *    seed advancement between yields and a "table-forbids" post-filter that rejects
-     *    already-yielded assignments. Bails out after consecutive duplicate hits exceed a
-     *    soft cap (`2 × yielded count + 8`) — at that point the feasible space is
-     *    exhausted relative to the search budget.
+     * For *diverse* distinct samples — useful when a small test/verification budget
+     * shouldn't be spent on one subtree — call [samples] (which uses random restarts
+     * with-replacement) and de-duplicate client-side, e.g. `samples(p).distinct().take(n)`.
      */
-    override fun enumerate(params: BacktrackParams): Sequence<Sample> = when (params.enumerationMode) {
-        EnumerationMode.Dfs -> enumerateDfs(params)
-        EnumerationMode.RandomRestart -> enumerateRandomRestart(params)
-    }
-
-    private fun enumerateDfs(params: BacktrackParams): Sequence<Sample> = sequence {
+    override fun enumerate(params: BacktrackParams): Sequence<Sample> = sequence {
         val window = ArrayDeque<Sample>()
         for (outcome in driveSearch(params)) {
             when (outcome) {
@@ -111,39 +103,6 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     }
                 }
                 SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return@sequence
-            }
-        }
-    }
-
-    private fun enumerateRandomRestart(params: BacktrackParams): Sequence<Sample> = sequence {
-        val yielded = HashSet<Sample>()
-        val window = ArrayDeque<Sample>()
-        var seed = params.randomSeed ?: Random.Default.nextLong()
-        var consecutiveDupes = 0
-        while (true) {
-            val perCall = params.copy(randomSeed = seed)
-            seed = seed * 6364136223846793005L + 1442695040888963407L
-            val r = solveOnce(perCall)
-            when (r) {
-                is SolveResult.Sat -> {
-                    val s = r.assignment
-                    if (s in yielded) {
-                        consecutiveDupes++
-                        val cap = 2 * yielded.size + 8
-                        if (consecutiveDupes > cap) return@sequence
-                        continue
-                    }
-                    consecutiveDupes = 0
-                    yielded.add(s)
-                    if (farEnough(s, window, params.minHammingDistance)) {
-                        yield(s)
-                        if (params.recentWindow > 0) {
-                            if (window.size >= params.recentWindow) window.removeFirst()
-                            window.addLast(s)
-                        }
-                    }
-                }
-                SolveResult.Unsat, SolveResult.Unknown -> return@sequence
             }
         }
     }
