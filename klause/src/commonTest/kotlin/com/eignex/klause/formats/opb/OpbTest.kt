@@ -1,4 +1,4 @@
-package com.eignex.klause.cnf
+package com.eignex.klause.formats.opb
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Lit

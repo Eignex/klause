@@ -1,0 +1,8 @@
+% Two int vars: a in [0..5], b in [0..5], with a + b <= 6 and a - b >= 1
+% (the latter encoded as -a + b <= -1, since FlatZinc only has int_lin_le/eq/ne).
+var 0..5: a;
+var 0..5: b;
+constraint int_lin_le([1, 1], [a, b], 6);
+constraint int_lin_le([-1, 1], [a, b], -1);
+solve satisfy;
+output ["a=", show(a), " b=", show(b), "\n"];

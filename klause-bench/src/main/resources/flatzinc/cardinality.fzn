@@ -1,0 +1,9 @@
+% exactly-one over 5 bools, encoded as bool_lin_eq with [1,1,1,1,1] coefs.
+var bool: x1;
+var bool: x2;
+var bool: x3;
+var bool: x4;
+var bool: x5;
+constraint bool_lin_eq([1, 1, 1, 1, 1], [x1, x2, x3, x4, x5], 1);
+solve satisfy;
+output ["x = [", show(x1), ", ", show(x2), ", ", show(x3), ", ", show(x4), ", ", show(x5), "]\n"];

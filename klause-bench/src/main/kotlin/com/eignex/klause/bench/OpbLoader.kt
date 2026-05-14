@@ -1,7 +1,7 @@
 package com.eignex.klause.bench
 
-import com.eignex.klause.cnf.Opb
-import com.eignex.klause.cnf.OpbProblem
+import com.eignex.klause.formats.opb.Opb
+import com.eignex.klause.formats.opb.OpbProblem
 
 /** Loads bundled OPB instances from `klause-bench/src/main/resources/opb/`.
  *  Use [loadOpb] when the harness needs the carried objective for `minimize`. */

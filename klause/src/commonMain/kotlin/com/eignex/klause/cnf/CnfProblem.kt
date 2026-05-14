@@ -1,5 +1,6 @@
 package com.eignex.klause.cnf
 
+import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.solver.Lit
 
 /**
@@ -34,17 +35,6 @@ class CnfProblem(
         return intVarMin[originalIntVar] + v
     }
 
-    /** DIMACS CNF serialization. Empty clauses (compile-time false) are emitted as `0`. */
-    fun toDimacs(): String {
-        val sb = StringBuilder()
-        sb.append("p cnf ").append(numVars).append(' ').append(clauses.size).append('\n')
-        for (clause in clauses) {
-            for (lit in clause) {
-                val v = Lit.variable(lit) + 1
-                sb.append(if (Lit.isPositive(lit)) v else -v).append(' ')
-            }
-            sb.append("0\n")
-        }
-        return sb.toString()
-    }
+    /** Convenience: render to DIMACS CNF via [Dimacs.write]. */
+    fun toDimacs(): String = Dimacs.write(this)
 }

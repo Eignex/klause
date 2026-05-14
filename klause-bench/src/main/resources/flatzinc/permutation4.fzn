@@ -1,0 +1,5 @@
+% 4-element permutation: an all-different over [1..4].
+array [1..4] of var 1..4: xs;
+constraint all_different_int(xs);
+solve satisfy;
+output [show(xs), "\n"];
