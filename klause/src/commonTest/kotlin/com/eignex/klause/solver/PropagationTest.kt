@@ -476,6 +476,17 @@ class PropagationTest {
     }
 
     @Test
+    fun `AllDifferent pigeonhole detects Unsat across non-pinned vars`() {
+        // 3 vars, each domain {0..1} (size 2), but 3 vars need 3 distinct values → Unsat
+        val p = Problem(
+            numBoolVars = 0, numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+            factors = listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)),
+        )
+        assertSame(PropagationResult.Unsat, p.propagate())
+    }
+
+    @Test
     fun `AllDifferent shaves taken value off domain boundary`() {
         // x0 pinned to 0; x1 in [0..2]; AllDifferent should tighten x1 ≥ 1.
         // Add IntLeq(x1, 1) to force singleton 1.

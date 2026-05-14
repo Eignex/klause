@@ -25,9 +25,10 @@ class AllDifferent(
         require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
     }
 
-    // TODO(propagate): full Hall-set / matching-based pruning. Current impl handles the easy
-    //  case — singleton-domain conflicts plus boundary tightening when a domain endpoint is
-    //  pinned-elsewhere — but stops short of arc consistency on the matching.
+    // TODO(propagate): full Hall-set / matching-based arc consistency (e.g. Régin's algorithm).
+    //  Current impl catches the simple cases — singleton conflicts, endpoint shaving, and the
+    //  global pigeonhole check (#available-values ≥ #non-pinned-vars) — but does not find
+    //  interior Hall sets to prune interior domain values.
 
     override val boolVars: IntArray = EMPTY
     override val intVars: IntArray = vars
@@ -117,18 +118,46 @@ class AllDifferent(
             if (d.min != d.max) continue
             if (!taken.add(d.min)) return false
         }
-        if (taken.isEmpty()) return true
         // For each non-singleton var, shave taken values off domain endpoints (repeatedly).
+        // Only worth scanning when at least one value is taken.
+        if (taken.isNotEmpty()) {
+            for (v in vars) {
+                val d = state.intDomains[v]
+                if (d.min == d.max) continue
+                var lo = d.min
+                var hi = d.max
+                while (lo <= hi && lo in taken) lo++
+                while (hi >= lo && hi in taken) hi--
+                if (lo > hi) return false
+                if (lo != d.min && !state.tightenIntMin(v, lo)) return false
+                if (hi != d.max && !state.tightenIntMax(v, hi)) return false
+            }
+        }
+        // Pigeonhole: across non-pinned vars, count distinct values still available (i.e.,
+        // values lying in some non-pinned var's tightened domain and not in [taken]). If that
+        // count is less than the number of non-pinned vars, no injective assignment exists.
+        //
+        // Vars can have wider domains than the declared union [domainMin, domainMin+domainSize)
+        // at Problem-construction time (full alignment is asserted only at SolverState init).
+        // Clip each var's effective domain to the declared union before tallying.
+        val domainMax = domainMin + domainSize - 1
+        val covered = BooleanArray(domainSize)
+        var nonPinned = 0
         for (v in vars) {
             val d = state.intDomains[v]
             if (d.min == d.max) continue
-            var lo = d.min
-            var hi = d.max
-            while (lo <= hi && lo in taken) lo++
-            while (hi >= lo && hi in taken) hi--
-            if (lo > hi) return false
-            if (lo != d.min && !state.tightenIntMin(v, lo)) return false
-            if (hi != d.max && !state.tightenIntMax(v, hi)) return false
+            nonPinned++
+            val lo = maxOf(d.min, domainMin)
+            val hi = minOf(d.max, domainMax)
+            for (value in lo..hi) {
+                if (value in taken) continue
+                covered[value - domainMin] = true
+            }
+        }
+        if (nonPinned > 0) {
+            var available = 0
+            for (c in covered) if (c) available++
+            if (available < nonPinned) return false
         }
         return true
     }

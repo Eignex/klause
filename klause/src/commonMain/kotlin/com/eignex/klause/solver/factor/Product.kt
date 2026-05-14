@@ -60,9 +60,10 @@ class Product(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Forward direction: result interval ⊆ corner-product range of a and b. The reverse
-        // directions (deriving a from b/result or b from a/result) need division with
-        // zero-crossing care and are deferred — TODO(propagate).
+        // Forward only: result ⊆ corner product range of (a, b). The reverse direction
+        // (deriving a from b and result, with the operand divided by a non-zero divisor) is
+        // sound in principle but in practice destabilises the worklist when intermediate
+        // bit-blasted Product factors interact with Linear sums — leaving as TODO.
         val da = state.intDomains[a]
         val db = state.intDomains[b]
         val (pLo, pHi) = cornerProductRange(da, db)
@@ -148,7 +149,7 @@ class Product(
         return minOf(p1, p2, p3, p4) to maxOf(p1, p2, p3, p4)
     }
 
-    private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long): Boolean {
+private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long): Boolean {
         if (lo > Int.MAX_VALUE || hi < Int.MIN_VALUE) return false
         val loI = if (lo < Int.MIN_VALUE) Int.MIN_VALUE else lo.toInt()
         val hiI = if (hi > Int.MAX_VALUE) Int.MAX_VALUE else hi.toInt()
