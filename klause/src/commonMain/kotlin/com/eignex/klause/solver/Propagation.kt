@@ -219,6 +219,92 @@ class PropagationState(
         }
         return out
     }
+
+    // Snapshot / restore for [PropagationSession]. Captures every mutable field so a pop
+    // can rewind the state to a prior fixpoint without re-propagating. Dirty queues are not
+    // snapshotted — the caller is expected to snapshot only between propagation cycles
+    // (i.e. when dirty queues are empty).
+    class Snapshot internal constructor(
+        internal val boolValues: Array<Boolean?>,
+        internal val intDomains: Array<IntDomain>,
+        internal val boolLevel: IntArray,
+        internal val intLevel: IntArray,
+        internal val decisionVars: IntArray,
+    )
+
+    fun snapshot(): Snapshot = Snapshot(
+        boolValues = boolValues.copyOf(),
+        intDomains = intDomains.copyOf(),
+        boolLevel = boolLevel.copyOf(),
+        intLevel = intLevel.copyOf(),
+        decisionVars = levelToDecisionVar.toIntArray(),
+    )
+
+    fun restore(s: Snapshot) {
+        for (i in s.boolValues.indices) boolValues[i] = s.boolValues[i]
+        for (i in s.intDomains.indices) intDomains[i] = s.intDomains[i]
+        for (i in s.boolLevel.indices) boolLevel[i] = s.boolLevel[i]
+        for (i in s.intLevel.indices) intLevel[i] = s.intLevel[i]
+        levelToDecisionVar.clear()
+        for (v in s.decisionVars) levelToDecisionVar.addLast(v)
+        // Aborted pushes may have left dirty queue entries behind; drop them.
+        while (dirtyBools.isNotEmpty()) dirtyBools.removeFirst()
+        while (dirtyInts.isNotEmpty()) dirtyInts.removeFirst()
+        conflictLevels = null
+        currentLevel = 0
+    }
+
+    /**
+     * Run propagation until no factor can derive more. When [allFactors] is true, every
+     * factor is enqueued initially (the usual one-shot path). When false, only factors
+     * touching variables currently in the dirty queues are enqueued — for incremental use
+     * by a session that just applied a pin and wants to extend the fixpoint.
+     *
+     * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
+     */
+    internal fun runToFixpoint(allFactors: Boolean): Set<Int>? {
+        val pending = BooleanArray(problem.numFactors)
+        val queue: ArrayDeque<Int> = ArrayDeque(problem.numFactors)
+        if (allFactors) {
+            for (fid in 0 until problem.numFactors) { pending[fid] = true; queue.addLast(fid) }
+        } else {
+            while (true) {
+                val v = pollDirtyBool(); if (v < 0) break
+                for (fid in problem.boolOccurrences[v]) {
+                    if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
+                }
+            }
+            while (true) {
+                val v = pollDirtyInt(); if (v < 0) break
+                for (fid in problem.intOccurrences[v]) {
+                    if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
+                }
+            }
+        }
+        while (queue.isNotEmpty()) {
+            val fid = queue.removeFirst()
+            pending[fid] = false
+            val f = problem.factors[fid]
+            currentLevel = maxLevelForVars(f.boolVars, f.intVars)
+            conflictLevels = null
+            if (!f.propagate(this, fid)) {
+                return conflictLevels ?: collectLevelsForVars(f.boolVars, f.intVars)
+            }
+            while (true) {
+                val v = pollDirtyBool(); if (v < 0) break
+                for (other in problem.boolOccurrences[v]) {
+                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
+                }
+            }
+            while (true) {
+                val v = pollDirtyInt(); if (v < 0) break
+                for (other in problem.intOccurrences[v]) {
+                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
+                }
+            }
+        }
+        return null
+    }
 }
 
 /** floor(a / b) with correct handling of negative operands. */

@@ -5,103 +5,129 @@ enum class VarKind { Bool, Int }
 
 /**
  * Stateful propagator with a decision trail. Push pins via [pinBool] / [pinInt]; each push
- * increments [decisionLevel] and propagates. On [PropagationResult.Unsat], the result carries
- * `conflictLevels` — the set of decision levels involved in the conflict — so a CSP-style
- * DFS sampler can pop directly to the deepest non-conflicting level.
+ * increments [decisionLevel] and propagates incrementally (only factors whose vars changed
+ * are revisited). On [PropagationResult.Unsat], the result carries `conflictLevels` so a
+ * CSP-style DFS sampler can backjump directly past the deepest non-conflicting level.
  *
- * Typical DFS loop:
- * ```
- * val s = PropagationSession(problem)
- * while (!allAssigned()) {
- *   val (v, value) = chooseDecision()
- *   when (val r = s.pinBool(v, value)) {
- *     is Implied -> continue
- *     is Unsat -> {
- *       val target = (r.conflictLevels.maxOrNull() ?: 0) - 1
- *       s.popToLevel(maxOf(0, target))
- *       // try alternate value at the next decision
- *     }
- *   }
- * }
- * ```
+ * One persistent [PropagationState] is reused across pushes. Each successful push records a
+ * post-fixpoint snapshot; [popLast] / [popToLevel] restore the snapshot at the target level
+ * in O(numVars), no re-propagation. Conflict on push reverts the state to the last good
+ * snapshot before returning Unsat — the session's trail is left at the pre-push level.
  *
- * This first iteration re-propagates on every push/pop (it builds a fresh [PropagationState]
- * each time via [Problem.propagate]). The API is the final shape; incremental fixpoint reuse
- * is documented as a TODO in the README. Not thread-safe.
+ * Not thread-safe. One consumer per session.
  */
 class PropagationSession(val problem: Problem) {
+    private val state: PropagationState = PropagationState(problem, Assumptions.None)
+    private data class LevelState(
+        val snap: PropagationState.Snapshot,
+        val implied: PropagationResult.Implied,
+    )
+    /** `levelStates[L]` is the state right after level [L]'s fixpoint. Index 0 = post-bake. */
+    private val levelStates: MutableList<LevelState> = mutableListOf()
     private val pinnedBools: LinkedHashMap<Int, Boolean> = LinkedHashMap()
     private val pinnedInts: LinkedHashMap<Int, Int> = LinkedHashMap()
-    /** Decision trail: each entry is a (kind, var) pair in push order; index = level - 1. */
     private val trail: ArrayDeque<Pair<VarKind, Int>> = ArrayDeque()
-    /** Most recent implied set, kept so push returns only newly-forced facts. */
+    /** Cumulative implied set as of the last successful push — used to diff push returns. */
     private var lastImplied: PropagationResult.Implied =
         PropagationResult.Implied(emptyMap(), emptyMap())
 
-    /** Current decision level — number of pins on the trail. 0 = no decisions. */
+    init {
+        state.runToFixpoint(allFactors = true)
+        val baseline = computeImplied()
+        levelStates.add(LevelState(state.snapshot(), baseline))
+        lastImplied = baseline
+    }
+
+    /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
     val decisionLevel: Int get() = trail.size
 
     /**
-     * Seed with an initial assumption set. Clears any prior trail. Each assumption is
-     * assigned its own decision level in iteration order (bools first, then ints).
+     * Seed with an initial assumption set. Resets any prior trail to level 0 first, then
+     * pushes each assumption in iteration order (bools first, then ints). Each gets its own
+     * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
      */
     fun seed(assumptions: Assumptions): PropagationResult {
+        state.restore(levelStates[0].snap)
+        if (levelStates.size > 1) levelStates.subList(1, levelStates.size).clear()
         pinnedBools.clear()
         pinnedInts.clear()
         trail.clear()
-        lastImplied = PropagationResult.Implied(emptyMap(), emptyMap())
+        lastImplied = levelStates[0].implied
+
         for ((v, b) in assumptions.bools) {
-            pinnedBools[v] = b; trail.addLast(VarKind.Bool to v)
+            val r = pushBool(v, b)
+            if (r is PropagationResult.Unsat) return r
         }
         for ((v, i) in assumptions.ints) {
-            pinnedInts[v] = i; trail.addLast(VarKind.Int to v)
+            val r = pushInt(v, i)
+            if (r is PropagationResult.Unsat) return r
         }
-        return runPropagate()
+        lastImplied = levelStates.last().implied
+        return computeImplied()
     }
 
-    /** Push one bool pin at a fresh decision level. */
+    /** Push one bool pin at a fresh decision level. Returns newly-implied facts (diff). */
     fun pinBool(v: Int, value: Boolean): PropagationResult {
-        if (pinnedBools[v] == value) {
-            return PropagationResult.Implied(emptyMap(), emptyMap())
-        }
-        pinnedBools[v] = value
-        trail.addLast(VarKind.Bool to v)
-        return runPropagate()
+        val r = pushBool(v, value)
+        if (r !is PropagationResult.Implied) return r
+        return diffAgainst(r, lastImplied).also { lastImplied = r }
     }
 
     /** Push one int pin at a fresh decision level. */
     fun pinInt(v: Int, value: Int): PropagationResult {
-        if (pinnedInts[v] == value) {
-            return PropagationResult.Implied(emptyMap(), emptyMap())
-        }
+        val r = pushInt(v, value)
+        if (r !is PropagationResult.Implied) return r
+        return diffAgainst(r, lastImplied).also { lastImplied = r }
+    }
+
+    private fun pushBool(v: Int, value: Boolean): PropagationResult {
+        if (pinnedBools[v] == value) return levelStates.last().implied
+        if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
+        val conflict = state.runToFixpoint(allFactors = false)
+        if (conflict != null) return revertAndUnsat(conflict)
+        pinnedBools[v] = value
+        trail.addLast(VarKind.Bool to v)
+        val implied = computeImplied()
+        levelStates.add(LevelState(state.snapshot(), implied))
+        return implied
+    }
+
+    private fun pushInt(v: Int, value: Int): PropagationResult {
+        if (pinnedInts[v] == value) return levelStates.last().implied
+        if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
+        val conflict = state.runToFixpoint(allFactors = false)
+        if (conflict != null) return revertAndUnsat(conflict)
         pinnedInts[v] = value
         trail.addLast(VarKind.Int to v)
-        return runPropagate()
+        val implied = computeImplied()
+        levelStates.add(LevelState(state.snapshot(), implied))
+        return implied
     }
 
     /**
-     * Pop the most-recently-pushed pin and re-propagate. No-op if the trail is empty.
-     * Resets `lastImplied` so the next push reports its implied facts in full.
+     * Build the Unsat result from [levels] (which references the *failed-push* level
+     * encoding still on the state), then restore the pre-push snapshot. Extraction must
+     * happen before restore, since restore wipes the level-to-var mapping.
      */
+    private fun revertAndUnsat(levels: Set<Int>): PropagationResult.Unsat {
+        val bools = state.extractConflictBools(levels)
+        val ints = state.extractConflictInts(levels)
+        state.restore(levelStates.last().snap)
+        return PropagationResult.Unsat(bools, ints, levels)
+    }
+
+    /** Pop the most-recently-pushed pin. No-op if the trail is empty. */
     fun popLast() {
         if (trail.isEmpty()) return
-        val (kind, v) = trail.removeLast()
-        when (kind) {
-            VarKind.Bool -> pinnedBools.remove(v)
-            VarKind.Int -> pinnedInts.remove(v)
-        }
-        lastImplied = PropagationResult.Implied(emptyMap(), emptyMap())
-        runPropagate()
+        popToLevel(trail.size - 1)
     }
 
     /**
-     * Pop until [decisionLevel] equals [level]. The pop is unconditional — even if the
-     * popped pins were not in any conflict. Used by DFS samplers to backjump.
-     *
-     * Throws [IllegalArgumentException] if [level] exceeds the current level.
+     * Pop until [decisionLevel] equals [level]. O(decisions popped × numVars) for the
+     * snapshot restore. Used by DFS samplers to backjump.
      */
     fun popToLevel(level: Int) {
-        require(level >= 0 && level <= trail.size) {
+        require(level in 0..trail.size) {
             "popToLevel($level): out of range [0, ${trail.size}]"
         }
         while (trail.size > level) {
@@ -110,9 +136,10 @@ class PropagationSession(val problem: Problem) {
                 VarKind.Bool -> pinnedBools.remove(v)
                 VarKind.Int -> pinnedInts.remove(v)
             }
+            levelStates.removeAt(levelStates.size - 1)
         }
-        lastImplied = PropagationResult.Implied(emptyMap(), emptyMap())
-        runPropagate()
+        state.restore(levelStates.last().snap)
+        lastImplied = levelStates.last().implied
     }
 
     /** Pop until [v] of [kind] is no longer pinned. No-op if [v] is already unpinned. */
@@ -137,17 +164,29 @@ class PropagationSession(val problem: Problem) {
     fun decisionAt(level: Int): Pair<VarKind, Int>? =
         if (level in 1..trail.size) trail.elementAt(level - 1) else null
 
-    private fun runPropagate(): PropagationResult {
-        val asm = Assumptions(bools = pinnedBools.toMap(), ints = pinnedInts.toMap())
-        val r = problem.propagate(asm)
-        return when (r) {
-            is PropagationResult.Unsat -> r
-            is PropagationResult.Implied -> {
-                val newBools = r.bools.filter { (k, vNew) -> lastImplied.bools[k] != vNew }
-                val newInts = r.ints.filter { (k, vNew) -> lastImplied.ints[k] != vNew }
-                lastImplied = r
-                PropagationResult.Implied(newBools, newInts)
+    private fun computeImplied(): PropagationResult.Implied {
+        val bools = HashMap<Int, Boolean>()
+        for (v in 0 until problem.numBoolVars) {
+            val b = state.boolValues[v] ?: continue
+            if (pinnedBools[v] == b) continue
+            bools[v] = b
+        }
+        val ints = HashMap<Int, Int>()
+        for (v in 0 until problem.numIntVars) {
+            val d = state.intDomains[v]
+            if (d.min == d.max) {
+                if (pinnedInts[v] == d.min) continue
+                ints[v] = d.min
             }
         }
+        return PropagationResult.Implied(bools, ints)
     }
+
+    private fun diffAgainst(
+        current: PropagationResult.Implied,
+        previous: PropagationResult.Implied,
+    ): PropagationResult.Implied = PropagationResult.Implied(
+        bools = current.bools.filter { (k, vNew) -> previous.bools[k] != vNew },
+        ints = current.ints.filter { (k, vNew) -> previous.ints[k] != vNew },
+    )
 }

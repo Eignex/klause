@@ -66,43 +66,13 @@ class Problem(
                 lvls,
             )
         }
-
-        // Initial worklist: every factor (the seeded vars may not cover everything, and the
-        // baked-once-at-init pass needs all of them anyway).
-        val pending = BooleanArray(numFactors) { true }
-        val queue: ArrayDeque<Int> = ArrayDeque(numFactors)
-        for (fid in 0 until numFactors) queue.addLast(fid)
-
-        while (queue.isNotEmpty()) {
-            val fid = queue.removeFirst()
-            pending[fid] = false
-            val f = factors[fid]
-            state.currentLevel = state.maxLevelForVars(f.boolVars, f.intVars)
-            state.conflictLevels = null
-            if (!f.propagate(state, fid)) {
-                val lvls = state.conflictLevels ?: state.collectLevelsForVars(f.boolVars, f.intVars)
-                return PropagationResult.Unsat(
-                    state.extractConflictBools(lvls),
-                    state.extractConflictInts(lvls),
-                    lvls,
-                )
-            }
-
-            // Drain whatever the factor dirtied; enqueue every other factor touching those vars.
-            while (true) {
-                val v = state.pollDirtyBool()
-                if (v < 0) break
-                for (other in boolOccurrences[v]) {
-                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
-                }
-            }
-            while (true) {
-                val v = state.pollDirtyInt()
-                if (v < 0) break
-                for (other in intOccurrences[v]) {
-                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
-                }
-            }
+        val conflict = state.runToFixpoint(allFactors = true)
+        if (conflict != null) {
+            return PropagationResult.Unsat(
+                state.extractConflictBools(conflict),
+                state.extractConflictInts(conflict),
+                conflict,
+            )
         }
 
         // Diff against input: only emit newly-forced facts.
