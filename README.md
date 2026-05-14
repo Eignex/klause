@@ -92,6 +92,5 @@ results as the new baseline with `:klause-bench:saveBaseline`.
 - Propagation: `Product` reverse direction (currently forward-only — destabilized worklist in bit-blasted division tests).
 - Propagation: full Hall-set / matching arc consistency in `AllDifferent` (currently pigeonhole + boundary shaving only).
 - Propagation: EQ-negation in `ReifiedLinear` / `ReifiedPseudoBoolean` (no clean interval form; `aux=false` on EQ is currently a no-op).
-- Propagation: tighter conflict analysis. The current implementation reads the failing factor's direct decision levels — sound and cheap, but coarser than walking the full implication graph (1-UIP-style).
 - `LogicNGSampler` does not implement `Optimizer` (real top-k via incremental CDCL with PB optimum constraints is future work).
 - klause-bench microbenchmark for the propagation-heavy / pinned-bool regime.

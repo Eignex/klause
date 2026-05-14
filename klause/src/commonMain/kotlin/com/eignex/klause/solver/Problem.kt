@@ -14,6 +14,15 @@ class Problem(
     val numIntVars: Int,
     val intDomains: Array<IntDomain>,
     val factors: List<Factor>,
+    /**
+     * Opt-in failed-literal probing at bake time. When `true`, every free bool variable is
+     * tested with both polarities: if pinning one polarity propagates Unsat, the other
+     * polarity is permanently folded into [baked]. Iterated to a fixed point. Cost is
+     * `O(numFreeBools × propagate)` once at construction; the result is a tighter baseline
+     * for every subsequent session. Off by default — tests construct many small problems
+     * and don't want the construction overhead.
+     */
+    val probeFailedLiterals: Boolean = false,
 ) {
     init {
         require(intDomains.size == numIntVars) {
@@ -45,7 +54,58 @@ class Problem(
      * here instead of after a full search budget. May be [PropagationResult.Unsat] for
      * trivially-infeasible problems; callers that want fail-fast behavior can check this.
      */
-    val baked: PropagationResult = propagate(Assumptions.None)
+    val baked: PropagationResult = computeBaked()
+
+    private fun computeBaked(): PropagationResult {
+        val initial = propagate(Assumptions.None)
+        if (!probeFailedLiterals || initial is PropagationResult.Unsat) return initial
+        return probeFreeBools(initial as PropagationResult.Implied)
+    }
+
+    /**
+     * Iteratively strengthens [initial] by probing each free bool with both polarities. If
+     * one polarity is Unsat under the current accumulated base, the opposite polarity is
+     * forced. Repeats until a full pass finds no new forcings.
+     */
+    private fun probeFreeBools(initial: PropagationResult.Implied): PropagationResult {
+        val bools = HashMap(initial.bools)
+        val ints = HashMap(initial.ints)
+        var changed = true
+        while (changed) {
+            changed = false
+            for (v in 0 until numBoolVars) {
+                if (v in bools) continue
+                val tryTrue = propagate(Assumptions(bools + (v to true), ints))
+                if (tryTrue is PropagationResult.Unsat) {
+                    val r = propagate(Assumptions(bools + (v to false), ints))
+                    if (r is PropagationResult.Unsat) return r
+                    foldInto(bools, ints, v, false, r as PropagationResult.Implied)
+                    changed = true
+                    continue
+                }
+                val tryFalse = propagate(Assumptions(bools + (v to false), ints))
+                if (tryFalse is PropagationResult.Unsat) {
+                    val r = propagate(Assumptions(bools + (v to true), ints))
+                    if (r is PropagationResult.Unsat) return r
+                    foldInto(bools, ints, v, true, r as PropagationResult.Implied)
+                    changed = true
+                }
+            }
+        }
+        return PropagationResult.Implied(bools, ints)
+    }
+
+    private fun foldInto(
+        bools: HashMap<Int, Boolean>,
+        ints: HashMap<Int, Int>,
+        forcedVar: Int,
+        forcedValue: Boolean,
+        implied: PropagationResult.Implied,
+    ) {
+        bools[forcedVar] = forcedValue
+        for ((k, b) in implied.bools) bools[k] = b
+        for ((k, i) in implied.ints) ints[k] = i
+    }
 
     /**
      * Run sound-but-incomplete deductive propagation against [assumptions]. Each factor's
