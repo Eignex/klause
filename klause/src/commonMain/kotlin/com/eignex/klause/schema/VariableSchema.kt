@@ -44,4 +44,22 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
             thisRef.add(prop.name, nc)
             ReadOnlyProperty { _, _ -> nc }
         }
+
+    /** Anonymous form of [constraint]; the entry is registered under a synthetic
+     *  `__c<n>` name. Use when the constraint has no natural identifier and you
+     *  don't need to reference it by handle elsewhere. */
+    protected fun constraint(expr: BoolExpr) {
+        add("__c${anonCounter++}", NamedConstraint(expr))
+    }
+
+    /** Bulk form: register a list of constraints under one property name. Each
+     *  element gets its own [NamedConstraint] entry, keyed `<prop>[0]`, `<prop>[1]`, … */
+    protected fun constraints(build: () -> List<BoolExpr>) =
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, List<NamedConstraint>>> { thisRef, prop ->
+            val ncs = build().map { NamedConstraint(it) }
+            ncs.forEachIndexed { i, nc -> thisRef.add("${prop.name}[$i]", nc) }
+            ReadOnlyProperty { _, _ -> ncs }
+        }
+
+    private var anonCounter: Int = 0
 }
