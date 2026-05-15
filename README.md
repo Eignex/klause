@@ -151,14 +151,14 @@ val text = cnf.toDimacs()
 - QF_LIA parity: to_real / to_int casts. Either bucket reals onto bounded ints or reject the benchmark.
 - QF_LIA parity: let-binding expansion in the SMT-LIB parser.
 - QF_LIA parity: unbounded integers in BacktrackSolver. Pairs with the bound-inference item above.
-- FlatZinc parity: arithmetic builtins beyond int_times. Need int_plus, int_minus, int_div, int_mod, int_abs, int_min, int_max, int_pow.
-- FlatZinc parity: array element constraints. array_int_element, array_var_int_element, array_bool_element.
-- FlatZinc parity: counting predicates count_neq / count_leq / count_geq, plus global_cardinality, nvalue, among, alldifferent_except_0.
-- FlatZinc parity: structural globals. table_*, lex_*, inverse map directly; bin_packing, cumulative, regular, circuit, subcircuit, diffn, knapsack, value_precede need new factors.
-- FlatZinc parity: full reification coverage. Comparison _reif, bool_and_reif, bool_or_reif, bool_xor_reif, and global _reifs.
-- FlatZinc parity: set variables and set constraints. No SetDomain today; a real slice of the MiniZinc Challenge uses them.
-- FlatZinc parity: float variables and continuous arithmetic. Currently bucketed at schema level only.
+- MiniZinc parity: ship a klause-mzn-lib declaring our native predicate set. MiniZinc decomposes anything we don't claim into combinations of what we do support, so every Challenge benchmark becomes runnable without per-global implementation work. Coverage-by-decomposition.
+- FlatZinc parity: arithmetic builtins beyond int_times. Need int_plus, int_minus, int_div, int_mod, int_abs, int_min, int_max, int_pow. These are decomposition targets so they must be native.
+- FlatZinc parity: array element constraints. array_int_element, array_var_int_element, array_bool_element. Also decomposition targets.
+- FlatZinc parity: full reification coverage of native predicates. Comparison _reif, bool_and_reif, bool_or_reif, bool_xor_reif. Globals that decompose don't need _reif variants; ones we keep native do.
 - FlatZinc parity: solve goals beyond satisfy. Wire minimize / maximize annotations into the Optimizer end-to-end.
+- FlatZinc perf: native propagators for globals that decomposition encodes poorly. Profile against klause-mzn-lib once it ships; cumulative, regular, circuit, and bin_packing are the usual suspects.
+- FlatZinc parity: set variables. MiniZinc decomposes set vars to indicator-bool arrays when the solver doesn't claim native sets, so we get coverage for free once the mzn-lib is in place. A first-class SetDomain is a perf upgrade, not a coverage requirement.
+- FlatZinc parity: float variables. MiniZinc does not auto-bucket floats for solvers that lack a Float sort, so this is a real gap. Options: import-time bucketing with a chosen granularity, or reject float-typed benchmarks.
 - XCSP3 parity: parser for XCSP3 XML, including extension tables and intension predicates.
 - DIMACS / OPB parity: weighted MaxSAT (.wcnf) loader.
 - Backend: klause-choco adapter. JVM-only module wrapping Choco-solver as a reference CP oracle and competitive benchmark target. Mature global-constraint catalog and battle-tested FlatZinc parser; mapping from klause factors is near 1:1.
