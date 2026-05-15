@@ -302,6 +302,20 @@ internal class FlatZincCompiler(
         else -> failHere("expected int constant, got ${e::class.simpleName}")
     }
 
+    /** Non-throwing variant of [evalIntConst]. Returns `null` when [e] refers to a
+     *  solver variable rather than a compile-time constant. */
+    private fun evalIntConstOrNull(e: FznExpr): Long? = when (e) {
+        is FznExpr.IntLit -> e.value
+        is FznExpr.BoolLit -> if (e.value) 1L else 0L
+        is FznExpr.Ident -> when (val p = params[e.name]) {
+            is ParamValue.Int -> p.value
+            is ParamValue.Bool -> if (p.value) 1L else 0L
+            else -> null
+        }
+        is FznExpr.ArrayAccess -> (arrays[e.name] as? FlatZincArray.IntParam)?.values?.get(e.index - 1)?.toLong()
+        else -> null
+    }
+
     private fun evalFloatConst(e: FznExpr): Double = when (e) {
         is FznExpr.FloatLit -> e.value
         is FznExpr.IntLit -> e.value.toDouble()
@@ -696,7 +710,12 @@ internal class FlatZincCompiler(
         val n = evalIntConst(c.args[0]).toInt()
         val xs = evalIntVarArray(c.args[1])
         val v = evalIntConst(c.args[2]).toInt()
-        emitCountAtLeast(xs, v, n)
+        val lits = IntArray(xs.size) { i ->
+            val aux = allocBool("__atleast_${xs[i]}_eq_${v}")
+            factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
+            Lit.make(aux, true)
+        }
+        factors.add(Cardinality(lits, min = n, max = lits.size))
     }
 
     private fun emitAtMost(c: FznConstraint) {
@@ -704,50 +723,60 @@ internal class FlatZincCompiler(
         val n = evalIntConst(c.args[0]).toInt()
         val xs = evalIntVarArray(c.args[1])
         val v = evalIntConst(c.args[2]).toInt()
-        emitCountAtMost(xs, v, n)
+        val lits = IntArray(xs.size) { i ->
+            val aux = allocBool("__atmost_${xs[i]}_eq_${v}")
+            factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
+            Lit.make(aux, true)
+        }
+        factors.add(Cardinality(lits, min = 0, max = n))
     }
 
     private fun emitCountEq(c: FznConstraint) {
-        // count_eq(x[], v, n): #{i : x[i] = v} = n.
+        // count_eq(x[], v, n): #{i : x[i] = v} = n. Any of v, n may be a constant or
+        // a variable; FlatZinc allows all four combinations.
         require(c.args.size == 3)
         val xs = evalIntVarArray(c.args[0])
-        val v = evalIntConst(c.args[1]).toInt()
-        val n = evalIntConst(c.args[2]).toInt()
-        emitCountAtLeast(xs, v, n)
-        emitCountAtMost(xs, v, n)
-    }
+        val vConst = evalIntConstOrNull(c.args[1])?.toInt()
+        val nConst = evalIntConstOrNull(c.args[2])?.toInt()
 
-    private fun emitCountAtLeast(xs: IntArray, v: Int, n: Int) {
-        // Allocate one indicator bool per xs[i]: aux_i ↔ (xs[i] = v). Then Cardinality(aux ≥ n).
-        val indicators = IntArray(xs.size) {
-            val auxName = "__count_${xs[it]}_eq_${v}"
-            val aux = allocBool(auxName)
-            factors.add(ReifiedLinear(
-                auxBoolVar = aux,
-                coeffs = intArrayOf(1),
-                vars = intArrayOf(xs[it]),
-                op = LinearOp.EQ,
-                bound = v,
-            ))
-            Lit.make(aux, true)
+        // Build one bool indicator per xs[i] satisfying `b_i ↔ (xs[i] = v)`.
+        val indicatorBools = IntArray(xs.size) { i ->
+            val aux = allocBool("__count_${xs[i]}_eq_${i}")
+            if (vConst != null) {
+                factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, vConst))
+            } else {
+                // v is a variable: encode b_i ↔ (xs[i] - v = 0).
+                val vVar = resolveIntVar(c.args[1])
+                factors.add(ReifiedLinear(aux, intArrayOf(1, -1), intArrayOf(xs[i], vVar), LinearOp.EQ, 0))
+            }
+            aux
         }
-        factors.add(Cardinality(indicators, min = n, max = indicators.size))
-    }
 
-    private fun emitCountAtMost(xs: IntArray, v: Int, n: Int) {
-        val indicators = IntArray(xs.size) {
-            val auxName = "__count_${xs[it]}_eq_${v}_amost"
-            val aux = allocBool(auxName)
-            factors.add(ReifiedLinear(
-                auxBoolVar = aux,
-                coeffs = intArrayOf(1),
-                vars = intArrayOf(xs[it]),
-                op = LinearOp.EQ,
-                bound = v,
-            ))
-            Lit.make(aux, true)
+        if (nConst != null) {
+            // Pure cardinality constraint: exactly nConst indicators true.
+            val lits = IntArray(xs.size) { Lit.make(indicatorBools[it], true) }
+            factors.add(Cardinality(lits, min = nConst, max = nConst))
+        } else {
+            // n is a variable. Channel each b_i to a 0/1 int via a second reified
+            // factor, then sum the channels and constrain the sum to equal n.
+            val channels = IntArray(xs.size) { i ->
+                val name = "__count_chan_$i"
+                val id = allocInt(name, 0, 1)
+                // `b_i ↔ (chan_i = 1)` — bidirectional channeling.
+                factors.add(ReifiedLinear(
+                    auxBoolVar = indicatorBools[i],
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(id),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ))
+                id
+            }
+            val nVar = resolveIntVar(c.args[2])
+            val coefs = IntArray(xs.size + 1) { if (it < xs.size) 1 else -1 }
+            val vars = IntArray(xs.size + 1) { if (it < xs.size) channels[it] else nVar }
+            factors.add(Linear(coefs, vars, LinearOp.EQ, 0))
         }
-        factors.add(Cardinality(indicators, min = 0, max = n))
     }
 
     // ---- solve / output -----------------------------------------------------
