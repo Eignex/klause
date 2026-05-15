@@ -35,6 +35,32 @@ enumerating without replacement are core operations, not afterthoughts.
 Klause is also not a MILP solver; objectives are linear over integers,
 not reals.
 
+## Use cases
+
+Klause is aimed at problems where a constraint system is the model and
+the question is "give me some valid configurations" rather than "prove
+this assertion holds". Concretely:
+
+- Constraint-aware test or fuzz input generation. Generate inputs that
+  satisfy structural invariants (allDifferent, table-encoded relations,
+  reified comparisons) so the downstream test exercises behaviour
+  rather than rejecting on input validation.
+- Diverse input sets for differential testing. Draw many valid samples
+  that are spread across the feasible region rather than clustered
+  around one corner.
+- Configuration synthesis. Find a system configuration (feature flags,
+  resource caps, routing weights) that satisfies a set of business
+  rules, with optional weighted-objective ranking.
+- Scheduling and assignment. Tasks to machines, students to rooms,
+  campaigns to budgets, given side constraints. Add a linear objective
+  to get cost-minimal feasibility.
+- Plan verification. Check that a proposed assignment satisfies all
+  declared constraints, and surface why it fails when it doesn't.
+
+Klause is not the right tool for proving program properties, deciding
+SMT theories outside QF_LIA, or solving continuous optimization. For
+those, reach for Z3, CVC5, or a MILP solver respectively.
+
 ## Schema
 
 ```kotlin
