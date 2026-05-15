@@ -102,6 +102,23 @@ val text = cnf.toDimacs()
 - CP search in `BacktrackSolver`: Luby or geometric restarts. Currently pure chronological DFS.
 - CP search in `BacktrackSolver`: last-conflict and impact-based value selection on top of the existing stateless `IndomainRandom` / `IndomainMin` / etc.
 - CP search in `BacktrackSolver`: no-good / lazy clause learning (LCG-style). The biggest jump in solver power but deepest engineering item; gets us from "CP solver circa 2005" to "competitive with Chuffed / CP-SAT".
+- CP search in `BacktrackSolver`: dom/wdeg variable ordering (Boussemart et al.). Each constraint accumulates a weight every time it triggers failure; pick the variable with the highest weight/domain-size ratio. Standard finite-domain CP heuristic, robust across problem types.
+- CP search in `BacktrackSolver`: phase-saving value selection. Cache the last value tried for each variable across restarts; reuse on next visit. Cheap, well-known SAT/CP technique.
+- CP search in `BacktrackSolver`: counting-based value heuristic (Pesant). Solution-density estimates per (var, value) drive the value choice. Works particularly well on globals like `allDifferent` and `gcc` where counts can be computed cheaply.
+- CP search in `BacktrackSolver`: solution-guided search. After the first solution, bias value selection toward the previous solution's assignment until a better one is found. Trivial to wire on top of phase-saving.
+- CP search in `BacktrackSolver`: large neighborhood search (LNS) for optimization. Freeze a random subset of variables to their current-best values and re-solve the rest. Standard CP optimization meta-heuristic; pairs well with `minimize`.
+- Local search in `LocalSearchSolver`: tabu list. Forbid recently-flipped variables for K steps to avoid cycling. Trivial addition to `Strategy`.
+- Local search in `LocalSearchSolver`: DDFW / SAPS strategies that actually use `LocalSearchState.factorWeights` (currently the field is allocated but no shipped strategy reads it).
+- Local search in `LocalSearchSolver`: variable neighborhood search (VNS) meta-heuristic. Cycles through neighborhood sizes when stuck.
+- Optimizer: branch-and-bound `minimize` / `maximize` in `BacktrackSolver`. The current implementation enumerates all feasible models and tracks the best, which is exponential. A real B&B prunes once a partial assignment can't beat the current best.
+- API: incremental solving via assumption push/pop. Some backends already accept per-call assumptions; an explicit `pushAssumptions` / `popAssumptions` lets callers reuse engine state across related queries.
+- API: UNSAT cores. Return the minimal subset of asserted constraints that produced unsat, mirroring SMT-LIB `get-unsat-core`. Useful for debugging and for MaxSAT-style relaxation.
+- API: deterministic budgets. `maxFlips` / `maxDecisions` exist per backend; add a wall-clock-independent "instruction budget" so test runs are reproducible across machines.
+- Sampling: hash-based uniform sampling (UniGen2-style). Slice the model space with XOR hashing and uniformly sample a slice. Currently we only have stochastic samplers with no uniformity guarantee.
+- Sampling: approximate model counting (ApproxMC). Companion to UniGen; same XOR-hashing primitive.
+- Sampling: weighted projected sampling (WAPS / KUS-style). Sample over a projection of the model space, weighted by user-defined factors.
+- Docs: tutorial / cookbook covering schema → constraints → solver-backend selection.
+- Docs: KDoc → static site (Dokka) so the API reference is browsable.
 - QF_LIA parity: SMT-LIB v2 parser for the QF_LIA subset (`set-logic`, `declare-fun`, `assert`, `check-sat`, core s-expression). Lets us run SMT-LIB benchmarks directly.
 - QF_LIA parity: static bound inference for int variables declared with full-range or unbounded domains. Scan constraint structure to derive sound bounds before bit-blasting; error out cleanly when no bound can be proved.
 - QF_LIA parity: `distinct` over arbitrary terms (booleans, mixed bool/int). `AllDifferent` covers the int case; the general `distinct` lowering for booleans is at-most-one over each value.
