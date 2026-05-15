@@ -505,13 +505,16 @@ class Compiler {
         }
 
         /**
-         * Lower `n div d` and `n mod d` together with Java-truncated semantics:
+         * Lower `n div d` and `n mod d` together with Euclidean semantics (matching
+         * SMT-LIB QF_LIA):
          *
-         *   q * d + r = n,    |r| < |d|,    r * n ≥ 0,    d ≠ 0.
+         *   q * d + r = n,    0 ≤ r < |d|,    d ≠ 0.
          *
-         * The first equation pins q and r relative to n and d; the second bounds the remainder;
-         * the third forces the remainder's sign to follow the numerator's sign (so dividing -7
-         * by 3 gives q = -2, r = -1 — same as `kotlin.Int.div` / `kotlin.Int.rem`).
+         * The remainder is always non-negative regardless of the signs of `n` and `d`.
+         * For example `(-7) mod 3 = 2` (with `q = -3`) and `(-7) mod (-3) = 2` (with
+         * `q = 3`). This disagrees with `kotlin.Int.rem` and Java's `%` operator, which
+         * keep the sign of the dividend; callers porting from Java-style semantics need
+         * to adjust.
          */
         private fun liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
             val nLifted = lift(num)
@@ -525,7 +528,7 @@ class Compiler {
             val nAbsMax = maxOf(if (nDom.min < 0) -nDom.min else nDom.min, nDom.max)
             val dAbsMax = maxOf(if (dDom.min < 0) -dDom.min else dDom.min, dDom.max)
             val qDomain = IntDomain(-nAbsMax, nAbsMax)
-            val rDomain = IntDomain(-(dAbsMax - 1), dAbsMax - 1)
+            val rDomain = IntDomain(0, dAbsMax - 1)
             val qName = newAuxIntVar(qDomain)
             val rName = newAuxIntVar(rDomain)
             val dqAbsMaxLong = nAbsMax.toLong() * dAbsMax + dAbsMax
@@ -542,16 +545,11 @@ class Compiler {
             assertExpr(
                 IntCompare(IntSum(listOf(IntRef(dqName), IntRef(rName))), IntCmpOp.EQ, nRef),
             )
-            // |r| < |d| → lift turns IntAbs into aux non-negative ints with the right semantics.
+            // r < |d|. The rDomain pin already enforces r ≥ 0.
             assertExpr(
-                IntCompare(IntAbs(IntRef(rName)), IntCmpOp.LT, IntAbs(dRef)),
+                IntCompare(IntRef(rName), IntCmpOp.LT, IntAbs(dRef)),
             )
-            // r * n ≥ 0 enforces sign(r) = sign(n) when r ≠ 0; trivially holds when r = 0.
-            assertExpr(
-                IntCompare(IntMul(IntRef(rName), nRef), IntCmpOp.GE, IntLit(0)),
-            )
-            // d ≠ 0 is required regardless of domain; emit an explicit guard if the domain spans 0.
-            // (Handled implicitly by the require above when 0 ∉ dDom.)
+            // d ≠ 0 is required regardless of domain; handled by the require above (0 ∉ dDom).
 
             return if (returnRemainder) IntRef(rName) else IntRef(qName)
         }

@@ -56,8 +56,9 @@ The DSL covers:
 
 - Boolean: and, or, implies, iff, not, xor.
 - Nominal: eq and ne against label literals.
-- Integer arithmetic: signed +, -, unary -, *, /, %, with Java-truncated
-  division and modulo and variable-by-variable multiplication.
+- Integer arithmetic: signed +, -, unary -, *, /, %, with Euclidean
+  division and modulo (remainder is always non-negative, matching
+  SMT-LIB QF_LIA) and variable-by-variable multiplication.
 - Comparisons: le, lt, ge, gt, eq, ne over arbitrary integer expressions.
 - Counting: atMost, atLeast, cardinality, pseudoBoolean and friends.
 - Global: gcc, allDifferent.
@@ -102,8 +103,11 @@ val text = cnf.toDimacs()
 - CP search in `BacktrackSolver`: last-conflict and impact-based value selection on top of the existing stateless `IndomainRandom` / `IndomainMin` / etc.
 - CP search in `BacktrackSolver`: no-good / lazy clause learning (LCG-style). The biggest jump in solver power but deepest engineering item; gets us from "CP solver circa 2005" to "competitive with Chuffed / CP-SAT".
 - QF_LIA parity: SMT-LIB v2 parser for the QF_LIA subset (`set-logic`, `declare-fun`, `assert`, `check-sat`, core s-expression). Lets us run SMT-LIB benchmarks directly.
-- QF_LIA parity: Euclidean `div` and `mod` variants. SMT-LIB QF_LIA uses Euclidean semantics (mod result non-negative); klause currently exposes only Java-truncated. Pick a default or expose both.
 - QF_LIA parity: static bound inference for int variables declared with full-range or unbounded domains. Scan constraint structure to derive sound bounds before bit-blasting; error out cleanly when no bound can be proved.
+- QF_LIA parity: `distinct` over arbitrary terms (booleans, mixed bool/int). `AllDifferent` covers the int case; the general `distinct` lowering for booleans is at-most-one over each value.
+- QF_LIA parity: `to_real` / `to_int` casts. Klause has no Real sort; any benchmark that mixes them via the SMT-LIB cast operators currently has no expressible analog. Either lift reals onto bucketed integers (with a chosen bucket count) or reject the benchmark.
+- QF_LIA parity: `let` binding expansion in the SMT-LIB parser. Klause's Kotlin DSL composes naturally so this is purely a parser concern (de-sugar lets to fresh names before lowering).
+- QF_LIA parity: unbounded integers in `BacktrackSolver`. Activity-based search + LCG should make wide-domain bounds propagation viable, but today there's no fallback when `IntDomain(min, max)` can't be derived statically. Pair with the bound-inference item above.
 - Perf (post-benchmark): replace `Assumptions.bools: Map<Int, Boolean>` / `ints: Map<Int, Int>` and `PropagationResult.Implied.{bools, ints}` with parallel-array representations to avoid `Int` boxing on the propagation hot path.
 - Perf (post-benchmark): make `LocalSearchState.factorWeights` lazy. Only DDFW-style strategies read it, but it's always allocated.
 - Perf (post-benchmark): audit `PropagationSession` snapshot allocation cost per push (5 array copies per snapshot). Consider pooling or a flat delta-trail.
