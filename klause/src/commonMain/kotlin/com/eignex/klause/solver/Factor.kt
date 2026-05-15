@@ -21,6 +21,10 @@ import com.eignex.klause.solver.propagation.PropagationState
 interface Factor {
     val boolVars: IntArray
     val intVars: IntArray
+    /** Float-typed variables this factor touches. Defaults to empty so existing
+     *  int-/bool-only factors don't need to opt in. Factors over real arithmetic
+     *  ([FloatLinear], [FloatComparison]) populate this. */
+    val floatVars: IntArray get() = EMPTY_INT_ARRAY
 
     /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
@@ -29,3 +33,5 @@ interface Factor {
      */
     fun propagate(state: PropagationState, factorId: Int): Boolean = true
 }
+
+private val EMPTY_INT_ARRAY = IntArray(0)

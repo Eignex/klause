@@ -50,11 +50,29 @@ class Assignment(val numBoolVars: Int, val numIntVars: Int) {
     )
 }
 
-/** Immutable assignment snapshot yielded by the solver. */
-data class Sample(val bools: BooleanArray, val ints: IntArray) {
+/**
+ * Immutable assignment snapshot yielded by the solver. Carries values for every
+ * variable in the problem: Booleans, finite-domain integers, and (when the problem
+ * declares any) IEEE-754 floats. The `floats` array is empty for problems with
+ * `numFloatVars == 0` so consumers that don't care about reals can ignore it.
+ */
+data class Sample(
+    val bools: BooleanArray,
+    val ints: IntArray,
+    val floats: DoubleArray = EMPTY_DOUBLE_ARRAY,
+) {
     override fun equals(other: Any?): Boolean {
         if (other !is Sample) return false
-        return bools.contentEquals(other.bools) && ints.contentEquals(other.ints)
+        return bools.contentEquals(other.bools) &&
+            ints.contentEquals(other.ints) &&
+            floats.contentEquals(other.floats)
     }
-    override fun hashCode(): Int = 31 * bools.contentHashCode() + ints.contentHashCode()
+    override fun hashCode(): Int {
+        var h = bools.contentHashCode()
+        h = 31 * h + ints.contentHashCode()
+        h = 31 * h + floats.contentHashCode()
+        return h
+    }
 }
+
+private val EMPTY_DOUBLE_ARRAY = DoubleArray(0)
