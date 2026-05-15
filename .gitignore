@@ -4,6 +4,7 @@ local.properties
 build/
 **/build
 **/*.db
+**/*.ozn
 
 ### IntelliJ IDEA ###
 .idea

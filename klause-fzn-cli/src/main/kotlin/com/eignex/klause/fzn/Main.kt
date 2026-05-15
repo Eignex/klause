@@ -97,7 +97,6 @@ private fun runOptimize(
             bestObj = v
             best = sample
             print(writeFlatZincSolution(program, sample))
-            println("----------")
         }
     }
     if (best == null) {

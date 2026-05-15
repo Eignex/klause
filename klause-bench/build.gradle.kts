@@ -62,6 +62,36 @@ tasks.register<JavaExec>("runCompleteness") {
     forwardBenchProps()
 }
 
+/** Opt-in: shallow-clone the MiniZinc Challenge benchmarks repo into `build/mzn/`.
+ *  Content lives in the build dir only — never committed — and is governed by the
+ *  upstream GPLv3 + per-problem licenses. */
+tasks.register("downloadMzn") {
+    group = "tools"
+    description = "Shallow-clone MiniZinc-benchmarks repo into build/mzn/."
+    notCompatibleWithConfigurationCache("ProcessBuilder calls inside doLast capture Project")
+    val outDir = layout.buildDirectory.dir("mzn").get().asFile
+    val rootDirFile = rootDir
+    doLast {
+        outDir.mkdirs()
+        val target = File(outDir, "minizinc-benchmarks")
+        if (target.exists() && target.list()?.isNotEmpty() == true) {
+            logger.lifecycle("[mzn] already present at ${target.relativeTo(rootDirFile)}, skipping")
+            return@doLast
+        }
+        logger.lifecycle("[mzn] cloning MiniZinc/minizinc-benchmarks (shallow)")
+        val proc = ProcessBuilder(
+            "git", "clone", "--depth", "1",
+            "https://github.com/MiniZinc/minizinc-benchmarks.git",
+            target.absolutePath,
+        ).directory(outDir).inheritIO().start()
+        val rc = proc.waitFor()
+        require(rc == 0) { "git clone failed (exit $rc); make sure git is installed and the network is reachable" }
+        val problems = target.list { f, _ -> f.isDirectory }?.size ?: 0
+        logger.lifecycle("[mzn] ready: $problems problem directories under build/mzn/minizinc-benchmarks/")
+        logger.lifecycle("[mzn] content licensed under GPLv3 plus per-problem licenses; do not redistribute outside this build dir")
+    }
+}
+
 /** One-shot task: regenerate the bundled JSON-SchemaDef sample file. Run as
  *  `./gradlew :klause-bench:dumpSchema`. */
 /** Opt-in: download SATLIB benchmark tarballs to `build/satlib/<set>/`. The bench
