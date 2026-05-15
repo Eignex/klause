@@ -4,40 +4,111 @@ import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
-import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.logicng.LogicNGParams
+import com.eignex.klause.logicng.LogicNGSolver
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.brute.BruteForceParams
+import com.eignex.klause.solver.brute.BruteForceSolver
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.z3.Z3Params
+import com.eignex.klause.z3.Z3Solver
 import java.io.File
 import kotlin.system.exitProcess
 
 /**
  * Minimal MiniZinc-compatible FlatZinc CLI.
  *
- * Invocation: `klause-fzn [flags] file.fzn`. Reads the FlatZinc model, hands it to
- * BacktrackSolver, prints solutions in MiniZinc's standard FZN output format:
+ * Invocation: `klause-fzn [flags] file.fzn`. Reads the FlatZinc model, hands it to the
+ * requested klause backend, prints solutions in MiniZinc's standard FZN output format:
  * each solution terminated by `----------`, the entire stream terminated by `==========`
  * for completed search, `=====UNSATISFIABLE=====` when no solution exists, or
  * `=====UNKNOWN=====` when the budget runs out before either is proven.
+ *
+ * Backend is chosen with `--engine NAME` (or `-e NAME`), or via the `klause.fzn.engine`
+ * system property. Recognised names: `backtrack` (default), `ls` / `localsearch`,
+ * `logicng`, `z3`, `brute`. Each backend honors `-t` (time limit) and `-r` (seed); the
+ * `-a` / `-n` flags apply to the satisfy path.
  */
 fun main(args: Array<String>) {
     val opts = parseArgs(args)
     val source = File(opts.fznPath).readText()
     val program = parseFlatZinc(source)
+    val engine = opts.engine ?: System.getProperty("klause.fzn.engine") ?: "backtrack"
+    dispatch(engine.lowercase(), program, opts)
+}
 
-    val params = (program.defaultBacktrackParams ?: BacktrackParams()).copy(
-        maxDecisions = opts.timeLimitMs?.let { Long.MAX_VALUE } ?: Long.MAX_VALUE,
-        randomSeed = opts.randomSeed,
-    )
-
-    when (val solve = program.solve) {
-        is SolveDirective.Satisfy -> runSatisfy(program, params, opts)
-        is SolveDirective.Minimize, is SolveDirective.Maximize ->
-            runOptimize(program, solve, params, opts)
+private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
+    when (engine) {
+        "backtrack", "bt" -> runWithBacktrack(program, opts)
+        "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
+        "logicng" -> runWithLogicNG(program, opts)
+        "z3" -> runWithZ3(program, opts)
+        "brute", "bruteforce", "brute-force" -> runWithBrute(program, opts)
+        else -> {
+            System.err.println("klause-fzn: unknown engine `$engine`; expected one of " +
+                "backtrack, ls, logicng, z3, brute")
+            exitProcess(2)
+        }
     }
 }
 
-private fun runSatisfy(program: FlatZincProgram, params: BacktrackParams, opts: Options) {
-    val solver = BacktrackSolver(program.problem)
+private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
+    val base = program.defaultBacktrackParams ?: BacktrackParams()
+    val params = base.copy(randomSeed = opts.randomSeed ?: base.randomSeed)
+    runGeneric(BacktrackSolver(program.problem), params, program, opts)
+}
+
+private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
+    val params = LocalSearchParams(randomSeed = opts.randomSeed)
+    runGeneric(LocalSearchSolver(program.problem), params, program, opts)
+}
+
+private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {
+    val params = LogicNGParams(
+        randomSeed = opts.randomSeed,
+        timeoutMillis = opts.timeLimitMs,
+    )
+    runGeneric(LogicNGSolver(program.problem), params, program, opts)
+}
+
+private fun runWithZ3(program: FlatZincProgram, opts: Options) {
+    val params = Z3Params(
+        randomSeed = opts.randomSeed,
+        timeoutMillis = opts.timeLimitMs,
+    )
+    runGeneric(Z3Solver(program.problem), params, program, opts)
+}
+
+private fun runWithBrute(program: FlatZincProgram, opts: Options) {
+    val params = BruteForceParams(randomSeed = opts.randomSeed)
+    runGeneric(BruteForceSolver(program.problem), params, program, opts)
+}
+
+/** Unified per-engine entry: dispatches between satisfy and optimize on the solve goal. */
+private fun <P : SolverParams> runGeneric(
+    solver: Solver<P>,
+    params: P,
+    program: FlatZincProgram,
+    opts: Options,
+) {
+    when (val solve = program.solve) {
+        is SolveDirective.Satisfy -> runSatisfy(solver, params, program, opts)
+        is SolveDirective.Minimize, is SolveDirective.Maximize ->
+            runOptimize(solver, params, program, solve, opts)
+    }
+}
+
+private fun <P : SolverParams> runSatisfy(
+    solver: Solver<P>,
+    params: P,
+    program: FlatZincProgram,
+    opts: Options,
+) {
     val limit = if (opts.allSolutions) opts.solutionCap ?: Long.MAX_VALUE else 1L
     var produced = 0L
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
@@ -53,40 +124,31 @@ private fun runSatisfy(program: FlatZincProgram, params: BacktrackParams, opts: 
     }
 
     if (produced == 0L) {
-        // enumerate exhausted without finding a model.
         println("=====UNSATISFIABLE=====")
     } else {
-        // Completed search or hit the requested cap; both report ==========.
         println("==========")
     }
 }
 
-private fun runOptimize(
+private fun <P : SolverParams> runOptimize(
+    solver: Solver<P>,
+    params: P,
     program: FlatZincProgram,
     solve: SolveDirective,
-    params: BacktrackParams,
     opts: Options,
 ) {
-    // Linear search: emit each feasible improvement as it's found. The current
-    // BacktrackSolver.minimize enumerates internally, so it doesn't stream improving
-    // solutions — for now, just produce the best found and report it.
-    // TODO: switch to branch-and-bound (matches the optimizer TODO item).
-    val solver = BacktrackSolver(program.problem)
-    val objKind: SolveDirective.ObjKind
-    val objName: String
-    val maximize: Boolean
-    when (solve) {
-        is SolveDirective.Minimize -> { objName = solve.objVar; objKind = solve.kind; maximize = false }
-        is SolveDirective.Maximize -> { objName = solve.objVar; objKind = solve.kind; maximize = true }
+    // Streaming linear-search: emit each improving feasible solution. We don't prove
+    // optimality (would need branch-and-bound integrated with the engine); after the
+    // search exhausts or times out, the last-printed solution is the best found.
+    val (objName, maximize) = when (solve) {
+        is SolveDirective.Minimize -> solve.objVar to false
+        is SolveDirective.Maximize -> solve.objVar to true
         else -> error("unreachable")
-    }
-    require(objKind == SolveDirective.ObjKind.Int) {
-        "klause-fzn currently supports only int objectives; got $objKind for $objName"
     }
     val objVarId = program.intVarsByName[objName]
         ?: error("objective variable '$objName' not found in int var map")
 
-    var best: com.eignex.klause.solver.Sample? = null
+    var best: Sample? = null
     var bestObj = if (maximize) Int.MIN_VALUE else Int.MAX_VALUE
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
     for (sample in solver.enumerate(params)) {
@@ -109,6 +171,7 @@ private fun runOptimize(
 
 private data class Options(
     val fznPath: String,
+    val engine: String?,
     val allSolutions: Boolean,
     val solutionCap: Long?,
     val timeLimitMs: Long?,
@@ -118,11 +181,12 @@ private data class Options(
 )
 
 /**
- * Parses the MiniZinc-standard FZN solver flags we claim in `klause.msc`: -a, -n, -s,
- * -v, -t, -r, plus the positional FZN path. Unknown flags are tolerated (printed to
- * stderr) to keep MiniZinc happy when it adds new ones we don't recognise.
+ * Parses the MiniZinc-standard FZN solver flags we claim in `klause.msc` (-a, -n, -s, -v,
+ * -t, -r) plus our `--engine` / `-e` selector. Unknown flags are tolerated (printed to
+ * stderr) to stay forward-compatible with MiniZinc additions we don't recognise.
  */
 private fun parseArgs(args: Array<String>): Options {
+    var engine: String? = null
     var allSolutions = false
     var solutionCap: Long? = null
     var timeLimitMs: Long? = null
@@ -139,6 +203,7 @@ private fun parseArgs(args: Array<String>): Options {
             "-v", "--verbose" -> { verbose = true; i++ }
             "-t", "--time-limit" -> { timeLimitMs = args[++i].toLong(); i++ }
             "-r" -> { randomSeed = args[++i].toLong(); i++ }
+            "-e", "--engine" -> { engine = args[++i]; i++ }
             else -> {
                 if (a.startsWith("-")) {
                     System.err.println("klause-fzn: ignoring unknown flag $a")
@@ -152,8 +217,8 @@ private fun parseArgs(args: Array<String>): Options {
         }
     }
     val path = fznPath ?: run {
-        System.err.println("usage: klause-fzn [flags] file.fzn")
+        System.err.println("usage: klause-fzn [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return Options(path, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics)
+    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics)
 }
