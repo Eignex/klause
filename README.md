@@ -97,6 +97,13 @@ val text = cnf.toDimacs()
 - Maven Central publishing, CI.
 - Propagation: `Product` reverse direction for non-singleton operands. Singleton-operand reverse (`a = result / b` when b is fixed) landed; the general interval-division case is sound but historically destabilized worklist interactions with bit-blasted Product chains.
 - Propagation: full Hall-set / matching arc consistency in `AllDifferent` (currently pigeonhole + boundary shaving only).
+- CP search in `BacktrackSolver`: activity-based variable ordering (VSIDS-style), in addition to the existing `RandomVariable` / `SmallestDomain` / `InputOrder`. Cheap addition, big win on structured problems.
+- CP search in `BacktrackSolver`: Luby or geometric restarts. Currently pure chronological DFS.
+- CP search in `BacktrackSolver`: last-conflict and impact-based value selection on top of the existing stateless `IndomainRandom` / `IndomainMin` / etc.
+- CP search in `BacktrackSolver`: no-good / lazy clause learning (LCG-style). The biggest jump in solver power but deepest engineering item; gets us from "CP solver circa 2005" to "competitive with Chuffed / CP-SAT".
+- QF_LIA parity: SMT-LIB v2 parser for the QF_LIA subset (`set-logic`, `declare-fun`, `assert`, `check-sat`, core s-expression). Lets us run SMT-LIB benchmarks directly.
+- QF_LIA parity: Euclidean `div` and `mod` variants. SMT-LIB QF_LIA uses Euclidean semantics (mod result non-negative); klause currently exposes only Java-truncated. Pick a default or expose both.
+- QF_LIA parity: static bound inference for int variables declared with full-range or unbounded domains. Scan constraint structure to derive sound bounds before bit-blasting; error out cleanly when no bound can be proved.
 - Perf (post-benchmark): replace `Assumptions.bools: Map<Int, Boolean>` / `ints: Map<Int, Int>` and `PropagationResult.Implied.{bools, ints}` with parallel-array representations to avoid `Int` boxing on the propagation hot path.
 - Perf (post-benchmark): make `LocalSearchState.factorWeights` lazy. Only DDFW-style strategies read it, but it's always allocated.
 - Perf (post-benchmark): audit `PropagationSession` snapshot allocation cost per push (5 array copies per snapshot). Consider pooling or a flat delta-trail.
