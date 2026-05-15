@@ -17,8 +17,10 @@ internal sealed interface FznType {
     data object FloatAny : FznType
     /** Float in `[lo, hi]`. */
     data class FloatRange(val lo: Double, val hi: Double) : FznType
-    /** Array of fixed length over an element type. */
-    data class Array(val length: Int, val element: FznType) : FznType
+    /** Array of fixed length over an element type. [elementIsVar] is `true` when the
+     *  declaration spelled `array [...] of var T` (the array structure is fixed but
+     *  each element binds to a solver variable), `false` for `array [...] of T`. */
+    data class Array(val length: Int, val element: FznType, val elementIsVar: Boolean = false) : FznType
 }
 
 internal sealed interface FznExpr {

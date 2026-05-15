@@ -57,7 +57,7 @@ internal class FlatZincCompiler(
             intVarsByName = intVars,
             floatVarsByName = floatVars,
             arraysByName = arrays,
-            outputItems = model.output?.let { compileOutput(it) },
+            outputItems = model.output?.let { compileOutput(it) } ?: synthesizeOutputItems(),
             defaultBacktrackParams = compileSearchAnnotation(),
         )
     }
@@ -773,6 +773,34 @@ internal class FlatZincCompiler(
             name in intVars -> name to SolveDirective.ObjKind.Int
             else -> failHere("solve objective `$name` is not a declared variable")
         }
+    }
+
+    /**
+     * When the FZN file has no explicit `output [...]` section, MiniZinc relies on
+     * `:: output_var` / `:: output_array(...)` annotations on individual var declarations
+     * to mark what to display. Synthesize an equivalent `OutputItem` list so the writer
+     * emits only the user-declared variables and skips internal `X_INTRODUCED_*` vars.
+     */
+    private fun synthesizeOutputItems(): List<OutputItem>? {
+        val items = ArrayList<OutputItem>()
+        for (decl in model.varDecls) {
+            val asArray = decl.annotations.firstOrNull { it.name == "output_array" }
+            val asVar = decl.annotations.firstOrNull { it.name == "output_var" }
+            when {
+                asArray != null -> {
+                    items += OutputItem.Literal("${decl.name} = ")
+                    items += OutputItem.ShowArray(decl.name)
+                    items += OutputItem.Literal(";\n")
+                }
+                asVar != null -> {
+                    items += OutputItem.Literal("${decl.name} = ")
+                    items += OutputItem.ShowVar(decl.name)
+                    items += OutputItem.Literal(";\n")
+                }
+            }
+        }
+        // Returning null preserves the writer's "no annotations, print every var" fallback.
+        return if (items.isEmpty()) null else items
     }
 
     private fun compileOutput(items: List<FznExpr>): List<OutputItem> = items.map { compileOutputItem(it) }

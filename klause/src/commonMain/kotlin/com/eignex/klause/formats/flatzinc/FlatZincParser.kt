@@ -81,7 +81,7 @@ internal class FlatZincParser(tokens: List<FznToken>) {
     }
 
     /** Whether the element type of an array was declared as `var T`. */
-    private fun elementIsVar(t: FznType.Array): Boolean = t.element !== UNTYPED_PAR
+    private fun elementIsVar(t: FznType.Array): Boolean = t.elementIsVar
 
     private fun parseType(): FznType {
         val tok = peek()
@@ -100,8 +100,7 @@ internal class FlatZincParser(tokens: List<FznToken>) {
             // `array [...] of var T` or `array [...] of T`.
             val elementIsVar = matchKw("var")
             val element = parseScalarType()
-            @Suppress("UNUSED_VARIABLE") val _markVar = elementIsVar  // markup only
-            return FznType.Array(hi.toInt(), element)
+            return FznType.Array(hi.toInt(), element, elementIsVar)
         }
         // Scalar type (possibly with `var` modifier we may have already eaten).
         return parseScalarType()
@@ -353,8 +352,4 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         }
     }
 
-    companion object {
-        /** Sentinel used internally; never returned externally. */
-        private val UNTYPED_PAR: FznType = FznType.IntAny
-    }
 }

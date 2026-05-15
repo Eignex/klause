@@ -6,6 +6,8 @@
 %
 % Run: minizinc --solver com.eignex.klause queens.mzn -a -n 10
 
+include "globals.mzn";
+
 int: n = 8;
 array[1..n] of var 1..n: q;
 
