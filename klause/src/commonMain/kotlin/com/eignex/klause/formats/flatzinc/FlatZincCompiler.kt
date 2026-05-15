@@ -381,6 +381,16 @@ internal class FlatZincCompiler(
         else -> failHere("expected bool var array, got ${e::class.simpleName}")
     }
 
+    private fun evalBoolConstArray(e: FznExpr): BooleanArray = when (e) {
+        is FznExpr.ArrayLit -> BooleanArray(e.elements.size) {
+            (e.elements[it] as? FznExpr.BoolLit)?.value
+                ?: failHere("expected bool literal in const array, got ${e.elements[it]::class.simpleName}")
+        }
+        is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.BoolParam)?.values
+            ?: failHere("`${e.name}` is not a bool parameter array")
+        else -> failHere("expected bool const array, got ${e::class.simpleName}")
+    }
+
     /** Resolve a constraint argument as an array of int variables. */
     private fun evalIntVarArray(e: FznExpr): IntArray = when (e) {
         is FznExpr.ArrayLit -> IntArray(e.elements.size) { resolveIntVar(e.elements[it]) }
@@ -473,6 +483,10 @@ internal class FlatZincCompiler(
         // Int comparisons (binary)
         "int_le", "int_lt", "int_eq", "int_ne", "int_ge", "int_gt" -> emitIntCmp(c)
 
+        // Reified int comparisons.
+        "int_eq_reif", "int_ne_reif", "int_le_reif", "int_lt_reif",
+        "int_ge_reif", "int_gt_reif" -> emitIntCmpReif(c)
+
         // Int linear
         "int_lin_le", "int_lin_eq", "int_lin_ne" -> emitIntLinear(c, reified = false)
         "int_lin_le_reif", "int_lin_eq_reif", "int_lin_ne_reif" -> emitIntLinear(c, reified = true)
@@ -489,6 +503,19 @@ internal class FlatZincCompiler(
 
         // Arithmetic
         "int_times" -> emitIntTimes(c)
+        "int_plus" -> emitIntPlus(c)
+        "int_minus" -> emitIntMinus(c)
+        "int_abs" -> emitIntAbs(c)
+        "int_max" -> emitIntMaxMin(c, max = true)
+        "int_min" -> emitIntMaxMin(c, max = false)
+        "int_div" -> emitIntDiv(c)
+        "int_mod" -> emitIntMod(c)
+
+        // Array element
+        "array_int_element" -> emitArrayIntElement(c, varArray = false)
+        "array_var_int_element" -> emitArrayIntElement(c, varArray = true)
+        "array_bool_element" -> emitArrayBoolElement(c, varArray = false)
+        "array_var_bool_element" -> emitArrayBoolElement(c, varArray = true)
 
         // Counting
         "at_least_int" -> emitAtLeast(c)
@@ -702,6 +729,169 @@ internal class FlatZincCompiler(
             b = resolveIntVar(c.args[1]),
             result = resolveIntVar(c.args[2]),
         ))
+    }
+
+    private fun emitIntPlus(c: FznConstraint) {
+        // int_plus(a, b, r): a + b = r.
+        require(c.args.size == 3)
+        val a = resolveIntVar(c.args[0])
+        val b = resolveIntVar(c.args[1])
+        val r = resolveIntVar(c.args[2])
+        factors.add(Linear(intArrayOf(1, 1, -1), intArrayOf(a, b, r), LinearOp.EQ, 0))
+    }
+
+    private fun emitIntMinus(c: FznConstraint) {
+        // int_minus(a, b, r): a - b = r.
+        require(c.args.size == 3)
+        val a = resolveIntVar(c.args[0])
+        val b = resolveIntVar(c.args[1])
+        val r = resolveIntVar(c.args[2])
+        factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(a, b, r), LinearOp.EQ, 0))
+    }
+
+    private fun emitIntAbs(c: FznConstraint) {
+        // int_abs(a, r): r = |a|. Encode as:
+        //   r ≥ a, r ≥ -a (always)
+        //   pa ↔ (r = a), pb ↔ (r = -a), (pa ∨ pb).
+        require(c.args.size == 2)
+        val a = resolveIntVar(c.args[0])
+        val r = resolveIntVar(c.args[1])
+        factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, r), LinearOp.LE, 0))  // a ≤ r
+        factors.add(Linear(intArrayOf(-1, -1), intArrayOf(a, r), LinearOp.LE, 0)) // -a ≤ r
+        val pa = allocBool("__abs_${a}_${r}_pa")
+        val pb = allocBool("__abs_${a}_${r}_pb")
+        factors.add(ReifiedLinear(pa, intArrayOf(1, -1), intArrayOf(r, a), LinearOp.EQ, 0))
+        factors.add(ReifiedLinear(pb, intArrayOf(1, 1), intArrayOf(r, a), LinearOp.EQ, 0))
+        factors.add(Clause(intArrayOf(Lit.make(pa, true), Lit.make(pb, true))))
+    }
+
+    private fun emitIntMaxMin(c: FznConstraint, max: Boolean) {
+        // int_max(a, b, r): r = max(a, b). int_min: r = min(a, b).
+        //   max → r ≥ a, r ≥ b, (r = a ∨ r = b)
+        //   min → r ≤ a, r ≤ b, (r = a ∨ r = b)
+        require(c.args.size == 3)
+        val a = resolveIntVar(c.args[0])
+        val b = resolveIntVar(c.args[1])
+        val r = resolveIntVar(c.args[2])
+        if (max) {
+            factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, r), LinearOp.LE, 0))   // a ≤ r
+            factors.add(Linear(intArrayOf(1, -1), intArrayOf(b, r), LinearOp.LE, 0))   // b ≤ r
+        } else {
+            factors.add(Linear(intArrayOf(-1, 1), intArrayOf(a, r), LinearOp.LE, 0))   // r ≤ a
+            factors.add(Linear(intArrayOf(-1, 1), intArrayOf(b, r), LinearOp.LE, 0))   // r ≤ b
+        }
+        val pa = allocBool("__mm_${a}_${b}_${r}_pa")
+        val pb = allocBool("__mm_${a}_${b}_${r}_pb")
+        factors.add(ReifiedLinear(pa, intArrayOf(1, -1), intArrayOf(r, a), LinearOp.EQ, 0))
+        factors.add(ReifiedLinear(pb, intArrayOf(1, -1), intArrayOf(r, b), LinearOp.EQ, 0))
+        factors.add(Clause(intArrayOf(Lit.make(pa, true), Lit.make(pb, true))))
+    }
+
+    private fun emitIntDiv(c: FznConstraint) {
+        // int_div(a, b, r): r = a div b, truncated-toward-zero (FlatZinc semantics).
+        // Klause's main div is Euclidean; here we encode truncated explicitly:
+        //   r * b + rem = a,  |rem| < |b|,  rem * a ≥ 0.
+        require(c.args.size == 3)
+        failHere("`int_div` is not yet supported; klause's truncated-div FZN encoding is TODO. " +
+            "Use `int_mod`-free formulations or switch to a backend with native int_div.")
+    }
+
+    private fun emitIntMod(c: FznConstraint) {
+        require(c.args.size == 3)
+        failHere("`int_mod` is not yet supported in the FZN compiler; same encoding as int_div, TODO.")
+    }
+
+    /**
+     * `array_int_element(idx, arr, result)` / `array_var_int_element(idx, arr, result)`:
+     * `result = arr[idx]` with 1-based indexing. The decomposition reifies `idx = i` for
+     * each `i ∈ [1, len]`, then implies `result = arr[i-1]` whenever the indicator holds.
+     */
+    private fun emitArrayIntElement(c: FznConstraint, varArray: Boolean) {
+        require(c.args.size == 3)
+        val idx = resolveIntVar(c.args[0])
+        val result = resolveIntVar(c.args[2])
+        val len: Int = if (varArray) {
+            val arr = evalIntVarArray(c.args[1])
+            for (i in 1..arr.size) wireElementCase(idx, i, "result_eq_arr[${i-1}]_var") { eqBool ->
+                factors.add(ReifiedLinear(eqBool, intArrayOf(1, -1), intArrayOf(result, arr[i-1]), LinearOp.EQ, 0))
+            }
+            arr.size
+        } else {
+            val arrConst = evalIntConstArray(c.args[1])
+            for (i in 1..arrConst.size) wireElementCase(idx, i, "result_eq_${arrConst[i-1]}_const") { eqBool ->
+                factors.add(ReifiedLinear(eqBool, intArrayOf(1), intArrayOf(result), LinearOp.EQ, arrConst[i-1]))
+            }
+            arrConst.size
+        }
+        // Enforce idx ∈ [1, len].
+        factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.GE, 1))
+        factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.LE, len))
+    }
+
+    /** Shared "if idx = i then <body>" wiring for element constraints. Allocates two
+     *  aux bools (idx-match indicator and body indicator) and clauses them. */
+    private inline fun wireElementCase(idx: Int, i: Int, tag: String, registerBody: (Int) -> Unit) {
+        val idxMatch = allocBool("__elem_${idx}_${i}_idx")
+        factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
+        val bodyHolds = allocBool("__elem_${idx}_${i}_$tag")
+        registerBody(bodyHolds)
+        // idxMatch → bodyHolds  ≡  ¬idxMatch ∨ bodyHolds
+        factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(bodyHolds, true))))
+    }
+
+    private fun emitArrayBoolElement(c: FznConstraint, varArray: Boolean) {
+        require(c.args.size == 3)
+        val idx = resolveIntVar(c.args[0])
+        val resultLit = resolveBoolLit(c.args[2])
+        val resultVar = Lit.variable(resultLit)
+        val len: Int = if (varArray) {
+            val arr = evalBoolVarArray(c.args[1])
+            for (i in 1..arr.size) {
+                val idxMatch = allocBool("__belem_${idx}_${i}_idx")
+                factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
+                // idxMatch → (result ↔ arr[i-1]): two binary clauses.
+                val arrLit = arr[i-1]
+                val arrVar = Lit.variable(arrLit)
+                factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, false), Lit.make(arrVar, true))))
+                factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, true), Lit.make(arrVar, false))))
+            }
+            arr.size
+        } else {
+            val arrConst = evalBoolConstArray(c.args[1])
+            for (i in 1..arrConst.size) {
+                val idxMatch = allocBool("__belem_${idx}_${i}_idx")
+                factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
+                if (arrConst[i-1]) {
+                    factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, true))))
+                } else {
+                    factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, false))))
+                }
+            }
+            arrConst.size
+        }
+        factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.GE, 1))
+        factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.LE, len))
+    }
+
+    private fun emitIntCmpReif(c: FznConstraint) {
+        // int_{eq,ne,le,lt,ge,gt}_reif(a, b, r): r ↔ (a ⟨op⟩ b). All reduce to
+        // ReifiedLinear with appropriate coeffs / bound.
+        require(c.args.size == 3)
+        val a = resolveIntVar(c.args[0])
+        val b = resolveIntVar(c.args[1])
+        val r = Lit.variable(resolveBoolLit(c.args[2]))
+        val coeffs = intArrayOf(1, -1)
+        val vars = intArrayOf(a, b)
+        val (op, bound) = when (c.name) {
+            "int_eq_reif" -> LinearOp.EQ to 0
+            "int_ne_reif" -> LinearOp.NE to 0
+            "int_le_reif" -> LinearOp.LE to 0
+            "int_lt_reif" -> LinearOp.LE to -1     // a < b  ⇔  a - b ≤ -1
+            "int_ge_reif" -> LinearOp.GE to 0
+            "int_gt_reif" -> LinearOp.GE to 1      // a > b  ⇔  a - b ≥ 1
+            else -> failHere("unhandled reified int cmp `${c.name}`")
+        }
+        factors.add(ReifiedLinear(r, coeffs, vars, op, bound))
     }
 
     private fun emitAtLeast(c: FznConstraint) {
