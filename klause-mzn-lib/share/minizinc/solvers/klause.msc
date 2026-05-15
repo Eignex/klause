@@ -1,0 +1,16 @@
+{
+  "id": "com.eignex.klause",
+  "name": "Klause",
+  "description": "SMT-flavored finite-domain solver in Kotlin",
+  "version": "0.1.0",
+  "mznlib": "../klause",
+  "executable": "../../../bin/klause-fzn",
+  "tags": ["cp", "int", "finite-domain"],
+  "stdFlags": ["-a", "-n", "-s", "-v", "-t", "-r"],
+  "supportsMzn": false,
+  "supportsFzn": true,
+  "needsSolns2Out": true,
+  "needsMznExecutable": false,
+  "needsStdlibDir": false,
+  "isGUIApplication": false
+}
