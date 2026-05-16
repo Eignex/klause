@@ -6,7 +6,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 class FloatArithmeticTest {
@@ -59,9 +58,11 @@ class FloatArithmeticTest {
         val solver = LocalSearchSolver(compiled.problem)
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 3)).take(50).toList()
         assertTrue(samples.isNotEmpty())
+        // Tolerance reflects backend-bucketing precision: integer-scaled coefficients can
+        // shift the boundary by a fraction of a bucket step (default 1/1023 ≈ 1e-3).
         for (s in samples) {
             val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate >= 0.4 - 1e-9, "rate=$rate violated -rate ≤ -0.4")
+            assertTrue(rate >= 0.4 - 2e-3, "rate=$rate violated -rate ≤ -0.4 beyond bucketing tolerance")
         }
     }
 
@@ -84,24 +85,35 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun `threshold above max is rejected at compile time`() {
+    fun `threshold above max is unsat at solve time`() {
+        // `rate ge 5.0` with rate ∈ [0, 1] is unsatisfiable. The old schema-level
+        // bucketing path caught this at compile-time; the new native-float path
+        // leaves it for the solver / propagator to surface.
         class S : VariableSchema() {
-            val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-
+            val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate ge 5.0 }
         }
-        assertFails { S().compile() }
+        val compiled = S().compile()
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.samples(LocalSearchParams(maxFlips = 1_000, randomSeed = 1)).take(1).toList()
+        assertTrue(samples.isEmpty(), "rate ge 5.0 on rate∈[0,1] should yield no samples")
     }
 
     @Test
-    fun `threshold above max is tautology at compile time`() {
+    fun `tautological float constraint emits a factor that the solver trivially satisfies`() {
+        // `rate le 5.0` with rate ∈ [0, 1] is trivially true. The old schema-level
+        // path emitted zero factors; the new native-float path emits one FloatLinear
+        // which the solver simply finds satisfied.
         class S : VariableSchema() {
-            val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-
+            val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate le 5.0 }
         }
         val compiled = S().compile()
-        assertEquals(0, compiled.problem.factors.size, "tautological constraint should produce no factors")
+        // One FloatLinear (rate ≤ 5.0) — always true.
+        assertEquals(1, compiled.problem.factors.size)
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.samples(LocalSearchParams(maxFlips = 1_000, randomSeed = 1)).take(1).toList()
+        assertTrue(samples.isNotEmpty(), "tautology should be satisfied by any assignment")
     }
 
     @Test
@@ -166,15 +178,16 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun `default bucket count is applied`() {
+    fun `float var produces a native FloatInterval in the compiled problem`() {
+        // The schema's `buckets` parameter no longer drives bucketing at compile time;
+        // float vars land in the Problem's floatDomains for per-backend lowering.
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate ge 0.5 }
         }
         val compiled = S().compile()
-
-        val rateDomain = compiled.problem.intDomains[0]
-        assertEquals(0, rateDomain.min)
-        assertEquals(1023, rateDomain.max)
+        assertEquals(1, compiled.problem.numFloatVars)
+        assertEquals(0.0, compiled.problem.floatDomains[0].lo)
+        assertEquals(1.0, compiled.problem.floatDomains[0].hi)
     }
 }

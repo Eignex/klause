@@ -170,6 +170,42 @@ enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 @SerialName("intcmp")
 data class IntCompare(val left: IntExpr, val op: IntCmpOp, val right: IntExpr) : BoolExpr
 
+/**
+ * Reified linear comparison over float variables: `Σ coeffs[k] · varNames[k] ⟨op⟩ bound`.
+ * Built by the schema-layer [com.eignex.klause.schema.FloatExpr] / [com.eignex.klause.schema.FloatHandle]
+ * comparison operators; lowered by the compiler to a [com.eignex.klause.solver.factor.FloatLinear]
+ * factor over float-var ids. The compile pipeline preserves the real-valued bound; per-backend
+ * bucketing (via [com.eignex.klause.solver.FloatLowering]) happens at solve-time.
+ */
+@Serializable
+@SerialName("floatlin")
+data class FloatLinearConstraint(
+    val coeffs: DoubleArray,
+    val varNames: List<String>,
+    val op: IntCmpOp,
+    val bound: Double,
+) : BoolExpr {
+    init {
+        require(coeffs.size == varNames.size) {
+            "coeffs/varNames length mismatch: ${coeffs.size} vs ${varNames.size}"
+        }
+    }
+    // Manual equals/hashCode because DoubleArray uses identity-equality by default.
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is FloatLinearConstraint) return false
+        return coeffs.contentEquals(other.coeffs) &&
+            varNames == other.varNames && op == other.op && bound == other.bound
+    }
+    override fun hashCode(): Int {
+        var h = coeffs.contentHashCode()
+        h = 31 * h + varNames.hashCode()
+        h = 31 * h + op.hashCode()
+        h = 31 * h + bound.hashCode()
+        return h
+    }
+}
+
 @Serializable
 @SerialName("alldiff")
 data class AllDifferent(val terms: List<IntExpr>) : BoolExpr {

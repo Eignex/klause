@@ -64,8 +64,9 @@ class Compiler {
         val boolVarIdByName = mutableMapOf<String, Int>()
         val intVarIdByName = mutableMapOf<String, Int>()
         val intDomains = mutableListOf<IntDomain>()
+        val floatVarIdByName = mutableMapOf<String, Int>()
+        val floatDomains = mutableListOf<com.eignex.klause.solver.FloatInterval>()
         val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
-        val floatDecoders = mutableMapOf<String, FloatSpec>()
         var numBoolVars = 0
         var numIntVars = 0
         private var auxIntCounter = 0
@@ -85,8 +86,13 @@ class Compiler {
                     }
                     is IntSpec -> intVarIdByName[name] = newIntVar(IntDomain(entry.min, entry.max))
                     is FloatSpec -> {
-                        intVarIdByName[name] = newIntVar(IntDomain(0, entry.buckets - 1))
-                        floatDecoders[name] = entry
+                        // Float variables are now native: allocate against floatDomains and
+                        // let per-backend FloatLowering handle bucketing at solve-time. The
+                        // schema's `buckets` parameter is preserved on the FloatSpec for
+                        // wire compatibility but is no longer consulted at compile-time.
+                        floatVarIdByName[name] = newFloatVar(
+                            com.eignex.klause.solver.FloatInterval(entry.min, entry.max),
+                        )
                     }
                     is NamedConstraint -> {} // handled in a second pass once all vars are registered
                 }
@@ -97,11 +103,18 @@ class Compiler {
             }
 
             return CompiledProblem(
-                problem = Problem(numBoolVars, numIntVars, intDomains.toTypedArray(), factors.toList()),
+                problem = Problem(
+                    numBoolVars = numBoolVars,
+                    numIntVars = numIntVars,
+                    intDomains = intDomains.toTypedArray(),
+                    factors = factors.toList(),
+                    numFloatVars = floatDomains.size,
+                    floatDomains = floatDomains.toTypedArray(),
+                ),
                 boolVarIdByName = boolVarIdByName.toMap(),
                 intVarIdByName = intVarIdByName.toMap(),
                 nominalIndicators = nominalIndicators.mapValues { it.value.toMap() },
-                floatDecoders = floatDecoders.toMap(),
+                floatVarIdByName = floatVarIdByName.toMap(),
             )
         }
 
@@ -110,6 +123,12 @@ class Compiler {
         fun newIntVar(domain: IntDomain): Int {
             val id = numIntVars++
             intDomains += domain
+            return id
+        }
+
+        fun newFloatVar(interval: com.eignex.klause.solver.FloatInterval): Int {
+            val id = floatDomains.size
+            floatDomains += interval
             return id
         }
 
@@ -142,6 +161,7 @@ class Compiler {
                     factors += Clause(intArrayOf(lowerToLit(expr)))
                 }
                 is IntCompare -> assertIntCompare(expr)
+                is com.eignex.klause.ast.FloatLinearConstraint -> assertFloatLinear(expr)
                 is AllDifferent -> assertAllDifferent(expr.terms)
                 is TableConstraint -> assertExpr(expandTable(expr))
                 is PseudoBooleanExpr -> {
@@ -172,6 +192,31 @@ class Compiler {
             } else {
                 if (tuples.size == 1) tuples[0] else Or(tuples)
             }
+        }
+
+        /**
+         * Lower a [com.eignex.klause.ast.FloatLinearConstraint] to a
+         * [com.eignex.klause.solver.factor.FloatLinear] factor. Resolves each variable
+         * name to a float-var id, splits strict-vs-loose comparisons against the
+         * supported [com.eignex.klause.solver.factor.LinearOp] set. Strict variants
+         * (LT, GT) are encoded as loose (LE, GE) for now — the distinction collapses
+         * once the backend buckets, and for native-float backends we'll need to
+         * preserve strictness; revisit when Z3 native lands.
+         */
+        private fun assertFloatLinear(c: com.eignex.klause.ast.FloatLinearConstraint) {
+            val vars = IntArray(c.varNames.size) { i ->
+                floatVarIdByName[c.varNames[i]]
+                    ?: error("Float variable '${c.varNames[i]}' not declared")
+            }
+            val op = when (c.op) {
+                com.eignex.klause.ast.IntCmpOp.LE,
+                com.eignex.klause.ast.IntCmpOp.LT -> com.eignex.klause.solver.factor.LinearOp.LE
+                com.eignex.klause.ast.IntCmpOp.GE,
+                com.eignex.klause.ast.IntCmpOp.GT -> com.eignex.klause.solver.factor.LinearOp.GE
+                com.eignex.klause.ast.IntCmpOp.EQ -> com.eignex.klause.solver.factor.LinearOp.EQ
+                com.eignex.klause.ast.IntCmpOp.NE -> com.eignex.klause.solver.factor.LinearOp.NE
+            }
+            factors += com.eignex.klause.solver.factor.FloatLinear(c.coeffs.copyOf(), vars, op, c.bound)
         }
 
         private fun assertAllDifferent(terms: List<IntExpr>) {
@@ -318,6 +363,14 @@ class Compiler {
                 tseitinIff(l, r)
             }
             is IntCompare -> reifyIntCompare(expr)
+            is com.eignex.klause.ast.FloatLinearConstraint -> {
+                // Reified float-linear: introduce an aux bool, assert one factor per
+                // truth side. Today we have FloatLinear but not ReifiedFloatLinear, so
+                // the implication is inert in the engine — usable as a top-level constraint
+                // but not yet as a sub-expression. Tracked as a follow-up.
+                error("FloatLinearConstraint at non-top-level position is not yet supported; " +
+                    "ReifiedFloatLinear factor still TODO.")
+            }
             is AtMost -> reifyCardinality(expr.children, 0, expr.k)
             is AtLeast -> reifyCardinality(expr.children, expr.k, expr.children.size)
             is CardinalityExpr -> reifyCardinality(expr.children, expr.min, expr.max)

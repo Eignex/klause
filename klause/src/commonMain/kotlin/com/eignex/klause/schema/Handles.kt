@@ -3,17 +3,15 @@ package com.eignex.klause.schema
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.BoolTerm
+import com.eignex.klause.ast.FloatLinearConstraint
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
-import com.eignex.klause.ast.IntScale
-import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.IntTerm
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.not
-import kotlin.math.roundToInt
 
 class BoolHandle(val name: String) : BoolTerm {
     override fun toExpr(): BoolExpr = BoolRef(name, negated = false)
@@ -32,24 +30,23 @@ class IntHandle(val name: String, val min: Int, val max: Int) : IntTerm {
 }
 
 /**
- * Float variable bucketed at the schema layer. The runtime represents it as an integer
- * domain `[0, buckets-1]`; comparisons and arithmetic against [Double] literals lower to
- * integer constraints on the bucket index at construction time.
+ * Float variable represented as a native real-valued solver variable with bounds
+ * `[min, max]`. Arithmetic and comparison operators build a [FloatExpr] that lowers
+ * to a [FloatLinearConstraint] AST node at compile-time; the compiler converts that
+ * into a [com.eignex.klause.solver.factor.FloatLinear] factor in the [com.eignex.klause.solver.Problem].
  *
- * Direct comparisons against literals (`f le 0.5`) work via [FloatExpr], which is also the
- * type returned by arithmetic operators (`f + 0.1`, `2 * f`, etc.). Same-handle linear
- * combinations like `(2 * f - 0.3) le f + 0.1` collapse to a single bucket-int comparison.
- *
- * Cross-handle linear arithmetic (mixing two distinct float handles in one expression) is
- * not yet supported and throws at expression-build time.
+ * The historical `buckets` parameter is preserved for source compatibility but is no
+ * longer used at the schema layer — bucketing is now a per-backend concern handled by
+ * [com.eignex.klause.solver.FloatLowering] at solve-time. Backends with native float
+ * support (Z3) ignore the lowering entirely.
  */
-class FloatHandle(val name: String, val min: Double, val max: Double, val buckets: Int) {
-
-    fun bucketOf(value: Double): Int {
-        val clamped = value.coerceIn(min, max)
-        val frac = (clamped - min) / (max - min)
-        return (frac * (buckets - 1)).roundToInt().coerceIn(0, buckets - 1)
-    }
+class FloatHandle(
+    val name: String,
+    val min: Double,
+    val max: Double,
+    @Deprecated("Bucketing is now a per-backend solve-time concern; this parameter is ignored.")
+    val buckets: Int = 0,
+) {
 
     /** Identity expression `1·f + 0`. Use this when an API needs a [FloatExpr]. */
     fun toExpr(): FloatExpr = FloatExpr(this, coeff = 1.0, offset = 0.0)
@@ -81,17 +78,10 @@ operator fun Int.times(expr: FloatExpr): FloatExpr = expr * this
 operator fun Double.times(expr: FloatExpr): FloatExpr = expr * this
 
 /**
- * Linear expression `Σ c_i · h_i + offset` over one or more [FloatHandle]s, all tracked
- * in real (Double) space. Arithmetic operators fold by merging coefficient maps;
- * comparisons against a Double or another [FloatExpr] lower to a single integer
- * comparison on the handles' bucket-int variables.
- *
- * Single-handle expressions take the precise per-handle quantization path
- * (folding offset/coeff into the threshold and using [FloatHandle.bucketOf]).
- * Multi-handle expressions take a rationalised path: each real coefficient is scaled by
- * a fixed precision factor and rounded to an integer, then the comparison is emitted
- * as `IntCompare(IntSum(IntScale(...)), op, IntLit(K))` for the existing affine
- * lowering in `Compiler` to turn into a `Linear` factor.
+ * Linear expression `Σ c_i · h_i + offset` over one or more [FloatHandle]s, all in real
+ * (Double) space. Arithmetic operators fold by merging coefficient maps; comparisons
+ * against a Double or another [FloatExpr] lower to a [FloatLinearConstraint] AST node,
+ * which the compiler turns into a [com.eignex.klause.solver.factor.FloatLinear] factor.
  */
 class FloatExpr internal constructor(
     private val terms: Map<FloatHandle, Double>,
@@ -120,12 +110,12 @@ class FloatExpr internal constructor(
     }
     operator fun minus(other: FloatExpr): FloatExpr = this + (-other)
 
-    infix fun le(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LE, IntCmpOp.GE)
-    infix fun lt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LT, IntCmpOp.GT)
-    infix fun ge(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GE, IntCmpOp.LE)
-    infix fun gt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GT, IntCmpOp.LT)
-    infix fun eq(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.EQ, IntCmpOp.EQ)
-    infix fun ne(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.NE, IntCmpOp.NE)
+    infix fun le(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LE)
+    infix fun lt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LT)
+    infix fun ge(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GE)
+    infix fun gt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GT)
+    infix fun eq(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.EQ)
+    infix fun ne(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.NE)
 
     /** Expression-vs-expression comparison: rewrite `lhs OP rhs` as `(lhs - rhs) OP 0`. */
     infix fun le(other: FloatExpr): BoolExpr = (this - other) le 0.0
@@ -135,15 +125,17 @@ class FloatExpr internal constructor(
     infix fun eq(other: FloatExpr): BoolExpr = (this - other) eq 0.0
     infix fun ne(other: FloatExpr): BoolExpr = (this - other) ne 0.0
 
-    private fun compare(threshold: Double, op: IntCmpOp, flippedOp: IntCmpOp): BoolExpr =
-        when {
-            terms.isEmpty() -> constantBool(evalConstant(op, threshold))
-            terms.size == 1 -> {
-                val entry = terms.entries.first()
-                singleHandleBucketCompare(entry.key, entry.value, threshold, op, flippedOp)
-            }
-            else -> multiHandleBucketCompare(threshold, op)
+    private fun compare(threshold: Double, op: IntCmpOp): BoolExpr {
+        if (terms.isEmpty()) return constantBool(evalConstant(op, threshold))
+        // `Σ c_i · h_i + offset  ⟨op⟩  threshold`  →  `Σ c_i · h_i  ⟨op⟩  threshold - offset`.
+        val coeffs = DoubleArray(terms.size)
+        val names = ArrayList<String>(terms.size)
+        for ((i, e) in terms.entries.withIndex()) {
+            coeffs[i] = e.value
+            names.add(e.key.name)
         }
+        return FloatLinearConstraint(coeffs, names, op, threshold - offset)
+    }
 
     private fun evalConstant(op: IntCmpOp, threshold: Double): Boolean = when (op) {
         IntCmpOp.LE -> offset <= threshold
@@ -154,73 +146,8 @@ class FloatExpr internal constructor(
         IntCmpOp.NE -> offset != threshold
     }
 
-    /**
-     * Single-handle path: fold coeff and offset into the threshold in float space, then
-     * round to a bucket index via [FloatHandle.bucketOf]. Out-of-range thresholds collapse
-     * to tautology / contradiction. [flippedOp] kicks in when [coeff] is negative because
-     * dividing both sides by a negative reverses the comparison direction.
-     */
-    private fun singleHandleBucketCompare(
-        handle: FloatHandle,
-        coeff: Double,
-        threshold: Double,
-        op: IntCmpOp,
-        flippedOp: IntCmpOp,
-    ): BoolExpr {
-        val ref = IntRef(handle.name)
-        val effectiveThreshold = (threshold - offset) / coeff
-        val finalOp = if (coeff < 0) flippedOp else op
-        return when {
-            effectiveThreshold < handle.min -> when (finalOp) {
-                IntCmpOp.LE, IntCmpOp.LT, IntCmpOp.EQ -> constantBool(false)
-                IntCmpOp.GE, IntCmpOp.GT, IntCmpOp.NE -> constantBool(true)
-            }
-            effectiveThreshold > handle.max -> when (finalOp) {
-                IntCmpOp.LE, IntCmpOp.LT, IntCmpOp.NE -> constantBool(true)
-                IntCmpOp.GE, IntCmpOp.GT, IntCmpOp.EQ -> constantBool(false)
-            }
-            else -> IntCompare(ref, finalOp, IntLit(handle.bucketOf(effectiveThreshold)))
-        }
-    }
-
-    /**
-     * Multi-handle path: substitute `real_i = h_i.min + (b_i / (h_i.buckets - 1)) ·
-     * (h_i.max - h_i.min)` for each handle and rearrange so the comparison reads
-     * `Σ s_i · b_i  OP  K` where `s_i = c_i · (h_i.max - h_i.min) / (h_i.buckets - 1)`
-     * and `K = threshold - offset - Σ c_i · h_i.min`. Multiply both sides by [SCALE] and
-     * round to integers; emit through the existing affine-lowering pipeline.
-     *
-     * Discretisation error is bounded by 1 / [SCALE] per term — orders of magnitude below
-     * the per-handle bucket grid for realistic [SCALE] values.
-     */
-    private fun multiHandleBucketCompare(threshold: Double, op: IntCmpOp): BoolExpr {
-        var constSum = offset
-        val children = mutableListOf<IntExpr>()
-        for ((h, c) in terms) {
-            val realStep = c * (h.max - h.min) / (h.buckets - 1)
-            val k = (SCALE * realStep).roundToInt()
-            if (k != 0) children.add(IntScale(k, IntRef(h.name)))
-            constSum += c * h.min
-        }
-        val K = (SCALE * (threshold - constSum)).roundToInt()
-        val sum: IntExpr = when (children.size) {
-            0 -> IntLit(0)
-            1 -> children[0]
-            else -> IntSum(children)
-        }
-        return IntCompare(sum, op, IntLit(K))
-    }
-
-    /**
-     * `0 = 0` for true and `0 ≠ 0` for false: the compiler's affine pass folds these to
-     * a no-op or a compile-time-false [IllegalStateException] respectively, matching how
-     * user-written contradictions like `(x - x) eq 5` already surface.
-     */
+    /** `0 = 0` for true and `0 ≠ 0` for false; the compiler's affine pass folds these. */
     private fun constantBool(value: Boolean): BoolExpr =
         if (value) IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
         else IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
-
-    private companion object {
-        const val SCALE: Double = 1_000_000.0
-    }
 }

@@ -114,7 +114,10 @@ class CompileTest {
         val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
 
         val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 99)).take(40).toList()
-        assertEquals(6, samples.toSet().size, "All 6 feasible solutions should be reached")
+        // The legacy schema-level bucketing exposed exactly 6 feasible values for rate ≥ 0.5
+        // (one per bucket from 0.5..1.0 at 11 buckets). Native floats with backend-level
+        // bucketing produce many more distinct values; just verify diversity and the bound.
+        assertTrue(samples.toSet().size >= 6, "expected ≥6 distinct samples, got ${samples.toSet().size}")
         for (s in samples) {
             val rate = compiled.decode(schema.rate, s)
             assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
