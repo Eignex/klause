@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.ast.FloatSpec
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.IntHandle
@@ -11,17 +12,16 @@ import com.eignex.klause.solver.Sample
  * Result of compiling a [com.eignex.klause.schema.VariableSchema] to a solver-side [Problem],
  * carrying the index needed to decode an assignment back to schema values.
  *
- * Boolean-side names map to packed-bit ids in `boolVarIdByName`; integer-side names map
- * to int-array ids in `intVarIdByName`; float-side names map to float-array ids in
- * `floatVarIdByName`. Nominal labels are encoded as one Boolean indicator per label,
- * tracked in `nominalIndicators`.
+ * Boolean-side names map to packed-bit ids in `boolVarIdByName`; integer/float-side names map
+ * to int-array ids in `intVarIdByName`. Float vars round-trip through their bucket index
+ * using the [FloatSpec] in `floatDecoders`.
  */
 class CompiledProblem(
     val problem: Problem,
     val boolVarIdByName: Map<String, Int>,
     val intVarIdByName: Map<String, Int>,
     val nominalIndicators: Map<String, Map<String, Int>>,
-    val floatVarIdByName: Map<String, Int>,
+    val floatDecoders: Map<String, FloatSpec>,
 ) {
     fun decode(handle: BoolHandle, sample: Sample): Boolean {
         val id = boolVarIdByName[handle.name]
@@ -43,8 +43,11 @@ class CompiledProblem(
     }
 
     fun decode(handle: FloatHandle, sample: Sample): Double {
-        val id = floatVarIdByName[handle.name]
+        val spec = floatDecoders[handle.name]
             ?: error("No float variable named '${handle.name}'")
-        return sample.floats[id]
+        val id = intVarIdByName[handle.name]
+            ?: error("Float '${handle.name}' has no int-side id")
+        val bucket = sample.ints[id]
+        return spec.min + (bucket.toDouble() / (spec.buckets - 1)) * (spec.max - spec.min)
     }
 }

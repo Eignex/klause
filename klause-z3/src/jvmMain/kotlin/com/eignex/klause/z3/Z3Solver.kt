@@ -241,7 +241,26 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         }
         val ints = IntArray(encoding.intExprs.size) { i ->
             val v = model.eval(encoding.intExprs[i], true)
-            (v as IntNum).int
+            (v as? IntNum)?.int ?: 0  // float-backed int vars are populated below from reals
+        }
+        // For each float var, recover the real value from the model and discretize it
+        // back to the bucket index expected by the schema-side decoder. Any int var that
+        // backs a float gets its bucket value written here.
+        val meta = problem.floatMetadata
+        if (meta != null) {
+            for (fid in 0 until meta.numFloatVars) {
+                val realExpr = encoding.realExprs[fid]
+                val v = model.eval(realExpr, true)
+                val real = (v as com.microsoft.z3.RatNum).let {
+                    it.bigIntNumerator.toDouble() / it.bigIntDenominator.toDouble()
+                }
+                val ivl = meta.intervals[fid]
+                val buckets = meta.bucketCounts[fid]
+                val bucket = if (buckets <= 1) 0
+                else (((real - ivl.lo) / (ivl.hi - ivl.lo)) * (buckets - 1)).toInt()
+                    .coerceIn(0, buckets - 1)
+                ints[meta.intVarByFloatVar[fid]] = bucket
+            }
         }
         return Sample(bools, ints)
     }

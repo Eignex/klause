@@ -56,13 +56,6 @@ data class BruteForceParams(
 class BruteForceSolver(override val problem: Problem) :
     Solver<BruteForceParams>, Optimizer<BruteForceParams> {
 
-    init {
-        require(problem.numFloatVars == 0) {
-            "BruteForceSolver does not support float variables; the assignment space is " +
-                "uncountable. Use Z3Solver for native floats, or bucket via klause schema."
-        }
-    }
-
     private val chunks: List<Chunk> = buildChunks(problem)
 
     override fun solve(params: BruteForceParams): SolveResult {

@@ -30,13 +30,6 @@ import kotlin.random.Random
  */
 class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, Optimizer<BacktrackParams> {
 
-    // Bucketing-based float handling: if [problem] has float vars, pre-lower it to a
-    // pure-int problem and decode floats back into each yielded Sample. When there are
-    // no float vars, [FloatLowering.lower] returns the original problem unchanged with
-    // an empty decoder — effectively free.
-    private val lowered = com.eignex.klause.solver.FloatLowering.lower(problem)
-    private val work: Problem = lowered.problem
-
     override fun solve(params: BacktrackParams): SolveResult {
         for (outcome in driveSearch(params)) {
             return when (outcome) {
@@ -192,10 +185,10 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      * popLast in that case.
      */
     private fun driveSearch(params: BacktrackParams): Sequence<SearchOutcome> = sequence {
-        if (work.baked is PropagationResult.Unsat) {
+        if (problem.baked is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted); return@sequence
         }
-        val session = PropagationSession(work)
+        val session = PropagationSession(problem)
         val seedResult = session.seed(params.assumptions)
         if (seedResult is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted); return@sequence
@@ -262,9 +255,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         val sp = session.problem
         val bools = BooleanArray(sp.numBoolVars) { v -> session.boolValue(v) ?: false }
         val ints = IntArray(sp.numIntVars) { v -> session.intDomain(v).min }
-        // Decode appends recovered float values when the original problem had float vars;
-        // otherwise it's a no-op identity.
-        return lowered.decoder.decode(Sample(bools, ints))
+        return Sample(bools, ints)
     }
 
     private fun farEnough(candidate: Sample, window: ArrayDeque<Sample>, minDistance: Int): Boolean {

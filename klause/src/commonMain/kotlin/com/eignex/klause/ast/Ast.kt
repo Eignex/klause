@@ -171,11 +171,18 @@ enum class IntCmpOp { LE, LT, GE, GT, EQ, NE }
 data class IntCompare(val left: IntExpr, val op: IntCmpOp, val right: IntExpr) : BoolExpr
 
 /**
- * Reified linear comparison over float variables: `Σ coeffs[k] · varNames[k] ⟨op⟩ bound`.
- * Built by the schema-layer [com.eignex.klause.schema.FloatExpr] / [com.eignex.klause.schema.FloatHandle]
- * comparison operators; lowered by the compiler to a [com.eignex.klause.solver.factor.FloatLinear]
- * factor over float-var ids. The compile pipeline preserves the real-valued bound; per-backend
- * bucketing (via [com.eignex.klause.solver.FloatLowering]) happens at solve-time.
+ * Schema-layer view of a real-valued linear comparison: `Σ coeffs[k] · varNames[k] ⟨op⟩ bound`.
+ * Built by [com.eignex.klause.schema.FloatExpr] / [com.eignex.klause.schema.FloatHandle]
+ * comparison operators. The compiler does two things with it:
+ *
+ *  1. Bucket each float variable to an int variable in the factor system and emit a
+ *     scaled-integer [com.eignex.klause.solver.factor.Linear] factor — what every
+ *     existing backend solves over.
+ *  2. Record the original real-valued form on [com.eignex.klause.solver.FloatMetadata]
+ *     so a native-real backend (Z3) can solve over reals directly.
+ *
+ * The AST node lives in [BoolExpr] so the constraint pipeline can carry it through
+ * `And` / `Or` / `Implies` etc. before the compiler intercepts it at lowering time.
  */
 @Serializable
 @SerialName("floatlin")
@@ -190,7 +197,6 @@ data class FloatLinearConstraint(
             "coeffs/varNames length mismatch: ${coeffs.size} vs ${varNames.size}"
         }
     }
-    // Manual equals/hashCode because DoubleArray uses identity-equality by default.
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is FloatLinearConstraint) return false

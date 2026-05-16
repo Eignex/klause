@@ -64,9 +64,18 @@ class Compiler {
         val boolVarIdByName = mutableMapOf<String, Int>()
         val intVarIdByName = mutableMapOf<String, Int>()
         val intDomains = mutableListOf<IntDomain>()
-        val floatVarIdByName = mutableMapOf<String, Int>()
-        val floatDomains = mutableListOf<com.eignex.klause.solver.FloatInterval>()
         val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
+        // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per
+        // float-var name (so the schema can decode `sample.ints[id]` back to a Double).
+        // `floatMetaIntervals` / `floatMetaIntVarIds` / `floatMetaBuckets` are the parallel
+        // arrays that get packaged into the Problem's optional [FloatMetadata] for backends
+        // that solve over reals natively.
+        val floatDecoders = mutableMapOf<String, FloatSpec>()
+        val floatMetaIntervals = mutableListOf<com.eignex.klause.solver.FloatInterval>()
+        val floatMetaIntVarIds = mutableListOf<Int>()
+        val floatMetaBuckets = mutableListOf<Int>()
+        val floatVarIdByName = mutableMapOf<String, Int>()  // float-id (metadata index) by name
+        val floatMetaConstraints = mutableListOf<com.eignex.klause.solver.RealLinearConstraint>()
         var numBoolVars = 0
         var numIntVars = 0
         private var auxIntCounter = 0
@@ -86,13 +95,18 @@ class Compiler {
                     }
                     is IntSpec -> intVarIdByName[name] = newIntVar(IntDomain(entry.min, entry.max))
                     is FloatSpec -> {
-                        // Float variables are now native: allocate against floatDomains and
-                        // let per-backend FloatLowering handle bucketing at solve-time. The
-                        // schema's `buckets` parameter is preserved on the FloatSpec for
-                        // wire compatibility but is no longer consulted at compile-time.
-                        floatVarIdByName[name] = newFloatVar(
-                            com.eignex.klause.solver.FloatInterval(entry.min, entry.max),
-                        )
+                        // Floats are bucketed inline so [Problem.factors] stays pure int+bool.
+                        // The original real-valued view (interval, bucket count, int-var
+                        // backing) lands in [Problem.floatMetadata] so native-real backends
+                        // (Z3) can use it.
+                        val intId = newIntVar(IntDomain(0, entry.buckets - 1))
+                        intVarIdByName[name] = intId
+                        floatDecoders[name] = entry
+                        val fid = floatMetaIntervals.size
+                        floatVarIdByName[name] = fid
+                        floatMetaIntervals += com.eignex.klause.solver.FloatInterval(entry.min, entry.max)
+                        floatMetaIntVarIds += intId
+                        floatMetaBuckets += entry.buckets
                     }
                     is NamedConstraint -> {} // handled in a second pass once all vars are registered
                 }
@@ -102,19 +116,27 @@ class Compiler {
                 if (entry is NamedConstraint) assertExpr(entry.expr)
             }
 
+            val metadata: com.eignex.klause.solver.FloatMetadata? =
+                if (floatMetaIntervals.isEmpty()) null
+                else com.eignex.klause.solver.FloatMetadata(
+                    intervals = floatMetaIntervals.toTypedArray(),
+                    bucketCounts = floatMetaBuckets.toIntArray(),
+                    intVarByFloatVar = floatMetaIntVarIds.toIntArray(),
+                    constraints = floatMetaConstraints.toList(),
+                )
+
             return CompiledProblem(
                 problem = Problem(
                     numBoolVars = numBoolVars,
                     numIntVars = numIntVars,
                     intDomains = intDomains.toTypedArray(),
                     factors = factors.toList(),
-                    numFloatVars = floatDomains.size,
-                    floatDomains = floatDomains.toTypedArray(),
+                    floatMetadata = metadata,
                 ),
                 boolVarIdByName = boolVarIdByName.toMap(),
                 intVarIdByName = intVarIdByName.toMap(),
                 nominalIndicators = nominalIndicators.mapValues { it.value.toMap() },
-                floatVarIdByName = floatVarIdByName.toMap(),
+                floatDecoders = floatDecoders.toMap(),
             )
         }
 
@@ -123,12 +145,6 @@ class Compiler {
         fun newIntVar(domain: IntDomain): Int {
             val id = numIntVars++
             intDomains += domain
-            return id
-        }
-
-        fun newFloatVar(interval: com.eignex.klause.solver.FloatInterval): Int {
-            val id = floatDomains.size
-            floatDomains += interval
             return id
         }
 
@@ -195,20 +211,27 @@ class Compiler {
         }
 
         /**
-         * Lower a [com.eignex.klause.ast.FloatLinearConstraint] to a
-         * [com.eignex.klause.solver.factor.FloatLinear] factor. Resolves each variable
-         * name to a float-var id, splits strict-vs-loose comparisons against the
-         * supported [com.eignex.klause.solver.factor.LinearOp] set. Strict variants
-         * (LT, GT) are encoded as loose (LE, GE) for now — the distinction collapses
-         * once the backend buckets, and for native-float backends we'll need to
-         * preserve strictness; revisit when Z3 native lands.
+         * Lower a [com.eignex.klause.ast.FloatLinearConstraint] in two parallel ways:
+         *
+         *  1. Bucket each referenced float variable using its declared [FloatSpec.buckets]
+         *     and emit a scaled-integer [Linear] factor — this is what every existing
+         *     backend solves over.
+         *  2. Append a [com.eignex.klause.solver.RealLinearConstraint] (over float-var
+         *     ids) to the metadata buffer so a native-real backend (Z3) can solve it
+         *     directly in real arithmetic.
+         *
+         * Scaling math (per float var `v` with interval `[lo, hi]` and `N` buckets, step
+         * `step = (hi - lo) / (N - 1)`): substitute `v = lo + b · step` and rearrange to
+         * `Σ (c_v · step_v) · b_v ⟨op⟩ bound − Σ c_v · lo_v`, then multiply by `SCALE` and
+         * round to integer coefficients. Discretisation error is ~1/SCALE per term.
          */
         private fun assertFloatLinear(c: com.eignex.klause.ast.FloatLinearConstraint) {
-            val vars = IntArray(c.varNames.size) { i ->
+            val n = c.varNames.size
+            val realIds = IntArray(n) { i ->
                 floatVarIdByName[c.varNames[i]]
                     ?: error("Float variable '${c.varNames[i]}' not declared")
             }
-            val op = when (c.op) {
+            val realOp = when (c.op) {
                 com.eignex.klause.ast.IntCmpOp.LE,
                 com.eignex.klause.ast.IntCmpOp.LT -> com.eignex.klause.solver.factor.LinearOp.LE
                 com.eignex.klause.ast.IntCmpOp.GE,
@@ -216,7 +239,31 @@ class Compiler {
                 com.eignex.klause.ast.IntCmpOp.EQ -> com.eignex.klause.solver.factor.LinearOp.EQ
                 com.eignex.klause.ast.IntCmpOp.NE -> com.eignex.klause.solver.factor.LinearOp.NE
             }
-            factors += com.eignex.klause.solver.factor.FloatLinear(c.coeffs.copyOf(), vars, op, c.bound)
+            floatMetaConstraints += com.eignex.klause.solver.RealLinearConstraint(
+                coeffs = c.coeffs.copyOf(),
+                floatVarIds = realIds,
+                op = realOp,
+                bound = c.bound,
+            )
+
+            // Bucketed-int rewrite for the factor list. Reuses the same SCALE
+            // historically used by [com.eignex.klause.schema.FloatExpr.multiHandleBucketCompare].
+            val scale = 1_000_000.0
+            var scaledBound = c.bound
+            val scaledCoeffs = IntArray(n)
+            val intVarIds = IntArray(n)
+            for (i in 0 until n) {
+                val name = c.varNames[i]
+                val fid = floatVarIdByName.getValue(name)
+                val interval = floatMetaIntervals[fid]
+                val buckets = floatMetaBuckets[fid]
+                val step = if (buckets > 1) (interval.hi - interval.lo) / (buckets - 1) else 0.0
+                scaledCoeffs[i] = (c.coeffs[i] * step * scale).toLong().toInt()
+                intVarIds[i] = floatMetaIntVarIds[fid]
+                scaledBound -= c.coeffs[i] * interval.lo
+            }
+            val scaledBoundInt = (scaledBound * scale).toLong().toInt()
+            factors += com.eignex.klause.solver.factor.Linear(scaledCoeffs, intVarIds, realOp, scaledBoundInt)
         }
 
         private fun assertAllDifferent(terms: List<IntExpr>) {

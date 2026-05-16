@@ -4,24 +4,25 @@ import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
- * Immutable solver-side problem. Variables come in three id spaces:
+ * Immutable solver-side problem. Variables come in two id spaces:
  *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [Assignment].
  *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [Assignment].
- *  - Float vars: ids `[0, numFloatVars)`, IEEE-754 doubles in solutions. Each has a
- *    [FloatInterval] domain. Native-float backends (Z3) reason over them directly;
- *    bucketing backends (bit-blaster, LogicNG, currently LS / Backtrack) lower them
- *    to bounded ints at the boundary via a `FloatLowering` pass.
  *
- * Factors declare which vars they touch; occurrence lists are split per kind so
- * propagation only walks the factors mentioning the changed variable.
+ * Each integer variable has an [IntDomain] for bounds. Factors mention either or both.
+ * Occurrence lists are split per kind so `flip(boolVar)` and `setInt(intVar)` only walk the
+ * factors mentioning that specific variable.
+ *
+ * Float variables, when the schema or front-end uses them, are bucketed to integer
+ * variables in the factor system (so [factors] stays pure int+bool). The optional
+ * [floatMetadata] sidecar carries the original real-valued view for backends that
+ * can solve over reals natively (currently Z3). All other backends ignore it.
  */
 class Problem(
     val numBoolVars: Int,
     val numIntVars: Int,
     val intDomains: Array<IntDomain>,
     val factors: List<Factor>,
-    val numFloatVars: Int = 0,
-    val floatDomains: Array<FloatInterval> = emptyArray(),
+    val floatMetadata: FloatMetadata? = null,
     /**
      * Opt-in failed-literal probing at bake time. When `true`, every free bool variable is
      * tested with both polarities: if pinning one polarity propagates Unsat, the other
@@ -36,14 +37,10 @@ class Problem(
         require(intDomains.size == numIntVars) {
             "intDomains size ${intDomains.size} != numIntVars $numIntVars"
         }
-        require(floatDomains.size == numFloatVars) {
-            "floatDomains size ${floatDomains.size} != numFloatVars $numFloatVars"
-        }
     }
 
     val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
     val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }
-    val floatOccurrences: Array<IntArray> = invert(numFloatVars) { it.floatVars }
 
     /**
      * For each factor, the ids of every other factor sharing at least one variable.
@@ -54,7 +51,6 @@ class Problem(
         val f = factors[fid]
         for (v in f.boolVars) for (o in boolOccurrences[v]) if (o != fid) seen.add(o)
         for (v in f.intVars) for (o in intOccurrences[v]) if (o != fid) seen.add(o)
-        for (v in f.floatVars) for (o in floatOccurrences[v]) if (o != fid) seen.add(o)
         seen.toIntArray()
     }
 

@@ -29,11 +29,7 @@ import com.eignex.klause.ast.PbOp
  */
 object BitBlaster {
 
-    fun compile(userProblem: Problem): CnfProblem {
-        // Bucket any float vars onto bounded ints before bit-blasting. The float-bucketing
-        // approximation is the price of routing a real-valued problem through a SAT path.
-        // When the user's problem has no floats, FloatLowering.lower returns it unchanged.
-        val problem = com.eignex.klause.solver.FloatLowering.lower(userProblem).problem
+    fun compile(problem: Problem): CnfProblem {
         val b = CnfBuilder()
         val boolMap = IntArray(problem.numBoolVars) { b.newVar() }
         val intBits = Array(problem.numIntVars) { i ->

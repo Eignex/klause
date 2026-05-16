@@ -178,16 +178,17 @@ class FloatArithmeticTest {
     }
 
     @Test
-    fun `float var produces a native FloatInterval in the compiled problem`() {
-        // The schema's `buckets` parameter no longer drives bucketing at compile time;
-        // float vars land in the Problem's floatDomains for per-backend lowering.
+    fun `float var records bucket count plus a FloatInterval in floatMetadata`() {
+        // Float vars are bucketed inline (factors stay int+bool); the original real-valued
+        // view lives in Problem.floatMetadata for native-real backends.
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate ge 0.5 }
         }
         val compiled = S().compile()
-        assertEquals(1, compiled.problem.numFloatVars)
-        assertEquals(0.0, compiled.problem.floatDomains[0].lo)
-        assertEquals(1.0, compiled.problem.floatDomains[0].hi)
+        val meta = compiled.problem.floatMetadata
+        assertEquals(1, meta?.numFloatVars)
+        assertEquals(0.0, meta?.intervals?.get(0)?.lo)
+        assertEquals(1.0, meta?.intervals?.get(0)?.hi)
     }
 }

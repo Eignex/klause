@@ -47,12 +47,6 @@ class LocalSearchSolver(
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
 ) : Solver<LocalSearchParams>, Optimizer<LocalSearchParams> {
 
-    // Bucketing-based float handling: see [BacktrackSolver]. Same approach; native float
-    // moves are a future replacement (LS strategies can sample within the float interval
-    // directly once we have float-aware moves).
-    private val lowered = com.eignex.klause.solver.FloatLowering.lower(problem)
-    private val work: Problem = lowered.problem
-
     override fun solve(params: LocalSearchParams): SolveResult = solveInternal(params, warm = null)
 
     override fun samples(params: LocalSearchParams): Sequence<Sample> = samplesInternal(params, warm = null)
@@ -81,14 +75,14 @@ class LocalSearchSolver(
      * (translates to [SolveResult.Unsat] / empty sequence / `null` minimize result).
      */
     private fun effectiveAssumptions(callAssumptions: Assumptions): Assumptions? {
-        val baked = work.baked
+        val baked = problem.baked
         if (baked is PropagationResult.Unsat) return null
         baked as PropagationResult.Implied
         if (callAssumptions.isEmpty) {
             return if (baked.isEmpty) Assumptions.None
             else Assumptions(bools = baked.bools, ints = baked.ints)
         }
-        return when (val r = work.propagate(callAssumptions)) {
+        return when (val r = problem.propagate(callAssumptions)) {
             is PropagationResult.Unsat -> null
             is PropagationResult.Implied -> {
                 val mergedBools = HashMap<Int, Boolean>(callAssumptions.bools)
@@ -134,7 +128,7 @@ class LocalSearchSolver(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val maxFlips = params.maxFlips
         return sequence {
-            val state = LocalSearchState(work, Random(seed), effectiveAssumptions)
+            val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
             warm?.applyTo(state)
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
@@ -153,8 +147,7 @@ class LocalSearchSolver(
                     // typically take just one or a few samples and never drain the
                     // sequence) still see captured weights.
                     warm?.captureFrom(state)
-                    // Decode appends float values when the original problem had any; otherwise no-op.
-                    yield(lowered.decoder.decode(snap))
+                    yield(snap)
                     flipsSinceYield = 0
                     restartPolicy.restart(state, bestSoFar = null)
                     flipsSinceRestart = 0
@@ -197,7 +190,7 @@ class LocalSearchSolver(
         warm: WarmState? = null,
     ): Sample? {
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = LocalSearchState(work, Random(seed), effectiveAssumptions)
+        val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         warm?.applyTo(state)
         // No bestSample yet — first restart is always full random.
         restartPolicy.restart(state, bestSoFar = null)
@@ -252,7 +245,7 @@ class LocalSearchSolver(
             totalFlips++
         }
         warm?.captureFrom(state)
-        return bestSample?.let { lowered.decoder.decode(it) }
+        return bestSample
     }
 
     /**
@@ -271,7 +264,7 @@ class LocalSearchSolver(
         var bestDelta = 0.0
         var bestMove: Move? = null
 
-        for (b in 0 until work.numBoolVars) {
+        for (b in 0 until problem.numBoolVars) {
             if (state.assumptions.isFrozenBool(b)) continue
             state.apply(Move.BoolFlip(b))
             if (state.cost == 0) {
@@ -285,10 +278,10 @@ class LocalSearchSolver(
             state.apply(Move.BoolFlip(b)) // revert
         }
 
-        for (i in 0 until work.numIntVars) {
+        for (i in 0 until problem.numIntVars) {
             if (state.assumptions.isFrozenInt(i)) continue
             val cur = state.assignment.intValue(i)
-            val d = work.intDomains[i]
+            val d = problem.intDomains[i]
             for (target in intArrayOf(cur - 1, cur + 1)) {
                 if (target !in d.min..d.max) continue
                 state.apply(Move.IntSet(i, target))
