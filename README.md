@@ -141,7 +141,8 @@ val text = cnf.toDimacs()
 - CP search: solution-guided search. Bias value selection toward the last solution until a better one is found.
 - CP search: large neighborhood search for optimization. Freeze a random subset to current-best, re-solve the rest.
 - Local search: tabu list. Forbid recently-flipped variables for K steps.
-- Local search: DDFW / SAPS strategies that actually use factorWeights.
+- Local search: optional SAPS strategy as a multiplicative-weighting alternative to the existing additive-transfer DDFW. Same clause-weighting family but different bias/exploration profile; only worth adding if a bench comparison shows SAPS dominates DDFW on any problem class we care about. Low priority — DDFW already covers the weight-learning niche.
+- Local search: extract DDFW's inline tabu list into a first-class decorator strategy that can wrap any picker (WalkSat, ProbSat, etc.), giving tabu protection without re-implementing it per strategy.
 - Local search: variable neighborhood search meta-heuristic.
 - Optimizer: branch-and-bound minimize / maximize in BacktrackSolver. The current impl enumerates all feasibles, which is exponential.
 - API: per-backend Session subclasses for incremental solving with learned-state persistence. The Session interface, push/pop assumption stack, and default stateless impl landed; backends with native incremental engines (LogicNG via MiniSat's assumption-set, Z3 via push/pop) should override Session to expose that natively rather than re-baking on each solve.
@@ -172,6 +173,6 @@ val text = cnf.toDimacs()
 - Backend: klause-ortools adapter for OR-tools CP-SAT via the Java bindings. State-of-the-art CP-SAT performance, but JNI-heavy and platform-specific natives — pick up after Choco.
 - Backend: klause-kissat / klause-cadical adapters. Kissat and CaDiCaL are SOTA CDCL SAT solvers (Kissat won SAT Competition 2020-2024); meaningfully faster than LogicNG's MiniSat on bit-blasted instances. Same lowering path as klause-logicng (bit-blast then dispatch). No Maven Central packages exist for either, so this means hand-rolled JNI bindings against the C source plus bundling platform-specific native binaries — substantial engineering. Probably only worth it once everything else on this TODO is done.
 - Perf (post-benchmark): replace Assumptions and PropagationResult.Implied maps with parallel-array representations to avoid Int boxing.
-- Perf (post-benchmark): make LocalSearchState.factorWeights lazy. Only DDFW-style strategies read it, but it's always allocated.
+- Perf (post-benchmark): make LocalSearchState.factorWeights lazy. Only DDFW (and a hypothetical SAPS) read it; WalkSat / ProbSat / SimulatedAnnealing / CcaWalkSat pay the allocation cost for nothing. Either lazy-init on first access from a weight-using strategy, or move the field onto a per-strategy state object.
 - Perf (post-benchmark): audit PropagationSession snapshot allocation cost. 5 array copies per push; consider pooling or a flat delta-trail.
 - Perf (post-benchmark): switch Problem.factors from List to Array if profiling shows virtual dispatch / list iteration cost.
