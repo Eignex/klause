@@ -16,6 +16,10 @@ import com.eignex.klause.solver.brute.BruteForceSolver
  */
 interface SolverParams {
     fun withAssumptions(@Suppress("UNUSED_PARAMETER") assumptions: Assumptions): SolverParams = this
+    /** Inject a cooperative cancellation token. Backends that support cancellation
+     *  override to return a copy with the token wired in; others (LogicNG, Z3, Brute)
+     *  default to no-op. */
+    fun withCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
 }
 
 /**

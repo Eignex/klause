@@ -37,6 +37,9 @@ data class BacktrackParams(
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
+    override fun withCancellation(cancellation: com.eignex.klause.solver.Cancellation): BacktrackParams =
+        copy(cancellation = cancellation)
+
     private companion object {
         fun merge(a: Assumptions, b: Assumptions): Assumptions {
             if (a.isEmpty) return b
