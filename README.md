@@ -14,8 +14,8 @@ Klause is a Kotlin constraint programming library: finite-domain
 variables (bounded integers and Booleans) with arithmetic, comparisons,
 logic, and global constraints (allDifferent, gcc, table, cardinality,
 element, lex). Floats lower onto bucketed integers and nominals lower
-onto Boolean indicators. Same problem class as Choco, OR-tools CP-SAT,
-Gecode, and Chuffed; same FlatZinc and MiniZinc-Challenge inputs.
+onto Boolean indicators. Usable from MiniZinc as a backend solver via
+the klause-mzn-lib package.
 
 Four interchangeable backends:
 
