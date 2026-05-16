@@ -10,30 +10,40 @@
 
 # Klause
 
-Klause is a Kotlin SMT-flavored solver for QF_LIA-style problems:
-quantifier-free formulas over Booleans and bounded integers, with
-arithmetic, comparisons, logic, and global constraints like
-allDifferent, gcc, and table. Floats lower onto bucketed integers and
-nominals lower onto Boolean indicators.
+Klause is a Kotlin constraint programming library: finite-domain
+variables (bounded integers and Booleans) with arithmetic, comparisons,
+logic, and global constraints (allDifferent, gcc, table, cardinality,
+element, lex). Floats lower onto bucketed integers and nominals lower
+onto Boolean indicators. Same problem class as Choco, OR-tools CP-SAT,
+Gecode, and Chuffed; same FlatZinc and MiniZinc-Challenge inputs.
 
-The internals borrow from the SMT playbook. A bit-blaster lowers
-integer constraints to CNF so problems can be shipped to external SAT
-engines, with a LogicNG adapter in the klause-logicng module.
-DPLL(T)-style theory propagation lives in the backtrack solver, a DFS
-over finite-domain integers with propagators per constraint,
-configurable variable and value heuristics, and true model-blocking
-enumeration. The klause-z3 module translates problems directly to Z3
-for hard instances. A local-search solver (WalkSat / probSAT-style) is
-the stochastic alternative for when complete methods blow up. All four
-backends implement the same Solver and Optimizer interfaces, so
+Four interchangeable backends:
+
+- A local-search solver (WalkSat / probSAT-style) for sampling and
+  stochastic solve. The default.
+- A complete CSP backtrack solver with propagation, configurable
+  variable and value heuristics, and true model-blocking enumeration.
+- A bit-blasting adapter in klause-logicng that lowers integers to
+  CNF and routes through MiniSat.
+- An SMT adapter in klause-z3 that translates problems directly to Z3,
+  with native real arithmetic for float variables.
+
+All four implement the same Solver and Optimizer interfaces so
 consumers swap by tradeoff per problem.
 
-Unlike Z3 or CVC5, klause's theory is narrow: bounded integers and
-Booleans, no bitvectors, arrays, floats, or strings. In exchange,
-sampling is first-class. Drawing samples with replacement and
-enumerating without replacement are core operations, not afterthoughts.
-Klause is also not a MILP solver; objectives are linear over integers,
-not reals.
+Unlike most CP libraries, sampling is first-class. Drawing samples
+with replacement and enumerating without replacement are core
+operations, not afterthoughts. The combination of a constraint
+language, a portfolio of CP and CP-adjacent engines, and a sampling
+API is the niche: most CP libraries solve once and stop; klause is
+built for repeated, diverse, and incremental queries against the
+same constraint system.
+
+Klause is not a MILP solver (objectives are linear over integers, not
+reals), not a full SMT solver (theory is finite-domain integers and
+Booleans, no bitvectors, arrays, strings, or quantifiers), and not
+intended for proving program properties. For those, reach for a MILP
+solver, Z3 or CVC5, or a verification framework respectively.
 
 ## Use cases
 
@@ -56,10 +66,6 @@ this assertion holds". Concretely:
   to get cost-minimal feasibility.
 - Plan verification. Check that a proposed assignment satisfies all
   declared constraints, and surface why it fails when it doesn't.
-
-Klause is not the right tool for proving program properties, deciding
-SMT theories outside QF_LIA, or solving continuous optimization. For
-those, reach for Z3, CVC5, or a MILP solver respectively.
 
 ## Schema
 
@@ -151,12 +157,12 @@ val text = cnf.toDimacs()
 - Sampling: weighted projected sampling (WAPS / KUS).
 - Docs: tutorial covering schema, constraints, and backend selection.
 - Docs: Dokka site for the KDoc.
-- QF_LIA parity: SMT-LIB v2 parser for the QF_LIA subset.
-- QF_LIA parity: static bound inference for int vars declared with full-range or unbounded domains. Error out cleanly when no bound is provable.
-- QF_LIA parity: distinct over arbitrary terms (booleans, mixed bool/int). AllDifferent covers ints already.
-- QF_LIA parity: to_real / to_int casts. Either bucket reals onto bounded ints or reject the benchmark.
-- QF_LIA parity: let-binding expansion in the SMT-LIB parser.
-- QF_LIA parity: unbounded integers in BacktrackSolver. Pairs with the bound-inference item above.
+- SMT-LIB parity: SMT-LIB v2 parser covering the finite-domain integer subset (QF_LIA in SMT-LIB terminology). Lets klause run SMT-LIB benchmarks alongside the FlatZinc / DIMACS / OPB ones it already handles.
+- SMT-LIB parity: static bound inference for int vars declared with full-range or unbounded domains. Error out cleanly when no bound is provable.
+- SMT-LIB parity: distinct over arbitrary terms (booleans, mixed bool/int). AllDifferent covers ints already.
+- SMT-LIB parity: to_real / to_int casts. Either bucket reals onto bounded ints or reject the benchmark.
+- SMT-LIB parity: let-binding expansion in the SMT-LIB parser.
+- SMT-LIB parity: unbounded integers in BacktrackSolver. Pairs with the bound-inference item above.
 - FlatZinc parity: int_div / int_mod with truncated-toward-zero semantics (FlatZinc spec, distinct from klause's internal Euclidean div). Currently fail-loud with a TODO message.
 - FlatZinc parity: bool_and_reif, bool_or_reif, bool_xor_reif, bool_lt_reif. The int comparison _reif variants landed; bool side still missing.
 - FlatZinc parity: streaming branch-and-bound in solve minimize / maximize. The current FZN CLI does linear search over enumerate and tracks the best — works but doesn't prune. B&B once it lands in BacktrackSolver wires through.
