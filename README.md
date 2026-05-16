@@ -17,27 +17,24 @@ element, lex). Floats lower onto bucketed integers and nominals lower
 onto Boolean indicators. Usable from MiniZinc as a backend solver via
 the klause-mzn-lib package.
 
-Four interchangeable backends:
+Two native engines, both implementing the same Solver and Optimizer
+interfaces:
 
 - A local-search solver (WalkSat / probSAT-style) for sampling and
   stochastic solve. The default.
 - A complete CSP backtrack solver with propagation, configurable
   variable and value heuristics, and true model-blocking enumeration.
-- A bit-blasting adapter in klause-logicng that lowers integers to
-  CNF and routes through MiniSat.
-- An SMT adapter in klause-z3 that translates problems directly to Z3,
-  with native real arithmetic for float variables.
 
-All four implement the same Solver and Optimizer interfaces so
-consumers swap by tradeoff per problem.
+Optional adapter modules (klause-logicng for bit-blasted SAT,
+klause-z3 for SMT) let the same problem be shipped to an external
+solver when it helps; they're side doors, not the core.
 
 Unlike most CP libraries, sampling is first-class. Drawing samples
 with replacement and enumerating without replacement are core
 operations, not afterthoughts. The combination of a constraint
-language, a portfolio of CP and CP-adjacent engines, and a sampling
-API is the niche: most CP libraries solve once and stop; klause is
-built for repeated, diverse, and incremental queries against the
-same constraint system.
+language, two native engines, and a sampling API is the niche: most
+CP libraries solve once and stop; klause is built for repeated,
+diverse, and incremental queries against the same constraint system.
 
 Klause is not a MILP solver (objectives are linear over integers, not
 reals), not a full SMT solver (theory is finite-domain integers and
@@ -114,9 +111,7 @@ val best = solver.minimize(weights, LocalSearchParams(maxFlips = 100_000))
 ```
 
 Local search is the default. Swap in the backtrack solver when you
-need completeness or true without-replacement enumeration, and the
-SAT or SMT adapters in klause-logicng and klause-z3 when you need raw
-solver horsepower on hard instances.
+need completeness or true without-replacement enumeration.
 
 ## Bit-blasting
 
