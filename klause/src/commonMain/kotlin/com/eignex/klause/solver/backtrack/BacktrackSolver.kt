@@ -197,8 +197,15 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         val trail: MutableList<TrailNode> = ArrayList()
         var decisionsLeft = params.maxDecisions
         var descend = true
+        // Check cancellation between iterations rather than every operation — amortised
+        // cost is negligible and the search responds within a handful of decisions.
+        var cancelCheckCountdown = 0
 
         loop@ while (true) {
+            if (cancelCheckCountdown-- <= 0) {
+                if (params.cancellation()) { yield(SearchOutcome.BudgetCapped); return@sequence }
+                cancelCheckCountdown = CANCEL_CHECK_INTERVAL
+            }
             if (descend) {
                 val varRef = params.variableHeuristic.pick(session, rng)
                 if (varRef == null) {
@@ -269,5 +276,12 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
         for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
         return d
+    }
+
+    private companion object {
+        /** Cancellation is polled this often inside the search loop. Lower = more
+         *  responsive; higher = lower overhead. 256 is a few microseconds per check at
+         *  worst, and the search stops within a few hundred decisions of a cancel. */
+        const val CANCEL_CHECK_INTERVAL: Int = 256
     }
 }

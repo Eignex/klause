@@ -37,6 +37,8 @@ data class LocalSearchParams(
      *  the requested values on every restart and ignores any move that would change
      *  them. Defaults to none. */
     val assumptions: Assumptions = Assumptions.None,
+    /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
+    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.NeverCancel,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

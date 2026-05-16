@@ -31,6 +31,8 @@ data class BacktrackParams(
     val valueHeuristic: ValueHeuristic = IndomainRandom,
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
+    /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
+    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.NeverCancel,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

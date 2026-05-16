@@ -139,8 +139,13 @@ class LocalSearchSolver(
             // fresh sample, we've effectively exhausted the search neighbourhood — end the
             // sequence.
             var flipsSinceYield = 0L
+            var cancelCountdown = 0
 
             try { while (flipsSinceYield < maxFlips) {
+                if (cancelCountdown-- <= 0) {
+                    if (params.cancellation()) return@sequence
+                    cancelCountdown = CANCEL_CHECK_INTERVAL
+                }
                 if (state.cost == 0) {
                     val snap = state.assignment.snapshot()
                     // Sync warm state on every yield so streaming consumers (which
@@ -205,7 +210,12 @@ class LocalSearchSolver(
         // degenerate objective (e.g. all-zero) on a constraint-free problem would
         // produce an infinite loop: cost stays at 0, greedy descent never improves,
         // and the restart path otherwise wouldn't bump [totalFlips].
+        var cancelCountdown = 0
         while (totalFlips < maxFlips) {
+            if (cancelCountdown-- <= 0) {
+                if (params.cancellation()) break
+                cancelCountdown = CANCEL_CHECK_INTERVAL
+            }
             if (state.cost == 0) {
                 // Score the current feasible assignment, record if best.
                 val snap = state.assignment.snapshot()
@@ -302,4 +312,8 @@ class LocalSearchSolver(
         return true
     }
 
+    private companion object {
+        /** Polling interval for cooperative cancellation; see Cancellation.kt. */
+        const val CANCEL_CHECK_INTERVAL: Int = 1024
+    }
 }
