@@ -37,4 +37,17 @@ data class LocalSearchParams(
      *  the requested values on every restart and ignores any move that would change
      *  them. Defaults to none. */
     val assumptions: Assumptions = Assumptions.None,
-) : SolverParams
+) : SolverParams {
+    override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
+        if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
+
+    private companion object {
+        fun merge(a: Assumptions, b: Assumptions): Assumptions {
+            if (a.isEmpty) return b
+            if (b.isEmpty) return a
+            val bools = HashMap<Int, Boolean>(a.bools).apply { putAll(b.bools) }
+            val ints = HashMap<Int, Int>(a.ints).apply { putAll(b.ints) }
+            return Assumptions(bools, ints)
+        }
+    }
+}

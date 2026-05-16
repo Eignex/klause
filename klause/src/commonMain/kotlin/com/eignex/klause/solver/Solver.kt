@@ -7,8 +7,16 @@ import com.eignex.klause.solver.brute.BruteForceSolver
  * Marker for backend-specific solver params. Each solver backend ships its own data class
  * implementing this; the [Solver] / [Optimizer] interfaces are generic over the params type
  * so the type system enforces the right params reach the right backend.
+ *
+ * [withAssumptions] is used by the [Session] abstraction to inject a stacked set of
+ * pinned variables into a per-call params object without each backend needing to know
+ * about Session. The default no-op returns `this` unchanged — appropriate for backends
+ * whose params don't carry an `assumptions` field. Backends that do (LocalSearchParams,
+ * BacktrackParams) override to return a copy with the merged pins applied.
  */
-interface SolverParams
+interface SolverParams {
+    fun withAssumptions(@Suppress("UNUSED_PARAMETER") assumptions: Assumptions): SolverParams = this
+}
 
 /**
  * Outcome of a single-shot [Solver.solve] call.
@@ -47,6 +55,14 @@ interface Solver<P : SolverParams> {
     fun sample(params: P): Sample? = samples(params).firstOrNull()
     fun samples(params: P): Sequence<Sample>
     fun enumerate(params: P): Sequence<Sample>
+
+    /**
+     * Open a stateful [Session] against this solver. The default returns a
+     * [StatelessSession] that manages an assumption stack but holds no other state;
+     * backends can override to inject cross-call state (warm-start, learned clauses,
+     * kumulant heuristic posteriors).
+     */
+    fun session(): Session<P> = StatelessSession(this)
 }
 
 /**

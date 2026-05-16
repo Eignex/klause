@@ -31,4 +31,17 @@ data class BacktrackParams(
     val valueHeuristic: ValueHeuristic = IndomainRandom,
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
-) : SolverParams
+) : SolverParams {
+    override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
+        if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
+
+    private companion object {
+        fun merge(a: Assumptions, b: Assumptions): Assumptions {
+            if (a.isEmpty) return b
+            if (b.isEmpty) return a
+            val bools = HashMap<Int, Boolean>(a.bools).apply { putAll(b.bools) }
+            val ints = HashMap<Int, Int>(a.ints).apply { putAll(b.ints) }
+            return Assumptions(bools, ints)
+        }
+    }
+}
