@@ -169,7 +169,7 @@ val text = cnf.toDimacs()
 - DIMACS / OPB parity: weighted MaxSAT (.wcnf) loader.
 - Backend: klause-choco adapter. JVM-only module wrapping Choco-solver as a reference CP oracle and competitive benchmark target. Mature global-constraint catalog and battle-tested FlatZinc parser; mapping from klause factors is near 1:1.
 - Backend: klause-ortools adapter for OR-tools CP-SAT via the Java bindings. State-of-the-art CP-SAT performance, but JNI-heavy and platform-specific natives — pick up after Choco.
-- Backend: klause-kissat / klause-cadical adapters via JNI. Kissat and CaDiCaL are SOTA CDCL SAT solvers (Kissat won SAT Competition 2020-2024); meaningfully faster than LogicNG's MiniSat on bit-blasted instances. Same lowering path as klause-logicng (bit-blast then dispatch). JNI bindings plus platform-specific natives are the cost.
+- Backend: klause-kissat / klause-cadical adapters. Kissat and CaDiCaL are SOTA CDCL SAT solvers (Kissat won SAT Competition 2020-2024); meaningfully faster than LogicNG's MiniSat on bit-blasted instances. Same lowering path as klause-logicng (bit-blast then dispatch). No Maven Central packages exist for either, so this means hand-rolled JNI bindings against the C source plus bundling platform-specific native binaries — substantial engineering. Probably only worth it once everything else on this TODO is done.
 - Perf (post-benchmark): replace Assumptions and PropagationResult.Implied maps with parallel-array representations to avoid Int boxing.
 - Perf (post-benchmark): make LocalSearchState.factorWeights lazy. Only DDFW-style strategies read it, but it's always allocated.
 - Perf (post-benchmark): audit PropagationSession snapshot allocation cost. 5 array copies per push; consider pooling or a flat delta-trail.
