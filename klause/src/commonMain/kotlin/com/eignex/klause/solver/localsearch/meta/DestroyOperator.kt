@@ -4,6 +4,9 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchSession
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -103,9 +106,63 @@ fun interface DestroyOperator {
             split(freedIds, problem.numBoolVars)
         }
 
+        /** Free variables that participate in factors *currently violated by the incumbent*.
+         *  Locally-feasible incumbents (cost = 0) leave nothing to free here, so the
+         *  operator returns an empty `FreedVars` — useful only when the ALNS incumbent
+         *  is genuinely partial / infeasible (e.g. mid-iteration after a destroyed phase,
+         *  or in soft-constraint settings). Caller should fall back to another operator
+         *  when this returns empty. */
+        val CurrentlyViolated: DestroyOperator = DestroyOperator { rng, problem, incumbent, _, fraction ->
+            val totalVars = problem.numBoolVars + problem.numIntVars
+            if (totalVars == 0) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            // Build a scratch state seeded with the incumbent; ask each factor whether it
+            // is violated under that assignment.
+            val scratch = LocalSearchState(problem, rng)
+            for (b in 0 until problem.numBoolVars) scratch.assignment.setBool(b, incumbent.bools[b])
+            for (i in 0 until problem.numIntVars) scratch.assignment.setInt(i, incumbent.ints[i])
+            scratch.recompute()
+            val violatedFactors = scratch.violated.toIntArray()
+            if (violatedFactors.isEmpty()) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            // Union the vars across all violated factors.
+            val freedSlots = HashSet<Int>()
+            for (fid in violatedFactors) {
+                val f = problem.factors[fid] as LocalSearchFactor
+                for (v in f.boolVars) freedSlots.add(v)
+                for (v in f.intVars) freedSlots.add(problem.numBoolVars + v)
+            }
+            // Subsample down to the fraction-sized target if the violated set is larger.
+            val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
+            val pool = freedSlots.toList()
+            val picked = if (pool.size <= k) pool else pool.shuffled(rng).take(k)
+            split(picked, problem.numBoolVars)
+        }
+
+        /**
+         * Activity-biased: free variables that were most recently / frequently touched in
+         * the inner solver's prior calls, read from a [LocalSearchSession]'s captured
+         * recency snapshot. Variables with the smallest `state.step - lastTouched` value
+         * are picked first — they are the ones the strategy was actively flipping in the
+         * recent search.
+         *
+         * Falls back to [Random] when the session has no recency capture yet (first
+         * iteration) or when no session was provided.
+         */
+        fun activityBiased(session: LocalSearchSession?): DestroyOperator = DestroyOperator { rng, problem, incumbent, objective, fraction ->
+            val recency = session?.warmStateView?.activityRecency() ?: IntArray(0)
+            if (recency.isEmpty()) return@DestroyOperator Random.destroy(rng, problem, incumbent, objective, fraction)
+            val totalVars = problem.numBoolVars + problem.numIntVars
+            val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
+            // Sort vars ascending by recency (smaller = more recently touched); take top k.
+            val indexed = IntArray(recency.size) { it }
+            val sorted = indexed.sortedBy { recency[it] }.take(k)
+            split(sorted, problem.numBoolVars)
+        }
+
         /** Default operator palette: random + worst-objective + adjacency-related. Three
          *  operators gives the bandit a non-trivial menu to learn from; callers can add
-         *  problem-specific operators. */
+         *  problem-specific operators (e.g. [CurrentlyViolated] when the incumbent is
+         *  expected to be partially-infeasible, or [activityBiased] when ALNS runs over
+         *  a [LocalSearchSession] that accumulates recency). */
         val Defaults: List<DestroyOperator> = listOf(Random, WorstObjective, AdjacencyRelated)
 
         private fun split(ids: List<Int>, numBoolVars: Int): FreedVars {

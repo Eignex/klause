@@ -35,9 +35,21 @@ class WarmState {
     /** Per-factor weights, size = `problem.numFactors`, or `null` if not yet populated. */
     internal var factorWeights: DoubleArray? = null
 
+    /** Per-variable recency, size = `numBoolVars + numIntVars` (bool ids first, then int
+     *  ids offset by `numBoolVars`). Smaller values mean "touched more recently in the
+     *  last LS call". `Int.MAX_VALUE` means "never touched in the captured call". `null`
+     *  if no call has completed yet. Used by ALNS destroy operators that pick high-
+     *  activity variables for re-optimisation. */
+    internal var activityRecency: IntArray? = null
+
+    /** Read-only view onto recency for tests / destroy operators. Returns an empty array
+     *  when no data has been captured yet. */
+    fun activityRecency(): IntArray = activityRecency ?: IntArray(0)
+
     /** Discard all warm state. The next session call starts from defaults. */
     fun reset() {
         factorWeights = null
+        activityRecency = null
     }
 
     /** Sync warm weights into [state] before the search loop starts. Size-mismatched
@@ -48,8 +60,18 @@ class WarmState {
         for (i in w.indices) state.factorWeights[i] = w[i]
     }
 
-    /** Capture the strategy's learned weights at the end of a search session. */
+    /** Capture the strategy's learned weights and per-variable recency at the end of a
+     *  search session. Recency is `state.step - lastTouched[v]` clamped to `Int`, with
+     *  `Int.MAX_VALUE` for untouched vars (lastTouched == 0). */
     internal fun captureFrom(state: LocalSearchState) {
         factorWeights = state.factorWeights.copyOf()
+        val total = state.problem.numBoolVars + state.problem.numIntVars
+        val recency = IntArray(total)
+        for (i in 0 until total) {
+            val touched = state.lastTouched[i]
+            recency[i] = if (touched == 0L) Int.MAX_VALUE
+                         else (state.step - touched).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+        }
+        activityRecency = recency
     }
 }

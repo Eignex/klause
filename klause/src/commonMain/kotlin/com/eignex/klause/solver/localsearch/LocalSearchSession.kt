@@ -1,34 +1,23 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.WarmState
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.LocalSearchSession
-
-import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Objective
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.Solver
-import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.propagation.PropagationResult
 
 /**
  * Stateful wrapper around a [LocalSearchSolver] that persists per-strategy learned state
  * (currently DDFW-style factor weights) across calls. The plain [LocalSearchSolver] keeps
  * its per-draw isolation property — concurrent callers don't interfere — by being
  * stateless across calls. Using a session is the opt-in path for callers that want
- * weights/heuristics to survive a `sample` / `solve` / `minimize` boundary.
+ * weights / heuristics to survive a `sample` / `solve` / `minimize` boundary.
+ *
+ * Implements [Session] so it slots into `solver.session()` like any other backend's
+ * stateful handle; on top of the standard `solve` / `samples` / `enumerate` it offers
+ * a `minimize` overload for the optimisation path (not part of the base interface
+ * because not every backend's [com.eignex.klause.solver.Solver] is an
+ * [com.eignex.klause.solver.Optimizer]).
  *
  * Sessions are **not thread-safe**: one consumer per session. The same underlying
  * [solver] can be shared by multiple sessions if each session is used from one thread.
@@ -40,8 +29,19 @@ import com.eignex.klause.solver.propagation.PropagationResult
  *    naturally / its iterator is cancelled). Sequences abandoned mid-iteration may not
  *    sync — accepted loss; the next call still starts from the previous capture.
  */
-class LocalSearchSession(val solver: LocalSearchSolver) {
+class LocalSearchSession(override val solver: LocalSearchSolver) : Session<LocalSearchParams> {
+
     private val warm: WarmState = WarmState()
+    private val stack: ArrayDeque<Assumptions> = ArrayDeque()
+
+    override val depth: Int get() = stack.size
+
+    override fun push(assumptions: Assumptions) { stack.addLast(assumptions) }
+
+    override fun pop() {
+        require(stack.isNotEmpty()) { "Session.pop on an empty assumption stack" }
+        stack.removeLast()
+    }
 
     /** Discard all warm state. The next call starts from strategy defaults. */
     fun reset() = warm.reset()
@@ -49,18 +49,34 @@ class LocalSearchSession(val solver: LocalSearchSolver) {
     /** Test-only window into the warm state. */
     internal val warmState: WarmState get() = warm
 
-    fun solve(params: LocalSearchParams = LocalSearchParams()): SolveResult =
-        solver.solveInternal(params, warm)
+    /** Read-only handle for cooperating components (e.g. ALNS destroy operators that
+     *  read [WarmState.activityRecency]). External callers must not mutate the warm
+     *  state directly — use [reset] to clear it. */
+    val warmStateView: WarmState get() = warm
 
-    fun sample(params: LocalSearchParams = LocalSearchParams()): Sample? =
-        samples(params).firstOrNull()
+    override fun solve(params: LocalSearchParams): SolveResult =
+        solver.solveInternal(applyStack(params), warm)
 
-    fun samples(params: LocalSearchParams = LocalSearchParams()): Sequence<Sample> =
-        solver.samplesInternal(params, warm)
+    override fun samples(params: LocalSearchParams): Sequence<Sample> =
+        solver.samplesInternal(applyStack(params), warm)
 
-    fun enumerate(params: LocalSearchParams = LocalSearchParams()): Sequence<Sample> =
-        solver.enumerateInternal(params, warm)
+    override fun enumerate(params: LocalSearchParams): Sequence<Sample> =
+        solver.enumerateInternal(applyStack(params), warm)
 
+    /** Optimisation entry point — not part of the base [Session] interface because not
+     *  every backend is an [com.eignex.klause.solver.Optimizer]. */
     fun minimize(objective: Objective, params: LocalSearchParams = LocalSearchParams()): Sample? =
-        solver.minimizeInternal(objective, params, warm)
+        solver.minimizeInternal(objective, applyStack(params), warm)
+
+    private fun applyStack(params: LocalSearchParams): LocalSearchParams {
+        if (stack.isEmpty()) return params
+        var merged = params.assumptions
+        for (a in stack) {
+            if (a.isEmpty) continue
+            val bools = HashMap<Int, Boolean>(merged.bools).apply { putAll(a.bools) }
+            val ints = HashMap<Int, Int>(merged.ints).apply { putAll(a.ints) }
+            merged = Assumptions(bools, ints)
+        }
+        return params.copy(assumptions = merged)
+    }
 }

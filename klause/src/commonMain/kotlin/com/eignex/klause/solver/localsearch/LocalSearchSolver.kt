@@ -63,6 +63,11 @@ class LocalSearchSolver(
 
     override fun enumerate(params: LocalSearchParams): Sequence<Sample> = enumerateInternal(params, warm = null)
 
+    /** Return a [LocalSearchSession] that persists DDFW-style factor weights across
+     *  calls and maintains an assumption stack. Backend-specific override of
+     *  [Solver.session]'s default `StatelessSession`. */
+    override fun session(): LocalSearchSession = LocalSearchSession(this)
+
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val eff = effectiveAssumptions(params.assumptions) ?: return SolveResult.Unsat
         return sampleInternal(params, eff, warm)?.let(SolveResult::Sat) ?: SolveResult.Unknown

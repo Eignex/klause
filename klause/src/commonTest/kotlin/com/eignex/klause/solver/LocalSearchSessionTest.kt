@@ -80,6 +80,32 @@ class LocalSearchSessionTest {
     }
 
     @Test
+    fun `session implements Session interface and is returned by solver session factory`() {
+        val solver = LocalSearchSolver(ddfwProblem())
+        val session = solver.session()
+        // The factory now returns a real LocalSearchSession, not the default StatelessSession.
+        assertTrue(session is LocalSearchSession, "expected LocalSearchSession, got ${session::class.simpleName}")
+        // depth = 0 on a fresh session; push/pop work.
+        assertEquals(0, session.depth)
+        session.push(com.eignex.klause.solver.Assumptions(bools = mapOf(0 to true)))
+        assertEquals(1, session.depth)
+        session.pop()
+        assertEquals(0, session.depth)
+    }
+
+    @Test
+    fun `session captures variable recency after a call`() {
+        val problem = ddfwProblem()
+        val solver = LocalSearchSolver(problem)
+        val session = LocalSearchSession(solver)
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L))
+        val recency = session.warmStateView.activityRecency()
+        assertEquals(6, recency.size, "recency should cover all (bool + int) var slots")
+        // After a sample search, at least some vars must have been touched (recency != MAX).
+        assertTrue(recency.any { it != Int.MAX_VALUE }, "expected at least one touched variable")
+    }
+
+    @Test
     fun `bare solver call does not touch the session warm state`() {
         // Concurrent / non-session callers shouldn't have a path to mutate session warm
         // state. Verified by running a bare solver call and confirming the unrelated
