@@ -249,7 +249,9 @@ class LocalSearchSolver(
                     totalFlips++
                     continue
                 }
-                // Local minimum on the (shaped) objective — restart and try a different basin.
+                // Local minimum on the (shaped) objective — give ILS-style policies a
+                // chance to update their incumbent before we restart.
+                restartPolicy.onLocalOptimum(state, snap, obj)
                 restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
                 totalFlips++

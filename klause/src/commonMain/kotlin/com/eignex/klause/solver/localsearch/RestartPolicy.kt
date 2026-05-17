@@ -34,6 +34,12 @@ interface RestartPolicy {
      *  restart. Return true to trigger a restart at the engine's next iteration. */
     fun shouldRestart(stepsSinceLastRestart: Int): Boolean
 
+    /** Notification from the optimiser path: greedy descent reached a feasible local
+     *  optimum at `state.cost == 0` with the given objective value. Policies that want
+     *  to track an incumbent across restarts (ILS-style) implement this; the default
+     *  is a no-op. The optimiser calls it right before [restart]. */
+    fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {}
+
     /** Carry out the restart. Default behaviour is a fresh random assignment via
      *  [LocalSearchState.restart]; policies that anchor to good regions override using
      *  [bestSoFar]. The optimiser path supplies the running best feasible sample;
