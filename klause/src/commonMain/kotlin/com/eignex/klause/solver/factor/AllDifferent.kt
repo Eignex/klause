@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -218,7 +219,31 @@ class AllDifferent(
             for (i in 0 until filled) sink.addIntSet(occupant, targets[i])
             return
         }
-        // Fallback: nudge occupant by ±1 within domain.
+        // No unused targets — every domain value is already taken. A single-var nudge
+        // would just shuffle the duplicate. Propose value-swap candidates: pair the
+        // occupant with the unique holder of another value in its domain. Within this
+        // one AllDifferent the swap preserves the value multiset (so the local duplicate
+        // count is unchanged), but in problems with multiple coupled AllDifferents (e.g.
+        // Sudoku rows × columns) the swap may resolve a duplicate elsewhere. Cap to
+        // [MAX_SWAP_CANDIDATES] — each Compound costs an apply-and-revert in scoring.
+        var swapsAdded = 0
+        for (w in d.min..d.max) {
+            if (swapsAdded >= MAX_SWAP_CANDIDATES) break
+            if (w == value) continue
+            val wIdx = w - domainMin
+            if (wIdx !in s.counts.indices || s.counts[wIdx] != 1) continue
+            // Locate the unique holder of w. O(|vars|) per candidate; bounded by
+            // MAX_SWAP_CANDIDATES so total cost is fixed.
+            var holder = -1
+            for (v in vars) if (state.assignment.intValue(v) == w) { holder = v; break }
+            if (holder == -1 || holder == occupant) continue
+            val hd = state.problem.intDomains[holder]
+            if (value < hd.min || value > hd.max) continue
+            sink.addCompound(listOf(Move.IntSet(occupant, w), Move.IntSet(holder, value)))
+            swapsAdded++
+        }
+        if (swapsAdded > 0) return
+        // Last-resort fallback: nudge occupant by ±1 within domain.
         val cur = state.assignment.intValue(occupant)
         if (cur < d.max) sink.addIntSet(occupant, cur + 1)
         if (cur > d.min) sink.addIntSet(occupant, cur - 1)
@@ -230,5 +255,9 @@ class AllDifferent(
          *  evaluation in WalkSat/probSAT, so don't go wild — the fan only needs to be wide enough
          *  for the strategy to discriminate. */
         const val MAX_REPAIR_TARGETS: Int = 4
+        /** Cap on swap-pair candidates per call. Each pair requires an O(|vars|) holder lookup
+         *  plus the apply-and-revert in [LocalSearchState.evaluateCompound]; two is enough for
+         *  the strategy to pick a swap over a single-var move when the domain is saturated. */
+        const val MAX_SWAP_CANDIDATES: Int = 2
     }
 }

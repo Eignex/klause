@@ -82,6 +82,42 @@ class AllDifferentTest {
     }
 
     @Test
+    fun `repair emits value-swap candidates when domain is fully saturated`() {
+        // 4 vars over [0..2] — all three values present, duplicate at 0. Every contiguous
+        // domain value is held by some var, so the conflict occupant has no unused target
+        // and the swap pass kicks in. (Pigeonhole-infeasible problem; that's fine — we're
+        // verifying the move-generation mechanism, not solving.)
+        val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 3)
+        val problem = com.eignex.klause.solver.Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = listOf(factor),
+        )
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 2)
+        state.assignment.setInt(3, 0)
+        state.recompute()
+        val sink = com.eignex.klause.solver.localsearch.MoveSink()
+        factor.proposeRepairMoves(state, factorId = 0, sink = sink)
+        val compounds = sink.list.filterIsInstance<com.eignex.klause.solver.Move.Compound>()
+        assertTrue(compounds.isNotEmpty(), "expected swap candidates with saturated domain; got ${sink.list}")
+        // Verify each Compound is a well-formed value-swap.
+        for (c in compounds) {
+            assertTrue(c.parts.size == 2, "swap should be 2-part, got ${c.parts.size}")
+            val a = c.parts[0] as com.eignex.klause.solver.Move.IntSet
+            val b = c.parts[1] as com.eignex.klause.solver.Move.IntSet
+            assertTrue(a.varId != b.varId, "swap should target distinct vars")
+            assertTrue(a.newValue == state.assignment.intValue(b.varId),
+                "swap part 0 takes part 1's old value")
+            assertTrue(b.newValue == state.assignment.intValue(a.varId),
+                "swap part 1 takes part 0's old value")
+        }
+    }
+
+    @Test
     fun `mismatched domain bounds fail at initialize`() {
 
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
