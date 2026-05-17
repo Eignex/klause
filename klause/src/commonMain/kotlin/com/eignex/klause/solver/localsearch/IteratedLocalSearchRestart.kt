@@ -36,11 +36,16 @@ class IteratedLocalSearchRestart(
     val adaptiveStallThreshold: Int = 3,
     val maxPerturbationStrength: Int = 50,
     val populationSize: Int = 1,
-    /** Probability per restart of generating the anchor via uniform crossover of two
-     *  random population members instead of single-anchor perturbation. Ignored when
+    /** Probability per restart of generating the anchor via crossover of two random
+     *  population members instead of single-anchor perturbation. Ignored when
      *  `populationSize < 2`. 0.0 disables crossover (default). 0.2-0.4 is a reasonable
      *  range when running with a populated incumbent set. */
     val crossoverRate: Double = 0.0,
+    /** How crossover combines two parents' values per variable. [CrossoverBias.Uniform]
+     *  (default) flips a fair coin; [CrossoverBias.BetterBiased] weights toward the
+     *  parent with the lower objective. Only consulted when [crossoverRate] > 0 and a
+     *  crossover restart fires. */
+    val crossoverBias: CrossoverBias = CrossoverBias.Uniform,
 ) : RestartPolicy {
 
     init {
@@ -89,7 +94,8 @@ class IteratedLocalSearchRestart(
         // perturbation since crossover itself diversifies. Only fires with ≥2 incumbents.
         if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
             val (parentA, parentB) = pickTwoDistinct(state.rng)
-            val child = uniformCrossover(parentA.sample, parentB.sample, state.rng)
+            val probA = crossoverBias.probParentA(parentA.objective, parentB.objective)
+            val child = biasedCrossover(parentA.sample, parentB.sample, probA, state.rng)
             applyChild(state, child)
             return
         }
@@ -109,9 +115,9 @@ class IteratedLocalSearchRestart(
         return population[i] to population[j]
     }
 
-    private fun uniformCrossover(a: Sample, b: Sample, rng: kotlin.random.Random): Sample {
-        val bools = BooleanArray(a.bools.size) { if (rng.nextBoolean()) a.bools[it] else b.bools[it] }
-        val ints = IntArray(a.ints.size) { if (rng.nextBoolean()) a.ints[it] else b.ints[it] }
+    private fun biasedCrossover(a: Sample, b: Sample, probA: Double, rng: kotlin.random.Random): Sample {
+        val bools = BooleanArray(a.bools.size) { if (rng.nextDouble() < probA) a.bools[it] else b.bools[it] }
+        val ints = IntArray(a.ints.size) { if (rng.nextDouble() < probA) a.ints[it] else b.ints[it] }
         return Sample(bools, ints)
     }
 

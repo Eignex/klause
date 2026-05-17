@@ -101,6 +101,24 @@ class TabuFilterTest {
     }
 
     @Test
+    fun `random band dynamic tenure stays within bounds`() {
+        val fn = TabuFilter.randomBand(low = 5, high = 15, seed = 42L)
+        repeat(100) {
+            val t = fn(it.toLong())
+            assertTrue(t in 5..15, "tenure $t escaped band [5,15]")
+        }
+    }
+
+    @Test
+    fun `linear growth dynamic tenure ramps from base to max`() {
+        val fn = TabuFilter.linearGrowth(base = 5, max = 25, maxAtStep = 1000L)
+        assertEquals(5, fn(0L))
+        assertTrue(fn(500L) in 5..25, "tenure at midpoint should be in range")
+        assertEquals(25, fn(1000L))
+        assertEquals(25, fn(99999L), "tenure should saturate at max past maxAtStep")
+    }
+
+    @Test
     fun `walk sat with custom tabu filter still solves`() {
         // Smoke test: passing a TabuFilter through the constructor changes nothing observable
         // for callers that previously passed tabuTenure.

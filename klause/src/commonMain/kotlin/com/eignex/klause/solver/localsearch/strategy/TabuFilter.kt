@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import kotlin.random.Random
 
 /**
  * Reusable candidate-set filter that removes moves whose variable was touched within the
@@ -54,6 +55,37 @@ data class TabuFilter(
     companion object {
         /** No tabu filtering at all — every raw candidate passes through. */
         val Disabled: TabuFilter = TabuFilter(tenure = 0)
+
+        /**
+         * Dynamic-tenure preset: pick a fresh tenure uniformly at random in `[low, high]`
+         * on every call. Adds diversification without making the average tenure drift —
+         * the [Glover-Laguna 1997] "robust tabu" pattern, useful when a single fixed
+         * tenure either traps the search (too short) or starves it (too long).
+         *
+         * The randomness comes from a private [Random] seeded by [seed]; pass a stable
+         * seed for reproducible runs, leave null for `Random.Default`.
+         */
+        fun randomBand(low: Int, high: Int, seed: Long? = null): (Long) -> Int {
+            require(low >= 0 && high >= low) { "expected 0 ≤ low ≤ high, got $low..$high" }
+            val rng = if (seed != null) Random(seed) else Random.Default
+            return { rng.nextInt(low, high + 1) }
+        }
+
+        /**
+         * Dynamic-tenure preset: grow tenure linearly with `state.step` from [base] up to
+         * [max], saturating after [maxAtStep] flips. Slow start (short tabu, encourages
+         * local progress) then plateau (longer tabu, forces diversification). Inverse of
+         * the literature "decaying tabu" — useful when the search benefits from increasing
+         * diversification as it stalls.
+         */
+        fun linearGrowth(base: Int, max: Int, maxAtStep: Long): (Long) -> Int {
+            require(base >= 0 && max >= base) { "expected 0 ≤ base ≤ max, got base=$base max=$max" }
+            require(maxAtStep > 0) { "maxAtStep must be positive, got $maxAtStep" }
+            return { step ->
+                if (step >= maxAtStep) max
+                else base + ((max - base) * step / maxAtStep).toInt()
+            }
+        }
     }
 }
 

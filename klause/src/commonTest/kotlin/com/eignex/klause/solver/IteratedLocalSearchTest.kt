@@ -174,6 +174,26 @@ class IteratedLocalSearchTest {
     }
 
     @Test
+    fun `BetterBiased crossover skews toward the better parent`() {
+        // Force every var to be picked from the better parent (rate = 0.5) and verify
+        // the child equals the better parent's sample.
+        val bias = com.eignex.klause.solver.localsearch.CrossoverBias.BetterBiased(rate = 0.5)
+        assertEquals(1.0, bias.probParentA(parentAObjective = 1.0, parentBObjective = 10.0),
+            "fully-biased should pick A when A is better")
+        assertEquals(0.0, bias.probParentA(parentAObjective = 10.0, parentBObjective = 1.0),
+            "fully-biased should pick B when B is better")
+        assertEquals(0.5, bias.probParentA(parentAObjective = 5.0, parentBObjective = 5.0),
+            "tied parents should fall back to uniform")
+    }
+
+    @Test
+    fun `Uniform crossover ignores objective`() {
+        val bias = com.eignex.klause.solver.localsearch.CrossoverBias.Uniform
+        assertEquals(0.5, bias.probParentA(1.0, 100.0))
+        assertEquals(0.5, bias.probParentA(100.0, 1.0))
+    }
+
+    @Test
     fun `crossover does nothing when population has fewer than 2 incumbents`() {
         // Single-member population — crossover should silently fall back to single-anchor mode.
         val factor = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
