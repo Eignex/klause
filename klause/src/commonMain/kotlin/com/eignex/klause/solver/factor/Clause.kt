@@ -78,16 +78,48 @@ class Clause(
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        // O(1) early-out via the precomputed lookup: factors get called per-flip via the
-        // occurrence list, but a defensive `not-in-clause` check is essentially free now.
-        if (litIndexByVar[boolVar] < 0) return 0
-        val wasViolated = isViolated(state, factorId)
-        val nowViolated = !anyLitTrueAfterFlip(state, boolVar)
+        val li = litIndexByVar[boolVar]
+        if (li < 0) return 0
+        val w = state.refPayload[factorId] as Watches
+        // The watched-literal `applyBoolFlip` maintains the *weak* invariant — "if any
+        // literal is true then at least one watch is true" — not the strong one ("every
+        // true literal up to 2 is watched"). We exploit the weak invariant to short-cut
+        // most flips and fall back to a scan only for the unlucky case where we flip
+        // a watch that's the only currently-true watch and need to know whether some
+        // non-watch literal is also true.
+        val w1True = litTrue(state, w.w1)
+        val w2True = w.w2 >= 0 && litTrue(state, w.w2)
+        val wasViolated = !w1True && !w2True
+
+        val nowViolated = when {
+            // Both watches true: at most one of them is the flipped literal; the other
+            // stays true regardless.
+            w1True && w2True -> false
+            // Only w1 is currently true. Flipping a non-watch leaves w1 alone — still
+            // satisfied. Flipping `w.w1` (== `li`) sends w1 false; we then need to
+            // know whether any other literal happens to be true (weak invariant
+            // permits true non-watch literals when at least one watch is true).
+            w1True -> if (li != w.w1) false else !anyOtherLitTrue(state, li)
+            w2True -> if (li != w.w2) false else !anyOtherLitTrue(state, li)
+            // Currently violated: every literal is false (this is the strong half of
+            // the invariant — when both watches are false, no literal is true, since
+            // applyBoolFlip would have rewatched otherwise). Flipping literals[li]
+            // makes it true → clause becomes satisfied.
+            else -> false
+        }
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
-        // TODO: full O(1) via watched literals. Earlier attempt assumed the rewatch
-        // invariant "if any literal is true then at least one watch is true" — the
-        // FactorPropertyTest random walk surfaces cases where that breaks, so an O(1)
-        // variant needs to first strengthen / verify the invariant in applyBoolFlip.
+    }
+
+    /** True iff some literal at an index other than [excludeIdx] is currently true.
+     *  Only invoked when the watched-literal short-cuts can't conclude, so the O(arity)
+     *  cost is rare in practice (most flips of well-satisfied clauses stay in the
+     *  both-watches-true branch). */
+    private fun anyOtherLitTrue(state: LocalSearchState, excludeIdx: Int): Boolean {
+        for (i in literals.indices) {
+            if (i == excludeIdx) continue
+            if (litTrue(state, i)) return true
+        }
+        return false
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
