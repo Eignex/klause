@@ -1,9 +1,11 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import kotlin.math.abs
 
 /**
  * Hamiltonian-cycle constraint: `succ` is an array of `n` variables, each holding the index
@@ -15,80 +17,120 @@ import com.eignex.klause.solver.propagation.PropagationState
  *  - `succ[i] = j` reads "node `j` is the successor of node `i`".
  *  - Domain: each `succ[i]` must hold a value in `[0, n)`. Out-of-range values count as
  *    violations.
- *  - Self-loops (`succ[i] = i`) are violations when `n ≥ 2` — a self-loop excludes node `i`
- *    from any cycle of length ≥ 2. Use [Subcircuit] when self-loops should be allowed as
- *    "node excluded from the circuit".
+ *  - Self-loops (`succ[i] = i`) are violations when `n ≥ 2` — use [Subcircuit] for the
+ *    self-loop-as-excluded variant.
  *  - Sub-cycles (e.g. `succ[0]=1, succ[1]=0` with `n ≥ 3`) are violations.
  *
- * Propagation is intentionally weak — currently just bounds and self-loop avoidance — so the
- * full Hamiltonian property is enforced at LS scoring time via [isViolated]. A future
- * dedicated propagator (no-sub-cycle reasoning via union-find of fixed segments) is on the
- * TODO; see `[CP] Factor: circuit` in README.
+ * LS cost is graded:
+ *   `cost = |numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`
+ * — broken assignments rank in proportion to "how far off Hamiltonian" they are
+ * (multiple disjoint cycles are worse than one near-cycle missing a couple of nodes), so
+ * strategies see a useful gradient instead of a flat broken/satisfied bit.
+ *
+ * Propagation:
+ *  - Bounds: every `succ[i]` is tightened to `[0, n)`.
+ *  - Self-loop shaving: `succ[i] != i` for `n ≥ 2` (shaves at domain endpoints).
+ *  - AllDifferent pigeonhole: every value held as a singleton by some `succ[i]` is
+ *    shaved from every other variable's domain endpoints.
+ *  - Sub-cycle prevention: for each non-singleton variable, walks backward through
+ *    singleton predecessors to find the start of the fixed chain ending at this node.
+ *    If the chain spans fewer than `n` nodes, the chain-start value is forbidden (closing
+ *    would form a sub-cycle of length < `n`). If the chain spans `n − 1` nodes (one
+ *    successor still to choose), the chain-start value is *forced* — the only completion.
+ *  - Worklist-driven: one propagate() call does one pass; the engine re-fires on
+ *    subsequent tightenings, so cascades resolve over multiple calls.
  */
 class Circuit(val succ: IntArray) : LocalSearchFactor {
 
-    init { require(succ.size >= 1) { "Circuit needs at least one var, got ${succ.size}" } }
+    init { require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" } }
 
     override val boolVars: IntArray = EMPTY
     override val intVars: IntArray = succ
 
     private val n: Int = succ.size
-    /** Reverse map var-id → position in [succ], for delta-from-IntVar paths. Var ids are
-     *  dense in klause but [succ] may carry them in arbitrary order; a pre-computed index
-     *  turns "find the position of this var" into an O(1) lookup. */
+
+    /** Reverse map var-id → position in [succ], for delta-from-IntVar paths. */
     private val positionOfVar: Map<Int, Int> = succ.withIndex().associate { (i, v) -> v to i }
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        // No payload — isViolated recomputes from the assignment every call.
+        state.intPayload[factorId] = computeCost(state, replaceAt = -1, replaceWith = 0)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        !formsCompleteCycle(state, replaceAt = -1, replaceWith = 0)
+        state.intPayload[factorId] > 0
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val pos = positionOfVar[intVar] ?: return 0
-        val wasViolated = !formsCompleteCycle(state, replaceAt = -1, replaceWith = 0)
-        val willViolate = !formsCompleteCycle(state, replaceAt = pos, replaceWith = newValue)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        val oldCost = state.intPayload[factorId]
+        val newCost = computeCost(state, replaceAt = pos, replaceWith = newValue)
+        return (if (newCost > 0) 1 else 0) - (if (oldCost > 0) 1 else 0)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        val pos = positionOfVar[intVar] ?: return 0
-        // After-apply: assignment already updated. We need before-vs-after delta.
-        val nowViolated = !formsCompleteCycle(state, replaceAt = -1, replaceWith = 0)
-        // Reconstruct pre-state by swapping pos's value back to oldValue.
-        val wasViolated = !formsCompleteCycle(state, replaceAt = pos, replaceWith = oldValue)
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        if (positionOfVar[intVar] == null) return 0
+        val oldCost = state.intPayload[factorId]
+        val newCost = computeCost(state, replaceAt = -1, replaceWith = 0)
+        state.intPayload[factorId] = newCost
+        return (if (newCost > 0) 1 else 0) - (if (oldCost > 0) 1 else 0)
     }
 
     /**
-     * Walk the successor graph from node 0; return true iff the assignment (with the
-     * optional `succ[replaceAt] = replaceWith` override) is a single cycle of length `n`
-     * visiting every node exactly once. Returns false on out-of-domain values, self-loops
-     * (`n ≥ 2`), and sub-cycles. O(n) per call.
+     * Graded cost: `|numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`.
+     * Returns 0 iff the assignment (with optional override `succ[replaceAt] = replaceWith`)
+     * is a single Hamiltonian cycle of length `n`. O(n).
      */
-    private fun formsCompleteCycle(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Boolean {
+    private fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int {
         if (n == 1) {
             val v = if (replaceAt == 0) replaceWith else state.assignment.intValue(succ[0])
-            return v == 0
+            return if (v == 0) 0 else 1
         }
-        val visited = BooleanArray(n)
-        var node = 0
-        for (step in 0 until n) {
-            if (visited[node]) return false // returned to an already-visited node (sub-cycle)
-            visited[node] = true
-            val nextVal = if (node == replaceAt) replaceWith else state.assignment.intValue(succ[node])
-            if (nextVal < 0 || nextVal >= n) return false
-            if (nextVal == node) return false // self-loop forbidden for n ≥ 2
-            node = nextVal
+        // Effective next value per node.
+        val next = IntArray(n)
+        var numSelfLoops = 0
+        var numOob = 0
+        for (i in 0 until n) {
+            val s = if (i == replaceAt) replaceWith else state.assignment.intValue(succ[i])
+            if (s < 0 || s >= n) {
+                next[i] = -1
+                numOob++
+            } else if (s == i) {
+                next[i] = -1
+                numSelfLoops++ // self-loop forbidden for n ≥ 2
+            } else {
+                next[i] = s
+            }
         }
-        return node == 0 // must close the cycle
+        // Functional-graph cycle decomposition. Each valid node has one out-edge; nodes
+        // with next[i] = -1 are sinks. Walk from each unvisited start, track entry step
+        // so a revisit can identify whether we closed a cycle (re-entered current path)
+        // or merged into a previously-explored region (no new cycle).
+        val UNVISITED = 0; val ON_STACK = 1; val DONE = 2
+        val markers = IntArray(n) // 0 = unvisited
+        val enterStep = IntArray(n)
+        var globalStep = 0
+        var numCycles = 0
+        var nodesInCycles = 0
+        for (start in 0 until n) {
+            if (markers[start] != UNVISITED) continue
+            var cur = start
+            while (cur >= 0 && markers[cur] == UNVISITED) {
+                markers[cur] = ON_STACK
+                enterStep[cur] = globalStep++
+                cur = next[cur]
+            }
+            if (cur >= 0 && markers[cur] == ON_STACK) {
+                // Returned to a node on the current path → cycle from `cur` to end-of-path.
+                numCycles++
+                nodesInCycles += globalStep - enterStep[cur]
+            }
+            // Settle path nodes as DONE so they're never revisited.
+            for (i in 0 until n) if (markers[i] == ON_STACK) markers[i] = DONE
+        }
+        return abs(numCycles - 1) + (n - nodesInCycles) + numSelfLoops + numOob
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Bounds: every succ[i]'s domain must intersect [0, n).
-        // Self-loops: when n ≥ 2, succ[i] != i — tighten by shaving the value-i endpoint.
-        // Full sub-cycle avoidance is left to a future dedicated propagator.
+        // 1. Tighten each succ[i] to the domain [0, n).
         for (i in succ.indices) {
             val v = succ[i]
             val d = state.intDomains[v]
@@ -97,46 +139,195 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
             if (newLo > newHi) return false
             if (newLo != d.min && !state.tightenIntMin(v, newLo)) return false
             if (newHi != d.max && !state.tightenIntMax(v, newHi)) return false
-            // Shave self-loop value `i` from endpoints; can't punch holes in the middle
-            // without a richer domain representation, so this only fires when `i` is at min/max.
-            if (n >= 2) {
-                val dd = state.intDomains[v]
-                if (dd.min == i && dd.min < dd.max) {
-                    if (!state.tightenIntMin(v, dd.min + 1)) return false
-                } else if (dd.max == i && dd.min < dd.max) {
-                    if (!state.tightenIntMax(v, dd.max - 1)) return false
-                } else if (dd.min == dd.max && dd.min == i) {
+        }
+        if (n == 1) {
+            val v = succ[0]
+            val d = state.intDomains[v]
+            if (0 !in d.min..d.max) return false
+            if (d.min != 0 && !state.tightenIntMin(v, 0)) return false
+            if (d.max != 0 && !state.tightenIntMax(v, 0)) return false
+            return true
+        }
+        // 2. Self-loop shaving (n ≥ 2): succ[i] != i.
+        for (i in succ.indices) {
+            val v = succ[i]
+            val d = state.intDomains[v]
+            if (d.min == i && d.min < d.max) {
+                if (!state.tightenIntMin(v, d.min + 1)) return false
+            } else if (d.max == i && d.min < d.max) {
+                if (!state.tightenIntMax(v, d.max - 1)) return false
+            } else if (d.min == d.max && d.min == i) {
+                return false
+            }
+        }
+        // 3. Collect singletons; flag pigeonhole violations.
+        val pred = IntArray(n) { -1 } // pred[target] = pos whose singleton succ = target
+        for (i in succ.indices) {
+            val v = succ[i]
+            val d = state.intDomains[v]
+            if (d.min == d.max) {
+                val target = d.min
+                if (pred[target] != -1) return false // two singletons → same node → no Hamiltonian
+                pred[target] = i
+            }
+        }
+        // 4. Pigeonhole: shave singleton-taken values from non-singleton endpoints.
+        for (i in succ.indices) {
+            val v = succ[i]
+            val d = state.intDomains[v]
+            if (d.min == d.max) continue
+            var newMin = d.min
+            while (newMin < d.max && pred[newMin] != -1 && pred[newMin] != i) newMin++
+            var newMax = d.max
+            while (newMax > newMin && pred[newMax] != -1 && pred[newMax] != i) newMax--
+            if (newMin > newMax) return false
+            if (newMin != d.min && !state.tightenIntMin(v, newMin)) return false
+            if (newMax != d.max && !state.tightenIntMax(v, newMax)) return false
+        }
+        // 5. Cycle-detect on singletons: walk the singleton-successor graph from each
+        //    unvisited node. If a closed cycle has length < n, it's a sub-cycle that
+        //    can never be extended into a Hamiltonian — fail. This also catches
+        //    "all-singletons assignments" that the search committed to.
+        val visited = BooleanArray(n)
+        for (start in 0 until n) {
+            if (visited[start]) continue
+            val path = ArrayList<Int>()
+            val onPath = BooleanArray(n)
+            var cur = start
+            while (cur in 0 until n && !visited[cur] && !onPath[cur]) {
+                path.add(cur); onPath[cur] = true
+                val sV = succ[cur]; val sD = state.intDomains[sV]
+                if (sD.min != sD.max) { cur = -2; break } // not singleton; chain ends here
+                cur = sD.min
+            }
+            if (cur in 0 until n && onPath[cur]) {
+                // Closed cycle in singletons; check length against n.
+                val cycleStartIdx = path.indexOf(cur)
+                val cycleLen = path.size - cycleStartIdx
+                if (cycleLen < n) return false
+                // cycleLen == n: full Hamiltonian via singletons; legal.
+            }
+            for (node in path) visited[node] = true
+        }
+        // 6. Chain analysis: for each non-singleton, walk backward via pred[] to chain
+        //    start; forbid (or force) chain start as successor.
+        for (i in succ.indices) {
+            val v = succ[i]
+            val d = state.intDomains[v]
+            if (d.min == d.max) continue
+            var start = i
+            var chainNodes = 1
+            var cur = i
+            while (true) {
+                val prev = pred[cur]
+                if (prev == -1) break
+                if (prev == start) {
+                    // Walked back to a node already on the current chain — singleton
+                    // sub-cycle that doesn't include this non-singleton. Hard violation.
                     return false
                 }
+                start = prev
+                chainNodes++
+                cur = prev
+                if (chainNodes > n) return false
+            }
+            if (chainNodes == n) {
+                // Chain spans all n nodes; succ[i] = start is the only completion.
+                if (start !in d.min..d.max) return false
+                if (!state.tightenIntMin(v, start)) return false
+                if (!state.tightenIntMax(v, start)) return false
+            } else {
+                // chainNodes < n; setting succ[i] = start would close a sub-cycle. Shave
+                // if `start` lies at a domain endpoint.
+                if (start == d.min && d.min < d.max) {
+                    if (!state.tightenIntMin(v, d.min + 1)) return false
+                } else if (start == d.max && d.min < d.max) {
+                    if (!state.tightenIntMax(v, d.max - 1)) return false
+                } else if (d.min == d.max && d.min == start) {
+                    return false
+                }
+                // else: start is interior — contiguous IntDomain can't punch a hole.
             }
         }
         return true
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (!isViolated(state, factorId)) return
-        // Generic repair: propose changing each succ var to each value in its domain that
-        // breaks the current sub-cycle structure. Capped by domain size; if domains are
-        // very large, defaults to ±1 nudge.
+        if (state.intPayload[factorId] == 0) return
+        // Single-var repair: try alternative successors at each node. Plus 2-var swap
+        // moves that merge two cycles into one (high-leverage when the current state
+        // has > 1 cycle and single-var moves can only shuffle them).
         for (i in succ.indices) {
             val v = succ[i]
             val cur = state.assignment.intValue(v)
             val d = state.problem.intDomains[v]
-            // Try at most MAX_TARGETS values, sampled across the domain.
             val span = d.size
             if (span <= MAX_TARGETS) {
                 for (target in d.min..d.max) {
                     if (target != cur && target != i) sink.addIntSet(v, target)
                 }
             } else {
-                // Large domain — propose a few sampled targets.
                 if (cur < d.max) sink.addIntSet(v, cur + 1)
                 if (cur > d.min) sink.addIntSet(v, cur - 1)
-                // Plus a random spread (state.rng) to break out of local plateaus.
                 repeat(MAX_TARGETS) {
                     val target = d.min + state.rng.nextInt(span)
                     if (target != cur && target != i) sink.addIntSet(v, target)
                 }
+            }
+        }
+        // 2-cycle merge: when the current configuration has multiple cycles, propose
+        // edge swaps. For two edges (i, succ[i]) and (j, succ[j]) with i, j in different
+        // cycles, the swap (i → succ[j]) and (j → succ[i]) merges them. Cap at a few
+        // candidates; full enumeration is O(n²).
+        proposeMergeSwaps(state, sink)
+    }
+
+    /** Walk current assignment, find nodes in different cycles, propose Compound swaps
+     *  that merge their cycles. Capped at [MAX_SWAP_CANDIDATES] for sink size. */
+    private fun proposeMergeSwaps(state: LocalSearchState, sink: MoveSink) {
+        if (n < 3) return
+        // Compute cycle id per node from the current assignment.
+        val cycleOf = IntArray(n) { -1 }
+        val UNVISITED = -1
+        var cycleId = 0
+        val effective = IntArray(n) { i ->
+            val s = state.assignment.intValue(succ[i])
+            if (s < 0 || s >= n || s == i) -1 else s
+        }
+        for (start in 0 until n) {
+            if (cycleOf[start] != UNVISITED) continue
+            // Walk; detect cycle.
+            val pathBuf = ArrayList<Int>()
+            var cur = start
+            while (cur >= 0 && cycleOf[cur] == UNVISITED && cur !in pathBuf) {
+                pathBuf.add(cur)
+                cur = effective[cur]
+            }
+            if (cur >= 0 && cur in pathBuf) {
+                val cycleStartIdx = pathBuf.indexOf(cur)
+                for (idx in cycleStartIdx until pathBuf.size) cycleOf[pathBuf[idx]] = cycleId
+                cycleId++
+            }
+            // Nodes outside any cycle (in tails) stay at UNVISITED; ignored for swaps.
+        }
+        if (cycleId < 2) return // single cycle (or none) — no merge swaps.
+        // Pick up to MAX_SWAP_CANDIDATES cross-cycle pairs.
+        var swapsAdded = 0
+        for (i in 0 until n) {
+            if (swapsAdded >= MAX_SWAP_CANDIDATES) break
+            if (cycleOf[i] < 0) continue
+            for (j in i + 1 until n) {
+                if (swapsAdded >= MAX_SWAP_CANDIDATES) break
+                if (cycleOf[j] < 0 || cycleOf[j] == cycleOf[i]) continue
+                // Domains must allow the swap.
+                val si = effective[i]
+                val sj = effective[j]
+                if (si < 0 || sj < 0) continue
+                val di = state.problem.intDomains[succ[i]]
+                val dj = state.problem.intDomains[succ[j]]
+                if (sj !in di.min..di.max || si !in dj.min..dj.max) continue
+                sink.addCompound(listOf(Move.IntSet(succ[i], sj), Move.IntSet(succ[j], si)))
+                swapsAdded++
             }
         }
     }
@@ -144,5 +335,6 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
     private companion object {
         val EMPTY: IntArray = IntArray(0)
         const val MAX_TARGETS: Int = 4
+        const val MAX_SWAP_CANDIDATES: Int = 4
     }
 }

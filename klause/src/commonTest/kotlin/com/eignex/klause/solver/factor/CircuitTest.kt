@@ -93,6 +93,107 @@ class CircuitTest {
     }
 
     @Test
+    fun `factor's internal graded cost reflects how broken the assignment is`() {
+        // state.cost is binary per-factor (count of violated factors). The Circuit
+        // factor's *graded* cost lives in state.intPayload[factorId] — read that to
+        // verify gradation.
+        val problem = fourNodeProblem()
+        val state = LocalSearchState(problem, Random(0))
+
+        // Two 2-cycles: 0↔1 and 2↔3 → numCycles=2, all 4 nodes in cycles, no self-loops.
+        // cost = |2-1| + (4-4) + 0 + 0 = 1.
+        state.assignment.setInt(0, 1); state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 3); state.assignment.setInt(3, 2)
+        state.recompute()
+        val cost2 = state.intPayload[0]
+        assertEquals(1, cost2, "two 2-cycles should yield graded cost 1")
+
+        // 4 self-loops → numCycles=0, no nodes in cycles, 4 self-loops.
+        // cost = |0-1| + (4-0) + 4 + 0 = 9.
+        state.assignment.setInt(0, 0); state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 2); state.assignment.setInt(3, 3)
+        state.recompute()
+        val cost4 = state.intPayload[0]
+        assertEquals(9, cost4, "4 self-loops should yield graded cost 9")
+
+        assertTrue(cost4 > cost2, "4-self-loop config should rank as more broken than 2-cycle config")
+    }
+
+    @Test
+    fun `cached cost matches recomputed after applying a move`() {
+        val problem = fourNodeProblem()
+        val state = LocalSearchState(problem, Random(0))
+        state.assignment.setInt(0, 1); state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 3); state.assignment.setInt(3, 0)
+        state.recompute()
+        assertEquals(0, state.cost, "Hamiltonian baseline")
+        // Apply a move that breaks the cycle and verify state.cost updates correctly.
+        state.apply(com.eignex.klause.solver.Move.IntSet(0, 2)) // succ[0] = 2 instead of 1
+        // Now: 0→2, 1→2, 2→3, 3→0. Two vars point to 2; functional graph degenerates.
+        // Cost should be > 0.
+        assertTrue(state.cost > 0, "broken assignment should have positive cost")
+    }
+
+    @Test
+    fun `BacktrackSolver enumerates exactly the Hamiltonian cycles on N=4`() {
+        // On N=4 there are exactly (4-1)!/2 = 3 distinct Hamiltonian cycles, but Circuit
+        // treats the cycle direction and starting point as distinct since it's "succ"
+        // not "tour". Total succ-arrays representing a Hamiltonian cycle on N=4 is
+        // (4-1)! = 6 (number of cyclic permutations of n elements).
+        val problem = fourNodeProblem()
+        val solver = com.eignex.klause.solver.backtrack.BacktrackSolver(problem)
+        val params = com.eignex.klause.solver.backtrack.BacktrackParams()
+        val samples = solver.enumerate(params).toList()
+        assertEquals(6, samples.size, "expected 6 Hamiltonian cycles on N=4, got ${samples.size}: $samples")
+        // Every enumerated solution is a valid cycle.
+        for (s in samples) {
+            val visited = BooleanArray(4)
+            var node = 0
+            for (step in 0 until 4) {
+                assertFalse(visited[node], "revisit at step $step in ${s.ints.toList()}")
+                visited[node] = true
+                node = s.ints[node]
+            }
+            assertEquals(0, node, "must close cycle in ${s.ints.toList()}")
+        }
+    }
+
+    @Test
+    fun `propagator forces last edge when N-1 successors are fixed`() {
+        // 4 vars, all bounds [0..3]. Pin succ[0]=1, succ[1]=2, succ[2]=3 via assumptions.
+        // Propagator should force succ[3]=0 (the only closing edge).
+        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3))
+        val problem = com.eignex.klause.solver.Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(factor),
+        )
+        val assumptions = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 1, 1 to 2, 2 to 3))
+        val result = problem.propagate(assumptions)
+        assertTrue(result is com.eignex.klause.solver.propagation.PropagationResult.Implied,
+            "propagation should succeed and force the closing edge; got $result")
+        val implied = result as com.eignex.klause.solver.propagation.PropagationResult.Implied
+        // succ[3] should be forced to 0.
+        assertEquals(0, implied.ints[3], "succ[3] should be forced to 0; got implied=${implied.ints}")
+    }
+
+    @Test
+    fun `propagator detects pigeonhole infeasibility`() {
+        // Two singletons pointing to the same successor → no Hamiltonian.
+        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3))
+        val problem = com.eignex.klause.solver.Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(factor),
+        )
+        // succ[0] = 2 and succ[1] = 2 → two predecessors of node 2.
+        val assumptions = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 2, 1 to 2))
+        val result = problem.propagate(assumptions)
+        assertTrue(result is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
+            "should detect infeasibility; got $result")
+    }
+
+    @Test
     fun `LS solver finds Hamiltonian cycle on N=4`() {
         val problem = fourNodeProblem()
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
