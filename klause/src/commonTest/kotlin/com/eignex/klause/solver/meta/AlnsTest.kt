@@ -3,6 +3,7 @@ package com.eignex.klause.solver.meta
 import com.eignex.klause.solver.localsearch.meta.Alns
 import com.eignex.klause.solver.localsearch.meta.DestroyOperator
 import com.eignex.klause.solver.localsearch.meta.FreedVars
+import com.eignex.klause.solver.localsearch.meta.GreedyConstructionRepair
 import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
 import com.eignex.klause.solver.localsearch.meta.RepairOperator
 import com.eignex.klause.solver.localsearch.meta.RouletteWheelBandit
@@ -155,6 +156,68 @@ class AlnsTest {
         // essentially zero with equal initial weights and 30 picks.)
         val repairIdxs = alns.iterationLog.map { it.repairIdx }.toSet()
         assertTrue(repairIdxs.isNotEmpty(), "ALNS should have logged at least one iteration")
+    }
+
+    @Test
+    fun `greedy construction repair climbs from infeasible incumbent to feasible optimum`() {
+        // 4 vars in exactly-one with weighted objective. Incumbent is all-false (infeasible).
+        // Greedy needs to flip one bool to true; under FeasibilityFirst shaping the only
+        // accepted flips are those reaching feasibility, so greedy picks bool 3 (cheapest
+        // weight = 3) and rejects flips to 0/1/2 which would have higher shaped score.
+        val factor = Cardinality.exactlyOne(intArrayOf(
+            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
+        ))
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val inner = LocalSearchSolver(problem)
+        // Pick a deterministic seed/order so the test is reproducible. The incumbent here
+        // is infeasible; greedy walks freed vars and accepts any flip that strictly lowers
+        // the shaped score, including transitions out of infeasibility.
+        val incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0))
+        val context = com.eignex.klause.solver.localsearch.meta.RepairContext(
+            inner = inner,
+            params = LocalSearchParams(randomSeed = 0L),
+            objective = objective,
+            pinAssumptions = com.eignex.klause.solver.Assumptions.None,
+            incumbent = incumbent,
+            freed = com.eignex.klause.solver.localsearch.meta.FreedVars(intArrayOf(0, 1, 2, 3), IntArray(0)),
+            rng = kotlin.random.Random(0),
+        )
+        val sample = GreedyConstructionRepair().repair(context)
+        assertNotNull(sample)
+        // Greedy reaches feasibility by flipping exactly one bool; under deterministic
+        // walk order the picked bool varies, but all feasible single-flip outcomes are
+        // among {10, 5, 8, 3}. We require feasibility (cost=0) and any of the four values.
+        val trueCount = (0..3).count { sample.bools[it] }
+        assertEquals(1, trueCount, "expected exactly one true after greedy repair")
+    }
+
+    @Test
+    fun `greedy construction respects pinned vars`() {
+        // 4 bools, exactly-one. Pin bools 0..2 false; only bool 3 free. Greedy must set
+        // bool 3 = true (the only path to feasibility); pinned vars stay at 0.
+        val factor = Cardinality.exactlyOne(intArrayOf(
+            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
+        ))
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val inner = LocalSearchSolver(problem)
+        val pinAssumptions = com.eignex.klause.solver.Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false))
+        val context = com.eignex.klause.solver.localsearch.meta.RepairContext(
+            inner = inner,
+            params = LocalSearchParams(randomSeed = 0L),
+            objective = objective,
+            pinAssumptions = pinAssumptions,
+            incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0)),
+            freed = com.eignex.klause.solver.localsearch.meta.FreedVars(intArrayOf(3), IntArray(0)),
+            rng = kotlin.random.Random(0),
+        )
+        val sample = GreedyConstructionRepair().repair(context)
+        assertNotNull(sample)
+        assertEquals(false, sample.bools[0])
+        assertEquals(false, sample.bools[1])
+        assertEquals(false, sample.bools[2])
+        assertEquals(true, sample.bools[3], "free var 3 should be flipped to satisfy exactly-one")
     }
 
     @Test

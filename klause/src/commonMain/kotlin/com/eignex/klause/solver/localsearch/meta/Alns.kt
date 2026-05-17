@@ -113,7 +113,7 @@ class Alns(
             }
 
             val pinAssumptions = buildPin(inner.problem, incumbent, freed)
-            val context = RepairContext(inner, perIterParams, objective, pinAssumptions, incumbent, freed)
+            val context = RepairContext(inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng)
             val repaired = repairOperators[repairIdx].repair(context)
             if (repaired == null) {
                 destroyBandit.reward(destroyIdx, rejectedReward)
