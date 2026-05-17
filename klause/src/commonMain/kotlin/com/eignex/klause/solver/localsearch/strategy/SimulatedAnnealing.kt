@@ -26,7 +26,7 @@ class SimulatedAnnealing(
     val initialTemperature: Double = 1.0,
     val coolingRate: Double = 0.999,
     val minTemperature: Double = 0.001,
-    val tabuTenure: Int = 10,
+    val tabu: TabuFilter = TabuFilter(tenure = 10),
 ) : Strategy {
 
     private var temperature: Double = initialTemperature
@@ -39,10 +39,7 @@ class SimulatedAnnealing(
         factor.proposeRepairMoves(state, factorId, state.moveSink)
         val raw = state.moveSink.list
         if (raw.isEmpty()) return null
-        val moves = if (tabuTenure > 0) {
-            val nonTaboo = raw.filter { !state.isTaboo(it, tabuTenure) }
-            if (nonTaboo.isEmpty()) raw else nonTaboo
-        } else raw
+        val moves = tabu.filter(state, raw)
 
         repeat(moves.size) {
             val move = moves[state.rng.nextInt(moves.size)]

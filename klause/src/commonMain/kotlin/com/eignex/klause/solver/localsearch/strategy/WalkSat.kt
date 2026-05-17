@@ -11,11 +11,14 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * for repair-move suggestions, then either flip a random suggestion (probability [noise]) or
  * pick the suggestion with the smallest break count (ties broken uniformly at random).
  *
- * A short-term tabu list (parameter [tabuTenure], default 10) filters out flips of variables
- * touched within the last [tabuTenure] accepted moves to avoid local cycling. Aspiration: when
- * every candidate is taboo, the filter is dropped and the strategy picks from the full set.
+ * Short-term tabu filtering, aspiration, and dynamic tenure are delegated to [tabu]; see
+ * [TabuFilter] for the available knobs. Default: tenure 10 with the historical
+ * "drop the filter when every candidate is tabu" aspiration.
  */
-class WalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
+class WalkSat(
+    val noise: Double = 0.5,
+    val tabu: TabuFilter = TabuFilter(tenure = 10),
+) : Strategy {
 
     override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
@@ -25,10 +28,7 @@ class WalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
         factor.proposeRepairMoves(state, factorId, state.moveSink)
         val raw = state.moveSink.list
         if (raw.isEmpty()) return null
-        val moves = if (tabuTenure > 0) {
-            val nonTaboo = raw.filter { !state.isTaboo(it, tabuTenure) }
-            if (nonTaboo.isEmpty()) raw else nonTaboo
-        } else raw
+        val moves = tabu.filter(state, raw)
 
         if (state.rng.nextDouble() < noise) {
             return moves[state.rng.nextInt(moves.size)]

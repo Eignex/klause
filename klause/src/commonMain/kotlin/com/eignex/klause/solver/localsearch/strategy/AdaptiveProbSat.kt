@@ -16,7 +16,7 @@ import kotlin.math.pow
 class AdaptiveProbSat(
     val baselineCb: Double = 2.06,
     val eps: Double = 1.0,
-    val tabuTenure: Int = 10,
+    val tabu: TabuFilter = TabuFilter(tenure = 10),
     theta: Int = 50,
     phi: Double = 0.2,
 ) : Strategy {
@@ -36,10 +36,7 @@ class AdaptiveProbSat(
         factor.proposeRepairMoves(state, factorId, state.moveSink)
         val raw = state.moveSink.list
         if (raw.isEmpty()) return null
-        val moves = if (tabuTenure > 0) {
-            val nonTaboo = raw.filter { !state.isTaboo(it, tabuTenure) }
-            if (nonTaboo.isEmpty()) raw else nonTaboo
-        } else raw
+        val moves = tabu.filter(state, raw)
         if (moves.size == 1) return moves[0]
 
         var totalWeight = 0.0

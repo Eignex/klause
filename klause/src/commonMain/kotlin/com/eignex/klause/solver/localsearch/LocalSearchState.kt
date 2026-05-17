@@ -136,6 +136,29 @@ class LocalSearchState(
         }
     }
 
+    /**
+     * Net change in the violated-factor count that would result from applying [move]. Used
+     * by [TabuFilter]'s [AspirationCriterion.OrImproving] to decide whether a tabu move
+     * is improving enough to override the tabu. Walks the affected var's occurrence list
+     * once; same O(arity) cost as [breakScore].
+     */
+    fun netDelta(move: Move): Int = when (move) {
+        is Move.BoolFlip -> {
+            var sum = 0
+            for (factorId in problem.boolOccurrences[move.varId]) {
+                sum += factors[factorId].deltaIfBoolFlipped(this, factorId, move.varId)
+            }
+            sum
+        }
+        is Move.IntSet -> {
+            var sum = 0
+            for (factorId in problem.intOccurrences[move.varId]) {
+                sum += factors[factorId].deltaIfIntSet(this, factorId, move.varId, move.newValue)
+            }
+            sum
+        }
+    }
+
     private fun applyBoolFlip(boolVar: Int) {
         assignment.flipBool(boolVar)
         val touchedFactors = problem.boolOccurrences[boolVar]

@@ -18,7 +18,10 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * existing all-tabu fallback). Tabu filtering then runs on what's left, with the same
  * aspiration. Selection is greedy on break-score with [noise]-probability random pick.
  */
-class CcaWalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
+class CcaWalkSat(
+    val noise: Double = 0.5,
+    val tabu: TabuFilter = TabuFilter(tenure = 10),
+) : Strategy {
 
     override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
@@ -32,10 +35,7 @@ class CcaWalkSat(val noise: Double = 0.5, val tabuTenure: Int = 10) : Strategy {
         val ccEligible = raw.filter { confChanged(state, it) }
         val afterCc = if (ccEligible.isEmpty()) raw else ccEligible
 
-        val moves = if (tabuTenure > 0) {
-            val nonTaboo = afterCc.filter { !state.isTaboo(it, tabuTenure) }
-            if (nonTaboo.isEmpty()) afterCc else nonTaboo
-        } else afterCc
+        val moves = tabu.filter(state, afterCc)
 
         if (state.rng.nextDouble() < noise) {
             return moves[state.rng.nextInt(moves.size)]

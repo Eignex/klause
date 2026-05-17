@@ -14,7 +14,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  */
 class AdaptiveWalkSat(
     val baselineNoise: Double = 0.2,
-    val tabuTenure: Int = 10,
+    val tabu: TabuFilter = TabuFilter(tenure = 10),
     theta: Int = 50,
     phi: Double = 0.2,
 ) : Strategy {
@@ -41,10 +41,7 @@ class AdaptiveWalkSat(
         factor.proposeRepairMoves(state, factorId, state.moveSink)
         val raw = state.moveSink.list
         if (raw.isEmpty()) return null
-        val moves = if (tabuTenure > 0) {
-            val nonTaboo = raw.filter { !state.isTaboo(it, tabuTenure) }
-            if (nonTaboo.isEmpty()) raw else nonTaboo
-        } else raw
+        val moves = tabu.filter(state, raw)
 
         if (state.rng.nextDouble() < noise) {
             return moves[state.rng.nextInt(moves.size)]
