@@ -111,7 +111,7 @@ class Alns(
             val repairedObj = objective.evaluate(repaired)
 
             val isNewBest = repairedObj < bestObj
-            val accept = isNewBest || acceptance.accept(repairedObj, incumbentObj)
+            val accept = isNewBest || acceptance.accept(repairedObj, incumbentObj, rng)
             val reward = when {
                 isNewBest -> newBestReward
                 accept -> acceptedReward

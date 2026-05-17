@@ -16,17 +16,52 @@ class IteratedLocalSearchTest {
 
     @Test
     fun `acceptance criteria semantics`() {
-        assertTrue(AcceptanceCriterion.Improving.accept(1.0, 2.0))
-        assertTrue(!AcceptanceCriterion.Improving.accept(2.0, 2.0))
-        assertTrue(!AcceptanceCriterion.Improving.accept(3.0, 2.0))
+        val rng = Random(0)
+        assertTrue(AcceptanceCriterion.Improving.accept(1.0, 2.0, rng))
+        assertTrue(!AcceptanceCriterion.Improving.accept(2.0, 2.0, rng))
+        assertTrue(!AcceptanceCriterion.Improving.accept(3.0, 2.0, rng))
 
-        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(1.0, 2.0))
-        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(2.0, 2.0))
-        assertTrue(!AcceptanceCriterion.BetterOrEqual.accept(3.0, 2.0))
+        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(1.0, 2.0, rng))
+        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(2.0, 2.0, rng))
+        assertTrue(!AcceptanceCriterion.BetterOrEqual.accept(3.0, 2.0, rng))
 
-        assertTrue(AcceptanceCriterion.RandomWalk.accept(1.0, 2.0))
-        assertTrue(AcceptanceCriterion.RandomWalk.accept(2.0, 2.0))
-        assertTrue(AcceptanceCriterion.RandomWalk.accept(3.0, 2.0))
+        assertTrue(AcceptanceCriterion.RandomWalk.accept(1.0, 2.0, rng))
+        assertTrue(AcceptanceCriterion.RandomWalk.accept(2.0, 2.0, rng))
+        assertTrue(AcceptanceCriterion.RandomWalk.accept(3.0, 2.0, rng))
+    }
+
+    @Test
+    fun `SA acceptance always accepts improvements and cools toward Improving`() {
+        val sa = AcceptanceCriterion.SimulatedAnnealing(initialTemperature = 1e6, coolingRate = 0.5, minTemperature = 1e-9)
+        val rng = Random(0)
+        // High T → worsening accepted (high probability).
+        var acceptedWorse = 0
+        repeat(10) { if (sa.accept(10.0, 1.0, rng)) acceptedWorse++ }
+        // Strict improvements always accepted regardless of T.
+        repeat(20) { assertTrue(sa.accept(1.0, 10.0, rng)) }
+        assertTrue(acceptedWorse > 0, "expected some worsening acceptances at high T")
+        // Now T is very small — worsening should almost always reject.
+        var rejectedAtLowT = 0
+        repeat(50) { if (!sa.accept(10.0, 1.0, rng)) rejectedAtLowT++ }
+        assertTrue(rejectedAtLowT >= 45, "at min T, worsening should reject; got $rejectedAtLowT/50")
+    }
+
+    @Test
+    fun `SA temperature respects min floor`() {
+        val sa = AcceptanceCriterion.SimulatedAnnealing(initialTemperature = 1.0, coolingRate = 0.001, minTemperature = 0.5)
+        val rng = Random(0)
+        repeat(100) { sa.accept(0.0, 0.0, rng) }
+        assertTrue(sa.temperature >= 0.5, "temperature escaped min floor: ${sa.temperature}")
+    }
+
+    @Test
+    fun `SA reset restores initial temperature`() {
+        val sa = AcceptanceCriterion.SimulatedAnnealing(initialTemperature = 2.0, coolingRate = 0.5, minTemperature = 0.01)
+        val rng = Random(0)
+        repeat(10) { sa.accept(0.0, 0.0, rng) }
+        assertTrue(sa.temperature < 2.0, "expected cooling, got ${sa.temperature}")
+        sa.reset()
+        assertEquals(2.0, sa.temperature)
     }
 
     @Test

@@ -42,7 +42,7 @@ class IteratedLocalSearchRestart(
 
     override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
         val current = incumbent
-        val accept = current == null || acceptance.accept(objective, incumbentObjective)
+        val accept = current == null || acceptance.accept(objective, incumbentObjective, state.rng)
         if (accept) {
             incumbent = sample
             incumbentObjective = objective
