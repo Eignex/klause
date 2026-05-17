@@ -150,6 +150,47 @@ class IteratedLocalSearchTest {
     }
 
     @Test
+    fun `crossover restart with two anchors produces a mix of their values`() {
+        // Two clearly-distinguishable parents: all-true vs all-false. Uniform crossover
+        // should give a mix (Hamming distance to each parent > 0 and < numVars with high prob).
+        val factor = Cardinality.atLeastOne(IntArray(8) { Lit.make(it, true) })
+        val problem = Problem(8, 0, emptyArray(), listOf(factor))
+        val state = LocalSearchState(problem, Random(42))
+        for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
+
+        val policy = IteratedLocalSearchRestart(
+            populationSize = 2,
+            crossoverRate = 1.0, // force crossover every restart
+            acceptance = com.eignex.klause.solver.localsearch.AcceptanceCriterion.BetterOrEqual,
+        )
+        policy.onLocalOptimum(state, Sample(BooleanArray(8) { true }, IntArray(0)), 10.0)
+        policy.onLocalOptimum(state, Sample(BooleanArray(8) { false }, IntArray(0)), 12.0)
+
+        policy.restart(state, bestSoFar = null)
+        // Sum trues should be between 1 and 7 with very high probability under uniform crossover.
+        val trues = (0 until 8).count { state.assignment.boolValue(it) }
+        assertTrue(trues in 1..7,
+            "expected mixed assignment after crossover, got $trues true (8 bits, both parents pure)")
+    }
+
+    @Test
+    fun `crossover does nothing when population has fewer than 2 incumbents`() {
+        // Single-member population — crossover should silently fall back to single-anchor mode.
+        val factor = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
+
+        val policy = IteratedLocalSearchRestart(populationSize = 3, crossoverRate = 1.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, true, true, true), IntArray(0)), 4.0)
+        // Only one incumbent — crossover requires two. Restart should perturb the lone anchor
+        // (or fall back to random if anchor=null). No crash.
+        policy.restart(state, bestSoFar = null)
+        // Just verify the engine didn't blow up; the resulting state is whatever perturbation produced.
+        assertTrue(state.step == 0L, "restart should reset step")
+    }
+
+    @Test
     fun `ils restart solves exact one cardinality`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),

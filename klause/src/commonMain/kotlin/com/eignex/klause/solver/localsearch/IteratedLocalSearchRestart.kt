@@ -36,9 +36,17 @@ class IteratedLocalSearchRestart(
     val adaptiveStallThreshold: Int = 3,
     val maxPerturbationStrength: Int = 50,
     val populationSize: Int = 1,
+    /** Probability per restart of generating the anchor via uniform crossover of two
+     *  random population members instead of single-anchor perturbation. Ignored when
+     *  `populationSize < 2`. 0.0 disables crossover (default). 0.2-0.4 is a reasonable
+     *  range when running with a populated incumbent set. */
+    val crossoverRate: Double = 0.0,
 ) : RestartPolicy {
 
-    init { require(populationSize >= 1) { "populationSize must be ≥ 1, got $populationSize" } }
+    init {
+        require(populationSize >= 1) { "populationSize must be ≥ 1, got $populationSize" }
+        require(crossoverRate in 0.0..1.0) { "crossoverRate must be in [0, 1], got $crossoverRate" }
+    }
 
     /** Population of (sample, objective) entries, sorted-ish: index 0 is the best by
      *  objective, last is the worst. Kept compact (no nulls) up to [populationSize]. */
@@ -77,6 +85,14 @@ class IteratedLocalSearchRestart(
     }
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+        // Crossover restart: uniform-recombine two random population members. Skips
+        // perturbation since crossover itself diversifies. Only fires with ≥2 incumbents.
+        if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
+            val (parentA, parentB) = pickTwoDistinct(state.rng)
+            val child = uniformCrossover(parentA.sample, parentB.sample, state.rng)
+            applyChild(state, child)
+            return
+        }
         val anchor = pickAnchor(state) ?: bestSoFar
         if (anchor == null) state.restart() else anchorAndPerturb(state, anchor, perturbationStrength)
     }
@@ -84,6 +100,26 @@ class IteratedLocalSearchRestart(
     private fun pickAnchor(state: LocalSearchState): Sample? {
         if (population.isEmpty()) return null
         return population[state.rng.nextInt(population.size)].sample
+    }
+
+    private fun pickTwoDistinct(rng: kotlin.random.Random): Pair<Incumbent, Incumbent> {
+        val i = rng.nextInt(population.size)
+        var j = rng.nextInt(population.size - 1)
+        if (j >= i) j++
+        return population[i] to population[j]
+    }
+
+    private fun uniformCrossover(a: Sample, b: Sample, rng: kotlin.random.Random): Sample {
+        val bools = BooleanArray(a.bools.size) { if (rng.nextBoolean()) a.bools[it] else b.bools[it] }
+        val ints = IntArray(a.ints.size) { if (rng.nextBoolean()) a.ints[it] else b.ints[it] }
+        return Sample(bools, ints)
+    }
+
+    private fun applyChild(state: LocalSearchState, child: Sample) {
+        val problem = state.problem
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, child.bools[b])
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, child.ints[i])
+        state.recompute()
     }
 
     /** Insertion-sort by ascending objective. Population is small (typical 1-5) so the
