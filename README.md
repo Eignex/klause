@@ -20,7 +20,8 @@ the klause-mzn-lib package.
 Two native engines, both implementing the same Solver and Optimizer
 interfaces:
 
-- A local-search solver (WalkSat / probSAT-style) for sampling and
+- A local-search solver (adaptive probSAT default; WalkSat, DDFW,
+  simulated-annealing, CCA variants also available) for sampling and
   stochastic solve. The default.
 - A complete CSP backtrack solver with propagation, configurable
   variable and value heuristics, and true model-blocking enumeration.

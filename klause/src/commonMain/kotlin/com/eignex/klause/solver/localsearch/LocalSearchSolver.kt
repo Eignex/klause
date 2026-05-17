@@ -24,8 +24,10 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.propagation.PropagationResult
 
+import com.eignex.klause.solver.localsearch.strategy.AdaptiveProbSat
+import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.WalkSat
+import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import kotlin.random.Random
 
 /**
@@ -43,7 +45,15 @@ import kotlin.random.Random
  */
 class LocalSearchSolver(
     override val problem: Problem,
-    val strategy: Strategy = WalkSat(),
+    // SOTA defaults (2026): adaptive probSAT with the OrImproving tabu aspiration. probSAT's
+    // continuous-weighted candidate distribution handles mixed-degree factor problems more
+    // gracefully than WalkSat's binary noise/greedy split; the adaptive controller removes
+    // the cb-tuning burden by widening the distribution during stalls and re-sharpening on
+    // progress (Hoos 2002, Balint-Schöning 2012). Tabu aspiration admits individually
+    // improving moves that would otherwise be blocked by the tenure window.
+    val strategy: Strategy = AdaptiveProbSat(
+        tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
+    ),
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
 ) : Solver<LocalSearchParams>, Optimizer<LocalSearchParams> {
 
