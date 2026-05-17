@@ -8,13 +8,18 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSession
+import com.eignex.kumulant.bandit.RouletteWheelBandit
+import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.random.Random
 
 /**
  * Adaptive Large Neighborhood Search meta-optimizer on top of an arbitrary
  * [Optimizer] over [LocalSearchParams]. Each iteration:
  *
- *   1. Pick a destroy operator from [destroyOperators] via [destroyBandit].
+ *   1. Pick a destroy operator from [destroyOperators] via [destroyBandit] (kumulant
+ *      [UnivariateBandit] — defaults to [RouletteWheelBandit]; swap in
+ *      `MultiArmedBandit(BetaBernoulliTS())` for Thompson sampling or any other
+ *      kumulant policy).
  *   2. Pick a repair operator from [repairOperators] via [repairBandit].
  *   3. Free `destroyFraction * totalVars` variables; pin the rest at incumbent values
  *      via [Assumptions].
@@ -23,8 +28,12 @@ import kotlin.random.Random
  *      restart cadence, or even the underlying solver).
  *   5. Reward both bandits: [newBestReward] / [acceptedReward] / [rejectedReward]
  *      depending on whether the repaired solution beats the global best, replaces the
- *      incumbent under [acceptance], or is rejected. Both bandits learn independently;
- *      the joint (destroy, repair) pair distribution emerges from their interaction.
+ *      incumbent under [acceptance], or is rejected. Reward magnitudes are passed
+ *      through to the bandit unchanged — callers using `BetaBernoulliTS` (which
+ *      expects soft Bernoulli probabilities) should configure rewards in `[0, 1]`;
+ *      the default values target `RouletteWheelBandit`'s weight-update scheme. Both
+ *      bandits learn independently; the joint (destroy, repair) pair distribution
+ *      emerges from their interaction.
  *
  * Compared to the [com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart] —
  * which lives inside the LS engine and re-anchors the assignment between flips — ALNS
@@ -46,8 +55,8 @@ class Alns(
     val newBestReward: Double = 3.0,
     val acceptedReward: Double = 1.0,
     val rejectedReward: Double = 0.0,
-    val destroyBandit: Bandit = RouletteWheelBandit(destroyOperators.size),
-    val repairBandit: Bandit = RouletteWheelBandit(repairOperators.size),
+    val destroyBandit: UnivariateBandit<*> = RouletteWheelBandit(destroyOperators.size),
+    val repairBandit: UnivariateBandit<*> = RouletteWheelBandit(repairOperators.size),
     val rng: Random = Random.Default,
     /** Optional session for cross-iteration state. When provided, [InnerLsRepair] (and
      *  any other repair operator that reads `context.session`) routes through it so
@@ -60,11 +69,11 @@ class Alns(
     init {
         require(destroyOperators.isNotEmpty()) { "Need at least one destroy operator" }
         require(repairOperators.isNotEmpty()) { "Need at least one repair operator" }
-        require(destroyOperators.size == destroyBandit.numOperators) {
-            "destroyBandit operator count ${destroyBandit.numOperators} doesn't match destroyOperators ${destroyOperators.size}"
+        require(destroyOperators.size == destroyBandit.snapshot().size) {
+            "destroyBandit arm count ${destroyBandit.snapshot().size} doesn't match destroyOperators ${destroyOperators.size}"
         }
-        require(repairOperators.size == repairBandit.numOperators) {
-            "repairBandit operator count ${repairBandit.numOperators} doesn't match repairOperators ${repairOperators.size}"
+        require(repairOperators.size == repairBandit.snapshot().size) {
+            "repairBandit arm count ${repairBandit.snapshot().size} doesn't match repairOperators ${repairOperators.size}"
         }
         require(destroyFraction in 0.0..1.0) { "destroyFraction must be in [0, 1], got $destroyFraction" }
     }
@@ -110,14 +119,13 @@ class Alns(
 
         for (iter in 0 until maxIterations) {
             if (params.cancellation()) break
-            val destroyIdx = destroyBandit.pick(rng)
-            val repairIdx = repairBandit.pick(rng)
+            val destroyIdx = destroyBandit.choose()
+            val repairIdx = repairBandit.choose()
             val freed = destroyOperators[destroyIdx]
                 .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
             if (freed.isEmpty) {
-                destroyBandit.reward(destroyIdx, rejectedReward)
-                repairBandit.reward(repairIdx, rejectedReward)
-                destroyBandit.advance(); repairBandit.advance()
+                destroyBandit.update(destroyIdx, rejectedReward)
+                repairBandit.update(repairIdx, rejectedReward)
                 continue
             }
 
@@ -125,9 +133,8 @@ class Alns(
             val context = RepairContext(inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session)
             val repaired = repairOperators[repairIdx].repair(context)
             if (repaired == null) {
-                destroyBandit.reward(destroyIdx, rejectedReward)
-                repairBandit.reward(repairIdx, rejectedReward)
-                destroyBandit.advance(); repairBandit.advance()
+                destroyBandit.update(destroyIdx, rejectedReward)
+                repairBandit.update(repairIdx, rejectedReward)
                 continue
             }
             val repairedObj = objective.evaluate(repaired)
@@ -139,14 +146,13 @@ class Alns(
                 accept -> acceptedReward
                 else -> rejectedReward
             }
-            destroyBandit.reward(destroyIdx, reward)
-            repairBandit.reward(repairIdx, reward)
+            destroyBandit.update(destroyIdx, reward)
+            repairBandit.update(repairIdx, reward)
             _iterationLog.add(IterationRecord(destroyIdx, repairIdx, freed.bools.size + freed.ints.size,
                 incumbentObj, repairedObj, accept, isNewBest))
 
             if (isNewBest) { bestSample = repaired; bestObj = repairedObj }
             if (accept) { incumbent = repaired; incumbentObj = repairedObj }
-            destroyBandit.advance(); repairBandit.advance()
         }
         return bestSample
     }

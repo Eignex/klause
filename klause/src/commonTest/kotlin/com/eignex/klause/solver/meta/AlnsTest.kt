@@ -6,7 +6,8 @@ import com.eignex.klause.solver.localsearch.meta.FreedVars
 import com.eignex.klause.solver.localsearch.meta.GreedyConstructionRepair
 import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
 import com.eignex.klause.solver.localsearch.meta.RepairOperator
-import com.eignex.klause.solver.localsearch.meta.RouletteWheelBandit
+import com.eignex.kumulant.bandit.BetaBernoulliTS
+import com.eignex.kumulant.bandit.MultiArmedBandit
 
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
@@ -23,34 +24,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AlnsTest {
-
-    @Test
-    fun `roulette wheel bandit updates weights on rewarded picks`() {
-        val bandit = RouletteWheelBandit(numOperators = 2, reactionFactor = 0.5, segmentLength = 4)
-        val rng = Random(42)
-        val initialW = bandit.weights.copyOf()
-        // Reward operator 0 repeatedly; bandit segment should bump its weight up over the
-        // tied initial allocation.
-        repeat(4) {
-            bandit.pick(rng)  // observe a pick; not used here
-            bandit.reward(0, reward = 3.0)
-            bandit.reward(1, reward = 0.0)
-            bandit.advance()
-        }
-        assertTrue(bandit.weights[0] > initialW[0], "operator 0 weight should grow: ${bandit.weights[0]} vs ${initialW[0]}")
-        assertTrue(bandit.weights[0] > bandit.weights[1], "operator 0 should now outweigh operator 1")
-    }
-
-    @Test
-    fun `roulette wheel respects min weight floor`() {
-        val bandit = RouletteWheelBandit(numOperators = 2, reactionFactor = 1.0, segmentLength = 1, minWeight = 0.5)
-        // Give operator 0 zero rewards for many segments — weight should not drop below minWeight.
-        repeat(20) {
-            bandit.reward(0, 0.0)
-            bandit.advance()
-        }
-        assertTrue(bandit.weights[0] >= 0.5, "weight escaped minWeight floor: ${bandit.weights[0]}")
-    }
 
     @Test
     fun `random destroy returns expected fraction`() {
@@ -273,37 +246,10 @@ class AlnsTest {
     }
 
     @Test
-    fun `thompson bandit picks a valid arm index`() {
-        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, random = kotlin.random.Random(42))
-        val rng = kotlin.random.Random(0)
-        repeat(20) {
-            val idx = bandit.pick(rng)
-            assertTrue(idx in 0..2, "bandit picked out-of-range index $idx")
-            bandit.reward(idx, 0.5)
-            bandit.advance()
-        }
-    }
-
-    @Test
-    fun `thompson bandit converges to a clearly-better arm`() {
-        // 3 arms, arm 0 always rewards 1.0, others 0.0. Thompson should converge to arm 0.
-        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, random = kotlin.random.Random(17))
-        val rng = kotlin.random.Random(0)
-        repeat(100) {
-            val idx = bandit.pick(rng)
-            val reward = if (idx == 0) 1.0 else 0.0
-            bandit.reward(idx, reward)
-            bandit.advance()
-        }
-        // After 100 rounds, the next 30 picks should be heavily biased toward arm 0.
-        var arm0Count = 0
-        repeat(30) { if (bandit.pick(rng) == 0) arm0Count++ }
-        assertTrue(arm0Count >= 25, "expected arm 0 dominance, got $arm0Count/30")
-    }
-
-    @Test
-    fun `alns can use thompson bandit in place of roulette wheel`() {
-        // Smoke test: plug a ThompsonBandit into Alns and verify it produces a feasible sample.
+    fun `alns can use a kumulant Thompson sampling bandit in place of the default roulette wheel`() {
+        // Smoke test: plug a MultiArmedBandit(BetaBernoulliTS()) into Alns and verify it
+        // produces a feasible sample. The kumulant bandit family is tested in kumulant
+        // itself; here we just verify the integration point.
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
@@ -314,8 +260,12 @@ class AlnsTest {
             inner = inner,
             destroyOperators = DestroyOperator.Defaults,
             repairOperators = RepairOperator.Defaults,
-            destroyBandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(DestroyOperator.Defaults.size),
-            repairBandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(RepairOperator.Defaults.size),
+            destroyBandit = MultiArmedBandit(DestroyOperator.Defaults.size, policy = BetaBernoulliTS(), random = Random(1)),
+            repairBandit = MultiArmedBandit(RepairOperator.Defaults.size, policy = BetaBernoulliTS(), random = Random(2)),
+            // BetaBernoulliTS expects rewards in [0, 1]; normalize from the (3, 1, 0) ALNS defaults.
+            newBestReward = 1.0,
+            acceptedReward = 0.33,
+            rejectedReward = 0.0,
             maxIterations = 10,
             flipsPerIteration = 200L,
         )
