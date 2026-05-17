@@ -63,6 +63,14 @@ class LocalSearchState(
     var cost: Int = 0
         internal set
 
+    /** Lowest [cost] observed since this state was constructed. Updated at the end of
+     *  every committed `apply(move)`; preserved across [restart] so the all-time minimum
+     *  drives aspiration decisions even when individual restart epochs go uphill. Used
+     *  by [com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImprovesBestEver]
+     *  to admit tabu moves that would beat the historical low. */
+    var bestCostSeen: Int = Int.MAX_VALUE
+        internal set
+
     /** Per-factor weight, default 1.0. Not read by the engine itself — every violation
      *  contributes +1/-1 to [cost] regardless. Strategies that want to bias the search
      *  toward repairing persistently-violated factors (e.g. SAPS) read and mutate this
@@ -106,6 +114,7 @@ class LocalSearchState(
                 cost++
             }
         }
+        if (cost < bestCostSeen) bestCostSeen = cost
     }
 
     fun apply(move: Move): Unit = when (move) {
@@ -184,6 +193,7 @@ class LocalSearchState(
         step++
         lastTouched[boolVar] = step
         if (touchCount[boolVar] < Int.MAX_VALUE) touchCount[boolVar]++
+        if (cost < bestCostSeen) bestCostSeen = cost
     }
 
     private fun applyIntSet(intVar: Int, newValue: Int) {
@@ -202,6 +212,7 @@ class LocalSearchState(
         val slot = problem.numBoolVars + intVar
         lastTouched[slot] = step
         if (touchCount[slot] < Int.MAX_VALUE) touchCount[slot]++
+        if (cost < bestCostSeen) bestCostSeen = cost
     }
 
     private fun invalidateBoolBreakNeighbourhood(factorIds: IntArray) {
@@ -246,6 +257,7 @@ class LocalSearchState(
     private fun evaluateCompound(move: Move.Compound): CompoundEval {
         val oldStep = step
         val oldCost = cost
+        val oldBestCost = bestCostSeen
         val oldViolatedIds: Set<Int> = violated.toIntArray().toHashSet()
         val oldBoolConf = boolConfChange.copyOf()
         val oldIntConf = intConfChange.copyOf()
@@ -266,11 +278,12 @@ class LocalSearchState(
 
         for (i in inverses.indices.reversed()) apply(inverses[i])
 
-        // Restore: step, lastTouched, conf-change arrays.
+        // Restore: step, lastTouched, conf-change arrays, best-cost watermark.
         step = oldStep
         for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
         for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
         for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
+        bestCostSeen = oldBestCost
 
         return CompoundEval(breakScore = breakCount, netDelta = netDelta)
     }

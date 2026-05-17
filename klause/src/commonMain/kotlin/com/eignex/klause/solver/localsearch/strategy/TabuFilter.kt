@@ -109,4 +109,19 @@ sealed interface AspirationCriterion {
         override fun admitsTabu(state: LocalSearchState, move: Move): Boolean =
             state.netDelta(move) < 0
     }
+
+    /** Standard literature aspiration: admit a tabu move if it would lead to a cost
+     *  strictly less than [LocalSearchState.bestCostSeen] — the historical minimum
+     *  across the whole search session (preserved across restarts). Stronger than
+     *  [OrImproving]: the move must reach a global minimum the search has never been
+     *  at, not merely improve over the current epoch's plateau. */
+    data object OrImprovesBestEver : AspirationCriterion {
+        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean {
+            // bestCostSeen starts at Int.MAX_VALUE; any move trivially beats that on the
+            // first call, which gracefully degrades to "allow tabu" until the watermark
+            // has been seeded by at least one apply.
+            val predicted = state.cost + state.netDelta(move)
+            return predicted < state.bestCostSeen
+        }
+    }
 }
