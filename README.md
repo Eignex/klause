@@ -109,6 +109,9 @@ solver.enumerate(LocalSearchParams(maxFlips = 100_000)).take(20).forEach { s ->
 
 val weights = LinearObjective(boolWeights = doubleArrayOf(/* ... */))
 val best = solver.minimize(weights, LocalSearchParams(maxFlips = 100_000))
+
+// Or point at one schema variable, MiniZinc-style:
+val cheapest = solver.minimize(compiled.minimize(schema.budget), LocalSearchParams(maxFlips = 100_000))
 ```
 
 Local search is the default. Swap in the backtrack solver when you
