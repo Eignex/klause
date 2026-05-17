@@ -16,6 +16,11 @@ class AdaptiveWalkSat(
     tabu: TabuFilter = TabuFilter(tenure = 10),
     theta: Int = 50,
     phi: Double = 0.2,
+    /** Opt-in EWMA-mode for the internal [NoiseController]. When non-null, improvement
+     *  detection compares the current cost against a kumulant-EwmaMean smoothed average
+     *  instead of the all-time low — less reactive to single-step jitter. See
+     *  [NoiseController] KDoc for the trade-off. */
+    ewmaAlpha: Double? = null,
 ) : WalkSat(noise = baselineNoise, tabu = tabu) {
 
     private val controller = NoiseController(
@@ -24,6 +29,7 @@ class AdaptiveWalkSat(
         phi = phi,
         minLevel = baselineNoise,
         maxLevel = 1.0,
+        ewmaAlpha = ewmaAlpha,
     )
 
     /** Current noise level. Exposed for tests / observability; not part of the Strategy API. */

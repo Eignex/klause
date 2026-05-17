@@ -17,14 +17,15 @@ import kotlin.random.Random
  * be normalized to `[0, 1]` before passing; see [Alns] for the standard normalization.
  *
  * [advance] is a no-op — Thompson updates posteriors immediately on every [reward].
- * The [Bandit.pick] rng argument is ignored; kumulant's internal `RandomSequence` (seeded
- * via [randomSeed]) drives the posterior draws.
+ * The [Bandit.pick] rng argument is ignored; the bandit uses its caller-supplied [random]
+ * source (default `Random.Default`) for posterior draws. Pass `Random(seed)` for
+ * reproducibility.
  */
 class ThompsonBandit(
     override val numOperators: Int,
     val priorAlpha: Double = 1.0,
     val priorBeta: Double = 1.0,
-    val randomSeed: Int = Random.Default.nextInt(),
+    val random: Random = Random.Default,
 ) : Bandit {
 
     init { require(numOperators > 0) { "numOperators must be positive, got $numOperators" } }
@@ -32,7 +33,7 @@ class ThompsonBandit(
     private val inner: MultiArmedBandit<*> = MultiArmedBandit(
         nbrArms = numOperators,
         policy = BetaBernoulliTS(priorAlpha = priorAlpha, priorBeta = priorBeta),
-        randomSeed = randomSeed,
+        random = random,
         maximize = true,
     )
 

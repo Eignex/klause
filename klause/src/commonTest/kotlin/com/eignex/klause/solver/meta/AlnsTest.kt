@@ -274,7 +274,7 @@ class AlnsTest {
 
     @Test
     fun `thompson bandit picks a valid arm index`() {
-        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, randomSeed = 42)
+        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, random = kotlin.random.Random(42))
         val rng = kotlin.random.Random(0)
         repeat(20) {
             val idx = bandit.pick(rng)
@@ -287,7 +287,7 @@ class AlnsTest {
     @Test
     fun `thompson bandit converges to a clearly-better arm`() {
         // 3 arms, arm 0 always rewards 1.0, others 0.0. Thompson should converge to arm 0.
-        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, randomSeed = 17)
+        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, random = kotlin.random.Random(17))
         val rng = kotlin.random.Random(0)
         repeat(100) {
             val idx = bandit.pick(rng)

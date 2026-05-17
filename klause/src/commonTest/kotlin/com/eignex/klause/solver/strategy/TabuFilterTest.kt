@@ -125,6 +125,32 @@ class TabuFilterTest {
     }
 
     @Test
+    fun `Cooling aspiration admits liberally at high T and converges to never at low T`() {
+        val state = smallState() // BoolFlip(0) tabu
+        val cooling = AspirationCriterion.Cooling(initialTemperature = 100.0, coolingRate = 0.5, minTemperature = 1e-9)
+        val moves = listOf<Move>(Move.BoolFlip(0))
+        // At high T (~100), exp(-1/100) ≈ 0.99 — admit rate is very high.
+        val highTfilter = TabuFilter(tenure = 10, aspiration = cooling)
+        var earlyAdmits = 0
+        repeat(50) {
+            cooling.reset()
+            if (highTfilter.filter(state, moves) == moves) earlyAdmits++
+        }
+        // Most calls should admit at high T.
+        assertTrue(earlyAdmits >= 40, "high-T admission rate too low: $earlyAdmits/50")
+
+        // Now cool aggressively to near-zero and verify near-rejection.
+        cooling.reset()
+        // Drive T down — each admitsTabu call cools by coolingRate=0.5 multiplicatively.
+        // After ~50 calls, T is far below 1e-9 (clamped at min).
+        repeat(100) { cooling.admitsTabu(state, Move.BoolFlip(0)) }
+        // At min T, exp(-1/1e-9) is effectively 0.
+        var lateAdmits = 0
+        repeat(50) { if (cooling.admitsTabu(state, Move.BoolFlip(0))) lateAdmits++ }
+        assertTrue(lateAdmits == 0, "low-T should never admit, got $lateAdmits/50")
+    }
+
+    @Test
     fun `Probabilistic aspiration admits tabu moves at the configured rate`() {
         // smallState applies BoolFlip(0) once, so var 0 is tabu under tenure 10.
         val state = smallState()

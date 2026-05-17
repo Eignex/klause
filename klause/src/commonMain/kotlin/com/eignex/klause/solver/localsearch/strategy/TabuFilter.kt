@@ -135,4 +135,38 @@ sealed interface AspirationCriterion {
         override fun admitsTabu(state: LocalSearchState, move: Move): Boolean =
             state.rng.nextDouble() < rate
     }
+
+    /**
+     * Simulated-annealing-style cooling admission. Admit a tabu move with probability
+     * `exp(-1 / temperature)`; the temperature multiplies by [coolingRate] on every
+     * admitsTabu call and is floored at [minTemperature]. Early in the search T is high
+     * and tabu moves are admitted liberally (effectively no tabu); late in the search T
+     * is low and admission becomes vanishingly rare (behaves like [AllowAllWhenAllTabu]).
+     *
+     * Carries mutable temperature state; don't share a single instance across concurrent
+     * solvers.
+     */
+    class Cooling(
+        val initialTemperature: Double = 1.0,
+        val coolingRate: Double = 0.999,
+        val minTemperature: Double = 1e-3,
+    ) : AspirationCriterion {
+        init {
+            require(initialTemperature > 0) { "initialTemperature must be positive, got $initialTemperature" }
+            require(coolingRate in 0.0..1.0) { "coolingRate must be in [0, 1], got $coolingRate" }
+            require(minTemperature > 0) { "minTemperature must be positive, got $minTemperature" }
+        }
+
+        var temperature: Double = initialTemperature
+            private set
+
+        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean {
+            val admit = state.rng.nextDouble() < kotlin.math.exp(-1.0 / temperature)
+            temperature = (temperature * coolingRate).coerceAtLeast(minTemperature)
+            return admit
+        }
+
+        /** Restore [temperature] to [initialTemperature]. */
+        fun reset() { temperature = initialTemperature }
+    }
 }

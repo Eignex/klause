@@ -19,6 +19,9 @@ class AdaptiveDdfw(
     tabu: TabuFilter = TabuFilter.Disabled,
     theta: Int = 50,
     phi: Double = 0.2,
+    /** Opt-in EWMA-mode for the internal [NoiseController]; see [AdaptiveWalkSat]'s
+     *  matching parameter. */
+    ewmaAlpha: Double? = null,
 ) : Ddfw(
     noiseProbability = noiseProbability,
     initWeight = initWeight,
@@ -26,7 +29,12 @@ class AdaptiveDdfw(
     tabu = tabu,
 ) {
 
-    private val controller = NoiseController(initial = 0.0, theta = theta, phi = phi)
+    private val controller = NoiseController(
+        initial = 0.0,
+        theta = theta,
+        phi = phi,
+        ewmaAlpha = ewmaAlpha,
+    )
 
     val currentIncrement: Double get() = baselineIncrement * (1.0 + controller.level * 4.0)
 
