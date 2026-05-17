@@ -57,46 +57,4 @@ data class LinearObjective(
         h = 31 * h + intCoefficients.contentHashCode()
         return h
     }
-
-    companion object {
-        /**
-         * "Minimize this one integer variable" — the MiniZinc `solve minimize x` idiom
-         * built directly. Equivalent to `LinearObjective(intCoefficients = arr)` where
-         * `arr` is length [numIntVars] with `arr[intVar] = 1.0` and the rest zero. Pass
-         * the problem's [Problem.numIntVars] to keep the coefficient array aligned with
-         * destroy operators like [com.eignex.klause.solver.localsearch.meta.DestroyOperator.WorstObjective]
-         * that index by position.
-         */
-        fun minimizeInt(intVar: Int, numIntVars: Int): LinearObjective {
-            require(intVar in 0 until numIntVars) { "intVar $intVar out of [0, $numIntVars)" }
-            val arr = DoubleArray(numIntVars)
-            arr[intVar] = 1.0
-            return LinearObjective(intCoefficients = arr)
-        }
-
-        /** Negate-the-coefficient form of [minimizeInt]. Optimizers minimize, so a `-1.0`
-         *  coefficient maximizes. */
-        fun maximizeInt(intVar: Int, numIntVars: Int): LinearObjective {
-            require(intVar in 0 until numIntVars) { "intVar $intVar out of [0, $numIntVars)" }
-            val arr = DoubleArray(numIntVars)
-            arr[intVar] = -1.0
-            return LinearObjective(intCoefficients = arr)
-        }
-
-        /** Minimize a single Boolean variable's truth value (penalises the bool being true). */
-        fun minimizeBool(boolVar: Int, numBoolVars: Int): LinearObjective {
-            require(boolVar in 0 until numBoolVars) { "boolVar $boolVar out of [0, $numBoolVars)" }
-            val arr = DoubleArray(numBoolVars)
-            arr[boolVar] = 1.0
-            return LinearObjective(boolWeights = arr)
-        }
-
-        /** Reward the Boolean being true. */
-        fun maximizeBool(boolVar: Int, numBoolVars: Int): LinearObjective {
-            require(boolVar in 0 until numBoolVars) { "boolVar $boolVar out of [0, $numBoolVars)" }
-            val arr = DoubleArray(numBoolVars)
-            arr[boolVar] = -1.0
-            return LinearObjective(boolWeights = arr)
-        }
-    }
 }

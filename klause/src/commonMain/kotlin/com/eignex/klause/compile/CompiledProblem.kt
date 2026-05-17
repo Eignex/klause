@@ -8,6 +8,10 @@ import com.eignex.klause.schema.NominalHandle
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.maximizeBool
+import com.eignex.klause.solver.maximizeInt
+import com.eignex.klause.solver.minimizeBool
+import com.eignex.klause.solver.minimizeInt
 
 /**
  * Result of compiling a [com.eignex.klause.schema.VariableSchema] to a solver-side [Problem],
@@ -54,45 +58,57 @@ class CompiledProblem(
 
     /**
      * MiniZinc-style `solve minimize x`: build the [LinearObjective] that points at this
-     * one variable. Equivalent to constructing a coefficient vector by hand with `1.0` at
-     * the handle's id; the symbolic form is just less error-prone when the schema mutates.
+     * one variable. The symbolic form is less error-prone than hand-building a
+     * coefficient array, especially when the schema mutates and variable ids shift.
      */
     fun minimize(handle: IntHandle): LinearObjective {
         val id = intVarIdByName[handle.name]
             ?: error("No integer variable named '${handle.name}'")
-        return LinearObjective.minimizeInt(id, problem.numIntVars)
+        return problem.minimizeInt(id)
     }
 
     fun maximize(handle: IntHandle): LinearObjective {
         val id = intVarIdByName[handle.name]
             ?: error("No integer variable named '${handle.name}'")
-        return LinearObjective.maximizeInt(id, problem.numIntVars)
+        return problem.maximizeInt(id)
     }
 
     fun minimize(handle: BoolHandle): LinearObjective {
         val id = boolVarIdByName[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
-        return LinearObjective.minimizeBool(id, problem.numBoolVars)
+        return problem.minimizeBool(id)
     }
 
     fun maximize(handle: BoolHandle): LinearObjective {
         val id = boolVarIdByName[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
-        return LinearObjective.maximizeBool(id, problem.numBoolVars)
+        return problem.maximizeBool(id)
     }
 
-    /** Float vars after compilation live on the int side as bucket indices. The
-     *  objective minimises the bucket id; multiply by `(max - min) / (buckets - 1)` if
-     *  you need a coefficient in real-valued units (or use [maximize] for the reverse). */
+    /** Minimise the real-valued float. Floats are bucketed on the int side post-compile;
+     *  the objective scales the bucket id by `(max - min) / (buckets - 1)` and folds
+     *  `min` into the constant so the objective value matches what `decode(handle, sample)`
+     *  reports — same units as the original schema declaration, not bucket indices. */
     fun minimize(handle: FloatHandle): LinearObjective {
-        val id = intVarIdByName[handle.name]
+        val spec = floatDecoders[handle.name]
             ?: error("No float variable named '${handle.name}'")
-        return LinearObjective.minimizeInt(id, problem.numIntVars)
+        val id = intVarIdByName[handle.name]
+            ?: error("Float '${handle.name}' has no int-side id")
+        val scale = (spec.max - spec.min) / (spec.buckets - 1)
+        val arr = DoubleArray(problem.numIntVars)
+        arr[id] = scale
+        return LinearObjective(intCoefficients = arr, constant = spec.min)
     }
 
     fun maximize(handle: FloatHandle): LinearObjective {
-        val id = intVarIdByName[handle.name]
+        val spec = floatDecoders[handle.name]
             ?: error("No float variable named '${handle.name}'")
-        return LinearObjective.maximizeInt(id, problem.numIntVars)
+        val id = intVarIdByName[handle.name]
+            ?: error("Float '${handle.name}' has no int-side id")
+        val scale = (spec.max - spec.min) / (spec.buckets - 1)
+        val arr = DoubleArray(problem.numIntVars)
+        arr[id] = -scale
+        // For maximise we minimise the negated real, so the constant flips too.
+        return LinearObjective(intCoefficients = arr, constant = -spec.min)
     }
 }
