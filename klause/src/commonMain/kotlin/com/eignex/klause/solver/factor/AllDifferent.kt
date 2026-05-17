@@ -33,6 +33,13 @@ class AllDifferent(
     override val boolVars: IntArray = EMPTY
     override val intVars: IntArray = vars
 
+    /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
+     *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
+     *  common case where each var appears exactly once this is always 1. */
+    private val occurrencesByVar: Map<Int, Int> = buildMap {
+        for (v in vars) put(v, getOrElse(v) { 0 } + 1)
+    }
+
     private class State(val counts: IntArray, var duplicateCount: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
@@ -103,11 +110,7 @@ class AllDifferent(
         return lostDup to gainedDup
     }
 
-    private fun occurrences(intVar: Int): Int {
-        var n = 0
-        for (v in vars) if (v == intVar) n++
-        return n
-    }
+    private fun occurrences(intVar: Int): Int = occurrencesByVar[intVar] ?: 0
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Build set of "taken" values: those held by any singleton-domain var. Two vars with
