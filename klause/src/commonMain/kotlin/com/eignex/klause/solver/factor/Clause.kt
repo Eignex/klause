@@ -34,6 +34,16 @@ class Clause(
     }
     override val intVars: IntArray = EMPTY
 
+    /** Pre-computed `boolVar → literal index` lookup. Cheap to materialise once at
+     *  construction; turns the per-flip "find my literal" loop into a hash lookup. The
+     *  compile path doesn't generate clauses where a var appears multiple times (`v` and
+     *  `¬v` together would be a tautology and gets dropped). Sentinel `-1` for absent. */
+    private val litIndexByVar: com.eignex.klause.util.IntIntMap = com.eignex.klause.util.IntIntMap.build(
+        keys = IntArray(literals.size) { Lit.variable(literals[it]) },
+        values = IntArray(literals.size) { it },
+        absent = -1,
+    )
+
     private class Watches(var w1: Int, var w2: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
@@ -68,10 +78,16 @@ class Clause(
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val w = state.refPayload[factorId] as Watches
+        // O(1) early-out via the precomputed lookup: factors get called per-flip via the
+        // occurrence list, but a defensive `not-in-clause` check is essentially free now.
+        if (litIndexByVar[boolVar] < 0) return 0
         val wasViolated = isViolated(state, factorId)
         val nowViolated = !anyLitTrueAfterFlip(state, boolVar)
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        // TODO: full O(1) via watched literals. Earlier attempt assumed the rewatch
+        // invariant "if any literal is true then at least one watch is true" — the
+        // FactorPropertyTest random walk surfaces cases where that breaks, so an O(1)
+        // variant needs to first strengthen / verify the invariant in applyBoolFlip.
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {

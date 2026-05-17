@@ -31,6 +31,26 @@ class Cardinality(
     }
     override val intVars: IntArray = EMPTY
 
+    /** Pre-computed map from a Boolean var id to the sum of polarity signs across every
+     *  occurrence in [literals]. Each entry is `+1` for a positive literal occurrence,
+     *  `-1` for a negative occurrence, summed if the var appears multiple times. The
+     *  delta of flipping [boolVar] from `pre` to `!pre` is then
+     *     `(if (pre then -1 else 1)) * signedOccurrencesByVar[boolVar]`
+     *  computed in O(1) instead of scanning every literal in the factor. */
+    private val signedOccurrencesByVar: com.eignex.klause.util.IntIntMap = run {
+        val signs = HashMap<Int, Int>()
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            val sign = if (Lit.isPositive(lit)) 1 else -1
+            signs[v] = (signs[v] ?: 0) + sign
+        }
+        com.eignex.klause.util.IntIntMap.build(
+            keys = signs.keys.toIntArray(),
+            values = signs.values.toIntArray(),
+            absent = 0,
+        )
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var count = 0
         for (lit in literals) {
@@ -46,11 +66,12 @@ class Cardinality(
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val pre = state.assignment.boolValue(boolVar)
-        var change = 0
-        for (lit in literals) {
-            if (Lit.variable(lit) != boolVar) continue
-            change += if (Lit.evaluate(lit, pre)) -1 else 1
-        }
+        // Flipping `boolVar` from `pre` to `!pre` shifts each occurrence's truth by
+        // ±1; the per-occurrence sign is +1 for positive literals, -1 for negatives.
+        // Aggregated as `signedOccurrencesByVar`; the direction depends on `pre`.
+        val signed = signedOccurrencesByVar[boolVar]
+        if (signed == 0) return 0
+        val change = if (pre) -signed else signed
         val n = state.intPayload[factorId]
         val newN = n + change
         val wasViolated = n < min || n > max
@@ -60,11 +81,9 @@ class Cardinality(
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val post = state.assignment.boolValue(boolVar)
-        var change = 0
-        for (lit in literals) {
-            if (Lit.variable(lit) != boolVar) continue
-            change += if (Lit.evaluate(lit, post)) 1 else -1
-        }
+        val signed = signedOccurrencesByVar[boolVar]
+        if (signed == 0) return 0
+        val change = if (post) signed else -signed
         val oldN = state.intPayload[factorId]
         val newN = oldN + change
         state.intPayload[factorId] = newN
