@@ -273,6 +273,57 @@ class AlnsTest {
     }
 
     @Test
+    fun `thompson bandit picks a valid arm index`() {
+        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, randomSeed = 42)
+        val rng = kotlin.random.Random(0)
+        repeat(20) {
+            val idx = bandit.pick(rng)
+            assertTrue(idx in 0..2, "bandit picked out-of-range index $idx")
+            bandit.reward(idx, 0.5)
+            bandit.advance()
+        }
+    }
+
+    @Test
+    fun `thompson bandit converges to a clearly-better arm`() {
+        // 3 arms, arm 0 always rewards 1.0, others 0.0. Thompson should converge to arm 0.
+        val bandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(numOperators = 3, randomSeed = 17)
+        val rng = kotlin.random.Random(0)
+        repeat(100) {
+            val idx = bandit.pick(rng)
+            val reward = if (idx == 0) 1.0 else 0.0
+            bandit.reward(idx, reward)
+            bandit.advance()
+        }
+        // After 100 rounds, the next 30 picks should be heavily biased toward arm 0.
+        var arm0Count = 0
+        repeat(30) { if (bandit.pick(rng) == 0) arm0Count++ }
+        assertTrue(arm0Count >= 25, "expected arm 0 dominance, got $arm0Count/30")
+    }
+
+    @Test
+    fun `alns can use thompson bandit in place of roulette wheel`() {
+        // Smoke test: plug a ThompsonBandit into Alns and verify it produces a feasible sample.
+        val factor = Cardinality.exactlyOne(intArrayOf(
+            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
+        ))
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val inner = LocalSearchSolver(problem)
+        val alns = Alns(
+            inner = inner,
+            destroyOperators = DestroyOperator.Defaults,
+            repairOperators = RepairOperator.Defaults,
+            destroyBandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(DestroyOperator.Defaults.size),
+            repairBandit = com.eignex.klause.solver.localsearch.meta.ThompsonBandit(RepairOperator.Defaults.size),
+            maxIterations = 10,
+            flipsPerIteration = 200L,
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        assertNotNull(sample)
+    }
+
+    @Test
     fun `freed vars empty triggers reward and continue`() {
         // Edge case: destroy op returns empty set. ALNS should reward (rejectedReward) and not crash.
         val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),

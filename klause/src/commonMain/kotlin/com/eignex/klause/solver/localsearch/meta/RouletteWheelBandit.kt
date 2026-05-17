@@ -18,12 +18,12 @@ import kotlin.random.Random
  * segment counter and triggers the weight update when full.
  */
 class RouletteWheelBandit(
-    val numOperators: Int,
+    override val numOperators: Int,
     val reactionFactor: Double = 0.1,
     val segmentLength: Int = 10,
     val initialWeight: Double = 1.0,
     val minWeight: Double = 0.01,
-) {
+) : Bandit {
     init {
         require(numOperators > 0) { "numOperators must be positive, got $numOperators" }
         require(reactionFactor in 0.0..1.0) { "reactionFactor must be in [0, 1], got $reactionFactor" }
@@ -35,7 +35,7 @@ class RouletteWheelBandit(
     private val callCounts: IntArray = IntArray(numOperators)
     private var picksThisSegment: Int = 0
 
-    fun pick(rng: Random): Int {
+    override fun pick(rng: Random): Int {
         var total = 0.0
         for (w in weights) total += w
         if (total <= 0.0) return rng.nextInt(numOperators)
@@ -47,13 +47,13 @@ class RouletteWheelBandit(
         return numOperators - 1
     }
 
-    fun reward(operatorIdx: Int, reward: Double) {
+    override fun reward(operatorIdx: Int, reward: Double) {
         accumulatedScores[operatorIdx] += reward
         callCounts[operatorIdx]++
     }
 
     /** Increment the segment counter; trigger a weight update when the segment is full. */
-    fun advance() {
+    override fun advance() {
         picksThisSegment++
         if (picksThisSegment >= segmentLength) {
             updateWeights()

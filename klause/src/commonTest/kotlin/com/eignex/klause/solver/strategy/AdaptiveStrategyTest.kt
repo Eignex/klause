@@ -58,6 +58,34 @@ class AdaptiveStrategyTest {
     }
 
     @Test
+    fun `noise controller in ewma mode tracks smoothed cost trend`() {
+        // ewmaAlpha=0.2 → roughly 5-observation window. Feed a slow downward trend; the
+        // EWMA mode should detect "improving" (cost below smoothed) often enough to keep
+        // the level near baseline.
+        val controller = NoiseController(initial = 0.2, theta = 5, phi = 0.2, ewmaAlpha = 0.2)
+        // Start at cost=20 and walk down 1 per step.
+        for (cost in 20 downTo 5) controller.observe(cost)
+        // After a clear downward trend the level should not have grown past the initial
+        // value (cost stays below EWMA → "improving" most of the time).
+        assertTrue(controller.level <= 0.3,
+            "level should stay near baseline under steady improvement; got ${controller.level}")
+    }
+
+    @Test
+    fun `noise controller in ewma mode bumps level when cost rises above smoothed`() {
+        // Feed a plateau (constant cost) then a rise; EWMA should detect the rise as a
+        // stall and bump level via the theta threshold.
+        val controller = NoiseController(initial = 0.1, theta = 3, phi = 0.3, ewmaAlpha = 0.5)
+        // Seed the EWMA with a baseline.
+        repeat(5) { controller.observe(10) }
+        val baseline = controller.level
+        // Now feed costs above the smoothed average — should accumulate stalls and bump.
+        repeat(10) { controller.observe(20) }
+        assertTrue(controller.level > baseline,
+            "level should grow on sustained rise above smoothed avg; got $baseline -> ${controller.level}")
+    }
+
+    @Test
     fun `adaptive walk sat finds feasible samples`() {
         val schema = CardinalityS()
         val compiled = schema.compile()

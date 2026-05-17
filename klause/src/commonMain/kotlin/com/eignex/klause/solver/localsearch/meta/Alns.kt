@@ -46,8 +46,8 @@ class Alns(
     val newBestReward: Double = 3.0,
     val acceptedReward: Double = 1.0,
     val rejectedReward: Double = 0.0,
-    val destroyBandit: RouletteWheelBandit = RouletteWheelBandit(destroyOperators.size),
-    val repairBandit: RouletteWheelBandit = RouletteWheelBandit(repairOperators.size),
+    val destroyBandit: Bandit = RouletteWheelBandit(destroyOperators.size),
+    val repairBandit: Bandit = RouletteWheelBandit(repairOperators.size),
     val rng: Random = Random.Default,
     /** Optional session for cross-iteration state. When provided, [InnerLsRepair] (and
      *  any other repair operator that reads `context.session`) routes through it so
