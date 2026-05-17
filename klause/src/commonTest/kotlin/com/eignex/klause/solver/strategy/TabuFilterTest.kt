@@ -125,6 +125,35 @@ class TabuFilterTest {
     }
 
     @Test
+    fun `Probabilistic aspiration admits tabu moves at the configured rate`() {
+        // smallState applies BoolFlip(0) once, so var 0 is tabu under tenure 10.
+        val state = smallState()
+        val filter = TabuFilter(tenure = 10, aspiration = AspirationCriterion.Probabilistic(rate = 1.0))
+        val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
+        // rate=1.0 always admits → both moves pass.
+        val out = filter.filter(state, moves)
+        assertEquals(2, out.size, "rate=1.0 should admit every tabu move; got $out")
+
+        // rate=0.0 falls back to the all-tabu fallback (one move available).
+        val zero = TabuFilter(tenure = 10, aspiration = AspirationCriterion.Probabilistic(rate = 0.0))
+        val outZero = zero.filter(state, listOf<Move>(Move.BoolFlip(0)))
+        // Only candidate is tabu and rate=0 rejects; fallback drops the filter.
+        assertEquals(listOf<Move>(Move.BoolFlip(0)), outZero)
+    }
+
+    @Test
+    fun `Probabilistic aspiration rejects out-of-range rate at construction`() {
+        try {
+            AspirationCriterion.Probabilistic(rate = -0.1)
+            error("should have thrown")
+        } catch (_: IllegalArgumentException) {}
+        try {
+            AspirationCriterion.Probabilistic(rate = 1.5)
+            error("should have thrown")
+        } catch (_: IllegalArgumentException) {}
+    }
+
+    @Test
     fun `random band dynamic tenure stays within bounds`() {
         val fn = TabuFilter.randomBand(low = 5, high = 15, seed = 42L)
         repeat(100) {

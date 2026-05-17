@@ -124,4 +124,15 @@ sealed interface AspirationCriterion {
             return predicted < state.bestCostSeen
         }
     }
+
+    /** Random leak: admit a tabu move with constant probability [rate]. Pairs well with
+     *  longer [TabuFilter.tenure] values to get a controllable diversification rate
+     *  without ever fully resetting the tabu window. [rate] ∈ [0, 1]; 0 disables the
+     *  leak (behaves like [AllowAllWhenAllTabu]), 1 disables tabu entirely. Typical
+     *  useful range is 0.05–0.2. */
+    data class Probabilistic(val rate: Double = 0.1) : AspirationCriterion {
+        init { require(rate in 0.0..1.0) { "rate must be in [0, 1], got $rate" } }
+        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean =
+            state.rng.nextDouble() < rate
+    }
 }
