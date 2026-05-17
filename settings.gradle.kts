@@ -7,4 +7,6 @@ pluginManagement {
     }
 }
 
+includeBuild("../kumulant")
+
 include(":klause", ":klause-logicng", ":klause-z3", ":klause-bench", ":klause-fzn-cli", ":klause-portfolio")
