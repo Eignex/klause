@@ -194,21 +194,31 @@ class AllDifferent(
         }
         if (occupant == -1) return
         val d = state.problem.intDomains[occupant]
-        // Reservoir-sample a target value not currently used.
-        var pickedTarget = Int.MIN_VALUE
+        // Reservoir-sample up to MAX_REPAIR_TARGETS unused targets from the occupant's domain.
+        // Giving the strategy a fan of candidates (instead of one) lets WalkSat/probSAT score
+        // by break count and pick the move that disturbs the fewest currently-satisfied factors —
+        // a real choice rather than coin-flipping a single sampled target.
+        val targets = IntArray(MAX_REPAIR_TARGETS) { Int.MIN_VALUE }
+        var filled = 0
         var seenTargets = 0
         for (target in d.min..d.max) {
             if (target == value) continue
             val tIdx = target - domainMin
             if (tIdx !in s.counts.indices || s.counts[tIdx] != 0) continue
             seenTargets++
-            if (state.rng.nextInt(seenTargets) == 0) pickedTarget = target
+            if (filled < MAX_REPAIR_TARGETS) {
+                targets[filled++] = target
+            } else {
+                // Reservoir replace: each subsequent target replaces a slot uniformly.
+                val r = state.rng.nextInt(seenTargets)
+                if (r < MAX_REPAIR_TARGETS) targets[r] = target
+            }
         }
-        if (pickedTarget != Int.MIN_VALUE) {
-            sink.addIntSet(occupant, pickedTarget)
+        if (filled > 0) {
+            for (i in 0 until filled) sink.addIntSet(occupant, targets[i])
             return
         }
-        // Fallback: nudge occupant by ±1.
+        // Fallback: nudge occupant by ±1 within domain.
         val cur = state.assignment.intValue(occupant)
         if (cur < d.max) sink.addIntSet(occupant, cur + 1)
         if (cur > d.min) sink.addIntSet(occupant, cur - 1)
@@ -216,5 +226,9 @@ class AllDifferent(
 
     private companion object {
         val EMPTY: IntArray = IntArray(0)
+        /** Cap on candidate targets per repair call. Each candidate adds one O(arity) break-score
+         *  evaluation in WalkSat/probSAT, so don't go wild — the fan only needs to be wide enough
+         *  for the strategy to discriminate. */
+        const val MAX_REPAIR_TARGETS: Int = 4
     }
 }
