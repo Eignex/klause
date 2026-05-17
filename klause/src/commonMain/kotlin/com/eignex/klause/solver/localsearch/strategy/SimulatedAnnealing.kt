@@ -38,8 +38,13 @@ class SimulatedAnnealing(
 
         repeat(moves.size) {
             val move = moves[state.rng.nextInt(moves.size)]
-            val delta = state.breakScore(move)
-            if (delta <= 0 || state.rng.nextDouble() < exp(-delta.toDouble() / temperature)) {
+            // Shaped break: under default (no shaping) this is just breakScore.toDouble();
+            // under Linear shaping the objective delta tilts the Metropolis criterion so
+            // objective-improving moves are accepted unconditionally (delta ≤ 0) and
+            // mildly-worsening moves get more acceptance probability than purely-break-
+            // based scoring would assign.
+            val delta = state.shapedBreakScore(move)
+            if (delta <= 0.0 || state.rng.nextDouble() < exp(-delta / temperature)) {
                 anneal()
                 return move
             }
