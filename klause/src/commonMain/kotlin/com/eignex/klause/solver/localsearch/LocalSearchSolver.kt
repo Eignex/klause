@@ -212,6 +212,12 @@ class LocalSearchSolver(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         warm?.applyTo(state)
+        // Plumb shaping into the state so strategies (e.g. WalkSat) consulting
+        // shapedBreakScore see the objective during pre-feasibility moves too. Only
+        // [CostShaping.Linear] contributes a non-zero lambda; FeasibilityFirst leaves
+        // the field at 0.0 so behavior is identical to the no-shaping path.
+        state.objective = objective
+        state.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
         // No bestSample yet — first restart is always full random.
         restartPolicy.restart(state, bestSoFar = null)
 

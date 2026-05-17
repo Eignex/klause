@@ -35,11 +35,15 @@ open class WalkSat(
             return moves[state.rng.nextInt(moves.size)]
         }
 
-        var bestBreak = Int.MAX_VALUE
+        // Greedy pick on the shaped break score: when [LocalSearchState.shapingLambda]
+        // is 0 (default, no objective shaping) this is identical to picking on the raw
+        // integer break score; under a Linear shaping the objective delta tilts ties
+        // (and near-ties) toward objective-improving moves even pre-feasibility.
+        var bestBreak = Double.POSITIVE_INFINITY
         var bestCount = 0
         var pick: Move? = null
         for (m in moves) {
-            val brk = state.breakScore(m)
+            val brk = state.shapedBreakScore(m)
             if (brk < bestBreak) {
                 bestBreak = brk
                 bestCount = 1

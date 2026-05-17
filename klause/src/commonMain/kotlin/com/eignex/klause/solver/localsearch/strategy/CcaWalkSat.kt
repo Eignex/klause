@@ -36,11 +36,13 @@ class CcaWalkSat(
         if (state.rng.nextDouble() < noise) {
             return moves[state.rng.nextInt(moves.size)]
         }
-        var bestBreak = Int.MAX_VALUE
+        // Same shaped-break pattern as WalkSat — reduces to raw integer break when no
+        // shaping is configured.
+        var bestBreak = Double.POSITIVE_INFINITY
         var bestCount = 0
         var pick: Move? = null
         for (m in moves) {
-            val brk = state.breakScore(m)
+            val brk = state.shapedBreakScore(m)
             if (brk < bestBreak) {
                 bestBreak = brk
                 bestCount = 1

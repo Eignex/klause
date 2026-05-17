@@ -52,6 +52,43 @@ class CostShapingTest {
     }
 
     @Test
+    fun `shapedBreakScore reduces to breakScore when no shaping configured`() {
+        // Default state: no objective injected, lambda 0 — shapedBreakScore must match
+        // breakScore exactly for every move.
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        state.recompute()
+        for (b in 0..1) {
+            val move = com.eignex.klause.solver.Move.BoolFlip(b)
+            val raw = state.breakScore(move).toDouble()
+            val shaped = state.shapedBreakScore(move)
+            assertEquals(raw, shaped, "shaped should match raw when shaping is off")
+        }
+    }
+
+    @Test
+    fun `shapedBreakScore incorporates linear objective delta when shaping is on`() {
+        // 2-var problem, bool 0 has objective weight 100, bool 1 has weight 1. Both
+        // currently false. Flipping bool 0 → true increases objective by 100; flipping
+        // bool 1 → true increases objective by 1. With lambda = 1.0, the shaped scores
+        // differ exactly by the weight gap.
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        state.assignment.setBool(0, false)
+        state.assignment.setBool(1, false)
+        state.recompute()
+        state.objective = LinearObjective(boolWeights = doubleArrayOf(100.0, 1.0))
+        state.shapingLambda = 1.0
+        val score0 = state.shapedBreakScore(com.eignex.klause.solver.Move.BoolFlip(0))
+        val score1 = state.shapedBreakScore(com.eignex.klause.solver.Move.BoolFlip(1))
+        // Both flips have the same break score (both resolve cost=1 → 0). Shaped scores
+        // differ by 99 (objective coefficient gap).
+        assertEquals(99.0, score0 - score1, "shaped break gap must equal objective gap")
+    }
+
+    @Test
     fun `linear shaping minimize on exact one cardinality finds the cheapest pick`() {
         // Same setup as OptimizerTest's exactly-one weighted case, but using shaped descent.
         val factor = Cardinality.exactlyOne(intArrayOf(

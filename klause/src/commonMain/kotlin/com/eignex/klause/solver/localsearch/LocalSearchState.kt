@@ -3,8 +3,10 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
@@ -69,6 +71,19 @@ class LocalSearchState(
      *  by [com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImprovesBestEver]
      *  to admit tabu moves that would beat the historical low. */
     var bestCostSeen: Int = Int.MAX_VALUE
+        internal set
+
+    /** Objective injected by the engine during a `minimize` call. `null` outside
+     *  `minimize` — strategies that consult [shapedBreakScore] gracefully fall back to
+     *  the unshaped break score when this is null. */
+    var objective: Objective? = null
+        internal set
+
+    /** Lambda coefficient extracted from `params.costShaping` for pre-feasibility shaping.
+     *  Set by the engine in [com.eignex.klause.solver.localsearch.LocalSearchSolver.minimizeImpl];
+     *  defaults to 0.0 (no shaping) outside a `minimize` call or under
+     *  [com.eignex.klause.solver.localsearch.CostShaping.FeasibilityFirst]. */
+    var shapingLambda: Double = 0.0
         internal set
 
     /** Per-factor weight, default 1.0. Not read by the engine itself — every violation
@@ -154,6 +169,51 @@ class LocalSearchState(
             count
         }
         is Move.Compound -> evaluateCompound(move).breakScore
+    }
+
+    /**
+     * Break score fused with the per-move objective delta:
+     *   `breakScore(move).toDouble() + shapingLambda * objectiveDelta(move)`
+     * When [shapingLambda] is zero, [objective] is null (outside a `minimize` call), or
+     * the objective isn't a [LinearObjective], this reduces exactly to
+     * `breakScore(move).toDouble()` — so non-shaping callers see identical behavior.
+     * Strategies that want pre-feasibility objective awareness call this in place of
+     * [breakScore]; the engine populates the relevant fields on `minimize` and leaves
+     * them at defaults otherwise.
+     *
+     * Only [LinearObjective] is shaped today (O(1) coefficient lookup per move).
+     * Non-linear objectives would require an apply-revert with full re-evaluation; the
+     * benefit doesn't justify the state churn so they fall through to the unshaped path.
+     */
+    fun shapedBreakScore(move: Move): Double {
+        val brk = breakScore(move).toDouble()
+        val obj = objective ?: return brk
+        if (shapingLambda == 0.0) return brk
+        if (obj !is LinearObjective) return brk
+        return brk + shapingLambda * linearObjectiveDelta(move, obj)
+    }
+
+    private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double = when (move) {
+        is Move.BoolFlip -> {
+            val v = move.varId
+            if (v < obj.boolWeights.size) {
+                val w = obj.boolWeights[v]
+                if (assignment.boolValue(v)) -w else w
+            } else 0.0
+        }
+        is Move.IntSet -> {
+            val v = move.varId
+            if (v < obj.intCoefficients.size) {
+                obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))
+            } else 0.0
+        }
+        is Move.Compound -> {
+            // Linear deltas are additive over parts evaluated against the initial
+            // assignment — same convention as the single-move delta.
+            var sum = 0.0
+            for (p in move.parts) sum += linearObjectiveDelta(p, obj)
+            sum
+        }
     }
 
     /**
