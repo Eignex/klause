@@ -106,6 +106,37 @@ class LocalSearchSessionTest {
     }
 
     @Test
+    fun `bestCostSeen watermark survives session call boundaries`() {
+        val problem = ddfwProblem()
+        val solver = LocalSearchSolver(problem)
+        val session = LocalSearchSession(solver)
+        // First call: search runs, watermark captured into WarmState.
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        val firstWatermark = session.warmStateView.bestCostSeen()
+        assertTrue(firstWatermark < Int.MAX_VALUE,
+            "expected watermark after first call, got $firstWatermark")
+
+        // Second call: warm state should re-seed bestCostSeen and the captured value is
+        // never higher than the first call's.
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L))
+        val secondWatermark = session.warmStateView.bestCostSeen()
+        assertTrue(secondWatermark <= firstWatermark,
+            "watermark must monotone-decrease: $firstWatermark -> $secondWatermark")
+    }
+
+    @Test
+    fun `reset clears bestCostSeen alongside other warm fields`() {
+        val problem = ddfwProblem()
+        val solver = LocalSearchSolver(problem)
+        val session = LocalSearchSession(solver)
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L))
+        assertTrue(session.warmStateView.bestCostSeen() < Int.MAX_VALUE)
+        session.reset()
+        assertEquals(Int.MAX_VALUE, session.warmStateView.bestCostSeen(),
+            "reset should restore the bestCost watermark to its empty default")
+    }
+
+    @Test
     fun `bare solver call does not touch the session warm state`() {
         // Concurrent / non-session callers shouldn't have a path to mutate session warm
         // state. Verified by running a bare solver call and confirming the unrelated

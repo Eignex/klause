@@ -42,20 +42,32 @@ class WarmState {
      *  restart epochs within a call — survives [LocalSearchState.restart]. */
     internal var activityTouches: IntArray? = null
 
+    /** Lowest [LocalSearchState.cost] observed across every call made through the session.
+     *  Persisted so `AspirationCriterion.OrImprovesBestEver` sees the full-history low,
+     *  not just the current call's watermark. `Int.MAX_VALUE` until the first apply. */
+    internal var bestCostSeen: Int = Int.MAX_VALUE
+
     /** Read-only view onto activity counts for tests / destroy operators. Returns an
      *  empty array when no data has been captured yet. */
     fun activityTouches(): IntArray = activityTouches ?: IntArray(0)
+
+    /** Read-only handle for tests / diagnostics. Returns `Int.MAX_VALUE` if no apply has
+     *  happened yet through this session. */
+    fun bestCostSeen(): Int = bestCostSeen
 
     /** Discard all warm state. The next session call starts from defaults. */
     fun reset() {
         factorWeights = null
         activityTouches = null
+        bestCostSeen = Int.MAX_VALUE
     }
 
-    /** Sync warm weights and activity counts into [state] before the search loop starts.
-     *  Size-mismatched warm state is silently dropped — the new Problem's factor / var
-     *  count overrides. Restoring [activityTouches] lets touch counts accumulate across
-     *  session calls, which is what `activityBiased` ALNS destroy keys on. */
+    /** Sync warm weights, activity counts, and the best-cost watermark into [state]
+     *  before the search loop starts. Size-mismatched warm state is silently dropped —
+     *  the new Problem's factor / var count overrides. Restoring [activityTouches] lets
+     *  touch counts accumulate across session calls (which is what `activityBiased`
+     *  ALNS destroy keys on); restoring [bestCostSeen] lets `OrImprovesBestEver`
+     *  aspiration see the full-history low. */
     internal fun applyTo(state: LocalSearchState) {
         factorWeights?.let { w ->
             if (w.size == state.factorWeights.size) {
@@ -67,13 +79,16 @@ class WarmState {
                 for (i in t.indices) state.touchCount[i] = t[i]
             }
         }
+        if (bestCostSeen < state.bestCostSeen) state.bestCostSeen = bestCostSeen
     }
 
-    /** Capture the strategy's learned weights and per-variable touch counts at the end
-     *  of a search session. Touch counts survive restart, so they reflect activity over
-     *  the whole call regardless of restart cadence. */
+    /** Capture the strategy's learned weights, per-variable touch counts, and best-cost
+     *  watermark at the end of a search session. Touch counts and the watermark survive
+     *  restart, so they reflect the whole call regardless of restart cadence. */
     internal fun captureFrom(state: LocalSearchState) {
         factorWeights = state.factorWeights.copyOf()
         activityTouches = state.touchCount.copyOf()
+        // Monotone-decreasing: never let the warm watermark go up between calls.
+        if (state.bestCostSeen < bestCostSeen) bestCostSeen = state.bestCostSeen
     }
 }
