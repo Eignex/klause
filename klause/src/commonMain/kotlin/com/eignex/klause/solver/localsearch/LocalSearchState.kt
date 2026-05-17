@@ -40,8 +40,17 @@ class LocalSearchState(
         private set
 
     /** Step at which each variable was last flipped or set. Index is the bool var id for
-     *  Boolean vars (`[0, numBoolVars)`); int var ids are offset by `numBoolVars`. */
+     *  Boolean vars (`[0, numBoolVars)`); int var ids are offset by `numBoolVars`.
+     *  Reset to zero on [restart] — used only for tabu / CCA-window decisions within a
+     *  single restart epoch. For cross-epoch activity tracking, see [touchCount]. */
     val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars)
+
+    /** Cumulative count of moves applied to each variable. Same indexing as [lastTouched]
+     *  (bool ids first, int ids offset by `numBoolVars`). Survives [restart] so it
+     *  measures activity across the whole search run, not just the current restart epoch.
+     *  Captured by [com.eignex.klause.solver.localsearch.WarmState] for ALNS's
+     *  `activityBiased` destroy operator. */
+    val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars)
 
     /** Lazy cache for [breakScore] of `Move.BoolFlip`. Entry `v` is fresh iff
      *  `boolBreakValid[v]`; otherwise the cached value is stale and must be recomputed. The
@@ -174,6 +183,7 @@ class LocalSearchState(
         boolConfChange[boolVar] = false
         step++
         lastTouched[boolVar] = step
+        if (touchCount[boolVar] < Int.MAX_VALUE) touchCount[boolVar]++
     }
 
     private fun applyIntSet(intVar: Int, newValue: Int) {
@@ -189,7 +199,9 @@ class LocalSearchState(
         markNeighborConfChange(touchedFactors)
         intConfChange[intVar] = false
         step++
-        lastTouched[problem.numBoolVars + intVar] = step
+        val slot = problem.numBoolVars + intVar
+        lastTouched[slot] = step
+        if (touchCount[slot] < Int.MAX_VALUE) touchCount[slot]++
     }
 
     private fun invalidateBoolBreakNeighbourhood(factorIds: IntArray) {

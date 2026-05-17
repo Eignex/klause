@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSession
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 
@@ -35,7 +36,10 @@ fun interface RepairOperator {
     }
 }
 
-/** Bundle of everything a [RepairOperator] needs to fill a freed neighbourhood. */
+/** Bundle of everything a [RepairOperator] needs to fill a freed neighbourhood. When
+ *  [session] is provided, operators that delegate to the inner solver should route
+ *  calls through it so cross-iteration state (DDFW weights, activity recency) survives;
+ *  the [inner] reference remains for operators that need raw `Optimizer` access. */
 data class RepairContext(
     val inner: Optimizer<LocalSearchParams>,
     val params: LocalSearchParams,
@@ -44,6 +48,7 @@ data class RepairContext(
     val incumbent: Sample,
     val freed: FreedVars,
     val rng: Random = Random.Default,
+    val session: LocalSearchSession? = null,
 )
 
 /**
@@ -58,7 +63,11 @@ class InnerLsRepair(
 ) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val params = if (flipsOverride != null) context.params.copy(maxFlips = flipsOverride) else context.params
-        return context.inner.minimize(context.objective, params.withAssumptions(context.pinAssumptions))
+        val merged = params.withAssumptions(context.pinAssumptions)
+        // Prefer the session when present so weight learning + activity recency
+        // accumulate across iterations; fall back to the bare inner Optimizer otherwise.
+        return context.session?.minimize(context.objective, merged)
+            ?: context.inner.minimize(context.objective, merged)
     }
 
     override fun toString(): String = "InnerLsRepair($label${flipsOverride?.let { ", flips=$it" } ?: ""})"

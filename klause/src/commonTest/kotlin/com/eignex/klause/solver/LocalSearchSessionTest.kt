@@ -94,15 +94,15 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `session captures variable recency after a call`() {
+    fun `session captures variable activity counts after a call`() {
         val problem = ddfwProblem()
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L))
-        val recency = session.warmStateView.activityRecency()
-        assertEquals(6, recency.size, "recency should cover all (bool + int) var slots")
-        // After a sample search, at least some vars must have been touched (recency != MAX).
-        assertTrue(recency.any { it != Int.MAX_VALUE }, "expected at least one touched variable")
+        val touches = session.warmStateView.activityTouches()
+        assertEquals(6, touches.size, "touches should cover all (bool + int) var slots")
+        // After a sample search, at least some vars must have been touched.
+        assertTrue(touches.any { it > 0 }, "expected at least one touched variable")
     }
 
     @Test

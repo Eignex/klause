@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSession
 import kotlin.random.Random
 
 /**
@@ -48,6 +49,12 @@ class Alns(
     val destroyBandit: RouletteWheelBandit = RouletteWheelBandit(destroyOperators.size),
     val repairBandit: RouletteWheelBandit = RouletteWheelBandit(repairOperators.size),
     val rng: Random = Random.Default,
+    /** Optional session for cross-iteration state. When provided, [InnerLsRepair] (and
+     *  any other repair operator that reads `context.session`) routes through it so
+     *  DDFW factor weights and per-variable activity recency survive across iterations.
+     *  Required to make `DestroyOperator.activityBiased(session)` useful — without a
+     *  session it falls back to random. Pass `solver.session() as LocalSearchSession`. */
+    val session: LocalSearchSession? = null,
 ) : Optimizer<LocalSearchParams> {
 
     init {
@@ -86,8 +93,10 @@ class Alns(
     override fun minimize(objective: Objective, params: LocalSearchParams): Sample? {
         _iterationLog.clear()
         // Initial solve to get an incumbent. Pass through the caller's full budget so the
-        // first feasibility / optimisation pass isn't artificially truncated.
-        var bestSample = inner.minimize(objective, params) ?: return null
+        // first feasibility / optimisation pass isn't artificially truncated. Route through
+        // the session when present so the first solve seeds DDFW weights and recency for
+        // later activity-biased / weight-driven destroy operators.
+        var bestSample = (session?.minimize(objective, params) ?: inner.minimize(objective, params)) ?: return null
         var bestObj = objective.evaluate(bestSample)
         var incumbent = bestSample
         var incumbentObj = bestObj
@@ -113,7 +122,7 @@ class Alns(
             }
 
             val pinAssumptions = buildPin(inner.problem, incumbent, freed)
-            val context = RepairContext(inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng)
+            val context = RepairContext(inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session)
             val repaired = repairOperators[repairIdx].repair(context)
             if (repaired == null) {
                 destroyBandit.reward(destroyIdx, rejectedReward)

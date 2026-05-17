@@ -138,23 +138,23 @@ fun interface DestroyOperator {
         }
 
         /**
-         * Activity-biased: free variables that were most recently / frequently touched in
-         * the inner solver's prior calls, read from a [LocalSearchSession]'s captured
-         * recency snapshot. Variables with the smallest `state.step - lastTouched` value
-         * are picked first — they are the ones the strategy was actively flipping in the
-         * recent search.
+         * Activity-biased: free variables that were touched most often in the inner
+         * solver's prior calls, read from a [LocalSearchSession]'s captured touch counts.
+         * Variables with the highest cumulative touch count are picked first — they are
+         * the ones the search has been working hardest on and most likely to benefit
+         * from re-optimisation in isolation.
          *
-         * Falls back to [Random] when the session has no recency capture yet (first
+         * Falls back to [Random] when the session has no activity capture yet (first
          * iteration) or when no session was provided.
          */
         fun activityBiased(session: LocalSearchSession?): DestroyOperator = DestroyOperator { rng, problem, incumbent, objective, fraction ->
-            val recency = session?.warmStateView?.activityRecency() ?: IntArray(0)
-            if (recency.isEmpty()) return@DestroyOperator Random.destroy(rng, problem, incumbent, objective, fraction)
+            val touches = session?.warmStateView?.activityTouches() ?: IntArray(0)
+            if (touches.isEmpty()) return@DestroyOperator Random.destroy(rng, problem, incumbent, objective, fraction)
             val totalVars = problem.numBoolVars + problem.numIntVars
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
-            // Sort vars ascending by recency (smaller = more recently touched); take top k.
-            val indexed = IntArray(recency.size) { it }
-            val sorted = indexed.sortedBy { recency[it] }.take(k)
+            // Sort vars descending by touch count (more touched = higher activity); take top k.
+            val indexed = IntArray(touches.size) { it }
+            val sorted = indexed.sortedByDescending { touches[it] }.take(k)
             split(sorted, problem.numBoolVars)
         }
 

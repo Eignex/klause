@@ -35,43 +35,45 @@ class WarmState {
     /** Per-factor weights, size = `problem.numFactors`, or `null` if not yet populated. */
     internal var factorWeights: DoubleArray? = null
 
-    /** Per-variable recency, size = `numBoolVars + numIntVars` (bool ids first, then int
-     *  ids offset by `numBoolVars`). Smaller values mean "touched more recently in the
-     *  last LS call". `Int.MAX_VALUE` means "never touched in the captured call". `null`
-     *  if no call has completed yet. Used by ALNS destroy operators that pick high-
-     *  activity variables for re-optimisation. */
-    internal var activityRecency: IntArray? = null
+    /** Per-variable cumulative touch count, size = `numBoolVars + numIntVars` (bool ids
+     *  first, int ids offset by `numBoolVars`). Larger values mean "touched more often
+     *  during the search run". `null` if no call has completed yet. Used by ALNS destroy
+     *  operators that pick high-activity variables for re-optimisation. Cumulative across
+     *  restart epochs within a call — survives [LocalSearchState.restart]. */
+    internal var activityTouches: IntArray? = null
 
-    /** Read-only view onto recency for tests / destroy operators. Returns an empty array
-     *  when no data has been captured yet. */
-    fun activityRecency(): IntArray = activityRecency ?: IntArray(0)
+    /** Read-only view onto activity counts for tests / destroy operators. Returns an
+     *  empty array when no data has been captured yet. */
+    fun activityTouches(): IntArray = activityTouches ?: IntArray(0)
 
     /** Discard all warm state. The next session call starts from defaults. */
     fun reset() {
         factorWeights = null
-        activityRecency = null
+        activityTouches = null
     }
 
-    /** Sync warm weights into [state] before the search loop starts. Size-mismatched
-     *  warm state is silently dropped — the new Problem's factor count overrides. */
+    /** Sync warm weights and activity counts into [state] before the search loop starts.
+     *  Size-mismatched warm state is silently dropped — the new Problem's factor / var
+     *  count overrides. Restoring [activityTouches] lets touch counts accumulate across
+     *  session calls, which is what `activityBiased` ALNS destroy keys on. */
     internal fun applyTo(state: LocalSearchState) {
-        val w = factorWeights ?: return
-        if (w.size != state.factorWeights.size) return
-        for (i in w.indices) state.factorWeights[i] = w[i]
+        factorWeights?.let { w ->
+            if (w.size == state.factorWeights.size) {
+                for (i in w.indices) state.factorWeights[i] = w[i]
+            }
+        }
+        activityTouches?.let { t ->
+            if (t.size == state.touchCount.size) {
+                for (i in t.indices) state.touchCount[i] = t[i]
+            }
+        }
     }
 
-    /** Capture the strategy's learned weights and per-variable recency at the end of a
-     *  search session. Recency is `state.step - lastTouched[v]` clamped to `Int`, with
-     *  `Int.MAX_VALUE` for untouched vars (lastTouched == 0). */
+    /** Capture the strategy's learned weights and per-variable touch counts at the end
+     *  of a search session. Touch counts survive restart, so they reflect activity over
+     *  the whole call regardless of restart cadence. */
     internal fun captureFrom(state: LocalSearchState) {
         factorWeights = state.factorWeights.copyOf()
-        val total = state.problem.numBoolVars + state.problem.numIntVars
-        val recency = IntArray(total)
-        for (i in 0 until total) {
-            val touched = state.lastTouched[i]
-            recency[i] = if (touched == 0L) Int.MAX_VALUE
-                         else (state.step - touched).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
-        }
-        activityRecency = recency
+        activityTouches = state.touchCount.copyOf()
     }
 }

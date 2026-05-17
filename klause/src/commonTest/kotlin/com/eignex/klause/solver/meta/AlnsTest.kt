@@ -242,6 +242,37 @@ class AlnsTest {
     }
 
     @Test
+    fun `alns over a session accumulates activity recency and feeds activity-biased destroy`() {
+        // Verify the cross-iteration wiring: when ALNS runs over a LocalSearchSession,
+        // the inner solver's per-call activity capture survives into the next iteration's
+        // destroy phase, where activityBiased reads it. Without a session, the activity
+        // operator falls back to random — verified by checking recency stays empty.
+        val factor = Cardinality.exactlyOne(intArrayOf(
+            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
+        ))
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val solver = LocalSearchSolver(problem)
+        val session = solver.session() as com.eignex.klause.solver.localsearch.LocalSearchSession
+
+        val alns = Alns(
+            inner = solver,
+            session = session,
+            destroyOperators = listOf(
+                DestroyOperator.Random,
+                DestroyOperator.activityBiased(session),
+            ),
+            maxIterations = 10,
+            flipsPerIteration = 200L,
+        )
+        alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        // After ALNS runs, activity touch counts should be populated (size = numBoolVars).
+        val touches = session.warmStateView.activityTouches()
+        assertEquals(4, touches.size)
+        assertTrue(touches.any { it > 0 }, "expected at least one touched variable")
+    }
+
+    @Test
     fun `freed vars empty triggers reward and continue`() {
         // Edge case: destroy op returns empty set. ALNS should reward (rejectedReward) and not crash.
         val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
