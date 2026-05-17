@@ -78,6 +78,12 @@ open class Ddfw(
                 }
                 sum
             }
+            // Approximate: sum weighted-break across parts. Over-counts when a factor
+            // newly broken by part i is re-satisfied by part j. Biased pessimistic for
+            // Compound moves vs single-var picks, which is acceptable for DDFW's greedy
+            // selection — exact handling would require an apply+revert that defeats
+            // weightedBreakScore's purpose of being a cheap proxy.
+            is Move.Compound -> move.parts.sumOf { weightedBreakScore(state, it) }
         }
     }
 

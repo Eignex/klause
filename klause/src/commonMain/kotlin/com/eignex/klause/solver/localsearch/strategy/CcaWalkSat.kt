@@ -56,5 +56,8 @@ class CcaWalkSat(
     private fun confChanged(state: LocalSearchState, move: Move): Boolean = when (move) {
         is Move.BoolFlip -> state.boolConfChange[move.varId]
         is Move.IntSet -> state.intConfChange[move.varId]
+        // Compound counts as conf-changed iff *all* parts are conf-changed — every
+        // affected var must have moved since its last touch for the move to be eligible.
+        is Move.Compound -> move.parts.all { confChanged(state, it) }
     }
 }

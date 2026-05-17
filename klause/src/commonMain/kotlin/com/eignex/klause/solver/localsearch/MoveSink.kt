@@ -24,5 +24,17 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         if (assumptions.isFrozenInt(varId)) return
         moves += Move.IntSet(varId, newValue)
     }
+
+    /** Add a multi-variable atomic transition. Skips the move entirely if any part
+     *  would touch a frozen variable — a Compound is all-or-nothing. */
+    fun addCompound(parts: List<Move>) {
+        for (p in parts) when (p) {
+            is Move.BoolFlip -> if (assumptions.isFrozenBool(p.varId)) return
+            is Move.IntSet -> if (assumptions.isFrozenInt(p.varId)) return
+            is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet)")
+        }
+        moves += Move.Compound(parts)
+    }
+
     fun clear() { moves.clear() }
 }

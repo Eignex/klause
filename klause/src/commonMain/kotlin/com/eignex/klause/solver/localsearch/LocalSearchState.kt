@@ -99,9 +99,10 @@ class LocalSearchState(
         }
     }
 
-    fun apply(move: Move) = when (move) {
+    fun apply(move: Move): Unit = when (move) {
         is Move.BoolFlip -> applyBoolFlip(move.varId)
         is Move.IntSet -> applyIntSet(move.varId, move.newValue)
+        is Move.Compound -> { for (p in move.parts) apply(p) }
     }
 
     /**
@@ -134,6 +135,7 @@ class LocalSearchState(
             }
             count
         }
+        is Move.Compound -> evaluateCompound(move).breakScore
     }
 
     /**
@@ -157,6 +159,7 @@ class LocalSearchState(
             }
             sum
         }
+        is Move.Compound -> evaluateCompound(move).netDelta
     }
 
     private fun applyBoolFlip(boolVar: Int) {
@@ -204,17 +207,75 @@ class LocalSearchState(
         }
     }
 
-    /** True iff [move]'s var was touched within the last [tenure] accepted moves. */
+    /** True iff [move]'s var was touched within the last [tenure] accepted moves. For
+     *  a [Move.Compound], conservative: true if *any* part is tabu. */
     fun isTaboo(move: Move, tenure: Int): Boolean {
         if (tenure <= 0) return false
-        val slot = when (move) {
-            is Move.BoolFlip -> move.varId
-            is Move.IntSet -> problem.numBoolVars + move.varId
+        return when (move) {
+            is Move.BoolFlip -> isTabooSlot(move.varId, tenure)
+            is Move.IntSet -> isTabooSlot(problem.numBoolVars + move.varId, tenure)
+            is Move.Compound -> move.parts.any { isTaboo(it, tenure) }
         }
+    }
+
+    private fun isTabooSlot(slot: Int, tenure: Int): Boolean {
         val touched = lastTouched[slot]
-        if (touched == 0L) return false   // never touched (lastTouched is reset on restart)
+        if (touched == 0L) return false
         return step - touched < tenure
     }
+
+    /**
+     * Apply [move] forward, observe (newly-violated, net-cost-diff), revert via inverse
+     * primitives, and restore step / lastTouched / conf-change so the state is exactly
+     * as it was before. Snapshot of `boolConfChange` and `intConfChange` is full arrays
+     * — they're touched in the neighbourhood of every applied part and selective restore
+     * would be more bookkeeping than it's worth for a Compound that's typically 2 parts.
+     */
+    private fun evaluateCompound(move: Move.Compound): CompoundEval {
+        val oldStep = step
+        val oldCost = cost
+        val oldViolatedIds: Set<Int> = violated.toIntArray().toHashSet()
+        val oldBoolConf = boolConfChange.copyOf()
+        val oldIntConf = intConfChange.copyOf()
+        // Capture inverse per part (BoolFlip self-inverts; IntSet needs current value).
+        val inverses = ArrayList<Move>(move.parts.size)
+        for (p in move.parts) inverses += inverseOf(p)
+        // Capture lastTouched for each affected slot — these will all get overwritten by
+        // the apply+revert dance.
+        val touchedSlots = IntArray(move.parts.size) { slotOf(move.parts[it]) }
+        val savedTouched = LongArray(touchedSlots.size) { lastTouched[touchedSlots[it]] }
+
+        for (p in move.parts) apply(p)
+
+        var breakCount = 0
+        val newViolated = violated.toIntArray()
+        for (fid in newViolated) if (fid !in oldViolatedIds) breakCount++
+        val netDelta = cost - oldCost
+
+        for (i in inverses.indices.reversed()) apply(inverses[i])
+
+        // Restore: step, lastTouched, conf-change arrays.
+        step = oldStep
+        for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
+        for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
+        for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
+
+        return CompoundEval(breakScore = breakCount, netDelta = netDelta)
+    }
+
+    private fun inverseOf(part: Move): Move = when (part) {
+        is Move.BoolFlip -> part
+        is Move.IntSet -> Move.IntSet(part.varId, assignment.intValue(part.varId))
+        is Move.Compound -> error("Compound parts are primitive by construction")
+    }
+
+    private fun slotOf(part: Move): Int = when (part) {
+        is Move.BoolFlip -> part.varId
+        is Move.IntSet -> problem.numBoolVars + part.varId
+        is Move.Compound -> error("Compound parts are primitive by construction")
+    }
+
+    private data class CompoundEval(val breakScore: Int, val netDelta: Int)
 
     private fun updateViolation(@Suppress("UNUSED_PARAMETER") factor: LocalSearchFactor, factorId: Int, deltaViolated: Int) {
         when (deltaViolated) {

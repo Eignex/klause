@@ -10,4 +10,22 @@ sealed interface Move {
 
     /** Set an integer variable to [newValue]. */
     data class IntSet(val varId: Int, val newValue: Int) : Move
+
+    /**
+     * Two or more single-variable moves applied as one transition. The engine commits
+     * each part in `parts` order, but break score / net delta / tabu are evaluated
+     * against the full post-state — so a Compound that resolves a conflict via two
+     * coupled changes can score better than either part alone.
+     *
+     * Parts must be `BoolFlip` or `IntSet` (no Compound-of-Compound); the LS engine
+     * uses apply-then-revert to evaluate cost diffs, which only works for invertible
+     * primitives. Constructed via [com.eignex.klause.solver.localsearch.MoveSink.addCompound];
+     * a Compound is tabu if *any* part is tabu (conservative).
+     */
+    data class Compound(val parts: List<Move>) : Move {
+        init {
+            require(parts.size >= 2) { "Compound move needs at least 2 parts, got ${parts.size}" }
+            require(parts.all { it !is Compound }) { "Compound move cannot nest another Compound" }
+        }
+    }
 }
