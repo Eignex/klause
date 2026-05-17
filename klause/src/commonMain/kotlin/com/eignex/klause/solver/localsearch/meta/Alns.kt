@@ -55,9 +55,14 @@ class Alns(
     val newBestReward: Double = 3.0,
     val acceptedReward: Double = 1.0,
     val rejectedReward: Double = 0.0,
-    val destroyBandit: UnivariateBandit<*> = RouletteWheelBandit(destroyOperators.size),
-    val repairBandit: UnivariateBandit<*> = RouletteWheelBandit(repairOperators.size),
+    /** Single RNG driving destroy-operator randomization, acceptance criteria, repair
+     *  contexts, and the default-constructed bandits. Pass `Random(seed)` for a fully
+     *  reproducible ALNS run from one seed — every randomized component derives its
+     *  draws from this stream. Users supplying custom bandits are responsible for
+     *  those bandits' RNGs (kumulant bandits each take a `random: Random` parameter). */
     val rng: Random = Random.Default,
+    val destroyBandit: UnivariateBandit<*> = RouletteWheelBandit(destroyOperators.size, random = rng),
+    val repairBandit: UnivariateBandit<*> = RouletteWheelBandit(repairOperators.size, random = rng),
     /** Optional session for cross-iteration state. When provided, [InnerLsRepair] (and
      *  any other repair operator that reads `context.session`) routes through it so
      *  DDFW factor weights and per-variable activity recency survive across iterations.
