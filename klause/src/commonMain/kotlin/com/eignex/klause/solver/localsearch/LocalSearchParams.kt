@@ -39,6 +39,11 @@ data class LocalSearchParams(
     val assumptions: Assumptions = Assumptions.None,
     /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
     val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.NeverCancel,
+    /** How [LocalSearchSolver.minimize] combines constraint violations with the objective
+     *  for greedy descent. Defaults to two-phase feasibility-first behaviour; switch to
+     *  [CostShaping.linear] or [CostShaping.saturating] on tight problems where the
+     *  feasible region is narrow. Ignored by `solve` / `samples` / `enumerate`. */
+    val costShaping: CostShaping = CostShaping.FeasibilityFirst,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

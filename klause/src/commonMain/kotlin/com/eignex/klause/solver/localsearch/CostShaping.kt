@@ -1,0 +1,78 @@
+package com.eignex.klause.solver.localsearch
+
+import kotlin.math.min
+import kotlin.math.sqrt
+
+/**
+ * Combines hard-constraint violation count with the soft objective into a single scalar the
+ * minimize engine uses for greedy descent. The default [FeasibilityFirst] preserves the
+ * historical two-phase behaviour: only consider the objective once `violationCount == 0`.
+ *
+ * For tight problems where the feasible region is narrow or disconnected, [linear] mixes
+ * the objective in from the start so the descent can step *through* slightly-infeasible
+ * neighbours to reach a strictly better feasible solution on the far side. [saturating]
+ * adds a cap on the violation contribution: useful when individual violations are very
+ * cheap relative to objective scale and would otherwise dominate.
+ *
+ * The engine still tracks "best feasible" snapshots separately — shaping only governs the
+ * direction of greedy descent, not which assignments count as solutions.
+ */
+sealed interface CostShaping {
+
+    /** Shaped scalar; lower is better. */
+    fun shape(violationCount: Int, objective: Double): Double
+
+    /** True iff descent should reject moves with `violationCount > 0`. Used to short-circuit
+     *  the existing greedy-objective code path for [FeasibilityFirst]. */
+    val feasibilityGated: Boolean
+
+    /** Historical behaviour: only optimise the objective once feasibility is reached. */
+    data object FeasibilityFirst : CostShaping {
+        override fun shape(violationCount: Int, objective: Double): Double =
+            if (violationCount == 0) objective else Double.POSITIVE_INFINITY
+        override val feasibilityGated: Boolean = true
+    }
+
+    /** `violationPenalty(violationCount) + lambda * objective`. */
+    data class Linear(
+        val lambda: Double = 1.0,
+        val violationPenalty: ViolationPenalty = ViolationPenalty.Identity,
+    ) : CostShaping {
+        init { require(lambda >= 0) { "lambda must be non-negative, got $lambda" } }
+        override fun shape(violationCount: Int, objective: Double): Double =
+            violationPenalty.of(violationCount) + lambda * objective
+        override val feasibilityGated: Boolean = false
+    }
+
+    companion object {
+        /** Linear blend without saturation. */
+        fun linear(lambda: Double): CostShaping = Linear(lambda)
+
+        /** Linear blend with a cap on the violation contribution (one violation can't
+         *  dominate). Useful when individual violations are cheap relative to objective. */
+        fun saturating(lambda: Double, cap: Double): CostShaping =
+            Linear(lambda, ViolationPenalty.Saturating(cap))
+
+        /** Linear blend with square-root scaling on violations. Sub-linear: each extra
+         *  violation contributes less than the previous one. */
+        fun sqrtViolation(lambda: Double): CostShaping =
+            Linear(lambda, ViolationPenalty.SquareRoot)
+    }
+}
+
+sealed interface ViolationPenalty {
+    fun of(violationCount: Int): Double
+
+    data object Identity : ViolationPenalty {
+        override fun of(violationCount: Int): Double = violationCount.toDouble()
+    }
+
+    data class Saturating(val cap: Double) : ViolationPenalty {
+        init { require(cap >= 0) { "cap must be non-negative, got $cap" } }
+        override fun of(violationCount: Int): Double = min(violationCount.toDouble(), cap)
+    }
+
+    data object SquareRoot : ViolationPenalty {
+        override fun of(violationCount: Int): Double = sqrt(violationCount.toDouble())
+    }
+}

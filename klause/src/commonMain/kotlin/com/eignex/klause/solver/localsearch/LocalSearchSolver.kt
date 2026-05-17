@@ -205,6 +205,7 @@ class LocalSearchSolver(
         var flipsSinceRestart = 0
         var totalFlips = 0L
         val maxFlips = params.maxFlips
+        val shaping = params.costShaping
 
         // Each restart counts as one unit of work against [maxFlips]. Otherwise a
         // degenerate objective (e.g. all-zero) on a constraint-free problem would
@@ -224,14 +225,21 @@ class LocalSearchSolver(
                     bestObj = obj
                     bestSample = snap
                 }
-                // Try to descend on the objective via a single feasibility-preserving move.
-                val descended = greedyObjectiveStep(state, objective)
+                // Try to descend via a single move. Under [CostShaping.FeasibilityFirst]
+                // this stays inside the feasible region; under a linear shaping it may
+                // temporarily step into infeasibility if the shaped score improves —
+                // the strategy loop below then drives back to feasibility.
+                val descended = if (shaping.feasibilityGated) {
+                    greedyObjectiveStep(state, objective)
+                } else {
+                    shapedDescentStep(state, objective, shaping)
+                }
                 if (descended) {
                     flipsSinceRestart++
                     totalFlips++
                     continue
                 }
-                // Local minimum on the objective — restart and try a different basin.
+                // Local minimum on the (shaped) objective — restart and try a different basin.
                 restartPolicy.restart(state, bestSample)
                 flipsSinceRestart = 0
                 totalFlips++
@@ -302,6 +310,57 @@ class LocalSearchSolver(
                         bestDelta = delta
                         bestMove = Move.IntSet(i, target)
                     }
+                }
+                state.apply(Move.IntSet(i, cur)) // revert
+            }
+        }
+
+        if (bestMove == null) return false
+        state.apply(bestMove)
+        return true
+    }
+
+    /**
+     * Shaped-cost greedy step. Picks the single-variable move (bool flip / int ±1) whose
+     * post-state shaped score `shape(violationCount, objective)` is strictly less than
+     * the current shaped score. Unlike [greedyObjectiveStep], may step into infeasibility
+     * — the main minimize loop then drives back via the configured strategy.
+     */
+    private fun shapedDescentStep(
+        state: LocalSearchState,
+        objective: Objective,
+        shaping: CostShaping,
+    ): Boolean {
+        val baselineSnap = state.assignment.snapshot()
+        val baselineObj = objective.evaluate(baselineSnap)
+        val baselineShaped = shaping.shape(state.cost, baselineObj)
+        var bestShaped = baselineShaped
+        var bestMove: Move? = null
+
+        for (b in 0 until problem.numBoolVars) {
+            if (state.assumptions.isFrozenBool(b)) continue
+            state.apply(Move.BoolFlip(b))
+            val obj = objective.evaluate(state.assignment.snapshot())
+            val shaped = shaping.shape(state.cost, obj)
+            if (shaped < bestShaped) {
+                bestShaped = shaped
+                bestMove = Move.BoolFlip(b)
+            }
+            state.apply(Move.BoolFlip(b)) // revert
+        }
+
+        for (i in 0 until problem.numIntVars) {
+            if (state.assumptions.isFrozenInt(i)) continue
+            val cur = state.assignment.intValue(i)
+            val d = problem.intDomains[i]
+            for (target in intArrayOf(cur - 1, cur + 1)) {
+                if (target !in d.min..d.max) continue
+                state.apply(Move.IntSet(i, target))
+                val obj = objective.evaluate(state.assignment.snapshot())
+                val shaped = shaping.shape(state.cost, obj)
+                if (shaped < bestShaped) {
+                    bestShaped = shaped
+                    bestMove = Move.IntSet(i, target)
                 }
                 state.apply(Move.IntSet(i, cur)) // revert
             }
