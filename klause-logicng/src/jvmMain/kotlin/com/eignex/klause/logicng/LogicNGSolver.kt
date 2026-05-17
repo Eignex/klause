@@ -31,7 +31,12 @@ import kotlin.random.Random
  */
 class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
 
-    private val cnf: CnfProblem = BitBlaster.compile(problem)
+    /** Bit-blasted CNF; exposed to [LogicNGSession] for the incremental-solving path. */
+    internal val cnf: CnfProblem = BitBlaster.compile(problem)
+
+    /** Return a [LogicNGSession] holding one MiniSat solver across calls so learned
+     *  conflict clauses persist between `solve` / `samples` / `enumerate` calls. */
+    override fun session(): LogicNGSession = LogicNGSession(this)
 
     override fun solve(params: LogicNGParams): SolveResult {
         val (_, satSolver) = buildSolver()
