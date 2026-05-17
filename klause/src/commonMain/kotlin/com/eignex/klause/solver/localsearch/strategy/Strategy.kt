@@ -1,7 +1,5 @@
 package com.eignex.klause.solver.localsearch.strategy
 
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 

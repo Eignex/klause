@@ -1,11 +1,5 @@
 package com.eignex.klause.solver.localsearch.strategy
 
-import com.eignex.klause.solver.localsearch.strategy.Ddfw
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.ProbSat
-import com.eignex.klause.solver.localsearch.strategy.WalkSat
-import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
-
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 
@@ -23,7 +17,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * folded into the top of `pickMove` (rather than an engine hook) — by the time DDFW is
  * asked for the next move, the previous one has already been applied.
  */
-class Ddfw(
+open class Ddfw(
     val noiseProbability: Double = 0.05,
     val initWeight: Double = 1.0,
     val increment: Double = 1.0,
@@ -32,10 +26,14 @@ class Ddfw(
 
     private var lastUpdateStep: Long = -1L
 
+    /** Subclass hook for parameter scheduling; [AdaptiveDdfw] overrides to grow `increment`
+     *  on stalls. Invoked once per `pickMove` before the weight transfer pass. */
+    protected open fun currentIncrement(state: LocalSearchState): Double = increment
+
     override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
         if (state.step > 0 && state.step != lastUpdateStep) {
-            updateWeights(state)
+            updateWeights(state, currentIncrement(state))
             lastUpdateStep = state.step
         }
         val factorId = state.violated.random(state.rng)
@@ -83,7 +81,7 @@ class Ddfw(
         }
     }
 
-    private fun updateWeights(state: LocalSearchState) {
+    private fun updateWeights(state: LocalSearchState, increment: Double) {
         val w = state.factorWeights
         val violated = state.violated.toIntArray()
         for (v in violated) {

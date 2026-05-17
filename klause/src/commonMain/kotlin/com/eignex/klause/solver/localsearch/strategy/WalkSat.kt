@@ -1,8 +1,5 @@
 package com.eignex.klause.solver.localsearch.strategy
 
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.WalkSat
-
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 
@@ -15,10 +12,14 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * [TabuFilter] for the available knobs. Default: tenure 10 with the historical
  * "drop the filter when every candidate is tabu" aspiration.
  */
-class WalkSat(
+open class WalkSat(
     val noise: Double = 0.5,
     val tabu: TabuFilter = TabuFilter(tenure = 10),
 ) : Strategy {
+
+    /** Subclass hook for parameter scheduling. [AdaptiveWalkSat] overrides to plug in a
+     *  [NoiseController]; the default returns the constructor-time [noise] unchanged. */
+    protected open fun currentNoise(state: LocalSearchState): Double = noise
 
     override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
@@ -30,7 +31,7 @@ class WalkSat(
         if (raw.isEmpty()) return null
         val moves = tabu.filter(state, raw)
 
-        if (state.rng.nextDouble() < noise) {
+        if (state.rng.nextDouble() < currentNoise(state)) {
             return moves[state.rng.nextInt(moves.size)]
         }
 

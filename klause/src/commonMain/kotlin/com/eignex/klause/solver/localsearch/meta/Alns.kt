@@ -59,8 +59,11 @@ class Alns(
     override fun samples(params: LocalSearchParams) = inner.samples(params)
     override fun enumerate(params: LocalSearchParams) = inner.enumerate(params)
 
-    /** History snapshot exposed for tests / debugging; not part of the Optimizer contract. */
-    val iterationLog: MutableList<IterationRecord> = mutableListOf()
+    private val _iterationLog: MutableList<IterationRecord> = mutableListOf()
+
+    /** History snapshot exposed for tests / debugging; not part of the Optimizer contract.
+     *  Read-only view — ALNS appends internally; callers may iterate but not mutate. */
+    val iterationLog: List<IterationRecord> get() = _iterationLog
 
     data class IterationRecord(
         val operatorIdx: Int,
@@ -72,7 +75,7 @@ class Alns(
     )
 
     override fun minimize(objective: Objective, params: LocalSearchParams): Sample? {
-        iterationLog.clear()
+        _iterationLog.clear()
         // Initial solve to get an incumbent. Pass through the caller's full budget so the
         // first feasibility / optimisation pass isn't artificially truncated.
         var bestSample = inner.minimize(objective, params) ?: return null
@@ -115,7 +118,7 @@ class Alns(
                 else -> rejectedReward
             }
             bandit.reward(opIdx, reward)
-            iterationLog.add(IterationRecord(opIdx, freed.bools.size + freed.ints.size, incumbentObj, repairedObj, accept, isNewBest))
+            _iterationLog.add(IterationRecord(opIdx, freed.bools.size + freed.ints.size, incumbentObj, repairedObj, accept, isNewBest))
 
             if (isNewBest) {
                 bestSample = repaired

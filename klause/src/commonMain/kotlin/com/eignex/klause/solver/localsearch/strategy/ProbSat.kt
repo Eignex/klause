@@ -1,9 +1,5 @@
 package com.eignex.klause.solver.localsearch.strategy
 
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.ProbSat
-import com.eignex.klause.solver.localsearch.strategy.WalkSat
-
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.math.pow
@@ -18,11 +14,15 @@ import kotlin.math.pow
  *
  * Defaults follow the paper: cb=2.06, eps=1.0. cb < 0 inverts the bias (avoid for production).
  */
-class ProbSat(
+open class ProbSat(
     val cb: Double = 2.06,
     val eps: Double = 1.0,
     val tabu: TabuFilter = TabuFilter(tenure = 10),
 ) : Strategy {
+
+    /** Subclass hook for parameter scheduling; [AdaptiveProbSat] overrides to vary `cb`
+     *  with the cost trajectory. */
+    protected open fun currentCb(state: LocalSearchState): Double = cb
 
     override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
@@ -35,11 +35,12 @@ class ProbSat(
         val moves = tabu.filter(state, raw)
         if (moves.size == 1) return moves[0]
 
+        val cbNow = currentCb(state)
         var totalWeight = 0.0
         val weights = DoubleArray(moves.size)
         for (i in moves.indices) {
             val brk = state.breakScore(moves[i])
-            val w = (eps + brk).pow(-cb)
+            val w = (eps + brk).pow(-cbNow)
             weights[i] = w
             totalWeight += w
         }

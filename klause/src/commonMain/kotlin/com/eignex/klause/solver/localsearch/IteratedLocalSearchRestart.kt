@@ -61,54 +61,7 @@ class IteratedLocalSearchRestart(
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         val anchor = incumbent ?: bestSoFar
-        if (anchor == null) {
-            state.restart()
-            return
-        }
-        val problem = state.problem
-        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, anchor.bools[b])
-        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, anchor.ints[i])
-        val totalVars = problem.numBoolVars + problem.numIntVars
-        if (totalVars > 0) {
-            repeat(perturbationStrength) {
-                val pick = state.rng.nextInt(totalVars)
-                if (pick < problem.numBoolVars) {
-                    state.assignment.flipBool(pick)
-                } else {
-                    val v = pick - problem.numBoolVars
-                    val d = problem.intDomains[v]
-                    state.assignment.setInt(v, d.min + state.rng.nextInt(d.size))
-                }
-            }
-        }
-        state.recompute()
+        if (anchor == null) state.restart() else anchorAndPerturb(state, anchor, perturbationStrength)
     }
 }
 
-/**
- * Decides whether a freshly-reached local optimum replaces the ILS incumbent.
- *
- * The standard literature menu:
- *  - [Improving] — only strictly better optima are accepted. Simplest, sometimes called
- *    "ILS-Better".
- *  - [BetterOrEqual] — also accepts ties; useful on plateaus.
- *  - [RandomWalk] — always accept (no rejection). Maximises diversification, simulates a
- *    pure random walk through local optima.
- */
-sealed interface AcceptanceCriterion {
-    fun accept(newObjective: Double, incumbentObjective: Double): Boolean
-
-    data object Improving : AcceptanceCriterion {
-        override fun accept(newObjective: Double, incumbentObjective: Double): Boolean =
-            newObjective < incumbentObjective
-    }
-
-    data object BetterOrEqual : AcceptanceCriterion {
-        override fun accept(newObjective: Double, incumbentObjective: Double): Boolean =
-            newObjective <= incumbentObjective
-    }
-
-    data object RandomWalk : AcceptanceCriterion {
-        override fun accept(newObjective: Double, incumbentObjective: Double): Boolean = true
-    }
-}

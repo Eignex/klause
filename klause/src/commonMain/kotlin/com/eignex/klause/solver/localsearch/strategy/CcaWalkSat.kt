@@ -1,9 +1,5 @@
 package com.eignex.klause.solver.localsearch.strategy
 
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.CcaWalkSat
-import com.eignex.klause.solver.localsearch.strategy.WalkSat
-
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 

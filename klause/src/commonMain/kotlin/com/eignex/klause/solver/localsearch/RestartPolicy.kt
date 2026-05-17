@@ -55,6 +55,31 @@ class FixedCadenceRestart(val maxFlipsBeforeRestart: Int = 10_000) : RestartPoli
 }
 
 /**
+ * Copy [anchor] into [state]'s assignment, apply [perturbationStrength] uniform-random
+ * single-variable mutations (bool flip or int re-set within its domain), then recompute
+ * the cost. Shared between [AdaptivePerturbationRestart] and [IteratedLocalSearchRestart].
+ */
+internal fun anchorAndPerturb(state: LocalSearchState, anchor: Sample, perturbationStrength: Int) {
+    val problem = state.problem
+    for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, anchor.bools[b])
+    for (i in 0 until problem.numIntVars) state.assignment.setInt(i, anchor.ints[i])
+    val totalVars = problem.numBoolVars + problem.numIntVars
+    if (totalVars > 0) {
+        repeat(perturbationStrength) {
+            val pick = state.rng.nextInt(totalVars)
+            if (pick < problem.numBoolVars) {
+                state.assignment.flipBool(pick)
+            } else {
+                val v = pick - problem.numBoolVars
+                val d = problem.intDomains[v]
+                state.assignment.setInt(v, d.min + state.rng.nextInt(d.size))
+            }
+        }
+    }
+    state.recompute()
+}
+
+/**
  * Restart from a perturbation of [bestSoFar] instead of randomising fully — keeps the
  * search anchored to good regions, helping `minimize` escape plateaus without throwing
  * away progress.
@@ -75,27 +100,7 @@ class AdaptivePerturbationRestart(
         stepsSinceLastRestart >= maxFlipsBeforeRestart
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-        if (bestSoFar == null) {
-            state.restart()
-            return
-        }
-        val problem = state.problem
-        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, bestSoFar.bools[b])
-        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, bestSoFar.ints[i])
-        val totalVars = problem.numBoolVars + problem.numIntVars
-        if (totalVars > 0) {
-            repeat(perturbationStrength) {
-                val pick = state.rng.nextInt(totalVars)
-                if (pick < problem.numBoolVars) {
-                    state.assignment.flipBool(pick)
-                } else {
-                    val v = pick - problem.numBoolVars
-                    val d = problem.intDomains[v]
-                    state.assignment.setInt(v, d.min + state.rng.nextInt(d.size))
-                }
-            }
-        }
-        state.recompute()
+        if (bestSoFar == null) state.restart() else anchorAndPerturb(state, bestSoFar, perturbationStrength)
     }
 }
 
