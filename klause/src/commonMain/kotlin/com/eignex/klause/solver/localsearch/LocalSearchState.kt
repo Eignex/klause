@@ -185,12 +185,21 @@ class LocalSearchState(
      * Non-linear objectives would require an apply-revert with full re-evaluation; the
      * benefit doesn't justify the state churn so they fall through to the unshaped path.
      */
-    fun shapedBreakScore(move: Move): Double {
-        val brk = breakScore(move).toDouble()
-        val obj = objective ?: return brk
-        if (shapingLambda == 0.0) return brk
-        if (obj !is LinearObjective) return brk
-        return brk + shapingLambda * linearObjectiveDelta(move, obj)
+    fun shapedBreakScore(move: Move): Double =
+        breakScore(move).toDouble() + shapedObjectiveDelta(move)
+
+    /**
+     * Lambda-multiplied objective delta contribution for shaping any per-move score:
+     * `shapingLambda * objectiveDelta(move)`. Returns `0.0` when shaping is off
+     * (no objective, lambda = 0, or non-Linear objective). Strategies that compose
+     * objective-aware scores (DDFW's weighted break, ProbSat's exponent input) add
+     * this on top of their base metric.
+     */
+    fun shapedObjectiveDelta(move: Move): Double {
+        val obj = objective ?: return 0.0
+        if (shapingLambda == 0.0) return 0.0
+        if (obj !is LinearObjective) return 0.0
+        return shapingLambda * linearObjectiveDelta(move, obj)
     }
 
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double = when (move) {

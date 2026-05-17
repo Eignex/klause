@@ -36,11 +36,21 @@ open class ProbSat(
         if (moves.size == 1) return moves[0]
 
         val cbNow = currentCb(state)
+        // Compute scores upfront; under shaping (state.shapingLambda != 0) the score is
+        // breakScore + shapedObjectiveDelta which can go negative when an objective
+        // improvement dominates. `(eps + score)^(-cb)` is undefined for non-positive
+        // bases, so shift the whole candidate set by the minimum so values stay >= 0.
+        // When shaping is off, every score is breakScore (>= 0) and min is >= 0; if min
+        // happens to be 0 (typical, since often some candidate doesn't break anything),
+        // shift = 0 and the formula matches the original verbatim.
+        val scores = DoubleArray(moves.size) { state.shapedBreakScore(moves[it]) }
+        var minScore = scores[0]
+        for (i in 1 until scores.size) if (scores[i] < minScore) minScore = scores[i]
+        val shift = if (minScore < 0.0) -minScore else 0.0
         var totalWeight = 0.0
         val weights = DoubleArray(moves.size)
         for (i in moves.indices) {
-            val brk = state.breakScore(moves[i])
-            val w = (eps + brk).pow(-cbNow)
+            val w = (eps + scores[i] + shift).pow(-cbNow)
             weights[i] = w
             totalWeight += w
         }

@@ -89,6 +89,35 @@ class CostShapingTest {
     }
 
     @Test
+    fun `shapedObjectiveDelta returns zero when shaping is off`() {
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        state.recompute()
+        // No objective set → delta is 0 for any move.
+        assertEquals(0.0, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(0)))
+        // Objective set but lambda = 0 → still 0.
+        state.objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0))
+        state.shapingLambda = 0.0
+        assertEquals(0.0, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(0)))
+    }
+
+    @Test
+    fun `shapedObjectiveDelta returns lambda times linear delta when shaping is on`() {
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        state.assignment.setBool(0, false)
+        state.assignment.setBool(1, false)
+        state.recompute()
+        state.objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0))
+        state.shapingLambda = 0.5
+        // Flipping bool 0 false → true adds 10 to objective; with lambda=0.5, delta = 5.
+        assertEquals(5.0, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(0)))
+        assertEquals(0.5, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(1)))
+    }
+
+    @Test
     fun `linear shaping minimize on exact one cardinality finds the cheapest pick`() {
         // Same setup as OptimizerTest's exactly-one weighted case, but using shaped descent.
         val factor = Cardinality.exactlyOne(intArrayOf(

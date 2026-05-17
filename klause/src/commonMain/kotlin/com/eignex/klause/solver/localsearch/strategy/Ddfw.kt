@@ -61,7 +61,7 @@ open class Ddfw(
 
     private fun weightedBreakScore(state: LocalSearchState, move: Move): Double {
         val w = state.factorWeights
-        return when (move) {
+        val base = when (move) {
             is Move.BoolFlip -> {
                 var sum = 0.0
                 for (fid in state.problem.boolOccurrences[move.varId]) {
@@ -85,6 +85,11 @@ open class Ddfw(
             // weightedBreakScore's purpose of being a cheap proxy.
             is Move.Compound -> move.parts.sumOf { weightedBreakScore(state, it) }
         }
+        // Add the shaped-objective contribution so DDFW's min-weighted pick is
+        // objective-aware too when shaping is on. When off, shapedObjectiveDelta is
+        // 0.0 and base is returned unchanged. DDFW picks min, so negative contributions
+        // (objective-improving moves) are admissible — no shift needed.
+        return base + state.shapedObjectiveDelta(move)
     }
 
     private fun updateWeights(state: LocalSearchState, increment: Double) {
