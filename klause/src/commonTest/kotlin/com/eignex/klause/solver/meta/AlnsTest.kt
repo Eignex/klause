@@ -61,6 +61,43 @@ class AlnsTest {
     }
 
     @Test
+    fun `adjacency related destroy stays inside connected components`() {
+        // Two disconnected sub-problems sharing nothing:
+        //   factor A: AtLeastOne over bool vars 0..3
+        //   factor B: AtLeastOne over bool vars 4..7
+        // Adjacency BFS from a seed in factor A should free vars only from A (until it
+        // exhausts the component, at which point it re-seeds; with small `fraction` we
+        // stay within one component).
+        val fA = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
+        val fB = Cardinality.atLeastOne(IntArray(4) { Lit.make(it + 4, true) })
+        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = listOf(fA, fB))
+        val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
+        val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
+        // Free 2 of 8 = fraction 0.25. Starts from one component and stays inside it.
+        val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
+        assertEquals(2, freed.bools.size)
+        val componentA = freed.bools.all { it in 0..3 }
+        val componentB = freed.bools.all { it in 4..7 }
+        assertTrue(componentA || componentB, "freed vars should be in one component: ${freed.bools.toList()}")
+    }
+
+    @Test
+    fun `adjacency related destroy reaches fraction across components when needed`() {
+        // Same two disconnected components, but free 6 of 8 (fraction 0.75) — adjacency
+        // BFS must re-seed into the second component after exhausting the first.
+        val fA = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
+        val fB = Cardinality.atLeastOne(IntArray(4) { Lit.make(it + 4, true) })
+        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = listOf(fA, fB))
+        val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
+        val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
+        val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.75)
+        assertEquals(6, freed.bools.size)
+        val fromA = freed.bools.count { it in 0..3 }
+        val fromB = freed.bools.count { it in 4..7 }
+        assertTrue(fromA > 0 && fromB > 0, "expected vars from both components, got A=$fromA B=$fromB")
+    }
+
+    @Test
     fun `worst objective destroy picks high contribution vars`() {
         // 4 bool vars, only var 3 is set true and has the largest weight; destroy fraction 0.25 → 1 var.
         // WorstObjective should pick var 3.
