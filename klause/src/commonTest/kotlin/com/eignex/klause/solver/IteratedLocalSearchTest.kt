@@ -103,6 +103,53 @@ class IteratedLocalSearchTest {
     }
 
     @Test
+    fun `population fills up to size and evicts worst on accept`() {
+        val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
+
+        val policy = IteratedLocalSearchRestart(
+            populationSize = 3,
+            acceptance = com.eignex.klause.solver.localsearch.AcceptanceCriterion.BetterOrEqual,
+        )
+        val s = { obj: Double -> Sample(booleanArrayOf(true, false), intArrayOf()) to obj }
+        policy.onLocalOptimum(state, s(10.0).first, 10.0)
+        policy.onLocalOptimum(state, s(8.0).first, 8.0)
+        policy.onLocalOptimum(state, s(12.0).first, 12.0)
+        assertEquals(3, policy.incumbents.size, "population should be at capacity")
+        // Objectives are sorted ascending; population is {8, 10, 12}.
+        assertEquals(8.0, policy.incumbents[0].objective)
+        assertEquals(12.0, policy.incumbents.last().objective)
+
+        // A new optimum at 5.0 beats the worst (12.0) — should be admitted, worst evicted.
+        policy.onLocalOptimum(state, s(5.0).first, 5.0)
+        assertEquals(3, policy.incumbents.size, "size capped")
+        assertEquals(5.0, policy.incumbents[0].objective, "5.0 should be new best")
+        assertEquals(10.0, policy.incumbents.last().objective, "12.0 should have been evicted")
+
+        // A new optimum at 11.0 doesn't beat the worst (10.0) — rejected under BetterOrEqual.
+        policy.onLocalOptimum(state, s(11.0).first, 11.0)
+        assertEquals(3, policy.incumbents.size)
+        assertEquals(10.0, policy.incumbents.last().objective, "population unchanged on reject")
+    }
+
+    @Test
+    fun `single incumbent mode preserved by default`() {
+        val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
+
+        val policy = IteratedLocalSearchRestart() // populationSize defaults to 1
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), intArrayOf()), 10.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(false, true), intArrayOf()), 5.0)
+        // Default acceptance is Improving — 5.0 < 10.0 admitted, evicting 10.0.
+        assertEquals(1, policy.incumbents.size, "single-incumbent mode")
+        assertEquals(5.0, policy.incumbents[0].objective)
+    }
+
+    @Test
     fun `ils restart solves exact one cardinality`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
