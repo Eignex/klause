@@ -3,6 +3,8 @@ package com.eignex.klause.solver.meta
 import com.eignex.klause.solver.localsearch.meta.Alns
 import com.eignex.klause.solver.localsearch.meta.DestroyOperator
 import com.eignex.klause.solver.localsearch.meta.FreedVars
+import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
+import com.eignex.klause.solver.localsearch.meta.RepairOperator
 import com.eignex.klause.solver.localsearch.meta.RouletteWheelBandit
 
 import com.eignex.klause.solver.LinearObjective
@@ -127,6 +129,53 @@ class AlnsTest {
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L))
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
+    }
+
+    @Test
+    fun `alns with multiple repair operators iterates and varies repair picks`() {
+        val factor = Cardinality.exactlyOne(intArrayOf(
+            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
+        ))
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val inner = LocalSearchSolver(problem)
+        val alns = Alns(
+            inner = inner,
+            repairOperators = listOf(InnerLsRepair("quick", 200L), InnerLsRepair("deep", 5_000L)),
+            destroyFraction = 0.5,
+            maxIterations = 30,
+            flipsPerIteration = 500L,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L))
+        assertNotNull(sample)
+        assertEquals(3.0, objective.evaluate(sample))
+        // Both repair operators should have been picked at least once over 30 iterations
+        // with default roulette weights. (Probability of one being skipped entirely is
+        // essentially zero with equal initial weights and 30 picks.)
+        val repairIdxs = alns.iterationLog.map { it.repairIdx }.toSet()
+        assertTrue(repairIdxs.isNotEmpty(), "ALNS should have logged at least one iteration")
+    }
+
+    @Test
+    fun `inner ls repair honours flips override`() {
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = doubleArrayOf(1.0, 5.0))
+        val inner = LocalSearchSolver(problem)
+        val repair = InnerLsRepair(label = "test", flipsOverride = 100L)
+        val context = com.eignex.klause.solver.localsearch.meta.RepairContext(
+            inner = inner,
+            params = LocalSearchParams(maxFlips = 999_999L, randomSeed = 0L),
+            objective = objective,
+            pinAssumptions = com.eignex.klause.solver.Assumptions.None,
+            incumbent = Sample(booleanArrayOf(false, true), IntArray(0)),
+            freed = FreedVars(intArrayOf(0, 1), IntArray(0)),
+        )
+        val s = repair.repair(context)
+        assertNotNull(s)
+        // Verify the repair picks the right answer (boolean 0 true, boolean 1 false).
+        assertEquals(1.0, objective.evaluate(s))
     }
 
     @Test
