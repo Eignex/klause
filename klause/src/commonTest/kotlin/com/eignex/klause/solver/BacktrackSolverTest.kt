@@ -37,7 +37,7 @@ class BacktrackSolverTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        assertEquals(SolveResult.Unsat, BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test

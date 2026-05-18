@@ -37,11 +37,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         for (outcome in driveSearch(params)) {
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
-                SearchOutcome.Exhausted -> SolveResult.Unsat
+                SearchOutcome.Exhausted -> SolveResult.Unsat()
                 SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
-        return SolveResult.Unsat
+        return SolveResult.Unsat()
     }
 
     /**
@@ -74,7 +74,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             val perCall = params.copy(randomSeed = seed)
             when (val r = solveOnce(perCall)) {
                 is SolveResult.Sat -> yield(r.assignment)
-                SolveResult.Unsat -> return@sequence
+                is SolveResult.Unsat -> return@sequence
                 is SolveResult.Unknown -> return@sequence
             }
             // LCG advance for reproducibility: same parent seed → same per-call seed
@@ -88,11 +88,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         for (outcome in driveSearch(params)) {
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
-                SearchOutcome.Exhausted -> SolveResult.Unsat
+                SearchOutcome.Exhausted -> SolveResult.Unsat()
                 SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
-        return SolveResult.Unsat
+        return SolveResult.Unsat()
     }
 
     /**
@@ -182,7 +182,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 }
                 SearchOutcome.Exhausted -> {
                     yield(if (best != null) MinimizeResult.Optimal(best, bestObj)
-                          else MinimizeResult.Infeasible)
+                          else MinimizeResult.Infeasible())
                     return@sequence
                 }
                 SearchOutcome.BudgetCapped -> {
@@ -193,7 +193,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             }
         }
         // Sequence drained without a terminal outcome — treat as exhausted.
-        yield(if (best != null) MinimizeResult.Optimal(best, bestObj) else MinimizeResult.Infeasible)
+        yield(if (best != null) MinimizeResult.Optimal(best, bestObj) else MinimizeResult.Infeasible())
     }
 
     /**

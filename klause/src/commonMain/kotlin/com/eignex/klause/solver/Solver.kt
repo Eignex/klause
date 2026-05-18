@@ -34,7 +34,12 @@ interface SolverParams {
  */
 sealed interface SolveResult {
     data class Sat(val assignment: Sample) : SolveResult
-    data object Unsat : SolveResult
+    /**
+     * Proven infeasible. [core] is an optional jointly-unsat subset of factor ids; backends
+     * that compute one populate it (Z3 via tracked assertions), backends that don't leave
+     * it `null`. `Unsat()` (no core) is a valid construction.
+     */
+    data class Unsat(val core: UnsatCore? = null) : SolveResult
     data class Unknown(val reason: TerminationReason) : SolveResult
 }
 

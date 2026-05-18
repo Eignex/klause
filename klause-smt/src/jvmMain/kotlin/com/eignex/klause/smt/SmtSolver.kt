@@ -53,7 +53,7 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
                 for (c in constraints) prover.addConstraint(c)
                 addAssumptions(params, encoding, prover)
                 return if (prover.isUnsat) {
-                    SolveResult.Unsat
+                    SolveResult.Unsat()
                 } else {
                     SolveResult.Sat(decode(prover.model, encoding))
                 }

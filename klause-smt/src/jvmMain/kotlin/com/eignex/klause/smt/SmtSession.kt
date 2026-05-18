@@ -76,7 +76,7 @@ class SmtSession(
     override fun solve(params: SmtParams): SolveResult {
         check(!closed) { "SmtSession is closed" }
         return withScope(params.assumptions) {
-            if (prover.isUnsat) SolveResult.Unsat
+            if (prover.isUnsat) SolveResult.Unsat()
             else SolveResult.Sat(decode(prover.model))
         }
     }

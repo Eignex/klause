@@ -61,7 +61,7 @@ class BruteForceSolver(override val problem: Problem) :
         for (sample in walk(params)) {
             return SolveResult.Sat(sample)
         }
-        return SolveResult.Unsat
+        return SolveResult.Unsat()
     }
 
     /**
@@ -87,7 +87,7 @@ class BruteForceSolver(override val problem: Problem) :
         return when {
             best != null && exhausted -> MinimizeResult.Optimal(best, bestObj)
             best != null -> MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
-            exhausted -> MinimizeResult.Infeasible
+            exhausted -> MinimizeResult.Infeasible()
             else -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
         }
     }

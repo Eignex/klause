@@ -7,6 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -75,7 +76,7 @@ class LogicNGSessionTest {
         val session = LogicNGSession(LogicNGSolver(problem))
         // Pin both 0 and 1 to true — violates exactly-one.
         val result = session.solve(LogicNGParams(assumptions = Assumptions(bools = mapOf(0 to true, 1 to true))))
-        assertEquals(SolveResult.Unsat, result)
+        assertIs<SolveResult.Unsat>(result)
     }
 
     @Test

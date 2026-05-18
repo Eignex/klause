@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -23,7 +24,7 @@ class CancellationTest {
     @Test
     fun `cancellation never set lets backtrack finish normally`() {
         val r = BacktrackSolver(unsatThreeBools()).solve(BacktrackParams(randomSeed = 0L))
-        assertEquals(SolveResult.Unsat, r)
+        assertIs<SolveResult.Unsat>(r)
     }
 
     /** A long-running LS search on an under-constrained problem; signal cancel from

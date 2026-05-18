@@ -40,13 +40,30 @@ internal class Z3Encoding(
 )
 
 /**
+ * Translation result: variable encoding plus the BoolExprs to assert. Constraints split
+ * into [auxiliary] (var domains, real-link bookkeeping — not user constraints, never
+ * appear in unsat cores) and [factorExprs] (parallel to [com.eignex.klause.solver.Problem.factors],
+ * one expression per factor in id order). The split lets `solve` track only factor
+ * constraints when [com.eignex.klause.z3.Z3Solver] is asked for an unsat core.
+ */
+internal class Z3Translation(
+    val encoding: Z3Encoding,
+    val auxiliary: List<BoolExpr>,
+    val factorExprs: List<BoolExpr>,
+) {
+    /** All constraints flattened in `auxiliary ++ factorExprs` order. Used by callers
+     *  that don't care about the source split (sample / enumerate / minimize). */
+    fun allConstraints(): List<BoolExpr> = auxiliary + factorExprs
+}
+
+/**
  * Direct (non-bit-blasted) SMT translation of a klause [Problem] to Z3. Each factor type
  * maps to a native Z3 expression — Z3 reasons over integers natively, so this catches
  * bit-blaster bugs the LogicNG path inherits.
  */
 internal object Z3Translator {
 
-    fun translate(problem: Problem, ctx: Context): Pair<Z3Encoding, List<BoolExpr>> {
+    fun translate(problem: Problem, ctx: Context): Z3Translation {
         val boolExprs: Array<BoolExpr> = Array(problem.numBoolVars) { i ->
             ctx.mkBoolConst("b$i") as BoolExpr
         }
@@ -67,12 +84,12 @@ internal object Z3Translator {
 
         val encoding = Z3Encoding(ctx, boolExprs, intExprs, realExprs)
 
-        val constraints = ArrayList<BoolExpr>()
+        val auxiliary = ArrayList<BoolExpr>()
         // Int-domain constraints — we always add these, even for float-backing int vars,
         // so the bucket index Z3 picks lives in `[0, buckets - 1]`.
         for (i in 0 until problem.numIntVars) {
             val d = problem.intDomains[i]
-            constraints.add(ctx.mkAnd(
+            auxiliary.add(ctx.mkAnd(
                 ctx.mkGe(intExprs[i], ctx.mkInt(d.min)),
                 ctx.mkLe(intExprs[i], ctx.mkInt(d.max)),
             ))
@@ -82,7 +99,7 @@ internal object Z3Translator {
         if (meta != null) {
             for (i in 0 until meta.numFloatVars) {
                 val ivl = meta.intervals[i]
-                constraints.add(ctx.mkAnd(
+                auxiliary.add(ctx.mkAnd(
                     ctx.mkGe(realExprs[i], ctx.mkReal(ivl.lo.toString())),
                     ctx.mkLe(realExprs[i], ctx.mkReal(ivl.hi.toString())),
                 ))
@@ -96,11 +113,14 @@ internal object Z3Translator {
                     ctx.mkReal(ivl.lo.toString()),
                     ctx.mkMul(ctx.mkReal(step.toString()), bucketReal),
                 ) as ArithExpr<RealSort>
-                constraints.add(ctx.mkEq(realExprs[i], linked))
+                auxiliary.add(ctx.mkEq(realExprs[i], linked))
             }
-            // Native-real linear constraints.
+            // Native-real linear constraints — auxiliary because they're derived from
+            // factor metadata, not directly from a Problem.factors entry; they exist to
+            // accelerate the LRA path alongside the int constraints, so attributing an
+            // unsat core to them isn't useful.
             for (c in meta.constraints) {
-                constraints.add(translateRealLinear(c, encoding, ctx))
+                auxiliary.add(translateRealLinear(c, encoding, ctx))
             }
         }
         // We keep BOTH the bucketed-int factors and the native-real constraints on the
@@ -110,10 +130,11 @@ internal object Z3Translator {
         // real values that decode to wrong-side buckets when the grid is coarse.) The
         // perf hit is small because the int Linear factors are short and Z3's mixed
         // int-real Simplex handles them efficiently.
+        val factorExprs = ArrayList<BoolExpr>(problem.factors.size)
         for (factor in problem.factors) {
-            constraints.add(translateFactor(factor, encoding, ctx))
+            factorExprs.add(translateFactor(factor, encoding, ctx))
         }
-        return encoding to constraints
+        return Z3Translation(encoding, auxiliary, factorExprs)
     }
 
     /** Translate a [com.eignex.klause.solver.RealLinearConstraint] into native Z3 real arithmetic. */

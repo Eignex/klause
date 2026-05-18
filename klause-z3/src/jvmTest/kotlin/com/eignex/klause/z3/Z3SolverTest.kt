@@ -16,6 +16,7 @@ import com.eignex.klause.solver.factor.LinearOp
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -38,7 +39,54 @@ class Z3SolverTest {
     fun `solve returns unsat for unsat portfolio`() {
         for (case in unsatPortfolio()) {
             val verdict = Z3Solver(case.problem).solve(Z3Params())
-            assertEquals(SolveResult.Unsat, verdict, "${case.name}: expected Unsat")
+            assertIs<SolveResult.Unsat>(verdict, "${case.name}: expected Unsat")
+        }
+    }
+
+    @Test
+    fun `solve populates unsat core for tracked factor contradictions`() {
+        // Two-clause direct contradiction: factor 0 forces var=true, factor 1 forces
+        // var=false. Z3's unsat core for this problem must mention both factor ids; an
+        // empty or single-id core would mean Z3 didn't see one of them as load-bearing.
+        val problem = Problem(
+            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+            ),
+        )
+        val verdict = Z3Solver(problem).solve(Z3Params())
+        val unsat = assertIs<SolveResult.Unsat>(verdict)
+        val core = unsat.core ?: fail("expected populated unsat core, got null")
+        assertEquals(setOf(0, 1), core.factorIds.toSet(),
+            "core should mention both contradicting clauses, got ${core.factorIds.toList()}")
+    }
+
+    @Test
+    fun `unsat core does not flag uninvolved factors`() {
+        // Five factors, only 0 and 1 are contradictory; 2..4 are irrelevant but valid.
+        // Z3's core extraction is not guaranteed minimal — but it should not include
+        // factors that aren't needed to derive UNSAT. The pair {0,1} is itself unsat,
+        // so a sound non-minimal extractor still won't grow the core much.
+        val problem = Problem(
+            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(3, false), Lit.make(1, false))),
+            ),
+        )
+        val verdict = Z3Solver(problem).solve(Z3Params())
+        val core = (verdict as SolveResult.Unsat).core
+            ?: fail("expected populated core")
+        assertTrue(0 in core.factorIds && 1 in core.factorIds,
+            "core must include the contradicting pair, got ${core.factorIds.toList()}")
+        // No silly bloat — the unrelated chain shouldn't be in the core.
+        for (irrelevant in 2..4) {
+            assertTrue(irrelevant !in core.factorIds,
+                "factor $irrelevant is irrelevant to the contradiction, got core=${core.factorIds.toList()}")
         }
     }
 
@@ -100,7 +148,7 @@ class Z3SolverTest {
             when (z3) {
                 is SolveResult.Sat -> assertTrue(ls is SolveResult.Sat,
                     "${case.name}: Z3 SAT but LS got $ls")
-                SolveResult.Unsat -> assertTrue(ls is SolveResult.Unknown || ls is SolveResult.Unsat,
+                is SolveResult.Unsat -> assertTrue(ls is SolveResult.Unknown || ls is SolveResult.Unsat,
                     "${case.name}: Z3 UNSAT but LS got $ls (should be Unknown or Unsat-via-propagation)")
                 is SolveResult.Unknown -> {}
             }

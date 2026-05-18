@@ -16,6 +16,7 @@ import com.eignex.klause.solver.factor.LinearOp
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -38,7 +39,7 @@ class LogicNGSolverTest {
     fun `solve returns unsat for unsat portfolio`() {
         for (case in unsatPortfolio()) {
             val verdict = LogicNGSolver(case.problem).solve(LogicNGParams())
-            assertEquals(SolveResult.Unsat, verdict, "${case.name}: expected Unsat")
+            assertIs<SolveResult.Unsat>(verdict, "${case.name}: expected Unsat")
         }
     }
 
@@ -127,7 +128,7 @@ class LogicNGSolverTest {
                     ls is SolveResult.Sat,
                     "${case.name}: LogicNG SAT but LS got $ls"
                 )
-                SolveResult.Unsat -> assertTrue(
+                is SolveResult.Unsat -> assertTrue(
                     ls is SolveResult.Unknown || ls is SolveResult.Unsat,
                     "${case.name}: LogicNG UNSAT but LS got $ls " +
                         "(LS should run out of flips, or prove Unsat via propagation)"

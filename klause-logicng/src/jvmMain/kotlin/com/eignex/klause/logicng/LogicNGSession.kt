@@ -59,7 +59,7 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         val lits = assumptionsToLiterals(mergedAssumptions(params.assumptions))
         return when (satSolver.sat(lits)) {
             Tristate.TRUE -> SolveResult.Sat(decode(satSolver.model()))
-            Tristate.FALSE -> SolveResult.Unsat
+            Tristate.FALSE -> SolveResult.Unsat()
             else -> SolveResult.Unknown(TerminationReason.Timeout)
         }
     }

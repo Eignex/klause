@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PortfolioTest {
@@ -41,7 +42,8 @@ class PortfolioTest {
         val workers = List(2) { BacktrackSolver(problem).session() }
         Portfolio(workers).use { p ->
             val r = p.solve(BacktrackParams(randomSeed = 0L))
-            assertEquals(SolveResult.Unsat, r)
+            assertIs<SolveResult.Unsat>(r)
+            Unit
         }
     }
 

@@ -43,7 +43,7 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
         val (_, satSolver) = buildSolver()
         return when (satSolver.sat()) {
             Tristate.TRUE -> SolveResult.Sat(decode(satSolver.model()))
-            Tristate.FALSE -> SolveResult.Unsat
+            Tristate.FALSE -> SolveResult.Unsat()
             Tristate.UNDEF -> SolveResult.Unknown(TerminationReason.Timeout)
             null -> SolveResult.Unknown(TerminationReason.Timeout)
         }

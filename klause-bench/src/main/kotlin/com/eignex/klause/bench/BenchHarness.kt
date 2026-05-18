@@ -66,8 +66,8 @@ object BenchHarness {
 
     private fun formatVerdict(v: SolveResult): String = when (v) {
         is SolveResult.Sat -> "Sat"
-        SolveResult.Unsat -> "Unsat"
-        SolveResult.Unknown -> "Unknown"
+        is SolveResult.Unsat -> "Unsat"
+        is SolveResult.Unknown -> "Unknown"
     }
 
     val json: Json = Json { prettyPrint = true; encodeDefaults = true }

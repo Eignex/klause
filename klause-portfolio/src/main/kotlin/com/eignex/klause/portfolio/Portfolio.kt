@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.TerminationReason
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -75,7 +76,7 @@ class Portfolio<P : SolverParams>(
         // by the winnerFlag short-circuit above — losers return Unknown quickly.
         results.firstOrNull { it is SolveResult.Sat }
             ?: results.firstOrNull { it is SolveResult.Unsat }
-            ?: SolveResult.Unknown
+            ?: SolveResult.Unknown(TerminationReason.Cancelled)
     }
 
     /**

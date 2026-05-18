@@ -7,6 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -53,7 +54,7 @@ class SmtSolverScaffoldTest {
         val unsatProblem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = listOf(factor1, factor2))
         val result = SmtSolver(unsatProblem).solve(SmtParams())
-        assertEquals(SolveResult.Unsat, result)
+        assertIs<SolveResult.Unsat>(result)
     }
 
     @Test

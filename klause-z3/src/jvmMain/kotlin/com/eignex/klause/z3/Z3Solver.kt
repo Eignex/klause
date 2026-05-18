@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.TerminationReason
+import com.eignex.klause.solver.UnsatCore
 import com.microsoft.z3.ArithExpr
 import com.microsoft.z3.BoolExpr
 import com.microsoft.z3.Context
@@ -43,22 +44,24 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         }
         val ctx = newContext()
         try {
-            val (encoding, constraints) = Z3Translator.translate(problem, ctx)
+            val t = Z3Translator.translate(problem, ctx)
             val opt = ctx.mkOptimize()
             params.timeoutMillis?.let { ms ->
                 val p = ctx.mkParams()
                 p.add("timeout", ms.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt())
                 opt.setParameters(p)
             }
-            for (c in constraints) opt.Add(c)
-            val objExpr = buildObjective(objective, encoding, ctx)
+            for (c in t.allConstraints()) opt.Add(c)
+            val objExpr = buildObjective(objective, t.encoding, ctx)
             opt.MkMinimize(objExpr)
             return when (opt.Check()) {
                 Status.SATISFIABLE -> {
-                    val sample = decode(opt.model, encoding)
+                    val sample = decode(opt.model, t.encoding)
                     MinimizeResult.Optimal(sample, objective.evaluate(sample))
                 }
-                Status.UNSATISFIABLE -> MinimizeResult.Infeasible
+                // Z3 Optimize does not surface unsat cores (would require switching to a
+                // tracked solver, which loses the optimization wrapper). Leave core null.
+                Status.UNSATISFIABLE -> MinimizeResult.Infeasible()
                 else -> MinimizeResult.Unknown(
                     TerminationReason.Timeout,
                 )
@@ -103,17 +106,51 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
     override fun solve(params: Z3Params): SolveResult {
         val ctx = newContext()
         try {
-            val (encoding, constraints) = Z3Translator.translate(problem, ctx)
-            val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
-            for (c in constraints) solver.add(c)
+            val t = Z3Translator.translate(problem, ctx)
+            // Tracked asserts on factor-derived constraints let Z3 produce an unsat core
+            // attributed back to klause factor ids. Auxiliary constraints (var domains,
+            // float-int link) are asserted untracked — they're never the "fault".
+            val solver = ctx.mkSolver().apply { applyParams(this, ctx, params, produceCores = true) }
+            for (c in t.auxiliary) solver.add(c)
+            // Track each factor constraint under a uniquely-named bool; Z3 returns those
+            // names in `solver.unsatCore` on UNSAT, and we parse the factor id back out.
+            for (fid in t.factorExprs.indices) {
+                solver.assertAndTrack(t.factorExprs[fid], ctx.mkBoolConst(coreTrackerName(fid)))
+            }
             return when (solver.check()) {
-                Status.SATISFIABLE -> SolveResult.Sat(decode(solver.model, encoding))
-                Status.UNSATISFIABLE -> SolveResult.Unsat
+                Status.SATISFIABLE -> SolveResult.Sat(decode(solver.model, t.encoding))
+                Status.UNSATISFIABLE -> SolveResult.Unsat(extractCore(solver))
                 else -> SolveResult.Unknown(TerminationReason.Timeout)
             }
         } finally {
             ctx.close()
         }
+    }
+
+    /** Map Z3's unsat-core return (an array of named bool trackers) back to klause factor
+     *  ids. Returns [UnsatCore.Empty] when the core is empty (Z3 derived UNSAT from the
+     *  auxiliary constraints alone — possible if a var domain is empty). */
+    private fun extractCore(solver: Z3LibSolver): UnsatCore {
+        val coreExprs = solver.unsatCore
+        if (coreExprs.isEmpty()) return UnsatCore.Empty
+        val ids = IntArray(coreExprs.size)
+        var w = 0
+        for (e in coreExprs) {
+            val parsed = parseTrackerName(e.toString()) ?: continue
+            ids[w++] = parsed
+        }
+        return if (w == ids.size) UnsatCore.of(ids) else UnsatCore.of(ids.copyOf(w))
+    }
+
+    private fun coreTrackerName(factorId: Int): String = "$CORE_TRACKER_PREFIX$factorId"
+
+    private fun parseTrackerName(rendered: String): Int? {
+        // Z3 renders bool consts as either `name` or `(:var name ...)`-ish; for `mkBoolConst`
+        // it's just the literal name. Strip surrounding pipes Z3 uses when names need
+        // quoting, then check the prefix.
+        val stripped = rendered.trim().trim('|')
+        if (!stripped.startsWith(CORE_TRACKER_PREFIX)) return null
+        return stripped.substring(CORE_TRACKER_PREFIX.length).toIntOrNull()
     }
 
     /**
@@ -141,12 +178,12 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         repeat(RANDOM_PIN_RETRIES) {
             val ctx = newContext()
             try {
-                val (encoding, constraints) = Z3Translator.translate(problem, ctx)
+                val t = Z3Translator.translate(problem, ctx)
                 val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
-                for (c in constraints) solver.add(c)
-                addRandomPins(ctx, encoding, solver, rng)
+                for (c in t.allConstraints()) solver.add(c)
+                addRandomPins(ctx, t.encoding, solver, rng)
                 if (solver.check() == Status.SATISFIABLE) {
-                    return decode(solver.model, encoding)
+                    return decode(solver.model, t.encoding)
                 }
             } finally {
                 ctx.close()
@@ -155,10 +192,10 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         // Fallback: no pins, deterministic Z3 result. Keeps the contract honest.
         val ctx = newContext()
         try {
-            val (encoding, constraints) = Z3Translator.translate(problem, ctx)
+            val t = Z3Translator.translate(problem, ctx)
             val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
-            for (c in constraints) solver.add(c)
-            return if (solver.check() == Status.SATISFIABLE) decode(solver.model, encoding) else null
+            for (c in t.allConstraints()) solver.add(c)
+            return if (solver.check() == Status.SATISFIABLE) decode(solver.model, t.encoding) else null
         } finally {
             ctx.close()
         }
@@ -196,14 +233,16 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
     private companion object {
         const val RANDOM_PIN_COUNT_CAP: Int = 8
         const val RANDOM_PIN_RETRIES: Int = 5
+        const val CORE_TRACKER_PREFIX: String = "fc"
     }
 
     override fun enumerate(params: Z3Params): Sequence<Sample> = sequence {
         val ctx = newContext()
         try {
-            val (encoding, constraints) = Z3Translator.translate(problem, ctx)
+            val t = Z3Translator.translate(problem, ctx)
+            val encoding = t.encoding
             val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
-            for (c in constraints) solver.add(c)
+            for (c in t.allConstraints()) solver.add(c)
             val window = ArrayDeque<Sample>()
             var attempts = 0L
             val deadline = params.timeoutMillis?.let { System.currentTimeMillis() + it }
@@ -232,12 +271,19 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
     private fun newContext(): Context = Context()
 
     /** Apply per-solver knobs ([Z3Params.randomSeed], [Z3Params.timeoutMillis]). Z3
-     *  rejects `random_seed` as a [Context] global; it has to live on the solver. */
-    private fun applyParams(solver: Z3LibSolver, ctx: Context, params: Z3Params) {
-        if (params.randomSeed == null && params.timeoutMillis == null) return
+     *  rejects `random_seed` as a [Context] global; it has to live on the solver.
+     *  When [produceCores] is true, also enables `unsat_core=true` so [Z3LibSolver.assertAndTrack]
+     *  works and `solver.unsatCore` is populated on UNSAT. Tracking adds a small constant
+     *  per-assertion overhead — only on for `solve` (which exposes a core through the
+     *  result type); not enabled on the sample/enumerate paths. */
+    private fun applyParams(
+        solver: Z3LibSolver, ctx: Context, params: Z3Params, produceCores: Boolean = false,
+    ) {
+        if (params.randomSeed == null && params.timeoutMillis == null && !produceCores) return
         val p = ctx.mkParams()
         params.randomSeed?.let { p.add("random_seed", it.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) }
         params.timeoutMillis?.let { p.add("timeout", it.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) }
+        if (produceCores) p.add("unsat_core", true)
         solver.setParameters(p)
     }
 

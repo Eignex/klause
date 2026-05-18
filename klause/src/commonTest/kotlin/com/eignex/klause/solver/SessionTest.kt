@@ -7,6 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
@@ -50,7 +51,7 @@ class SessionTest {
         session.push(Assumptions(bools = mapOf(1 to true)))  // overrides 1 = false
         // Now 0 = true and 1 = true both pinned → infeasible for exactly-one.
         val r = session.solve(BacktrackParams(randomSeed = 0L))
-        assertEquals(SolveResult.Unsat, r)
+        assertIs<SolveResult.Unsat>(r)
 
         session.pop()  // back to just 0 = true, 1 = false, 2 = false → feasible
         val r2 = session.solve(BacktrackParams(randomSeed = 0L))

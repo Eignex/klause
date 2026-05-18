@@ -64,7 +64,7 @@ class LocalSearchSolver(
     override fun session(): LocalSearchSession = LocalSearchSession(this)
 
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
-        val eff = effectiveAssumptions(params.assumptions) ?: return SolveResult.Unsat
+        val eff = effectiveAssumptions(params.assumptions) ?: return SolveResult.Unsat()
         return sampleInternal(params, eff, warm)?.let(SolveResult::Sat)
             ?: SolveResult.Unknown(TerminationReason.BudgetExhausted)
     }
@@ -151,7 +151,7 @@ class LocalSearchSolver(
     ): Sequence<MinimizeResult> = sequence {
         val eff = effectiveAssumptions(params.assumptions)
         if (eff == null) {
-            yield(MinimizeResult.Infeasible)
+            yield(MinimizeResult.Infeasible())
             return@sequence
         }
         runMinimizeStream(objective, params, eff, warm)

@@ -37,7 +37,8 @@ sealed interface SampleResult {
     data class Found(val sample: Sample) : SampleResult {
         override val assignment: Sample get() = sample
     }
-    data object Infeasible : SampleResult {
+    /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
+    data class Infeasible(val core: UnsatCore? = null) : SampleResult {
         override val assignment: Sample? = null
     }
     data class Unknown(val reason: TerminationReason) : SampleResult {
@@ -79,7 +80,8 @@ sealed interface MinimizeResult {
         override val objective: Double,
         val reason: TerminationReason,
     ) : WithSample
-    data object Infeasible : MinimizeResult {
+    /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
+    data class Infeasible(val core: UnsatCore? = null) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null
     }
