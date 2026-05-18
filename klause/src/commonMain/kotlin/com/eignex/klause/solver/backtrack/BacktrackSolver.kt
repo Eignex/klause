@@ -214,21 +214,29 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     /**
      * A trail frame for one variable being explored. The value iterator is supplied by the
      * caller's [ValueHeuristic] at node creation; [applyNext] pulls the next value, pushes
-     * it into the session, and reports the session's response (or `null` when exhausted).
+     * it into the session, and reports back both the value (so the engine can fire
+     * heuristic callbacks scoped to the attempted pair) and the session's propagation
+     * response. Returns `null` when the value iterator is exhausted.
      */
     private sealed interface TrailNode {
         val varRef: VarRef
-        fun applyNext(session: PropagationSession): PropagationResult?
+        fun applyNext(session: PropagationSession): ApplyOutcome?
     }
+
+    /** What [TrailNode.applyNext] returns: the actual value pushed (bools encoded as 0/1
+     *  so the value heuristic callbacks see the original heuristic-emitted form) plus the
+     *  session's [PropagationResult]. */
+    private data class ApplyOutcome(val value: Int, val result: PropagationResult)
 
     private class BoolNode(
         override val varRef: VarRef.Bool,
         valueSeq: Sequence<Int>,
     ) : TrailNode {
         private val iter = valueSeq.iterator()
-        override fun applyNext(session: PropagationSession): PropagationResult? {
+        override fun applyNext(session: PropagationSession): ApplyOutcome? {
             if (!iter.hasNext()) return null
-            return session.pinBool(varRef.varId, iter.next() != 0)
+            val v = iter.next()
+            return ApplyOutcome(v, session.pinBool(varRef.varId, v != 0))
         }
     }
 
@@ -237,9 +245,10 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         valueSeq: Sequence<Int>,
     ) : TrailNode {
         private val iter = valueSeq.iterator()
-        override fun applyNext(session: PropagationSession): PropagationResult? {
+        override fun applyNext(session: PropagationSession): ApplyOutcome? {
             if (!iter.hasNext()) return null
-            return session.pinInt(varRef.varId, iter.next())
+            val v = iter.next()
+            return ApplyOutcome(v, session.pinInt(varRef.varId, v))
         }
     }
 
@@ -302,6 +311,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         session.popLast()
                         trail.removeAt(trail.size - 1)
                     }
+                    params.variableHeuristic.onRestart()
+                    params.valueHeuristic.onRestart()
                     lubyIdx++
                     continue@outer
                 }
@@ -316,7 +327,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     val ordered = applyPhase(varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                     val node = makeNode(varRef, ordered)
                     val decsBefore = decisionsLeft
-                    if (!advance(node, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
+                    if (!advance(node, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
                         decisionsThisRun += decsBefore - decisionsLeft
                         if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
                         descend = false
@@ -330,7 +341,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     val top = trail.last()
                     session.popLast()
                     val decsBefore = decisionsLeft
-                    if (advance(top, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
+                    if (advance(top, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
                         decisionsThisRun += decsBefore - decisionsLeft
                         capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                         descend = true
@@ -423,16 +434,19 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
 
     /**
      * Drive [node] through its remaining values until one succeeds or it exhausts. On Unsat
-     * the session self-reverts, so the engine doesn't need to compensate. When [pruneIf]
-     * is non-null, a successful pin is *additionally* checked against the predicate: if
-     * the predicate says "no descendant of this partial assignment can improve the
-     * incumbent," the pin is reverted via `popLast` and the next value tried — branch-
-     * and-bound style soft pruning that the engine treats identically to an Unsat. Returns
-     * `false` when the node runs out of values or the decision budget is exhausted.
+     * the session self-reverts; the engine notifies the heuristics so activity-/conflict-
+     * driven strategies (VSIDS, dom/wdeg, last-conflict) can accumulate state. When
+     * [pruneIf] is non-null, a successful pin is *additionally* checked against the
+     * predicate: if the predicate says "no descendant of this partial assignment can
+     * improve the incumbent," the pin is reverted and the next value tried — B&B soft
+     * pruning, not fired as a heuristic conflict (the partial assignment is still
+     * propagation-consistent). Returns `false` when the node runs out of values or the
+     * decision budget is exhausted.
      */
     private fun advance(
         node: TrailNode,
         session: PropagationSession,
+        params: BacktrackParams,
         pruneIf: ((PropagationSession) -> Boolean)?,
         decisionsRemaining: () -> Long,
         decrement: () -> Unit,
@@ -440,14 +454,18 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         while (true) {
             if (decisionsRemaining() <= 0) return false
             decrement()
-            val r = node.applyNext(session) ?: return false
-            if (r is PropagationResult.Unsat) continue
+            val outcome = node.applyNext(session) ?: return false
+            if (outcome.result is PropagationResult.Unsat) {
+                params.variableHeuristic.onConflict(node.varRef)
+                params.valueHeuristic.onConflict(node.varRef, outcome.value)
+                continue
+            }
             if (pruneIf != null && pruneIf(session)) {
-                // Pin succeeded but the B&B bound says this subtree can't beat the
-                // incumbent. Revert and try the next value at this node.
                 session.popLast()
                 continue
             }
+            params.variableHeuristic.onCommit(node.varRef)
+            params.valueHeuristic.onCommit(node.varRef, outcome.value)
             return true
         }
     }

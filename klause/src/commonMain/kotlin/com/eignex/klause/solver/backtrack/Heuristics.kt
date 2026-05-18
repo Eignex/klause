@@ -14,9 +14,23 @@ sealed interface VarRef {
     data class IntVar(override val varId: Int) : VarRef
 }
 
-/** Picks the next variable to branch on. Returns `null` when every variable is determined. */
-fun interface VariableHeuristic {
+/**
+ * Picks the next variable to branch on. Returns `null` when every variable is determined.
+ *
+ * The optional notification hooks ([onConflict], [onCommit], [onRestart]) let activity-,
+ * conflict-, or weight-driven heuristics (VSIDS, dom/wdeg, last-conflict, impact-based)
+ * accumulate state across the search without smuggling listeners through the engine.
+ * Pure heuristics (random, smallest-domain, input-order) ignore them via the defaults.
+ */
+interface VariableHeuristic {
     fun pick(session: PropagationSession, rng: Random): VarRef?
+    /** Called once per propagation conflict at [varRef]; bump activity / failure weight. */
+    fun onConflict(varRef: VarRef) {}
+    /** Called once per successful pin of [varRef]; useful for phase-saving-like state. */
+    fun onCommit(varRef: VarRef) {}
+    /** Called when the engine restarts (Luby / geometric); decay activity or reset
+     *  per-run counters here. */
+    fun onRestart() {}
 }
 
 /**
@@ -26,9 +40,16 @@ fun interface VariableHeuristic {
  * it advances to the next.
  *
  * For bool vars, the int values are `0` (false) and `1` (true).
+ *
+ * Notification hooks parallel [VariableHeuristic]'s, scoped to the (var, value) pair
+ * that the engine actually attempted. Impact-based value selection and solution-guided
+ * heuristics consume these.
  */
-fun interface ValueHeuristic {
+interface ValueHeuristic {
     fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int>
+    fun onConflict(varRef: VarRef, value: Int) {}
+    fun onCommit(varRef: VarRef, value: Int) {}
+    fun onRestart() {}
 }
 
 // ---- Variable heuristics ---------------------------------------------------------------
