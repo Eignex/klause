@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.BacktrackParams
 
@@ -110,7 +111,7 @@ class BacktrackSolverTest {
             ))),
         )
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
-        val best = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 0L))
+        val best = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(best)
         assertEquals(3.0, obj.evaluate(best))
         assertEquals(true, best.bools[3])

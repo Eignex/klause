@@ -27,7 +27,7 @@ class MinimizeTerminationTest {
         val sample = solver.minimize(
             degenerate,
             LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L),
-        )
+        ).assignment
         // Any feasible assignment is acceptable; we just verify it returned at all.
         assertNotNull(sample)
     }

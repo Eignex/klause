@@ -19,7 +19,7 @@ class AssumptionsTest {
         repeat(20) { seed ->
             val sample = solver.sample(
                 LocalSearchParams(randomSeed = seed.toLong(), assumptions = Assumptions(bools = mapOf(0 to true))),
-            )
+            ).assignment
             assertNotNull(sample)
             assertEquals(true, sample.bools[0], "bool 0 must be fixed to true (seed=$seed)")
         }
@@ -37,7 +37,7 @@ class AssumptionsTest {
         repeat(20) { seed ->
             val sample = solver.sample(
                 LocalSearchParams(randomSeed = seed.toLong(), assumptions = Assumptions(ints = mapOf(0 to 42))),
-            )
+            ).assignment
             assertNotNull(sample)
             assertEquals(42, sample.ints[0])
         }
@@ -56,7 +56,7 @@ class AssumptionsTest {
                 maxFlips = 50_000L,
                 assumptions = Assumptions(bools = mapOf(2 to false)),
             ),
-        )
+        ).assignment
         assertNotNull(sample)
         assertEquals(false, sample.bools[2], "bool 2 must stay false despite negative weight")
         assertEquals(true, sample.bools[0])
@@ -92,7 +92,7 @@ class AssumptionsTest {
                 maxFlips = 10_000,
                 assumptions = Assumptions(bools = mapOf(0 to false)),
             ),
-        )
+        ).assignment
         assertNotNull(sample)
         assertEquals(false, sample.bools[0])
         assertEquals(true, sample.bools[1])

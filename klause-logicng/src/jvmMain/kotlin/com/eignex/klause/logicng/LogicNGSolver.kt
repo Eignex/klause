@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.TerminationReason
 import org.logicng.datastructures.Tristate
 import org.logicng.formulas.Formula
 import org.logicng.formulas.FormulaFactory
@@ -43,8 +44,8 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
         return when (satSolver.sat()) {
             Tristate.TRUE -> SolveResult.Sat(decode(satSolver.model()))
             Tristate.FALSE -> SolveResult.Unsat
-            Tristate.UNDEF -> SolveResult.Unknown
-            null -> SolveResult.Unknown
+            Tristate.UNDEF -> SolveResult.Unknown(TerminationReason.Timeout)
+            null -> SolveResult.Unknown(TerminationReason.Timeout)
         }
     }
 

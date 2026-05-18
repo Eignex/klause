@@ -3,6 +3,7 @@ package com.eignex.klause.solver.brute
 import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
 
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -10,6 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.kpermute.LongPermutation
 import com.eignex.kpermute.longPermutation
@@ -70,17 +72,27 @@ class BruteForceSolver(override val problem: Problem) :
      * If the cap is generous enough to exhaust the assignment space, the result is the
      * exact global minimum; otherwise it's the best-seen-so-far.
      */
-    override fun minimize(objective: Objective, params: BruteForceParams): Sample? {
+    override fun minimize(objective: Objective, params: BruteForceParams): MinimizeResult {
         var bestObj = Double.POSITIVE_INFINITY
         var best: Sample? = null
-        for (s in walk(params)) {
+        val budget = StepBudget(params.maxSteps)
+        for (s in walkWithBudget(params, budget)) {
             val obj = objective.evaluate(s)
             if (obj < bestObj) {
                 bestObj = obj
                 best = s
             }
         }
-        return best
+        // budget.remaining > 0 means the walker exhausted the assignment space naturally
+        // (the search proved no better solution exists). Otherwise we hit the step cap
+        // and the result is only best-effort.
+        val exhausted = budget.remaining > 0
+        return when {
+            best != null && exhausted -> MinimizeResult.Optimal(best, bestObj)
+            best != null -> MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
+            exhausted -> MinimizeResult.Infeasible
+            else -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+        }
     }
 
     /** With replacement: each yield is the first satisfying assignment of a freshly-seeded
@@ -115,10 +127,15 @@ class BruteForceSolver(override val problem: Problem) :
      * permutations. When [params.maxSteps] is [Long.MAX_VALUE] (the default) the walk is
      * effectively unbounded.
      */
-    private fun walk(params: BruteForceParams): Sequence<Sample> {
+    private fun walk(params: BruteForceParams): Sequence<Sample> =
+        walkWithBudget(params, StepBudget(params.maxSteps))
+
+    /** Variant of [walk] that uses a caller-supplied [StepBudget], so the caller can
+     *  read `remaining` after iteration to distinguish "space exhausted naturally"
+     *  from "step budget hit." Used by [minimize]'s Optimal-vs-BestFound verdict. */
+    private fun walkWithBudget(params: BruteForceParams, budget: StepBudget): Sequence<Sample> {
         val seed = params.randomSeed ?: 0L
         val state = LocalSearchState(problem, Random(seed))
-        val budget = StepBudget(params.maxSteps)
         if (chunks.isEmpty()) {
             // No variables — there's exactly one assignment to test.
             return sequence {

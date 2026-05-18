@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -218,7 +219,7 @@ class IteratedLocalSearchTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val solver = LocalSearchSolver(problem, restartPolicy = IteratedLocalSearchRestart(maxFlipsBeforeRestart = 50))
-        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 20_000L, randomSeed = 1L))
+        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 20_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
     }

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
@@ -76,8 +77,8 @@ class RestartPolicyTest {
         val fixed = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart())
         val adaptive = LocalSearchSolver(problem, restartPolicy = AdaptivePerturbationRestart())
 
-        val a = fixed.minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 1L))
-        val b = adaptive.minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 1L))
+        val a = fixed.minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 1L)).assignment
+        val b = adaptive.minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 1L)).assignment
         assertNotNull(a)
         assertNotNull(b)
         assertEquals(objective.evaluate(a), objective.evaluate(b))
@@ -121,7 +122,7 @@ class RestartPolicyTest {
         )
         val problem = Problem(3, 0, emptyArray(), clauses)
         val solver = LocalSearchSolver(problem, restartPolicy = LubyRestart(unit = 50))
-        val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 9L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 9L)).assignment
         assertNotNull(sample)
     }
 }

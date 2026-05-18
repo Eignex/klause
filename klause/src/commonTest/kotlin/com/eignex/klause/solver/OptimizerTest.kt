@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 
@@ -23,7 +24,7 @@ class OptimizerTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val solver = LocalSearchSolver(problem)
-        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 50_000L, randomSeed = 1L))
+        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 50_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
         for (i in 0..3) {
@@ -41,7 +42,7 @@ class OptimizerTest {
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val sample = LocalSearchSolver(problem)
-            .minimize(objective, LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L))
+            .minimize(objective, LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L)).assignment
         assertNotNull(sample)
         assertEquals(2, sample.ints[0])
     }
@@ -56,7 +57,7 @@ class OptimizerTest {
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
         val sample = LocalSearchSolver(problem)
-            .minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 13L))
+            .minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 13L)).assignment
         assertNotNull(sample)
 
         val score = objective.evaluate(sample)
@@ -86,7 +87,7 @@ class OptimizerTest {
         )
         val objective = LinearObjective(boolWeights = doubleArrayOf(1.0))
         val sample = LocalSearchSolver(problem)
-            .minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L))
+            .minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L)).assignment
         assertEquals(null, sample)
     }
 }

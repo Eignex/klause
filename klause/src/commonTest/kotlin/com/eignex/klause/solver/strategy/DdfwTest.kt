@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.strategy
 
+
 import com.eignex.klause.solver.localsearch.strategy.Ddfw
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -26,7 +27,7 @@ class DdfwTest {
         )
         val problem = Problem(3, 0, emptyArray(), clauses)
         val solver = LocalSearchSolver(problem, strategy = Ddfw())
-        val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 7L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 7L)).assignment
         assertNotNull(sample, "DDFW should find a satisfying assignment within budget")
         for (clause in clauses) {
             val sat = clause.literals.any { lit ->

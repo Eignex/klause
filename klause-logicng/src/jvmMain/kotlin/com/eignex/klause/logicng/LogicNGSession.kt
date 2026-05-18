@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.TerminationReason
 import org.logicng.datastructures.Assignment as LogicNGAssignment
 import org.logicng.datastructures.Tristate
 import org.logicng.formulas.Formula
@@ -59,7 +60,7 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         return when (satSolver.sat(lits)) {
             Tristate.TRUE -> SolveResult.Sat(decode(satSolver.model()))
             Tristate.FALSE -> SolveResult.Unsat
-            else -> SolveResult.Unknown
+            else -> SolveResult.Unknown(TerminationReason.Timeout)
         }
     }
 

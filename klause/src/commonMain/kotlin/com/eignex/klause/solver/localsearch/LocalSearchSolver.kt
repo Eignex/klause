@@ -16,8 +16,11 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SampleResult
+import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -70,7 +73,8 @@ class LocalSearchSolver(
 
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val eff = effectiveAssumptions(params.assumptions) ?: return SolveResult.Unsat
-        return sampleInternal(params, eff, warm)?.let(SolveResult::Sat) ?: SolveResult.Unknown
+        return sampleInternal(params, eff, warm)?.let(SolveResult::Sat)
+            ?: SolveResult.Unknown(TerminationReason.BudgetExhausted)
     }
 
     internal fun samplesInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
@@ -114,19 +118,44 @@ class LocalSearchSolver(
      * subtypes fall back to a full [Objective.evaluate] re-score per candidate move, which
      * is correct but slow.
      */
-    override fun minimize(objective: Objective, params: LocalSearchParams): Sample? =
+    override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult =
         minimizeInternal(objective, params, warm = null)
 
-    internal fun minimizeInternal(objective: Objective, params: LocalSearchParams, warm: WarmState?): Sample? {
-        val eff = effectiveAssumptions(params.assumptions) ?: return null
-        return minimizeImpl(objective, params, eff, warm)
+    /**
+     * Internal minimize entry point. Local search is **incomplete**: it never proves
+     * optimality or infeasibility. So the verdict is always either
+     * [MinimizeResult.BestFound] (a feasible was reached) or
+     * [MinimizeResult.Unknown] (budget gone before feasibility).
+     * Bake-time-Unsat is the one case we can prove Infeasible — propagation derived it
+     * before LS started.
+     */
+    internal fun minimizeInternal(
+        objective: Objective,
+        params: LocalSearchParams,
+        warm: WarmState?,
+    ): MinimizeResult {
+        val eff = effectiveAssumptions(params.assumptions)
+            ?: return MinimizeResult.Infeasible
+        val sample = minimizeImpl(objective, params, eff, warm)
+        return if (sample != null) {
+            MinimizeResult.BestFound(
+                sample = sample,
+                objective = objective.evaluate(sample),
+                reason = TerminationReason.BudgetExhausted,
+            )
+        } else {
+            MinimizeResult.Unknown(
+                TerminationReason.BudgetExhausted,
+            )
+        }
     }
 
     fun solve(): SolveResult = solve(LocalSearchParams())
-    fun sample(): Sample? = sample(LocalSearchParams())
+    fun sample(): SampleResult = sample(LocalSearchParams())
     fun samples(): Sequence<Sample> = samples(LocalSearchParams())
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
-    fun minimize(objective: Objective): Sample? = minimize(objective, LocalSearchParams())
+    fun minimize(objective: Objective): MinimizeResult =
+        minimize(objective, LocalSearchParams())
 
     private fun streamImpl(
         params: LocalSearchParams,

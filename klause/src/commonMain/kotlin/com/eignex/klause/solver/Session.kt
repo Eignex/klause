@@ -37,7 +37,14 @@ interface Session<P : SolverParams> : AutoCloseable {
     fun pop()
 
     fun solve(params: P): SolveResult
-    fun sample(params: P): Sample? = samples(params).firstOrNull()
+    /** Default implementation drains [samples] for one yield. Wraps it in
+     *  [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
+     *  doesn't. Mirrors [Solver.sample]'s contract. */
+    fun sample(params: P): SampleResult {
+        val s = samples(params).firstOrNull()
+        return if (s != null) SampleResult.Found(s)
+        else SampleResult.Unknown(TerminationReason.BudgetExhausted)
+    }
     fun samples(params: P): Sequence<Sample>
     fun enumerate(params: P): Sequence<Sample>
 

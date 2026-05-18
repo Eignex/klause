@@ -1,5 +1,6 @@
 package com.eignex.klause.z3
 
+
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
 import kotlin.test.Test
@@ -25,7 +26,7 @@ class Z3NativeFloatTest {
         assertTrue((compiled.problem.floatMetadata?.numFloatVars ?: 0) == 1)
 
         val solver = Z3Solver(compiled.problem)
-        val sample = solver.sample(Z3Params())
+        val sample = solver.sample(Z3Params()).assignment
         assertTrue(sample != null, "Z3 should find a feasible rate ≥ 0.4")
         val rate = compiled.decode(schema.rate, sample!!)
         // Decoded via the bucket grid (5 buckets across [0,1] → step 0.25). Any real

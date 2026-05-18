@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+
 import com.eignex.klause.ast.circuit
 import com.eignex.klause.ast.cumulative
 import com.eignex.klause.ast.disjunctive
@@ -28,7 +29,7 @@ class CircuitDslTest {
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Circuit })
         val solver = BacktrackSolver(compiled.problem)
-        val sample = solver.sample(BacktrackParams())
+        val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample)
         // Verify it's a Hamiltonian cycle of length 4.
         val visited = BooleanArray(4)
@@ -54,7 +55,7 @@ class CircuitDslTest {
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Circuit })
         val solver = BacktrackSolver(compiled.problem)
-        val sample = solver.sample(BacktrackParams())
+        val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample)
         // The user-facing values are 1..4 (1-indexed). Verify Hamiltonian cycle in that space.
         val visited = BooleanArray(4)
@@ -86,7 +87,7 @@ class CircuitDslTest {
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Cumulative })
         val solver = BacktrackSolver(compiled.problem)
-        val sample = solver.sample(BacktrackParams())
+        val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample)
         // Verify non-overlapping schedule under capacity 1.
         val occ = IntArray(8)

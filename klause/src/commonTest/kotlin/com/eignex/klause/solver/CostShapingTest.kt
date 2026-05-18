@@ -133,7 +133,7 @@ class CostShapingTest {
                 randomSeed = 1L,
                 costShaping = CostShaping.linear(lambda = 1.0),
             ),
-        )
+        ).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
     }

@@ -1,10 +1,12 @@
 package com.eignex.klause.solver.localsearch.meta
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSession
@@ -104,13 +106,13 @@ class Alns(
         val newBest: Boolean,
     )
 
-    override fun minimize(objective: Objective, params: LocalSearchParams): Sample? {
+    override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult {
         _iterationLog.clear()
-        // Initial solve to get an incumbent. Pass through the caller's full budget so the
-        // first feasibility / optimisation pass isn't artificially truncated. Route through
-        // the session when present so the first solve seeds DDFW weights and recency for
-        // later activity-biased / weight-driven destroy operators.
-        var bestSample = (session?.minimize(objective, params) ?: inner.minimize(objective, params)) ?: return null
+        // Initial solve to get an incumbent. Route through the session when present so the
+        // first solve seeds DDFW weights / recency for later activity-biased destroys.
+        val initialResult = session?.minimize(objective, params) ?: inner.minimize(objective, params)
+        val initialSample = initialResult.assignment ?: return initialResult
+        var bestSample: Sample = initialSample
         var bestObj = objective.evaluate(bestSample)
         var incumbent = bestSample
         var incumbentObj = bestObj
@@ -159,7 +161,11 @@ class Alns(
             if (isNewBest) { bestSample = repaired; bestObj = repairedObj }
             if (accept) { incumbent = repaired; incumbentObj = repairedObj }
         }
-        return bestSample
+        // ALNS is incomplete — every successful run returns BestFound, never Optimal.
+        return MinimizeResult.BestFound(
+            sample = bestSample, objective = bestObj,
+            reason = TerminationReason.BudgetExhausted,
+        )
     }
 
     /** Build an [Assumptions] pinning every variable *not* in [freed] to its incumbent value. */

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -122,7 +123,7 @@ class DisjunctiveTest {
             problem,
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 17L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 17L)).assignment
         assertNotNull(sample)
         val starts = sample.ints
         val occ = BooleanArray(3)

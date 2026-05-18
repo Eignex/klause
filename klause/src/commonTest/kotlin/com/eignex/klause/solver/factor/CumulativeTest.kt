@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -166,7 +167,7 @@ class CumulativeTest {
     fun `BacktrackSolver finds a feasible 3-task unary schedule`() {
         val problem = threeTasksUnary()
         val solver = BacktrackSolver(problem)
-        val sample = solver.sample(BacktrackParams())
+        val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample, "BacktrackSolver should find a feasible schedule")
         // Verify the assignment is in fact non-overlapping.
         val starts = sample.ints
@@ -186,7 +187,7 @@ class CumulativeTest {
             problem,
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 11L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 11L)).assignment
         assertNotNull(sample, "LS should find a feasible cumulative schedule")
         val starts = sample.ints
         val occ = IntArray(8)

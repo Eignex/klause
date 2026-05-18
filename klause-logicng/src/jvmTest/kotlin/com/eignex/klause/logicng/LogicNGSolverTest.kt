@@ -132,7 +132,7 @@ class LogicNGSolverTest {
                     "${case.name}: LogicNG UNSAT but LS got $ls " +
                         "(LS should run out of flips, or prove Unsat via propagation)"
                 )
-                SolveResult.Unknown -> {}
+                is SolveResult.Unknown -> {}
             }
         }
     }

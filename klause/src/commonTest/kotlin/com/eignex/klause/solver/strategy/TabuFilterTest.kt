@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.strategy
 
+
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
@@ -211,7 +212,7 @@ class TabuFilterTest {
             ),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 100),
         )
-        val sample = solver.sample()
+        val sample = solver.sample().assignment
         assertTrue(sample != null, "WalkSat with TabuFilter failed to find a sample")
     }
 }

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
@@ -82,7 +83,7 @@ class SubcircuitTest {
     fun `LS solver finds a valid subcircuit`() {
         val problem = fourNodeProblem()
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 13L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 13L)).assignment
         assertTrue(sample != null, "LS should find a valid Subcircuit configuration")
     }
 }

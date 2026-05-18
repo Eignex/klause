@@ -1,12 +1,14 @@
 package com.eignex.klause.z3
 
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.TerminationReason
 import com.microsoft.z3.ArithExpr
 import com.microsoft.z3.BoolExpr
 import com.microsoft.z3.Context
@@ -35,7 +37,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
      * (bool indicators lifted via `mkITE`); other [Objective] subtypes are not supported
      * and throw at runtime.
      */
-    override fun minimize(objective: Objective, params: Z3Params): Sample? {
+    override fun minimize(objective: Objective, params: Z3Params): MinimizeResult {
         require(objective is LinearObjective) {
             "Z3 backend only supports LinearObjective; got ${objective::class.simpleName}"
         }
@@ -52,8 +54,14 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
             val objExpr = buildObjective(objective, encoding, ctx)
             opt.MkMinimize(objExpr)
             return when (opt.Check()) {
-                Status.SATISFIABLE -> decode(opt.model, encoding)
-                else -> null
+                Status.SATISFIABLE -> {
+                    val sample = decode(opt.model, encoding)
+                    MinimizeResult.Optimal(sample, objective.evaluate(sample))
+                }
+                Status.UNSATISFIABLE -> MinimizeResult.Infeasible
+                else -> MinimizeResult.Unknown(
+                    TerminationReason.Timeout,
+                )
             }
         } finally {
             ctx.close()
@@ -101,7 +109,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
             return when (solver.check()) {
                 Status.SATISFIABLE -> SolveResult.Sat(decode(solver.model, encoding))
                 Status.UNSATISFIABLE -> SolveResult.Unsat
-                else -> SolveResult.Unknown
+                else -> SolveResult.Unknown(TerminationReason.Timeout)
             }
         } finally {
             ctx.close()

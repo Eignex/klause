@@ -35,7 +35,7 @@ interface SolverParams {
 sealed interface SolveResult {
     data class Sat(val assignment: Sample) : SolveResult
     data object Unsat : SolveResult
-    data object Unknown : SolveResult
+    data class Unknown(val reason: TerminationReason) : SolveResult
 }
 
 /**
@@ -56,7 +56,17 @@ sealed interface SolveResult {
 interface Solver<P : SolverParams> {
     val problem: Problem
     fun solve(params: P): SolveResult
-    fun sample(params: P): Sample? = samples(params).firstOrNull()
+    /**
+     * Default implementation drains [samples] for one yield. Wraps it in
+     * [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
+     * doesn't. Backends with a cheaper one-shot path that can also distinguish
+     * Infeasible (proven) from Unknown (budget) should override.
+     */
+    fun sample(params: P): SampleResult {
+        val s = samples(params).firstOrNull()
+        return if (s != null) SampleResult.Found(s)
+        else SampleResult.Unknown(TerminationReason.BudgetExhausted)
+    }
     fun samples(params: P): Sequence<Sample>
     fun enumerate(params: P): Sequence<Sample>
 
@@ -82,8 +92,16 @@ interface Solver<P : SolverParams> {
  */
 interface Optimizer<P : SolverParams> : Solver<P> {
     /**
-     * Return the lowest-objective assignment that satisfies all hard constraints, or
-     * `null` if no feasible assignment was found within [params]'s budget.
+     * Optimise the assignment against [objective] under the hard constraints. Verdict:
+     *  - [MinimizeResult.Optimal] — feasible found and proved optimal (search exhausted
+     *    or bound proves no better exists).
+     *  - [MinimizeResult.BestFound] — feasible found but optimality not proven; carries
+     *    the [TerminationReason] that stopped the search.
+     *  - [MinimizeResult.Infeasible] — no feasible exists.
+     *  - [MinimizeResult.Unknown] — no feasible found, no infeasibility proven.
+     *
+     * Local-search backends can never return [MinimizeResult.Optimal] or
+     * [MinimizeResult.Infeasible].
      */
-    fun minimize(objective: Objective, params: P): Sample?
+    fun minimize(objective: Objective, params: P): MinimizeResult
 }

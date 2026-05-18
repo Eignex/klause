@@ -102,7 +102,7 @@ class Z3SolverTest {
                     "${case.name}: Z3 SAT but LS got $ls")
                 SolveResult.Unsat -> assertTrue(ls is SolveResult.Unknown || ls is SolveResult.Unsat,
                     "${case.name}: Z3 UNSAT but LS got $ls (should be Unknown or Unsat-via-propagation)")
-                SolveResult.Unknown -> {}
+                is SolveResult.Unknown -> {}
             }
         }
     }

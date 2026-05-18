@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
@@ -18,7 +19,7 @@ class BranchAndBoundTest {
             factors = emptyList(),
         )
         val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L))
+        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         for (i in 0 until 4) assertEquals(false, sample.bools[i])
     }
@@ -30,7 +31,7 @@ class BranchAndBoundTest {
             factors = emptyList(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L))
+        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(2, sample.ints[0])
     }
@@ -42,7 +43,7 @@ class BranchAndBoundTest {
             factors = emptyList(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(-1.0))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L))
+        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(7, sample.ints[0])
     }
@@ -69,7 +70,7 @@ class BranchAndBoundTest {
                 variableHeuristic = InputOrder,
                 valueHeuristic = IndomainMin,
             ),
-        )
+        ).assignment
         assertNotNull(sample, "B&B should land at the optimum well inside a 200-decision budget")
         for (i in 0 until n) assertEquals(false, sample.bools[i],
             "B&B optimum is all-false; got ${sample.bools.toList()}")
@@ -93,7 +94,7 @@ class BranchAndBoundTest {
             factors = listOf(factor),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 1.0, 1.0))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L))
+        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         val sum = sample.ints[0] + sample.ints[1] + sample.ints[2]
         assertEquals(6, sum, "optimal disjunctive schedule sums to 0+2+4=6; got ${sample.ints.toList()}")

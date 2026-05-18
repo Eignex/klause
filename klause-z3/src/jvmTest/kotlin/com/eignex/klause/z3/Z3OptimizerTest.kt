@@ -1,5 +1,6 @@
 package com.eignex.klause.z3
 
+
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -23,7 +24,7 @@ class Z3OptimizerTest {
         ))
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
-        val sample = Z3Solver(problem).minimize(objective, Z3Params())
+        val sample = Z3Solver(problem).minimize(objective, Z3Params()).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
         assertEquals(true, sample.bools[3])
@@ -37,7 +38,7 @@ class Z3OptimizerTest {
             factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
-        val sample = Z3Solver(problem).minimize(objective, Z3Params())
+        val sample = Z3Solver(problem).minimize(objective, Z3Params()).assignment
         assertNotNull(sample)
         assertEquals(2, sample.ints[0])
     }
@@ -50,9 +51,9 @@ class Z3OptimizerTest {
             factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
-        val z3Sample = Z3Solver(problem).minimize(objective, Z3Params())
+        val z3Sample = Z3Solver(problem).minimize(objective, Z3Params()).assignment
         val lsSample = LocalSearchSolver(problem)
-            .minimize(objective, LocalSearchParams(maxFlips = 200_000L, randomSeed = 42L))
+            .minimize(objective, LocalSearchParams(maxFlips = 200_000L, randomSeed = 42L)).assignment
         assertNotNull(z3Sample)
         assertNotNull(lsSample)
 
@@ -69,7 +70,7 @@ class Z3OptimizerTest {
             ),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
-        val sample = Z3Solver(problem).minimize(objective, Z3Params())
+        val sample = Z3Solver(problem).minimize(objective, Z3Params()).assignment
         assertEquals(null, sample)
     }
 }

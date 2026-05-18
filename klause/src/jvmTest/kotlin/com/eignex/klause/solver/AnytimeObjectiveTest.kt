@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -29,7 +30,7 @@ class AnytimeObjectiveTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0, 100.0, 50.0))
         // A budget of 50 flips is enough to find at least one feasible.
-        val sample = LocalSearchSolver(problem).minimize(obj, LocalSearchParams(maxFlips = 50, randomSeed = 1L))
+        val sample = LocalSearchSolver(problem).minimize(obj, LocalSearchParams(maxFlips = 50, randomSeed = 1L)).assignment
         assertNotNull(sample, "minimize must return a feasible when one was reached during the budget")
         assertTrue(sample.bools.count { it } == 1, "must be a feasible exactly-one assignment")
     }
@@ -54,7 +55,7 @@ class AnytimeObjectiveTest {
                 randomSeed = 0L,
                 cancellation = { cancel.get() },
             ),
-        )
+        ).assignment
         flagger.join()
         // 50ms is enough for any local-search to find at least one of the 6 feasibles.
         assertNotNull(sample, "minimize must remember the best feasible across cancellation")

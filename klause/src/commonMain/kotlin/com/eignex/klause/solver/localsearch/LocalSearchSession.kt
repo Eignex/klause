@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
@@ -65,7 +66,10 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
 
     /** Optimisation entry point — not part of the base [Session] interface because not
      *  every backend is an [com.eignex.klause.solver.Optimizer]. */
-    fun minimize(objective: Objective, params: LocalSearchParams = LocalSearchParams()): Sample? =
+    fun minimize(
+        objective: Objective,
+        params: LocalSearchParams = LocalSearchParams(),
+    ): MinimizeResult =
         solver.minimizeInternal(objective, applyStack(params), warm)
 
     private fun applyStack(params: LocalSearchParams): LocalSearchParams {

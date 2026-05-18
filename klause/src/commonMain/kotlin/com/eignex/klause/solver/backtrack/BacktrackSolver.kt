@@ -2,6 +2,7 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -9,6 +10,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
@@ -36,7 +38,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
                 SearchOutcome.Exhausted -> SolveResult.Unsat
-                SearchOutcome.BudgetCapped -> SolveResult.Unknown
+                SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
         return SolveResult.Unsat
@@ -73,7 +75,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             when (val r = solveOnce(perCall)) {
                 is SolveResult.Sat -> yield(r.assignment)
                 SolveResult.Unsat -> return@sequence
-                SolveResult.Unknown -> return@sequence
+                is SolveResult.Unknown -> return@sequence
             }
             // LCG advance for reproducibility: same parent seed → same per-call seed
             // sequence → same sample sequence. The per-call seeds drive the heuristics'
@@ -87,7 +89,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
                 SearchOutcome.Exhausted -> SolveResult.Unsat
-                SearchOutcome.BudgetCapped -> SolveResult.Unknown
+                SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
         return SolveResult.Unsat
@@ -141,7 +143,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      * degrades to "never prune," so correctness is preserved at the cost of falling
      * back to full enumeration.
      */
-    override fun minimize(objective: Objective, params: BacktrackParams): Sample? {
+    override fun minimize(objective: Objective, params: BacktrackParams): MinimizeResult {
         var best: Sample? = null
         var bestObj = Double.POSITIVE_INFINITY
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
@@ -157,10 +159,16 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     val o = objective.evaluate(outcome.sample)
                     if (o < bestObj) { bestObj = o; best = outcome.sample }
                 }
-                SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return best
+                SearchOutcome.Exhausted -> return if (best != null) {
+                    MinimizeResult.Optimal(best, bestObj)
+                } else MinimizeResult.Infeasible
+                SearchOutcome.BudgetCapped -> return if (best != null) {
+                    MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
+                } else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
-        return best
+        // Sequence drained without a terminal outcome — treat as exhausted.
+        return if (best != null) MinimizeResult.Optimal(best, bestObj) else MinimizeResult.Infeasible
     }
 
     /**

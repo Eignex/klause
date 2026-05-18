@@ -66,8 +66,9 @@ class InnerLsRepair(
         val merged = params.withAssumptions(context.pinAssumptions)
         // Prefer the session when present so weight learning + activity recency
         // accumulate across iterations; fall back to the bare inner Optimizer otherwise.
-        return context.session?.minimize(context.objective, merged)
+        val result = context.session?.minimize(context.objective, merged)
             ?: context.inner.minimize(context.objective, merged)
+        return result.assignment
     }
 
     override fun toString(): String = "InnerLsRepair($label${flipsOverride?.let { ", flips=$it" } ?: ""})"

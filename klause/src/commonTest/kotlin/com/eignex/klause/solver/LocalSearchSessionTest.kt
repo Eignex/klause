@@ -37,7 +37,7 @@ class LocalSearchSessionTest {
         // Before any call: warm state is empty.
         assertNull(session.warmState.factorWeights)
         // Run a sample-search; DDFW will mutate weights along the way.
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
         val captured = session.warmState.factorWeights
         assertNotNull(captured, "session should capture factorWeights")
         assertEquals(problem.numFactors, captured.size)
@@ -49,7 +49,7 @@ class LocalSearchSessionTest {
     fun `reset clears warm state`() {
         val problem = ddfwProblem()
         val session = LocalSearchSession(LocalSearchSolver(problem, strategy = Ddfw()))
-        session.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 2L))
+        session.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 2L)).assignment
         assertNotNull(session.warmState.factorWeights)
         session.reset()
         assertNull(session.warmState.factorWeights)
@@ -60,9 +60,9 @@ class LocalSearchSessionTest {
         val problem = ddfwProblem()
         val session = LocalSearchSession(LocalSearchSolver(problem, strategy = Ddfw()))
         val obj = LinearObjective(boolWeights = DoubleArray(6) { 1.0 })
-        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 5L))
+        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 5L)).assignment
         val firstWeights = session.warmState.factorWeights!!.copyOf()
-        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 6L))
+        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 6L)).assignment
         val secondWeights = session.warmState.factorWeights!!
         // The second capture should not be exactly equal to the all-defaults vector —
         // it built on top of the first.
@@ -98,7 +98,7 @@ class LocalSearchSessionTest {
         val problem = ddfwProblem()
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L))
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L)).assignment
         val touches = session.warmStateView.activityTouches()
         assertEquals(6, touches.size, "touches should cover all (bool + int) var slots")
         // After a sample search, at least some vars must have been touched.
@@ -111,14 +111,14 @@ class LocalSearchSessionTest {
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
         // First call: search runs, watermark captured into WarmState.
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
         val firstWatermark = session.warmStateView.bestCostSeen()
         assertTrue(firstWatermark < Int.MAX_VALUE,
             "expected watermark after first call, got $firstWatermark")
 
         // Second call: warm state should re-seed bestCostSeen and the captured value is
         // never higher than the first call's.
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L))
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L)).assignment
         val secondWatermark = session.warmStateView.bestCostSeen()
         assertTrue(secondWatermark <= firstWatermark,
             "watermark must monotone-decrease: $firstWatermark -> $secondWatermark")
@@ -129,7 +129,7 @@ class LocalSearchSessionTest {
         val problem = ddfwProblem()
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L))
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L)).assignment
         assertTrue(session.warmStateView.bestCostSeen() < Int.MAX_VALUE)
         session.reset()
         assertEquals(Int.MAX_VALUE, session.warmStateView.bestCostSeen(),
@@ -145,7 +145,7 @@ class LocalSearchSessionTest {
         val solver = LocalSearchSolver(problem, strategy = Ddfw())
         val session = LocalSearchSession(solver)
         // Bare call — bypasses the session entirely.
-        solver.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 9L))
+        solver.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 9L)).assignment
         assertNull(session.warmState.factorWeights, "bare solver call must not write to session warm state")
     }
 }

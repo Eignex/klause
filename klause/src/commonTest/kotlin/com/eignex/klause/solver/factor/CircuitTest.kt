@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
@@ -77,7 +78,7 @@ class CircuitTest {
         // Just verify the problem can be solved — full propagation correctness requires
         // PropagationState plumbing which is BacktrackSolver-internal. Skip detailed checks.
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 100))
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 1L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 1L)).assignment
         // Sample may be null if LS can't find a Hamiltonian cycle in the budget; if found,
         // verify it's actually a valid cycle.
         if (sample != null) {
@@ -197,7 +198,7 @@ class CircuitTest {
     fun `LS solver finds Hamiltonian cycle on N=4`() {
         val problem = fourNodeProblem()
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L)).assignment
         assertTrue(sample != null, "LS should find a Hamiltonian cycle on N=4 within budget")
         // Verify the sample is actually a valid cycle.
         val visited = BooleanArray(4)

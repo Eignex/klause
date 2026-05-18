@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.meta
 
+
 import com.eignex.klause.solver.localsearch.meta.Alns
 import com.eignex.klause.solver.localsearch.meta.DestroyOperator
 import com.eignex.klause.solver.localsearch.meta.FreedVars
@@ -100,7 +101,7 @@ class AlnsTest {
             flipsPerIteration = 200L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L))
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
     }
@@ -121,7 +122,7 @@ class AlnsTest {
             flipsPerIteration = 500L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L))
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
         // Both repair operators should have been picked at least once over 30 iterations
@@ -238,7 +239,7 @@ class AlnsTest {
             maxIterations = 10,
             flipsPerIteration = 200L,
         )
-        alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
         // After ALNS runs, activity touch counts should be populated (size = numBoolVars).
         val touches = session.warmStateView.activityTouches()
         assertEquals(4, touches.size)
@@ -269,7 +270,7 @@ class AlnsTest {
             maxIterations = 10,
             flipsPerIteration = 200L,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
     }
 
@@ -282,7 +283,7 @@ class AlnsTest {
         val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }
         val inner = LocalSearchSolver(problem)
         val alns = Alns(inner = inner, destroyOperators = listOf(emptyOp), maxIterations = 5, flipsPerIteration = 100L)
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L))
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L)).assignment
         assertNotNull(sample, "ALNS should still return the initial solve's incumbent")
     }
 }

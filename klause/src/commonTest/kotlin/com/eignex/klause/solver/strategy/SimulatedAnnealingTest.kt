@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.strategy
 
+
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -22,7 +23,7 @@ class SimulatedAnnealingTest {
         )
         val problem = Problem(3, 0, emptyArray(), clauses)
         val solver = LocalSearchSolver(problem, strategy = SimulatedAnnealing())
-        val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 7L))
+        val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 7L)).assignment
         assertNotNull(sample, "SA should find a satisfying assignment within budget")
         for (clause in clauses) {
             val sat = clause.literals.any { lit ->
@@ -42,8 +43,8 @@ class SimulatedAnnealingTest {
         val problem = Problem(4, 0, emptyArray(), clauses)
         val fast = LocalSearchSolver(problem, strategy = SimulatedAnnealing(coolingRate = 0.99))
         val slow = LocalSearchSolver(problem, strategy = SimulatedAnnealing(coolingRate = 0.9999))
-        val a = fast.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 1L))
-        val b = slow.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 2L))
+        val a = fast.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 1L)).assignment
+        val b = slow.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 2L)).assignment
         assertNotNull(a)
         assertNotNull(b)
     }
