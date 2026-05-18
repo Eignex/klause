@@ -439,6 +439,104 @@ class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
         }
 }
 
+/**
+ * Impact-based value selection (Refalo 2004). For each candidate value of [varRef], probes
+ * a real propagation pin via [PropagationSession.pinBool] / [pinInt], measures the log of
+ * the post-pin remaining-domain product, then reverts. Values are returned in **ascending
+ * post-product order**: smaller residual search space = stronger pruning = try first.
+ *
+ *  - Values whose probe yields [PropagationResult.Unsat] are dropped entirely from the
+ *    sequence — the engine never wastes a real pin on them. Free pre-pruning at every node.
+ *  - For int domains larger than [maxProbes], a uniformly random subset is probed; the
+ *    un-probed remainder is appended at the end in ascending order (so coverage is
+ *    preserved if the engine backtracks past every probed value). Bool vars are always
+ *    fully probed (only two values).
+ *  - Composes with `LastConflict` and any variable heuristic; the cost is O(maxProbes ×
+ *    propagation), amortised by the pruning power that lets the search skip whole subtrees.
+ *
+ * Caveat: the heuristic does work *inside* `values()` (pin + propagate + popLast). This is
+ * cheap per call but isn't free — for large random/enumeration workloads where node count
+ * dominates, the simpler `Indomain*` family will still win on wall-time even if each node
+ * does more work. Use Impact when reasoning power per node matters, e.g. structured CSPs
+ * with strong global propagators.
+ */
+class Impact(
+    private val maxProbes: Int = 32,
+) : ValueHeuristic {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> {
+        val candidates: IntArray = when (varRef) {
+            is VarRef.Bool -> intArrayOf(0, 1)
+            is VarRef.IntVar -> {
+                val d = session.intDomain(varRef.varId)
+                if (d.size <= maxProbes) IntArray(d.size) { d.valueAt(it) }
+                else {
+                    // Sample without replacement so we don't waste budget on duplicates.
+                    val seen = HashSet<Int>(maxProbes * 2)
+                    val sample = IntArray(maxProbes)
+                    var i = 0
+                    var guard = 0
+                    while (i < maxProbes && guard < maxProbes * 8) {
+                        val candidate = d.valueAt(rng.nextInt(d.size))
+                        if (seen.add(candidate)) { sample[i] = candidate; i++ }
+                        guard++
+                    }
+                    if (i < maxProbes) sample.copyOf(i) else sample
+                }
+            }
+        }
+
+        // Each probe: pin → measure log-product → revert (popLast). Unsat probes self-revert
+        // and are dropped from the returned order entirely.
+        val scored = ArrayList<Pair<Int, Double>>(candidates.size)
+        for (v in candidates) {
+            val r = when (varRef) {
+                is VarRef.Bool -> session.pinBool(varRef.varId, v != 0)
+                is VarRef.IntVar -> session.pinInt(varRef.varId, v)
+            }
+            if (r is com.eignex.klause.solver.propagation.PropagationResult.Unsat) continue
+            val post = logRemainingDomainProduct(session)
+            session.popLast()
+            scored.add(v to post)
+        }
+        scored.sortBy { it.second }
+
+        // For very large int domains we only probed a subset; append the rest at the end
+        // in ascending value order so DFS still covers everything if it backtracks that
+        // far. Bool domains are always fully probed, so this branch never triggers there.
+        if (varRef is VarRef.IntVar) {
+            val d = session.intDomain(varRef.varId)
+            if (candidates.size < d.size) {
+                val probed = HashSet<Int>(candidates.size * 2).apply {
+                    for ((p, _) in scored) add(p); for (c in candidates) add(c)
+                }
+                val ordered = scored.asSequence().map { it.first }
+                return ordered + sequence { d.forEach { if (it !in probed) yield(it) } }
+            }
+        }
+        return scored.asSequence().map { it.first }
+    }
+
+    /**
+     * Sum of `ln(size)` over every unpinned variable (bools count as `ln 2` when free).
+     * Equivalent to the log of the product of remaining domain sizes. We work in log-space
+     * to avoid `Double` overflow on problems with hundreds of free vars.
+     */
+    private fun logRemainingDomainProduct(session: PropagationSession): Double {
+        var s = 0.0
+        val p = session.problem
+        for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += LN2
+        for (v in 0 until p.numIntVars) {
+            val sz = session.intDomain(v).size
+            if (sz > 1) s += kotlin.math.ln(sz.toDouble())
+        }
+        return s
+    }
+
+    private companion object {
+        private val LN2 = kotlin.math.ln(2.0)
+    }
+}
+
 /** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
  *  the engine can early-exit before enumerating the full domain on a backtrack. */
 private fun domainValuesAscending(d: com.eignex.klause.solver.IntDomain): Sequence<Int> =
