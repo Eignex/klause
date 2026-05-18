@@ -86,9 +86,28 @@ class LocalSearchState(
 
     /** Per-factor weight, default 1.0. Not read by the engine itself — every violation
      *  contributes +1/-1 to [cost] regardless. Strategies that want to bias the search
-     *  toward repairing persistently-violated factors (e.g. SAPS) read and mutate this
-     *  array between picks. */
-    val factorWeights: DoubleArray = DoubleArray(problem.numFactors) { 1.0 }
+     *  toward repairing persistently-violated factors (e.g. DDFW, SAPS) read and mutate
+     *  this array between picks.
+     *
+     *  Lazily allocated on first access. WalkSat / ProbSat / SimulatedAnnealing / CcaWalkSat
+     *  never touch it and so pay no allocation cost; only DDFW (and any future weight-using
+     *  strategy) triggers the `DoubleArray(numFactors)` allocation. [WarmState.captureFrom]
+     *  probes [factorWeightsAllocated] before reading to avoid forcing the allocation just
+     *  to capture all-1.0 defaults from sessions that ran a weight-blind strategy. */
+    private var _factorWeights: DoubleArray? = null
+    val factorWeights: DoubleArray
+        get() {
+            var w = _factorWeights
+            if (w == null) {
+                w = DoubleArray(problem.numFactors) { 1.0 }
+                _factorWeights = w
+            }
+            return w
+        }
+
+    /** True iff [factorWeights] has been touched (allocated) on this state. Reading is
+     *  free; allows callers to probe without forcing the lazy allocation. */
+    internal val factorWeightsAllocated: Boolean get() = _factorWeights != null
 
     /** Configuration-Checking flag per Boolean variable. `true` means a neighboring
      *  variable has been touched since this var was last flipped (or since restart) — the

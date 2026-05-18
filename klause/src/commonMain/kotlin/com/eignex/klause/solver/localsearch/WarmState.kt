@@ -78,9 +78,16 @@ class WarmState {
 
     /** Capture the strategy's learned weights, per-variable touch counts, and best-cost
      *  watermark at the end of a search session. Touch counts and the watermark survive
-     *  restart, so they reflect the whole call regardless of restart cadence. */
+     *  restart, so they reflect the whole call regardless of restart cadence.
+     *
+     *  Skips the weight copy when the state never allocated [LocalSearchState.factorWeights]
+     *  — happens whenever the strategy was weight-blind (WalkSat, ProbSat, etc.).
+     *  Capturing a freshly-allocated all-1.0 default would force the allocation we just
+     *  avoided. */
     internal fun captureFrom(state: LocalSearchState) {
-        factorWeights = state.factorWeights.copyOf()
+        if (state.factorWeightsAllocated) {
+            factorWeights = state.factorWeights.copyOf()
+        }
         activityTouches = state.touchCount.copyOf()
         // Monotone-decreasing: never let the warm watermark go up between calls.
         if (state.bestCostSeen < bestCostSeen) bestCostSeen = state.bestCostSeen
