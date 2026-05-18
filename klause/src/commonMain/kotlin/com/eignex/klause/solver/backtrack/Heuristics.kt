@@ -565,6 +565,54 @@ class ConflictOrdering(private val base: VariableHeuristic) : VariableHeuristic 
     override fun onSolution(snapshot: com.eignex.klause.solver.Sample) = base.onSolution(snapshot)
 }
 
+/**
+ * Max-regret variable selection for optimisation. The *regret* of a variable is the
+ * difference between the best-case and worst-case contribution that branching choices on
+ * it can make to the objective:
+ *  - bool var `b` with weight `w`: regret = |w|.
+ *  - int var `v` with coefficient `c` and domain `[lo..hi]`: regret = |c| · (hi - lo).
+ *
+ * Picks the unpinned variable with the maximum regret. Branching where the objective is
+ * most sensitive lets the engine drive the upper bound down (or lower bound up) fastest —
+ * a standard Choco / OR-tools default for `minimize`. When every remaining variable has
+ * regret 0 (singleton or zero coefficient), delegates to [base] so the search makes
+ * progress on feasibility too.
+ *
+ * Pair with [IndomainBest] for a complete objective-aware (var, value) strategy.
+ */
+class MaxRegret(
+    private val objective: com.eignex.klause.solver.LinearObjective,
+    private val base: VariableHeuristic = SmallestDomain,
+) : VariableHeuristic {
+
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        val problem = session.problem
+        var best: VarRef? = null
+        var bestRegret = 0.0
+        for (v in 0 until problem.numBoolVars) {
+            if (session.boolValue(v) != null) continue
+            val w = if (v < objective.boolWeights.size) objective.boolWeights[v] else 0.0
+            val r = kotlin.math.abs(w)
+            if (r > bestRegret) { bestRegret = r; best = VarRef.Bool(v) }
+        }
+        for (v in 0 until problem.numIntVars) {
+            val d = session.intDomain(v)
+            if (d.size <= 1) continue
+            val c = if (v < objective.intCoefficients.size) objective.intCoefficients[v] else 0.0
+            val r = kotlin.math.abs(c) * (d.max - d.min)
+            if (r > bestRegret) { bestRegret = r; best = VarRef.IntVar(v) }
+        }
+        return best ?: base.pick(session, rng)
+    }
+
+    override fun onConflict(varRef: VarRef) = base.onConflict(varRef)
+    override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) = base.onConflict(varRef, unsat)
+    override fun onCommit(varRef: VarRef) = base.onCommit(varRef)
+    override fun onPropagation(implied: PropagationResult.Implied) = base.onPropagation(implied)
+    override fun onRestart() = base.onRestart()
+    override fun onSolution(snapshot: com.eignex.klause.solver.Sample) = base.onSolution(snapshot)
+}
+
 // ---- Value heuristics ------------------------------------------------------------------
 
 /** Smallest value first (a.k.a. `indomain_min`). For bools: `false` then `true`. */
@@ -771,6 +819,37 @@ private fun logRemainingDomainProduct(session: PropagationSession): Double {
         if (sz > 1) s += kotlin.math.ln(sz.toDouble())
     }
     return s
+}
+
+/**
+ * Objective-aware value selection — `indomain_best` / `intDomainBest`. For an int var with
+ * coefficient `c` in the linear objective, returns the domain ascending (best minimum first)
+ * when `c ≥ 0` and descending when `c < 0`. For a bool var with weight `w`, returns the
+ * polarity minimising `w` first (false first when `w ≥ 0`, true first when `w < 0`).
+ *
+ * Pairs naturally with [MaxRegret] (variable side) and a B&B-style optimisation loop —
+ * each successful pin moves the partial assignment as close to the global optimum as the
+ * variable-level coefficients allow, so the incumbent improves fast and pruning kicks in
+ * early. For a satisfiability problem, falls through to [IndomainMin] (every coefficient
+ * is zero so ascending order is preserved).
+ */
+class IndomainBest(
+    private val objective: com.eignex.klause.solver.LinearObjective,
+) : ValueHeuristic {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
+        when (varRef) {
+            is VarRef.Bool -> {
+                val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0.0
+                // false contributes 0; true contributes w. Lower-contribution-first.
+                if (w >= 0.0) sequenceOf(0, 1) else sequenceOf(1, 0)
+            }
+            is VarRef.IntVar -> {
+                val c = if (varRef.varId < objective.intCoefficients.size) objective.intCoefficients[varRef.varId] else 0.0
+                val d = session.intDomain(varRef.varId)
+                if (c >= 0.0) sequence { d.forEach { yield(it) } }
+                else sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }
+            }
+        }
 }
 
 /**
