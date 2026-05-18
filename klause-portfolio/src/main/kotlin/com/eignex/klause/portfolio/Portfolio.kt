@@ -1,6 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
@@ -15,6 +17,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Parallel portfolio of klause [Session] workers. Each worker is single-threaded and
@@ -53,30 +57,144 @@ class Portfolio<P : SolverParams>(
     }
 
     /**
-     * Solve in parallel. The first worker to produce a definitive answer (Sat or, on
-     * a complete backend, Unsat) wins; the rest are cancelled. If all workers exhaust
-     * their budgets and return Unknown, the portfolio returns Unknown.
+     * Solve in parallel. Behaviour depends on [strategy]:
+     *
+     *  - [PortfolioStrategy.RaceFirstFeasible] (default): the first worker to produce a
+     *    definitive answer (Sat or, on a complete backend, Unsat) wins; the rest are
+     *    cancelled.
+     *  - [PortfolioStrategy.Exhaustive]: every worker runs to its own budget without
+     *    being cancelled by siblings. The portfolio reduces over the full set of results
+     *    afterwards (prefer Sat, then Unsat, then Unknown). Use when each worker's run
+     *    contributes telemetry / posterior data the caller wants to collect, or when
+     *    cancellation cost dominates the savings.
      */
     suspend fun solve(params: P): SolveResult = coroutineScope {
         val winnerFlag = AtomicBoolean(false)
         val token: Cancellation = { winnerFlag.get() }
         @Suppress("UNCHECKED_CAST")
-        val workerParams = params.withCancellation(token) as P
+        val workerParams = when (strategy) {
+            PortfolioStrategy.RaceFirstFeasible -> params.withCancellation(token) as P
+            PortfolioStrategy.Exhaustive -> params  // no cross-worker cancellation
+        }
 
         val results = workers.map { session ->
             async(Dispatchers.Default) {
                 val r = session.solve(workerParams)
-                // Set the flag on a definitive answer so the other workers stop promptly.
-                if (r is SolveResult.Sat || r is SolveResult.Unsat) winnerFlag.set(true)
+                if (strategy is PortfolioStrategy.RaceFirstFeasible) {
+                    // Set the flag on a definitive answer so the other workers stop promptly.
+                    if (r is SolveResult.Sat || r is SolveResult.Unsat) winnerFlag.set(true)
+                }
                 r
             }
         }.awaitAll()
 
-        // Reduce: prefer Sat, then Unsat, then Unknown. Race semantics are preserved
-        // by the winnerFlag short-circuit above — losers return Unknown quickly.
+        // Reduce: prefer Sat, then Unsat, then Unknown.
         results.firstOrNull { it is SolveResult.Sat }
             ?: results.firstOrNull { it is SolveResult.Unsat }
             ?: SolveResult.Unknown(TerminationReason.Cancelled)
+    }
+
+    /**
+     * Parallel branch-and-bound minimisation. Each worker streams its own
+     * [Session.improvements]; new incumbents are folded into a *shared best bound*
+     * exposed back to every worker via [paramsWithBound]. When workers honour the bound
+     * (klause's `BacktrackSolver` does, via `BacktrackParams.objectiveBoundSupplier`),
+     * tightening from one worker prunes every other worker's subtree immediately — the
+     * core wall-clock win on top of plain parallel search.
+     *
+     *  - [paramsWithBound] is supplied by the caller because the bound injection point
+     *    is backend-specific. For `BacktrackParams`, pass
+     *    `{ p, supplier -> p.copy(objectiveBoundSupplier = supplier) }`. Defaults to
+     *    identity (no bound sharing — workers run independently and only the final
+     *    reduce picks the best).
+     *  - If any worker proves [MinimizeResult.Optimal], the portfolio cancels the rest
+     *    and returns Optimal at the proven objective. If every worker stalls with a
+     *    feasible-but-non-optimal result, the portfolio returns
+     *    [MinimizeResult.BestFound] at the globally best objective.
+     *
+     *  Cancellation, like [solve], is wired through `withCancellation` so workers exit
+     *  promptly when optimality is proven elsewhere.
+     */
+    suspend fun minimize(
+        objective: Objective,
+        params: P,
+        paramsWithBound: (P, () -> Double) -> P = { p, _ -> p },
+    ): MinimizeResult = coroutineScope {
+        // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity
+        // equality and CAS would fail spuriously on autoboxed Doubles.
+        val sharedBoundBits = AtomicLong(java.lang.Double.doubleToRawLongBits(Double.POSITIVE_INFINITY))
+        val bestSample = AtomicReference<Sample?>(null)
+        val cancelled = AtomicBoolean(false)
+        val token: Cancellation = { cancelled.get() }
+
+        fun readBound(): Double = java.lang.Double.longBitsToDouble(sharedBoundBits.get())
+
+        @Suppress("UNCHECKED_CAST")
+        val workerParams = paramsWithBound(params.withCancellation(token) as P, ::readBound)
+
+        val deferreds = workers.map { session ->
+            async(Dispatchers.Default) {
+                var local: MinimizeResult = MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                for (r in session.improvements(objective, workerParams)) {
+                    when (r) {
+                        is MinimizeResult.BestFound -> {
+                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                            local = r
+                        }
+                        is MinimizeResult.Optimal -> {
+                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                            cancelled.set(true)
+                            local = r
+                            break
+                        }
+                        is MinimizeResult.Infeasible -> { local = r }
+                        is MinimizeResult.Unknown -> { local = r }
+                    }
+                }
+                local
+            }
+        }
+        val results = deferreds.awaitAll()
+
+        // Reduce verdicts across workers. Soundness rules:
+        //  - A worker's direct Optimal claim is only honoured if it didn't run under
+        //    external bound sharing (the engine downgrades to BestFound when shared).
+        //    Single-worker / unshared portfolios still produce direct Optimal here.
+        //  - If every worker terminated cleanly (no Unknown from budget exhaustion or
+        //    cancellation), the union of their searches covered the entire space — so
+        //    the global incumbent is provably optimal.
+        //  - Else, with a global incumbent, the best provable claim is BestFound.
+        //  - Without any incumbent and at least one Unknown, the search was inconclusive.
+        //  - Without any incumbent and all workers terminated cleanly, the problem is
+        //    proven infeasible.
+        val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
+        if (directOptimal != null) return@coroutineScope directOptimal
+
+        val anyUnknown = results.any { it is MinimizeResult.Unknown }
+        val sample = bestSample.get()
+        val finalBound = readBound()
+        if (sample != null) {
+            return@coroutineScope if (anyUnknown) MinimizeResult.BestFound(
+                sample, finalBound, TerminationReason.BudgetExhausted,
+            ) else MinimizeResult.Optimal(sample, finalBound)
+        }
+        if (anyUnknown) MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+        else MinimizeResult.Infeasible()
+    }
+
+    private fun updateSharedBound(
+        boundBits: AtomicLong,
+        best: AtomicReference<Sample?>,
+        objective: Double,
+        sample: Sample,
+    ) {
+        while (true) {
+            val curBits = boundBits.get()
+            val cur = java.lang.Double.longBitsToDouble(curBits)
+            if (objective >= cur) return
+            val newBits = java.lang.Double.doubleToRawLongBits(objective)
+            if (boundBits.compareAndSet(curBits, newBits)) { best.set(sample); return }
+        }
     }
 
     /**
@@ -105,8 +223,17 @@ class Portfolio<P : SolverParams>(
 }
 
 /** Strategy knobs for [Portfolio]. Each entry currently affects `solve` only; `samples`
- *  always fans-in from every worker. */
+ *  always fans-in from every worker; `minimize` always shares the global bound regardless
+ *  of strategy (race semantics are honoured via cooperative cancellation on Optimal). */
 sealed interface PortfolioStrategy {
     /** First worker to produce a definitive answer wins; others are cancelled. Default. */
     data object RaceFirstFeasible : PortfolioStrategy
+    /**
+     * Run every worker to its own budget without cross-worker cancellation. The portfolio
+     * reduces over the full set of results afterwards. Useful when each worker contributes
+     * telemetry / posterior data the caller wants to collect, when workers are pinning
+     * different posterior priors and need to all complete, or when the cancellation cost
+     * dominates the savings on cheap instances.
+     */
+    data object Exhaustive : PortfolioStrategy
 }

@@ -73,6 +73,19 @@ data class BacktrackParams(
      * MiniSAT / Glucose default is 2.
      */
     val lbdGlueThreshold: Int = 2,
+    /**
+     * Externally-supplied objective upper bound for branch-and-bound minimisation. When
+     * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
+     * engines read it at each leaf-attempt and prune the subtree whenever the
+     * `LinearObjective` lower bound on the current partial assignment is `≥ supplier()`.
+     * Used by the parallel CP portfolio to share the best-known incumbent across workers
+     * — each worker keeps pruning against a tightening external bound even when its own
+     * local incumbent is worse. `null` (default) disables external bound sharing; the
+     * engine still tracks and prunes against its own internal incumbent. Only honoured
+     * for [com.eignex.klause.solver.LinearObjective] — arbitrary objective subtypes
+     * can't yield a sound LB and silently skip external pruning.
+     */
+    val objectiveBoundSupplier: (() -> Double)? = null,
     /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
     val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.Cancellation.Never,
 ) : SolverParams {

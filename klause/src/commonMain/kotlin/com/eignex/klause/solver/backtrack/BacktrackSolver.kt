@@ -163,7 +163,14 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         var best: Sample? = null
         var bestObj = Double.POSITIVE_INFINITY
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
-            is LinearObjective -> { session -> linearLowerBound(objective, session) >= bestObj }
+            is LinearObjective -> { session ->
+                // Effective bound = min(local incumbent, external supplier). External bound
+                // sharing lets a parallel CP portfolio tighten every worker's pruning past
+                // their local incumbent as soon as any worker finds a better one.
+                val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
+                val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
+                linearLowerBound(objective, session) >= effectiveBound
+            }
             else -> null
         }
         for (outcome in driveSearch(
@@ -183,8 +190,23 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     }
                 }
                 is SearchOutcome.Exhausted -> {
-                    yield(if (best != null) MinimizeResult.Optimal(best, bestObj)
-                          else MinimizeResult.Infeasible(outcome.core))
+                    // When an external bound supplier is active, the engine has pruned
+                    // subtrees against bounds that may be tighter than the local incumbent.
+                    // Its terminal verdict can therefore no longer claim local-Optimal nor
+                    // global-Infeasible soundly — the unpruned space proves a property
+                    // relative to the shared bound, not absolutely. Downgrade to BestFound
+                    // (when a local incumbent exists) or Unknown (when none does); the
+                    // calling portfolio can upgrade to Optimal/Infeasible after combining
+                    // every worker's verdict.
+                    val externalShared = params.objectiveBoundSupplier != null
+                    yield(when {
+                        externalShared && best != null ->
+                            MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
+                        externalShared ->
+                            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                        best != null -> MinimizeResult.Optimal(best, bestObj)
+                        else -> MinimizeResult.Infeasible(outcome.core)
+                    })
                     return@sequence
                 }
                 SearchOutcome.BudgetCapped -> {

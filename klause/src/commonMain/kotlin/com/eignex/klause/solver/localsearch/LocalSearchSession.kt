@@ -64,19 +64,18 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
     override fun enumerate(params: LocalSearchParams): Sequence<Sample> =
         solver.enumerateInternal(applyStack(params), warm)
 
-    /** Optimisation entry point — not part of the base [Session] interface because not
-     *  every backend is an [com.eignex.klause.solver.Optimizer]. */
-    fun minimize(
+    /** Optimisation entry point — overrides [Session.minimize] with warm-start support. */
+    override fun minimize(
         objective: Objective,
-        params: LocalSearchParams = LocalSearchParams(),
+        params: LocalSearchParams,
     ): MinimizeResult =
         solver.minimizeInternal(objective, applyStack(params), warm)
 
     /** Streaming optimisation — yields each new incumbent then a terminal verdict.
      *  Mirrors [com.eignex.klause.solver.Optimizer.improvements]. */
-    fun improvements(
+    override fun improvements(
         objective: Objective,
-        params: LocalSearchParams = LocalSearchParams(),
+        params: LocalSearchParams,
     ): Sequence<MinimizeResult> =
         solver.improvementsInternal(objective, applyStack(params), warm)
 

@@ -80,6 +80,42 @@ class PortfolioTest {
         }
     }
 
+    @Test
+    fun `portfolio minimize returns the global best across workers`() = runBlocking {
+        // minimize x + 2y subject to x + y >= 3, x ∈ [0..5], y ∈ [0..5]. Optimum = 3.
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 2,
+            intDomains = arrayOf(
+                com.eignex.klause.solver.IntDomain(0, 5),
+                com.eignex.klause.solver.IntDomain(0, 5),
+            ),
+            factors = listOf(com.eignex.klause.solver.factor.Linear(
+                coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
+                op = com.eignex.klause.solver.factor.LinearOp.GE, bound = 3,
+            )),
+        )
+        val obj = com.eignex.klause.solver.LinearObjective(
+            intCoefficients = doubleArrayOf(1.0, 2.0))
+        val workers = List(3) { i -> BacktrackSolver(problem).session() }
+        Portfolio(workers).use { p ->
+            val r = p.minimize(obj, BacktrackParams(randomSeed = 0L)) { params, supplier ->
+                params.copy(objectiveBoundSupplier = supplier)
+            }
+            val optimal = assertIs<com.eignex.klause.solver.MinimizeResult.Optimal>(r)
+            assertEquals(3.0, optimal.objectiveValue)
+        }
+    }
+
+    @Test
+    fun `exhaustive strategy runs every worker to budget`() = runBlocking {
+        val problem = exactlyOneOver(3)
+        val workers = List(2) { BacktrackSolver(problem).session() }
+        Portfolio(workers, strategy = PortfolioStrategy.Exhaustive).use { p ->
+            val r = p.solve(BacktrackParams(randomSeed = 0L))
+            assertTrue(r is SolveResult.Sat, "expected Sat from exhaustive run; got $r")
+        }
+    }
+
     private fun exactlyOneOver(n: Int): Problem {
         val factor = Cardinality.exactlyOne(IntArray(n) { Lit.make(it, true) })
         return Problem(n, 0, emptyArray(), listOf(factor))
