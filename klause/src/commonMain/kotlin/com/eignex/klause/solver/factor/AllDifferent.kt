@@ -130,18 +130,20 @@ class AllDifferent(
             if (d.min != d.max) continue
             if (!taken.add(d.min)) return false
         }
-        // ---- 2. Shave singleton values from non-singleton domain endpoints. -------------
+        // ---- 2. Remove singleton-taken values from every other var's domain. ----------
+        // With sparse domain support, this is full GAC on singleton conflicts (not just
+        // endpoint shaving): if a singleton var holds value `t`, every non-singleton var's
+        // domain has `t` punched out — even when `t` is interior to that var's range.
         if (taken.isNotEmpty()) {
             for (v in vars) {
                 val d = state.intDomains[v]
                 if (d.min == d.max) continue
-                var lo = d.min
-                var hi = d.max
-                while (lo <= hi && lo in taken) lo++
-                while (hi >= lo && hi in taken) hi--
-                if (lo > hi) return false
-                if (lo != d.min && !state.tightenIntMin(v, lo)) return false
-                if (hi != d.max && !state.tightenIntMax(v, hi)) return false
+                for (t in taken) {
+                    // Skip values outside this var's bounds — quick rejection for the common
+                    // case where many singletons are far from any given var's domain.
+                    if (t < d.min || t > d.max) continue
+                    if (!state.excludeIntValue(v, t)) return false
+                }
             }
         }
         // ---- 3. Hall-interval detection (bound consistency). ---------------------------
@@ -174,23 +176,31 @@ class AllDifferent(
                 val span = b - a + 1
                 if (count > span) return false
                 if (count == span && count > 0 && count < vars.size) {
-                    // Hall interval — prune from non-Hall-set vars. Vars whose domain is
-                    // fully inside [a, b] are members; vars whose domain spans across
-                    // (min < a and max > b) can't be helped via contiguous-domain
-                    // tightening, but the bound-consistent overlap cases can.
+                    // Hall interval — prune from non-Hall-set vars. Three sub-cases:
+                    //  - var's domain fully inside [a, b] → it's a Hall-set member, skip.
+                    //  - var's max ∈ [a, b] (left-overlap)          → tighten max down to a - 1.
+                    //  - var's min ∈ [a, b] (right-overlap)         → tighten min up to b + 1.
+                    //  - var spans across (min < a AND max > b)     → punch every Hall
+                    //    value out individually via excludeIntValue (sparse domain
+                    //    representation handles the interior holes).
                     for (v in vars) {
                         val d = state.intDomains[v]
                         if (d.min >= a && d.max <= b) continue
-                        // d.max ∈ [a, b]: forbidden right portion; tighten max down.
-                        if (d.max in a..b) {
-                            if (!state.tightenIntMax(v, a - 1)) return false
-                        }
-                        // d.min ∈ [a, b]: forbidden left portion; tighten min up. Both
-                        // can fire on different vars (never on the same one — if both d.min
-                        // and d.max were in [a, b], the var would be a Hall-set member
-                        // and skipped above).
-                        if (d.min in a..b) {
-                            if (!state.tightenIntMin(v, b + 1)) return false
+                        when {
+                            d.max in a..b -> {
+                                if (!state.tightenIntMax(v, a - 1)) return false
+                            }
+                            d.min in a..b -> {
+                                if (!state.tightenIntMin(v, b + 1)) return false
+                            }
+                            d.min < a && d.max > b -> {
+                                // Spanning across; punch every Hall value out.
+                                for (h in a..b) {
+                                    if (h !in d) continue
+                                    if (!state.excludeIntValue(v, h)) return false
+                                }
+                            }
+                            // else: no overlap with [a, b] at all → nothing to do.
                         }
                     }
                 }

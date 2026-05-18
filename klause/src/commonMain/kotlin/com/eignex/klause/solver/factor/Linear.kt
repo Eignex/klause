@@ -160,10 +160,9 @@ internal fun propagateLinearBounds(
         LinearOp.NE -> if (sumLo == bound && sumHi == bound) return false
     }
     if (op == LinearOp.NE) {
-        // NE only propagates boundary-tightenings: if the sole free term places the bound at
-        // the var's domain endpoint, shave that endpoint. Generalises old IntNeq.
-        // Walk the terms; we can act only on terms where the "rest" of the sum collapses to
-        // a single point (sumOtherLo == sumOtherHi).
+        // NE: when the "rest" of the sum collapses to a single point, the i-th term must
+        // avoid one specific value. With sparse-domain support we can punch that value
+        // out even when it's interior to the variable's domain (not just at an endpoint).
         for (i in 0 until n) {
             val c = coeffs[i].toLong()
             if (c == 0L) continue
@@ -174,15 +173,9 @@ internal fun propagateLinearBounds(
             val rhs = bound - otherLo
             if (rhs % c != 0L) continue
             val forbidden = rhs / c
+            if (forbidden < Int.MIN_VALUE || forbidden > Int.MAX_VALUE) continue
             val v = vars[i]
-            val d = state.intDomains[v]
-            if (d.min.toLong() == forbidden && d.min < d.max) {
-                if (!state.tightenIntMin(v, d.min + 1)) return false
-            } else if (d.max.toLong() == forbidden && d.min < d.max) {
-                if (!state.tightenIntMax(v, d.max - 1)) return false
-            } else if (d.min == d.max && d.min.toLong() == forbidden) {
-                return false
-            }
+            if (!state.excludeIntValue(v, forbidden.toInt())) return false
         }
         return true
     }

@@ -185,6 +185,52 @@ class AllDifferentTest {
     }
 
     @Test
+    fun `singleton-taken value punched out of interior of other domains`() {
+        // With sparse-domain support, singletons remove the taken value even when it
+        // lands in the interior of another var's domain — not just at endpoints.
+        // Setup: v0 pinned to 3 (a singleton). v1 has domain [1, 5]. After
+        // propagation, v1's domain should retain min=1 and max=5 but have value 3
+        // excluded (size = 4 instead of 5).
+        val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 6)
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 5)),
+            factors = listOf(factor),
+        )
+        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val d1 = session.intDomain(1)
+        kotlin.test.assertEquals(1, d1.min, "v1's min should remain 1 (3 is interior)")
+        kotlin.test.assertEquals(5, d1.max, "v1's max should remain 5 (3 is interior)")
+        kotlin.test.assertEquals(4, d1.size, "v1 should have 4 values after punching out 3; got $d1")
+        kotlin.test.assertTrue(3 !in d1, "v1 should no longer contain 3")
+        kotlin.test.assertTrue(2 in d1 && 4 in d1, "v1 should still contain 2 and 4")
+    }
+
+    @Test
+    fun `hall interval with spanning intruder punches every interior value`() {
+        // Hall set with values [3, 5] (three vars). A fourth var with domain [1, 7]
+        // spans across the Hall interval — sparse-domain pruning now punches 3, 4,
+        // and 5 out of its domain even though min and max can't move past the holes.
+        val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 8)
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(
+                IntDomain(3, 5), IntDomain(3, 5), IntDomain(3, 5),  // Hall set on [3, 5]
+                IntDomain(1, 7),                                     // spanning intruder
+            ),
+            factors = listOf(factor),
+        )
+        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val d3 = session.intDomain(3)
+        kotlin.test.assertEquals(1, d3.min)
+        kotlin.test.assertEquals(7, d3.max)
+        for (h in 3..5) kotlin.test.assertTrue(h !in d3, "value $h should be a hole, got $d3")
+        for (k in intArrayOf(1, 2, 6, 7)) {
+            kotlin.test.assertTrue(k in d3, "value $k should remain; got $d3")
+        }
+    }
+
+    @Test
     fun `mismatched domain bounds fail at initialize`() {
 
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
