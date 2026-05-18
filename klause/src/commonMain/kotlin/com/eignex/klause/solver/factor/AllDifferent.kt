@@ -27,10 +27,12 @@ class AllDifferent(
         require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
     }
 
-    // TODO(propagate): full Hall-set / matching-based arc consistency (e.g. Régin's algorithm).
-    //  Current impl catches the simple cases — singleton conflicts, endpoint shaving, and the
-    //  global pigeonhole check (#available-values ≥ #non-pinned-vars) — but does not find
-    //  interior Hall sets to prune interior domain values.
+    // Propagation strength: bound-consistent (Puget-style) via Hall-interval detection.
+    // Full Régin GAC would punch holes in non-contiguous interior domains, but klause's
+    // [com.eignex.klause.solver.IntDomain] is a contiguous interval — endpoint tightening
+    // is the strongest representable inference, so bound consistency is the theoretical
+    // ceiling here. Régin SCC residual reasoning would only help if IntDomain ever grew
+    // a sparse-value representation.
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = vars
@@ -121,16 +123,14 @@ class AllDifferent(
     private fun occurrences(intVar: Int): Int = occurrencesByVar[intVar]
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Build set of "taken" values: those held by any singleton-domain var. Two vars with
-        // the same singleton value → Unsat.
+        // ---- 1. Singleton conflicts. ----------------------------------------------------
         val taken = HashSet<Int>()
         for (v in vars) {
             val d = state.intDomains[v]
             if (d.min != d.max) continue
             if (!taken.add(d.min)) return false
         }
-        // For each non-singleton var, shave taken values off domain endpoints (repeatedly).
-        // Only worth scanning when at least one value is taken.
+        // ---- 2. Shave singleton values from non-singleton domain endpoints. -------------
         if (taken.isNotEmpty()) {
             for (v in vars) {
                 val d = state.intDomains[v]
@@ -144,13 +144,67 @@ class AllDifferent(
                 if (hi != d.max && !state.tightenIntMax(v, hi)) return false
             }
         }
-        // Pigeonhole: across non-pinned vars, count distinct values still available (i.e.,
-        // values lying in some non-pinned var's tightened domain and not in [taken]). If that
-        // count is less than the number of non-pinned vars, no injective assignment exists.
+        // ---- 3. Hall-interval detection (bound consistency). ---------------------------
+        // For each candidate interval [a, b] over var-endpoint pairs, count vars whose
+        // *entire* domain falls inside it. Two cases of interest:
+        //   count > span  → pigeonhole infeasibility, [a, b] can't host that many vars.
+        //   count = span  → Hall interval: the vars inside it monopolise all `span`
+        //                   values, so other vars get any overlap with [a, b] pruned.
         //
-        // Vars can have wider domains than the declared union [domainMin, domainMin+domainSize)
-        // at Problem-construction time (full alignment is asserted only at LocalSearchState init).
-        // Clip each var's effective domain to the declared union before tallying.
+        // Endpoint enumeration is complete for Hall-interval discovery: any Hall interval
+        // [a, b] has a equal to some var's domain min (extending leftward only loosens
+        // membership) and b equal to some var's domain max. We collect distinct min /
+        // max values and iterate the cartesian product. Cost is O(|mins| * |maxes| * n);
+        // for typical AllDifferent sizes (n ≤ ~50) this is well within budget.
+        val mins = HashSet<Int>()
+        val maxes = HashSet<Int>()
+        for (v in vars) {
+            val d = state.intDomains[v]
+            mins.add(d.min)
+            maxes.add(d.max)
+        }
+        for (a in mins) {
+            for (b in maxes) {
+                if (b < a) continue
+                var count = 0
+                for (v in vars) {
+                    val d = state.intDomains[v]
+                    if (d.min >= a && d.max <= b) count++
+                }
+                val span = b - a + 1
+                if (count > span) return false
+                if (count == span && count > 0 && count < vars.size) {
+                    // Hall interval — prune from non-Hall-set vars. Vars whose domain is
+                    // fully inside [a, b] are members; vars whose domain spans across
+                    // (min < a and max > b) can't be helped via contiguous-domain
+                    // tightening, but the bound-consistent overlap cases can.
+                    for (v in vars) {
+                        val d = state.intDomains[v]
+                        if (d.min >= a && d.max <= b) continue
+                        // d.max ∈ [a, b]: forbidden right portion; tighten max down.
+                        if (d.max in a..b) {
+                            if (!state.tightenIntMax(v, a - 1)) return false
+                        }
+                        // d.min ∈ [a, b]: forbidden left portion; tighten min up. Both
+                        // can fire on different vars (never on the same one — if both d.min
+                        // and d.max were in [a, b], the var would be a Hall-set member
+                        // and skipped above).
+                        if (d.min in a..b) {
+                            if (!state.tightenIntMin(v, b + 1)) return false
+                        }
+                    }
+                }
+            }
+        }
+        // ---- 4. Global pigeonhole (cheap last-line check). ------------------------------
+        // After Hall pruning the per-interval pigeonhole would catch any remaining
+        // infeasibility, but the old "available values across all non-pinned vars" check
+        // is cheap and catches the universal-Hall case (k = nonPinned, [a, b] spanning
+        // everything) when Hall enumeration above happened to miss it because the union
+        // isn't contiguous. Vars can have wider domains than the declared union
+        // [domainMin, domainMin+domainSize) at Problem-construction time (full alignment
+        // is asserted only at LocalSearchState init), so clip each var's effective domain
+        // to the declared union before tallying.
         val domainMax = domainMin + domainSize - 1
         val covered = BooleanArray(domainSize)
         var nonPinned = 0

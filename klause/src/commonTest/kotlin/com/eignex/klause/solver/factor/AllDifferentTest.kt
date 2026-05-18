@@ -118,6 +118,73 @@ class AllDifferentTest {
     }
 
     @Test
+    fun `hall interval prunes other vars' bounds via propagation`() {
+        // Three vars sharing the same 3-value domain [1, 3] form a Hall interval. A
+        // fourth var with domain [0, 5] must skip the Hall interval — its bounds get
+        // shaved on either side, but since [1, 3] is in the *interior* of [0, 5], only
+        // the endpoint cases land: with current bounds, neither min nor max sits inside
+        // [1, 3], so no bound prune happens directly. Use a fourth var with domain [2, 5]
+        // instead: its min (2) is inside the Hall interval, so it gets bumped to 4.
+        val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 6)
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(
+                IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3),  // Hall set on [1, 3]
+                IntDomain(2, 5),                                     // overlapping intruder
+            ),
+            factors = listOf(factor),
+        )
+        // BacktrackSolver runs propagation to fixpoint at session init.
+        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        // After init: v3's min should be pushed up past the Hall interval to 4.
+        val v3Domain = session.intDomain(3)
+        kotlin.test.assertEquals(4, v3Domain.min,
+            "v3's min should be tightened to 4 (Hall set [1,3] forbids 2,3 for v3); got $v3Domain")
+        kotlin.test.assertEquals(5, v3Domain.max,
+            "v3's max should remain 5; got $v3Domain")
+    }
+
+    @Test
+    fun `hall interval detects infeasibility (pigeonhole over interval)`() {
+        // Four vars all confined to [1, 3] — 4 vars but only 3 values. Hall-interval
+        // count > span detects infeasibility at propagation time.
+        val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)),
+            factors = listOf(factor),
+        )
+        // Bake-time propagation should mark the problem Unsat.
+        val baked = problem.baked
+        assertTrue(baked is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
+            "expected bake-time Unsat from Hall pigeonhole; got $baked")
+    }
+
+    @Test
+    fun `hall interval prunes overlapping bounds on both sides`() {
+        // Hall set with values [3, 4] (two vars). A third var with domain [4, 7] should
+        // have its min pushed to 5. A fourth var with domain [1, 3] should have its max
+        // pushed to 2.
+        val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 8)
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(
+                IntDomain(3, 4), IntDomain(3, 4),   // Hall set on [3, 4]
+                IntDomain(4, 7),                     // min 4 ∈ [3, 4] → push to 5
+                IntDomain(1, 3),                     // max 3 ∈ [3, 4] → push to 2
+            ),
+            factors = listOf(factor),
+        )
+        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val v2 = session.intDomain(2)
+        val v3 = session.intDomain(3)
+        kotlin.test.assertEquals(5, v2.min, "v2's min should be pushed past Hall set; got $v2")
+        kotlin.test.assertEquals(7, v2.max)
+        kotlin.test.assertEquals(1, v3.min)
+        kotlin.test.assertEquals(2, v3.max, "v3's max should be pulled below Hall set; got $v3")
+    }
+
+    @Test
     fun `mismatched domain bounds fail at initialize`() {
 
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
