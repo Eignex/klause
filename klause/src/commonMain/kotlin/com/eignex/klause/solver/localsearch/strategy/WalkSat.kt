@@ -22,37 +22,13 @@ open class WalkSat(
     protected open fun currentNoise(state: LocalSearchState): Double = noise
 
     override fun pickMove(state: LocalSearchState): Move? {
-        if (state.violated.isEmpty()) return null
-        val factorId = state.violated.random(state.rng)
-        val factor = state.factors[factorId]
-        state.moveSink.clear()
-        factor.proposeRepairMoves(state, factorId, state.moveSink)
-        val raw = state.moveSink.list
-        if (raw.isEmpty()) return null
+        val raw = state.proposeMovesFromRandomViolated() ?: return null
         val moves = tabu.filter(state, raw)
-
         if (state.rng.nextDouble() < currentNoise(state)) {
             return moves[state.rng.nextInt(moves.size)]
         }
-
-        // Greedy pick on the shaped break score: when [LocalSearchState.shapingLambda]
-        // is 0 (default, no objective shaping) this is identical to picking on the raw
-        // integer break score; under a Linear shaping the objective delta tilts ties
-        // (and near-ties) toward objective-improving moves even pre-feasibility.
-        var bestBreak = Double.POSITIVE_INFINITY
-        var bestCount = 0
-        var pick: Move? = null
-        for (m in moves) {
-            val brk = state.shapedBreakScore(m)
-            if (brk < bestBreak) {
-                bestBreak = brk
-                bestCount = 1
-                pick = m
-            } else if (brk == bestBreak) {
-                bestCount++
-                if (state.rng.nextInt(bestCount) == 0) pick = m
-            }
-        }
-        return pick
+        // Greedy pick on the shaped break score; under no shaping this is identical to
+        // picking on the raw integer break score.
+        return state.greedyPickByShapedBreak(moves)
     }
 }

@@ -36,12 +36,7 @@ open class Ddfw(
             updateWeights(state, currentIncrement(state))
             lastUpdateStep = state.step
         }
-        val factorId = state.violated.random(state.rng)
-        val factor = state.factors[factorId]
-        state.moveSink.clear()
-        factor.proposeRepairMoves(state, factorId, state.moveSink)
-        val raw = state.moveSink.list
-        if (raw.isEmpty()) return null
+        val raw = state.proposeMovesFromRandomViolated() ?: return null
         val moves = tabu.filter(state, raw)
 
         if (state.rng.nextDouble() < noiseProbability) {

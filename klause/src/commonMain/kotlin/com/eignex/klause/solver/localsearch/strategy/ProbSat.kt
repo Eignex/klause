@@ -25,13 +25,7 @@ open class ProbSat(
     protected open fun currentCb(state: LocalSearchState): Double = cb
 
     override fun pickMove(state: LocalSearchState): Move? {
-        if (state.violated.isEmpty()) return null
-        val factorId = state.violated.random(state.rng)
-        val factor = state.factors[factorId]
-        state.moveSink.clear()
-        factor.proposeRepairMoves(state, factorId, state.moveSink)
-        val raw = state.moveSink.list
-        if (raw.isEmpty()) return null
+        val raw = state.proposeMovesFromRandomViolated() ?: return null
         val moves = tabu.filter(state, raw)
         if (moves.size == 1) return moves[0]
 

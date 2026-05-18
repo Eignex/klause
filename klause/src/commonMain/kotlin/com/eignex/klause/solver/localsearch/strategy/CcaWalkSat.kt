@@ -20,39 +20,14 @@ class CcaWalkSat(
 ) : Strategy {
 
     override fun pickMove(state: LocalSearchState): Move? {
-        if (state.violated.isEmpty()) return null
-        val factorId = state.violated.random(state.rng)
-        val factor = state.factors[factorId]
-        state.moveSink.clear()
-        factor.proposeRepairMoves(state, factorId, state.moveSink)
-        val raw = state.moveSink.list
-        if (raw.isEmpty()) return null
-
+        val raw = state.proposeMovesFromRandomViolated() ?: return null
         val ccEligible = raw.filter { confChanged(state, it) }
         val afterCc = if (ccEligible.isEmpty()) raw else ccEligible
-
         val moves = tabu.filter(state, afterCc)
-
         if (state.rng.nextDouble() < noise) {
             return moves[state.rng.nextInt(moves.size)]
         }
-        // Same shaped-break pattern as WalkSat — reduces to raw integer break when no
-        // shaping is configured.
-        var bestBreak = Double.POSITIVE_INFINITY
-        var bestCount = 0
-        var pick: Move? = null
-        for (m in moves) {
-            val brk = state.shapedBreakScore(m)
-            if (brk < bestBreak) {
-                bestBreak = brk
-                bestCount = 1
-                pick = m
-            } else if (brk == bestBreak) {
-                bestCount++
-                if (state.rng.nextInt(bestCount) == 0) pick = m
-            }
-        }
-        return pick
+        return state.greedyPickByShapedBreak(moves)
     }
 
     private fun confChanged(state: LocalSearchState, move: Move): Boolean = when (move) {

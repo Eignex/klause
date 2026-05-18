@@ -295,6 +295,39 @@ class LocalSearchState(
         }
     }
 
+    /** Pick a uniformly-random violated factor, ask it for repair-move suggestions, and
+     *  return the raw list. Returns `null` when no factor is violated or the violated
+     *  factor proposed no moves. Every WalkSAT-family [Strategy.pickMove] starts the same
+     *  way; this method is the shared opener. */
+    fun proposeMovesFromRandomViolated(): List<Move>? {
+        if (violated.isEmpty()) return null
+        val factorId = violated.random(rng)
+        moveSink.clear()
+        factors[factorId].proposeRepairMoves(this, factorId, moveSink)
+        val raw = moveSink.list
+        return if (raw.isEmpty()) null else raw
+    }
+
+    /** Greedy reservoir-sampled pick: the move with the smallest [shapedBreakScore]
+     *  (ties broken uniformly at random). Used by WalkSat / CcaWalkSat after candidate
+     *  filtering. Returns `null` on an empty input. */
+    fun greedyPickByShapedBreak(moves: List<Move>): Move? {
+        if (moves.isEmpty()) return null
+        var bestBreak = Double.POSITIVE_INFINITY
+        var bestCount = 0
+        var pick: Move? = null
+        for (m in moves) {
+            val brk = shapedBreakScore(m)
+            if (brk < bestBreak) {
+                bestBreak = brk; bestCount = 1; pick = m
+            } else if (brk == bestBreak) {
+                bestCount++
+                if (rng.nextInt(bestCount) == 0) pick = m
+            }
+        }
+        return pick
+    }
+
     /** True iff [move]'s var was touched within the last [tenure] accepted moves. For
      *  a [Move.Compound], conservative: true if *any* part is tabu. */
     fun isTaboo(move: Move, tenure: Int): Boolean {
