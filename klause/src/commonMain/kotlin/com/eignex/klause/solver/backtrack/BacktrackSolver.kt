@@ -143,7 +143,21 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      * degrades to "never prune," so correctness is preserved at the cost of falling
      * back to full enumeration.
      */
-    override fun minimize(objective: Objective, params: BacktrackParams): MinimizeResult {
+    override fun minimize(objective: Objective, params: BacktrackParams): MinimizeResult =
+        improvements(objective, params).last()
+
+    /**
+     * Anytime variant of [minimize]: yields one [MinimizeResult.BestFound] per new
+     * incumbent discovered, followed by exactly one terminal verdict
+     * ([MinimizeResult.Optimal] / [MinimizeResult.Infeasible] / final
+     * [MinimizeResult.BestFound] / [MinimizeResult.Unknown]). Same B&B engine as
+     * [minimize]; just exposes the search's intermediate bests as they land instead of
+     * collapsing them into a single return value.
+     */
+    override fun improvements(
+        objective: Objective,
+        params: BacktrackParams,
+    ): Sequence<MinimizeResult> = sequence {
         var best: Sample? = null
         var bestObj = Double.POSITIVE_INFINITY
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
@@ -157,18 +171,29 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             when (outcome) {
                 is SearchOutcome.Found -> {
                     val o = objective.evaluate(outcome.sample)
-                    if (o < bestObj) { bestObj = o; best = outcome.sample }
+                    if (o < bestObj) {
+                        bestObj = o; best = outcome.sample
+                        // Yield each new incumbent eagerly — consumers can react to it
+                        // before search continues toward the bound. The reason here is
+                        // a hint ("more might come"); the terminal yield carries the
+                        // real verdict.
+                        yield(MinimizeResult.BestFound(outcome.sample, o, TerminationReason.BudgetExhausted))
+                    }
                 }
-                SearchOutcome.Exhausted -> return if (best != null) {
-                    MinimizeResult.Optimal(best, bestObj)
-                } else MinimizeResult.Infeasible
-                SearchOutcome.BudgetCapped -> return if (best != null) {
-                    MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
-                } else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                SearchOutcome.Exhausted -> {
+                    yield(if (best != null) MinimizeResult.Optimal(best, bestObj)
+                          else MinimizeResult.Infeasible)
+                    return@sequence
+                }
+                SearchOutcome.BudgetCapped -> {
+                    yield(if (best != null) MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
+                          else MinimizeResult.Unknown(TerminationReason.BudgetExhausted))
+                    return@sequence
+                }
             }
         }
         // Sequence drained without a terminal outcome — treat as exhausted.
-        return if (best != null) MinimizeResult.Optimal(best, bestObj) else MinimizeResult.Infeasible
+        yield(if (best != null) MinimizeResult.Optimal(best, bestObj) else MinimizeResult.Infeasible)
     }
 
     /**

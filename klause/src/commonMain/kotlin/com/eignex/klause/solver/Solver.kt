@@ -104,4 +104,27 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      * [MinimizeResult.Infeasible].
      */
     fun minimize(objective: Objective, params: P): MinimizeResult
+
+    /**
+     * Streaming variant of [minimize]: yields one [MinimizeResult] per *new incumbent*
+     * discovered during the search, followed by a single terminal result describing how
+     * the search ended.
+     *
+     *  - Each non-terminal yield is a [MinimizeResult.BestFound] carrying the new best
+     *    sample and objective seen so far.
+     *  - The terminal yield is one of: [MinimizeResult.Optimal] (search proved
+     *    optimality), [MinimizeResult.Infeasible] (no feasible exists),
+     *    [MinimizeResult.BestFound] with the final reason (budget / timeout /
+     *    cancellation hit while holding a feasible), or [MinimizeResult.Unknown]
+     *    (search ended without proving anything, no feasible found).
+     *
+     * Lets long-running optimizations report progress without callbacks or polling.
+     * `solver.minimize(obj, p)` is now equivalent to `solver.improvements(obj, p).last()`.
+     *
+     * Default implementation: a single-element sequence wrapping [minimize]. Backends
+     * with an inner anytime loop ([BacktrackSolver], [LocalSearchSolver]) override to
+     * yield each improvement as it lands.
+     */
+    fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> =
+        sequenceOf(minimize(objective, params))
 }
