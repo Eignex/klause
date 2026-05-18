@@ -365,7 +365,12 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 if (descend) {
                     val varRef = params.variableHeuristic.pick(session, rng)
                     if (varRef == null) {
-                        yield(SearchOutcome.Found(snapshotAssignment(session)))
+                        val snap = snapshotAssignment(session)
+                        // Notify heuristics first so solution-guided variants can snapshot
+                        // the incumbent before the engine continues with the next yield.
+                        params.variableHeuristic.onSolution(snap)
+                        params.valueHeuristic.onSolution(snap)
+                        yield(SearchOutcome.Found(snap))
                         descend = false
                         continue@inner
                     }

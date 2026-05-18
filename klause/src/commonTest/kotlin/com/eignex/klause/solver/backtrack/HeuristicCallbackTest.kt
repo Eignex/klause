@@ -45,6 +45,9 @@ class HeuristicCallbackTest {
         // and these stubs for the value-level ones.
         override fun onCommit(varRef: VarRef, value: Int) { /* counted via var-level */ }
         override fun onConflict(varRef: VarRef, value: Int) { /* counted via var-level */ }
+        // Both VariableHeuristic and ValueHeuristic carry onSolution; pick a single
+        // override that satisfies both (they share the same signature).
+        override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
     }
 
     @Test

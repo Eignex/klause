@@ -28,6 +28,9 @@ interface VariableHeuristic {
     fun pick(session: PropagationSession, rng: Random): VarRef?
     /** Called once per propagation conflict at [varRef]; bump activity / failure weight. */
     fun onConflict(varRef: VarRef) {}
+    /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
+     *  the assignment here so they can bias future picks toward it. Default no-op. */
+    fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
     /**
      * Richer conflict notification: [varRef] is the decision that triggered the conflict,
      * [unsat] carries the full reason set (decision variables, decision levels, contributing
@@ -63,6 +66,9 @@ interface ValueHeuristic {
     fun onConflict(varRef: VarRef, value: Int) {}
     fun onCommit(varRef: VarRef, value: Int) {}
     fun onRestart() {}
+    /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
+     *  the assignment here so they can bias future picks toward it. Default no-op. */
+    fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
 }
 
 // ---- Variable heuristics ---------------------------------------------------------------
@@ -360,6 +366,10 @@ class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
         pending = null
         base.onRestart()
     }
+
+    override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {
+        base.onSolution(snapshot)
+    }
 }
 
 // ---- Value heuristics ------------------------------------------------------------------
@@ -568,6 +578,65 @@ private fun logRemainingDomainProduct(session: PropagationSession): Double {
         if (sz > 1) s += kotlin.math.ln(sz.toDouble())
     }
     return s
+}
+
+/**
+ * Solution-guided value selection (Demoen-Garcia-de-la-Banda 2009 / Beck-Davenport). Wraps
+ * a [base] value heuristic: once a SAT leaf is observed via [onSolution], the heuristic
+ * snapshots the assignment, and on every subsequent pick it tries the snapshot's value for
+ * the var first (falling back to [base]'s order for everything else). The snapshot is
+ * refreshed on each new solution — typical use is optimisation, where successive incumbents
+ * are similar and a search biased to stay near the previous incumbent finds the next one
+ * faster than starting from scratch.
+ *
+ *  - First descent (before any solution) is purely [base] — no bias.
+ *  - After a solution: saved value tried first; if the saved value is no longer in the
+ *    current domain (the search has propagated it away), falls through to [base] in full.
+ *  - Snapshots **persist** across [onRestart] — that's the whole point: cross-restart
+ *    bias toward the last-seen incumbent. The base's `onRestart` is still forwarded so
+ *    activity-based wrappers like [Vsids] still decay as expected.
+ *
+ * Composes naturally with [Impact] / [MaxSd] / [IndomainRandom] / phase-saving as the
+ * inner choice — the engine still runs through the saved value first, but if that branch
+ * proves infeasible, the inner heuristic's order takes over.
+ */
+class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic {
+
+    private var bools: BooleanArray? = null
+    private var ints: IntArray? = null
+
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> {
+        val savedBools = bools
+        val savedInts = ints
+        if (savedBools == null || savedInts == null) return base.values(session, varRef, rng)
+        val saved: Int = when (varRef) {
+            is VarRef.Bool -> if (varRef.varId < savedBools.size && savedBools[varRef.varId]) 1 else 0
+            is VarRef.IntVar -> {
+                if (varRef.varId >= savedInts.size) return base.values(session, varRef, rng)
+                savedInts[varRef.varId]
+            }
+        }
+        val savedFeasible = when (varRef) {
+            // Bool: saved is always 0 or 1 — feasible iff the var is still unpinned.
+            is VarRef.Bool -> session.boolValue(varRef.varId) == null
+            is VarRef.IntVar -> saved in session.intDomain(varRef.varId)
+        }
+        return if (savedFeasible) {
+            sequenceOf(saved) + base.values(session, varRef, rng).filter { it != saved }
+        } else {
+            base.values(session, varRef, rng)
+        }
+    }
+
+    override fun onConflict(varRef: VarRef, value: Int) = base.onConflict(varRef, value)
+    override fun onCommit(varRef: VarRef, value: Int) = base.onCommit(varRef, value)
+    override fun onRestart() = base.onRestart()
+
+    override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {
+        bools = snapshot.bools.copyOf()
+        ints = snapshot.ints.copyOf()
+        base.onSolution(snapshot)
+    }
 }
 
 /** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
