@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
+import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
@@ -367,28 +368,58 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     val ordered = applyPhase(varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                     val node = makeNode(varRef, ordered)
                     val decsBefore = decisionsLeft
-                    if (!advance(node, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
-                        decisionsThisRun += decsBefore - decisionsLeft
-                        if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
-                        descend = false
-                        continue@inner
-                    }
+                    val out = advance(node, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })
                     decisionsThisRun += decsBefore - decisionsLeft
-                    capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
-                    trail.add(node)
+                    when (out) {
+                        AdvanceOutcome.Success -> {
+                            capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                            trail.add(node)
+                        }
+                        AdvanceOutcome.Exhausted -> {
+                            descend = false
+                            continue@inner
+                        }
+                        AdvanceOutcome.BudgetCapped -> {
+                            yield(SearchOutcome.BudgetCapped); return@sequence
+                        }
+                        is AdvanceOutcome.Backjump -> {
+                            // Trail size == session.decisionLevel here (the failed pin was
+                            // self-reverted by the session); pop both in lockstep to the
+                            // target level, then descend fresh.
+                            backjumpTo(out.toLevel, trail, session, params,
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                            descend = true
+                            continue@inner
+                        }
+                    }
                 } else {
                     if (trail.isEmpty()) { yield(SearchOutcome.Exhausted()); return@sequence }
                     val top = trail.last()
                     session.popLast()
                     val decsBefore = decisionsLeft
-                    if (advance(top, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
-                        decisionsThisRun += decsBefore - decisionsLeft
-                        capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
-                        descend = true
-                    } else {
-                        decisionsThisRun += decsBefore - decisionsLeft
-                        if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
-                        trail.removeAt(trail.size - 1)
+                    val out = advance(top, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })
+                    decisionsThisRun += decsBefore - decisionsLeft
+                    when (out) {
+                        AdvanceOutcome.Success -> {
+                            capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                            descend = true
+                        }
+                        AdvanceOutcome.Exhausted -> {
+                            trail.removeAt(trail.size - 1)
+                        }
+                        AdvanceOutcome.BudgetCapped -> {
+                            yield(SearchOutcome.BudgetCapped); return@sequence
+                        }
+                        is AdvanceOutcome.Backjump -> {
+                            // The else-path popped session below trail.last; remove the
+                            // stale trail entry first to re-align (trail.size becomes
+                            // session.decisionLevel), then pop both to the target level.
+                            trail.removeAt(trail.size - 1)
+                            backjumpTo(out.toLevel, trail, session, params,
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                            descend = true
+                            continue@inner
+                        }
                     }
                 }
             }
@@ -483,6 +514,27 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      * propagation-consistent). Returns `false` when the node runs out of values or the
      * decision budget is exhausted.
      */
+    /**
+     * What [advance] reports back to the search loop. The previous `Boolean` was
+     * `true = success / false = exhausted-or-budget`; LCG-style non-chronological
+     * backjump adds a third path that needs the target level threaded back to the
+     * outer loop, hence the sealed type.
+     */
+    private sealed interface AdvanceOutcome {
+        /** A value pinned cleanly; commit the node to the trail. */
+        data object Success : AdvanceOutcome
+        /** Node has no more values; chronological backtrack. */
+        data object Exhausted : AdvanceOutcome
+        /** Decision budget hit. */
+        data object BudgetCapped : AdvanceOutcome
+        /** Non-chronological backjump requested — pop trail to [toLevel] and resume
+         *  search (descend with a fresh pick). [toLevel] is the second-highest decision
+         *  level in the 1UIP learned clause; the learned clause is guaranteed to be
+         *  unit-and-asserting at that level, so the next propagation pass will force
+         *  the asserting literal automatically. */
+        data class Backjump(val toLevel: Int) : AdvanceOutcome
+    }
+
     private fun advance(
         node: TrailNode,
         session: PropagationSession,
@@ -490,11 +542,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         pruneIf: ((PropagationSession) -> Boolean)?,
         decisionsRemaining: () -> Long,
         decrement: () -> Unit,
-    ): Boolean {
+    ): AdvanceOutcome {
         while (true) {
-            if (decisionsRemaining() <= 0) return false
+            if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
             decrement()
-            val outcome = node.applyNext(session) ?: return false
+            val outcome = node.applyNext(session) ?: return AdvanceOutcome.Exhausted
             val r = outcome.result
             if (r is PropagationResult.Unsat) {
                 // Forward the full conflict reason record so activity-, weight-, and
@@ -502,6 +554,13 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 // need without further plumbing.
                 params.variableHeuristic.onConflict(node.varRef, r)
                 params.valueHeuristic.onConflict(node.varRef, outcome.value)
+                // CDB: if the analyzer produced a 1UIP clause with a non-chronological
+                // backjump target, signal it up. The clause itself isn't stored yet
+                // (LCG learning persistence is a follow-up); just the jump distance is
+                // honoured, which by itself prunes subtrees that would re-derive the
+                // same conflict at higher levels.
+                val learned = r.learnedClause as? ConflictAnalyzer.AnalysisResult.Learned
+                if (learned != null) return AdvanceOutcome.Backjump(learned.backjumpLevel)
                 continue
             }
             if (pruneIf != null && pruneIf(session)) {
@@ -510,8 +569,32 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             }
             params.variableHeuristic.onCommit(node.varRef)
             params.valueHeuristic.onCommit(node.varRef, outcome.value)
-            return true
+            return AdvanceOutcome.Success
         }
+    }
+
+    /** Pop trail + session in lockstep down to [toLevel]. Pre-condition: `trail.size ==
+     *  session.decisionLevel` (both call sites align before invoking). The
+     *  phase-saving / capture-phase arrays don't need clearing — they're advisory hints
+     *  that survive backtracks. */
+    private fun backjumpTo(
+        toLevel: Int,
+        trail: MutableList<TrailNode>,
+        session: PropagationSession,
+        params: BacktrackParams,
+        @Suppress("UNUSED_PARAMETER") boolPhase: BooleanArray?,
+        @Suppress("UNUSED_PARAMETER") boolPhaseSet: BooleanArray?,
+        @Suppress("UNUSED_PARAMETER") intPhase: IntArray?,
+        @Suppress("UNUSED_PARAMETER") intPhaseSet: BooleanArray?,
+    ) {
+        while (trail.size > toLevel) {
+            session.popLast()
+            trail.removeAt(trail.size - 1)
+        }
+        // Heuristics aren't notified per-popped-decision — VSIDS/dom-wdeg state lives
+        // independent of the trail; `onCommit` is paired only with new decisions, not
+        // with backjumps over old ones. (Same contract as restart.)
+        @Suppress("UNUSED_PARAMETER") params
     }
 
     private fun snapshotAssignment(session: PropagationSession): Sample {

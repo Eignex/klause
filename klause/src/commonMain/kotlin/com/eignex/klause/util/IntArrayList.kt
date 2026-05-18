@@ -24,6 +24,13 @@ class IntArrayList(initialCapacity: Int = 8) {
         size = 0
     }
 
+    /** Truncate to [newSize], dropping the suffix. No-op if [newSize] is `>= size`.
+     *  Used by snapshot/restore call-sites that need to rewind an append-only journal
+     *  back to a prior watermark without reallocating. */
+    fun truncateTo(newSize: Int) {
+        if (newSize < size) size = newSize
+    }
+
     fun toIntArray(): IntArray = data.copyOf(size)
 
     inline fun forEach(action: (Int) -> Unit) {

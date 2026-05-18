@@ -54,4 +54,19 @@ interface Factor {
      * for every factor that hasn't opted in.
      */
     val initialBoolWatchers: IntArray? get() = null
+
+    /**
+     * If this factor just returned `false` from [propagate], the clause-form explanation
+     * of why — i.e. an array of literals, all currently *false* in [state], whose
+     * disjunction is unsatisfied. The propagation-graph conflict analyzer seeds its
+     * resolution loop with this set when computing a learned clause (lazy clause
+     * generation). Returns `null` for factors that can't produce a clause-form reason;
+     * the analyzer falls back to chronological backtrack in that case.
+     *
+     * For [com.eignex.klause.solver.factor.Clause] this is literally the clause's
+     * `literals` array — all of which are false when propagate returns false. Other
+     * factor types (Linear, Cardinality, AllDifferent) don't yet implement it; future
+     * work extends conflict analysis to those by giving each a custom Nogood.
+     */
+    fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
 }

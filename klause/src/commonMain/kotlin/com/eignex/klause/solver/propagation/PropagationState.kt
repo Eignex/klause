@@ -122,6 +122,32 @@ class PropagationState(
     val boolWatchersByLit: Array<com.eignex.klause.util.IntArrayList> =
         Array(2 * problem.numBoolVars) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
 
+    /**
+     * Per-bool-var antecedent literals — the literal-form reason why this variable's
+     * current pin was implied. For a Clause that unit-propagated `v`, the antecedents are
+     * all the *other* literals in that clause, every one of which was already false at
+     * pin time (that's why the clause was unit). `null` = no antecedents recorded, which
+     * means either:
+     *   - the var was pinned as a decision / assumption (no factor reason), or
+     *   - the var was pinned by a factor that doesn't yet record antecedents
+     *     (everything except [com.eignex.klause.solver.factor.Clause] today).
+     *
+     * Maintained alongside [boolReason] (factor id) for first-UIP conflict analysis
+     * (lazy clause generation). When the conflict analyzer hits a `null` entry it treats
+     * the variable as a search-tree leaf, same as a decision.
+     */
+    val boolAntecedents: Array<IntArray?> = arrayOfNulls(problem.numBoolVars)
+
+    /**
+     * Chronological journal of bool pins, decisions and implications interleaved. Used by
+     * [com.eignex.klause.solver.propagation.ConflictAnalyzer] to walk the implication
+     * graph in reverse pin order — the standard 1UIP loop needs to resolve against the
+     * *most recently pinned* variable in the current conflict, which requires this
+     * append-only trail.
+     */
+    val boolPinOrder: com.eignex.klause.util.IntArrayList =
+        com.eignex.klause.util.IntArrayList(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
+
     init {
         for (fid in 0 until problem.numFactors) {
             val watchers = problem.factors[fid].initialBoolWatchers ?: continue
@@ -171,7 +197,7 @@ class PropagationState(
         levelToDecisionVar.add(v)
         currentLevel = levelToDecisionVar.size
         currentFactor = -1
-        return pinBoolImpl(v, value)
+        return pinBoolImpl(v, value, antecedents = null)
     }
 
     /** Push an int var as a new decision. */
@@ -182,12 +208,18 @@ class PropagationState(
         return setIntImpl(v, value)
     }
 
-    fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value)
+    fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value, antecedents = null)
+    /** Variant that records [antecedents] — the literals whose truth values implied this
+     *  pin. Lets the conflict analyzer reconstruct the propagation chain backwards. Pass
+     *  `null` (the default no-arg form) when the factor doesn't track antecedents — that's
+     *  fine, the analyzer just treats this pin as a leaf in the implication graph. */
+    fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean =
+        pinBoolImpl(v, value, antecedents)
     fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo)
     fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi)
     fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value)
 
-    private fun pinBoolImpl(v: Int, value: Boolean): Boolean {
+    private fun pinBoolImpl(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
         val cur = boolValues[v]
         if (cur != null) {
             if (cur == value) return true
@@ -202,6 +234,8 @@ class PropagationState(
         boolValues[v] = value
         boolLevel[v] = currentLevel
         boolReason[v] = currentFactor
+        boolAntecedents[v] = antecedents
+        boolPinOrder.add(v)
         dirtyBools.addLast(v)
         return true
     }
@@ -354,6 +388,8 @@ class PropagationState(
         internal val boolReason: IntArray,
         internal val intMinReason: IntArray,
         internal val intMaxReason: IntArray,
+        internal val boolAntecedents: Array<IntArray?>,
+        internal val boolPinOrderSize: Int,
     )
 
     fun snapshot(): Snapshot = Snapshot(
@@ -365,6 +401,8 @@ class PropagationState(
         boolReason = boolReason.copyOf(),
         intMinReason = intMinReason.copyOf(),
         intMaxReason = intMaxReason.copyOf(),
+        boolAntecedents = boolAntecedents.copyOf(),
+        boolPinOrderSize = boolPinOrder.size,
     )
 
     fun restore(s: Snapshot) {
@@ -375,6 +413,8 @@ class PropagationState(
         for (i in s.boolReason.indices) boolReason[i] = s.boolReason[i]
         for (i in s.intMinReason.indices) intMinReason[i] = s.intMinReason[i]
         for (i in s.intMaxReason.indices) intMaxReason[i] = s.intMaxReason[i]
+        for (i in s.boolAntecedents.indices) boolAntecedents[i] = s.boolAntecedents[i]
+        boolPinOrder.truncateTo(s.boolPinOrderSize)
         levelToDecisionVar.clear()
         for (v in s.decisionVars) levelToDecisionVar.add(v)
         // Aborted pushes may have left dirty queue entries behind; drop them.

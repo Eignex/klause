@@ -151,5 +151,13 @@ sealed interface PropagationResult {
         val conflictInts: Set<Int> = emptySet(),
         val conflictLevels: Set<Int> = emptySet(),
         val conflictFactors: Set<Int> = emptySet(),
+        /**
+         * First-UIP analysis result captured before state revert, or `null` when the
+         * conflict happened at level 0 (no learning possible), inside an assumption
+         * seed (no failing factor to seed from), or in a backend that doesn't run the
+         * analyzer. Engines that support non-chronological backjump (CDB) read
+         * `learnedClause` to pick a [ConflictAnalyzer.AnalysisResult.Learned.backjumpLevel].
+         */
+        val learnedClause: ConflictAnalyzer.AnalysisResult? = null,
     ) : PropagationResult
 }

@@ -144,8 +144,18 @@ class PropagationSession(val problem: Problem) {
         val ints = state.extractConflictInts(levels)
         // Must extract factors *before* restoring — restore wipes the seed + reason arrays.
         val factors = state.extractConflictFactors()
+        // Run 1UIP analysis BEFORE restore — the analyzer walks `state.boolAntecedents` /
+        // `state.boolPinOrder` / `state.boolLevel`, all of which restore would rewind.
+        // Only applicable when a factor's `propagate` triggered the conflict (so
+        // `currentFactor >= 0`); seed-assumption conflicts don't have a clause-form
+        // antecedent to seed analysis with.
+        val learned: ConflictAnalyzer.AnalysisResult? = run {
+            val failingFid = state.currentFactor
+            if (failingFid < 0) null
+            else ConflictAnalyzer(state).analyze(failingFid)
+        }
         state.restore(levelStates.last().snap)
-        return PropagationResult.Unsat(bools, ints, levels, factors)
+        return PropagationResult.Unsat(bools, ints, levels, factors, learned)
     }
 
     /** Pop the most-recently-pushed pin. No-op if the trail is empty. */

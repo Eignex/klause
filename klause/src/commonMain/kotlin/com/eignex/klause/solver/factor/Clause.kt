@@ -45,6 +45,11 @@ class Clause(
         if (literals.size == 1) intArrayOf(literals[0])
         else intArrayOf(literals[0], literals[1])
 
+    /** When [propagate] returns false, every literal of this clause was false — that's
+     *  the textbook clause-form nogood for conflict analysis. Returning the literals
+     *  directly (no copy) is safe because the analyzer only reads them. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray = literals
+
     /** Pre-computed `boolVar → literal index` lookup. Cheap to materialise once at
      *  construction; turns the per-flip "find my literal" loop into a hash lookup. The
      *  compile path doesn't generate clauses where a var appears multiple times (`v` and
@@ -234,10 +239,31 @@ class Clause(
         val w1False = litFalse(state, watches[1])
         return when {
             w0False && w1False -> false
-            w0False -> pinLit(state, literals[watches[1]])
-            w1False -> pinLit(state, literals[watches[0]])
+            // Unit propagation: pin the unassigned watch with antecedents = every other
+            // literal in the clause (all of which are now false). At conflict-analysis
+            // time the analyzer uses these to walk the implication graph back from this
+            // pin.
+            w0False -> pinUnit(state, watches[1])
+            w1False -> pinUnit(state, watches[0])
             else -> true
         }
+    }
+
+    /** Unit-propagate the literal at [unitIdx] to true, recording every other literal in
+     *  the clause as the antecedent set. Each non-unit literal is currently false (that's
+     *  why this clause was unit), so its "antecedent role" is `lit = false` ⇔ the
+     *  corresponding variable is at its negated polarity. Conflict analysis later resolves
+     *  against these. */
+    private fun pinUnit(state: PropagationState, unitIdx: Int): Boolean {
+        val unitLit = literals[unitIdx]
+        val antecedents: IntArray? = if (literals.size <= 1) null
+        else {
+            val out = IntArray(literals.size - 1)
+            var w = 0
+            for (i in literals.indices) if (i != unitIdx) out[w++] = literals[i]
+            out
+        }
+        return state.pinBool(Lit.variable(unitLit), Lit.isPositive(unitLit), antecedents)
     }
 
     private fun litTrue(state: PropagationState, idx: Int): Boolean {
@@ -259,9 +285,6 @@ class Clause(
         }
         return -1
     }
-
-    private fun pinLit(state: PropagationState, lit: Int): Boolean =
-        state.pinBool(Lit.variable(lit), Lit.isPositive(lit))
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
