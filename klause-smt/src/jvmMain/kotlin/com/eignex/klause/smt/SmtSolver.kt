@@ -28,10 +28,22 @@ import org.sosy_lab.java_smt.api.SolverContext.ProverOptions
  * users who want lean, single-backend Z3 access still pick that module; users who
  * want cross-backend experimentation or pure-Java SMT pick this one.
  *
- * Scaffold scope: `solve()` only. `samples()` / `enumerate()` / `minimize()` come in
- * follow-ups once the basic SAT path is validated.
+ * Scaffold scope: `solve()` directly; `samples()` / `enumerate()` go through [session]
+ * (a one-shot session is opened and immediately closed). Native `minimize()` comes in a
+ * follow-up.
  */
 class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
+
+    /**
+     * Open an [SmtSession] holding ONE [org.sosy_lab.java_smt.api.SolverContext] +
+     * [org.sosy_lab.java_smt.api.ProverEnvironment] across `solve` / `samples` /
+     * `enumerate` calls. The backend ([SmtParams.solver]) is locked at session
+     * construction. Always [SmtSession.close] when done.
+     */
+    override fun session(): SmtSession = SmtSession(this, SmtParams())
+
+    /** Open a session with a specific backend (and any other initial param defaults). */
+    fun session(initialParams: SmtParams): SmtSession = SmtSession(this, initialParams)
 
     override fun solve(params: SmtParams): SolveResult {
         val context = newContext(params)
@@ -51,11 +63,13 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
         }
     }
 
-    override fun samples(params: SmtParams): Sequence<Sample> =
-        error("SmtSolver.samples() not yet implemented; use solve() for now or fall back to klause-z3")
+    override fun samples(params: SmtParams): Sequence<Sample> = sequence {
+        session(params).use { s -> for (smp in s.samples(params)) yield(smp) }
+    }
 
-    override fun enumerate(params: SmtParams): Sequence<Sample> =
-        error("SmtSolver.enumerate() not yet implemented; use solve() for now or fall back to klause-z3")
+    override fun enumerate(params: SmtParams): Sequence<Sample> = sequence {
+        session(params).use { s -> for (smp in s.enumerate(params)) yield(smp) }
+    }
 
     private fun newContext(params: SmtParams): SolverContext {
         val config = Configuration.defaultConfiguration()
@@ -73,11 +87,11 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
     ) {
         val bmgr = encoding.fm.booleanFormulaManager
         val imgr = encoding.fm.integerFormulaManager
-        for ((boolVar, value) in params.assumptions.bools) {
+        params.assumptions.forEachBool { boolVar, value ->
             val lit = encoding.boolFormulas[boolVar]
             prover.addConstraint(if (value) lit else bmgr.not(lit))
         }
-        for ((intVar, value) in params.assumptions.ints) {
+        params.assumptions.forEachInt { intVar, value ->
             prover.addConstraint(imgr.equal(encoding.intFormulas[intVar], imgr.makeNumber(value.toLong())))
         }
     }
