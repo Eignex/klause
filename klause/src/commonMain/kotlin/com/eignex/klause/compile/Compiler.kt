@@ -2,6 +2,10 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.ast.AllDifferent
 import com.eignex.klause.ast.And
+import com.eignex.klause.ast.CircuitExpr
+import com.eignex.klause.ast.CumulativeExpr
+import com.eignex.klause.ast.DisjunctiveExpr
+import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
 import com.eignex.klause.ast.PbOp
@@ -53,7 +57,11 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
+import com.eignex.klause.solver.factor.Circuit as CircuitFactor
+import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
+import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
 
 class Compiler {
 
@@ -179,6 +187,10 @@ class Compiler {
                 is IntCompare -> assertIntCompare(expr)
                 is com.eignex.klause.ast.FloatLinearConstraint -> assertFloatLinear(expr)
                 is AllDifferent -> assertAllDifferent(expr.terms)
+                is CircuitExpr -> assertCircuit(expr.succ, expr.valueOffset, sub = false)
+                is SubcircuitExpr -> assertCircuit(expr.succ, expr.valueOffset, sub = true)
+                is CumulativeExpr -> assertCumulative(expr)
+                is DisjunctiveExpr -> assertDisjunctive(expr)
                 is TableConstraint -> assertExpr(expandTable(expr))
                 is PseudoBooleanExpr -> {
                     val lits = lowerAllBool(expr.lits)
@@ -288,6 +300,60 @@ class Compiler {
             for (i in lifted.indices) for (j in i + 1 until lifted.size) {
                 assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]))
             }
+        }
+
+        /**
+         * Lower [CircuitExpr] / [SubcircuitExpr] to its native factor. Each `succ` term must
+         * lift to a bare [IntRef]. When [valueOffset] is nonzero (e.g. 1 for FlatZinc-style
+         * 1-indexed inputs), aux 0-indexed int vars are allocated and channeled to the original
+         * vars via a Linear factor — the factor itself stays 0-indexed.
+         */
+        private fun assertCircuit(succ: List<IntExpr>, valueOffset: Int, sub: Boolean) {
+            val n = succ.size
+            val lifted = succ.map { lift(it) }
+            require(lifted.all { it is IntRef }) {
+                "${if (sub) "subcircuit" else "circuit"}: every successor term must be a bare " +
+                    "variable reference (no arithmetic). Got ${lifted.map { it::class.simpleName }}."
+            }
+            val srcIds = IntArray(n) { intVarOf((lifted[it] as IntRef).name) }
+            val ids = if (valueOffset == 0) srcIds else IntArray(n) { i ->
+                // Channel: aux = src - valueOffset, with aux ∈ [0, n − 1].
+                val auxId = newIntVar(IntDomain(0, n - 1))
+                factors += Linear(
+                    coeffs = intArrayOf(1, -1),
+                    vars = intArrayOf(srcIds[i], auxId),
+                    op = LinearOp.EQ,
+                    bound = valueOffset,
+                )
+                auxId
+            }
+            factors += if (sub) SubcircuitFactor(succ = ids) else CircuitFactor(succ = ids)
+        }
+
+        private fun assertCumulative(expr: CumulativeExpr) {
+            val lifted = expr.starts.map { lift(it) }
+            require(lifted.all { it is IntRef }) {
+                "cumulative: every start term must be a bare variable reference (no arithmetic)."
+            }
+            val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+            factors += CumulativeFactor(
+                starts = ids,
+                durations = expr.durations.toIntArray(),
+                resources = expr.resources.toIntArray(),
+                capacity = expr.capacity,
+            )
+        }
+
+        private fun assertDisjunctive(expr: DisjunctiveExpr) {
+            val lifted = expr.starts.map { lift(it) }
+            require(lifted.all { it is IntRef }) {
+                "disjunctive: every start term must be a bare variable reference (no arithmetic)."
+            }
+            val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+            factors += DisjunctiveFactor(
+                starts = ids,
+                durations = expr.durations.toIntArray(),
+            )
         }
 
         fun assertIntCompare(expr: IntCompare) {
@@ -429,6 +495,9 @@ class Compiler {
                 }
                 tseitinAnd(pairs)
             }
+            is CircuitExpr, is SubcircuitExpr, is CumulativeExpr, is DisjunctiveExpr ->
+                error("${expr::class.simpleName} at non-top-level position is not yet supported; " +
+                    "circuit / cumulative / disjunctive can only appear as top-level constraints today.")
             is TableConstraint -> lowerToLit(expandTable(expr))
             is PseudoBooleanExpr -> {
                 val lits = lowerAllBool(expr.lits)

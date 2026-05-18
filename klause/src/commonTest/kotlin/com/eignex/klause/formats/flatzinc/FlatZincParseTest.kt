@@ -124,6 +124,62 @@ class FlatZincParseTest {
     }
 
     @Test
+    fun `circuit emits a hamiltonian cycle`() {
+        // MiniZinc-style 1-indexed circuit: each succ holds a value in [1, n].
+        val src = """
+            array [1..4] of var 1..4: succ;
+            constraint circuit(succ);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L))
+        assertNotNull(sample)
+        // Decode the cycle in 1-indexed space.
+        val visited = BooleanArray(4)
+        var node = 0
+        for (step in 0 until 4) {
+            assertTrue(!visited[node], "revisit at step $step: ${sample.ints.toList()}")
+            visited[node] = true
+            node = sample.ints[node] - 1
+        }
+        assertEquals(0, node, "circuit should close in 4 steps: ${sample.ints.toList()}")
+    }
+
+    @Test
+    fun `cumulative respects capacity`() {
+        // 3 unit-resource tasks of duration 2; capacity 1 forces serialization.
+        val src = """
+            array [1..3] of var 0..4: s;
+            array [1..3] of int: dur = [2, 2, 2];
+            array [1..3] of int: res = [1, 1, 1];
+            constraint cumulative(s, dur, res, 1);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L))
+        assertNotNull(sample)
+        val occ = IntArray(8)
+        for (i in 0 until 3) {
+            val start = sample.ints[i]
+            for (t in start until start + 2) if (t in occ.indices) occ[t]++
+        }
+        for (t in occ.indices) assertTrue(occ[t] <= 1, "capacity violated at t=$t: ${sample.ints.toList()}")
+    }
+
+    @Test
+    fun `disjunctive serializes three unit tasks`() {
+        val src = """
+            array [1..3] of var 0..2: s;
+            array [1..3] of int: dur = [1, 1, 1];
+            constraint disjunctive(s, dur);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val samples = BacktrackSolver(program.problem).enumerate(BacktrackParams(randomSeed = 0L)).toList()
+        assertEquals(6, samples.size, "expected 3! disjunctive schedules; got ${samples.size}")
+    }
+
+    @Test
     fun `float vars are bucketed and float_lin_le works`() {
         val src = """
             var 0.0..10.0: x;

@@ -164,6 +164,55 @@ private fun lexChain(a: List<IntTerm>, b: List<IntTerm>, strict: Boolean): BoolE
 }
 
 /**
+ * Hamiltonian-cycle constraint on a successor array. Default `valueOffset = 0` matches
+ * klause's native 0-indexed convention. Pass `valueOffset = 1` to match MiniZinc/FlatZinc
+ * 1-indexed inputs.
+ */
+fun circuit(succ: List<IntTerm>, valueOffset: Int = 0): BoolExpr {
+    require(succ.size >= 2) { "circuit(): need at least two nodes" }
+    return CircuitExpr(succ.map { it.toIntExpr() }, valueOffset)
+}
+
+/** Variadic convenience overload for [circuit]. */
+fun circuit(vararg succ: IntTerm): BoolExpr = circuit(succ.toList(), valueOffset = 0)
+
+/**
+ * Subcircuit: like [circuit], but `succ[i] = i + valueOffset` marks node `i` excluded.
+ * Included nodes form a single cycle.
+ */
+fun subcircuit(succ: List<IntTerm>, valueOffset: Int = 0): BoolExpr {
+    require(succ.isNotEmpty()) { "subcircuit(): need at least one node" }
+    return SubcircuitExpr(succ.map { it.toIntExpr() }, valueOffset)
+}
+
+/**
+ * Cumulative scheduling constraint: `Σ {resources[i] : starts[i] ≤ t < starts[i] + durations[i]} ≤ capacity`
+ * at every integer time point `t`. Durations / resources / capacity are constants.
+ */
+fun cumulative(
+    starts: List<IntTerm>,
+    durations: List<Int>,
+    resources: List<Int>,
+    capacity: Int,
+): BoolExpr {
+    require(starts.size == durations.size && starts.size == resources.size) {
+        "cumulative(): starts/durations/resources must have the same length"
+    }
+    return CumulativeExpr(starts.map { it.toIntExpr() }, durations, resources, capacity)
+}
+
+/**
+ * Disjunctive (one-machine / no-overlap) scheduling constraint. Durations are constants.
+ * Tasks may not overlap in time.
+ */
+fun disjunctive(starts: List<IntTerm>, durations: List<Int>): BoolExpr {
+    require(starts.size == durations.size) {
+        "disjunctive(): starts and durations must have the same length"
+    }
+    return DisjunctiveExpr(starts.map { it.toIntExpr() }, durations)
+}
+
+/**
  * Channel an integer variable to a list of Boolean indicators: `bools[i] iff (intVar = offset+i)`
  * for every index `i`. Useful for switching between an integer and a one-hot Boolean encoding.
  */

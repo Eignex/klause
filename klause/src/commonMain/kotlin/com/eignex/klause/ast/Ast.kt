@@ -218,6 +218,75 @@ data class AllDifferent(val terms: List<IntExpr>) : BoolExpr {
     init { require(terms.size >= 2) { "AllDifferent needs at least two terms" } }
 }
 
+/**
+ * Hamiltonian-cycle constraint over a successor array. `succ[i]` is the index of node `i`'s
+ * successor; the assignment must form a single cycle visiting every node. [valueOffset] is
+ * the integer that represents node 0 — `0` for klause's native 0-indexed form, `1` for
+ * FlatZinc-style 1-indexed inputs.
+ */
+@Serializable
+@SerialName("circuit")
+data class CircuitExpr(val succ: List<IntExpr>, val valueOffset: Int = 0) : BoolExpr {
+    init { require(succ.size >= 2) { "Circuit needs at least two nodes" } }
+}
+
+/**
+ * Subcircuit — like [CircuitExpr] but `succ[i] = i + valueOffset` marks node `i` as
+ * excluded; the included nodes (non-self-loops) must form a single cycle.
+ */
+@Serializable
+@SerialName("subcircuit")
+data class SubcircuitExpr(val succ: List<IntExpr>, val valueOffset: Int = 0) : BoolExpr {
+    init { require(succ.isNotEmpty()) { "Subcircuit needs at least one node" } }
+}
+
+/**
+ * Cumulative scheduling: at every integer time point the sum of resource use of tasks
+ * running at that point stays under [capacity]. [starts] are integer-variable expressions;
+ * [durations] and [resources] are constants (variable-duration / variable-resource
+ * cumulative is not supported by the current klause factor).
+ */
+@Serializable
+@SerialName("cumulative")
+data class CumulativeExpr(
+    val starts: List<IntExpr>,
+    val durations: List<Int>,
+    val resources: List<Int>,
+    val capacity: Int,
+) : BoolExpr {
+    init {
+        require(starts.size == durations.size && starts.size == resources.size) {
+            "CumulativeExpr: starts/durations/resources must have the same length"
+        }
+        require(capacity >= 0) { "CumulativeExpr capacity must be ≥ 0, got $capacity" }
+        for (i in durations.indices) {
+            require(durations[i] >= 0) { "CumulativeExpr durations[$i] must be ≥ 0" }
+            require(resources[i] >= 0) { "CumulativeExpr resources[$i] must be ≥ 0" }
+        }
+    }
+}
+
+/**
+ * Disjunctive (one-machine / unary-resource) constraint. Tasks may not overlap.
+ * Special case of [CumulativeExpr] with all-1 resources and capacity = 1, but ships its own
+ * stronger propagator (time-tabling + detectable precedences + edge-finding).
+ */
+@Serializable
+@SerialName("disjunctive")
+data class DisjunctiveExpr(
+    val starts: List<IntExpr>,
+    val durations: List<Int>,
+) : BoolExpr {
+    init {
+        require(starts.size == durations.size) {
+            "DisjunctiveExpr: starts and durations must have the same length"
+        }
+        for (i in durations.indices) {
+            require(durations[i] >= 0) { "DisjunctiveExpr durations[$i] must be ≥ 0" }
+        }
+    }
+}
+
 @Serializable
 @SerialName("table")
 data class TableConstraint(

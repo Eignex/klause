@@ -6,11 +6,15 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Xor
 import kotlin.math.roundToLong
 
@@ -500,6 +504,11 @@ internal class FlatZincCompiler(
 
         // Global
         "all_different_int" -> emitAllDifferent(c)
+        "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
+        "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
+        "cumulative", "fzn_cumulative" -> emitCumulative(c)
+        "disjunctive", "fzn_disjunctive",
+        "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c)
 
         // Arithmetic
         "int_times" -> emitIntTimes(c)
@@ -720,6 +729,64 @@ internal class FlatZincCompiler(
             if (d.max > hi) hi = d.max
         }
         factors.add(AllDifferent(vars = vars, domainMin = lo, domainSize = hi - lo + 1))
+    }
+
+    /**
+     * `circuit(succ)` / `subcircuit(succ)`. FlatZinc emits these with the array's *declared*
+     * index base — typically `1..n` from MiniZinc, but the index base is implicit in the
+     * succ vars' domains. The klause [Circuit] / [Subcircuit] factors are 0-indexed; if the
+     * succ domains' minimum is nonzero, we channel through aux 0-indexed vars via Linear
+     * factors so the factor itself stays canonical.
+     */
+    private fun emitCircuit(c: FznConstraint, sub: Boolean) {
+        require(c.args.size == 1)
+        val srcIds = evalIntVarArray(c.args[0])
+        val n = srcIds.size
+        // Infer value-offset from the domains: MiniZinc's standard `circuit` uses 1-based
+        // node indexing, so domain min is usually 1. We use the smallest domain.min seen.
+        var offset = Int.MAX_VALUE
+        for (v in srcIds) offset = minOf(offset, intDomains[v].min)
+        if (offset == Int.MAX_VALUE) offset = 0
+        val ids = if (offset == 0) srcIds else IntArray(n) { i ->
+            val auxName = "__circuit_aux_${i}_${factors.size}"
+            val auxId = allocInt(auxName, 0, n - 1)
+            // src[i] − aux[i] = offset.
+            factors.add(Linear(
+                coeffs = intArrayOf(1, -1),
+                vars = intArrayOf(srcIds[i], auxId),
+                op = LinearOp.EQ,
+                bound = offset,
+            ))
+            auxId
+        }
+        factors.add(if (sub) Subcircuit(succ = ids) else Circuit(succ = ids))
+    }
+
+    /**
+     * `cumulative(starts, durations, resources, capacity)`. The klause factor requires
+     * constant durations / resources / capacity; if any of those is given as a variable,
+     * we fail-loud so the model is surfaced rather than silently decomposed.
+     */
+    private fun emitCumulative(c: FznConstraint) {
+        require(c.args.size == 4) { "cumulative expects 4 args, got ${c.args.size}" }
+        val starts = evalIntVarArray(c.args[0])
+        val durations = evalIntConstArray(c.args[1])
+        val resources = evalIntConstArray(c.args[2])
+        val capacity = evalIntConst(c.args[3]).toInt()
+        factors.add(Cumulative(
+            starts = starts,
+            durations = durations,
+            resources = resources,
+            capacity = capacity,
+        ))
+    }
+
+    /** `disjunctive(starts, durations)` / `disjunctive_strict(...)`. Durations are constants. */
+    private fun emitDisjunctive(c: FznConstraint) {
+        require(c.args.size == 2) { "disjunctive expects 2 args, got ${c.args.size}" }
+        val starts = evalIntVarArray(c.args[0])
+        val durations = evalIntConstArray(c.args[1])
+        factors.add(Disjunctive(starts = starts, durations = durations))
     }
 
     private fun emitIntTimes(c: FznConstraint) {
