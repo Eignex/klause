@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -30,7 +31,7 @@ class Xor(
         for (v in unique) out[i++] = v
         out
     }
-    override val intVars: IntArray = EMPTY
+    override val intVars: IntArray = EmptyIntArray
 
     /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`.
      *  Flipping a var toggles factor parity by exactly this amount. */
@@ -120,9 +121,4 @@ class Xor(
         for (v in boolVars) {
             if (parityByVar.coeffOf(v) == 1) sink.addBoolFlip(v)
         }
-    }
-
-    private companion object {
-        val EMPTY: IntArray = IntArray(0)
-    }
-}
+    }}

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -32,7 +33,7 @@ class Clause(
         for (v in seen) out[i++] = v
         out
     }
-    override val intVars: IntArray = EMPTY
+    override val intVars: IntArray = EmptyIntArray
 
     /** Pre-computed `boolVar → literal index` lookup. Cheap to materialise once at
      *  construction; turns the per-flip "find my literal" loop into a hash lookup. The
@@ -221,9 +222,4 @@ class Clause(
             if (litTrue(state, i)) return i
         }
         return -1
-    }
-
-    private companion object {
-        val EMPTY: IntArray = IntArray(0)
-    }
-}
+    }}

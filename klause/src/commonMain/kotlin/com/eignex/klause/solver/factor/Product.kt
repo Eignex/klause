@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -21,7 +22,7 @@ class Product(
     val result: Int,
 ) : LocalSearchFactor {
 
-    override val boolVars: IntArray = EMPTY
+    override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = intArrayOf(a, b, result)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {}
@@ -195,9 +196,4 @@ private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long): Bo
         if (!state.tightenIntMin(v, loI)) return false
         if (!state.tightenIntMax(v, hiI)) return false
         return true
-    }
-
-    private companion object {
-        val EMPTY: IntArray = IntArray(0)
-    }
-}
+    }}

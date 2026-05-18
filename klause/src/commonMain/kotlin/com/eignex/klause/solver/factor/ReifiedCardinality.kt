@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -33,7 +34,7 @@ class ReifiedCardinality(
         for (v in unique) out[i++] = v
         out
     }
-    override val intVars: IntArray = EMPTY
+    override val intVars: IntArray = EmptyIntArray
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var count = 0
@@ -150,9 +151,4 @@ class ReifiedCardinality(
         }
     }
 
-    private fun inRange(count: Int): Boolean = count in min..max
-
-    private companion object {
-        val EMPTY: IntArray = IntArray(0)
-    }
-}
+    private fun inRange(count: Int): Boolean = count in min..max}

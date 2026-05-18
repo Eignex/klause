@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -44,7 +45,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
 
     init { require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" } }
 
-    override val boolVars: IntArray = EMPTY
+    override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = succ
 
     private val n: Int = succ.size
@@ -333,7 +334,6 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
     }
 
     private companion object {
-        val EMPTY: IntArray = IntArray(0)
         const val MAX_TARGETS: Int = 4
         const val MAX_SWAP_CANDIDATES: Int = 4
     }

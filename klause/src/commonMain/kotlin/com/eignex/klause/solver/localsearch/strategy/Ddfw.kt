@@ -59,17 +59,13 @@ open class Ddfw(
         val base = when (move) {
             is Move.BoolFlip -> {
                 var sum = 0.0
-                for (fid in state.problem.boolOccurrences[move.varId]) {
-                    val f = state.factors[fid]
-                    if (f.deltaIfBoolFlipped(state, fid, move.varId) > 0) sum += w[fid]
-                }
+                state.forEachBoolFactorDelta(move.varId) { fid, d -> if (d > 0) sum += w[fid] }
                 sum
             }
             is Move.IntSet -> {
                 var sum = 0.0
-                for (fid in state.problem.intOccurrences[move.varId]) {
-                    val f = state.factors[fid]
-                    if (f.deltaIfIntSet(state, fid, move.varId, move.newValue) > 0) sum += w[fid]
+                state.forEachIntFactorDelta(move.varId, move.newValue) { fid, d ->
+                    if (d > 0) sum += w[fid]
                 }
                 sum
             }

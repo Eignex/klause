@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -65,7 +66,7 @@ class Cumulative(
         }
     }
 
-    override val boolVars: IntArray = EMPTY
+    override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = starts
 
     private val n: Int = starts.size
@@ -366,9 +367,4 @@ class Cumulative(
                 }
             }
         }
-    }
-
-    private companion object {
-        val EMPTY: IntArray = IntArray(0)
-    }
-}
+    }}

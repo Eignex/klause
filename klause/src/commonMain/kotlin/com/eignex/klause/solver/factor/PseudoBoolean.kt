@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
@@ -31,7 +32,7 @@ class PseudoBoolean(
         for (v in seen) out[i++] = v
         out
     }
-    override val intVars: IntArray = EMPTY
+    override val intVars: IntArray = EmptyIntArray
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0
@@ -100,12 +101,7 @@ class PseudoBoolean(
             delta += if (Lit.evaluate(literals[i], pre)) -weights[i] else weights[i]
         }
         return delta
-    }
-
-    private companion object {
-        val EMPTY: IntArray = IntArray(0)
-    }
-}
+    }}
 
 /**
  * Range `[sumLo, sumHi]` reachable by `Σ weights[i] * lit_i` given current pins.

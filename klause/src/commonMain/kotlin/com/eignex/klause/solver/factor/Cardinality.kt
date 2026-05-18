@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -29,7 +30,7 @@ class Cardinality(
         for (v in seen) out[i++] = v
         out
     }
-    override val intVars: IntArray = EMPTY
+    override val intVars: IntArray = EmptyIntArray
 
     /** Pre-computed map from a Boolean var id to the sum of polarity signs across every
      *  occurrence in [literals]. Each entry is `+1` for a positive literal occurrence,
@@ -160,6 +161,5 @@ class Cardinality(
         fun exactlyOne(literals: IntArray): Cardinality =
             Cardinality(literals, min = 1, max = 1)
 
-        private val EMPTY: IntArray = IntArray(0)
     }
 }

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -31,7 +32,7 @@ class AllDifferent(
     //  global pigeonhole check (#available-values ≥ #non-pinned-vars) — but does not find
     //  interior Hall sets to prune interior domain values.
 
-    override val boolVars: IntArray = EMPTY
+    override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = vars
 
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
@@ -250,7 +251,6 @@ class AllDifferent(
     }
 
     private companion object {
-        val EMPTY: IntArray = IntArray(0)
         /** Cap on candidate targets per repair call. Each candidate adds one O(arity) break-score
          *  evaluation in WalkSat/probSAT, so don't go wild — the fan only needs to be wide enough
          *  for the strategy to discriminate. */

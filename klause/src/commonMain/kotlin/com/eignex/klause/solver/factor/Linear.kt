@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -27,7 +28,7 @@ class Linear(
         require(coeffs.isNotEmpty()) { "Linear must have at least one term" }
     }
 
-    override val boolVars: IntArray = IntArray(0)
+    override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = vars
 
     private val coeffLookup: CoeffLookup = CoeffLookup.build(vars, coeffs)

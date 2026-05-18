@@ -143,14 +143,9 @@ class LocalSearchState(
     fun breakScore(move: Move): Int = when (move) {
         is Move.BoolFlip -> {
             val v = move.varId
-            if (boolBreakValid[v]) {
-                boolBreakCache[v]
-            } else {
+            if (boolBreakValid[v]) boolBreakCache[v] else {
                 var count = 0
-                for (factorId in problem.boolOccurrences[v]) {
-                    val f = factors[factorId]
-                    if (f.deltaIfBoolFlipped(this, factorId, v) > 0) count++
-                }
+                forEachBoolFactorDelta(v) { _, d -> if (d > 0) count++ }
                 boolBreakCache[v] = count
                 boolBreakValid[v] = true
                 count
@@ -158,10 +153,7 @@ class LocalSearchState(
         }
         is Move.IntSet -> {
             var count = 0
-            for (factorId in problem.intOccurrences[move.varId]) {
-                val f = factors[factorId]
-                if (f.deltaIfIntSet(this, factorId, move.varId, move.newValue) > 0) count++
-            }
+            forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
             count
         }
         is Move.Compound -> evaluateCompound(move).breakScore
@@ -230,16 +222,12 @@ class LocalSearchState(
     fun netDelta(move: Move): Int = when (move) {
         is Move.BoolFlip -> {
             var sum = 0
-            for (factorId in problem.boolOccurrences[move.varId]) {
-                sum += factors[factorId].deltaIfBoolFlipped(this, factorId, move.varId)
-            }
+            forEachBoolFactorDelta(move.varId) { _, d -> sum += d }
             sum
         }
         is Move.IntSet -> {
             var sum = 0
-            for (factorId in problem.intOccurrences[move.varId]) {
-                sum += factors[factorId].deltaIfIntSet(this, factorId, move.varId, move.newValue)
-            }
+            forEachIntFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
             sum
         }
         is Move.Compound -> evaluateCompound(move).netDelta
@@ -292,6 +280,25 @@ class LocalSearchState(
             val f = factors[factorId]
             for (v in f.boolVars) boolConfChange[v] = true
             for (v in f.intVars) intConfChange[v] = true
+        }
+    }
+
+    /** Walk every factor that touches bool var [v], call its `deltaIfBoolFlipped`, and
+     *  hand the (factorId, delta) pair to [action]. Inline so callers stay allocation-
+     *  free. Shared by [breakScore], [netDelta], and DDFW's weighted-break score. */
+    inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
+        for (factorId in problem.boolOccurrences[v]) {
+            action(factorId, factors[factorId].deltaIfBoolFlipped(this, factorId, v))
+        }
+    }
+
+    /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var [v] with
+     *  target value [newValue]. */
+    inline fun forEachIntFactorDelta(
+        v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit,
+    ) {
+        for (factorId in problem.intOccurrences[v]) {
+            action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
         }
     }
 
