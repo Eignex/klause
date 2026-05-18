@@ -42,9 +42,9 @@ class BacktrackSolverTest {
 
     @Test
     fun `solve populates unsat core when propagation rules out the problem at root`() {
-        // Two-clause direct contradiction. Bake-time propagation derives UNSAT before
-        // any decision is taken — `Problem.baked` is `PropagationResult.Unsat` carrying
-        // the failing factor id, which `BacktrackSolver` lifts to an `UnsatCore`.
+        // Two-clause direct contradiction. Bake-time propagation pins var 0 via the first
+        // clause; the second clause then fails on a conflicting pin. Both factors are
+        // load-bearing for the contradiction, and the propagation-graph BFS captures both.
         val p = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
             factors = listOf(
@@ -53,13 +53,49 @@ class BacktrackSolverTest {
             ),
         )
         val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
-        val core = verdict.core
-            ?: error("expected propagation-derived unsat core, got null")
-        // Only one of the two factors actually returned `false` from propagate (the
-        // second one to fire, whichever it was). A more complete reason-trail extractor
-        // would name both; for now a single-factor "blame" is the contract.
-        assertTrue(core.size == 1 && core.factorIds[0] in 0..1,
-            "expected single factor id in {0,1}, got ${core.factorIds.toList()}")
+        val core = verdict.core ?: error("expected propagation-derived unsat core, got null")
+        assertEquals(setOf(0, 1), core.factorIds.toSet(),
+            "core should mention both contradicting clauses, got ${core.factorIds.toList()}")
+    }
+
+    @Test
+    fun `unsat core captures chained propagation through intermediate factors`() {
+        // Four clauses chained: x0 → x1 → x2 → ¬x2. Bake-time propagation forces
+        // x0 = true (unit clause), then x1 = true (clause says ¬x0 ∨ x1), then x2 = true,
+        // then the final clause requires x2 = false → contradiction. All four factors
+        // are load-bearing — the BFS through reason-arrays must collect every one.
+        val p = Problem(
+            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true))),                                  // x0
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),              // ¬x0 ∨ x1
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),              // ¬x1 ∨ x2
+                Clause(intArrayOf(Lit.make(2, false))),                                 // ¬x2
+            ),
+        )
+        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        val core = verdict.core ?: error("expected propagation-derived unsat core, got null")
+        assertEquals(setOf(0, 1, 2, 3), core.factorIds.toSet(),
+            "transitive core should include every link in the propagation chain, got ${core.factorIds.toList()}")
+    }
+
+    @Test
+    fun `unsat core handles two-sided int narrowing`() {
+        // Two linear constraints: 1·x >= 5 and 1·x <= 3. Each individually is fine on
+        // domain [0,10]; together they empty the domain. Both factors must appear in
+        // the core — the separate intMinReason / intMaxReason tracking is what catches
+        // this (a single-reason scheme would lose whichever side was set first).
+        val p = Problem(
+            numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 10)),
+            factors = listOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+            ),
+        )
+        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        val core = verdict.core ?: error("expected propagation-derived unsat core, got null")
+        assertEquals(setOf(0, 1), core.factorIds.toSet(),
+            "both-side narrowing should put both factors in the core, got ${core.factorIds.toList()}")
     }
 
     @Test

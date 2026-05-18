@@ -64,10 +64,31 @@ class PropagationState(
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
     internal var conflictLevels: MutableSet<Int>? = null
 
-    /** Populated by [runToFixpoint] when a factor's `propagate` returns `false`, with that
-     *  factor's id. `-1` means "not from a factor invocation" (e.g. seed-assumption
-     *  contradiction); callers must check before using. */
-    internal var conflictFactor: Int = -1
+    /** Per-var record of which factor most recently *forced* the value. `-1` means "set by a
+     *  decision / assumption, not by any factor's propagation step". Read by
+     *  [extractConflictFactors] to walk the propagation graph backwards from a conflict and
+     *  collect every factor that contributed. */
+    val boolReason: IntArray = IntArray(problem.numBoolVars) { -1 }
+    /** Factor that most recently tightened this int var's lower bound. `-1` = decision /
+     *  initial domain. Tracked separately from [intMaxReason] so two-sided narrowing
+     *  conflicts (one factor tightens min, another tightens max into infeasibility) both
+     *  surface in the core. */
+    val intMinReason: IntArray = IntArray(problem.numIntVars) { -1 }
+    /** Mirror of [intMinReason] for the upper bound. */
+    val intMaxReason: IntArray = IntArray(problem.numIntVars) { -1 }
+
+    /** Factor whose [Factor.propagate] is currently running. Read by the impl methods so
+     *  state changes can be attributed back to a factor. `-1` between factor invocations
+     *  (decisions, assumption seeding) — those pins/tightenings record `reason = -1`. */
+    internal var currentFactor: Int = -1
+
+    /**
+     * Seed set of factors directly implicated in a contradiction. Populated by [runToFixpoint]
+     * (the factor that returned `false`) and by the impl methods (both sides of a two-source
+     * narrowing). [extractConflictFactors] BFSes from this seed via the reason arrays to
+     * produce the full propagation-graph core.
+     */
+    internal var conflictSeedFactors: MutableSet<Int>? = null
 
     init {
         seeded = seedAssumptions(assumptions)
@@ -95,6 +116,7 @@ class PropagationState(
     fun pinBoolAsDecision(v: Int, value: Boolean): Boolean {
         levelToDecisionVar.add(v)
         currentLevel = levelToDecisionVar.size
+        currentFactor = -1
         return pinBoolImpl(v, value)
     }
 
@@ -102,6 +124,7 @@ class PropagationState(
     fun setIntAsDecision(v: Int, value: Int): Boolean {
         levelToDecisionVar.add(problem.numBoolVars + v)
         currentLevel = levelToDecisionVar.size
+        currentFactor = -1
         return setIntImpl(v, value)
     }
 
@@ -114,12 +137,17 @@ class PropagationState(
         val cur = boolValues[v]
         if (cur != null) {
             if (cur == value) return true
-            // Conflict — record levels of both contributors.
+            // Conflict — record levels of both contributors, and seed the factor core with
+            // the prior pin's reason (whichever factor forced `cur`, if any) plus the
+            // currently-running factor (if any).
             recordConflictLevels(boolLevel[v], currentLevel)
+            seedConflictFactor(boolReason[v])
+            seedConflictFactor(currentFactor)
             return false
         }
         boolValues[v] = value
         boolLevel[v] = currentLevel
+        boolReason[v] = currentFactor
         dirtyBools.addLast(v)
         return true
     }
@@ -128,11 +156,17 @@ class PropagationState(
         val d = intDomains[v]
         if (lo <= d.min) return true
         if (lo > d.max) {
+            // Two-sided narrowing emptied the domain: the existing upper bound came from
+            // `intMaxReason[v]`, and `currentFactor` is the one trying to push the lower
+            // past it. Both go into the core seed.
             recordConflictLevels(intLevel[v], currentLevel)
+            seedConflictFactor(intMaxReason[v])
+            seedConflictFactor(currentFactor)
             return false
         }
         intDomains[v] = IntDomain(lo, d.max)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
+        intMinReason[v] = currentFactor
         dirtyInts.addLast(v)
         return true
     }
@@ -142,12 +176,21 @@ class PropagationState(
         if (hi >= d.max) return true
         if (hi < d.min) {
             recordConflictLevels(intLevel[v], currentLevel)
+            seedConflictFactor(intMinReason[v])
+            seedConflictFactor(currentFactor)
             return false
         }
         intDomains[v] = IntDomain(d.min, hi)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
+        intMaxReason[v] = currentFactor
         dirtyInts.addLast(v)
         return true
+    }
+
+    private fun seedConflictFactor(fid: Int) {
+        if (fid < 0) return
+        val s = conflictSeedFactors ?: HashSet<Int>().also { conflictSeedFactors = it }
+        s.add(fid)
     }
 
     private fun setIntImpl(v: Int, value: Int): Boolean =
@@ -210,6 +253,40 @@ class PropagationState(
         return out
     }
 
+    /**
+     * BFS the propagation graph backwards from [conflictSeedFactors] (factors directly
+     * implicated in a contradiction) through the per-var reason arrays, collecting every
+     * factor whose firing transitively contributed. Each visited factor F is expanded by
+     * walking its `boolVars` / `intVars`: for each variable, the factor (if any) that
+     * forced the current value / domain bound is added to the frontier. Returns the full
+     * factor-level core, or the empty set when no seed was recorded (e.g. seed-assumption
+     * contradictions that never reached a factor).
+     *
+     * Two-sided narrowing is handled because [intMinReason] and [intMaxReason] are tracked
+     * separately and both endpoints are walked for every int var.
+     */
+    internal fun extractConflictFactors(): Set<Int> {
+        val seed = conflictSeedFactors ?: return emptySet()
+        if (seed.isEmpty()) return emptySet()
+        val out = HashSet<Int>(seed)
+        val frontier = ArrayDeque<Int>().apply { addAll(seed) }
+        while (frontier.isNotEmpty()) {
+            val fid = frontier.removeFirst()
+            val f = problem.factors[fid]
+            for (v in f.boolVars) {
+                val r = boolReason[v]
+                if (r >= 0 && out.add(r)) frontier.addLast(r)
+            }
+            for (v in f.intVars) {
+                val rMin = intMinReason[v]
+                if (rMin >= 0 && out.add(rMin)) frontier.addLast(rMin)
+                val rMax = intMaxReason[v]
+                if (rMax >= 0 && out.add(rMax)) frontier.addLast(rMax)
+            }
+        }
+        return out
+    }
+
     // Snapshot / restore for [PropagationSession]. Captures every mutable field so a pop
     // can rewind the state to a prior fixpoint without re-propagating. Dirty queues are not
     // snapshotted — the caller is expected to snapshot only between propagation cycles
@@ -220,6 +297,9 @@ class PropagationState(
         internal val boolLevel: IntArray,
         internal val intLevel: IntArray,
         internal val decisionVars: IntArray,
+        internal val boolReason: IntArray,
+        internal val intMinReason: IntArray,
+        internal val intMaxReason: IntArray,
     )
 
     fun snapshot(): Snapshot = Snapshot(
@@ -228,6 +308,9 @@ class PropagationState(
         boolLevel = boolLevel.copyOf(),
         intLevel = intLevel.copyOf(),
         decisionVars = levelToDecisionVar.toIntArray(),
+        boolReason = boolReason.copyOf(),
+        intMinReason = intMinReason.copyOf(),
+        intMaxReason = intMaxReason.copyOf(),
     )
 
     fun restore(s: Snapshot) {
@@ -235,14 +318,18 @@ class PropagationState(
         for (i in s.intDomains.indices) intDomains[i] = s.intDomains[i]
         for (i in s.boolLevel.indices) boolLevel[i] = s.boolLevel[i]
         for (i in s.intLevel.indices) intLevel[i] = s.intLevel[i]
+        for (i in s.boolReason.indices) boolReason[i] = s.boolReason[i]
+        for (i in s.intMinReason.indices) intMinReason[i] = s.intMinReason[i]
+        for (i in s.intMaxReason.indices) intMaxReason[i] = s.intMaxReason[i]
         levelToDecisionVar.clear()
         for (v in s.decisionVars) levelToDecisionVar.add(v)
         // Aborted pushes may have left dirty queue entries behind; drop them.
         dirtyBools.clear()
         dirtyInts.clear()
         conflictLevels = null
-        conflictFactor = -1
+        conflictSeedFactors = null
         currentLevel = 0
+        currentFactor = -1
     }
 
     /**
@@ -254,6 +341,9 @@ class PropagationState(
      * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
      */
     internal fun runToFixpoint(allFactors: Boolean): Set<Int>? {
+        // Clear conflict bookkeeping from any prior run — reusing the state across pushes
+        // would otherwise mix old seeds into a new conflict's core.
+        conflictSeedFactors = null
         val pending = BooleanArray(problem.numFactors)
         val queue = com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numFactors.coerceAtLeast(8))
         if (allFactors) {
@@ -277,9 +367,14 @@ class PropagationState(
             pending[fid] = false
             val f = problem.factors[fid]
             currentLevel = maxLevelForVars(f.boolVars, f.intVars)
+            currentFactor = fid
             conflictLevels = null
             if (!f.propagate(this, fid)) {
-                conflictFactor = fid
+                // The failing factor is always in the core, regardless of whether it
+                // recorded a conflict via the impl methods (some factors return false
+                // without calling pin/tighten — they just detected infeasibility from
+                // the current state).
+                seedConflictFactor(fid)
                 return conflictLevels ?: collectLevelsForVars(f.boolVars, f.intVars)
             }
             while (true) {

@@ -143,7 +143,7 @@ class Problem(
                 state.extractConflictBools(conflict),
                 state.extractConflictInts(conflict),
                 conflict,
-                conflictFactorsOf(state),
+                state.extractConflictFactors(),
             )
         }
 
@@ -171,13 +171,6 @@ class Problem(
             intKeys = iKeys.toIntArray(),
             intValues = iVals.toIntArray(),
         )
-    }
-
-    /** Wrap [PropagationState.conflictFactor] (if any) in a single-element set for
-     *  [PropagationResult.Unsat.conflictFactors]. */
-    private fun conflictFactorsOf(state: PropagationState): Set<Int> {
-        val fid = state.conflictFactor
-        return if (fid >= 0) setOf(fid) else emptySet()
     }
 
     private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {

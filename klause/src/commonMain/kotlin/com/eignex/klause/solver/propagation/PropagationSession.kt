@@ -42,12 +42,11 @@ class PropagationSession(val problem: Problem) {
     init {
         val conflict = state.runToFixpoint(allFactors = true)
         if (conflict != null) {
-            val fid = state.conflictFactor
             bakedUnsat = PropagationResult.Unsat(
                 state.extractConflictBools(conflict),
                 state.extractConflictInts(conflict),
                 conflict,
-                if (fid >= 0) setOf(fid) else emptySet(),
+                state.extractConflictFactors(),
             )
         }
         val baseline = computeImplied()
@@ -143,8 +142,8 @@ class PropagationSession(val problem: Problem) {
     private fun revertAndUnsat(levels: Set<Int>): PropagationResult.Unsat {
         val bools = state.extractConflictBools(levels)
         val ints = state.extractConflictInts(levels)
-        val fid = state.conflictFactor
-        val factors = if (fid >= 0) setOf(fid) else emptySet()
+        // Must extract factors *before* restoring — restore wipes the seed + reason arrays.
+        val factors = state.extractConflictFactors()
         state.restore(levelStates.last().snap)
         return PropagationResult.Unsat(bools, ints, levels, factors)
     }
