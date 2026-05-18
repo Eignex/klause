@@ -105,6 +105,67 @@ class BacktrackSolverTest {
     }
 
     @Test
+    fun `cardinality watched literals propagate at-least-K under pin pressure`() {
+        // AtLeast-2 over 8 vars. Pin 5 of them to false → only 3 positive literals are
+        // non-false; need 2 true. Pin a 6th to false → only 2 non-false remain; both
+        // must be unit-pinned true. The watched-literal scheme (3 at-least watches,
+        // 0 at-most watches since max == n) drives this exactly.
+        val problem = Problem(
+            numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(Cardinality(
+                literals = IntArray(8) { Lit.make(it, true) },
+                min = 2, max = 8,
+            )),
+        )
+        val pins = mutableMapOf<Int, Boolean>()
+        for (v in 0 until 6) pins[v] = false  // 6 of 8 false → exactly 2 non-false left
+        val result = BacktrackSolver(problem).solve(BacktrackParams(
+            assumptions = Assumptions(bools = pins),
+        ))
+        val sat = assertIs<SolveResult.Sat>(result)
+        assertEquals(true, sat.assignment.bools[6], "v6 should be unit-forced true")
+        assertEquals(true, sat.assignment.bools[7], "v7 should be unit-forced true")
+    }
+
+    @Test
+    fun `cardinality watched literals propagate at-most-K when count saturates`() {
+        // AtMost-2 over 8 vars. Pin 2 of them to true → no more can be true; the
+        // remaining 6 must be forced false. Watched-literal at-most side detects this
+        // when its (n - max + 1) = 7 watches can't find a non-true replacement.
+        val problem = Problem(
+            numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(Cardinality(
+                literals = IntArray(8) { Lit.make(it, true) },
+                min = 0, max = 2,
+            )),
+        )
+        val pins = mutableMapOf<Int, Boolean>(0 to true, 1 to true)
+        val result = BacktrackSolver(problem).solve(BacktrackParams(
+            assumptions = Assumptions(bools = pins),
+        ))
+        val sat = assertIs<SolveResult.Sat>(result)
+        for (v in 2 until 8) {
+            assertEquals(false, sat.assignment.bools[v],
+                "v$v should be unit-forced false to keep count ≤ 2, got ${sat.assignment.bools[v]}")
+        }
+    }
+
+    @Test
+    fun `cardinality bilateral exactly-one detects unsat under conflicting pins`() {
+        // ExactlyOne over 4 vars with two of them pinned true → contradiction.
+        // The watched scheme has both at-least (2 watches) and at-most (4 watches);
+        // the at-most side should fire and detect the over-budget condition.
+        val problem = Problem(
+            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(Cardinality.exactlyOne(IntArray(4) { Lit.make(it, true) })),
+        )
+        val r = BacktrackSolver(problem).solve(BacktrackParams(
+            assumptions = Assumptions(bools = mapOf(0 to true, 1 to true)),
+        ))
+        assertIs<SolveResult.Unsat>(r)
+    }
+
+    @Test
     fun `watched literals propagate wide unit clauses correctly`() {
         // A 50-literal clause: at least one of v0..v49 must be true. Bake-time
         // propagation can't pin anything (50 unassigned). After pinning v0..v48 to
