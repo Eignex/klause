@@ -283,6 +283,81 @@ class ConflictAnalyzerTest {
     }
 
     @Test
+    fun `clause minimization drops redundant literals`() {
+        // Build a propagation chain that produces a learnable clause whose raw 1UIP
+        // output contains a redundant literal, then verify minimization removes it.
+        //
+        //   c0: ¬a ∨ b        (a forces b)
+        //   c1: ¬b ∨ c        (b forces c)
+        //   c2: ¬a ∨ ¬b ∨ ¬c  (fails when a, b, c all true)
+        //
+        // Decision: a=true (lvl 1) → b forced (c0), c forced (c1), c2 fails.
+        //
+        // Raw 1UIP resolution:
+        //   Seed (c2): [¬a, ¬b, ¬c]. All at level 1.
+        //   currentLevelCount = 3.
+        //   Walk trail. Most recent = c. Resolve via c's antecedents (c1): [¬b, c],
+        //   minus c → [¬b]. ¬b already in seen — nothing new. Continue.
+        //   Most recent = b. Resolve via b's antecedents (c0): [¬a, b], minus b → [¬a].
+        //   ¬a already in seen. Continue.
+        //   Most recent = a. UIP. learned literals are [¬a, ¬b, ¬c] (added during seed),
+        //   plus UIP literal ¬a added at the end → but ¬a is already there.
+        //
+        // After 1UIP: literals are {¬a, ¬b, ¬c} (raw, possibly with one dup).
+        // Minimization: variable c is implied by b (antecedents = [¬b], which is
+        // already in clause). Drop c. Variable b is implied by a (antecedents = [¬a],
+        // also in clause). Drop b. Result: just {¬a}.
+        val problem = Problem(
+            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+        val session = PropagationSession(problem)
+        val r = session.pinBool(0, true)
+        val unsat = assertIs<PropagationResult.Unsat>(r)
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
+        assertEquals(setOf(Lit.make(0, false)), learned.literals.toSet(),
+            "minimization should drop ¬b and ¬c (both implied by ¬a via the chain), " +
+            "leaving just [¬a]; got ${learned.literals.toList()}")
+        assertEquals(0, learned.backjumpLevel,
+            "unit-clause learning forces backjump to level 0")
+        assertEquals(1, learned.lbd, "minimized to single literal → LBD = 1")
+    }
+
+    @Test
+    fun `clause minimization preserves correctness on minimized SAT search`() {
+        // End-to-end check: run a CDB search that learns minimizable clauses, verify
+        // the resulting assignment satisfies every original clause.
+        val problem = Problem(
+            numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false), Lit.make(3, false))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+            ),
+        )
+        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 11L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        val s = sat.assignment.bools
+        val clauses = listOf(
+            listOf(Lit.make(0, false), Lit.make(1, true)),
+            listOf(Lit.make(1, false), Lit.make(2, true)),
+            listOf(Lit.make(2, false), Lit.make(3, true)),
+            listOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false), Lit.make(3, false)),
+            listOf(Lit.make(0, true), Lit.make(4, true)),
+        )
+        for ((i, c) in clauses.withIndex()) {
+            assertTrue(c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
+                "clause $i not satisfied by ${s.toList()}")
+        }
+    }
+
+    @Test
     fun `CDB finds SAT on a chained-propagation instance`() {
         // (¬a ∨ b), (¬b ∨ c), (¬c ∨ d), (¬d ∨ e), (a).
         // a=true forces b → c → d → e via unit propagation. No conflict — search

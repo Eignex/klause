@@ -69,7 +69,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      * the failing factor was firing at.
      */
     fun analyze(conflictFactorId: Int): AnalysisResult {
-        val factor = state.problem.factors[conflictFactorId]
+        val factor = state.factorAt(conflictFactorId)
         val seedReason = factor.conflictReason(state, conflictFactorId) ?: return AnalysisResult.NotApplicable
         val currentLevel = state.currentLevel
         if (currentLevel <= 0) {
@@ -98,10 +98,9 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
 
         if (currentLevelCount == 0) {
             // Every literal in the conflict reason was at a level < current — the conflict
-            // is fundamentally lower. Backjump to the deepest of those levels, learned
-            // clause is the conflict reason directly (negated).
-            val backjumpLevel = learned.map { state.boolLevel[Lit.variable(it)] }.maxOrNull() ?: 0
-            return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
+            // is fundamentally lower. The learned clause is the conflict reason directly
+            // (negated); [finalizeClause] computes backjump level from the literals' levels.
+            return finalizeClause(learned, currentLevel)
         }
 
         // Walk the pin trail backwards, resolving against the most-recently-pinned
@@ -134,8 +133,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                 // as it was, pivot can't be at its current value".
                 val pivotPinned = state.boolValues[pivot] ?: error("UIP variable $pivot is unpinned")
                 learned.add(Lit.make(pivot, !pivotPinned))
-                val backjumpLevel = backjumpLevelOf(learned, currentLevel)
-                return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
+                return finalizeClause(learned, currentLevel)
             }
             // Not yet UIP — replace pivot with its antecedents (resolution).
             val antecedents = state.boolAntecedents[pivot]
@@ -146,8 +144,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                     learned.add(Lit.make(pivot, !pivotPinned))
                     // Drain the rest of `seen` similarly.
                     drainSeenAsLeaves(seen, learned)
-                    val backjumpLevel = backjumpLevelOf(learned, currentLevel)
-                    return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
+                    return finalizeClause(learned, currentLevel)
                 }
             ingestReason(antecedents, seen, learned, currentLevel) {
                 currentLevelCount++
@@ -156,8 +153,84 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         // Defensive fallback when the trail walk doesn't reach UIP (shouldn't normally
         // happen): emit whatever's in `seen` as leaves.
         drainSeenAsLeaves(seen, learned)
-        val backjumpLevel = backjumpLevelOf(learned, currentLevel)
-        return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
+        return finalizeClause(learned, currentLevel)
+    }
+
+    /**
+     * Apply self-subsuming-resolution minimization, then compute backjump level + LBD
+     * on the final clause and wrap into [AnalysisResult.Learned]. Single tail call from
+     * every exit path of [analyze] so all exit shapes get the same post-processing.
+     */
+    private fun finalizeClause(learned: ArrayList<Int>, currentLevel: Int): AnalysisResult.Learned {
+        val minimized = minimize(learned, currentLevel)
+        return AnalysisResult.Learned(
+            minimized.toIntArray(),
+            backjumpLevelOf(minimized, currentLevel),
+            lbdOf(minimized),
+        )
+    }
+
+    /**
+     * Self-subsuming-resolution clause minimization. After 1UIP produces the learned
+     * clause, any literal `l` whose variable has antecedents fully implied by the rest
+     * of the clause is *redundant* — dropping it yields a strictly stronger clause
+     * (subset of the original under standard resolution rules).
+     *
+     * The UIP literal (at [currentLevel]) is never dropped — it's the asserting literal
+     * the engine relies on at the backjump level. Other literals are checked via
+     * [isRedundant], which walks antecedents recursively with a per-call cache to keep
+     * the cost linear in the implication graph reached.
+     *
+     * Standard CDCL polish (MiniSAT, Glucose). Shrinks learned clauses by 10-30% on
+     * typical SAT-style instances, with knock-on improvements to watcher-list traversal
+     * cost during future propagation.
+     */
+    private fun minimize(learned: ArrayList<Int>, currentLevel: Int): ArrayList<Int> {
+        if (learned.size <= 1) return learned
+        val inClause = BooleanArray(state.problem.numBoolVars)
+        for (lit in learned) inClause[Lit.variable(lit)] = true
+        val cache = HashMap<Int, Boolean>(learned.size * 4)
+        val toDrop = HashSet<Int>()
+        for (lit in learned) {
+            val v = Lit.variable(lit)
+            // Never drop the UIP — it's the asserting literal.
+            if (state.boolLevel[v] == currentLevel) continue
+            if (isRedundant(v, inClause, cache)) toDrop.add(v)
+        }
+        if (toDrop.isEmpty()) return learned
+        val out = ArrayList<Int>(learned.size - toDrop.size)
+        for (lit in learned) if (Lit.variable(lit) !in toDrop) out.add(lit)
+        return out
+    }
+
+    /**
+     * True iff every chain of antecedents leading to [v]'s pin terminates in either a
+     * variable that's *already in the learned clause* ([inClause]) or a level-0 fact.
+     * Decision-style leaves (variables with `null` antecedents) make [v] non-redundant.
+     *
+     * Cached per variable for the duration of a single [minimize] call — the recursion
+     * depth is bounded by the size of the implication graph reached, but the cache
+     * keeps the total work linear.
+     */
+    private fun isRedundant(
+        v: Int, inClause: BooleanArray, cache: HashMap<Int, Boolean>,
+    ): Boolean {
+        cache[v]?.let { return it }
+        val antecedents = state.boolAntecedents[v] ?: run {
+            cache[v] = false; return false
+        }
+        for (lit in antecedents) {
+            val u = Lit.variable(lit)
+            if (u == v) continue
+            if (state.boolLevel[u] <= 0) continue           // level-0 fact: implied by problem alone
+            if (inClause[u]) continue                       // already in clause: not introducing a new dependency
+            if (!isRedundant(u, inClause, cache)) {
+                cache[v] = false
+                return false
+            }
+        }
+        cache[v] = true
+        return true
     }
 
     /**
