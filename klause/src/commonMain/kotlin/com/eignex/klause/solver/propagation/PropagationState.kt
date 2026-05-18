@@ -2,6 +2,7 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 
 /**
@@ -89,6 +90,59 @@ class PropagationState(
      * produce the full propagation-graph core.
      */
     internal var conflictSeedFactors: MutableSet<Int>? = null
+
+    /**
+     * Per-factor mutable scratch space — mirrors [com.eignex.klause.solver.localsearch.LocalSearchState.refPayload]
+     * on the LS side. Factors stash propagation-time bookkeeping here keyed by their own
+     * factor id; the engine doesn't touch the contents. Today's only user is
+     * [com.eignex.klause.solver.factor.Clause]'s two-watched-literal scheme, but the slot
+     * is general so future factors (Cardinality watched literals, etc.) can adopt the
+     * same pattern.
+     *
+     * Drift across snapshot / restore is intentional. CDCL-style watches are advisory:
+     * they point at "non-false-when-last-checked" literals, and propagate self-corrects
+     * by re-validating on each fire. Carrying them across pops keeps work amortised
+     * without the snapshot copying that level-aware state needs.
+     */
+    val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
+
+    /**
+     * Per-literal wakeup index for factors opting into [com.eignex.klause.solver.Factor.initialBoolWatchers].
+     * Slot `boolWatchersByLit[lit]` lists factor ids that should fire when literal `lit`
+     * transitions to false. Sized `2 * problem.numBoolVars`; lit ids are the standard
+     * [com.eignex.klause.solver.Lit.make] encoding. Populated at construction from each
+     * factor's initial watch set; factors with dynamic watches (Clause) keep it in sync
+     * via [moveBoolWatcher] as their watches drift during propagation.
+     *
+     * Like [refPayload], the index drifts across snapshot / restore on purpose. After a
+     * pop the watches reflect their state at the deepest level reached — that's still
+     * sound, since the invariant is "watch is on a non-false literal", and pop reverts
+     * pins which only *adds* non-false literals.
+     */
+    val boolWatchersByLit: Array<com.eignex.klause.util.IntArrayList> =
+        Array(2 * problem.numBoolVars) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
+
+    init {
+        for (fid in 0 until problem.numFactors) {
+            val watchers = problem.factors[fid].initialBoolWatchers ?: continue
+            for (lit in watchers) boolWatchersByLit[lit].add(fid)
+        }
+    }
+
+    /**
+     * Move factor [factorId]'s registration from [oldLit] to [newLit] in
+     * [boolWatchersByLit]. Called by watcher-using factors when they relocate a watch
+     * during propagation. The removal scans [oldLit]'s slot (typically a handful of
+     * entries) and swap-and-pops; the insert is O(1).
+     */
+    fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
+        if (oldLit == newLit) return
+        val from = boolWatchersByLit[oldLit]
+        for (i in 0 until from.size) {
+            if (from[i] == factorId) { from.removeAt(i); break }
+        }
+        boolWatchersByLit[newLit].add(factorId)
+    }
 
     init {
         seeded = seedAssumptions(assumptions)
@@ -351,9 +405,7 @@ class PropagationState(
         } else {
             while (true) {
                 val v = pollDirtyBool(); if (v < 0) break
-                for (fid in problem.boolOccurrences[v]) {
-                    if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
-                }
+                enqueueForBoolChange(v, pending, queue)
             }
             while (true) {
                 val v = pollDirtyInt(); if (v < 0) break
@@ -379,9 +431,7 @@ class PropagationState(
             }
             while (true) {
                 val v = pollDirtyBool(); if (v < 0) break
-                for (other in problem.boolOccurrences[v]) {
-                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
-                }
+                enqueueForBoolChange(v, pending, queue)
             }
             while (true) {
                 val v = pollDirtyInt(); if (v < 0) break
@@ -391,5 +441,31 @@ class PropagationState(
             }
         }
         return null
+    }
+
+    /**
+     * Add every factor that should fire on [v]'s newly-pinned value to [queue], using the
+     * split wakeup paths: occurrence-list for factors that don't watch literals, plus the
+     * per-literal watcher index for those that do (currently Clauses). For watcher-using
+     * factors only the literal that just transitioned to *false* triggers a fire — true
+     * literals satisfy the clause, no propagation needed.
+     */
+    private fun enqueueForBoolChange(
+        v: Int,
+        pending: BooleanArray,
+        queue: com.eignex.klause.util.IntArrayDeque,
+    ) {
+        for (fid in problem.nonBoolWatcherBoolOccurrences[v]) {
+            if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
+        }
+        // The literal that just became false is the one whose polarity opposes the pin.
+        // boolValues[v] is non-null here (the var was added to dirtyBools only after a
+        // successful pin); read it directly.
+        val falseLit = Lit.make(v, !boolValues[v]!!)
+        val watchers = boolWatchersByLit[falseLit]
+        for (i in 0 until watchers.size) {
+            val fid = watchers[i]
+            if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
+        }
     }
 }

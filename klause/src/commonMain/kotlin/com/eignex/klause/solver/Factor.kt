@@ -34,4 +34,24 @@ interface Factor {
      * — sound but trivial. Factors override to participate in [Problem.propagate].
      */
     fun propagate(state: PropagationState, factorId: Int): Boolean = true
+
+    /**
+     * Boolean literals this factor wants per-literal wakeup on, or `null` for the default
+     * occurrence-list wakeup (fire on *any* change to a variable in [boolVars]). When
+     * non-null, the propagation engine routes bool wakeups through a per-literal index
+     * (`boolWatchersByLit[lit]`) instead of through [boolVars]: the factor fires only when
+     * the literal that just became *false* is in this set. The factor is responsible for
+     * keeping the index in sync as watches drift, via
+     * [PropagationState.moveBoolWatcher].
+     *
+     * Used by [com.eignex.klause.solver.factor.Clause] to implement two-watched-literal
+     * propagation (Zhang–Stickel / MiniSAT): only the two watched literals trigger
+     * wakeups, so a 50-literal clause fires on 2/50 var changes instead of 50/50. The
+     * same scheme generalises to Cardinality with k+1 watched literals — a future
+     * factor can adopt this contract without engine changes.
+     *
+     * Default is `null` — preserves the current "wake on any boolVars change" semantics
+     * for every factor that hasn't opted in.
+     */
+    val initialBoolWatchers: IntArray? get() = null
 }

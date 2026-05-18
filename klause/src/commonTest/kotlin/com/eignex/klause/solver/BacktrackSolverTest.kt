@@ -80,6 +80,56 @@ class BacktrackSolverTest {
     }
 
     @Test
+    fun `watcher index routes wakeups only on the false-going literal`() {
+        // Clause `+v0 ∨ +v1 ∨ +v2`. Initial watches are on v0 and v1. After
+        // construction, the per-literal watcher index should list the clause at
+        // Lit.make(0,true) and Lit.make(1,true) — and nowhere else, including
+        // *negative* polarities of those vars and either polarity of v2 (which is
+        // not yet watched).
+        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
+        val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(clause))
+        val state = com.eignex.klause.solver.propagation.PropagationState(problem, Assumptions.None)
+        // Initially watching the literals at indices 0 and 1 — the positive forms of v0 and v1.
+        assertEquals(1, state.boolWatchersByLit[Lit.make(0, true)].size,
+            "clause should be in watcher list for +v0")
+        assertEquals(1, state.boolWatchersByLit[Lit.make(1, true)].size,
+            "clause should be in watcher list for +v1")
+        // Should NOT be on the negative polarities (those becoming false means the
+        // positive literal is true → clause satisfied → no wakeup needed).
+        assertEquals(0, state.boolWatchersByLit[Lit.make(0, false)].size,
+            "clause should not be woken when -v0 becomes false (i.e., v0 = true)")
+        // Should NOT be on v2 at all yet — not a watched literal.
+        assertEquals(0, state.boolWatchersByLit[Lit.make(2, true)].size,
+            "v2 is not yet a watched literal")
+    }
+
+    @Test
+    fun `watched literals propagate wide unit clauses correctly`() {
+        // A 50-literal clause: at least one of v0..v49 must be true. Bake-time
+        // propagation can't pin anything (50 unassigned). After pinning v0..v48 to
+        // false via assumptions, the clause becomes unit on v49 → propagation pins
+        // v49 = true. This exercises the watched-literal scheme on a clause where
+        // most literals are false at propagation time; the per-fire walk has to find
+        // the one remaining non-false literal as a replacement watch and detect unit.
+        val problem = Problem(
+            numBoolVars = 50, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(Clause(IntArray(50) { Lit.make(it, true) })),
+        )
+        val pins = mutableMapOf<Int, Boolean>()
+        for (v in 0 until 49) pins[v] = false
+        val result = BacktrackSolver(problem).solve(BacktrackParams(
+            assumptions = Assumptions(bools = pins),
+        ))
+        val sat = assertIs<SolveResult.Sat>(result)
+        assertEquals(true, sat.assignment.bools[49],
+            "watched-literal unit propagation should force v49 = true")
+        for (v in 0 until 49) {
+            assertEquals(false, sat.assignment.bools[v], "v$v assumption should hold")
+        }
+    }
+
+    @Test
     fun `unsat core handles two-sided int narrowing`() {
         // Two linear constraints: 1·x >= 5 and 1·x <= 3. Each individually is fine on
         // domain [0,10]; together they empty the domain. Both factors must appear in

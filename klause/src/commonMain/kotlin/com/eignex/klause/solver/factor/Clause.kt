@@ -35,6 +35,16 @@ class Clause(
     }
     override val intVars: IntArray = EmptyIntArray
 
+    /** Initial two-watched-literal wakeup positions. Unit clauses watch their single
+     *  literal so they fire when it becomes false; longer clauses watch literals[0] and
+     *  literals[1] to start. The CP engine routes per-literal wakeups through this set
+     *  via [com.eignex.klause.solver.propagation.PropagationState.boolWatchersByLit]; as
+     *  watches drift during propagation, [propagate] keeps the index in sync by calling
+     *  `state.moveBoolWatcher`. */
+    override val initialBoolWatchers: IntArray =
+        if (literals.size == 1) intArrayOf(literals[0])
+        else intArrayOf(literals[0], literals[1])
+
     /** Pre-computed `boolVar → literal index` lookup. Cheap to materialise once at
      *  construction; turns the per-flip "find my literal" loop into a hash lookup. The
      *  compile path doesn't generate clauses where a var appears multiple times (`v` and
@@ -156,29 +166,102 @@ class Clause(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
+    /**
+     * Two-watched-literal propagation (Zhang–Stickel / MiniSAT). Caches a pair of literal
+     * indices on [PropagationState.refPayload]; each fire checks at most those two before
+     * looking further. Common case (both watches non-false): returns in O(1) regardless of
+     * clause arity. Slow case (a watch turned false): scans for a non-false replacement,
+     * O(arity) worst-case but amortised across many fires since most flips don't disturb
+     * the watches.
+     *
+     * Soundness across [PropagationSession] push/pop: watches deliberately aren't
+     * snapshotted (see [PropagationState.refPayload] kdoc). After a pop, watches may
+     * point at literals that are again unassigned at the restored level — perfectly
+     * valid, since the invariant is "watches point at non-false literals" and unassigned
+     * counts as non-false. If a restored state actually makes the watches stale (some
+     * literal at the watch position is somehow false), the first propagate call
+     * re-validates and moves them.
+     */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Walk literals once. Detect a satisfying literal, count unassigned literals, remember the
-        // last unassigned one. If satisfied → nothing to do. If 0 unassigned and none satisfied →
-        // Unsat. If exactly 1 unassigned and none satisfied → pin it to its required polarity.
-        var unassignedCount = 0
-        var unassignedLit = 0
-        for (lit in literals) {
+        if (literals.size == 1) {
+            // Unit clause: no second watch to play with. Trivial check-or-pin.
+            val lit = literals[0]
             val v = Lit.variable(lit)
             val b = state.boolValues[v]
-            if (b == null) {
-                unassignedCount++
-                unassignedLit = lit
-                if (unassignedCount > 1) return true  // not yet unit; no propagation possible
-            } else if (Lit.evaluate(lit, b)) {
-                return true  // clause already satisfied
+            return if (b == null) state.pinBool(v, Lit.isPositive(lit))
+                   else Lit.evaluate(lit, b)
+        }
+        val watches = (state.refPayload[factorId] as IntArray?) ?: run {
+            // First fire on this session: initial watches at indices 0 and 1. The body
+            // below re-validates if either is already false.
+            val w = intArrayOf(0, 1)
+            state.refPayload[factorId] = w
+            w
+        }
+        // Fast path: if either watched literal is currently true, the clause is satisfied
+        // and we don't even need to look further. This is the dominant case once watches
+        // have settled, and is what makes the propagator amortised-O(1) per fire.
+        if (litTrue(state, watches[0]) || litTrue(state, watches[1])) return true
+
+        // If a watch is on a now-false literal, scan for a non-false replacement. Skip
+        // both currently-watched indices so the two watches stay distinct. Whenever we
+        // move a watch, notify the state so its per-literal wakeup index stays in sync —
+        // future flips of the *old* literal's var won't wake this clause anymore (correct,
+        // since we're no longer watching it), and flips of the *new* literal's var will.
+        if (litFalse(state, watches[0])) {
+            val rep = findNonFalseLitExcept(state, watches[0], watches[1])
+            if (rep >= 0) {
+                state.moveBoolWatcher(factorId, literals[watches[0]], literals[rep])
+                watches[0] = rep
             }
         }
-        return when (unassignedCount) {
-            0 -> false  // all literals false → contradiction
-            1 -> state.pinBool(Lit.variable(unassignedLit), Lit.isPositive(unassignedLit))
+        if (litFalse(state, watches[1])) {
+            val rep = findNonFalseLitExcept(state, watches[1], watches[0])
+            if (rep >= 0) {
+                state.moveBoolWatcher(factorId, literals[watches[1]], literals[rep])
+                watches[1] = rep
+            }
+        }
+        // Re-evaluate after potential moves. If either is now true, satisfied.
+        if (litTrue(state, watches[0]) || litTrue(state, watches[1])) return true
+
+        // No true literal. Each watch is either false (no replacement was found) or
+        // unassigned. Outcomes:
+        //   both false        → no literal can be true → contradiction
+        //   one false, one ?  → ? is the only candidate → unit-pin it
+        //   both unassigned   → clause not yet determined → no propagation
+        val w0False = litFalse(state, watches[0])
+        val w1False = litFalse(state, watches[1])
+        return when {
+            w0False && w1False -> false
+            w0False -> pinLit(state, literals[watches[1]])
+            w1False -> pinLit(state, literals[watches[0]])
             else -> true
         }
     }
+
+    private fun litTrue(state: PropagationState, idx: Int): Boolean {
+        val lit = literals[idx]
+        val b = state.boolValues[Lit.variable(lit)] ?: return false
+        return Lit.evaluate(lit, b)
+    }
+
+    private fun litFalse(state: PropagationState, idx: Int): Boolean {
+        val lit = literals[idx]
+        val b = state.boolValues[Lit.variable(lit)] ?: return false
+        return !Lit.evaluate(lit, b)
+    }
+
+    private fun findNonFalseLitExcept(state: PropagationState, excludeA: Int, excludeB: Int): Int {
+        for (i in literals.indices) {
+            if (i == excludeA || i == excludeB) continue
+            if (!litFalse(state, i)) return i
+        }
+        return -1
+    }
+
+    private fun pinLit(state: PropagationState, lit: Int): Boolean =
+        state.pinBool(Lit.variable(lit), Lit.isPositive(lit))
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return

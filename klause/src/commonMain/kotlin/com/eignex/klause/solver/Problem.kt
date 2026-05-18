@@ -43,6 +43,24 @@ class Problem(
     val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }
 
     /**
+     * [boolOccurrences] minus factors that use per-literal wakeup (see
+     * [Factor.initialBoolWatchers]). The propagation engine walks this list for
+     * occurrence-driven wakeup, while watcher-using factors are woken via the
+     * per-state [com.eignex.klause.solver.propagation.PropagationState.boolWatchersByLit]
+     * index instead. Identical to [boolOccurrences] when no factor opts in.
+     */
+    val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
+        val watcherFids = HashSet<Int>()
+        for (i in factors.indices) {
+            if (factors[i].initialBoolWatchers != null) watcherFids.add(i)
+        }
+        if (watcherFids.isEmpty()) boolOccurrences
+        else Array(numBoolVars) { v ->
+            boolOccurrences[v].filter { it !in watcherFids }.toIntArray()
+        }
+    }
+
+    /**
      * For each factor, the ids of every other factor sharing at least one variable.
      * Used by clause-weighting strategies (DDFW) to find candidate weight donors.
      */
