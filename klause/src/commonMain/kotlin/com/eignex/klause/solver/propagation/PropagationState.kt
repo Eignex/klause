@@ -338,6 +338,12 @@ class PropagationState(
     fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo)
     fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi)
     fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value)
+    /** Punch a hole in [v]'s domain at [value]. Returns `true` on success (including the
+     *  no-op case when [value] is already absent), `false` on conflict (would empty the
+     *  domain). When [value] is at the current endpoint, this is equivalent to a
+     *  bound-tighten by one; when it's interior, it transitions the domain to sparse
+     *  representation. */
+    fun excludeIntValue(v: Int, value: Int): Boolean = excludeIntValueImpl(v, value)
 
     private fun pinBoolImpl(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
         val cur = boolValues[v]
@@ -372,7 +378,9 @@ class PropagationState(
             seedConflictFactor(currentFactor)
             return false
         }
-        intDomains[v] = IntDomain(lo, d.max)
+        // Preserve interior holes via the sparse-aware constructor path. For contiguous
+        // domains this is functionally identical to `IntDomain(lo, d.max)`.
+        intDomains[v] = d.withMinAtLeast(lo)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMinReason[v] = currentFactor
         dirtyInts.addLast(v)
@@ -388,9 +396,44 @@ class PropagationState(
             seedConflictFactor(currentFactor)
             return false
         }
-        intDomains[v] = IntDomain(d.min, hi)
+        intDomains[v] = d.withMaxAtMost(hi)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMaxReason[v] = currentFactor
+        dirtyInts.addLast(v)
+        return true
+    }
+
+    /**
+     * Punch a hole at [value] in `intDomains[v]`. Three cases:
+     *  - `value` not in the current domain → no-op, returns `true`.
+     *  - `value` is at the current min or max → equivalent to a one-step bound tighten.
+     *  - `value` is interior → the domain transitions to sparse representation. Other
+     *    propagators still see the same `min`/`max` until further tightening; the hole
+     *    affects `contains(value)` lookups and `forEach` iteration.
+     *
+     * Returns `false` only when removing [value] would empty the domain (singleton
+     * domain whose sole value is [value]). On conflict, seeds the factor core with the
+     * level / reason fields already tracked for the min and max sides.
+     */
+    private fun excludeIntValueImpl(v: Int, value: Int): Boolean {
+        val d = intDomains[v]
+        if (value !in d) return true
+        if (d.min == d.max && d.min == value) {
+            recordConflictLevels(intLevel[v], currentLevel)
+            seedConflictFactor(intMinReason[v])
+            seedConflictFactor(intMaxReason[v])
+            seedConflictFactor(currentFactor)
+            return false
+        }
+        val newDomain = d.excludeValue(value)
+        intDomains[v] = newDomain
+        intLevel[v] = maxOf(intLevel[v], currentLevel)
+        // Reason attribution: which side (min/max) "moved" depends on where the hole
+        // landed. Pure interior holes don't shift either endpoint; in that case the
+        // current factor still becomes the relevant reason for any future propagator
+        // walking back through this variable.
+        if (newDomain.min != d.min) intMinReason[v] = currentFactor
+        if (newDomain.max != d.max) intMaxReason[v] = currentFactor
         dirtyInts.addLast(v)
         return true
     }
