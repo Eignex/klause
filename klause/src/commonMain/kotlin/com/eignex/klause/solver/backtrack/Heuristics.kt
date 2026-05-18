@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 
@@ -28,13 +30,13 @@ interface VariableHeuristic {
     fun onConflict(varRef: VarRef) {}
     /**
      * Richer conflict notification: [varRef] is the decision that triggered the conflict,
-     * [conflictBools] / [conflictInts] are the *other* decision variables across all
-     * levels involved in the conflict (see [com.eignex.klause.solver.propagation.PropagationResult.Unsat]
-     * for the per-level encoding). VSIDS / dom-wdeg / EVSIDS bump every variable in the
-     * conflict reason set, not just the failed decision; classical heuristics ignore the
-     * extra info via the default forwarding to [onConflict] (varRef only).
+     * [unsat] carries the full reason set (decision variables, decision levels, contributing
+     * factor ids) the propagation engine assembled. VSIDS reads `conflictBools` /
+     * `conflictInts`; dom/wdeg reads `conflictFactors`; impact-style heuristics could read
+     * `conflictLevels` to score depth. Default forwards to [onConflict] (varRef only) so
+     * pure / activity-agnostic heuristics ignore the extra info transparently.
      */
-    fun onConflict(varRef: VarRef, conflictBools: Set<Int>, conflictInts: Set<Int>) {
+    fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
         onConflict(varRef)
     }
     /** Called once per successful pin of [varRef]; useful for phase-saving-like state. */
@@ -184,14 +186,12 @@ class Vsids(
         return best
     }
 
-    override fun onConflict(
-        varRef: VarRef, conflictBools: Set<Int>, conflictInts: Set<Int>,
-    ) {
+    override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
         ensureSized(boolActivity.size.coerceAtLeast(0), intActivity.size.coerceAtLeast(0))
         // Bump every decision variable in the conflict reason set, plus the failed
         // decision itself (in case it isn't already in the set — typically it is).
-        for (b in conflictBools) bumpBool(b)
-        for (i in conflictInts) bumpInt(i)
+        for (b in unsat.conflictBools) bumpBool(b)
+        for (i in unsat.conflictInts) bumpInt(i)
         when (varRef) {
             is VarRef.Bool -> bumpBool(varRef.varId)
             is VarRef.IntVar -> bumpInt(varRef.varId)
@@ -233,6 +233,132 @@ object RandomVariable : VariableHeuristic {
         }
         if (candidates.isEmpty()) return null
         return candidates[rng.nextInt(candidates.size)]
+    }
+}
+
+/**
+ * Domain-over-weighted-degree (Boussemart-Hemery-Lecoutre-Sais 2004). Maintains a
+ * per-factor *failure weight* that's bumped every time the factor participates in a
+ * conflict — read off [PropagationResult.Unsat.conflictFactors], which carries the full
+ * propagation-graph attribution shipped earlier. The variable score is then
+ *     wdeg(v) / dom(v)
+ * where `wdeg(v) = Σ factor_weights[f]` over every factor mentioning `v`. Pick the
+ * variable with the highest score; first-fail with a conflict-driven prior on which
+ * constraints have proven hard so far.
+ *
+ * Compared to [Vsids]: dom/wdeg attributes "hardness" to *constraints* (so two variables
+ * touched by the same hard constraint are both prioritised), while VSIDS attributes
+ * directly to *variables*. Empirically dom/wdeg wins on CSPs with structured propagators;
+ * VSIDS wins on SAT-style problems. They compose — a portfolio bandit can pick between
+ * them per restart.
+ *
+ * Weights persist across [onRestart]; that's intentional, mirroring VSIDS's persistence.
+ * Resizes the factor-weights array across problems for instance reuse.
+ */
+class DomWdeg : VariableHeuristic {
+
+    private var factorWeights: DoubleArray = DoubleArray(0)
+
+    private fun ensureSized(numFactors: Int) {
+        if (factorWeights.size != numFactors) {
+            // Default initial weight is 1.0 — every factor contributes its degree before
+            // any conflict is observed (classical dom/deg behaviour).
+            factorWeights = DoubleArray(numFactors) { 1.0 }
+        }
+    }
+
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        val problem = session.problem
+        ensureSized(problem.numFactors)
+        var best: VarRef? = null
+        var bestScore = Double.NEGATIVE_INFINITY
+        for (v in 0 until problem.numBoolVars) {
+            if (session.boolValue(v) != null) continue
+            // Bool domain size = 2 when unpinned.
+            val score = wdegBool(problem, v) / 2.0
+            if (score > bestScore) { bestScore = score; best = VarRef.Bool(v) }
+        }
+        for (v in 0 until problem.numIntVars) {
+            val dom = session.intDomain(v).size
+            if (dom <= 1) continue
+            val score = wdegInt(problem, v) / dom.toDouble()
+            if (score > bestScore) { bestScore = score; best = VarRef.IntVar(v) }
+        }
+        return best
+    }
+
+    private fun wdegBool(problem: Problem, v: Int): Double {
+        var sum = 0.0
+        for (fid in problem.boolOccurrences[v]) sum += factorWeights[fid]
+        return sum
+    }
+
+    private fun wdegInt(problem: Problem, v: Int): Double {
+        var sum = 0.0
+        for (fid in problem.intOccurrences[v]) sum += factorWeights[fid]
+        return sum
+    }
+
+    override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
+        // Every factor implicated in the conflict gets +1. The reason set was assembled
+        // by a backward BFS through the propagation graph (see
+        // PropagationState.extractConflictFactors), so this captures all contributing
+        // constraints, not just the single failing one.
+        for (fid in unsat.conflictFactors) {
+            if (fid < factorWeights.size) factorWeights[fid] += 1.0
+        }
+    }
+}
+
+/**
+ * Last-conflict prioritisation (Lecoutre-Saïs-Tabary-Vidal 2009). Wraps any base
+ * [VariableHeuristic]: on every pick, returns the variable that triggered the most
+ * recent conflict (if it's still unpinned), otherwise delegates to the base. Cleared
+ * when the prioritised variable successfully commits (the next pick falls through to
+ * the base) or on restart.
+ *
+ * Tends to fix unstable subtrees fast — when the search backtracks past a conflict
+ * and the responsible variable is back in scope, branching on it again before
+ * exploring other vars lets the engine confirm or rule out the cause of the prior
+ * failure without wandering. Composes cleanly with [Vsids] / [DomWdeg]: use
+ * `LastConflict(Vsids())` to get last-conflict priority on top of activity-driven
+ * picking.
+ */
+class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
+
+    private var pending: VarRef? = null
+
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        val candidate = pending
+        if (candidate != null) {
+            val stillFree = when (candidate) {
+                is VarRef.Bool -> session.boolValue(candidate.varId) == null
+                is VarRef.IntVar -> session.intDomain(candidate.varId).size > 1
+            }
+            if (stillFree) return candidate
+            pending = null  // assigned away (likely via propagation); drop the prioritisation
+        }
+        return base.pick(session, rng)
+    }
+
+    override fun onConflict(varRef: VarRef) {
+        pending = varRef
+        base.onConflict(varRef)
+    }
+
+    override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
+        pending = varRef
+        base.onConflict(varRef, unsat)
+    }
+
+    override fun onCommit(varRef: VarRef) {
+        if (pending == varRef) pending = null
+        base.onCommit(varRef)
+    }
+
+    override fun onRestart() {
+        pending = null
+        base.onRestart()
     }
 }
 

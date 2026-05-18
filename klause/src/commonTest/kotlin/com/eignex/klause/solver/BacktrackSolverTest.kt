@@ -2,6 +2,10 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.DomWdeg
+import com.eignex.klause.solver.backtrack.LastConflict
+import com.eignex.klause.solver.backtrack.RandomVariable
+import com.eignex.klause.solver.backtrack.SmallestDomain
 import com.eignex.klause.solver.backtrack.VarRef
 import com.eignex.klause.solver.backtrack.Vsids
 
@@ -384,8 +388,9 @@ class BacktrackSolverTest {
         )
         val vsids = Vsids()
         // Bump v3 directly via the rich onConflict signature. Use varRef = v3 and an
-        // empty conflict set so only v3 gets the bump.
-        repeat(3) { vsids.onConflict(VarRef.Bool(3), emptySet(), emptySet()) }
+        // empty Unsat record so only v3 (the failing decision) gets the bump.
+        val emptyUnsat = com.eignex.klause.solver.propagation.PropagationResult.Unsat()
+        repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
         // Solve with this VSIDS; the first decision should be on v3.
         val pinned = mutableMapOf<Int, Boolean>()
         // We can't easily inspect "which var was picked first" without engine hooks, so
@@ -411,6 +416,97 @@ class BacktrackSolverTest {
         val r2 = BacktrackSolver(p2).solve(BacktrackParams(variableHeuristic = vsids))
         assertIs<SolveResult.Sat>(r2)
         assertEquals(true, r2.assignment.bools[6])
+    }
+
+    @Test
+    fun `dom-wdeg finds SAT and proves UNSAT on small instances`() {
+        // Mixed sanity check: SAT + UNSAT problems both terminate correctly under
+        // dom/wdeg picking.
+        val satProblem = Problem(
+            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Cardinality.exactlyOne(intArrayOf(
+                    Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
+                )),
+            ),
+        )
+        val r1 = BacktrackSolver(satProblem).solve(BacktrackParams(
+            variableHeuristic = DomWdeg(), randomSeed = 0L,
+        ))
+        val sat = assertIs<SolveResult.Sat>(r1)
+        assertEquals(1, sat.assignment.bools.count { it })
+
+        val unsatProblem = Problem(
+            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+            ),
+        )
+        val r2 = BacktrackSolver(unsatProblem).solve(BacktrackParams(
+            variableHeuristic = DomWdeg(),
+        ))
+        assertIs<SolveResult.Unsat>(r2)
+    }
+
+    @Test
+    fun `last-conflict prioritises the failing variable on the next pick`() {
+        // Wrap an InputOrder base with LastConflict. After a conflict on v3, the next
+        // pick should be v3 (when still free). We can't directly inspect "which var
+        // was picked first" — instead, verify behaviour with a fake conflict-trigger:
+        // call onConflict(v3) directly, then ask `pick` on a fresh session.
+        val problem = Problem(
+            numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(Clause(intArrayOf(Lit.make(0, true)))),  // unit on v0
+        )
+        val base = RandomVariable
+        val lc = LastConflict(base)
+        // Simulate a conflict on v3.
+        lc.onConflict(VarRef.Bool(3))
+        // Now pick. Build a session with no pins; v3 should be the choice regardless
+        // of the base heuristic's random pick.
+        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val picked = lc.pick(session, kotlin.random.Random(0L))
+        assertEquals(VarRef.Bool(3), picked,
+            "last-conflict should return v3 when it triggered the most recent conflict")
+    }
+
+    @Test
+    fun `last-conflict clears its pending var on successful commit`() {
+        val problem = Problem(
+            numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
+            factors = emptyList(),
+        )
+        val lc = LastConflict(SmallestDomain)
+        lc.onConflict(VarRef.Bool(2))
+        // Commit v2 → the prioritisation should drop.
+        lc.onCommit(VarRef.Bool(2))
+        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val picked = lc.pick(session, kotlin.random.Random(0L))
+        // After commit, falls through to base — which is SmallestDomain, so first bool var.
+        assertEquals(VarRef.Bool(0), picked,
+            "last-conflict should defer to base after the prioritised var commits")
+    }
+
+    @Test
+    fun `last-conflict composes with vsids end-to-end`() {
+        // Functional check: LastConflict(Vsids()) finds SAT on a conflict-heavy instance.
+        val problem = Problem(
+            numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Cardinality.exactlyOne(intArrayOf(
+                    Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
+                )),
+                Cardinality.exactlyOne(intArrayOf(
+                    Lit.make(3, true), Lit.make(4, true), Lit.make(5, true),
+                )),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+            ),
+        )
+        val r = BacktrackSolver(problem).solve(BacktrackParams(
+            variableHeuristic = LastConflict(Vsids()), randomSeed = 0L,
+        ))
+        assertIs<SolveResult.Sat>(r)
     }
 
     @Test

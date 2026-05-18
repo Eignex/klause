@@ -497,9 +497,10 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             val outcome = node.applyNext(session) ?: return false
             val r = outcome.result
             if (r is PropagationResult.Unsat) {
-                // Forward the full conflict reason set so activity-based heuristics (VSIDS)
-                // bump every involved decision variable, not just the failing one.
-                params.variableHeuristic.onConflict(node.varRef, r.conflictBools, r.conflictInts)
+                // Forward the full conflict reason record so activity-, weight-, and
+                // factor-driven heuristics (VSIDS, dom/wdeg) all see exactly what they
+                // need without further plumbing.
+                params.variableHeuristic.onConflict(node.varRef, r)
                 params.valueHeuristic.onConflict(node.varRef, outcome.value)
                 continue
             }
