@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.UnsatCore
 import org.sosy_lab.common.ShutdownNotifier
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
@@ -49,12 +50,25 @@ class SmtSession(
     private val prover: ProverEnvironment
     private val stack: ArrayDeque<Assumptions> = ArrayDeque()
     private var closed: Boolean = false
+    /** Reverse map from factor-derived assertion back to its [com.eignex.klause.solver.Problem.factors]
+     *  index. Populated at session construction; lookups happen on UNSAT to attribute
+     *  the prover's reported unsat core back to klause factor ids. */
+    private val factorByFormula: HashMap<BooleanFormula, Int>
 
     init {
-        val (enc, constraints) = SmtTranslator.translate(solver.problem, context.formulaManager)
-        encoding = enc
-        prover = context.newProverEnvironment(ProverOptions.GENERATE_MODELS)
-        for (c in constraints) prover.addConstraint(c)
+        val t = SmtTranslator.translate(solver.problem, context.formulaManager)
+        encoding = t.encoding
+        prover = context.newProverEnvironment(
+            ProverOptions.GENERATE_MODELS,
+            ProverOptions.GENERATE_UNSAT_CORE,
+        )
+        for (c in t.auxiliary) prover.addConstraint(c)
+        factorByFormula = HashMap(t.factorFormulas.size * 2)
+        for (fid in t.factorFormulas.indices) {
+            val f = t.factorFormulas[fid]
+            prover.addConstraint(f)
+            factorByFormula[f] = fid
+        }
     }
 
     override val depth: Int get() = stack.size
@@ -76,9 +90,29 @@ class SmtSession(
     override fun solve(params: SmtParams): SolveResult {
         check(!closed) { "SmtSession is closed" }
         return withScope(params.assumptions) {
-            if (prover.isUnsat) SolveResult.Unsat()
+            if (prover.isUnsat) SolveResult.Unsat(extractCore())
             else SolveResult.Sat(decode(prover.model))
         }
+    }
+
+    /** Attribute the prover's unsat core (a list of formulas it added) back to klause
+     *  factor ids. Returns `null` when the backend doesn't honour
+     *  [ProverOptions.GENERATE_UNSAT_CORE] (returns empty / throws). */
+    private fun extractCore(): UnsatCore? {
+        val coreFormulas = try {
+            prover.unsatCore
+        } catch (_: UnsupportedOperationException) {
+            return null
+        }
+        if (coreFormulas.isEmpty()) return null
+        val ids = IntArray(coreFormulas.size)
+        var w = 0
+        for (f in coreFormulas) {
+            val id = factorByFormula[f] ?: continue
+            ids[w++] = id
+        }
+        if (w == 0) return null
+        return UnsatCore.of(if (w == ids.size) ids else ids.copyOf(w))
     }
 
     /**

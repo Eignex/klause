@@ -33,6 +33,21 @@ internal class SmtEncoding(
 )
 
 /**
+ * Translation result mirroring [com.eignex.klause.z3.Z3Translation]: variable encoding
+ * plus the formulas to assert, split into [auxiliary] (var domains, real-link
+ * bookkeeping — never appear in unsat cores) and [factorFormulas] (parallel to
+ * [com.eignex.klause.solver.Problem.factors] in id order). The split lets `solve`
+ * track only factor-derived assertions when an unsat core is requested.
+ */
+internal class SmtTranslation(
+    val encoding: SmtEncoding,
+    val auxiliary: List<BooleanFormula>,
+    val factorFormulas: List<BooleanFormula>,
+) {
+    fun allConstraints(): List<BooleanFormula> = auxiliary + factorFormulas
+}
+
+/**
  * Direct (non-bit-blasted) SMT translation of a klause [Problem] to JavaSMT formulas.
  * Same factor-by-factor mapping as the discontinued `klause-z3` path, but expressed
  * against JavaSMT's solver-agnostic API so any compatible backend (SMTInterpol default,
@@ -40,7 +55,7 @@ internal class SmtEncoding(
  */
 internal object SmtTranslator {
 
-    fun translate(problem: Problem, fm: FormulaManager): Pair<SmtEncoding, List<BooleanFormula>> {
+    fun translate(problem: Problem, fm: FormulaManager): SmtTranslation {
         val bmgr = fm.booleanFormulaManager
         val imgr = fm.integerFormulaManager
         val rmgr = fm.rationalFormulaManager
@@ -53,21 +68,21 @@ internal object SmtTranslator {
             else Array(meta.numFloatVars) { i -> rmgr.makeVariable("r$i") }
 
         val encoding = SmtEncoding(fm, boolFormulas, intFormulas, realFormulas)
-        val constraints = ArrayList<BooleanFormula>()
+        val auxiliary = ArrayList<BooleanFormula>()
 
-        // Int-domain bounds.
+        // Int-domain bounds — auxiliary, never load-bearing in user-facing unsat cores.
         for (i in 0 until problem.numIntVars) {
             val d = problem.intDomains[i]
-            constraints.add(bmgr.and(
+            auxiliary.add(bmgr.and(
                 imgr.greaterOrEquals(intFormulas[i], imgr.makeNumber(d.min.toLong())),
                 imgr.lessOrEquals(intFormulas[i], imgr.makeNumber(d.max.toLong())),
             ))
         }
-        // Native-real domain constraints + bucket linkage.
+        // Native-real domain constraints + bucket linkage — auxiliary.
         if (meta != null) {
             for (i in 0 until meta.numFloatVars) {
                 val ivl = meta.intervals[i]
-                constraints.add(bmgr.and(
+                auxiliary.add(bmgr.and(
                     rmgr.greaterOrEquals(realFormulas[i], rmgr.makeNumber(ivl.lo)),
                     rmgr.lessOrEquals(realFormulas[i], rmgr.makeNumber(ivl.hi)),
                 ))
@@ -79,16 +94,17 @@ internal object SmtTranslator {
                     rmgr.makeNumber(ivl.lo),
                     rmgr.multiply(rmgr.makeNumber(step), intVar),
                 )
-                constraints.add(rmgr.equal(realFormulas[i], linked))
+                auxiliary.add(rmgr.equal(realFormulas[i], linked))
             }
             for (c in meta.constraints) {
-                constraints.add(translateRealLinear(c, encoding))
+                auxiliary.add(translateRealLinear(c, encoding))
             }
         }
+        val factorFormulas = ArrayList<BooleanFormula>(problem.factors.size)
         for (factor in problem.factors) {
-            constraints.add(translateFactor(factor, encoding))
+            factorFormulas.add(translateFactor(factor, encoding))
         }
-        return encoding to constraints
+        return SmtTranslation(encoding, auxiliary, factorFormulas)
     }
 
     private fun translateRealLinear(c: RealLinearConstraint, e: SmtEncoding): BooleanFormula {

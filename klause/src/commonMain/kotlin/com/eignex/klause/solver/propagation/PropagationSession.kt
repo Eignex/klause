@@ -42,10 +42,12 @@ class PropagationSession(val problem: Problem) {
     init {
         val conflict = state.runToFixpoint(allFactors = true)
         if (conflict != null) {
+            val fid = state.conflictFactor
             bakedUnsat = PropagationResult.Unsat(
                 state.extractConflictBools(conflict),
                 state.extractConflictInts(conflict),
                 conflict,
+                if (fid >= 0) setOf(fid) else emptySet(),
             )
         }
         val baseline = computeImplied()
@@ -141,8 +143,10 @@ class PropagationSession(val problem: Problem) {
     private fun revertAndUnsat(levels: Set<Int>): PropagationResult.Unsat {
         val bools = state.extractConflictBools(levels)
         val ints = state.extractConflictInts(levels)
+        val fid = state.conflictFactor
+        val factors = if (fid >= 0) setOf(fid) else emptySet()
         state.restore(levelStates.last().snap)
-        return PropagationResult.Unsat(bools, ints, levels)
+        return PropagationResult.Unsat(bools, ints, levels, factors)
     }
 
     /** Pop the most-recently-pushed pin. No-op if the trail is empty. */

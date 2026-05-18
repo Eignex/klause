@@ -135,6 +135,12 @@ sealed interface PropagationResult {
      *  - [conflictBools] / [conflictInts] are the decision variables at those levels. They
      *    are derived from [conflictLevels] for convenience; CSP-style DFS samplers typically
      *    read [conflictLevels] directly to compute their backjump target.
+     *  - [conflictFactors] is the set of [com.eignex.klause.solver.Problem.factors] ids that
+     *    derived the contradiction. Currently populated only with the *single* factor that
+     *    returned `false` from `propagate` — sound but minimal in the trivial sense. Full
+     *    propagation-graph attribution (every factor whose firing contributed to the
+     *    failing factor's premises) requires a reason trail and lands with LCG-style clause
+     *    learning. Empty when the contradiction came from a seed assumption check.
      *
      *  The conflict subset is jointly unsatisfiable but not guaranteed minimal — callers must
      *  not assume minimality. An empty result means the contradiction was implied by problem
@@ -144,5 +150,6 @@ sealed interface PropagationResult {
         val conflictBools: Set<Int> = emptySet(),
         val conflictInts: Set<Int> = emptySet(),
         val conflictLevels: Set<Int> = emptySet(),
+        val conflictFactors: Set<Int> = emptySet(),
     ) : PropagationResult
 }

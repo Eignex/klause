@@ -4,10 +4,12 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.UnsatCore
 import org.sosy_lab.common.ShutdownNotifier
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
+import org.sosy_lab.java_smt.api.BooleanFormula
 import org.sosy_lab.java_smt.api.Model
 import org.sosy_lab.java_smt.api.SolverContext
 import org.sosy_lab.java_smt.api.SolverContext.ProverOptions
@@ -48,19 +50,57 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
     override fun solve(params: SmtParams): SolveResult {
         val context = newContext(params)
         try {
-            val (encoding, constraints) = SmtTranslator.translate(problem, context.formulaManager)
-            context.newProverEnvironment(ProverOptions.GENERATE_MODELS).use { prover ->
-                for (c in constraints) prover.addConstraint(c)
-                addAssumptions(params, encoding, prover)
+            val t = SmtTranslator.translate(problem, context.formulaManager)
+            // Request unsat-core generation so `prover.unsatCore` is populated on UNSAT.
+            // Tracking maps each factor-derived formula to its factor id; auxiliary
+            // (domain / real-link) constraints are added but not tracked — they'd never
+            // be a useful "blame" target. Not every JavaSMT backend honors
+            // GENERATE_UNSAT_CORE (SMTInterpol does; some others ignore it and return an
+            // empty core), so we treat an empty/incompatible result as `core = null`.
+            context.newProverEnvironment(
+                ProverOptions.GENERATE_MODELS,
+                ProverOptions.GENERATE_UNSAT_CORE,
+            ).use { prover ->
+                for (c in t.auxiliary) prover.addConstraint(c)
+                val factorByFormula = HashMap<BooleanFormula, Int>(t.factorFormulas.size * 2)
+                for (fid in t.factorFormulas.indices) {
+                    val f = t.factorFormulas[fid]
+                    prover.addConstraint(f)
+                    factorByFormula[f] = fid
+                }
+                addAssumptions(params, t.encoding, prover)
                 return if (prover.isUnsat) {
-                    SolveResult.Unsat()
+                    SolveResult.Unsat(extractCore(prover, factorByFormula))
                 } else {
-                    SolveResult.Sat(decode(prover.model, encoding))
+                    SolveResult.Sat(decode(prover.model, t.encoding))
                 }
             }
         } finally {
             context.close()
         }
+    }
+
+    /** Map JavaSMT's unsat-core formulas back to klause factor ids. Returns `null` when
+     *  the backend doesn't support core extraction (returns an empty list despite UNSAT),
+     *  preserving the "core is opt-in per backend" contract. */
+    private fun extractCore(
+        prover: org.sosy_lab.java_smt.api.ProverEnvironment,
+        factorByFormula: Map<BooleanFormula, Int>,
+    ): UnsatCore? {
+        val coreFormulas = try {
+            prover.unsatCore
+        } catch (_: UnsupportedOperationException) {
+            return null
+        }
+        if (coreFormulas.isEmpty()) return null
+        val ids = IntArray(coreFormulas.size)
+        var w = 0
+        for (f in coreFormulas) {
+            val id = factorByFormula[f] ?: continue
+            ids[w++] = id
+        }
+        if (w == 0) return null
+        return UnsatCore.of(if (w == ids.size) ids else ids.copyOf(w))
     }
 
     override fun samples(params: SmtParams): Sequence<Sample> = sequence {

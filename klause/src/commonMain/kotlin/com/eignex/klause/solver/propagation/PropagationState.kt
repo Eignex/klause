@@ -64,6 +64,11 @@ class PropagationState(
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
     internal var conflictLevels: MutableSet<Int>? = null
 
+    /** Populated by [runToFixpoint] when a factor's `propagate` returns `false`, with that
+     *  factor's id. `-1` means "not from a factor invocation" (e.g. seed-assumption
+     *  contradiction); callers must check before using. */
+    internal var conflictFactor: Int = -1
+
     init {
         seeded = seedAssumptions(assumptions)
     }
@@ -236,6 +241,7 @@ class PropagationState(
         dirtyBools.clear()
         dirtyInts.clear()
         conflictLevels = null
+        conflictFactor = -1
         currentLevel = 0
     }
 
@@ -273,6 +279,7 @@ class PropagationState(
             currentLevel = maxLevelForVars(f.boolVars, f.intVars)
             conflictLevels = null
             if (!f.propagate(this, fid)) {
+                conflictFactor = fid
                 return conflictLevels ?: collectLevelsForVars(f.boolVars, f.intVars)
             }
             while (true) {

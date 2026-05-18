@@ -41,6 +41,28 @@ class BacktrackSolverTest {
     }
 
     @Test
+    fun `solve populates unsat core when propagation rules out the problem at root`() {
+        // Two-clause direct contradiction. Bake-time propagation derives UNSAT before
+        // any decision is taken — `Problem.baked` is `PropagationResult.Unsat` carrying
+        // the failing factor id, which `BacktrackSolver` lifts to an `UnsatCore`.
+        val p = Problem(
+            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+            ),
+        )
+        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        val core = verdict.core
+            ?: error("expected propagation-derived unsat core, got null")
+        // Only one of the two factors actually returned `false` from propagate (the
+        // second one to fire, whichever it was). A more complete reason-trail extractor
+        // would name both; for now a single-factor "blame" is the contract.
+        assertTrue(core.size == 1 && core.factorIds[0] in 0..1,
+            "expected single factor id in {0,1}, got ${core.factorIds.toList()}")
+    }
+
+    @Test
     fun `solve respects assumptions`() {
         // (x0 ∨ x1) with x0=false pinned → x1 must be true in the SAT witness.
         val p = Problem(

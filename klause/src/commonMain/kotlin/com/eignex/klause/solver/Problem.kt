@@ -129,6 +129,8 @@ class Problem(
         val state = PropagationState(this, assumptions)
         if (!state.seeded) {
             val lvls = state.conflictLevels ?: emptySet()
+            // Seed contradiction — no factor invocation was the trigger, so the factor
+            // set stays empty (the assumption pair was the load-bearing input).
             return PropagationResult.Unsat(
                 state.extractConflictBools(lvls),
                 state.extractConflictInts(lvls),
@@ -141,6 +143,7 @@ class Problem(
                 state.extractConflictBools(conflict),
                 state.extractConflictInts(conflict),
                 conflict,
+                conflictFactorsOf(state),
             )
         }
 
@@ -168,6 +171,13 @@ class Problem(
             intKeys = iKeys.toIntArray(),
             intValues = iVals.toIntArray(),
         )
+    }
+
+    /** Wrap [PropagationState.conflictFactor] (if any) in a single-element set for
+     *  [PropagationResult.Unsat.conflictFactors]. */
+    private fun conflictFactorsOf(state: PropagationState): Set<Int> {
+        val fid = state.conflictFactor
+        return if (fid >= 0) setOf(fid) else emptySet()
     }
 
     private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {

@@ -58,6 +58,25 @@ class SmtSolverScaffoldTest {
     }
 
     @Test
+    fun `solve populates unsat core for tracked factor contradictions`() {
+        // Two-clause direct contradiction at the factor level; SMTInterpol supports
+        // GENERATE_UNSAT_CORE so we expect both factor ids to be reported.
+        val problem = Problem(
+            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true))),
+                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false))),
+            ),
+        )
+        val result = SmtSolver(problem).solve(SmtParams())
+        val unsat = assertIs<SolveResult.Unsat>(result)
+        val core = unsat.core
+            ?: error("expected populated unsat core from SMTInterpol, got null")
+        assertTrue(0 in core.factorIds && 1 in core.factorIds,
+            "core should mention both contradicting clauses, got ${core.factorIds.toList()}")
+    }
+
+    @Test
     fun `assumptions force a specific value`() {
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.TerminationReason
+import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
@@ -37,7 +38,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         for (outcome in driveSearch(params)) {
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
-                SearchOutcome.Exhausted -> SolveResult.Unsat()
+                is SearchOutcome.Exhausted -> SolveResult.Unsat(outcome.core)
                 SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
@@ -88,7 +89,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         for (outcome in driveSearch(params)) {
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
-                SearchOutcome.Exhausted -> SolveResult.Unsat()
+                is SearchOutcome.Exhausted -> SolveResult.Unsat(outcome.core)
                 SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
@@ -118,7 +119,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         }
                     }
                 }
-                SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return@sequence
+                is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return@sequence
             }
         }
     }
@@ -180,9 +181,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         yield(MinimizeResult.BestFound(outcome.sample, o, TerminationReason.BudgetExhausted))
                     }
                 }
-                SearchOutcome.Exhausted -> {
+                is SearchOutcome.Exhausted -> {
                     yield(if (best != null) MinimizeResult.Optimal(best, bestObj)
-                          else MinimizeResult.Infeasible())
+                          else MinimizeResult.Infeasible(outcome.core))
                     return@sequence
                 }
                 SearchOutcome.BudgetCapped -> {
@@ -230,9 +231,20 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     // Engine.
     // ---------------------------------------------------------------------------------------
 
+    /** Lift a [PropagationResult.Unsat]'s factor-level conflict info to a klause [UnsatCore].
+     *  Empty `conflictFactors` (seed-only contradiction, no factor invocation involved)
+     *  collapses to `null` — the API contract is "core absent" rather than "core empty",
+     *  since an empty core wouldn't be actionable. */
+    private fun coreOf(unsat: PropagationResult.Unsat): UnsatCore? =
+        if (unsat.conflictFactors.isEmpty()) null
+        else UnsatCore.of(unsat.conflictFactors)
+
     private sealed interface SearchOutcome {
         data class Found(val sample: Sample) : SearchOutcome
-        data object Exhausted : SearchOutcome
+        /** DFS exhausted without finding a model. [core] is non-null when the exhaustion
+         *  was forced by root-level propagation (bake or seed); after a full DFS-tree
+         *  walk, no single-factor core explains the result and [core] stays null. */
+        data class Exhausted(val core: UnsatCore? = null) : SearchOutcome
         data object BudgetCapped : SearchOutcome
     }
 
@@ -288,12 +300,12 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         pruneIf: ((PropagationSession) -> Boolean)? = null,
     ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
-            yield(SearchOutcome.Exhausted); return@sequence
+            yield(SearchOutcome.Exhausted(coreOf(problem.baked))); return@sequence
         }
         val session = PropagationSession(problem)
         val seedResult = session.seed(params.assumptions)
         if (seedResult is PropagationResult.Unsat) {
-            yield(SearchOutcome.Exhausted); return@sequence
+            yield(SearchOutcome.Exhausted(coreOf(seedResult))); return@sequence
         }
         // Phase-saving: cache the last value committed for each var (across backtracks
         // and restarts). Allocated only when enabled. The `boolPhaseSet` parallel array
@@ -362,7 +374,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                     trail.add(node)
                 } else {
-                    if (trail.isEmpty()) { yield(SearchOutcome.Exhausted); return@sequence }
+                    if (trail.isEmpty()) { yield(SearchOutcome.Exhausted()); return@sequence }
                     val top = trail.last()
                     session.popLast()
                     val decsBefore = decisionsLeft
