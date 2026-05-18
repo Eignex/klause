@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -121,19 +122,75 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     }
 
     /**
-     * Linear-objective minimisation by enumeration. Complete but exponential — fine on
-     * small spaces, otherwise use the LS or Z3 backend.
+     * Branch-and-bound minimisation. Walks the DFS yielding feasible leaves; each leaf
+     * improves the incumbent `bestObj` and tightens a partial-assignment lower bound
+     * that the search engine consults on every successful pin to prune the subtree when
+     * it provably can't beat the incumbent. The pruning predicate closes over the
+     * mutable `bestObj`, so the tightening propagates lazily without explicit
+     * communication into the engine.
+     *
+     * For [LinearObjective] the bound is `Σ_b lb_b(bool) + Σ_i lb_i(int) + constant`,
+     * where:
+     *  - `lb_b = boolWeights[b]` if `b` is pinned-true, `0` if pinned-false,
+     *    `min(0, boolWeights[b])` if unpinned;
+     *  - `lb_i = coeff[i] · (coeff ≥ 0 ? dom.min : dom.max)`.
+     *
+     * Sound: every completion can only *raise* the contribution of unpinned vars from
+     * the minimum, so an LB that already equals or exceeds the incumbent guarantees no
+     * descendant leaf beats it. For arbitrary [Objective] subtypes the predicate
+     * degrades to "never prune," so correctness is preserved at the cost of falling
+     * back to full enumeration.
      */
     override fun minimize(objective: Objective, params: BacktrackParams): Sample? {
         var best: Sample? = null
         var bestObj = Double.POSITIVE_INFINITY
-        // Must use enumerate (DFS terminates on Exhausted) rather than samples (infinite
-        // for any feasible problem).
-        for (s in enumerate(params.copy(minHammingDistance = 0, recentWindow = 0))) {
-            val o = objective.evaluate(s)
-            if (o < bestObj) { bestObj = o; best = s }
+        val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
+            is LinearObjective -> { session -> linearLowerBound(objective, session) >= bestObj }
+            else -> null
+        }
+        for (outcome in driveSearch(
+            params.copy(minHammingDistance = 0, recentWindow = 0),
+            pruneIf = pruneIf,
+        )) {
+            when (outcome) {
+                is SearchOutcome.Found -> {
+                    val o = objective.evaluate(outcome.sample)
+                    if (o < bestObj) { bestObj = o; best = outcome.sample }
+                }
+                SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return best
+            }
         }
         return best
+    }
+
+    /**
+     * Sound lower bound on a [LinearObjective] given the current partial assignment in
+     * [session]. Pinned vars contribute their exact value; unpinned bool vars take the
+     * weight (or 0) that makes their contribution smallest; unpinned int vars take the
+     * domain endpoint matching the coefficient's sign.
+     */
+    private fun linearLowerBound(obj: LinearObjective, session: PropagationSession): Double {
+        var total = obj.constant
+        val sp = session.problem
+        val nb = minOf(sp.numBoolVars, obj.boolWeights.size)
+        for (b in 0 until nb) {
+            val w = obj.boolWeights[b]
+            val v = session.boolValue(b)
+            total += when {
+                v == true -> w
+                v == false -> 0.0
+                w < 0.0 -> w
+                else -> 0.0
+            }
+        }
+        val ni = minOf(sp.numIntVars, obj.intCoefficients.size)
+        for (i in 0 until ni) {
+            val c = obj.intCoefficients[i]
+            if (c == 0.0) continue
+            val d = session.intDomain(i)
+            total += if (c >= 0.0) c * d.min else c * d.max
+        }
+        return total
     }
 
     // ---------------------------------------------------------------------------------------
@@ -184,7 +241,10 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      * `session`'s pushed pins. On Unsat, `session` self-reverts — the engine doesn't
      * popLast in that case.
      */
-    private fun driveSearch(params: BacktrackParams): Sequence<SearchOutcome> = sequence {
+    private fun driveSearch(
+        params: BacktrackParams,
+        pruneIf: ((PropagationSession) -> Boolean)? = null,
+    ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted); return@sequence
         }
@@ -214,7 +274,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     continue@loop
                 }
                 val node = makeNode(varRef, params.valueHeuristic.values(session, varRef, rng))
-                if (!advance(node, session, { decisionsLeft }, { decisionsLeft-- })) {
+                if (!advance(node, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
                     if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
                     descend = false
                     continue@loop
@@ -224,7 +284,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 if (trail.isEmpty()) { yield(SearchOutcome.Exhausted); return@sequence }
                 val top = trail.last()
                 session.popLast()
-                if (advance(top, session, { decisionsLeft }, { decisionsLeft-- })) {
+                if (advance(top, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
                     descend = true
                 } else {
                     if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
@@ -241,12 +301,17 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
 
     /**
      * Drive [node] through its remaining values until one succeeds or it exhausts. On Unsat
-     * the session self-reverts, so the engine doesn't need to compensate. Returns `false`
-     * either when the node ran out of values OR the decision budget was hit mid-loop.
+     * the session self-reverts, so the engine doesn't need to compensate. When [pruneIf]
+     * is non-null, a successful pin is *additionally* checked against the predicate: if
+     * the predicate says "no descendant of this partial assignment can improve the
+     * incumbent," the pin is reverted via `popLast` and the next value tried — branch-
+     * and-bound style soft pruning that the engine treats identically to an Unsat. Returns
+     * `false` when the node runs out of values or the decision budget is exhausted.
      */
     private fun advance(
         node: TrailNode,
         session: PropagationSession,
+        pruneIf: ((PropagationSession) -> Boolean)?,
         decisionsRemaining: () -> Long,
         decrement: () -> Unit,
     ): Boolean {
@@ -254,7 +319,14 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             if (decisionsRemaining() <= 0) return false
             decrement()
             val r = node.applyNext(session) ?: return false
-            if (r !is PropagationResult.Unsat) return true
+            if (r is PropagationResult.Unsat) continue
+            if (pruneIf != null && pruneIf(session)) {
+                // Pin succeeded but the B&B bound says this subtree can't beat the
+                // incumbent. Revert and try the next value at this node.
+                session.popLast()
+                continue
+            }
+            return true
         }
     }
 
