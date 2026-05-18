@@ -115,22 +115,73 @@ class ReifiedCardinality(
         if (definitelyIn) return state.pinBool(auxBoolVar, true)
         if (definitelyOut) return state.pinBool(auxBoolVar, false)
 
-        // When aux is pinned true, do the same forcing Cardinality does.
         val aux = state.boolValues[auxBoolVar] ?: return true
-        if (!aux) return true  // ¬aux: forcing logic is rarely productive at this scope; skip.
+        if (aux) {
+            // aux pinned true → body must hold: count ∈ [min, max]. Mirror Cardinality's
+            // boundary-forcing pass.
+            if (trueCount == max && unassigned > 0) {
+                for (lit in literals) {
+                    val v = Lit.variable(lit)
+                    if (state.boolValues[v] != null) continue
+                    if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+                }
+            } else if (trueCount + unassigned == min && unassigned > 0) {
+                for (lit in literals) {
+                    val v = Lit.variable(lit)
+                    if (state.boolValues[v] != null) continue
+                    if (!state.pinBool(v, Lit.isPositive(lit))) return false
+                }
+            }
+            return true
+        }
 
-        if (trueCount == max && unassigned > 0) {
-            for (lit in literals) {
-                val v = Lit.variable(lit)
-                if (state.boolValues[v] != null) continue
-                if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+        // aux pinned false → body must NOT hold: final count ∉ [min, max], i.e., must end up
+        // either *strictly below* min or *strictly above* max. With `x = additional trues`
+        // picked from the `unassigned` literals:
+        //   feasible x values are [0, min−trueCount−1] ∪ [max−trueCount+1, unassigned].
+        // The "down" branch is feasible only if `min − trueCount − 1 ≥ 0`, i.e. `trueCount < min`.
+        // The "up" branch is feasible only if `max − trueCount + 1 ≤ unassigned`, i.e.
+        // `trueCount + unassigned > max`. When exactly one branch is feasible the propagator
+        // can force the asymmetric extreme:
+        //   - up-only & need == unassigned → force every unassigned literal *true*.
+        //   - down-only & cap == 0          → force every unassigned literal *false*.
+        // Any other combination is undetermined; future literal pins narrow it organically.
+        if (unassigned == 0) return true  // no flexibility left to force anyway
+        val downBranchFeasible = trueCount < min
+        val upBranchFeasible = trueCount + unassigned > max
+        // The double-infeasibility case (both branches blocked) is unreachable here: it's
+        // equivalent to `definitelyIn`, which the early-return above already converted to
+        // a `pinBool(auxBoolVar, true)` — that pin conflicts with the pre-pinned aux=false
+        // and `revertAndUnsat` surfaces Unsat at the session level before we land in this
+        // body.
+        when {
+            !downBranchFeasible && upBranchFeasible -> {
+                // Must escape upward. Required additional trues: `max - trueCount + 1`.
+                // Unique forcing when that requirement equals `unassigned` — every
+                // unassigned literal must flip true.
+                val need = max - trueCount + 1
+                if (need == unassigned) {
+                    for (lit in literals) {
+                        val v = Lit.variable(lit)
+                        if (state.boolValues[v] != null) continue
+                        if (!state.pinBool(v, Lit.isPositive(lit))) return false
+                    }
+                }
             }
-        } else if (trueCount + unassigned == min && unassigned > 0) {
-            for (lit in literals) {
-                val v = Lit.variable(lit)
-                if (state.boolValues[v] != null) continue
-                if (!state.pinBool(v, Lit.isPositive(lit))) return false
+            !upBranchFeasible && downBranchFeasible -> {
+                // Must stay below min. Allowed at most `min - trueCount - 1` extra trues —
+                // when that cap is zero, force every unassigned literal false.
+                val cap = min - trueCount - 1
+                if (cap == 0) {
+                    for (lit in literals) {
+                        val v = Lit.variable(lit)
+                        if (state.boolValues[v] != null) continue
+                        if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+                    }
+                }
             }
+            // both branches feasible (or both infeasible — handled by definitelyIn): no
+            // unique forcing this round.
         }
         return true
     }
