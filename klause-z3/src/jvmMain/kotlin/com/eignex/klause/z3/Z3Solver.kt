@@ -41,7 +41,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         require(objective is LinearObjective) {
             "Z3 backend only supports LinearObjective; got ${objective::class.simpleName}"
         }
-        val ctx = newContext(params)
+        val ctx = newContext()
         try {
             val (encoding, constraints) = Z3Translator.translate(problem, ctx)
             val opt = ctx.mkOptimize()
@@ -101,7 +101,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         ctx.mkReal(value.toString())
 
     override fun solve(params: Z3Params): SolveResult {
-        val ctx = newContext(params)
+        val ctx = newContext()
         try {
             val (encoding, constraints) = Z3Translator.translate(problem, ctx)
             val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
@@ -139,7 +139,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
     /** Pin a random subset of vars and solve; retry with fresh pins on Unsat. */
     private fun drawDiverseSample(params: Z3Params, rng: kotlin.random.Random): Sample? {
         repeat(RANDOM_PIN_RETRIES) {
-            val ctx = newContext(params.copy(randomSeed = rng.nextLong()))
+            val ctx = newContext()
             try {
                 val (encoding, constraints) = Z3Translator.translate(problem, ctx)
                 val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
@@ -153,7 +153,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
             }
         }
         // Fallback: no pins, deterministic Z3 result. Keeps the contract honest.
-        val ctx = newContext(params)
+        val ctx = newContext()
         try {
             val (encoding, constraints) = Z3Translator.translate(problem, ctx)
             val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
@@ -199,7 +199,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
     }
 
     override fun enumerate(params: Z3Params): Sequence<Sample> = sequence {
-        val ctx = newContext(params)
+        val ctx = newContext()
         try {
             val (encoding, constraints) = Z3Translator.translate(problem, ctx)
             val solver = ctx.mkSolver().apply { applyParams(this, ctx, params) }
@@ -229,7 +229,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
 
     // ---- helpers ----
 
-    private fun newContext(@Suppress("UNUSED_PARAMETER") params: Z3Params): Context = Context()
+    private fun newContext(): Context = Context()
 
     /** Apply per-solver knobs ([Z3Params.randomSeed], [Z3Params.timeoutMillis]). Z3
      *  rejects `random_seed` as a [Context] global; it has to live on the solver. */
@@ -290,14 +290,6 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
 
     private fun farEnough(candidate: Sample, window: ArrayDeque<Sample>, minDistance: Int): Boolean {
         if (minDistance <= 0 || window.isEmpty()) return true
-        for (p in window) if (hamming(candidate, p) < minDistance) return false
+        for (p in window) if (candidate.hammingDistanceTo(p) < minDistance) return false
         return true
-    }
-
-    private fun hamming(a: Sample, b: Sample): Int {
-        var d = 0
-        for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
-        for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
-        return d
-    }
-}
+    }}

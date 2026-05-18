@@ -85,7 +85,7 @@ class Z3SolverTest {
         ).take(8).toList()
         for (i in samples.indices) {
             for (j in (i + 1) until samples.size) {
-                val d = hamming(samples[i], samples[j])
+                val d = samples[i].hammingDistanceTo(samples[j])
                 assertTrue(d >= 3, "samples $i, $j at distance $d violates minHammingDistance=3")
             }
         }
@@ -161,12 +161,4 @@ class Z3SolverTest {
         state.recompute()
         assertEquals(0, state.cost,
             "$label: sample $sample violates ${state.violated.size} hard factor(s)")
-    }
-
-    private fun hamming(a: Sample, b: Sample): Int {
-        var d = 0
-        for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
-        for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
-        return d
-    }
-}
+    }}

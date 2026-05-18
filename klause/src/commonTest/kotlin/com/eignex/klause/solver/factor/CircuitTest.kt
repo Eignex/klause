@@ -172,9 +172,8 @@ class CircuitTest {
         val result = problem.propagate(assumptions)
         assertTrue(result is com.eignex.klause.solver.propagation.PropagationResult.Implied,
             "propagation should succeed and force the closing edge; got $result")
-        val implied = result as com.eignex.klause.solver.propagation.PropagationResult.Implied
         // succ[3] should be forced to 0.
-        assertEquals(0, implied.ints[3], "succ[3] should be forced to 0; got implied=${implied.ints}")
+        assertEquals(0, result.ints[3], "succ[3] should be forced to 0; got implied=${result.ints}")
     }
 
     @Test
@@ -203,10 +202,10 @@ class CircuitTest {
         val visited = BooleanArray(4)
         var node = 0
         for (step in 0 until 4) {
-            assertFalse(visited[node], "revisit at step $step in ${sample!!.ints.toList()}")
+            assertFalse(visited[node], "revisit at step $step in ${sample.ints.toList()}")
             visited[node] = true
             node = sample.ints[node]
         }
-        assertEquals(0, node, "must return to start in ${sample!!.ints.toList()}")
+        assertEquals(0, node, "must return to start in ${sample.ints.toList()}")
     }
 }

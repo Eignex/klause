@@ -52,6 +52,17 @@ class Assignment(val numBoolVars: Int, val numIntVars: Int) {
 
 /** Immutable assignment snapshot yielded by the solver. */
 data class Sample(val bools: BooleanArray, val ints: IntArray) {
+
+    /** Hamming distance to [other]: number of variable slots that differ. Caller must
+     *  ensure same arity (same numBoolVars / numIntVars); not bounds-checked. Used by
+     *  diversity post-filters on `enumerate` / `samples` across every backend. */
+    fun hammingDistanceTo(other: Sample): Int {
+        var d = 0
+        for (i in bools.indices) if (bools[i] != other.bools[i]) d++
+        for (i in ints.indices) if (ints[i] != other.ints[i]) d++
+        return d
+    }
+
     override fun equals(other: Any?): Boolean {
         if (other !is Sample) return false
         return bools.contentEquals(other.bools) && ints.contentEquals(other.ints)

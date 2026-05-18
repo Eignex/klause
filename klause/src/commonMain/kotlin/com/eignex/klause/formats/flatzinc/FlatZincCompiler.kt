@@ -153,7 +153,7 @@ internal class FlatZincCompiler(
             }
             FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
-            is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar, d.annotations)
+            is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar)
         }
     }
 
@@ -162,7 +162,6 @@ internal class FlatZincCompiler(
         type: FznType.Array,
         value: FznExpr?,
         isVar: Boolean,
-        @Suppress("UNUSED_PARAMETER") annotations: List<FznAnnotation>,
     ) {
         if (!isVar) {
             // Parameter array — must have an initializer literal.

@@ -140,8 +140,7 @@ class CumulativeTest {
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
-        val implied = result as PropagationResult.Implied
-        assertEquals(4, implied.ints[1], "task 1 must be pinned to t=4 after time-tabling shaves earlier starts")
+        assertEquals(4, result.ints[1], "task 1 must be pinned to t=4 after time-tabling shaves earlier starts")
     }
 
     @Test

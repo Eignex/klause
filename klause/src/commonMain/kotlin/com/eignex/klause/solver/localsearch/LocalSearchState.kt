@@ -250,7 +250,7 @@ class LocalSearchState(
         val touchedFactors = problem.boolOccurrences[boolVar]
         for (factorId in touchedFactors) {
             val factor = factors[factorId]
-            updateViolation(factor, factorId, factor.applyBoolFlip(this, factorId, boolVar))
+            updateViolation(factorId, factor.applyBoolFlip(this, factorId, boolVar))
         }
         invalidateBoolBreakNeighbourhood(touchedFactors)
         markNeighborConfChange(touchedFactors)
@@ -268,7 +268,7 @@ class LocalSearchState(
         val touchedFactors = problem.intOccurrences[intVar]
         for (factorId in touchedFactors) {
             val factor = factors[factorId]
-            updateViolation(factor, factorId, factor.applyIntSet(this, factorId, intVar, old))
+            updateViolation(factorId, factor.applyIntSet(this, factorId, intVar, old))
         }
         invalidateBoolBreakNeighbourhood(touchedFactors)
         markNeighborConfChange(touchedFactors)
@@ -367,7 +367,7 @@ class LocalSearchState(
 
     private data class CompoundEval(val breakScore: Int, val netDelta: Int)
 
-    private fun updateViolation(@Suppress("UNUSED_PARAMETER") factor: LocalSearchFactor, factorId: Int, deltaViolated: Int) {
+    private fun updateViolation(factorId: Int, deltaViolated: Int) {
         when (deltaViolated) {
             +1 -> {
                 violated.add(factorId)

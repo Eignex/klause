@@ -175,17 +175,9 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
 
     private fun farEnough(candidate: Sample, window: ArrayDeque<Sample>, minDistance: Int): Boolean {
         if (minDistance <= 0 || window.isEmpty()) return true
-        for (p in window) if (hammingDistance(candidate, p) < minDistance) return false
+        for (p in window) if (candidate.hammingDistanceTo(p) < minDistance) return false
         return true
     }
-
-    private fun hammingDistance(a: Sample, b: Sample): Int {
-        var d = 0
-        for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
-        for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
-        return d
-    }
-
     private fun varName(cnfVar: Int): String = "x$cnfVar"
     private fun literalNameToId(name: String): Int =
         if (name.startsWith("x")) name.substring(1).toIntOrNull() ?: -1 else -1

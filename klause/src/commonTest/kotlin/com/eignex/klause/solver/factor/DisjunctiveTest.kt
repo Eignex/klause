@@ -63,15 +63,12 @@ class DisjunctiveTest {
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
-        val implied = result as PropagationResult.Implied
         // dom[1] becomes [3, 5] — not pinned. Verify by checking that pinning t=2 fails.
         val unsatPin = problem.propagate(Assumptions(ints = mapOf(1 to 2)))
         assertTrue(unsatPin is PropagationResult.Unsat, "pinning task 1 at t=2 must fail; got $unsatPin")
         // And pinning at t=3 should succeed.
         val okPin = problem.propagate(Assumptions(ints = mapOf(1 to 3)))
         assertTrue(okPin is PropagationResult.Implied, "pinning task 1 at t=3 should succeed; got $okPin")
-        // Use implied to silence unused warnings — confirm at least no infeasibility seen.
-        assertTrue(implied.ints.isNotEmpty() || implied.ints.isEmpty())
     }
 
     @Test
@@ -92,8 +89,7 @@ class DisjunctiveTest {
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
-        val implied = result as PropagationResult.Implied
-        assertEquals(4, implied.ints[2], "edge-finding should pin task 2's start to 4; implied=${implied.ints}")
+        assertEquals(4, result.ints[2], "edge-finding should pin task 2's start to 4; implied=${result.ints}")
     }
 
     @Test

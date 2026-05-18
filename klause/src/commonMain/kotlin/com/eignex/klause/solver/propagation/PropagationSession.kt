@@ -76,19 +76,19 @@ class PropagationSession(val problem: Problem) {
         trail.clear()
         lastImplied = levelStates[0].implied
 
-        var earlyUnsat: PropagationResult.Unsat? = null
-        assumptions.forEachBool { v, b ->
-            if (earlyUnsat != null) return@forEachBool
-            val r = pushBool(v, b)
-            if (r is PropagationResult.Unsat) earlyUnsat = r
+        // Seed bool then int pins from the primitive sorted arrays. Iterating directly
+        // (vs. forEachBool / forEachInt) lets us `return` the first Unsat without a
+        // captured-flag dance.
+        val bk = assumptions.boolKeys; val bv = assumptions.boolValues
+        for (i in bk.indices) {
+            val r = pushBool(bk[i], bv[i])
+            if (r is PropagationResult.Unsat) return r
         }
-        if (earlyUnsat != null) return earlyUnsat!!
-        assumptions.forEachInt { v, i ->
-            if (earlyUnsat != null) return@forEachInt
-            val r = pushInt(v, i)
-            if (r is PropagationResult.Unsat) earlyUnsat = r
+        val ik = assumptions.intKeys; val iv = assumptions.intValues
+        for (i in ik.indices) {
+            val r = pushInt(ik[i], iv[i])
+            if (r is PropagationResult.Unsat) return r
         }
-        if (earlyUnsat != null) return earlyUnsat!!
         lastImplied = levelStates.last().implied
         return computeImplied()
     }

@@ -504,17 +504,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
 
     private fun farEnough(candidate: Sample, window: ArrayDeque<Sample>, minDistance: Int): Boolean {
         if (minDistance <= 0 || window.isEmpty()) return true
-        for (p in window) if (hamming(candidate, p) < minDistance) return false
+        for (p in window) if (candidate.hammingDistanceTo(p) < minDistance) return false
         return true
     }
-
-    private fun hamming(a: Sample, b: Sample): Int {
-        var d = 0
-        for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
-        for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
-        return d
-    }
-
     private companion object {
         /** Cancellation is polled this often inside the search loop. Lower = more
          *  responsive; higher = lower overhead. 256 is a few microseconds per check at

@@ -65,14 +65,22 @@ class PropagationState(
     internal var conflictLevels: MutableSet<Int>? = null
 
     init {
-        var ok = true
-        assumptions.forEachBool { v, b ->
-            if (ok && !pinBoolAsDecision(v, b)) ok = false
+        seeded = seedAssumptions(assumptions)
+    }
+
+    /** Push every pin in [a] as a fresh decision; return `false` (so [seeded] becomes
+     *  `false`) on the first contradiction. Direct primitive-array iteration so the early
+     *  exit is a clean `return`. */
+    private fun seedAssumptions(a: Assumptions): Boolean {
+        val bk = a.boolKeys; val bv = a.boolValues
+        for (i in bk.indices) {
+            if (!pinBoolAsDecision(bk[i], bv[i])) return false
         }
-        if (ok) assumptions.forEachInt { v, i ->
-            if (ok && !setIntAsDecision(v, i)) ok = false
+        val ik = a.intKeys; val iv = a.intValues
+        for (i in ik.indices) {
+            if (!setIntAsDecision(ik[i], iv[i])) return false
         }
-        seeded = ok
+        return true
     }
 
     /**

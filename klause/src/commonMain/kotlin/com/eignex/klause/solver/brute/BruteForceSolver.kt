@@ -198,17 +198,9 @@ class BruteForceSolver(override val problem: Problem) :
 
     private fun farEnough(candidate: Sample, window: ArrayDeque<Sample>, minDistance: Int): Boolean {
         if (minDistance <= 0 || window.isEmpty()) return true
-        for (p in window) if (hamming(candidate, p) < minDistance) return false
+        for (p in window) if (candidate.hammingDistanceTo(p) < minDistance) return false
         return true
     }
-
-    private fun hamming(a: Sample, b: Sample): Int {
-        var d = 0
-        for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
-        for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
-        return d
-    }
-
     // ---- chunked-space layout ----
 
     private enum class DimKind { BOOL, INT }

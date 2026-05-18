@@ -226,7 +226,7 @@ class AlnsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val solver = LocalSearchSolver(problem)
-        val session = solver.session() as com.eignex.klause.solver.localsearch.LocalSearchSession
+        val session = solver.session()
 
         val alns = Alns(
             inner = solver,

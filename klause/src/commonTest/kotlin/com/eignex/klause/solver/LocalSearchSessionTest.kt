@@ -82,9 +82,10 @@ class LocalSearchSessionTest {
     @Test
     fun `session implements Session interface and is returned by solver session factory`() {
         val solver = LocalSearchSolver(ddfwProblem())
-        val session = solver.session()
-        // The factory now returns a real LocalSearchSession, not the default StatelessSession.
-        assertTrue(session is LocalSearchSession, "expected LocalSearchSession, got ${session::class.simpleName}")
+        // The factory's return type is `LocalSearchSession` (overridden from the default
+        // `Session<...>`), so the type system already enforces what this test originally
+        // asserted at runtime.
+        val session: LocalSearchSession = solver.session()
         // depth = 0 on a fresh session; push/pop work.
         assertEquals(0, session.depth)
         session.push(com.eignex.klause.solver.Assumptions(bools = mapOf(0 to true)))

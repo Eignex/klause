@@ -49,7 +49,7 @@ class IntIntMap private constructor(
                 for (i in keys.indices) arr[keys[i] - lo] = values[i]
                 IntIntMap(ArrayBacking(lo, arr), absent)
             } else {
-                IntIntMap(HashBacking.build(keys, values, absent), absent)
+                IntIntMap(HashBacking.build(keys, values), absent)
             }
         }
     }
@@ -92,7 +92,7 @@ class IntIntMap private constructor(
         }
 
         companion object {
-            fun build(keys: IntArray, values: IntArray, @Suppress("UNUSED_PARAMETER") absent: Int): HashBacking {
+            fun build(keys: IntArray, values: IntArray): HashBacking {
                 // Capacity = next power of two such that load factor ≤ 0.5.
                 var cap = 8
                 while (cap < keys.size * 2) cap *= 2
