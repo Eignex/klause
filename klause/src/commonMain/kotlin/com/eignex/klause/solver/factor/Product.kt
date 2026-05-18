@@ -68,21 +68,79 @@ class Product(
         val db = state.intDomains[b]
         val (pLo, pHi) = cornerProductRange(da, db)
         if (!tightenLong(state, result, pLo, pHi)) return false
-        // Reverse, singleton-operand only. Non-singleton interval division is sound but
-        // produced unstable worklist interactions with bit-blasted Product chains in the
-        // earlier attempt; the singleton case is the high-value sub-case (constant factor
-        // arithmetic, channelled mod constraints) and is provably stable since `tighten*`
-        // is monotonic.
-        val dbAfter = state.intDomains[b]
-        val daAfter = state.intDomains[a]
+
+        // Reverse — narrow `a` from result/b, then narrow `b` from result/a.
+        //
+        // The divisor must not contain zero (a/0 is undefined); the propagator skips that
+        // case and lets the forward direction + future singleton refinements handle it
+        // once one side is pinned. Within that constraint we handle two regimes:
+        //   - singleton divisor (the original safe path): exact integer division.
+        //   - non-singleton divisor: corner-division interval bounds over the four
+        //     `(r-endpoint, d-endpoint)` pairs, ceiling for the lower bound and flooring
+        //     for the upper. Both are monotonic in their inputs — tightening either
+        //     operand can only shrink the computed target range — so worklist iteration
+        //     reaches fixpoint cleanly without the bit-blast feedback that destabilised
+        //     the earlier general-interval attempt (which used a different signed-division
+        //     formulation susceptible to non-monotone updates on zero-crossing inputs).
         val dr = state.intDomains[result]
-        if (dbAfter.min == dbAfter.max && dbAfter.min != 0) {
-            if (!narrowByDivisor(state, target = a, divisor = dbAfter.min.toLong(), r = dr)) return false
-        }
-        if (daAfter.min == daAfter.max && daAfter.min != 0) {
-            if (!narrowByDivisor(state, target = b, divisor = daAfter.min.toLong(), r = state.intDomains[result])) return false
+        val dbAfter = state.intDomains[b]
+        if (!reverseNarrow(state, target = a, divisorDomain = dbAfter, r = dr)) return false
+        val daAfter = state.intDomains[a]
+        if (!reverseNarrow(state, target = b, divisorDomain = daAfter, r = state.intDomains[result])) return false
+
+        // Zero-exclusion: if result's domain is strictly non-zero (0 ∉ result), then
+        // neither a nor b can be zero (since 0·x = 0 ∉ result). With contiguous-interval
+        // domains we can only push 0 out when it sits on an endpoint, but that's the
+        // common case after upstream propagation has shaved most of the domain.
+        val drFinal = state.intDomains[result]
+        if (0 !in drFinal.min..drFinal.max) {
+            val daFinal = state.intDomains[a]
+            if (daFinal.min == 0 && !state.tightenIntMin(a, 1)) return false
+            if (daFinal.max == 0 && !state.tightenIntMax(a, -1)) return false
+            val dbFinal = state.intDomains[b]
+            if (dbFinal.min == 0 && !state.tightenIntMin(b, 1)) return false
+            if (dbFinal.max == 0 && !state.tightenIntMax(b, -1)) return false
         }
         return true
+    }
+
+    /**
+     * Narrow [target]'s domain so that `target * d ∈ r` for some `d ∈ divisorDomain`.
+     * Requires `0 ∉ divisorDomain` — caller's responsibility (we exit cleanly when it
+     * isn't). Dispatches to the existing singleton-only fast path or to corner-division
+     * for the general case.
+     */
+    private fun reverseNarrow(
+        state: PropagationState,
+        target: Int,
+        divisorDomain: IntDomain,
+        r: IntDomain,
+    ): Boolean {
+        if (0 in divisorDomain.min..divisorDomain.max) return true   // skip: zero-crossing
+        if (divisorDomain.min == divisorDomain.max) {
+            return narrowByDivisor(state, target, divisorDomain.min.toLong(), r)
+        }
+        // Corner-division interval bounds. Four (r-endpoint, d-endpoint) pairs span the
+        // continuous-division range; ceiling each gives a lower-bound candidate, flooring
+        // each gives an upper-bound candidate. The min of ceilings and max of floors are
+        // the tightest integer bounds the divisor-and-numerator endpoints induce.
+        val rLo = r.min.toLong()
+        val rHi = r.max.toLong()
+        val dLo = divisorDomain.min.toLong()
+        val dHi = divisorDomain.max.toLong()
+        var tLo = Long.MAX_VALUE
+        var tHi = Long.MIN_VALUE
+        // Avoid `listOf` allocation in the hot path — explicit corner pairs.
+        for (rn in longArrayOf(rLo, rHi)) {
+            for (dn in longArrayOf(dLo, dHi)) {
+                val c = ceilDivLong(rn, dn)
+                val f = floorDivLong(rn, dn)
+                if (c < tLo) tLo = c
+                if (f > tHi) tHi = f
+            }
+        }
+        if (tLo > tHi) return false
+        return tightenLong(state, target, tLo, tHi)
     }
 
     /**
