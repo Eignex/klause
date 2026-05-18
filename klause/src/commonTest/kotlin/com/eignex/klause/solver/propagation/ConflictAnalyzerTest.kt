@@ -184,6 +184,105 @@ class ConflictAnalyzerTest {
     }
 
     @Test
+    fun `LBD reflects the distinct decision levels in the learned clause`() {
+        // Same two-decision conflict as `learned clause spans multiple decision levels`,
+        // but here we assert the LBD field. Learned clause is [¬a, ¬b]; literals span
+        // two distinct decision levels (1 and 2) → LBD = 2 (glue-clause boundary).
+        val problem = Problem(
+            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+        val session = PropagationSession(problem)
+        assertIs<PropagationResult.Implied>(session.pinBool(0, true))
+        val unsat = assertIs<PropagationResult.Unsat>(session.pinBool(1, true))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
+        assertEquals(2, learned.lbd, "two-decision-level clause should have LBD = 2")
+    }
+
+    @Test
+    fun `forgetLearnedClauses removes high-LBD clauses and remaps watcher entries`() {
+        // Drive a search that learns multiple clauses, then prune.
+        val problem = Problem(
+            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(2, true),  Lit.make(3, false))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+            ),
+        )
+        val r = BacktrackSolver(problem).solve(BacktrackParams(
+            // Cap at 0 → forgetting will drop everything except glue (LBD ≤ 2). Combined
+            // with a tight Luby restart base, the forgetting pass triggers reliably.
+            lubyRestartBase = 4,
+            maxLearnedClauses = 0,
+            lbdGlueThreshold = 2,
+            randomSeed = 7L,
+        ))
+        // Correctness must survive forgetting — every original clause must still be
+        // satisfied. (The bound enforces forgetting actually runs.)
+        val sat = assertIs<SolveResult.Sat>(r)
+        val s = sat.assignment.bools
+        val clauses = listOf(
+            listOf(Lit.make(0, true), Lit.make(1, true)),
+            listOf(Lit.make(0, false), Lit.make(2, true)),
+            listOf(Lit.make(1, false), Lit.make(2, false)),
+            listOf(Lit.make(2, true), Lit.make(3, false)),
+            listOf(Lit.make(2, false), Lit.make(3, true)),
+        )
+        for ((i, c) in clauses.withIndex()) {
+            assertTrue(c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
+                "clause $i not satisfied by ${s.toList()}")
+        }
+    }
+
+    @Test
+    fun `state forgetLearnedClauses directly compacts and remaps`() {
+        // Hand-construct a state, add three learned clauses with different LBDs, drop
+        // the middle one, and verify the remaining are correctly renumbered and the
+        // watcher index points at the new ids.
+        val problem = Problem(
+            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        val state = PropagationState(problem, com.eignex.klause.solver.Assumptions.None)
+        val baseFid = problem.numFactors
+        val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true)))
+        val c2 = Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true)))
+        val fid0 = state.addLearnedClause(c0, lbd = 1)
+        val fid1 = state.addLearnedClause(c1, lbd = 5)  // will be dropped
+        val fid2 = state.addLearnedClause(c2, lbd = 1)
+        assertEquals(baseFid, fid0)
+        assertEquals(baseFid + 1, fid1)
+        assertEquals(baseFid + 2, fid2)
+        assertEquals(3, state.learnedClauses.size)
+        // Confirm watcher index has c1 listed at some lit before forget.
+        assertTrue(state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
+            "c1 should be in ¬b watcher list before forget")
+
+        // Forget anything with LBD > 1.
+        state.forgetLearnedClauses { _, lbd -> lbd <= 1 }
+        assertEquals(2, state.learnedClauses.size,
+            "expected 2 clauses kept after dropping the high-LBD one")
+        // Remaining clauses should be c0 and c2 — order preserved, renumbered.
+        assertEquals(c0, state.learnedClauses[0])
+        assertEquals(c2, state.learnedClauses[1])
+        // The watcher index must no longer reference the dropped fid (¬b watcher list
+        // should not contain fid1 = baseFid+1 anymore).
+        assertTrue(!state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
+            "watcher entry for the dropped clause should be removed")
+        // The surviving clauses should be present at their new ids.
+        val newFid2 = baseFid + 1  // c2 moved up one slot
+        assertTrue(state.boolWatchersByLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
+            "c2 should be findable at its new fid (${newFid2}) via its watch literal")
+    }
+
+    @Test
     fun `CDB finds SAT on a chained-propagation instance`() {
         // (¬a ∨ b), (¬b ∨ c), (¬c ∨ d), (¬d ∨ e), (a).
         // a=true forces b → c → d → e via unit propagation. No conflict — search

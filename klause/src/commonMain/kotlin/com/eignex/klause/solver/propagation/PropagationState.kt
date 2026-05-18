@@ -116,9 +116,14 @@ class PropagationState(
      *  treat them like any other [com.eignex.klause.solver.factor.Clause] via [factorAt];
      *  they participate in propagation through [boolWatchersByLit] just like static
      *  clauses. Survives [restore] (clauses are facts about the original problem, not
-     *  trail state). */
+     *  trail state); pruned by [forgetLearnedClauses]. */
     private val _learnedClauses: ArrayList<com.eignex.klause.solver.factor.Clause> = ArrayList()
     val learnedClauses: List<com.eignex.klause.solver.factor.Clause> get() = _learnedClauses
+
+    /** LBD (Literal Block Distance) per learned clause, parallel to [_learnedClauses].
+     *  Glucose-style glue metric: lower = more re-usable. Forgetting policies key on
+     *  this to decide which clauses to drop. */
+    private val _learnedLbd: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
 
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
@@ -131,8 +136,9 @@ class PropagationState(
         else _learnedClauses[fid - problem.numFactors]
 
     /**
-     * Register a learned clause and return its assigned factor id. Performs three things:
+     * Register a learned clause and return its assigned factor id. Performs four things:
      *   - append to [_learnedClauses];
+     *   - record the clause's [lbd] in [_learnedLbd] (parallel array);
      *   - grow [_refPayload] by one slot so [Clause.propagate]'s
      *     `state.refPayload[factorId]` access stays in-bounds;
      *   - install the clause's initial watch literals in [boolWatchersByLit] so it
@@ -141,15 +147,83 @@ class PropagationState(
      * Does NOT eagerly propagate — that's the session-level
      * [PropagationSession.addLearnedClause]'s job. Returns the new factor id.
      */
-    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause): Int {
+    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause, lbd: Int): Int {
         val newFid = totalFactorCount
         _learnedClauses.add(clause)
+        _learnedLbd.add(lbd)
         _refPayload.add(null)
         val watchers = clause.initialBoolWatchers
         if (watchers != null) {
             for (lit in watchers) boolWatchersByLit[lit].add(newFid)
         }
         return newFid
+    }
+
+    /** Read-only view of LBDs for tests / introspection. Parallel to [learnedClauses]. */
+    fun learnedClauseLbd(learnedIndex: Int): Int = _learnedLbd[learnedIndex]
+
+    /**
+     * Prune the learned-clause database. The [keep] predicate decides per (learnedIndex,
+     * lbd) whether to retain that clause; dropped clauses' factor ids vanish and the
+     * remaining clauses are renumbered contiguously starting at `problem.numFactors`.
+     * Three things are rebuilt:
+     *   - [_learnedClauses] / [_learnedLbd] compacted to the kept entries in order;
+     *   - the learned-clause tail of [_refPayload] compacted similarly;
+     *   - every list in [boolWatchersByLit] walked once, with learned factor ids
+     *     remapped through `oldFid → newFid` or removed when dropped.
+     *
+     * Watchers' positions inside each clause's `refPayload[fid]` are watch *indices*
+     * (into `clause.literals`), not factor ids — they survive the compaction unchanged.
+     * Cost is amortised across infrequent calls (typical: once per Luby restart).
+     */
+    fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+        val n = _learnedClauses.size
+        if (n == 0) return
+        val remap = IntArray(n)  // remap[i] = new learned index, or -1 if dropped
+        var newCount = 0
+        for (i in 0 until n) {
+            remap[i] = if (keep(i, _learnedLbd[i])) newCount++ else -1
+        }
+        if (newCount == n) return  // nothing dropped
+
+        // Compact _learnedClauses + _learnedLbd in place using a two-pointer walk —
+        // every kept entry slides down to its new position; tail beyond newCount is
+        // trimmed at the end.
+        var w = 0
+        for (i in 0 until n) if (remap[i] >= 0) {
+            _learnedClauses[w] = _learnedClauses[i]
+            _learnedLbd[w] = _learnedLbd[i]
+            w++
+        }
+        while (_learnedClauses.size > newCount) _learnedClauses.removeAt(_learnedClauses.size - 1)
+        _learnedLbd.truncateTo(newCount)
+
+        // Compact the learned tail of _refPayload similarly. Static-factor entries stay
+        // at indices [0, problem.numFactors) untouched.
+        val refBase = problem.numFactors
+        var rw = refBase
+        for (i in 0 until n) if (remap[i] >= 0) {
+            _refPayload[rw] = _refPayload[refBase + i]
+            rw++
+        }
+        while (_refPayload.size > rw) _refPayload.removeAt(_refPayload.size - 1)
+
+        // Remap each per-literal watcher list. Static fids pass through; learned fids
+        // either rewrite to their new factor id or get dropped.
+        for (lit in boolWatchersByLit.indices) {
+            val list = boolWatchersByLit[lit]
+            var wi = 0
+            for (r in 0 until list.size) {
+                val fid = list[r]
+                if (fid < refBase) {
+                    list[wi++] = fid
+                } else {
+                    val newLearnedIdx = remap[fid - refBase]
+                    if (newLearnedIdx >= 0) list[wi++] = refBase + newLearnedIdx
+                }
+            }
+            list.truncateTo(wi)
+        }
     }
 
     /**

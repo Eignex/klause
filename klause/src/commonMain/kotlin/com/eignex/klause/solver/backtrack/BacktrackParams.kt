@@ -58,6 +58,21 @@ data class BacktrackParams(
      * fixed seed when no restarts are in play.
      */
     val phaseSaving: Boolean = false,
+    /**
+     * Cap on the learned-clause database size. When non-null, a restart-driven
+     * forgetting pass runs on every Luby restart (gated by [lubyRestartBase]): clauses
+     * with LBD ≤ [lbdGlueThreshold] are kept regardless ("glue clauses"); among the
+     * rest, the lowest-LBD clauses are kept up to the cap and higher-LBD clauses are
+     * dropped. `null` (default) disables forgetting — clauses accumulate indefinitely.
+     * Set to a few thousand for hard instances where memory growth is a concern.
+     */
+    val maxLearnedClauses: Int? = null,
+    /**
+     * Glue threshold for [maxLearnedClauses] — clauses with LBD ≤ this are always
+     * retained, since they typically capture cross-cutting "high-leverage" constraints.
+     * MiniSAT / Glucose default is 2.
+     */
+    val lbdGlueThreshold: Int = 2,
     /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
     val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.Cancellation.Never,
 ) : SolverParams {

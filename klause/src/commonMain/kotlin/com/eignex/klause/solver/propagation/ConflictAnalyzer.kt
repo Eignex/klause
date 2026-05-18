@@ -36,13 +36,27 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
          * @param backjumpLevel the level the engine should pop trail back to. The learned
          *  clause is guaranteed to be unit at this level — propagation will immediately
          *  force the asserting literal, breaking the conflict.
+         * @param lbd Literal Block Distance — the number of *distinct decision levels*
+         *  appearing in the learned clause. Lower LBD ⇒ more "glue-like" (binds many
+         *  variables at the same level together) ⇒ likelier to be reused later in the
+         *  search. Restart-driven forgetting policies (see
+         *  [com.eignex.klause.solver.backtrack.BacktrackParams.maxLearnedClauses] /
+         *  `lbdGlueThreshold`) order clauses by LBD when deciding which to keep.
          */
-        data class Learned(val literals: IntArray, val backjumpLevel: Int) : AnalysisResult {
+        data class Learned(
+            val literals: IntArray,
+            val backjumpLevel: Int,
+            val lbd: Int,
+        ) : AnalysisResult {
             override fun equals(other: Any?): Boolean =
-                other is Learned && literals.contentEquals(other.literals) && backjumpLevel == other.backjumpLevel
-            override fun hashCode(): Int = 31 * literals.contentHashCode() + backjumpLevel
+                other is Learned
+                    && literals.contentEquals(other.literals)
+                    && backjumpLevel == other.backjumpLevel
+                    && lbd == other.lbd
+            override fun hashCode(): Int =
+                31 * (31 * literals.contentHashCode() + backjumpLevel) + lbd
             override fun toString(): String =
-                "Learned(literals=${literals.toList()}, backjumpLevel=$backjumpLevel)"
+                "Learned(literals=${literals.toList()}, backjumpLevel=$backjumpLevel, lbd=$lbd)"
         }
 
         /** Analysis couldn't produce a clause (no conflict reason, or non-Clause failure). */
@@ -87,7 +101,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             // is fundamentally lower. Backjump to the deepest of those levels, learned
             // clause is the conflict reason directly (negated).
             val backjumpLevel = learned.map { state.boolLevel[Lit.variable(it)] }.maxOrNull() ?: 0
-            return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel)
+            return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
         }
 
         // Walk the pin trail backwards, resolving against the most-recently-pinned
@@ -121,7 +135,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                 val pivotPinned = state.boolValues[pivot] ?: error("UIP variable $pivot is unpinned")
                 learned.add(Lit.make(pivot, !pivotPinned))
                 val backjumpLevel = backjumpLevelOf(learned, currentLevel)
-                return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel)
+                return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
             }
             // Not yet UIP — replace pivot with its antecedents (resolution).
             val antecedents = state.boolAntecedents[pivot]
@@ -133,7 +147,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                     // Drain the rest of `seen` similarly.
                     drainSeenAsLeaves(seen, learned)
                     val backjumpLevel = backjumpLevelOf(learned, currentLevel)
-                    return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel)
+                    return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
                 }
             ingestReason(antecedents, seen, learned, currentLevel) {
                 currentLevelCount++
@@ -143,7 +157,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         // happen): emit whatever's in `seen` as leaves.
         drainSeenAsLeaves(seen, learned)
         val backjumpLevel = backjumpLevelOf(learned, currentLevel)
-        return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel)
+        return AnalysisResult.Learned(learned.toIntArray(), backjumpLevel, lbdOf(learned))
     }
 
     /**
@@ -186,6 +200,20 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             if (learned.any { Lit.variable(it) == v }) continue
             learned.add(Lit.make(v, !pinned))
         }
+    }
+
+    /**
+     * Literal Block Distance: the number of *distinct decision levels* spanned by the
+     * learned clause's literals. Glauert-style "glue" measure popularised by Audemard &
+     * Simon's Glucose — a tighter predictor of long-term clause usefulness than raw
+     * length or activity. Forgetting policies typically keep clauses with LBD ≤ 2
+     * forever ("glue clauses") and drop high-LBD clauses first.
+     */
+    private fun lbdOf(learned: List<Int>): Int {
+        if (learned.isEmpty()) return 0
+        val seenLevels = HashSet<Int>(learned.size)
+        for (lit in learned) seenLevels.add(state.boolLevel[Lit.variable(lit)])
+        return seenLevels.size
     }
 
     /**

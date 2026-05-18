@@ -354,6 +354,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     }
                     params.variableHeuristic.onRestart()
                     params.valueHeuristic.onRestart()
+                    // LCG learned-clause forgetting: at each restart, prune the database
+                    // when over [maxLearnedClauses]. Glue clauses (LBD ≤ glueThreshold)
+                    // are always retained; among the rest, the lowest-LBD entries are
+                    // kept up to the cap.
+                    forgetIfOverCap(session, params)
                     lubyIdx++
                     continue@outer
                 }
@@ -581,6 +586,45 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         }
     }
 
+    /**
+     * Apply the LCG forgetting policy on a Luby restart. No-op when
+     * [BacktrackParams.maxLearnedClauses] is null or the learned database is already
+     * under the cap. Otherwise: glue clauses (LBD ≤ [BacktrackParams.lbdGlueThreshold])
+     * are kept, and among non-glue clauses we keep the lowest-LBD ones up to the
+     * remaining cap. Implemented as: collect (index, lbd) pairs for non-glue clauses,
+     * sort by LBD ascending, take the first `remaining` of them, plus all glue.
+     */
+    private fun forgetIfOverCap(session: PropagationSession, params: BacktrackParams) {
+        val cap = params.maxLearnedClauses ?: return
+        val learnedSize = session.problem.let { _ ->
+            // PropagationSession exposes the count indirectly via session.state — pull
+            // it from the state field that learnedClauses reads. We reuse the public
+            // accessor on the session here to avoid leaking the state.
+            session.learnedClauseCount
+        }
+        if (learnedSize <= cap) return
+        val glueThreshold = params.lbdGlueThreshold
+        // Bucket non-glue clauses by LBD and pick the lowest LBDs up to the residual
+        // capacity. We do this as: compute LBD per index, sort ascending, and define
+        // `keep(i, lbd) = lbd <= glueThreshold || rank(i) < remaining`.
+        val nonGlue = ArrayList<IntArray>(learnedSize)  // [lbd, index] pairs
+        for (i in 0 until learnedSize) {
+            val lbd = session.learnedClauseLbd(i)
+            if (lbd > glueThreshold) nonGlue.add(intArrayOf(lbd, i))
+        }
+        // If all are glue, nothing to forget.
+        if (nonGlue.isEmpty()) return
+        val glueCount = learnedSize - nonGlue.size
+        val remainingCap = (cap - glueCount).coerceAtLeast(0)
+        if (nonGlue.size <= remainingCap) return  // already under cap
+        nonGlue.sortBy { it[0] }  // ascending LBD
+        val kept = HashSet<Int>(remainingCap)
+        for (k in 0 until remainingCap) kept.add(nonGlue[k][1])
+        session.forgetLearnedClauses { idx, lbd ->
+            lbd <= glueThreshold || idx in kept
+        }
+    }
+
     /** How [backjumpAndLearn] terminated. */
     private enum class BackjumpTerm {
         /** Backjumped, learned clause asserted cleanly. Resume by descending. */
@@ -635,7 +679,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             // calls); if the clause came out empty, fall back to chronological.
             if (current.literals.isEmpty()) return BackjumpTerm.Stuck
             val clause = com.eignex.klause.solver.factor.Clause(current.literals)
-            val result = session.addLearnedClause(clause)
+            val result = session.addLearnedClause(clause, current.lbd)
             when (result) {
                 is PropagationResult.Implied -> return BackjumpTerm.Resume
                 is PropagationResult.Unsat -> {

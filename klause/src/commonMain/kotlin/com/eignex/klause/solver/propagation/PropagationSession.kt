@@ -123,14 +123,30 @@ class PropagationSession(val problem: Problem) {
      * learned clause is a constraint over existing variables, not a decision. So no
      * snapshot is pushed and no decision counter is bumped.
      */
-    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause): PropagationResult {
+    fun addLearnedClause(
+        clause: com.eignex.klause.solver.factor.Clause,
+        lbd: Int,
+    ): PropagationResult {
         bakedUnsat?.let { return it }
-        val newFid = state.addLearnedClause(clause)
+        val newFid = state.addLearnedClause(clause, lbd)
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid)
         if (conflict != null) return revertAndUnsat(conflict)
         val implied = computeImplied()
         return diffAgainst(implied, lastImplied).also { lastImplied = implied }
     }
+
+    /** Forward to [PropagationState.forgetLearnedClauses]. Called by the engine's
+     *  restart hook to bound the learned-clause database. */
+    fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+        state.forgetLearnedClauses(keep)
+    }
+
+    /** Current learned-clause count. Used by the engine to decide whether to invoke
+     *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
+    val learnedClauseCount: Int get() = state.learnedClauses.size
+
+    /** LBD of the learned clause at [learnedIndex]. */
+    fun learnedClauseLbd(learnedIndex: Int): Int = state.learnedClauseLbd(learnedIndex)
 
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
         if (pinnedBools[v] == value) return levelStates.last().implied
