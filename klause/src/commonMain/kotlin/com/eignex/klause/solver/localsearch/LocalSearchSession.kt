@@ -72,6 +72,14 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
     ): MinimizeResult =
         solver.minimizeInternal(objective, applyStack(params), warm)
 
+    /** Streaming optimisation — yields each new incumbent then a terminal verdict.
+     *  Mirrors [com.eignex.klause.solver.Optimizer.improvements]. */
+    fun improvements(
+        objective: Objective,
+        params: LocalSearchParams = LocalSearchParams(),
+    ): Sequence<MinimizeResult> =
+        solver.improvementsInternal(objective, applyStack(params), warm)
+
     private fun applyStack(params: LocalSearchParams): LocalSearchParams {
         if (stack.isEmpty()) return params
         var merged = params.assumptions

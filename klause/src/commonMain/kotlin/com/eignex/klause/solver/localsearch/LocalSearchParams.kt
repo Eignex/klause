@@ -38,7 +38,7 @@ data class LocalSearchParams(
      *  them. Defaults to none. */
     val assumptions: Assumptions = Assumptions.None,
     /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
-    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.NeverCancel,
+    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.Cancellation.Never,
     /** How [LocalSearchSolver.minimize] combines constraint violations with the objective
      *  for greedy descent. Defaults to two-phase feasibility-first behaviour; switch to
      *  [CostShaping.linear] or [CostShaping.saturating] on tight problems where the

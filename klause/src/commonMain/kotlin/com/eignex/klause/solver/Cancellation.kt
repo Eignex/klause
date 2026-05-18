@@ -5,8 +5,8 @@ import kotlin.time.TimeSource
 
 /**
  * Caller-supplied cooperative-cancellation token. Engines call it periodically and stop
- * their search promptly when [isCancelled] returns `true`. The default token,
- * [Cancellation.Never] (aliased as [NeverCancel]), never cancels.
+ * their search promptly when [isCancelled] returns `true`. The default token is
+ * [Cancellation.Never].
  *
  * The interface is a `fun interface` so a bare `() -> Boolean` lambda still SAM-converts
  * to a [Cancellation], and `params.cancellation()` keeps working at every legacy call
@@ -65,5 +65,3 @@ fun interface Cancellation {
     }
 }
 
-/** Backward-compat alias for [Cancellation.Never]. */
-val NeverCancel: Cancellation = Cancellation.Never

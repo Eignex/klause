@@ -119,35 +119,50 @@ class LocalSearchSolver(
      * is correct but slow.
      */
     override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult =
-        minimizeInternal(objective, params, warm = null)
+        improvementsInternal(objective, params, warm = null).last()
+
+    override fun improvements(
+        objective: Objective,
+        params: LocalSearchParams,
+    ): Sequence<MinimizeResult> = improvementsInternal(objective, params, warm = null)
 
     /**
      * Internal minimize entry point. Local search is **incomplete**: it never proves
      * optimality or infeasibility. So the verdict is always either
-     * [MinimizeResult.BestFound] (a feasible was reached) or
-     * [MinimizeResult.Unknown] (budget gone before feasibility).
-     * Bake-time-Unsat is the one case we can prove Infeasible — propagation derived it
-     * before LS started.
+     * [MinimizeResult.BestFound] (a feasible was reached) or [MinimizeResult.Unknown]
+     * (budget gone before feasibility). Bake-time-Unsat is the one case we can prove
+     * Infeasible — propagation derived it before LS started.
      */
     internal fun minimizeInternal(
         objective: Objective,
         params: LocalSearchParams,
         warm: WarmState?,
-    ): MinimizeResult {
+    ): MinimizeResult = improvementsInternal(objective, params, warm).last()
+
+    /**
+     * Streaming search. Yields one [MinimizeResult.BestFound] per new incumbent
+     * established during the inner loop (i.e. every time `obj < bestObj` strictly
+     * improves), followed by exactly one terminal verdict. Consumers can react to each
+     * improvement before search continues; `improvements(...).last()` is equivalent to
+     * the single-shot [minimize] semantics.
+     *
+     * The terminal verdict is [MinimizeResult.Infeasible] when propagation rules the
+     * problem out before any LS work happens; otherwise either a final
+     * [MinimizeResult.BestFound] (carrying the same sample as the last intermediate
+     * yield, with the real termination reason) or [MinimizeResult.Unknown] when LS
+     * never reached feasibility.
+     */
+    internal fun improvementsInternal(
+        objective: Objective,
+        params: LocalSearchParams,
+        warm: WarmState?,
+    ): Sequence<MinimizeResult> = sequence {
         val eff = effectiveAssumptions(params.assumptions)
-            ?: return MinimizeResult.Infeasible
-        val sample = minimizeImpl(objective, params, eff, warm)
-        return if (sample != null) {
-            MinimizeResult.BestFound(
-                sample = sample,
-                objective = objective.evaluate(sample),
-                reason = TerminationReason.BudgetExhausted,
-            )
-        } else {
-            MinimizeResult.Unknown(
-                TerminationReason.BudgetExhausted,
-            )
+        if (eff == null) {
+            yield(MinimizeResult.Infeasible)
+            return@sequence
         }
+        runMinimizeStream(objective, params, eff, warm)
     }
 
     fun solve(): SolveResult = solve(LocalSearchParams())
@@ -225,12 +240,22 @@ class LocalSearchSolver(
      * the objective), restart and try again. Best-feasible-objective state lives across
      * restarts so we monotonically improve.
      */
-    private fun minimizeImpl(
+    /**
+     * Streaming body of the LS minimize loop. Yields a [MinimizeResult.BestFound] on
+     * every strict improvement; yields exactly one terminal verdict
+     * ([MinimizeResult.BestFound] with reason, or [MinimizeResult.Unknown]) on exit.
+     * Two-phase per restart attempt: WalkSat-style fight to feasibility, then a greedy
+     * descent on the objective restricted to feasibility-preserving moves. When the
+     * descent reaches a local minimum (no neighbour both keeps `cost == 0` and lowers
+     * the objective), restart and try again. Best-feasible-objective state lives across
+     * restarts so we monotonically improve.
+     */
+    private suspend fun SequenceScope<MinimizeResult>.runMinimizeStream(
         objective: Objective,
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
-        warm: WarmState? = null,
-    ): Sample? {
+        warm: WarmState?,
+    ) {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         warm?.applyTo(state)
@@ -249,6 +274,7 @@ class LocalSearchSolver(
         var totalFlips = 0L
         val maxFlips = params.maxFlips
         val shaping = params.costShaping
+        var cancelled = false
 
         // Each restart counts as one unit of work against [maxFlips]. Otherwise a
         // degenerate objective (e.g. all-zero) on a constraint-free problem would
@@ -257,7 +283,7 @@ class LocalSearchSolver(
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
-                if (params.cancellation()) break
+                if (params.cancellation()) { cancelled = true; break }
                 cancelCountdown = CANCEL_CHECK_INTERVAL
             }
             if (state.cost == 0) {
@@ -267,6 +293,8 @@ class LocalSearchSolver(
                 if (obj < bestObj) {
                     bestObj = obj
                     bestSample = snap
+                    // Yield each strict improvement as the inner loop discovers it.
+                    yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }
                 // Try to descend via a single move. Under [CostShaping.FeasibilityFirst]
                 // this stays inside the feasible region; under a linear shaping it may
@@ -308,7 +336,11 @@ class LocalSearchSolver(
             totalFlips++
         }
         warm?.captureFrom(state)
-        return bestSample
+        val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
+        yield(
+            if (bestSample != null) MinimizeResult.BestFound(bestSample, bestObj, reason)
+            else MinimizeResult.Unknown(reason)
+        )
     }
 
     /**

@@ -11,7 +11,7 @@ class CancellationCompositionTest {
     fun `Never never cancels`() {
         assertFalse(Cancellation.Never.isCancelled())
         assertFalse(Cancellation.Never())
-        assertFalse(NeverCancel())
+        assertFalse(Cancellation.Never())
     }
 
     @Test

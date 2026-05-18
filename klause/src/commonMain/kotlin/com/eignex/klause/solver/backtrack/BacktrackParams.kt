@@ -51,7 +51,7 @@ data class BacktrackParams(
      */
     val phaseSaving: Boolean = false,
     /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
-    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.NeverCancel,
+    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.Cancellation.Never,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
