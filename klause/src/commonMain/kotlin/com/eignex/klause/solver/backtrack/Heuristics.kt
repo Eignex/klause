@@ -463,78 +463,111 @@ class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
 class Impact(
     private val maxProbes: Int = 32,
 ) : ValueHeuristic {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> {
-        val candidates: IntArray = when (varRef) {
-            is VarRef.Bool -> intArrayOf(0, 1)
-            is VarRef.IntVar -> {
-                val d = session.intDomain(varRef.varId)
-                if (d.size <= maxProbes) IntArray(d.size) { d.valueAt(it) }
-                else {
-                    // Sample without replacement so we don't waste budget on duplicates.
-                    val seen = HashSet<Int>(maxProbes * 2)
-                    val sample = IntArray(maxProbes)
-                    var i = 0
-                    var guard = 0
-                    while (i < maxProbes && guard < maxProbes * 8) {
-                        val candidate = d.valueAt(rng.nextInt(d.size))
-                        if (seen.add(candidate)) { sample[i] = candidate; i++ }
-                        guard++
-                    }
-                    if (i < maxProbes) sample.copyOf(i) else sample
-                }
-            }
-        }
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
+        probeAndOrder(session, varRef, rng, maxProbes, ascending = true)
+}
 
-        // Each probe: pin → measure log-product → revert (popLast). Unsat probes self-revert
-        // and are dropped from the returned order entirely.
-        val scored = ArrayList<Pair<Int, Double>>(candidates.size)
-        for (v in candidates) {
-            val r = when (varRef) {
-                is VarRef.Bool -> session.pinBool(varRef.varId, v != 0)
-                is VarRef.IntVar -> session.pinInt(varRef.varId, v)
-            }
-            if (r is com.eignex.klause.solver.propagation.PropagationResult.Unsat) continue
-            val post = logRemainingDomainProduct(session)
-            session.popLast()
-            scored.add(v to post)
-        }
-        scored.sortBy { it.second }
+/**
+ * Counting-based value selection — the Pesant 2005 "Maxsd" (maximum solution-density)
+ * heuristic, instantiated with the cheap aFC (approximate Frequency Count, Zanarini-Pesant
+ * 2009) proxy: for each candidate value, probe a real propagation pin, then score by the
+ * log-product of remaining domain sizes. **Larger residual product = more solutions still
+ * supported = try first** (the dual ordering of [Impact]).
+ *
+ * The Pesant intuition is that values which leave the constraint network *richer* are more
+ * likely to be on a path to a solution; values which immediately collapse domains are more
+ * likely to lead to a dead-end. Same probing machinery and infeasible-value drop as
+ * [Impact], with sorting reversed. Both compose with `LastConflict` and any variable
+ * heuristic.
+ *
+ * Notes:
+ *  - The log-product is a geometric-mean proxy for the true solution-density. Exact factor
+ *    counters (regular DFA, AllDifferent permanent) would be more accurate but require
+ *    per-factor support that isn't in klause's current factor API.
+ *  - Empirically: counting wins on structured combinatorial problems (rostering, scheduling)
+ *    where the solution manifold is "fat" near correct subtrees; Impact wins on
+ *    pruning-heavy first-fail problems.
+ */
+class MaxSd(
+    private val maxProbes: Int = 32,
+) : ValueHeuristic {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
+        probeAndOrder(session, varRef, rng, maxProbes, ascending = false)
+}
 
-        // For very large int domains we only probed a subset; append the rest at the end
-        // in ascending value order so DFS still covers everything if it backtracks that
-        // far. Bool domains are always fully probed, so this branch never triggers there.
-        if (varRef is VarRef.IntVar) {
+/**
+ * Shared probing core for [Impact] and [MaxSd]. For each candidate value of [varRef]:
+ *   - push a real propagation pin via [PropagationSession.pinBool] / [pinInt];
+ *   - score by the log of the remaining-domain product;
+ *   - revert with [PropagationSession.popLast] (Unsat probes self-revert, are dropped).
+ *
+ * [ascending] = `true` orders smallest-residual first (Impact); `false` orders largest-
+ * residual first (MaxSd). For int domains larger than [maxProbes], a random subset is
+ * probed; the un-probed remainder is appended at the end so DFS coverage is preserved.
+ */
+private fun probeAndOrder(
+    session: PropagationSession,
+    varRef: VarRef,
+    rng: Random,
+    maxProbes: Int,
+    ascending: Boolean,
+): Sequence<Int> {
+    val candidates: IntArray = when (varRef) {
+        is VarRef.Bool -> intArrayOf(0, 1)
+        is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            if (candidates.size < d.size) {
-                val probed = HashSet<Int>(candidates.size * 2).apply {
-                    for ((p, _) in scored) add(p); for (c in candidates) add(c)
+            if (d.size <= maxProbes) IntArray(d.size) { d.valueAt(it) }
+            else {
+                val seen = HashSet<Int>(maxProbes * 2)
+                val sample = IntArray(maxProbes)
+                var i = 0
+                var guard = 0
+                while (i < maxProbes && guard < maxProbes * 8) {
+                    val candidate = d.valueAt(rng.nextInt(d.size))
+                    if (seen.add(candidate)) { sample[i] = candidate; i++ }
+                    guard++
                 }
-                val ordered = scored.asSequence().map { it.first }
-                return ordered + sequence { d.forEach { if (it !in probed) yield(it) } }
+                if (i < maxProbes) sample.copyOf(i) else sample
             }
         }
-        return scored.asSequence().map { it.first }
     }
-
-    /**
-     * Sum of `ln(size)` over every unpinned variable (bools count as `ln 2` when free).
-     * Equivalent to the log of the product of remaining domain sizes. We work in log-space
-     * to avoid `Double` overflow on problems with hundreds of free vars.
-     */
-    private fun logRemainingDomainProduct(session: PropagationSession): Double {
-        var s = 0.0
-        val p = session.problem
-        for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += LN2
-        for (v in 0 until p.numIntVars) {
-            val sz = session.intDomain(v).size
-            if (sz > 1) s += kotlin.math.ln(sz.toDouble())
+    val scored = ArrayList<Pair<Int, Double>>(candidates.size)
+    for (v in candidates) {
+        val r = when (varRef) {
+            is VarRef.Bool -> session.pinBool(varRef.varId, v != 0)
+            is VarRef.IntVar -> session.pinInt(varRef.varId, v)
         }
-        return s
+        if (r is com.eignex.klause.solver.propagation.PropagationResult.Unsat) continue
+        val post = logRemainingDomainProduct(session)
+        session.popLast()
+        scored.add(v to post)
     }
+    if (ascending) scored.sortBy { it.second } else scored.sortByDescending { it.second }
+    if (varRef is VarRef.IntVar) {
+        val d = session.intDomain(varRef.varId)
+        if (candidates.size < d.size) {
+            val probed = HashSet<Int>(candidates.size * 2).apply {
+                for ((p, _) in scored) add(p); for (c in candidates) add(c)
+            }
+            val ordered = scored.asSequence().map { it.first }
+            return ordered + sequence { d.forEach { if (it !in probed) yield(it) } }
+        }
+    }
+    return scored.asSequence().map { it.first }
+}
 
-    private companion object {
-        private val LN2 = kotlin.math.ln(2.0)
+/** Sum of `ln(size)` over every unpinned variable (bools count as `ln 2` when free). Log-
+ *  space to dodge `Double` overflow on problems with hundreds of free vars. */
+private fun logRemainingDomainProduct(session: PropagationSession): Double {
+    var s = 0.0
+    val p = session.problem
+    val ln2 = kotlin.math.ln(2.0)
+    for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += ln2
+    for (v in 0 until p.numIntVars) {
+        val sz = session.intDomain(v).size
+        if (sz > 1) s += kotlin.math.ln(sz.toDouble())
     }
+    return s
 }
 
 /** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
