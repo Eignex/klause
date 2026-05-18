@@ -26,6 +26,17 @@ interface VariableHeuristic {
     fun pick(session: PropagationSession, rng: Random): VarRef?
     /** Called once per propagation conflict at [varRef]; bump activity / failure weight. */
     fun onConflict(varRef: VarRef) {}
+    /**
+     * Richer conflict notification: [varRef] is the decision that triggered the conflict,
+     * [conflictBools] / [conflictInts] are the *other* decision variables across all
+     * levels involved in the conflict (see [com.eignex.klause.solver.propagation.PropagationResult.Unsat]
+     * for the per-level encoding). VSIDS / dom-wdeg / EVSIDS bump every variable in the
+     * conflict reason set, not just the failed decision; classical heuristics ignore the
+     * extra info via the default forwarding to [onConflict] (varRef only).
+     */
+    fun onConflict(varRef: VarRef, conflictBools: Set<Int>, conflictInts: Set<Int>) {
+        onConflict(varRef)
+    }
     /** Called once per successful pin of [varRef]; useful for phase-saving-like state. */
     fun onCommit(varRef: VarRef) {}
     /** Called when the engine restarts (Luby / geometric); decay activity or reset
@@ -110,6 +121,102 @@ object LargestDomain : VariableHeuristic {
             }
         }
         return best
+    }
+}
+
+/**
+ * Variable State Independent Decaying Sum (Moskewicz et al., Chaff 2001 / MiniSAT). The
+ * activity counter for each variable is bumped on every conflict the variable is implicated
+ * in, with the bump amount [increment] growing geometrically over time so recent conflicts
+ * dominate. Equivalent to per-bump multiplicative decay by a factor of [decay] applied
+ * uniformly to every prior activity, but cheaper (we only mutate the increment, not every
+ * activity entry). Periodically rescales when [increment] approaches [Double] overflow.
+ *
+ * Picks the unpinned variable with the highest activity. Ties broken by variable-id order
+ * (bools precede ints). Activities persist across [onRestart] — that's the whole point of
+ * VSIDS, learning carries over.
+ *
+ * Pre-LCG limitation: today the engine's [com.eignex.klause.solver.propagation.PropagationResult.Unsat]
+ * carries the *decision variables* at conflict levels, not every variable on the
+ * propagation-reason path. Bumping decision variables only gives a useful (if coarser)
+ * signal — still consistently better than random / smallest-domain on hard instances. When
+ * full conflict-graph attribution lands (alongside [no-good / lazy clause learning]) this
+ * heuristic will see the richer set automatically through [onConflict].
+ *
+ * Defaults follow MiniSAT: `decay = 0.95`. Lower decay (e.g., 0.8) makes the heuristic more
+ * aggressive about following recent conflicts; higher (e.g., 0.99) is more conservative.
+ */
+class Vsids(
+    private val decay: Double = 0.95,
+    private val rescaleThreshold: Double = 1e100,
+) : VariableHeuristic {
+
+    init {
+        require(decay in 0.5..0.999) { "VSIDS decay must be in 0.5..0.999, got $decay" }
+    }
+
+    private var increment: Double = 1.0
+    private var boolActivity: DoubleArray = DoubleArray(0)
+    private var intActivity: DoubleArray = DoubleArray(0)
+
+    /** Resize the activity arrays the first time we see a session — keeps the heuristic
+     *  reusable across problems with different shapes. */
+    private fun ensureSized(numBool: Int, numInt: Int) {
+        if (boolActivity.size != numBool) boolActivity = DoubleArray(numBool)
+        if (intActivity.size != numInt) intActivity = DoubleArray(numInt)
+    }
+
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        val problem = session.problem
+        ensureSized(problem.numBoolVars, problem.numIntVars)
+        var best: VarRef? = null
+        var bestActivity = Double.NEGATIVE_INFINITY
+        for (v in 0 until problem.numBoolVars) {
+            if (session.boolValue(v) != null) continue
+            val a = boolActivity[v]
+            if (a > bestActivity) { bestActivity = a; best = VarRef.Bool(v) }
+        }
+        for (v in 0 until problem.numIntVars) {
+            if (session.intDomain(v).size <= 1) continue
+            val a = intActivity[v]
+            if (a > bestActivity) { bestActivity = a; best = VarRef.IntVar(v) }
+        }
+        return best
+    }
+
+    override fun onConflict(
+        varRef: VarRef, conflictBools: Set<Int>, conflictInts: Set<Int>,
+    ) {
+        ensureSized(boolActivity.size.coerceAtLeast(0), intActivity.size.coerceAtLeast(0))
+        // Bump every decision variable in the conflict reason set, plus the failed
+        // decision itself (in case it isn't already in the set — typically it is).
+        for (b in conflictBools) bumpBool(b)
+        for (i in conflictInts) bumpInt(i)
+        when (varRef) {
+            is VarRef.Bool -> bumpBool(varRef.varId)
+            is VarRef.IntVar -> bumpInt(varRef.varId)
+        }
+        // Grow the increment for the next conflict — implicit multiplicative decay of
+        // every prior activity by `decay`, without touching the arrays.
+        increment /= decay
+        if (increment > rescaleThreshold) rescaleAll()
+    }
+
+    private fun bumpBool(v: Int) {
+        if (v < boolActivity.size) boolActivity[v] += increment
+    }
+    private fun bumpInt(v: Int) {
+        if (v < intActivity.size) intActivity[v] += increment
+    }
+
+    /** Divide every activity (and [increment]) by [rescaleThreshold] so the relative
+     *  ordering is preserved but we step well clear of `Double.MAX_VALUE`. Standard
+     *  MiniSAT rescale. */
+    private fun rescaleAll() {
+        val k = 1.0 / rescaleThreshold
+        for (i in boolActivity.indices) boolActivity[i] *= k
+        for (i in intActivity.indices) intActivity[i] *= k
+        increment *= k
     }
 }
 
