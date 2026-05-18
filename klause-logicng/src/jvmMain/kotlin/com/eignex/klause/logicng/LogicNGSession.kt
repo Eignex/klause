@@ -121,12 +121,7 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
     private fun mergedAssumptions(call: Assumptions): Assumptions {
         if (stack.isEmpty() && call.isEmpty) return Assumptions.None
         var merged = call
-        for (a in stack) {
-            if (a.isEmpty) continue
-            val bools = HashMap<Int, Boolean>(merged.bools).apply { putAll(a.bools) }
-            val ints = HashMap<Int, Int>(merged.ints).apply { putAll(a.ints) }
-            merged = Assumptions(bools, ints)
-        }
+        for (a in stack) merged = merged.mergedWith(a)
         return merged
     }
 
@@ -135,16 +130,16 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         if (a.isEmpty) return emptyList()
         val cnf = solver.cnf
         val lits = ArrayList<Literal>()
-        for ((boolVar, value) in a.bools) {
+        a.forEachBool { boolVar, value ->
             if (boolVar in 0 until cnf.boolVarToCnfVar.size) {
                 lits.add(factory.literal(varName(cnf.boolVarToCnfVar[boolVar]), value))
             }
         }
-        for ((intVar, value) in a.ints) {
-            if (intVar !in cnf.intVarBits.indices) continue
+        a.forEachInt { intVar, value ->
+            if (intVar !in cnf.intVarBits.indices) return@forEachInt
             val bits = cnf.intVarBits[intVar]
             val offset = value - cnf.intVarMin[intVar]
-            if (offset < 0 || offset >= (1 shl bits.size)) continue // out of CNF-encodable range
+            if (offset < 0 || offset >= (1 shl bits.size)) return@forEachInt
             for (i in bits.indices) {
                 val bitVal = ((offset shr i) and 1) == 1
                 lits.add(factory.literal(varName(bits[i]), bitVal))

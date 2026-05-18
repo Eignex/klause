@@ -38,7 +38,7 @@ class PropagationSession(val problem: Problem) {
     private val trail: ArrayDeque<Pair<VarKind, Int>> = ArrayDeque()
     /** Cumulative implied set as of the last successful push — used to diff push returns. */
     private var lastImplied: PropagationResult.Implied =
-        PropagationResult.Implied(emptyMap(), emptyMap())
+        PropagationResult.Implied.Empty
 
     /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
      *  All session operations short-circuit to this result. */
@@ -81,14 +81,19 @@ class PropagationSession(val problem: Problem) {
         trail.clear()
         lastImplied = levelStates[0].implied
 
-        for ((v, b) in assumptions.bools) {
+        var earlyUnsat: PropagationResult.Unsat? = null
+        assumptions.forEachBool { v, b ->
+            if (earlyUnsat != null) return@forEachBool
             val r = pushBool(v, b)
-            if (r is PropagationResult.Unsat) return r
+            if (r is PropagationResult.Unsat) earlyUnsat = r
         }
-        for ((v, i) in assumptions.ints) {
+        if (earlyUnsat != null) return earlyUnsat!!
+        assumptions.forEachInt { v, i ->
+            if (earlyUnsat != null) return@forEachInt
             val r = pushInt(v, i)
-            if (r is PropagationResult.Unsat) return r
+            if (r is PropagationResult.Unsat) earlyUnsat = r
         }
+        if (earlyUnsat != null) return earlyUnsat!!
         lastImplied = levelStates.last().implied
         return computeImplied()
     }
@@ -193,29 +198,59 @@ class PropagationSession(val problem: Problem) {
     fun decisionAt(level: Int): Pair<VarKind, Int>? =
         if (level in 1..trail.size) trail.elementAt(level - 1) else null
 
+    /**
+     * Build a fresh [PropagationResult.Implied] from the propagation state, excluding
+     * already-pinned vars. Iterates the var spaces in ascending id order so the resulting
+     * primitive arrays are naturally sorted — no separate sort step required.
+     */
     private fun computeImplied(): PropagationResult.Implied {
-        val bools = HashMap<Int, Boolean>()
+        val bKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val bVals = ArrayList<Boolean>()
         for (v in 0 until problem.numBoolVars) {
             val b = state.boolValues[v] ?: continue
             if (pinnedBools[v] == b) continue
-            bools[v] = b
+            bKeys.add(v); bVals.add(b)
         }
-        val ints = HashMap<Int, Int>()
+        val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         for (v in 0 until problem.numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
                 if (pinnedInts[v] == d.min) continue
-                ints[v] = d.min
+                iKeys.add(v); iVals.add(d.min)
             }
         }
-        return PropagationResult.Implied(bools, ints)
+        return PropagationResult.Implied(
+            boolKeys = bKeys.toIntArray(),
+            boolValues = BooleanArray(bVals.size) { bVals[it] },
+            intKeys = iKeys.toIntArray(),
+            intValues = iVals.toIntArray(),
+        )
     }
 
+    /**
+     * Filter [current] to entries that differ from [previous]. Both sides are key-sorted,
+     * so we walk in lockstep with binary-search misses replacing the old Map filtering.
+     */
     private fun diffAgainst(
         current: PropagationResult.Implied,
         previous: PropagationResult.Implied,
-    ): PropagationResult.Implied = PropagationResult.Implied(
-        bools = current.bools.filter { (k, vNew) -> previous.bools[k] != vNew },
-        ints = current.ints.filter { (k, vNew) -> previous.ints[k] != vNew },
-    )
+    ): PropagationResult.Implied {
+        val bKeys = com.eignex.klause.util.IntArrayList(initialCapacity = current.numBools)
+        val bVals = ArrayList<Boolean>(current.numBools)
+        current.forEachBool { k, v ->
+            if (previous.boolValueOrNull(k) != v) { bKeys.add(k); bVals.add(v) }
+        }
+        val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = current.numInts)
+        val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = current.numInts)
+        current.forEachInt { k, v ->
+            if (previous.intValueOrNull(k) != v) { iKeys.add(k); iVals.add(v) }
+        }
+        return PropagationResult.Implied(
+            boolKeys = bKeys.toIntArray(),
+            boolValues = BooleanArray(bVals.size) { bVals[it] },
+            intKeys = iKeys.toIntArray(),
+            intValues = iVals.toIntArray(),
+        )
+    }
 }

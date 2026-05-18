@@ -112,8 +112,8 @@ class Problem(
         implied: PropagationResult.Implied,
     ) {
         bools[forcedVar] = forcedValue
-        for ((k, b) in implied.bools) bools[k] = b
-        for ((k, i) in implied.ints) ints[k] = i
+        implied.forEachBool { k, b -> bools[k] = b }
+        implied.forEachInt { k, i -> ints[k] = i }
     }
 
     /**
@@ -144,22 +144,30 @@ class Problem(
             )
         }
 
-        // Diff against input: only emit newly-forced facts.
-        val bools = HashMap<Int, Boolean>()
+        // Diff against input: only emit newly-forced facts. Iterates vars in ascending
+        // id order so the resulting primitive arrays are pre-sorted (no separate sort).
+        val bKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val bVals = ArrayList<Boolean>()
         for (v in 0 until numBoolVars) {
             val b = state.boolValues[v] ?: continue
-            if (assumptions.bools[v] == b) continue
-            bools[v] = b
+            if (assumptions.boolValueOrNull(v) == b) continue
+            bKeys.add(v); bVals.add(b)
         }
-        val ints = HashMap<Int, Int>()
+        val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         for (v in 0 until numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
-                if (assumptions.ints[v] == d.min) continue
-                ints[v] = d.min
+                if (assumptions.intValueOrNull(v) == d.min) continue
+                iKeys.add(v); iVals.add(d.min)
             }
         }
-        return PropagationResult.Implied(bools, ints)
+        return PropagationResult.Implied(
+            boolKeys = bKeys.toIntArray(),
+            boolValues = BooleanArray(bVals.size) { bVals[it] },
+            intKeys = iKeys.toIntArray(),
+            intValues = iVals.toIntArray(),
+        )
     }
 
     private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {

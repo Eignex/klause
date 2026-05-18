@@ -81,13 +81,9 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
 
     private fun mergedStack(): Assumptions {
         if (stack.size == 1) return stack.first()
-        val bools = HashMap<Int, Boolean>()
-        val ints = HashMap<Int, Int>()
-        for (a in stack) {
-            for ((k, v) in a.bools) bools[k] = v
-            for ((k, v) in a.ints) ints[k] = v
-        }
-        return Assumptions(bools, ints)
+        var merged = Assumptions.None
+        for (a in stack) merged = merged.mergedWith(a)
+        return merged
     }
 
     override fun solve(params: P): SolveResult = solver.solve(applyStack(params))

@@ -105,12 +105,10 @@ class LocalSearchState(
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
         // Overwrite the assumed slots so the assignment starts feasible w.r.t. the caller's pins.
-        for ((id, value) in assumptions.bools) {
+        assumptions.forEachBool { id, value ->
             if (assignment.boolValue(id) != value) assignment.flipBool(id)
         }
-        for ((id, value) in assumptions.ints) {
-            assignment.setInt(id, value)
-        }
+        assumptions.forEachInt { id, value -> assignment.setInt(id, value) }
         for (i in lastTouched.indices) lastTouched[i] = 0L
         for (i in boolConfChange.indices) boolConfChange[i] = true
         for (i in intConfChange.indices) intConfChange[i] = true

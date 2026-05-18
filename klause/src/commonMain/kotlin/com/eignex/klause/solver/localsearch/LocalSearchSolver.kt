@@ -94,18 +94,11 @@ class LocalSearchSolver(
         if (baked is PropagationResult.Unsat) return null
         baked as PropagationResult.Implied
         if (callAssumptions.isEmpty) {
-            return if (baked.isEmpty) Assumptions.None
-            else Assumptions(bools = baked.bools, ints = baked.ints)
+            return if (baked.isEmpty) Assumptions.None else baked.toAssumptions()
         }
         return when (val r = problem.propagate(callAssumptions)) {
             is PropagationResult.Unsat -> null
-            is PropagationResult.Implied -> {
-                val mergedBools = HashMap<Int, Boolean>(callAssumptions.bools)
-                mergedBools.putAll(r.bools)
-                val mergedInts = HashMap<Int, Int>(callAssumptions.ints)
-                mergedInts.putAll(r.ints)
-                Assumptions(mergedBools, mergedInts)
-            }
+            is PropagationResult.Implied -> callAssumptions.mergedWith(r.toAssumptions())
         }
     }
 

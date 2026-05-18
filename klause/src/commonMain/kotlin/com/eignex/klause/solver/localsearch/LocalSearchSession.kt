@@ -71,12 +71,7 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
     private fun applyStack(params: LocalSearchParams): LocalSearchParams {
         if (stack.isEmpty()) return params
         var merged = params.assumptions
-        for (a in stack) {
-            if (a.isEmpty) continue
-            val bools = HashMap<Int, Boolean>(merged.bools).apply { putAll(a.bools) }
-            val ints = HashMap<Int, Int>(merged.ints).apply { putAll(a.ints) }
-            merged = Assumptions(bools, ints)
-        }
+        for (a in stack) merged = merged.mergedWith(a)
         return params.copy(assumptions = merged)
     }
 }

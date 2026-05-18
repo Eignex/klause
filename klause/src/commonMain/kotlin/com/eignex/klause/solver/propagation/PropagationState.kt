@@ -33,9 +33,12 @@ class PropagationState(
     /** Per-int current domain (copy of [Problem.intDomains], narrowed as propagation proceeds). */
     val intDomains: Array<IntDomain> = Array(problem.numIntVars) { problem.intDomains[it] }
 
-    /** Vars whose pin/domain changed since the driver last drained them. */
-    private val dirtyBools: ArrayDeque<Int> = ArrayDeque()
-    private val dirtyInts: ArrayDeque<Int> = ArrayDeque()
+    /** Vars whose pin/domain changed since the driver last drained them. Primitive int
+     *  ring buffers to avoid the autoboxing tax `ArrayDeque<Int>` pays on every push/poll. */
+    private val dirtyBools: com.eignex.klause.util.IntArrayDeque =
+        com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
+    private val dirtyInts: com.eignex.klause.util.IntArrayDeque =
+        com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
 
     /** False iff seeding the assumptions themselves already produced a contradiction. */
     var seeded: Boolean = true
@@ -50,9 +53,11 @@ class PropagationState(
 
     /**
      * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
-     * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed.
+     * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed. Primitive
+     * int list (no boxing on push or indexed read).
      */
-    private val levelToDecisionVar: ArrayDeque<Int> = ArrayDeque()
+    private val levelToDecisionVar: com.eignex.klause.util.IntArrayList =
+        com.eignex.klause.util.IntArrayList()
 
     /** Number of decisions pushed so far. Equals the maximum level. */
     val numDecisions: Int get() = levelToDecisionVar.size
@@ -64,14 +69,14 @@ class PropagationState(
     internal var conflictLevels: MutableSet<Int>? = null
 
     init {
-        seedLoop@ for ((v, b) in assumptions.bools) {
-            if (!pinBoolAsDecision(v, b)) { seeded = false; break@seedLoop }
+        var ok = true
+        assumptions.forEachBool { v, b ->
+            if (ok && !pinBoolAsDecision(v, b)) ok = false
         }
-        if (seeded) {
-            for ((v, i) in assumptions.ints) {
-                if (!setIntAsDecision(v, i)) { seeded = false; break }
-            }
+        if (ok) assumptions.forEachInt { v, i ->
+            if (ok && !setIntAsDecision(v, i)) ok = false
         }
+        seeded = ok
     }
 
     /**
@@ -79,14 +84,14 @@ class PropagationState(
      * seed input assumptions and by [PropagationSession] to push branches.
      */
     fun pinBoolAsDecision(v: Int, value: Boolean): Boolean {
-        levelToDecisionVar.addLast(v)
+        levelToDecisionVar.add(v)
         currentLevel = levelToDecisionVar.size
         return pinBoolImpl(v, value)
     }
 
     /** Push an int var as a new decision. */
     fun setIntAsDecision(v: Int, value: Int): Boolean {
-        levelToDecisionVar.addLast(problem.numBoolVars + v)
+        levelToDecisionVar.add(problem.numBoolVars + v)
         currentLevel = levelToDecisionVar.size
         return setIntImpl(v, value)
     }
@@ -222,10 +227,10 @@ class PropagationState(
         for (i in s.boolLevel.indices) boolLevel[i] = s.boolLevel[i]
         for (i in s.intLevel.indices) intLevel[i] = s.intLevel[i]
         levelToDecisionVar.clear()
-        for (v in s.decisionVars) levelToDecisionVar.addLast(v)
+        for (v in s.decisionVars) levelToDecisionVar.add(v)
         // Aborted pushes may have left dirty queue entries behind; drop them.
-        while (dirtyBools.isNotEmpty()) dirtyBools.removeFirst()
-        while (dirtyInts.isNotEmpty()) dirtyInts.removeFirst()
+        dirtyBools.clear()
+        dirtyInts.clear()
         conflictLevels = null
         currentLevel = 0
     }
@@ -240,7 +245,7 @@ class PropagationState(
      */
     internal fun runToFixpoint(allFactors: Boolean): Set<Int>? {
         val pending = BooleanArray(problem.numFactors)
-        val queue: ArrayDeque<Int> = ArrayDeque(problem.numFactors)
+        val queue = com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numFactors.coerceAtLeast(8))
         if (allFactors) {
             for (fid in 0 until problem.numFactors) { pending[fid] = true; queue.addLast(fid) }
         } else {

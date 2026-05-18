@@ -9,9 +9,122 @@ import com.eignex.klause.solver.propagation.PropagationResult
  * infeasibility.
  */
 sealed interface PropagationResult {
-    /** [bools] and [ints] are disjoint from the input assumptions: only newly-forced facts. */
-    data class Implied(val bools: Map<Int, Boolean>, val ints: Map<Int, Int>) : PropagationResult {
-        val isEmpty: Boolean get() = bools.isEmpty() && ints.isEmpty()
+
+    /**
+     * Newly-forced facts beyond the input assumptions. Stored as parallel primitive
+     * arrays sorted ascending by key — no autoboxing on iteration or lookup, no
+     * `HashMap` allocations when combining with [com.eignex.klause.solver.Assumptions].
+     *
+     * Primitive APIs ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull])
+     * are the hot path; the legacy [bools] / [ints] map accessors are retained as lazy
+     * views for cold call-sites (tests, debug printing).
+     */
+    class Implied internal constructor(
+        /** Bool var ids in ascending order. */
+        val boolKeys: IntArray,
+        /** Forced values aligned with [boolKeys]. */
+        val boolValues: BooleanArray,
+        /** Int var ids in ascending order. */
+        val intKeys: IntArray,
+        /** Forced values aligned with [intKeys]. */
+        val intValues: IntArray,
+    ) : PropagationResult {
+
+        val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
+        val numBools: Int get() = boolKeys.size
+        val numInts: Int get() = intKeys.size
+
+        fun boolValueOrNull(id: Int): Boolean? {
+            val idx = boolKeys.binarySearch(id)
+            return if (idx >= 0) boolValues[idx] else null
+        }
+
+        fun intValueOrNull(id: Int): Int? {
+            val idx = intKeys.binarySearch(id)
+            return if (idx >= 0) intValues[idx] else null
+        }
+
+        inline fun forEachBool(action: (id: Int, value: Boolean) -> Unit) {
+            for (i in boolKeys.indices) action(boolKeys[i], boolValues[i])
+        }
+
+        inline fun forEachInt(action: (id: Int, value: Int) -> Unit) {
+            for (i in intKeys.indices) action(intKeys[i], intValues[i])
+        }
+
+        /** Reinterpret this implied set as an [com.eignex.klause.solver.Assumptions].
+         *  Both share the same key-sorted parallel-array layout, so the conversion is
+         *  three [copyOf] calls (one per primitive array) — no rebuild, no boxing. */
+        fun toAssumptions(): com.eignex.klause.solver.Assumptions =
+            com.eignex.klause.solver.Assumptions(
+                boolKeys = boolKeys.copyOf(),
+                boolValues = boolValues.copyOf(),
+                intKeys = intKeys.copyOf(),
+                intValues = intValues.copyOf(),
+            )
+
+        /** Legacy backward-compat view. Allocates a `LinkedHashMap` per access — hot
+         *  paths should use [forEachBool] / [boolValueOrNull] instead. */
+        val bools: Map<Int, Boolean>
+            get() = if (boolKeys.isEmpty()) emptyMap() else
+                LinkedHashMap<Int, Boolean>(boolKeys.size).also { m ->
+                    for (i in boolKeys.indices) m[boolKeys[i]] = boolValues[i]
+                }
+
+        /** Legacy backward-compat view. See [bools]. */
+        val ints: Map<Int, Int>
+            get() = if (intKeys.isEmpty()) emptyMap() else
+                LinkedHashMap<Int, Int>(intKeys.size).also { m ->
+                    for (i in intKeys.indices) m[intKeys[i]] = intValues[i]
+                }
+
+        override fun equals(other: Any?): Boolean {
+            if (other !is Implied) return false
+            return boolKeys.contentEquals(other.boolKeys) &&
+                boolValues.contentEquals(other.boolValues) &&
+                intKeys.contentEquals(other.intKeys) &&
+                intValues.contentEquals(other.intValues)
+        }
+
+        override fun hashCode(): Int {
+            var h = boolKeys.contentHashCode()
+            h = 31 * h + boolValues.contentHashCode()
+            h = 31 * h + intKeys.contentHashCode()
+            h = 31 * h + intValues.contentHashCode()
+            return h
+        }
+
+        override fun toString(): String = buildString {
+            append("Implied(bools={")
+            for (i in boolKeys.indices) {
+                if (i > 0) append(", ")
+                append(boolKeys[i]); append("="); append(boolValues[i])
+            }
+            append("}, ints={")
+            for (i in intKeys.indices) {
+                if (i > 0) append(", ")
+                append(intKeys[i]); append("="); append(intValues[i])
+            }
+            append("})")
+        }
+
+        companion object {
+            val Empty: Implied = Implied(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
+
+            /** Map-based factory preserved for backward compat — call sites can keep
+             *  using `Implied(bools, ints)`. Normalises to the primitive sorted-array form. */
+            operator fun invoke(
+                bools: Map<Int, Boolean> = emptyMap(),
+                ints: Map<Int, Int> = emptyMap(),
+            ): Implied {
+                if (bools.isEmpty() && ints.isEmpty()) return Empty
+                val bKeys = bools.keys.toIntArray().also { it.sort() }
+                val bVals = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) }
+                val iKeys = ints.keys.toIntArray().also { it.sort() }
+                val iVals = IntArray(iKeys.size) { ints.getValue(iKeys[it]) }
+                return Implied(bKeys, bVals, iKeys, iVals)
+            }
+        }
     }
 
     /**
