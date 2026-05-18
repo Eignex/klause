@@ -585,6 +585,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 session.popLast()
                 continue
             }
+            // ABS-style activity heuristics need the implied set from the just-completed
+            // propagation step; only Implied carries those keys.
+            if (r is PropagationResult.Implied) {
+                params.variableHeuristic.onPropagation(r)
+            }
             params.variableHeuristic.onCommit(node.varRef)
             params.valueHeuristic.onCommit(node.varRef, outcome.value)
             return AdvanceOutcome.Success

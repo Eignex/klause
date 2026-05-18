@@ -44,6 +44,13 @@ interface VariableHeuristic {
     }
     /** Called once per successful pin of [varRef]; useful for phase-saving-like state. */
     fun onCommit(varRef: VarRef) {}
+    /**
+     * Called after every successful propagation step (pin + fixpoint). [implied] carries
+     * the variables newly forced into singletons during this step. Activity-Based Search
+     * (Michel-Van Hentenryck 2012) bumps per-variable activity here; pure / activity-
+     * agnostic heuristics ignore. Default no-op.
+     */
+    fun onPropagation(implied: PropagationResult.Implied) {}
     /** Called when the engine restarts (Luby / geometric); decay activity or reset
      *  per-run counters here. */
     fun onRestart() {}
@@ -362,6 +369,10 @@ class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
         base.onCommit(varRef)
     }
 
+    override fun onPropagation(implied: PropagationResult.Implied) {
+        base.onPropagation(implied)
+    }
+
     override fun onRestart() {
         pending = null
         base.onRestart()
@@ -369,6 +380,102 @@ class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
 
     override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {
         base.onSolution(snapshot)
+    }
+}
+
+/**
+ * Activity-Based Search (Michel-Van Hentenryck 2012). Choco's flagship variable selection.
+ * Maintains a per-variable *activity* counter that increments every time the variable is
+ * forced into a singleton by a propagation step (read off [PropagationResult.Implied]).
+ * Different from VSIDS: VSIDS bumps only on conflicts; ABS bumps on *every* propagation
+ * event the variable participates in — a broader, lower-variance signal of which variables
+ * the constraint network is structurally hardest at.
+ *
+ * Picks `argmax a(v) / dom(v)` over unpinned variables. Decay is implicit via geometric
+ * `increment` growth (same trick as VSIDS); per-decision rescale when `increment` nears
+ * `Double` overflow. Activities persist across [onRestart] by default — that's how ABS
+ * learns from one run to the next; set [resetOnRestart] to true to clear them at every
+ * Luby restart for an aggressive variant.
+ *
+ *  - [decay] ∈ (0, 1): higher = more conservative (gives long-tail history more weight);
+ *    Choco default is 0.999. Lower = more aggressive (forgets old conflicts fast).
+ *  - [resetOnRestart] = false (default): preserve activities across restarts; true clears
+ *    them, useful for "ABS restart" mode where each run rebuilds the activity map.
+ *
+ * Caveat: klause's [PropagationResult.Implied] currently reports newly-singletoned
+ * variables, not every var whose domain was reduced. So our ABS activity is a narrower
+ * signal than the textbook version (which counts every domain-reduction event). Still
+ * captures the dominant signal on most CSPs — vars frequently forced into singletons are
+ * exactly the structurally-critical ones.
+ */
+class ActivityBasedSearch(
+    private val decay: Double = 0.999,
+    private val resetOnRestart: Boolean = false,
+    private val rescaleThreshold: Double = 1e100,
+) : VariableHeuristic {
+
+    init {
+        require(decay in 0.5..0.9999) { "ABS decay must be in 0.5..0.9999, got $decay" }
+    }
+
+    private var increment: Double = 1.0
+    private var boolActivity: DoubleArray = DoubleArray(0)
+    private var intActivity: DoubleArray = DoubleArray(0)
+
+    private fun ensureSized(numBool: Int, numInt: Int) {
+        if (boolActivity.size != numBool) boolActivity = DoubleArray(numBool) { 1.0 }
+        if (intActivity.size != numInt) intActivity = DoubleArray(numInt) { 1.0 }
+    }
+
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        val problem = session.problem
+        ensureSized(problem.numBoolVars, problem.numIntVars)
+        var best: VarRef? = null
+        var bestScore = Double.NEGATIVE_INFINITY
+        for (v in 0 until problem.numBoolVars) {
+            if (session.boolValue(v) != null) continue
+            val score = boolActivity[v] / 2.0
+            if (score > bestScore) { bestScore = score; best = VarRef.Bool(v) }
+        }
+        for (v in 0 until problem.numIntVars) {
+            val sz = session.intDomain(v).size
+            if (sz <= 1) continue
+            val score = intActivity[v] / sz
+            if (score > bestScore) { bestScore = score; best = VarRef.IntVar(v) }
+        }
+        return best
+    }
+
+    override fun onPropagation(implied: PropagationResult.Implied) {
+        ensureSized(boolActivity.size, intActivity.size)
+        implied.forEachBool { id, _ ->
+            if (id < boolActivity.size) boolActivity[id] += increment
+        }
+        implied.forEachInt { id, _ ->
+            if (id < intActivity.size) intActivity[id] += increment
+        }
+    }
+
+    override fun onCommit(varRef: VarRef) {
+        // Implicit decay: grow increment so future bumps are larger (equivalent to dividing
+        // every prior activity by `decay`, without touching the arrays). Same trick as VSIDS.
+        increment /= decay
+        if (increment > rescaleThreshold) rescaleAll()
+    }
+
+    override fun onRestart() {
+        if (resetOnRestart) {
+            for (i in boolActivity.indices) boolActivity[i] = 1.0
+            for (i in intActivity.indices) intActivity[i] = 1.0
+            increment = 1.0
+        }
+    }
+
+    private fun rescaleAll() {
+        val k = 1.0 / rescaleThreshold
+        for (i in boolActivity.indices) boolActivity[i] *= k
+        for (i in intActivity.indices) intActivity[i] *= k
+        increment *= k
     }
 }
 
