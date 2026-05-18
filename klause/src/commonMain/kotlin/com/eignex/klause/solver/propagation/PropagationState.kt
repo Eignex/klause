@@ -104,7 +104,53 @@ class PropagationState(
      * by re-validating on each fire. Carrying them across pops keeps work amortised
      * without the snapshot copying that level-aware state needs.
      */
-    val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
+    /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
+     *  alongside the learned-clause registry without copying the full array. */
+    private val _refPayload: ArrayList<Any?> = ArrayList<Any?>(problem.numFactors).apply {
+        repeat(problem.numFactors) { add(null) }
+    }
+    val refPayload: MutableList<Any?> get() = _refPayload
+
+    /** Learned clauses accumulated during search (LCG-style nogoods produced by
+     *  [ConflictAnalyzer]). Their factor ids live in `[problem.numFactors, totalFactorCount)` —
+     *  treat them like any other [com.eignex.klause.solver.factor.Clause] via [factorAt];
+     *  they participate in propagation through [boolWatchersByLit] just like static
+     *  clauses. Survives [restore] (clauses are facts about the original problem, not
+     *  trail state). */
+    private val _learnedClauses: ArrayList<com.eignex.klause.solver.factor.Clause> = ArrayList()
+    val learnedClauses: List<com.eignex.klause.solver.factor.Clause> get() = _learnedClauses
+
+    /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
+     *  when iterating or sizing per-factor scratch in the engine. */
+    val totalFactorCount: Int get() = problem.numFactors + _learnedClauses.size
+
+    /** Unified factor accessor; routes static factor ids to [Problem.factors] and learned
+     *  factor ids (≥ `problem.numFactors`) to [learnedClauses]. */
+    fun factorAt(fid: Int): com.eignex.klause.solver.Factor =
+        if (fid < problem.numFactors) problem.factors[fid]
+        else _learnedClauses[fid - problem.numFactors]
+
+    /**
+     * Register a learned clause and return its assigned factor id. Performs three things:
+     *   - append to [_learnedClauses];
+     *   - grow [_refPayload] by one slot so [Clause.propagate]'s
+     *     `state.refPayload[factorId]` access stays in-bounds;
+     *   - install the clause's initial watch literals in [boolWatchersByLit] so it
+     *     participates in the wakeup index.
+     *
+     * Does NOT eagerly propagate — that's the session-level
+     * [PropagationSession.addLearnedClause]'s job. Returns the new factor id.
+     */
+    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause): Int {
+        val newFid = totalFactorCount
+        _learnedClauses.add(clause)
+        _refPayload.add(null)
+        val watchers = clause.initialBoolWatchers
+        if (watchers != null) {
+            for (lit in watchers) boolWatchersByLit[lit].add(newFid)
+        }
+        return newFid
+    }
 
     /**
      * Per-literal wakeup index for factors opting into [com.eignex.klause.solver.Factor.initialBoolWatchers].
@@ -360,7 +406,10 @@ class PropagationState(
         val frontier = ArrayDeque<Int>().apply { addAll(seed) }
         while (frontier.isNotEmpty()) {
             val fid = frontier.removeFirst()
-            val f = problem.factors[fid]
+            // factorAt routes learned-clause ids (≥ problem.numFactors) to the
+            // session's clause registry — required now that conflicts can name a
+            // learned clause as their failing factor.
+            val f = factorAt(fid)
             for (v in f.boolVars) {
                 val r = boolReason[v]
                 if (r >= 0 && out.add(r)) frontier.addLast(r)
@@ -434,14 +483,15 @@ class PropagationState(
      *
      * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
      */
-    internal fun runToFixpoint(allFactors: Boolean): Set<Int>? {
+    internal fun runToFixpoint(allFactors: Boolean, initialFactor: Int = -1): Set<Int>? {
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
         // would otherwise mix old seeds into a new conflict's core.
         conflictSeedFactors = null
-        val pending = BooleanArray(problem.numFactors)
-        val queue = com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numFactors.coerceAtLeast(8))
+        val factorCount = totalFactorCount
+        val pending = BooleanArray(factorCount)
+        val queue = com.eignex.klause.util.IntArrayDeque(initialCapacity = factorCount.coerceAtLeast(8))
         if (allFactors) {
-            for (fid in 0 until problem.numFactors) { pending[fid] = true; queue.addLast(fid) }
+            for (fid in 0 until factorCount) { pending[fid] = true; queue.addLast(fid) }
         } else {
             while (true) {
                 val v = pollDirtyBool(); if (v < 0) break
@@ -453,11 +503,18 @@ class PropagationState(
                     if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
                 }
             }
+            // Optional seed — used by [PropagationSession.addLearnedClause] to force the
+            // newly-stored learned clause to fire on the next propagation cycle (it would
+            // otherwise sit dormant since the watcher index only wakes on false-going
+            // literals, and a freshly-added clause's watches haven't been triggered yet).
+            if (initialFactor in 0 until factorCount && !pending[initialFactor]) {
+                pending[initialFactor] = true; queue.addLast(initialFactor)
+            }
         }
         while (queue.isNotEmpty()) {
             val fid = queue.removeFirst()
             pending[fid] = false
-            val f = problem.factors[fid]
+            val f = factorAt(fid)
             currentLevel = maxLevelForVars(f.boolVars, f.intVars)
             currentFactor = fid
             conflictLevels = null

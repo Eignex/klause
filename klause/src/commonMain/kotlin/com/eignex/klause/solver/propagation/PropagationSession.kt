@@ -110,6 +110,28 @@ class PropagationSession(val problem: Problem) {
         return diffAgainst(r, lastImplied).also { lastImplied = r }
     }
 
+    /**
+     * Register a learned [clause] and immediately propagate it. Used by the
+     * BacktrackSolver after a CDB backjump to make the analyzer's 1UIP clause stick:
+     * the clause stays alive for the rest of the session and participates in every
+     * future propagation cycle through [PropagationState.boolWatchersByLit]. Returns
+     * the propagation result of asserting it — typically [PropagationResult.Implied]
+     * with the UIP literal now forced, or [PropagationResult.Unsat] if the assertion
+     * cascades into another conflict (the engine handles that as a fresh CDB round).
+     *
+     * Unlike [pinBool] / [pinInt], this does *not* open a new trail level — the
+     * learned clause is a constraint over existing variables, not a decision. So no
+     * snapshot is pushed and no decision counter is bumped.
+     */
+    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause): PropagationResult {
+        bakedUnsat?.let { return it }
+        val newFid = state.addLearnedClause(clause)
+        val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid)
+        if (conflict != null) return revertAndUnsat(conflict)
+        val implied = computeImplied()
+        return diffAgainst(implied, lastImplied).also { lastImplied = implied }
+    }
+
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
         if (pinnedBools[v] == value) return levelStates.last().implied
         if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())

@@ -384,12 +384,17 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         }
                         is AdvanceOutcome.Backjump -> {
                             // Trail size == session.decisionLevel here (the failed pin was
-                            // self-reverted by the session); pop both in lockstep to the
-                            // target level, then descend fresh.
-                            backjumpTo(out.toLevel, trail, session, params,
-                                boolPhase, boolPhaseSet, intPhase, intPhaseSet)
-                            descend = true
-                            continue@inner
+                            // self-reverted by the session); execute the backjump + learn
+                            // sequence. On cascading conflict during assertion, recurse.
+                            val term = backjumpAndLearn(out.learned, trail, session, params,
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false)
+                            when (term) {
+                                BackjumpTerm.Resume -> { descend = true; continue@inner }
+                                BackjumpTerm.Exhausted -> {
+                                    yield(SearchOutcome.Exhausted()); return@sequence
+                                }
+                                BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                            }
                         }
                     }
                 } else {
@@ -411,14 +416,17 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             yield(SearchOutcome.BudgetCapped); return@sequence
                         }
                         is AdvanceOutcome.Backjump -> {
-                            // The else-path popped session below trail.last; remove the
-                            // stale trail entry first to re-align (trail.size becomes
-                            // session.decisionLevel), then pop both to the target level.
-                            trail.removeAt(trail.size - 1)
-                            backjumpTo(out.toLevel, trail, session, params,
-                                boolPhase, boolPhaseSet, intPhase, intPhaseSet)
-                            descend = true
-                            continue@inner
+                            // Else-path: session has been popped below trail.last; align
+                            // first (trail.removeAt) then proceed to backjump + learn.
+                            val term = backjumpAndLearn(out.learned, trail, session, params,
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true)
+                            when (term) {
+                                BackjumpTerm.Resume -> { descend = true; continue@inner }
+                                BackjumpTerm.Exhausted -> {
+                                    yield(SearchOutcome.Exhausted()); return@sequence
+                                }
+                                BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                            }
                         }
                     }
                 }
@@ -527,12 +535,12 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         data object Exhausted : AdvanceOutcome
         /** Decision budget hit. */
         data object BudgetCapped : AdvanceOutcome
-        /** Non-chronological backjump requested — pop trail to [toLevel] and resume
-         *  search (descend with a fresh pick). [toLevel] is the second-highest decision
-         *  level in the 1UIP learned clause; the learned clause is guaranteed to be
-         *  unit-and-asserting at that level, so the next propagation pass will force
-         *  the asserting literal automatically. */
-        data class Backjump(val toLevel: Int) : AdvanceOutcome
+        /** Non-chronological backjump requested. After the engine pops trail to
+         *  `learned.backjumpLevel`, it materialises [learned.literals] as a `Clause`,
+         *  hands it to [PropagationSession.addLearnedClause], and resumes with the new
+         *  clause now constraining future search and unit-propagating the asserting
+         *  literal. */
+        data class Backjump(val learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned) : AdvanceOutcome
     }
 
     private fun advance(
@@ -560,7 +568,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 // honoured, which by itself prunes subtrees that would re-derive the
                 // same conflict at higher levels.
                 val learned = r.learnedClause as? ConflictAnalyzer.AnalysisResult.Learned
-                if (learned != null) return AdvanceOutcome.Backjump(learned.backjumpLevel)
+                if (learned != null) return AdvanceOutcome.Backjump(learned)
                 continue
             }
             if (pruneIf != null && pruneIf(session)) {
@@ -573,29 +581,83 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         }
     }
 
-    /** Pop trail + session in lockstep down to [toLevel]. Pre-condition: `trail.size ==
-     *  session.decisionLevel` (both call sites align before invoking). The
-     *  phase-saving / capture-phase arrays don't need clearing — they're advisory hints
-     *  that survive backtracks. */
-    private fun backjumpTo(
-        toLevel: Int,
+    /** How [backjumpAndLearn] terminated. */
+    private enum class BackjumpTerm {
+        /** Backjumped, learned clause asserted cleanly. Resume by descending. */
+        Resume,
+        /** Asserting the learned clause forced a level-0 contradiction; the entire search
+         *  space is infeasible. Engine yields [SearchOutcome.Exhausted]. */
+        Exhausted,
+        /** Cascading conflicts couldn't be resolved further (e.g., assertion reached
+         *  level 0 without a useful new clause). Fall back to chronological backtrack. */
+        Stuck,
+    }
+
+    /**
+     * Execute the CDB backjump + clause-learn sequence:
+     *   - pop trail + session to [learned.backjumpLevel];
+     *   - materialise [learned.literals] as a [com.eignex.klause.solver.factor.Clause]
+     *     and feed it to [PropagationSession.addLearnedClause], which asserts it via
+     *     propagation (forcing the asserting literal as a unit pin);
+     *   - if the assertion cascades into another conflict, recurse on the new analyzer
+     *     result. Bounded to keep the search loop from looping forever on pathological
+     *     instances; [BackjumpTerm.Stuck] surfaces to the caller in that case.
+     *
+     * @param alignFirst when `true`, drops the stale [trail.last] entry before popping
+     *   (used by the else-path where session was already popped past trail.last by the
+     *   caller).
+     */
+    private fun backjumpAndLearn(
+        learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned,
         trail: MutableList<TrailNode>,
         session: PropagationSession,
-        params: BacktrackParams,
+        @Suppress("UNUSED_PARAMETER") params: BacktrackParams,
         @Suppress("UNUSED_PARAMETER") boolPhase: BooleanArray?,
         @Suppress("UNUSED_PARAMETER") boolPhaseSet: BooleanArray?,
         @Suppress("UNUSED_PARAMETER") intPhase: IntArray?,
         @Suppress("UNUSED_PARAMETER") intPhaseSet: BooleanArray?,
-    ) {
-        while (trail.size > toLevel) {
-            session.popLast()
-            trail.removeAt(trail.size - 1)
+        alignFirst: Boolean,
+    ): BackjumpTerm {
+        if (alignFirst && trail.isNotEmpty()) trail.removeAt(trail.size - 1)
+        var current = learned
+        // Cap the recursive backjump loop to defend against pathological cycles. Each
+        // round strictly reduces the conflict level (the analyzer's backjumpLevel is
+        // always < the conflict's current level), so termination is guaranteed in a
+        // sane analyzer — the cap is purely defensive.
+        repeat(MAX_CASCADING_BACKJUMPS) {
+            // Pop trail + session to the backjump level.
+            while (trail.size > current.backjumpLevel) {
+                session.popLast()
+                trail.removeAt(trail.size - 1)
+            }
+            // Build the Clause and assert it. The clause's literals are non-empty as
+            // long as the analyzer produced a UIP (always the case in well-formed
+            // calls); if the clause came out empty, fall back to chronological.
+            if (current.literals.isEmpty()) return BackjumpTerm.Stuck
+            val clause = com.eignex.klause.solver.factor.Clause(current.literals)
+            val result = session.addLearnedClause(clause)
+            when (result) {
+                is PropagationResult.Implied -> return BackjumpTerm.Resume
+                is PropagationResult.Unsat -> {
+                    // Assertion cascaded into another conflict. The session ran the
+                    // analyzer on the new conflict; if a new learned clause came back,
+                    // recurse — otherwise we're stuck.
+                    val next = result.learnedClause
+                        as? com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
+                        ?: return BackjumpTerm.Stuck
+                    // If the new backjump target is level 0 and the clause is empty
+                    // after that jump, the whole problem is infeasible.
+                    if (next.backjumpLevel == 0 && next.literals.isEmpty()) {
+                        return BackjumpTerm.Exhausted
+                    }
+                    current = next
+                }
+                else -> return BackjumpTerm.Stuck  // shouldn't happen — addLearnedClause returns only Implied/Unsat
+            }
         }
-        // Heuristics aren't notified per-popped-decision — VSIDS/dom-wdeg state lives
-        // independent of the trail; `onCommit` is paired only with new decisions, not
-        // with backjumps over old ones. (Same contract as restart.)
-        @Suppress("UNUSED_PARAMETER") params
+        return BackjumpTerm.Stuck
     }
+
 
     private fun snapshotAssignment(session: PropagationSession): Sample {
         val sp = session.problem
@@ -614,5 +676,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
          *  responsive; higher = lower overhead. 256 is a few microseconds per check at
          *  worst, and the search stops within a few hundred decisions of a cancel. */
         const val CANCEL_CHECK_INTERVAL: Int = 256
+        /** Cap on cascading CDB backjumps within a single search step. Defensive; under
+         *  a well-formed analyzer the loop terminates well before this. */
+        const val MAX_CASCADING_BACKJUMPS: Int = 64
     }
 }

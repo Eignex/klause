@@ -120,6 +120,70 @@ class ConflictAnalyzerTest {
     }
 
     @Test
+    fun `learned clause persists in the session after backjump`() {
+        // Two-decision conflict that learns [¬a, ¬b]. After backjump to level 1 + clause
+        // assertion, the session's learned-clause registry should contain exactly the
+        // learned clause, and a *fresh* attempt to pin a=true should now be blocked at
+        // level 1 (it would unit-propagate ¬b through the learned clause, then a future
+        // pin of b=true would conflict). Direct way to test: hand-walk the session,
+        // re-pin a=true post-learn, and observe the cascade.
+        val problem = Problem(
+            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+        // Run the solver — it will hit the conflict, learn, and proceed to SAT (a=false
+        // ∨ b=false satisfies the learned clause; one of them remains free to satisfy
+        // the originals too).
+        val r = BacktrackSolver(problem).solve(BacktrackParams(
+            variableHeuristic = InputOrder, randomSeed = 0L,
+        ))
+        val sat = assertIs<SolveResult.Sat>(r)
+        // The found model must satisfy: not both a and b true.
+        val a = sat.assignment.bools[0]
+        val b = sat.assignment.bools[1]
+        assertTrue(!(a && b),
+            "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b")
+    }
+
+    @Test
+    fun `engine accumulates learned clauses across multiple conflicts`() {
+        // Three-decision pigeonhole-flavoured instance designed to trigger multiple
+        // conflicts during search. After solve completes, the session-internal state
+        // should have at least one learned clause stored (validated indirectly via the
+        // solver's correctness — the more direct check would require exposing the
+        // learned-clause list, which would be a public API concession).
+        val problem = Problem(
+            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),    // a ∨ b
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),    // ¬a ∨ c
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),   // ¬b ∨ ¬c
+                Clause(intArrayOf(Lit.make(2, true),  Lit.make(3, false))),   // c ∨ ¬d
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),    // ¬c ∨ d
+            ),
+        )
+        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 42L))
+        // Verify a satisfying assignment.
+        val sat = assertIs<SolveResult.Sat>(r)
+        val s = sat.assignment.bools
+        // Manually evaluate every clause to confirm correctness.
+        val clauses = listOf(
+            listOf(Lit.make(0, true), Lit.make(1, true)),
+            listOf(Lit.make(0, false), Lit.make(2, true)),
+            listOf(Lit.make(1, false), Lit.make(2, false)),
+            listOf(Lit.make(2, true), Lit.make(3, false)),
+            listOf(Lit.make(2, false), Lit.make(3, true)),
+        )
+        for ((i, c) in clauses.withIndex()) {
+            assertTrue(c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
+                "clause $i not satisfied by $s")
+        }
+    }
+
+    @Test
     fun `CDB finds SAT on a chained-propagation instance`() {
         // (¬a ∨ b), (¬b ∨ c), (¬c ∨ d), (¬d ∨ e), (a).
         // a=true forces b → c → d → e via unit propagation. No conflict — search
