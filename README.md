@@ -165,7 +165,6 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
   - Contextual ILS acceptance — learn whether to accept worsening optima from `(objective_delta, stall_count, iteration_fraction)` features.
   - Context-driven `flipsPerIteration` for ALNS — bandit over budget profiles `{quick, standard, deep}` selecting which depth to invest given recent-improvement context.
 - `[LS+CP]` Cross-*instance* posterior persistence: problem-class N starts from class N-1's learned state. Cross-call state already lives in the Session subclasses (`LocalSearchSession` carries DDFW weights / activity touches / `bestCostSeen`; `LogicNGSession` and `SmtSession` reuse their native engines); the missing piece is the on-disk pooled-prior store that kumulant's `fitPopulationPrior` would feed from.
-- `[API]` Deterministic instruction budgets, wall-clock-independent. Add a maxInstructions param across backends complementing the existing maxFlips / maxDecisions / timeoutMillis budgets.
 - `[Sampling]` Hash-based uniform sampling (UniGen2-style). XOR-slice the model space, sample within a slice.
 - `[Sampling]` Approximate model counting (ApproxMC). Same XOR-hashing primitive as UniGen.
 - `[Sampling]` Weighted projected sampling (WAPS / KUS).

@@ -34,7 +34,18 @@ data class BruteForceParams(
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
     val maxSteps: Long = Long.MAX_VALUE,
-) : SolverParams
+    /**
+     * Wall-clock-independent operation budget across all backends. For [BruteForceSolver]
+     * one instruction = one assignment visited (the same unit [maxSteps] counts). When
+     * both are set, the smaller wins. `null` = no instruction-budget cap; use [maxSteps]
+     * alone. See the matching field on `BacktrackParams` / `LocalSearchParams` for the
+     * cross-backend rationale.
+     */
+    val maxInstructions: Long? = null,
+) : SolverParams {
+    /** Effective per-call assignment cap honouring both [maxSteps] and [maxInstructions]. */
+    internal val effectiveStepCap: Long get() = minOf(maxSteps, maxInstructions ?: Long.MAX_VALUE)
+}
 
 /**
  * Ground-truth [Solver] / [Optimizer] for testing. Walks the entire assignment space in a
@@ -72,7 +83,7 @@ class BruteForceSolver(override val problem: Problem) :
     override fun minimize(objective: Objective, params: BruteForceParams): MinimizeResult {
         var bestObj = Double.POSITIVE_INFINITY
         var best: Sample? = null
-        val budget = StepBudget(params.maxSteps)
+        val budget = StepBudget(params.effectiveStepCap)
         for (s in walkWithBudget(params, budget)) {
             val obj = objective.evaluate(s)
             if (obj < bestObj) {
@@ -125,7 +136,7 @@ class BruteForceSolver(override val problem: Problem) :
      * effectively unbounded.
      */
     private fun walk(params: BruteForceParams): Sequence<Sample> =
-        walkWithBudget(params, StepBudget(params.maxSteps))
+        walkWithBudget(params, StepBudget(params.effectiveStepCap))
 
     /** Variant of [walk] that uses a caller-supplied [StepBudget], so the caller can
      *  read `remaining` after iteration to distinguish "space exhausted naturally"

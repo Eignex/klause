@@ -21,4 +21,13 @@ data class Z3Params(
     val recentWindow: Int = 0,
     val maxModels: Long = Long.MAX_VALUE,
     val timeoutMillis: Long? = null,
+    /**
+     * Wall-clock-independent operation budget — wired to Z3's `rlimit` solver parameter.
+     * Z3 ticks `rlimit` on internal events (propagations, decisions, conflicts, etc.); the
+     * exact mapping to "instructions" is solver-version-specific but reproducible across
+     * runs on the same Z3 build. Typical values: 1e5 (fast probe), 1e7 (medium), 1e9
+     * (long). `null` = no cap. The match for `maxInstructions` on the internal backends'
+     * params; same field name across backends keeps cross-backend callers symmetric.
+     */
+    val maxInstructions: Long? = null,
 ) : SolverParams

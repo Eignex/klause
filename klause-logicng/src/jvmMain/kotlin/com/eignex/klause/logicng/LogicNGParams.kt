@@ -26,6 +26,15 @@ data class LogicNGParams(
     val maxModels: Long = Long.MAX_VALUE,
     val timeoutMillis: Long? = null,
     val assumptions: Assumptions = Assumptions.None,
+    /**
+     * Wall-clock-independent operation budget — present for API symmetry with the other
+     * backends' [com.eignex.klause.solver.SolverParams]. **Currently ignored** by this
+     * backend: LogicNG's MiniSat does not expose a deterministic-instruction counter on
+     * the pinned version, and there's no clean hook to enforce one externally without
+     * rewriting the model-enumeration loop. Use [timeoutMillis] until LogicNG (or a
+     * replacement adapter) gains an `rlimit`-style knob.
+     */
+    val maxInstructions: Long? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LogicNGParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

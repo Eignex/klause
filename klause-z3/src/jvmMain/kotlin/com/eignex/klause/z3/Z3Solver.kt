@@ -279,10 +279,15 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
     private fun applyParams(
         solver: Z3LibSolver, ctx: Context, params: Z3Params, produceCores: Boolean = false,
     ) {
-        if (params.randomSeed == null && params.timeoutMillis == null && !produceCores) return
+        if (params.randomSeed == null && params.timeoutMillis == null
+            && params.maxInstructions == null && !produceCores) return
         val p = ctx.mkParams()
         params.randomSeed?.let { p.add("random_seed", it.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) }
         params.timeoutMillis?.let { p.add("timeout", it.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) }
+        // Z3's rlimit is the wall-clock-independent budget: Z3 increments an internal
+        // counter on diverse events and aborts once it crosses the limit. Same value on
+        // the same Z3 build = same termination point regardless of host speed.
+        params.maxInstructions?.let { p.add("rlimit", it.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) }
         if (produceCores) p.add("unsat_core", true)
         solver.setParameters(p)
     }

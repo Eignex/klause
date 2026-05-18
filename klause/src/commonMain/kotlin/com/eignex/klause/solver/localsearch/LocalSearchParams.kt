@@ -28,6 +28,15 @@ import com.eignex.klause.solver.SolverParams
  */
 data class LocalSearchParams(
     val maxFlips: Long = Long.MAX_VALUE,
+    /**
+     * Wall-clock-independent operation budget across all backends. For [LocalSearchSolver]
+     * one instruction = one flip (the same unit [maxFlips] counts). When both are set, the
+     * smaller wins. `null` = no instruction-budget cap. See [maxFlips] for the LS-specific
+     * description; this field exists so callers can use the same budget name across the
+     * BacktrackSolver / LocalSearchSolver / BruteForceSolver param objects without
+     * remembering which knob each one prefers.
+     */
+    val maxInstructions: Long? = null,
     val randomSeed: Long? = null,
     /** Variables to pin for the duration of this call. The solver initialises them to
      *  the requested values on every restart and ignores any move that would change

@@ -30,6 +30,16 @@ data class SmtParams(
     val maxModels: Long = Long.MAX_VALUE,
     val timeoutMillis: Long? = null,
     val assumptions: Assumptions = Assumptions.None,
+    /**
+     * Wall-clock-independent operation budget — present for API symmetry with the other
+     * backends' [com.eignex.klause.solver.SolverParams]. **Currently ignored** by this
+     * backend: JavaSMT does not expose Z3's `rlimit` or any equivalent uniformly across
+     * its supported solvers, so there's no per-solver knob we can pass through here.
+     * Use [timeoutMillis] until JavaSMT (or specific backends below it) gain such a knob;
+     * the direct [com.eignex.klause.z3.Z3Solver] in klause-z3 honours `maxInstructions`
+     * via Z3's native rlimit if you need wall-clock-independent budgets today.
+     */
+    val maxInstructions: Long? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): SmtParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

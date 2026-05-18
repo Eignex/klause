@@ -99,6 +99,25 @@ class BacktrackSolverTest {
     }
 
     @Test
+    fun `maxInstructions tightens budget vs maxDecisions when smaller`() {
+        // 10 unconstrained bools — DFS needs to pin all 10 to reach a SAT leaf since
+        // there are no propagators to collapse the tree. maxInstructions = 2 hits the
+        // cap after 2 decisions → Unknown. A generous budget reaches SAT.
+        val p = Problem(
+            numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(),
+            factors = emptyList(),
+        )
+        val tight = BacktrackSolver(p).solve(BacktrackParams(
+            maxDecisions = Long.MAX_VALUE, maxInstructions = 2L, randomSeed = 0L,
+        ))
+        assertIs<SolveResult.Unknown>(tight)
+        val loose = BacktrackSolver(p).solve(BacktrackParams(
+            maxDecisions = Long.MAX_VALUE, maxInstructions = 1_000_000L, randomSeed = 0L,
+        ))
+        assertIs<SolveResult.Sat>(loose)
+    }
+
+    @Test
     fun `solve respects assumptions`() {
         // (x0 ∨ x1) with x0=false pinned → x1 must be true in the SAT witness.
         val p = Problem(

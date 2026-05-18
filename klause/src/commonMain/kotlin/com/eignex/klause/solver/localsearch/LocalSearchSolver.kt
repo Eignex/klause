@@ -170,7 +170,8 @@ class LocalSearchSolver(
         warm: WarmState? = null,
     ): Sequence<Sample> {
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val maxFlips = params.maxFlips
+        // Tighten with the cross-backend instruction budget when set.
+        val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         return sequence {
             val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
             warm?.applyTo(state)
@@ -264,7 +265,7 @@ class LocalSearchSolver(
         var bestSample: Sample? = null
         var flipsSinceRestart = 0
         var totalFlips = 0L
-        val maxFlips = params.maxFlips
+        val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         val shaping = params.costShaping
         var cancelled = false
 

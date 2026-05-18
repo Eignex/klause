@@ -319,7 +319,10 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
 
         val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
         val rng = Random(baseSeed)
-        var decisionsLeft = params.maxDecisions
+        // The effective budget tightens the two limits — whichever is smaller wins. This
+        // lets a uniform `maxInstructions` work across backends without removing the
+        // backend-specific `maxDecisions` knob.
+        var decisionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
 
         // Outer restart loop. Each iteration is one Luby-bounded DFS run from the root.
         // When `lubyRestartBase` is null the loop runs exactly once with infinite per-run

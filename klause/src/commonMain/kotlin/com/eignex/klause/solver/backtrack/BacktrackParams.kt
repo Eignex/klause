@@ -25,6 +25,14 @@ import com.eignex.klause.solver.SolverParams
  */
 data class BacktrackParams(
     val maxDecisions: Long = Long.MAX_VALUE,
+    /**
+     * Wall-clock-independent operation budget across all backends. For [BacktrackSolver]
+     * one instruction = one decision attempt (the same unit [maxDecisions] counts). When
+     * both are set, the smaller wins. `null` = no instruction-budget cap; use [maxDecisions]
+     * alone. Makes the same params object portable across backends without each one needing
+     * to know its primary-budget field name (LS sees flips, Brute sees steps, etc.).
+     */
+    val maxInstructions: Long? = null,
     val randomSeed: Long? = null,
     val assumptions: Assumptions = Assumptions.None,
     val variableHeuristic: VariableHeuristic = RandomVariable,
