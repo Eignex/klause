@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.meta
 
-
 import com.eignex.klause.solver.localsearch.meta.Alns
 import com.eignex.klause.solver.localsearch.meta.DestroyOperator
 import com.eignex.klause.solver.localsearch.meta.FreedVars

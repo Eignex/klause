@@ -1,19 +1,11 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.WarmState
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.RestartPolicy
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult

@@ -1,6 +1,5 @@
 package com.eignex.klause.z3
 
-
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.localsearch.LocalSearchParams

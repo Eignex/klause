@@ -1,6 +1,5 @@
 package com.eignex.klause.solver
 
-
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.BacktrackParams
 

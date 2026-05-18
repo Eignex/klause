@@ -8,9 +8,9 @@ import kotlin.time.TimeSource
  * their search promptly when [isCancelled] returns `true`. The default token is
  * [Cancellation.Never].
  *
- * The interface is a `fun interface` so a bare `() -> Boolean` lambda still SAM-converts
- * to a [Cancellation], and `params.cancellation()` keeps working at every legacy call
- * site (the [invoke] operator forwards to [isCancelled]).
+ * The interface is a `fun interface` so a bare `() -> Boolean` lambda SAM-converts to a
+ * [Cancellation], and `params.cancellation()` reads naturally (the [invoke] operator
+ * forwards to [isCancelled]).
  *
  * Compose tokens with [or] / [and]:
  * ```
@@ -35,8 +35,8 @@ import kotlin.time.TimeSource
 fun interface Cancellation {
     fun isCancelled(): Boolean
 
-    /** Preserved for backward-compat: every legacy site invokes the token via
-     *  `cancellation()`. Forwards to [isCancelled]. */
+    /** Makes the token callable as `cancellation()` — natural shorthand for a
+     *  predicate-shaped value. Forwards to [isCancelled]. */
     operator fun invoke(): Boolean = isCancelled()
 
     /** Cancel when either side cancels. Short-circuit on the receiver. */

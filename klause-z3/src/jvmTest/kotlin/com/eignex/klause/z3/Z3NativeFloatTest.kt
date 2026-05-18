@@ -1,6 +1,5 @@
 package com.eignex.klause.z3
 
-
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
 import kotlin.test.Test

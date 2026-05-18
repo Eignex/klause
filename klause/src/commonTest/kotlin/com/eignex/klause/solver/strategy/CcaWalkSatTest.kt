@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.strategy
 
-
 import com.eignex.klause.solver.localsearch.strategy.CcaWalkSat
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams

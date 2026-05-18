@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.strategy
 
-
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.localsearch.strategy.WalkSat

@@ -1,9 +1,5 @@
 package com.eignex.klause.solver.propagation
 
-import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.solver.propagation.PropagationResult
-import com.eignex.klause.solver.propagation.PropagationState
-
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem

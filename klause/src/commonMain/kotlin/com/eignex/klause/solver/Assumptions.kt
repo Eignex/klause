@@ -18,9 +18,9 @@ package com.eignex.klause.solver
  *
  * Storage is parallel primitive arrays sorted ascending by key — no autoboxing on any
  * read, no `HashMap` allocations on merge, and binary-search lookup for [boolValueOrNull]
- * / [intValueOrNull]. The legacy [bools] / [ints] map accessors are kept as lazy views
- * so existing call-sites keep working, but the hot paths should prefer the primitive
- * accessors ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull],
+ * / [intValueOrNull]. The [bools] / [ints] map views are kept for the bake-time
+ * failed-literal probing path in [Problem] and for tests; hot paths should use the
+ * primitive accessors ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull],
  * [mergedWith]) which never allocate.
  */
 class Assumptions internal constructor(
@@ -68,9 +68,7 @@ class Assumptions internal constructor(
      * semantics — the Session abstraction relies on this). Returns a fresh
      * [Assumptions]; the inputs are untouched.
      *
-     * Primitive sorted-merge in O(n + m); no `HashMap`, no autoboxing. Replaces the old
-     * `HashMap<Int, Boolean>(a.bools).apply { putAll(b.bools) }` pattern that lit up
-     * every session merge call.
+     * Primitive sorted-merge in O(n + m); no `HashMap`, no autoboxing.
      */
     fun mergedWith(other: Assumptions): Assumptions {
         if (other.isEmpty) return this
@@ -131,15 +129,16 @@ class Assumptions internal constructor(
         }
     }
 
-    /** Legacy backward-compat view. Allocates a `LinkedHashMap` per access — hot paths
-     *  should call [forEachBool] / [boolValueOrNull] instead. */
+    /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
+     *  [Problem]'s failed-literal probing and by tests; hot paths should call
+     *  [forEachBool] / [boolValueOrNull] instead. */
     val bools: Map<Int, Boolean>
         get() = if (boolKeys.isEmpty()) emptyMap() else
             LinkedHashMap<Int, Boolean>(boolKeys.size).also { m ->
                 for (i in boolKeys.indices) m[boolKeys[i]] = boolValues[i]
             }
 
-    /** Legacy backward-compat view. Allocates per access — see [bools]. */
+    /** Map view. Allocates per access — see [bools]. */
     val ints: Map<Int, Int>
         get() = if (intKeys.isEmpty()) emptyMap() else
             LinkedHashMap<Int, Int>(intKeys.size).also { m ->
@@ -180,9 +179,8 @@ class Assumptions internal constructor(
         val None: Assumptions =
             Assumptions(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
 
-        /** Map-based constructor preserved for backward compat — call sites can keep
-         *  using `Assumptions(bools = mapOf(0 to true))`. Internally normalises to the
-         *  primitive sorted-array form. */
+        /** Map-based factory. Call sites use `Assumptions(bools = mapOf(0 to true))`;
+         *  internally normalises to the primitive sorted-array form. */
         operator fun invoke(
             bools: Map<Int, Boolean> = emptyMap(),
             ints: Map<Int, Int> = emptyMap(),

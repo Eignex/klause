@@ -1,11 +1,9 @@
 package com.eignex.klause.solver.localsearch
 
-
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntSwapSet

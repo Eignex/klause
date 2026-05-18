@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.strategy
 
-
 import com.eignex.klause.solver.localsearch.strategy.Ddfw
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams

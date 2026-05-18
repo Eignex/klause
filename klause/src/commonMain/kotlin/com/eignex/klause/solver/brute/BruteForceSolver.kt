@@ -1,8 +1,5 @@
 package com.eignex.klause.solver.brute
 
-import com.eignex.klause.solver.brute.BruteForceParams
-import com.eignex.klause.solver.brute.BruteForceSolver
-
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer

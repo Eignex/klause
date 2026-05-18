@@ -1,6 +1,5 @@
 package com.eignex.klause.compile
 
-
 import com.eignex.klause.ast.circuit
 import com.eignex.klause.ast.cumulative
 import com.eignex.klause.ast.disjunctive

@@ -1,8 +1,5 @@
 package com.eignex.klause.solver.propagation
 
-import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.solver.propagation.PropagationResult
-
 /**
  * Result of [com.eignex.klause.solver.Problem.propagate]. Either a (possibly empty) set of
  * literals/values forced beyond the input assumptions, or a sound (but incomplete) proof of
@@ -16,8 +13,8 @@ sealed interface PropagationResult {
      * `HashMap` allocations when combining with [com.eignex.klause.solver.Assumptions].
      *
      * Primitive APIs ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull])
-     * are the hot path; the legacy [bools] / [ints] map accessors are retained as lazy
-     * views for cold call-sites (tests, debug printing).
+     * are the hot path; the [bools] / [ints] map views serve cold call-sites (the
+     * bake-time failed-literal probing path in `Problem`, tests, debug printing).
      */
     class Implied internal constructor(
         /** Bool var ids in ascending order. */
@@ -63,15 +60,16 @@ sealed interface PropagationResult {
                 intValues = intValues.copyOf(),
             )
 
-        /** Legacy backward-compat view. Allocates a `LinkedHashMap` per access — hot
-         *  paths should use [forEachBool] / [boolValueOrNull] instead. */
+        /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
+         *  failed-literal probing in `Problem` and by tests; hot paths should use
+         *  [forEachBool] / [boolValueOrNull] instead. */
         val bools: Map<Int, Boolean>
             get() = if (boolKeys.isEmpty()) emptyMap() else
                 LinkedHashMap<Int, Boolean>(boolKeys.size).also { m ->
                     for (i in boolKeys.indices) m[boolKeys[i]] = boolValues[i]
                 }
 
-        /** Legacy backward-compat view. See [bools]. */
+        /** Map view. See [bools]. */
         val ints: Map<Int, Int>
             get() = if (intKeys.isEmpty()) emptyMap() else
                 LinkedHashMap<Int, Int>(intKeys.size).also { m ->
@@ -111,8 +109,8 @@ sealed interface PropagationResult {
         companion object {
             val Empty: Implied = Implied(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
 
-            /** Map-based factory preserved for backward compat — call sites can keep
-             *  using `Implied(bools, ints)`. Normalises to the primitive sorted-array form. */
+            /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
+             *  normalises to the primitive sorted-array form. */
             operator fun invoke(
                 bools: Map<Int, Boolean> = emptyMap(),
                 ints: Map<Int, Int> = emptyMap(),
