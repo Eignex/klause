@@ -31,6 +31,25 @@ data class BacktrackParams(
     val valueHeuristic: ValueHeuristic = IndomainRandom,
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
+    /**
+     * Luby restart base. When non-null, the search pops back to root after
+     * `lubyN(restartIdx) * lubyRestartBase` decisions in the current run and starts
+     * fresh from level 0. Phase-saving (see [phaseSaving]) and the B&B bound (in
+     * [com.eignex.klause.solver.Optimizer.minimize]) survive the restart, so each
+     * restart resumes with strictly more information than the previous run. Disabled
+     * by default — set to a moderate value (e.g. `100` or `200`) on hard instances
+     * where DFS gets stuck on bad subtrees.
+     */
+    val lubyRestartBase: Long? = null,
+    /**
+     * Phase-saving: cache the last value the search committed to for each variable.
+     * On a fresh descent (after a backtrack or restart) the cached value is tried
+     * first, so the search doesn't lose the work spent narrowing down the right
+     * polarity each time. Standard CDCL-derived heuristic; combines naturally with
+     * [lubyRestartBase]. Disabled by default to keep the search deterministic given a
+     * fixed seed when no restarts are in play.
+     */
+    val phaseSaving: Boolean = false,
     /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
     val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.NeverCancel,
 ) : SolverParams {

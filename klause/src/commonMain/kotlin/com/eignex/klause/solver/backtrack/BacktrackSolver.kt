@@ -261,42 +261,134 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         if (seedResult is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted); return@sequence
         }
-        val rng = Random(params.randomSeed ?: Random.Default.nextLong())
-        val trail: MutableList<TrailNode> = ArrayList()
-        var decisionsLeft = params.maxDecisions
-        var descend = true
-        // Check cancellation between iterations rather than every operation — amortised
-        // cost is negligible and the search responds within a handful of decisions.
-        var cancelCheckCountdown = 0
+        // Phase-saving: cache the last value committed for each var (across backtracks
+        // and restarts). Allocated only when enabled. The `boolPhaseSet` parallel array
+        // distinguishes "never committed a value yet" from "saved value happens to be
+        // false" — without it the default-false BooleanArray entries would shadow any
+        // real saves of false.
+        val boolPhase: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numBoolVars) else null
+        val boolPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numBoolVars) else null
+        val intPhase: IntArray? = if (params.phaseSaving) IntArray(problem.numIntVars) else null
+        val intPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numIntVars) else null
 
-        loop@ while (true) {
-            if (cancelCheckCountdown-- <= 0) {
-                if (params.cancellation()) { yield(SearchOutcome.BudgetCapped); return@sequence }
-                cancelCheckCountdown = CANCEL_CHECK_INTERVAL
-            }
-            if (descend) {
-                val varRef = params.variableHeuristic.pick(session, rng)
-                if (varRef == null) {
-                    yield(SearchOutcome.Found(snapshotAssignment(session)))
-                    descend = false
-                    continue@loop
+        val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
+        val rng = Random(baseSeed)
+        var decisionsLeft = params.maxDecisions
+
+        // Outer restart loop. Each iteration is one Luby-bounded DFS run from the root.
+        // When `lubyRestartBase` is null the loop runs exactly once with infinite per-run
+        // budget — same as the pre-restart behaviour.
+        var lubyIdx = 1L
+        outer@ while (true) {
+            val perRunBudget: Long = params.lubyRestartBase?.let { base ->
+                // Cap multiplication to avoid overflow on tiny base + huge lubyIdx.
+                val limit = lubyN(lubyIdx)
+                if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
+            } ?: Long.MAX_VALUE
+            var decisionsThisRun = 0L
+
+            val trail: MutableList<TrailNode> = ArrayList()
+            var descend = true
+            var cancelCheckCountdown = 0
+
+            inner@ while (true) {
+                if (cancelCheckCountdown-- <= 0) {
+                    if (params.cancellation()) { yield(SearchOutcome.BudgetCapped); return@sequence }
+                    cancelCheckCountdown = CANCEL_CHECK_INTERVAL
                 }
-                val node = makeNode(varRef, params.valueHeuristic.values(session, varRef, rng))
-                if (!advance(node, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
-                    if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
-                    descend = false
-                    continue@loop
+                // Luby budget hit → pop back to root and restart.
+                if (decisionsThisRun >= perRunBudget) {
+                    while (trail.isNotEmpty()) {
+                        session.popLast()
+                        trail.removeAt(trail.size - 1)
+                    }
+                    lubyIdx++
+                    continue@outer
                 }
-                trail.add(node)
-            } else {
-                if (trail.isEmpty()) { yield(SearchOutcome.Exhausted); return@sequence }
-                val top = trail.last()
-                session.popLast()
-                if (advance(top, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
-                    descend = true
+                if (descend) {
+                    val varRef = params.variableHeuristic.pick(session, rng)
+                    if (varRef == null) {
+                        yield(SearchOutcome.Found(snapshotAssignment(session)))
+                        descend = false
+                        continue@inner
+                    }
+                    val values = params.valueHeuristic.values(session, varRef, rng)
+                    val ordered = applyPhase(varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                    val node = makeNode(varRef, ordered)
+                    val decsBefore = decisionsLeft
+                    if (!advance(node, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
+                        decisionsThisRun += decsBefore - decisionsLeft
+                        if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
+                        descend = false
+                        continue@inner
+                    }
+                    decisionsThisRun += decsBefore - decisionsLeft
+                    capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                    trail.add(node)
                 } else {
-                    if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
-                    trail.removeAt(trail.size - 1)
+                    if (trail.isEmpty()) { yield(SearchOutcome.Exhausted); return@sequence }
+                    val top = trail.last()
+                    session.popLast()
+                    val decsBefore = decisionsLeft
+                    if (advance(top, session, pruneIf, { decisionsLeft }, { decisionsLeft-- })) {
+                        decisionsThisRun += decsBefore - decisionsLeft
+                        capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                        descend = true
+                    } else {
+                        decisionsThisRun += decsBefore - decisionsLeft
+                        if (decisionsLeft <= 0) { yield(SearchOutcome.BudgetCapped); return@sequence }
+                        trail.removeAt(trail.size - 1)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * If phase-saving is on and a value is cached for [varRef], prepend the cached value
+     * to the heuristic's order (and drop it from the rest of the sequence so it isn't
+     * tried twice). Otherwise the heuristic's order passes through unchanged.
+     */
+    private fun applyPhase(
+        varRef: VarRef,
+        values: Sequence<Int>,
+        boolPhase: BooleanArray?, boolPhaseSet: BooleanArray?,
+        intPhase: IntArray?, intPhaseSet: BooleanArray?,
+    ): Sequence<Int> {
+        return when (varRef) {
+            is VarRef.Bool -> {
+                if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[varRef.varId]) {
+                    val saved = if (boolPhase[varRef.varId]) 1 else 0
+                    sequenceOf(saved) + values.filter { it != saved }
+                } else values
+            }
+            is VarRef.IntVar -> {
+                if (intPhase != null && intPhaseSet != null && intPhaseSet[varRef.varId]) {
+                    val saved = intPhase[varRef.varId]
+                    sequenceOf(saved) + values.filter { it != saved }
+                } else values
+            }
+        }
+    }
+
+    /** Record the variable's currently-pinned value for phase-saving. Called after every
+     *  successful pin (descent into a node). */
+    private fun capturePhase(
+        varRef: VarRef, session: PropagationSession,
+        boolPhase: BooleanArray?, boolPhaseSet: BooleanArray?,
+        intPhase: IntArray?, intPhaseSet: BooleanArray?,
+    ) {
+        when (varRef) {
+            is VarRef.Bool -> {
+                if (boolPhase != null && boolPhaseSet != null) {
+                    val v = session.boolValue(varRef.varId)
+                    if (v != null) { boolPhase[varRef.varId] = v; boolPhaseSet[varRef.varId] = true }
+                }
+            }
+            is VarRef.IntVar -> {
+                if (intPhase != null && intPhaseSet != null) {
+                    val d = session.intDomain(varRef.varId)
+                    if (d.min == d.max) { intPhase[varRef.varId] = d.min; intPhaseSet[varRef.varId] = true }
                 }
             }
         }
@@ -305,6 +397,28 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     private fun makeNode(varRef: VarRef, values: Sequence<Int>): TrailNode = when (varRef) {
         is VarRef.Bool -> BoolNode(varRef, values)
         is VarRef.IntVar -> IntNode(varRef, values)
+    }
+
+    /**
+     * Luby sequence (Luby-Sinclair-Zuckerman 1993). Standard CDCL restart schedule:
+     * `1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, ...`. Closed form:
+     * `lubyN(i) = 2^(k-1)` when `i = 2^k − 1` (i.e. one less than a power of two);
+     * otherwise `lubyN(i − 2^(k-1) + 1)` where `k = ⌊log₂(i)⌋ + 1`.
+     */
+    private fun lubyN(idxIn: Long): Long {
+        var i = idxIn
+        var k = 1
+        // Find smallest k such that 2^k > i.
+        while ((1L shl k) <= i) k++
+        // Equivalent to the textbook recurrence; iteratively unwound.
+        while (true) {
+            val pow = 1L shl (k - 1)
+            if (i == (pow shl 1) - 1) return pow
+            // Otherwise i < (pow << 1) - 1; recurse on (i - pow + 1).
+            i = i - pow + 1
+            k = 1
+            while ((1L shl k) <= i) k++
+        }
     }
 
     /**
