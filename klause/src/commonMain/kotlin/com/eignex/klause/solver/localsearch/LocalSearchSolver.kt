@@ -371,7 +371,7 @@ class LocalSearchSolver(
             val cur = state.assignment.intValue(i)
             val d = problem.intDomains[i]
             for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d.min..d.max) continue
+                if (target !in d) continue  // sparse-aware: rejects holes
                 state.apply(Move.IntSet(i, target))
                 if (state.cost == 0) {
                     val obj = objective.evaluate(state.assignment.snapshot())
@@ -424,7 +424,7 @@ class LocalSearchSolver(
             val cur = state.assignment.intValue(i)
             val d = problem.intDomains[i]
             for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d.min..d.max) continue
+                if (target !in d) continue  // sparse-aware: rejects holes
                 state.apply(Move.IntSet(i, target))
                 val obj = objective.evaluate(state.assignment.snapshot())
                 val shaped = shaping.shape(state.cost, obj)

@@ -128,6 +128,29 @@ class IntDomain private constructor(
     }
 
     /**
+     * Return the `i`-th value present in the domain (0-indexed in ascending order).
+     * Used by random-value pickers that take `rng.nextInt(size)` and need an actual
+     * domain value (not just an offset from [min] which would land on holes for
+     * sparse domains). Contiguous fast path is `min + i`; sparse path walks the
+     * holes array to compute the gap-adjusted offset. O(holes.size) worst case but
+     * cheap for typical sparse domains (few holes).
+     */
+    fun valueAt(i: Int): Int {
+        if (holes == null) return min + i
+        // Walk holes: each hole at position `h` (in absolute value) skips one value
+        // between min and i. Equivalently: find the smallest `v` ≥ min + i such that
+        // `(min..v).filter { it !in holes }.count() == i + 1`. Linear-scan is the
+        // simplest and fastest for small `holes`.
+        var v = min + i
+        var holeIdx = 0
+        while (holeIdx < holes.size && holes[holeIdx] <= v) {
+            v++
+            holeIdx++
+        }
+        return v
+    }
+
+    /**
      * Iterate every value present in the domain in ascending order. Contiguous fast
      * path is a plain `min..max` walk; sparse path filters via a single linear walk
      * of [holes] (no per-element binarySearch). Inlined so callers get the hot path

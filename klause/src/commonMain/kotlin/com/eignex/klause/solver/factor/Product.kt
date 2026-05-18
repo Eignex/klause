@@ -224,7 +224,7 @@ class Product(
         var bestError = kotlin.math.abs(currentValue.toLong() * otherValue - rv)
         for (delta in -2..2) {
             val cand = center + delta
-            if (cand !in domain.min..domain.max) continue
+            if (cand !in domain) continue
             val error = kotlin.math.abs(cand.toLong() * otherValue - rv)
             if (error < bestError) {
                 bestError = error

@@ -64,7 +64,7 @@ internal fun anchorAndPerturb(state: LocalSearchState, anchor: Sample, perturbat
             } else {
                 val v = pick - problem.numBoolVars
                 val d = problem.intDomains[v]
-                state.assignment.setInt(v, d.min + state.rng.nextInt(d.size))
+                state.assignment.setInt(v, d.valueAt(state.rng.nextInt(d.size)))
             }
         }
     }

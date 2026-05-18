@@ -144,7 +144,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         if (n == 1) {
             val v = succ[0]
             val d = state.intDomains[v]
-            if (0 !in d.min..d.max) return false
+            if (0 !in d) return false  // sparse-aware: 0 could be a hole
             if (d.min != 0 && !state.tightenIntMin(v, 0)) return false
             if (d.max != 0 && !state.tightenIntMax(v, 0)) return false
             return true
@@ -234,7 +234,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
             }
             if (chainNodes == n) {
                 // Chain spans all n nodes; succ[i] = start is the only completion.
-                if (start !in d.min..d.max) return false
+                if (start !in d) return false  // sparse-aware
                 if (!state.tightenIntMin(v, start)) return false
                 if (!state.tightenIntMax(v, start)) return false
             } else {
@@ -264,14 +264,14 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
             val d = state.problem.intDomains[v]
             val span = d.size
             if (span <= MAX_TARGETS) {
-                for (target in d.min..d.max) {
+                d.forEach { target ->
                     if (target != cur && target != i) sink.addIntSet(v, target)
                 }
             } else {
                 if (cur < d.max) sink.addIntSet(v, cur + 1)
                 if (cur > d.min) sink.addIntSet(v, cur - 1)
                 repeat(MAX_TARGETS) {
-                    val target = d.min + state.rng.nextInt(span)
+                    val target = d.valueAt(state.rng.nextInt(span))
                     if (target != cur && target != i) sink.addIntSet(v, target)
                 }
             }

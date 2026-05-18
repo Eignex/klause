@@ -123,9 +123,9 @@ class GreedyConstructionRepair(
             var bestVal = cur
             var bestScore = baseline
             val candidates: IntArray = if (d.size <= intDomainSampleCap) {
-                IntArray(d.size) { d.min + it }
+                IntArray(d.size) { d.valueAt(it) }
             } else {
-                IntArray(intDomainSampleCap) { d.min + context.rng.nextInt(d.size) }
+                IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
             }
             for (v in candidates) {
                 if (v == cur) continue

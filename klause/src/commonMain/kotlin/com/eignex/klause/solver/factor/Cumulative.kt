@@ -349,20 +349,20 @@ class Cumulative(
             if (runsAtPeak) {
                 // Start just after the peak: cur' = absT + 1 (clamped to domain).
                 val afterPeak = absT + 1
-                if (afterPeak in dom.min..dom.max && afterPeak != cur) sink.addIntSet(v, afterPeak)
+                if (afterPeak in dom && afterPeak != cur) sink.addIntSet(v, afterPeak)
                 // Finish just before the peak: cur' = absT - d.
                 val beforePeak = absT - d
-                if (beforePeak in dom.min..dom.max && beforePeak != cur) sink.addIntSet(v, beforePeak)
+                if (beforePeak in dom && beforePeak != cur) sink.addIntSet(v, beforePeak)
             }
             // Local nudges as a robustness fallback for tight windows.
             if (cur < dom.max && cur + 1 != cur) sink.addIntSet(v, cur + 1)
             if (cur > dom.min && cur - 1 != cur) sink.addIntSet(v, cur - 1)
             // A few random alternatives so the search isn't trapped near the peak.
             if (dom.size <= MAX_TARGETS) {
-                for (target in dom.min..dom.max) if (target != cur) sink.addIntSet(v, target)
+                dom.forEach { target -> if (target != cur) sink.addIntSet(v, target) }
             } else {
                 repeat(MAX_TARGETS) {
-                    val pick = dom.min + state.rng.nextInt(dom.size)
+                    val pick = dom.valueAt(state.rng.nextInt(dom.size))
                     if (pick != cur) sink.addIntSet(v, pick)
                 }
             }

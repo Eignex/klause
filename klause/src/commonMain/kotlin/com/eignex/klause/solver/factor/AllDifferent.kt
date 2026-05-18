@@ -267,17 +267,20 @@ class AllDifferent(
         val targets = IntArray(MAX_REPAIR_TARGETS) { Int.MIN_VALUE }
         var filled = 0
         var seenTargets = 0
-        for (target in d.min..d.max) {
-            if (target == value) continue
-            val tIdx = target - domainMin
-            if (tIdx !in s.counts.indices || s.counts[tIdx] != 0) continue
-            seenTargets++
-            if (filled < MAX_REPAIR_TARGETS) {
-                targets[filled++] = target
-            } else {
-                // Reservoir replace: each subsequent target replaces a slot uniformly.
-                val r = state.rng.nextInt(seenTargets)
-                if (r < MAX_REPAIR_TARGETS) targets[r] = target
+        // `forEach` skips holes for sparse domains; contiguous fast path is identical
+        // to the previous `min..max` walk.
+        d.forEach { target ->
+            if (target != value) {
+                val tIdx = target - domainMin
+                if (tIdx in s.counts.indices && s.counts[tIdx] == 0) {
+                    seenTargets++
+                    if (filled < MAX_REPAIR_TARGETS) {
+                        targets[filled++] = target
+                    } else {
+                        val r = state.rng.nextInt(seenTargets)
+                        if (r < MAX_REPAIR_TARGETS) targets[r] = target
+                    }
+                }
             }
         }
         if (filled > 0) {
@@ -295,6 +298,7 @@ class AllDifferent(
         for (w in d.min..d.max) {
             if (swapsAdded >= MAX_SWAP_CANDIDATES) break
             if (w == value) continue
+            if (w !in d) continue  // sparse-aware: skip holes in occupant's domain
             val wIdx = w - domainMin
             if (wIdx !in s.counts.indices || s.counts[wIdx] != 1) continue
             // Locate the unique holder of w. O(|vars|) per candidate; bounded by
@@ -303,7 +307,7 @@ class AllDifferent(
             for (v in vars) if (state.assignment.intValue(v) == w) { holder = v; break }
             if (holder == -1 || holder == occupant) continue
             val hd = state.problem.intDomains[holder]
-            if (value < hd.min || value > hd.max) continue
+            if (value !in hd) continue  // also sparse-aware on holder's domain
             sink.addCompound(listOf(Move.IntSet(occupant, w), Move.IntSet(holder, value)))
             swapsAdded++
         }

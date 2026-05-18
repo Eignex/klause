@@ -369,10 +369,7 @@ object IndomainMin : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
         when (varRef) {
             is VarRef.Bool -> sequenceOf(0, 1)
-            is VarRef.IntVar -> {
-                val d = session.intDomain(varRef.varId)
-                (d.min..d.max).asSequence()
-            }
+            is VarRef.IntVar -> domainValuesAscending(session.intDomain(varRef.varId))
         }
 }
 
@@ -381,10 +378,7 @@ object IndomainMax : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
         when (varRef) {
             is VarRef.Bool -> sequenceOf(1, 0)
-            is VarRef.IntVar -> {
-                val d = session.intDomain(varRef.varId)
-                (d.max downTo d.min).asSequence()
-            }
+            is VarRef.IntVar -> domainValuesDescending(session.intDomain(varRef.varId))
         }
 }
 
@@ -398,13 +392,16 @@ object IndomainMiddle : ValueHeuristic {
             is VarRef.Bool -> sequenceOf(0, 1)
             is VarRef.IntVar -> {
                 val d = session.intDomain(varRef.varId)
-                val mid = d.min + d.size / 2
+                // Use the sparse-aware `valueAt` to land on the actual middle value
+                // (skipping holes) and then walk outward, filtering with `in d` so the
+                // sequence never yields a hole.
+                val mid = d.valueAt(d.size / 2)
                 sequence {
                     yield(mid)
                     var off = 1
                     while (mid - off >= d.min || mid + off <= d.max) {
-                        if (mid + off <= d.max) yield(mid + off)
-                        if (mid - off >= d.min) yield(mid - off)
+                        if (mid + off <= d.max && (mid + off) in d) yield(mid + off)
+                        if (mid - off >= d.min && (mid - off) in d) yield(mid - off)
                         off++
                     }
                 }
@@ -419,7 +416,8 @@ object IndomainRandom : ValueHeuristic {
             is VarRef.Bool -> if (rng.nextBoolean()) sequenceOf(1, 0) else sequenceOf(0, 1)
             is VarRef.IntVar -> {
                 val d = session.intDomain(varRef.varId)
-                val list = (d.min..d.max).toMutableList()
+                // Materialise the actual non-hole values via valueAt, shuffle, return.
+                val list = IntArray(d.size) { d.valueAt(it) }.toMutableList()
                 list.shuffle(rng)
                 list.asSequence()
             }
@@ -427,10 +425,8 @@ object IndomainRandom : ValueHeuristic {
 }
 
 /**
- * Allow-list value selection: tries only [allowedValues] (in order) regardless of the
- * current domain. Useful when constraints have carved holes in a contiguous [IntDomain]
- * range — skipping the forbidden values up-front avoids the per-hole conflict-propagate
- * round.
+ * Allow-list value selection: tries only [allowedValues] (in order) intersected with the
+ * current domain. Sparse-aware via the `in d` membership check.
  */
 class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
@@ -438,7 +434,20 @@ class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
             is VarRef.Bool -> allowedValues.asSequence().filter { it == 0 || it == 1 }
             is VarRef.IntVar -> {
                 val d = session.intDomain(varRef.varId)
-                allowedValues.asSequence().filter { it in d.min..d.max }
+                allowedValues.asSequence().filter { it in d }
             }
         }
 }
+
+/** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
+ *  the engine can early-exit before enumerating the full domain on a backtrack. */
+private fun domainValuesAscending(d: com.eignex.klause.solver.IntDomain): Sequence<Int> =
+    sequence { d.forEach { yield(it) } }
+
+/** Descending sequence; same skip-holes semantics. */
+private fun domainValuesDescending(d: com.eignex.klause.solver.IntDomain): Sequence<Int> =
+    sequence {
+        // Backwards walk: iterate from max down to min, skip holes via membership check.
+        // For sparse domains this is O((max - min) + holes); for contiguous it's O(span).
+        for (v in d.max downTo d.min) if (v in d) yield(v)
+    }

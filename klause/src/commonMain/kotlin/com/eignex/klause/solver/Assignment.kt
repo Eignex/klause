@@ -40,7 +40,7 @@ class Assignment(val numBoolVars: Int, val numIntVars: Int) {
         }
         for (i in 0 until numIntVars) {
             val d = intDomains[i]
-            ints[i] = d.min + rng.nextInt(d.size)
+            ints[i] = d.valueAt(rng.nextInt(d.size))   // sparse-aware uniform pick
         }
     }
 
