@@ -2,6 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
@@ -89,6 +90,10 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "decreasing_int", "fzn_decreasing_int" -> emitMonotone(c, ascending = false, strict = false)
     "strictly_increasing_int", "fzn_strictly_increasing_int" -> emitMonotone(c, ascending = true, strict = true)
     "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, ascending = false, strict = true)
+
+    // Array min/max
+    "array_int_maximum", "fzn_array_int_maximum" -> emitArrayMinMax(c, max = true)
+    "array_int_minimum", "fzn_array_int_minimum" -> emitArrayMinMax(c, max = false)
 
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
 }
@@ -518,6 +523,14 @@ internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
         else -> failHere("unhandled reified int cmp `${c.name}`")
     }
     factors.add(ReifiedLinear(r, coeffs, vars, op, bound))
+}
+
+/** `array_int_maximum(result, xs)` / `array_int_minimum(...)` — single [ArrayMinMax] factor. */
+internal fun FlatZincCompiler.emitArrayMinMax(c: FznConstraint, max: Boolean) {
+    require(c.args.size == 2)
+    val result = resolveIntVar(c.args[0])
+    val xs = evalIntVarArray(c.args[1])
+    factors.add(ArrayMinMax(result = result, xs = xs, max = max))
 }
 
 /** `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
