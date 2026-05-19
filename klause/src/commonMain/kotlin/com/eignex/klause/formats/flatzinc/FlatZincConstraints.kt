@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.BinPacking
+import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Sequence as SequenceFactor
@@ -87,6 +88,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "bin_packing", "fzn_bin_packing" -> emitBinPacking(c, BinPacking.Mode.UniformCapacity)
     "bin_packing_capa", "fzn_bin_packing_capa" -> emitBinPacking(c, BinPacking.Mode.PerBinCapacity)
     "bin_packing_load", "fzn_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
+    "diffn", "fzn_diffn" -> emitDiffn(c, nonStrict = false)
+    "diffn_nonstrict", "fzn_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -325,6 +328,16 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `diffn(xs, ys, widths, heights)` / `diffn_nonstrict(...)` — 2D rectangle non-overlap. */
+internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
+    require(c.args.size == 4)
+    val xs = evalIntVarArray(c.args[0])
+    val ys = evalIntVarArray(c.args[1])
+    val widths = evalIntConstArray(c.args[2])
+    val heights = evalIntConstArray(c.args[3])
+    factors.add(Diffn(xs, ys, widths, heights, nonStrict))
 }
 
 /**
