@@ -15,22 +15,18 @@ class Assignment(
      *  must equal [numSetVars] when non-empty; empty IntArray when there are no set vars. */
     val setUniverseSizes: IntArray = IntArray(0),
 ) {
-    private val bits: LongArray = LongArray((numBoolVars + 63) ushr 6)
+    private val bits: Bits = Bits(numBoolVars)
     private val ints: IntArray = IntArray(numIntVars)
     private val sets: Array<Bits> = Array(numSetVars) { Bits(setUniverseSizes[it]) }
 
-    fun boolValue(varId: Int): Boolean =
-        (bits[varId ushr 6] ushr (varId and 63)) and 1L == 1L
+    fun boolValue(varId: Int): Boolean = bits.get(varId)
 
     fun setBool(varId: Int, value: Boolean) {
-        val w = varId ushr 6
-        val mask = 1L shl (varId and 63)
-        bits[w] = if (value) bits[w] or mask else bits[w] and mask.inv()
+        if (value) bits.set(varId) else bits.clear(varId)
     }
 
     fun flipBool(varId: Int) {
-        val w = varId ushr 6
-        bits[w] = bits[w] xor (1L shl (varId and 63))
+        if (bits.get(varId)) bits.clear(varId) else bits.set(varId)
     }
 
     fun intValue(varId: Int): Int = ints[varId]
@@ -40,12 +36,11 @@ class Assignment(
     }
 
     fun randomize(rng: Random, intDomains: Array<IntDomain>) {
-        for (i in bits.indices) bits[i] = rng.nextLong()
+        // Direct word fill — much faster than a per-var coin flip via bits.set / clear.
+        val ws = bits.words
+        for (i in ws.indices) ws[i] = rng.nextLong()
         val tail = numBoolVars and 63
-        if (tail != 0) {
-            val mask = (1L shl tail) - 1L
-            bits[bits.size - 1] = bits[bits.size - 1] and mask
-        }
+        if (tail != 0) ws[ws.size - 1] = ws[ws.size - 1] and ((1L shl tail) - 1L)
         for (i in 0 until numIntVars) {
             val d = intDomains[i]
             ints[i] = d.valueAt(rng.nextInt(d.size))   // sparse-aware uniform pick
@@ -65,7 +60,7 @@ class Assignment(
     fun setMembers(setId: Int): IntArray = sets[setId].toIntArray()
 
     fun snapshot(): Sample = Sample(
-        bools = BooleanArray(numBoolVars) { boolValue(it) },
+        bools = BooleanArray(numBoolVars) { bits.get(it) },
         ints = ints.copyOf(),
         sets = Array(numSetVars) { sets[it].toIntArray() },
     )

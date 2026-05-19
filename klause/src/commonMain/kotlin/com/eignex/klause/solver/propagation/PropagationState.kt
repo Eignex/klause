@@ -25,8 +25,31 @@ class PropagationState(
     val problem: Problem,
     assumptions: Assumptions,
 ) {
-    /** Per-bool current pin; `null` means unassigned. */
-    val boolValues: Array<Boolean?> = arrayOfNulls(problem.numBoolVars)
+    /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
+     *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
+     *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than the old `Array<Boolean?>`
+     *  and one less pointer indirection per read (no boxed `Boolean`). */
+    private val boolAssigned: Bits = Bits(problem.numBoolVars)
+    private val boolValueBits: Bits = Bits(problem.numBoolVars)
+
+    /** Operator-indexable view preserving the call-site syntax `state.boolValues[v]` and
+     *  `state.boolValues[v] = x`. Reads `null` when unassigned. Write `null` clears the
+     *  assigned bit. The backing storage is the parallel-Bits pair above. */
+    inner class BoolView {
+        val size: Int get() = problem.numBoolVars
+        val indices: IntRange get() = 0 until problem.numBoolVars
+        operator fun get(v: Int): Boolean? =
+            if (boolAssigned.get(v)) boolValueBits.get(v) else null
+        operator fun set(v: Int, value: Boolean?) {
+            if (value == null) {
+                boolAssigned.clear(v)
+                return
+            }
+            if (value) boolValueBits.set(v) else boolValueBits.clear(v)
+            boolAssigned.set(v)
+        }
+    }
+    val boolValues: BoolView = BoolView()
 
     /** Per-int current domain (copy of [Problem.intDomains], narrowed as propagation proceeds). */
     val intDomains: Array<IntDomain> = Array(problem.numIntVars) { problem.intDomains[it] }
@@ -600,7 +623,8 @@ class PropagationState(
     // snapshotted — the caller is expected to snapshot only between propagation cycles
     // (i.e. when dirty queues are empty).
     class Snapshot internal constructor(
-        internal val boolValues: Array<Boolean?>,
+        internal val boolAssigned: Bits,
+        internal val boolValueBits: Bits,
         internal val intDomains: Array<IntDomain>,
         internal val setRequired: Array<Bits>,
         internal val setPossible: Array<Bits>,
@@ -615,7 +639,8 @@ class PropagationState(
     )
 
     fun snapshot(): Snapshot = Snapshot(
-        boolValues = boolValues.copyOf(),
+        boolAssigned = boolAssigned.copy(),
+        boolValueBits = boolValueBits.copy(),
         intDomains = intDomains.copyOf(),
         setRequired = Array(setRequired.size) { setRequired[it].copy() },
         setPossible = Array(setPossible.size) { setPossible[it].copy() },
@@ -630,7 +655,8 @@ class PropagationState(
     )
 
     fun restore(s: Snapshot) {
-        for (i in s.boolValues.indices) boolValues[i] = s.boolValues[i]
+        boolAssigned.copyFrom(s.boolAssigned)
+        boolValueBits.copyFrom(s.boolValueBits)
         for (i in s.intDomains.indices) intDomains[i] = s.intDomains[i]
         for (i in s.setRequired.indices) setRequired[i].copyFrom(s.setRequired[i])
         for (i in s.setPossible.indices) setPossible[i].copyFrom(s.setPossible[i])
