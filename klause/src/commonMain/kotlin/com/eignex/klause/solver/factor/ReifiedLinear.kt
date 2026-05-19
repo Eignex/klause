@@ -124,16 +124,12 @@ class ReifiedLinear(
     }
 
     /**
-     * Compose aux-pin antecedents from the int-fact antecedents that drove the
-     * always/never-holds inference. For each var:
-     *   - alwaysHolds && (LE | NE-high | EQ): max side of positive-coeff vars,
-     *     min side of negative-coeff vars (whichever side moved sumHi down/up).
-     *   - alwaysHolds && (GE | NE-low): opposite.
-     *   - neverHolds: mirror of alwaysHolds.
-     *
-     * Pragmatically we union *both sides* across all vars — sound but coarser; the
-     * analyzer's minimization shrinks redundant entries. A tighter implementation
-     * would inspect each var's coefficient sign and only emit the relevant side.
+     * Compose aux-pin antecedents from involved vars' int trails. Bool-literal union
+     * form — the analyzer resolves through them via the standard 1UIP loop. A sharper
+     * atom-lit form is available via [PropagationState.atomVarGe] / [atomVarLe], but
+     * adopting it requires extending [com.eignex.klause.solver.factor.Clause] and the
+     * watched-literal infrastructure to handle atom-var ids (currently sized to
+     * `numBoolVars`); that's the next LCG step.
      */
     private fun composeAuxAntecedents(state: PropagationState, alwaysHolds: Boolean): IntArray? {
         val seen = HashSet<Int>()
