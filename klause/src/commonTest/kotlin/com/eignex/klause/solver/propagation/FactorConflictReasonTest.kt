@@ -432,6 +432,48 @@ class FactorConflictReasonTest {
     }
 
     @Test
+    fun `atom-lit clause unit-propagates via state pinLit dispatch`() {
+        // End-to-end atom-lit clause: a learned-style Clause whose literals reference
+        // atom-var ids dispatches through state.litTrue / pinLit. Pinning the underlying
+        // int var to make one atom false forces the other atom to be true → re-derives
+        // as a corresponding int tighten on its underlying int var.
+        //
+        // Setup: int v0 in [0, 9], int v1 in [0, 9]. Allocate atoms `[v0 ≥ 5]` and
+        // `[v1 ≥ 7]`. Add Clause `[[v0 ≥ 5], [v1 ≥ 7]]` (positive atom lits). Then
+        // tighten v0.max to 4 → atom `[v0 ≥ 5]` becomes false → clause unit-propagates
+        // `[v1 ≥ 7]` to true, which re-derives as `tightenIntMin(v1, 7)`.
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
+            factors = emptyList(),
+        )
+        val state = com.eignex.klause.solver.propagation.PropagationState(
+            problem, com.eignex.klause.solver.Assumptions.None,
+        )
+        // Allocate atoms. Both currently undetermined (5 ∈ [0,9], 7 ∈ [0,9]).
+        // Wait — atom truth derives from currentTruth(): [v0 ≥ 5] is true iff v0.min ≥ 5.
+        // With dom [0,9], v0.min = 0, so atom is currently false. Similarly [v1 ≥ 7].
+        val atomV0Ge5 = state.atomVarGe(0, 5)
+        val atomV1Ge7 = state.atomVarGe(1, 7)
+        // Add the clause as a learned clause.
+        val clause = com.eignex.klause.solver.factor.Clause(intArrayOf(
+            Lit.make(atomV0Ge5, true),
+            Lit.make(atomV1Ge7, true),
+        ))
+        state.addLearnedClause(clause, lbd = 2)
+        // Decide v0 ≤ 4 (which makes atom [v0 ≥ 5] false permanently, since v0.max < 5).
+        // We do this by calling tightenIntMax directly with no antecedents (a decision).
+        state.currentLevel = 1
+        assertTrue(state.tightenIntMax(0, 4))
+        // Run propagation — the clause must wake (atom-lit watcher fires) and
+        // unit-propagate [v1 ≥ 7] which translates to tightenIntMin(v1, 7).
+        val conflict = state.runToFixpoint(allFactors = false)
+        assertTrue(conflict == null, "no conflict expected; clause should unit-propagate")
+        assertEquals(7, state.intDomains[1].min,
+            "atom-lit clause should have unit-propagated [v1 ≥ 7] → tightenIntMin(v1, 7)")
+    }
+
+    @Test
     fun `Xor conflict analyzer learns clause containing decision`() {
         // a ⊕ b = 1. With Clauses forcing a, b both true on x=true → parity 0, conflict.
         val problem = Problem(

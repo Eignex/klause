@@ -218,7 +218,7 @@ class PropagationState(
         _refPayload.add(null)
         val watchers = clause.initialBoolWatchers
         if (watchers != null) {
-            for (lit in watchers) boolWatchersByLit[lit].add(newFid)
+            for (lit in watchers) installLitWatch(lit, newFid)
         }
         return newFid
     }
@@ -378,6 +378,20 @@ class PropagationState(
      *  → atomId. Allows O(1) re-allocation checks. */
     private val atomByKey: HashMap<Long, Int> = HashMap()
 
+    /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions
+     *  to false. Mirrors [boolWatchersByLit] for atoms; keyed by atom-lit id rather than
+     *  fixed-array indexed because atoms are allocated dynamically. */
+    internal val atomWatchersByLit: HashMap<Int, com.eignex.klause.util.IntArrayList> = HashMap()
+
+    /** For each int variable, the atoms whose truth depends on it — used to recompute
+     *  atom truth and fire watchers after a successful tighten / exclude. */
+    private val atomsByIntVar: HashMap<Int, com.eignex.klause.util.IntArrayList> = HashMap()
+
+    /** Factor ids woken by atom-lit transitions during the current propagation step.
+     *  Drained alongside dirty-int / dirty-bool processing in [runToFixpoint]. */
+    private val dirtyAtomFactors: com.eignex.klause.util.IntArrayDeque =
+        com.eignex.klause.util.IntArrayDeque(initialCapacity = 8)
+
     private fun atomKey(intVar: Int, kind: Int, threshold: Int): Long {
         // Threshold can be negative; bias by Int.MIN_VALUE to keep it non-negative within
         // the lower 32 bits. Kind takes bit 32; intVar takes bits 33..63.
@@ -406,33 +420,123 @@ class PropagationState(
     /** Translate a virtual atom-var id back to its 0-based atom index. */
     fun atomIdOf(v: Int): Int = v - problem.numBoolVars
 
+    /** Current truth of an atom — derived fresh from `intDomains`, not the
+     *  snapshot-at-allocation [atomValue]. Returns `null` when undetermined (the bound
+     *  isn't either side-decided yet). Used by [litTrue] / [litFalse] / [pinLit]. */
+    fun atomCurrentTruth(atomId: Int): Boolean? =
+        atomTruthOf(atomIntVar[atomId], atomKind[atomId], atomThreshold[atomId])
+
+    /** Unified truth lookup over bool literals and atom-lit literals. Returns `null`
+     *  when undetermined. Pair with [Lit.evaluate] / explicit polarity branching to
+     *  reason about literal truth. */
+    fun litTruth(lit: Int): Boolean? {
+        val v = com.eignex.klause.solver.Lit.variable(lit)
+        val raw: Boolean? = if (v < problem.numBoolVars) boolValues[v]
+        else atomCurrentTruth(atomIdOf(v))
+        if (raw == null) return null
+        return com.eignex.klause.solver.Lit.evaluate(lit, raw)
+    }
+
+    /** True iff [lit] is currently `true` (returns false when undetermined). */
+    fun litTrue(lit: Int): Boolean = litTruth(lit) == true
+
+    /** True iff [lit] is currently `false` (returns false when undetermined). */
+    fun litFalse(lit: Int): Boolean = litTruth(lit) == false
+
+    /** Assign [lit] to true, recording [antecedents]. Dispatches between bool pins
+     *  ([pinBool]) and atom assignment (re-derived as the corresponding int-bound
+     *  tighten on the underlying var). Returns `false` on conflict. */
+    fun pinLit(lit: Int, antecedents: IntArray? = null): Boolean {
+        val v = com.eignex.klause.solver.Lit.variable(lit)
+        val pos = com.eignex.klause.solver.Lit.isPositive(lit)
+        if (v < problem.numBoolVars) return pinBoolImpl(v, pos, antecedents)
+        val atomId = atomIdOf(v)
+        val intVar = atomIntVar[atomId]
+        val k = atomThreshold[atomId]
+        return when (atomKind[atomId]) {
+            0 -> if (pos) tightenIntMinImpl(intVar, k, antecedents)       // [v ≥ k] true → v.min ≥ k
+                 else    tightenIntMaxImpl(intVar, k - 1, antecedents)    // [v ≥ k] false → v ≤ k-1
+            1 -> if (pos) tightenIntMaxImpl(intVar, k, antecedents)       // [v ≤ k] true → v.max ≤ k
+                 else    tightenIntMinImpl(intVar, k + 1, antecedents)    // [v ≤ k] false → v ≥ k+1
+            else -> error("unknown atom kind")
+        }
+    }
+
     private fun allocAtom(intVar: Int, kind: Int, threshold: Int): Int {
         val key = atomKey(intVar, kind, threshold)
         atomByKey[key]?.let { return problem.numBoolVars + it }
-        val d = intDomains[intVar]
-        // Atom value derived from current domain bound.
-        val holds = when (kind) {
-            0 -> d.min >= threshold
-            1 -> d.max <= threshold
-            else -> error("unknown atom kind $kind")
-        }
-        // Level / antecedents snapshotted from the relevant int-trail entry.
-        val level: Int
-        val ant: IntArray?
-        when {
-            !holds -> { level = 0; ant = null }   // atom currently false: leaf-style
-            kind == 0 -> { level = intLevel[intVar]; ant = intMinAntecedents[intVar] }
-            else      -> { level = intLevel[intVar]; ant = intMaxAntecedents[intVar] }
-        }
         val id = atomIntVar.size
         atomIntVar.add(intVar)
         atomKind.add(kind)
         atomThreshold.add(threshold)
-        atomValue.add(if (holds) 1 else 0)
-        atomLevel.add(level)
-        atomAntecedents.add(ant)
+        atomAntecedents.add(null)  // overwritten below if truth is determined
+        // Compute initial truth (may be null = undetermined).
+        val truth = atomTruthOf(intVar, kind, threshold)
+        if (truth == null) {
+            atomValue.add(2)   // 2 = undetermined sentinel
+            atomLevel.add(0)
+        } else {
+            atomValue.add(if (truth) 1 else 0)
+            atomLevel.add(intLevel[intVar])
+            atomAntecedents[id] = if (kind == 0) intMinAntecedents[intVar]
+                                  else          intMaxAntecedents[intVar]
+        }
         atomByKey[key] = id
+        val list = atomsByIntVar.getOrPut(intVar) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
+        list.add(id)
         return problem.numBoolVars + id
+    }
+
+    private fun atomTruthOf(v: Int, kind: Int, k: Int): Boolean? {
+        val d = intDomains[v]
+        return when (kind) {
+            0 -> when {
+                d.min >= k -> true
+                d.max < k -> false
+                else -> null
+            }
+            1 -> when {
+                d.max <= k -> true
+                d.min > k -> false
+                else -> null
+            }
+            else -> error("unknown atom kind")
+        }
+    }
+
+    /** After a successful [tightenIntMinImpl] / [tightenIntMaxImpl] / [excludeIntValueImpl]
+     *  on int var [v], recompute the truth of every atom that depends on [v]. Atoms whose
+     *  truth flipped get their level / antecedents updated to the current tightening's,
+     *  and watchers on the now-false atom-lit are scheduled to fire. */
+    private fun propagateAtomsForVar(v: Int, ant: IntArray?) {
+        val atoms = atomsByIntVar[v] ?: return
+        for (i in 0 until atoms.size) {
+            val atomId = atoms[i]
+            val newT = atomCurrentTruth(atomId) ?: continue
+            val oldRaw = atomValue[atomId]
+            val newRaw = if (newT) 1 else 0
+            if (oldRaw == newRaw) continue   // already at this truth
+            // Truth changed (either from the sentinel "unknown" or from the opposite
+            // boolean value). Update the snapshot and fire the now-false lit's watchers.
+            atomValue[atomId] = newRaw
+            atomLevel[atomId] = currentLevel
+            atomAntecedents[atomId] = ant
+            val falseLit = com.eignex.klause.solver.Lit.make(problem.numBoolVars + atomId, !newT)
+            val w = atomWatchersByLit[falseLit] ?: continue
+            for (j in 0 until w.size) dirtyAtomFactors.addLast(w[j])
+        }
+    }
+
+    /** Install [fid] as a watcher of [lit]. Dispatches between [boolWatchersByLit]
+     *  (bool var space) and [atomWatchersByLit] (atom var space). */
+    internal fun installLitWatch(lit: Int, fid: Int) {
+        val v = com.eignex.klause.solver.Lit.variable(lit)
+        if (v < problem.numBoolVars) {
+            boolWatchersByLit[lit].add(fid)
+        } else {
+            val list = atomWatchersByLit.getOrPut(lit) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
+            list.add(fid)
+        }
     }
 
     /**
@@ -448,7 +552,7 @@ class PropagationState(
     init {
         for (fid in 0 until problem.numFactors) {
             val watchers = problem.factors[fid].initialBoolWatchers ?: continue
-            for (lit in watchers) boolWatchersByLit[lit].add(fid)
+            for (lit in watchers) installLitWatch(lit, fid)
         }
     }
 
@@ -460,11 +564,23 @@ class PropagationState(
      */
     fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
         if (oldLit == newLit) return
-        val from = boolWatchersByLit[oldLit]
-        for (i in 0 until from.size) {
-            if (from[i] == factorId) { from.removeAt(i); break }
+        // Remove from old.
+        val oldV = com.eignex.klause.solver.Lit.variable(oldLit)
+        if (oldV < problem.numBoolVars) {
+            val from = boolWatchersByLit[oldLit]
+            for (i in 0 until from.size) {
+                if (from[i] == factorId) { from.removeAt(i); break }
+            }
+        } else {
+            val from = atomWatchersByLit[oldLit]
+            if (from != null) {
+                for (i in 0 until from.size) {
+                    if (from[i] == factorId) { from.removeAt(i); break }
+                }
+            }
         }
-        boolWatchersByLit[newLit].add(factorId)
+        // Install on new.
+        installLitWatch(newLit, factorId)
     }
 
     init {
@@ -575,6 +691,7 @@ class PropagationState(
         intMinReason[v] = currentFactor
         intMinAntecedents[v] = antecedents
         dirtyInts.addLast(v)
+        propagateAtomsForVar(v, antecedents)
         return true
     }
 
@@ -592,6 +709,7 @@ class PropagationState(
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = antecedents
         dirtyInts.addLast(v)
+        propagateAtomsForVar(v, antecedents)
         return true
     }
 
@@ -633,6 +751,7 @@ class PropagationState(
             intMaxAntecedents[v] = antecedents
         }
         dirtyInts.addLast(v)
+        propagateAtomsForVar(v, antecedents)
         return true
     }
 
@@ -662,8 +781,26 @@ class PropagationState(
      *  set [currentLevel] before each factor invocation. */
     fun maxLevelForVars(boolVars: IntArray, intVars: IntArray): Int {
         var max = 0
-        for (v in boolVars) { val l = boolLevel[v]; if (l > max) max = l }
+        for (v in boolVars) {
+            // boolVars may include atom-var ids when a Clause has atom-lits; dispatch.
+            val l = if (v < problem.numBoolVars) boolLevel[v]
+                    else atomLevel[v - problem.numBoolVars]
+            if (l > max) max = l
+        }
         for (v in intVars) { val l = intLevel[v]; if (l > max) max = l }
+        return max
+    }
+
+    /** Variant that also folds in atom-lit levels for a Clause's literals — used for
+     *  learned clauses that reference atom-vars, where the relevant decision level isn't
+     *  captured by [boolVars] / [intVars] alone. */
+    fun maxLevelForClause(literals: IntArray): Int {
+        var max = 0
+        for (lit in literals) {
+            val v = com.eignex.klause.solver.Lit.variable(lit)
+            val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevel[v - problem.numBoolVars]
+            if (l > max) max = l
+        }
         return max
     }
 
@@ -790,21 +927,39 @@ class PropagationState(
         for (i in s.intMinAntecedents.indices) intMinAntecedents[i] = s.intMinAntecedents[i]
         for (i in s.intMaxAntecedents.indices) intMaxAntecedents[i] = s.intMaxAntecedents[i]
         boolPinOrder.truncateTo(s.boolPinOrderSize)
-        // Atoms allocated after the snapshot are removed wholesale — their virtual var
-        // ids would dangle otherwise. Pre-snapshot atoms keep their snapshot-time
-        // truth/level/antecedents (immutable post-allocation).
+        // Atoms allocated after the snapshot are removed wholesale; their virtual var
+        // ids and watcher registrations are dropped to avoid dangling. Pre-snapshot
+        // atoms keep their state — but since the engine now tracks live atom truth
+        // via [propagateAtomsForVar], we re-derive their values from the restored
+        // intDomains rather than trusting the snapshot truth (which may reflect a
+        // later flip).
         while (atomIntVar.size > s.atomCount) {
             val id = atomIntVar.size - 1
-            val key = atomKey(atomIntVar[id], atomKind[id], atomThreshold[id])
+            val intVar = atomIntVar[id]
+            val key = atomKey(intVar, atomKind[id], atomThreshold[id])
             atomByKey.remove(key)
+            // Remove from the per-int-var index.
+            atomsByIntVar[intVar]?.let { list ->
+                for (i in 0 until list.size) {
+                    if (list[i] == id) { list.removeAt(i); break }
+                }
+            }
+            // Drop watcher entries for both atom-lits.
+            atomWatchersByLit.remove(com.eignex.klause.solver.Lit.make(problem.numBoolVars + id, true))
+            atomWatchersByLit.remove(com.eignex.klause.solver.Lit.make(problem.numBoolVars + id, false))
             atomIntVar.truncateTo(id)
             atomKind.truncateTo(id)
             atomThreshold.truncateTo(id)
             atomValue.truncateTo(id)
             atomLevel.truncateTo(id)
-            // ArrayList — remove last.
             atomAntecedents.removeAt(atomAntecedents.size - 1)
         }
+        // Refresh remaining atoms' truth from the restored int domains.
+        for (atomId in 0 until atomIntVar.size) {
+            val t = atomCurrentTruth(atomId) ?: continue
+            atomValue[atomId] = if (t) 1 else 0
+        }
+        dirtyAtomFactors.clear()
         levelToDecisionVar.clear()
         for (v in s.decisionVars) levelToDecisionVar.add(v)
         // Aborted pushes may have left dirty queue entries behind; drop them.
@@ -845,6 +1000,13 @@ class PropagationState(
                     if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
                 }
             }
+            // Atom-lit watchers woken by int tightens before runToFixpoint was called.
+            while (dirtyAtomFactors.isNotEmpty()) {
+                val fid = dirtyAtomFactors.removeFirst()
+                if (fid in 0 until factorCount && !pending[fid]) {
+                    pending[fid] = true; queue.addLast(fid)
+                }
+            }
             // Optional seed — used by [PropagationSession.addLearnedClause] to force the
             // newly-stored learned clause to fire on the next propagation cycle (it would
             // otherwise sit dormant since the watcher index only wakes on false-going
@@ -858,6 +1020,12 @@ class PropagationState(
             pending[fid] = false
             val f = factorAt(fid)
             currentLevel = maxLevelForVars(f.boolVars, f.intVars)
+            // For learned Clauses (which may carry atom-lits), also consider the atoms'
+            // levels — those participate in the factor's "effective decision level".
+            if (f is com.eignex.klause.solver.factor.Clause) {
+                val clauseLevel = maxLevelForClause(f.literals)
+                if (clauseLevel > currentLevel) currentLevel = clauseLevel
+            }
             currentFactor = fid
             conflictLevels = null
             if (!f.propagate(this, fid)) {
@@ -877,6 +1045,11 @@ class PropagationState(
                 for (other in problem.intOccurrences[v]) {
                     if (!pending[other]) { pending[other] = true; queue.addLast(other) }
                 }
+            }
+            // Wake factors registered as atom-lit watchers whose atom truth just flipped.
+            while (dirtyAtomFactors.isNotEmpty()) {
+                val other = dirtyAtomFactors.removeFirst()
+                if (!pending[other]) { pending[other] = true; queue.addLast(other) }
             }
         }
         return null

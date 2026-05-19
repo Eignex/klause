@@ -167,8 +167,8 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             Lit.make(pivot, !pinned)
         } else {
             val atomId = pivot - numBoolVars
-            val holds = state.atomValue[atomId] != 0
-            Lit.make(pivot, !holds)  // atom-var lit; lit's positivity is the negation of current truth
+            val holds = state.atomCurrentTruth(atomId) ?: error("UIP atom $atomId undetermined")
+            Lit.make(pivot, !holds)
         }
     }
 
@@ -291,13 +291,13 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             if (lvl == currentLevel) {
                 bumpCurrentLevel()
             } else {
-                // Lower-level variable: emit its currently-false-form literal.
                 if (v < numBoolVars) {
                     val pinned = state.boolValues[v] ?: error("seen var $v not pinned")
                     learned.add(Lit.make(v, !pinned))
                 } else {
                     val atomId = v - numBoolVars
-                    val holds = state.atomValue[atomId] != 0
+                    val holds = state.atomCurrentTruth(atomId)
+                        ?: error("ingest atom $atomId at lower level undetermined")
                     learned.add(Lit.make(v, !holds))
                 }
             }
@@ -314,7 +314,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                 Lit.make(v, !pinned)
             } else {
                 val atomId = v - numBoolVars
-                val holds = state.atomValue[atomId] != 0
+                val holds = state.atomCurrentTruth(atomId) ?: continue
                 Lit.make(v, !holds)
             }
             if (learned.any { Lit.variable(it) == v }) continue

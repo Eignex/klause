@@ -191,10 +191,9 @@ class Clause(
         if (literals.size == 1) {
             // Unit clause: no second watch to play with. Trivial check-or-pin.
             val lit = literals[0]
-            val v = Lit.variable(lit)
-            val b = state.boolValues[v]
-            return if (b == null) state.pinBool(v, Lit.isPositive(lit))
-                   else Lit.evaluate(lit, b)
+            val t = state.litTruth(lit)
+            return if (t == null) state.pinLit(lit, antecedents = null)
+                   else t  // already true → satisfied; already false → conflict.
         }
         val watches = (state.refPayload[factorId] as IntArray?) ?: run {
             // First fire on this session: initial watches at indices 0 and 1. The body
@@ -250,10 +249,8 @@ class Clause(
     }
 
     /** Unit-propagate the literal at [unitIdx] to true, recording every other literal in
-     *  the clause as the antecedent set. Each non-unit literal is currently false (that's
-     *  why this clause was unit), so its "antecedent role" is `lit = false` ⇔ the
-     *  corresponding variable is at its negated polarity. Conflict analysis later resolves
-     *  against these. */
+     *  the clause as the antecedent set. Uses [PropagationState.pinLit] so atom-literal
+     *  clauses re-derive as int-bound tightens on the underlying var. */
     private fun pinUnit(state: PropagationState, unitIdx: Int): Boolean {
         val unitLit = literals[unitIdx]
         val antecedents: IntArray? = if (literals.size <= 1) null
@@ -263,20 +260,14 @@ class Clause(
             for (i in literals.indices) if (i != unitIdx) out[w++] = literals[i]
             out
         }
-        return state.pinBool(Lit.variable(unitLit), Lit.isPositive(unitLit), antecedents)
+        return state.pinLit(unitLit, antecedents)
     }
 
-    private fun litTrue(state: PropagationState, idx: Int): Boolean {
-        val lit = literals[idx]
-        val b = state.boolValues[Lit.variable(lit)] ?: return false
-        return Lit.evaluate(lit, b)
-    }
+    private fun litTrue(state: PropagationState, idx: Int): Boolean =
+        state.litTrue(literals[idx])
 
-    private fun litFalse(state: PropagationState, idx: Int): Boolean {
-        val lit = literals[idx]
-        val b = state.boolValues[Lit.variable(lit)] ?: return false
-        return !Lit.evaluate(lit, b)
-    }
+    private fun litFalse(state: PropagationState, idx: Int): Boolean =
+        state.litFalse(literals[idx])
 
     private fun findNonFalseLitExcept(state: PropagationState, excludeA: Int, excludeB: Int): Int {
         for (i in literals.indices) {
