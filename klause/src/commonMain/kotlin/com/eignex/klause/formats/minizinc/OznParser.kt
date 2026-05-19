@@ -33,31 +33,13 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parseOutputItem(): OznItem.Output {
         expectKeyword("output")
-        // `output` takes a single array expression — either a literal `[ e1, e2, ... ]`
-        // or a comprehension `[ body | gens ]`. Route through the shared atom parser so
-        // the comprehension shape is handled correctly.
-        expectPunct("[")
-        val items: List<OznExpr> = if (peekPunct("]")) {
-            advance()
-            emptyList()
-        } else {
-            val first = parseExpr()
-            if (peekPunct("|")) {
-                advance()
-                val gens = parseGenerators()
-                expectPunct("]")
-                // Wrap the comprehension as the single output element. The evaluator
-                // sees an array; output rendering concatenates element strings.
-                listOf(OznExpr.Comprehension(first, gens, isSet = false))
-            } else {
-                val list = ArrayList<OznExpr>().also { it.add(first) }
-                while (peekPunct(",")) { advance(); list.add(parseExpr()) }
-                expectPunct("]")
-                list
-            }
-        }
+        // `output` takes a single array-valued expression: a literal `[...]`, a
+        // comprehension `[body | gens]`, or any combination joined by `++` (string /
+        // array concatenation). Parse a full expression and let the evaluator unwrap
+        // the resulting array.
+        val expr = parseExpr()
         expectPunct(";")
-        return OznItem.Output(items)
+        return OznItem.Output(listOf(expr))
     }
 
     private fun parseVarDecl(): OznItem.VarDecl {
@@ -128,13 +110,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     // --- Expressions (recursive descent over precedence ladder) ---------------------
 
-    fun parseExpr(): OznExpr = parseIfOrLetOrLogical()
-
-    private fun parseIfOrLetOrLogical(): OznExpr {
-        if (peekKeyword("if")) return parseIf()
-        if (peekKeyword("let")) return parseLet()
-        return parseLogical()
-    }
+    fun parseExpr(): OznExpr = parseLogical()
 
     private fun parseIf(): OznExpr {
         expectKeyword("if")
@@ -232,6 +208,11 @@ internal class OznParser(private val tokens: List<OznToken>) {
             val operand = parseUnary()
             return OznExpr.Unary(op, operand)
         }
+        if (t.kind == OznTokenKind.KEYWORD && t.text == "not") {
+            advance()
+            val operand = parseUnary()
+            return OznExpr.Unary("not", operand)
+        }
         return parsePostfix()
     }
 
@@ -254,6 +235,11 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parseAtom(): OznExpr {
         val t = peek()
+        // `if-then-else-endif` and `let { ... } in expr` can appear as subexpressions of
+        // larger operator expressions (e.g. `show(x) ++ if c then a else b endif`).
+        // Recurse to the top precedence level so they're parsed correctly here.
+        if (t.kind == OznTokenKind.KEYWORD && t.text == "if") return parseIf()
+        if (t.kind == OznTokenKind.KEYWORD && t.text == "let") return parseLet()
         return when (t.kind) {
             OznTokenKind.INT -> { advance(); OznExpr.IntLit(t.text.toLong()) }
             OznTokenKind.FLOAT -> { advance(); OznExpr.FloatLit(t.text.toDouble()) }
@@ -290,6 +276,35 @@ internal class OznParser(private val tokens: List<OznToken>) {
         if (peekPunct("]")) {
             advance()
             return OznExpr.ArrayLit(emptyList())
+        }
+        // 2D-array literal `[| r1c1, r1c2 | r2c1, r2c2 | ... |]`. Detected by the
+        // leading `|` immediately after `[`. Rows are pipe-separated; cells within a
+        // row are comma-separated. Lowered to `array2d(1..rows, 1..cols, [flat])` so
+        // the evaluator's array2d path handles indexing / display.
+        if (peekPunct("|")) {
+            advance()
+            val rows = ArrayList<List<OznExpr>>()
+            while (true) {
+                val row = ArrayList<OznExpr>()
+                if (!peekPunct("|")) {
+                    row.add(parseExpr())
+                    while (peekPunct(",")) { advance(); row.add(parseExpr()) }
+                }
+                if (row.isNotEmpty()) rows.add(row)
+                if (peekPunct("|")) {
+                    advance()
+                    if (peekPunct("]")) { advance(); break }
+                } else if (peekPunct("]")) { advance(); break }
+                else break
+            }
+            val n = rows.size
+            val m = rows.firstOrNull()?.size ?: 0
+            val flat = rows.flatten()
+            return OznExpr.Call("array2d", listOf(
+                OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(n.toLong())),
+                OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(m.toLong())),
+                OznExpr.ArrayLit(flat),
+            ))
         }
         val first = parseExpr()
         // Detect comprehension: `expr | ident in ...`.

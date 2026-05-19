@@ -181,7 +181,9 @@ internal class OznEvaluator(items: List<OznItem>) {
     private fun evalCall(c: OznExpr.Call, ctx: Context): OznValue {
         val args = c.args.map { eval(it, ctx) }
         return when (c.name) {
-            "show", "showInt", "showFloat", "show_int", "show_float", "fix" ->
+            "show", "showInt", "showFloat", "show_int", "show_float", "fix",
+            "format", "format_justify_string", "showDzn", "show_dzn", "show2dDzn",
+            "showJSON", "show_json" ->
                 OznValue.StringV(stringifyForShow(args.last()))
             "show2d" -> OznValue.StringV(stringify2d(args[0]))
             "show3d" -> OznValue.StringV(stringify3d(args[0]))
@@ -207,6 +209,11 @@ internal class OznEvaluator(items: List<OznItem>) {
                     args[0] as OznValue.RangeV,
                     args[1] as OznValue.RangeV,
                     args[2] as OznValue.RangeV)
+            }
+            "array4d", "array5d", "array6d" -> {
+                // Higher-dim arrays — stringify as a flat MZN array. Display fidelity is
+                // a stretch goal; for output rendering, treat them as 1D.
+                args.last() as OznValue.ArrayV
             }
             "bool2int" -> OznValue.IntV(if ((args[0] as OznValue.BoolV).value) 1 else 0)
             "int2float" -> OznValue.FloatV((args[0] as OznValue.IntV).value.toDouble())
@@ -305,6 +312,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                 else -> throw OznEvalException("unary -: $v")
             }
             "+" -> v
+            "not" -> OznValue.BoolV(!(v as OznValue.BoolV).value)
             else -> throw OznEvalException("unary `${e.op}`")
         }
     }

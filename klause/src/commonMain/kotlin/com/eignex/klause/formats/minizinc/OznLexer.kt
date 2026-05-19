@@ -50,7 +50,7 @@ internal class OznLexer(private val source: String) {
         val c = source[pos]
         return when {
             c == '"' -> stringLit(ln)
-            c.isDigit() || (c == '-' && pos + 1 < source.length && source[pos + 1].isDigit()) -> numberOrRange(ln)
+            c.isDigit() -> numberOrRange(ln)
             c.isLetter() || c == '_' -> identOrKeyword(ln)
             else -> punct(ln)
         }
@@ -84,7 +84,6 @@ internal class OznLexer(private val source: String) {
 
     private fun numberOrRange(ln: Int): OznToken {
         val start = pos
-        if (source[pos] == '-') pos++
         while (pos < source.length && source[pos].isDigit()) pos++
         // Float?
         if (pos < source.length && source[pos] == '.' &&
@@ -103,7 +102,7 @@ internal class OznLexer(private val source: String) {
         val kind = when (text) {
             "true", "false" -> OznTokenKind.BOOL
             "output", "array", "set", "of", "var", "int", "bool", "float", "string",
-            "if", "then", "elseif", "else", "endif", "in", "where", "let",
+            "if", "then", "elseif", "else", "endif", "in", "where", "let", "not", "xor",
             "show", "show2d", "show3d", "show_int", "show_float", "fix",
             "array1d", "array2d", "array3d", "array4d", "array5d", "array6d",
             "min", "max", "abs", "sum", "product",
