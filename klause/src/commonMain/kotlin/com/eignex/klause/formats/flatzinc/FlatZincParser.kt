@@ -114,10 +114,9 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                 "int" -> { advance(); FznType.IntAny }
                 "float" -> { advance(); FznType.FloatAny }
                 "set" -> {
-                    advance(); expectKw("of"); parseScalarType()
-                    // We don't support set-of-int variables — fail at compile time, not parse.
-                    // Represent as IntAny so the compiler can refuse cleanly.
-                    FznType.IntAny
+                    advance(); expectKw("of")
+                    val element = parseScalarType()
+                    FznType.SetOfInt(element)
                 }
                 else -> failHere("unexpected type keyword '${tok.keyword}'")
             }

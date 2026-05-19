@@ -35,6 +35,13 @@ internal class FlatZincCompiler(
     internal val model: FznModel,
     internal val floatBuckets: Int = 1024,
     internal val floatScale: Long = 1_000_000L,
+    /**
+     * Per the MiniZinc Challenge LS-track rules, `symmetry_breaking_constraint(...)` and
+     * `redundant_constraint(...)` may be dropped by local-search solvers. Set this to
+     * `true` from LS-engine entry points to skip those constraints entirely. The CP
+     * default enforces them as `bool == true`.
+     */
+    internal val forLocalSearch: Boolean = false,
 ) {
     // State is `internal` (not `private`) so the extension functions in
     // `FlatZincExprEval.kt` / `FlatZincConstraints.kt` / `FlatZincSolveOutput.kt` can
@@ -49,14 +56,38 @@ internal class FlatZincCompiler(
     internal val factors = ArrayList<Factor>()
     internal var numBoolVars: Int = 0
 
+    /**
+     * Float-var-index assigned in allocation order — keyed by the float var's backing int
+     * id. Populated by [allocFloat]. Builds [com.eignex.klause.solver.FloatMetadata] at
+     * compile time so backends with native real support (Z3) can recover the real-valued
+     * view instead of solving over the bucketed ints.
+     */
+    internal val floatVarIndex = HashMap<Int, Int>()
+    internal val floatIntervals = ArrayList<com.eignex.klause.solver.FloatInterval>()
+    internal val floatBucketCounts = ArrayList<Int>()
+    internal val floatIntVarIds = ArrayList<Int>()
+    internal val realConstraints = ArrayList<com.eignex.klause.solver.RealLinearConstraint>()
+
+    /** Enum-typed int vars: declared label list per var name. Populated from
+     *  `klause_enum_labels([...])` annotations on the var decl. */
+    internal val enumLabelsByVar = HashMap<String, List<String>>()
+
     fun compile(): FlatZincProgram {
         for (decl in model.varDecls) processDecl(decl)
         for (c in model.constraints) processConstraint(c)
+        val floatMetadata = if (floatIntervals.isEmpty()) null else
+            com.eignex.klause.solver.FloatMetadata(
+                intervals = floatIntervals.toTypedArray(),
+                bucketCounts = floatBucketCounts.toIntArray(),
+                intVarByFloatVar = floatIntVarIds.toIntArray(),
+                constraints = realConstraints.toList(),
+            )
         val problem = Problem(
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),
             factors = factors,
+            floatMetadata = floatMetadata,
         )
         return FlatZincProgram(
             problem = problem,
@@ -67,6 +98,7 @@ internal class FlatZincCompiler(
             arraysByName = arrays,
             outputItems = model.output?.let { compileOutput(it) } ?: synthesizeOutputItems(),
             defaultBacktrackParams = compileSearchAnnotation(),
+            enumLabelsByVar = enumLabelsByVar.toMap(),
         )
     }
 
@@ -157,8 +189,30 @@ internal class FlatZincCompiler(
             }
             FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
+            is FznType.SetOfInt -> failHere(
+                "variable `${d.name}`: set-of-int variables are not supported; " +
+                "ask MiniZinc to decompose sets (omit `set` from the solver's native predicates)"
+            )
             is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar)
         }
+        recordEnumLabels(d)
+    }
+
+    /**
+     * Recognise `klause_enum_labels(["Red","Green","Blue"])` on a var decl. The klause MZN
+     * library emits this on enum-typed ints so the tag names survive into klause; without
+     * it MiniZinc lowers enums to bare `1..n` ints with the tag table only in `.ozn`.
+     */
+    internal fun recordEnumLabels(d: FznVarDecl) {
+        val ann = d.annotations.firstOrNull { it.name == "klause_enum_labels" } ?: return
+        if (ann.args.size != 1) failHere("klause_enum_labels: expected 1 array arg")
+        val arr = ann.args[0] as? FznExpr.ArrayLit
+            ?: failHere("klause_enum_labels: expected array literal")
+        val labels = arr.elements.map {
+            (it as? FznExpr.StringLit)?.value
+                ?: failHere("klause_enum_labels: elements must be string literals")
+        }
+        enumLabelsByVar[d.name] = labels
     }
 
     internal fun processArrayDecl(
@@ -213,6 +267,7 @@ internal class FlatZincCompiler(
                     bucketings!!.add(floatVars.getValue(elemName))
                 }
                 FznType.IntAny, FznType.FloatAny -> failHere("array `$name`: unbounded element type")
+                is FznType.SetOfInt -> failHere("array `$name`: array of set-of-int not supported")
                 is FznType.Array -> failHere("nested arrays not supported")
             }
         }
@@ -224,6 +279,7 @@ internal class FlatZincCompiler(
         FznType.Bool -> FlatZincArray.Vars.ElementKind.Bool
         is FznType.IntRange, is FznType.IntSet, FznType.IntAny -> FlatZincArray.Vars.ElementKind.Int
         is FznType.FloatRange, FznType.FloatAny -> FlatZincArray.Vars.ElementKind.Float
+        is FznType.SetOfInt -> failHere("set-of-int element kind not supported")
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
@@ -243,6 +299,11 @@ internal class FlatZincCompiler(
         intDomains.add(IntDomain(0, floatBuckets - 1))
         intVars[name] = id
         floatVars[name] = FloatBucketing(id, lo, hi, floatBuckets)
+        // Assign a float-var-index for FloatMetadata in allocation order.
+        floatVarIndex[id] = floatIntervals.size
+        floatIntervals.add(com.eignex.klause.solver.FloatInterval(lo, hi))
+        floatBucketCounts.add(floatBuckets)
+        floatIntVarIds.add(id)
         return id
     }
 
@@ -286,6 +347,7 @@ internal class FlatZincCompiler(
                 evalFloatConst(lit.elements[it])
             })
         }
+        is FznType.SetOfInt -> failHere("parameter array `$name`: set-of-int not supported")
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
@@ -469,6 +531,7 @@ internal class FlatZincCompiler(
             is FznExpr.Ident -> intVars[e.name] ?: failHere("undefined float var `${e.name}`")
             else -> failHere("expected float var, got ${e::class.simpleName}")
         }
+        is FznType.SetOfInt -> failHere("set-of-int element refs not supported")
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
@@ -557,8 +620,9 @@ fun parseFlatZinc(
     source: String,
     floatBuckets: Int = 1024,
     floatScale: Long = 1_000_000L,
+    forLocalSearch: Boolean = false,
 ): FlatZincProgram {
     val tokens = FlatZincLexer(source).tokenize()
     val model = FlatZincParser(tokens).parse()
-    return FlatZincCompiler(model, floatBuckets, floatScale).compile()
+    return FlatZincCompiler(model, floatBuckets, floatScale, forLocalSearch).compile()
 }

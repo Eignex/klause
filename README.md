@@ -158,14 +158,10 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[Format/SMT-LIB]` to_real / to_int casts. Either bucket reals onto bounded ints or reject the benchmark.
 - `[Format/SMT-LIB]` Let-binding expansion in the SMT-LIB parser.
 - `[Format/SMT-LIB]` Unbounded integers in BacktrackSolver. Pairs with the bound-inference item above.
-- `[Format/FlatZinc]` Streaming branch-and-bound in `solve minimize` / `maximize`. The CLI does linear-search-over-enumerate today — works but doesn't prune. Wires through once B&B lands in BacktrackSolver.
-- `[Format/FlatZinc]` LS-track conventions: treat `symmetry_breaking_constraint(...)` and `redundant_constraint(...)` as no-ops under local search, per MZN Challenge LS rules.
-- `[Format/FlatZinc]` Set variables. MZN decomposes set vars to indicator-bool arrays when the solver doesn't claim native sets; parser currently misdiagnoses set decls as "unbounded int". Either decline cleanly or claim set support and decompose at klause level.
-- `[Format/FlatZinc]` Populate `Problem.floatMetadata` from FlatZincCompiler so FZN-loaded problems get native-real Z3 handling. Schema path already does this; FZN side still buckets inline.
-- `[Format/FlatZinc]` Map MZN enums onto klause's `nominal(...)` schema field. Enums lower to FlatZinc as `1..n` ints with tag names erased; klause already round-trips `nominal` labels through compile/decode. Needs the parser to retain `output_var :: var_enum_value` annotations (or read the `.ozn` mapping file) so tag names survive.
+- `[Format/FlatZinc]` Native set variables (the parser declines set decls cleanly today). Claim set support and decompose to indicator-bool arrays at klause level so MZN stops handing sets back as ints.
+- `[Format/FlatZinc]` Read the paired `.ozn` mapping file so MZN enum tag names round-trip into klause's `nominal(...)` schema field without callers having to inject `klause_enum_labels(...)` annotations manually.
 - `[Format/FlatZinc]` Full Challenge-corpus parse-pass test. Drive `mzn2fzn` over [minizinc-benchmarks](https://github.com/MiniZinc/minizinc-benchmarks) and [libminizinc/tests](https://github.com/MiniZinc/libminizinc/tree/master/tests/spec); assert every produced `.fzn` parses + compiles. Surfaces FZN-spec quirks (set vars, optional types, edge-case decompositions). Regression gate before Challenge submission; CI installs MiniZinc from the official tarball.
 - `[Format/XCSP3]` Parser for XCSP3 XML, including extension tables and intension predicates.
-- `[Format/DIMACS]` Weighted MaxSAT (.wcnf) loader.
 - `[Backend]` klause-smt `Optimizer.minimize()` via JavaSMT's `OptimizationProverEnvironment` (Z3 / MathSAT5-only — others need an external linear-search loop). `SmtSolver` + `SmtSession` already ship with SMTInterpol (pure-Java default) and klause-z3 (direct-Z3 path).
 - `[Backend]` klause-choco adapter. JVM-only wrapper around Choco-solver as a reference CP oracle and benchmark target. Mature global catalog, battle-tested FZN parser; klause-factor mapping is near 1:1.
 - `[Backend]` klause-ortools adapter for OR-tools CP-SAT via Java bindings. SOTA CP-SAT performance but JNI-heavy + platform-specific natives — after Choco.

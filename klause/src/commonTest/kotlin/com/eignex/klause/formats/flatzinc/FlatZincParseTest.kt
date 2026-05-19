@@ -227,6 +227,76 @@ class FlatZincParseTest {
     }
 
     @Test
+    fun `symmetry_breaking_constraint enforced in CP mode`() {
+        val src = """
+            var bool: x;
+            constraint symmetry_breaking_constraint(x);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        assertTrue(sat.assignment.bools[0])
+    }
+
+    @Test
+    fun `klause_enum_labels annotation populates enumLabelsByVar`() {
+        val src = """
+            var 1..3: color :: klause_enum_labels(["Red","Green","Blue"]);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        assertEquals(listOf("Red", "Green", "Blue"), program.enumLabelsByVar["color"])
+    }
+
+    @Test
+    fun `FZN float vars populate floatMetadata sidecar`() {
+        val src = """
+            var 0.0..10.0: x;
+            var -5.0..5.0: y;
+            constraint float_lin_le([1.0, 2.0], [x, y], 7.5);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val md = assertNotNull(program.problem.floatMetadata)
+        assertEquals(2, md.numFloatVars)
+        assertEquals(0.0, md.intervals[0].lo)
+        assertEquals(10.0, md.intervals[0].hi)
+        assertEquals(-5.0, md.intervals[1].lo)
+        assertEquals(1, md.constraints.size)
+        val rc = md.constraints[0]
+        assertEquals(7.5, rc.bound)
+        assertEquals(listOf(1.0, 2.0), rc.coeffs.toList())
+        assertEquals(listOf(0, 1), rc.floatVarIds.toList())
+    }
+
+    @Test
+    fun `set var declines with clear error`() {
+        val src = """
+            var set of 1..5: s;
+            solve satisfy;
+        """.trimIndent()
+        try {
+            parseFlatZinc(src)
+            error("expected FlatZincParseException")
+        } catch (e: FlatZincParseException) {
+            assertTrue(e.message!!.contains("set"), "got: ${e.message}")
+        }
+    }
+
+    @Test
+    fun `redundant_constraint dropped under forLocalSearch`() {
+        // With LS no-op, the constraint disappears entirely: x is free.
+        val src = """
+            var bool: x;
+            constraint redundant_constraint(x);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src, forLocalSearch = true)
+        assertEquals(0, program.problem.factors.size)
+    }
+
+    @Test
     fun `int_eq with constant`() {
         val src = """
             var 0..5: x;

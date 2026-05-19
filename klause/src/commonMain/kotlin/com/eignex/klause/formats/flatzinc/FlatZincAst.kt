@@ -17,6 +17,9 @@ internal sealed interface FznType {
     data object FloatAny : FznType
     /** Float in `[lo, hi]`. */
     data class FloatRange(val lo: Double, val hi: Double) : FznType
+    /** `set of <element>` — set-valued variable. Klause has no native set support, so the
+     *  compiler refuses these cleanly rather than silently treating them as ints. */
+    data class SetOfInt(val element: FznType) : FznType
     /** Array of fixed length over an element type. [elementIsVar] is `true` when the
      *  declaration spelled `array [...] of var T` (the array structure is fixed but
      *  each element binds to a solver variable), `false` for `array [...] of T`. */

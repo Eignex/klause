@@ -34,6 +34,18 @@ data class FlatZincProgram(
      * search strategy; everyone else can ignore it.
      */
     val defaultBacktrackParams: BacktrackParams?,
+    /**
+     * For int vars that originated as MiniZinc enums, the ordered label list — index `i` (0-based)
+     * corresponds to the FlatZinc integer value `i + 1`. Empty when no enum metadata was carried
+     * through the FZN file.
+     *
+     * MiniZinc strips enum tag names when lowering to FZN; the standard recovery route is the
+     * paired `.ozn` mapping file (not yet parsed). As a stopgap, the klause MZN library can
+     * emit a `klause_enum_labels(["Red","Green","Blue"])` annotation on each enum-typed var
+     * decl; the parser preserves those into this map so downstream tooling can decode integer
+     * solutions back to enum tags.
+     */
+    val enumLabelsByVar: Map<String, List<String>> = emptyMap(),
 )
 
 /** Top-level solve directive parsed from `solve satisfy ;` / `solve minimize x ;` etc. */

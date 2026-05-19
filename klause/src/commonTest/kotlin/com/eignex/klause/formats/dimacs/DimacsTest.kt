@@ -98,4 +98,40 @@ class DimacsTest {
         val problem = Dimacs.parse(text)
         assertTrue(problem.factors.size == 1)
     }
+
+    @Test
+    fun `parses old wcnf format with top weight`() {
+        // 3 vars, 3 clauses. top=10 → weight 10 = hard, weights 1/2 = soft.
+        val text = """
+            c sample wcnf
+            p wcnf 3 3 10
+            10 1 2 0
+            1 -1 0
+            2 -2 0
+        """.trimIndent()
+        val w = Dimacs.parseWcnf(text)
+        assertEquals(3, w.numOriginalBoolVars)
+        // 3 original + 2 relaxation bools.
+        assertEquals(5, w.problem.numBoolVars)
+        // 1 hard clause + 2 relaxed soft clauses.
+        assertEquals(3, w.problem.factors.size)
+        assertEquals(0.0, w.objective.boolWeights[0])
+        assertEquals(1.0, w.objective.boolWeights[3])
+        assertEquals(2.0, w.objective.boolWeights[4])
+    }
+
+    @Test
+    fun `parses new maxsat format with h prefix`() {
+        val text = """
+            h 1 2 0
+            5 -1 0
+            3 -2 0
+        """.trimIndent()
+        val w = Dimacs.parseWcnf(text)
+        assertEquals(2, w.numOriginalBoolVars)
+        assertEquals(4, w.problem.numBoolVars)
+        assertEquals(3, w.problem.factors.size)
+        assertEquals(5.0, w.objective.boolWeights[2])
+        assertEquals(3.0, w.objective.boolWeights[3])
+    }
 }

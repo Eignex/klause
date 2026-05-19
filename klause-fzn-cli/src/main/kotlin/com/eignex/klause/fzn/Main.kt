@@ -6,9 +6,13 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
+import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.maximizeInt
+import com.eignex.klause.solver.minimizeInt
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.brute.BruteForceParams
@@ -137,9 +141,6 @@ private fun <P : SolverParams> runOptimize(
     solve: SolveDirective,
     opts: Options,
 ) {
-    // Streaming linear-search: emit each improving feasible solution. We don't prove
-    // optimality (would need branch-and-bound integrated with the engine); after the
-    // search exhausts or times out, the last-printed solution is the best found.
     val (objName, maximize) = when (solve) {
         is SolveDirective.Minimize -> solve.objVar to false
         is SolveDirective.Maximize -> solve.objVar to true
@@ -148,6 +149,48 @@ private fun <P : SolverParams> runOptimize(
     val objVarId = program.intVarsByName[objName]
         ?: error("objective variable '$objName' not found in int var map")
 
+    val optimizer = solver as? Optimizer<P>
+    if (optimizer == null) {
+        // No native optimization: fall back to streaming linear-search-over-enumerate.
+        runOptimizeViaEnumerate(solver, params, program, objVarId, maximize, opts)
+        return
+    }
+    // Streaming branch-and-bound: yield each improving incumbent, then a terminal verdict.
+    val objective = if (maximize) program.problem.maximizeInt(objVarId)
+                    else program.problem.minimizeInt(objVarId)
+    var produced = 0
+    for (step in optimizer.improvements(objective, params)) {
+        when (step) {
+            is MinimizeResult.WithSample -> {
+                print(writeFlatZincSolution(program, step.sample))
+                produced++
+                if (step is MinimizeResult.Optimal) {
+                    println("==========")
+                    return
+                }
+            }
+            is MinimizeResult.Infeasible -> {
+                println("=====UNSATISFIABLE=====")
+                return
+            }
+            is MinimizeResult.Unknown -> {
+                println("=====UNKNOWN=====")
+                return
+            }
+        }
+    }
+    // Sequence ended without a terminal verdict: best-found stands, no optimality proven.
+    if (produced == 0) println("=====UNKNOWN=====") else println("==========")
+}
+
+private fun <P : SolverParams> runOptimizeViaEnumerate(
+    solver: Solver<P>,
+    params: P,
+    program: FlatZincProgram,
+    objVarId: Int,
+    maximize: Boolean,
+    opts: Options,
+) {
     var best: Sample? = null
     var bestObj = if (maximize) Int.MIN_VALUE else Int.MAX_VALUE
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }

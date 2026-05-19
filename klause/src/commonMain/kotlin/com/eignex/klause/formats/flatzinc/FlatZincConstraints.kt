@@ -175,6 +175,12 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "arg_min_bool", "fzn_arg_min_bool" -> emitArgMinMaxBool(c, max = false)
     "table_bool", "fzn_table_bool" -> emitTableBool(c)
 
+    // MZN Challenge LS-track conventions: when [FlatZincCompiler.forLocalSearch] is set,
+    // both annotations drop entirely; otherwise they assert their bool arg is true so the
+    // wrapped constraint is enforced as the CP solver expects.
+    "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
+    "redundant_constraint", "fzn_redundant_constraint" -> emitAnnotationConstraint(c)
+
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
 }
 
@@ -423,6 +429,13 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
         factors.add(ReifiedLinear(Lit.variable(aux), scaledCoeffs, vars, op, scaledBound.toInt()))
     } else {
         factors.add(Linear(scaledCoeffs, vars, op, scaledBound.toInt()))
+        // Record the original real-valued form so native-real backends (Z3) can solve over
+        // reals instead of the bucketed scaled-int factor. Reified variants stay int-only —
+        // there's no FloatMetadata channel for them yet.
+        val floatIds = IntArray(coefs.size) { i ->
+            floatVarIndex[varRefs[i].varId] ?: failHere("float var index missing")
+        }
+        realConstraints.add(com.eignex.klause.solver.RealLinearConstraint(coefs, floatIds, op, bound))
     }
 }
 
@@ -1235,4 +1248,11 @@ internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
         val vars = IntArray(xs.size + 1) { if (it < xs.size) channels[it] else nVar }
         factors.add(Linear(coefs, vars, LinearOp.EQ, 0))
     }
+}
+
+internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
+    if (forLocalSearch) return
+    require(c.args.size == 1) { "${c.name} expects 1 arg" }
+    val lit = resolveBoolLit(c.args[0])
+    factors.add(Clause(intArrayOf(lit)))
 }
