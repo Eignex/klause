@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
+
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
@@ -8,7 +10,9 @@ import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.TerminationReason
-import kotlinx.coroutines.Dispatchers
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -16,9 +20,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Parallel portfolio of klause [Session] workers. Each worker is single-threaded and
@@ -46,6 +47,12 @@ import java.util.concurrent.atomic.AtomicReference
  * cancellation tokens. Anything else on `params` (random seed, time limit, etc.)
  * passes through verbatim — if you want each worker to use a different seed, supply
  * already-distinct params at construction by mapping over the worker list.
+ *
+ * **Platform note**: the Portfolio runs on every klause target. JVM and Kotlin/Native
+ * give workers real parallel execution via the default coroutines dispatcher (a pool of
+ * OS threads). JS and WASM target single-threaded event loops, so workers cooperatively
+ * interleave on one CPU — there's no wall-clock speedup, but the coordination layer
+ * (cancellation, fan-in, bound sharing) still composes correctly.
  */
 class Portfolio<P : SolverParams>(
     val workers: List<Session<P>>,
@@ -70,7 +77,7 @@ class Portfolio<P : SolverParams>(
      */
     suspend fun solve(params: P): SolveResult = coroutineScope {
         val winnerFlag = AtomicBoolean(false)
-        val token: Cancellation = { winnerFlag.get() }
+        val token: Cancellation = { winnerFlag.load() }
         @Suppress("UNCHECKED_CAST")
         val workerParams = when (strategy) {
             PortfolioStrategy.RaceFirstFeasible -> params.withCancellation(token) as P
@@ -78,11 +85,11 @@ class Portfolio<P : SolverParams>(
         }
 
         val results = workers.map { session ->
-            async(Dispatchers.Default) {
+            async {
                 val r = session.solve(workerParams)
                 if (strategy is PortfolioStrategy.RaceFirstFeasible) {
                     // Set the flag on a definitive answer so the other workers stop promptly.
-                    if (r is SolveResult.Sat || r is SolveResult.Unsat) winnerFlag.set(true)
+                    if (r is SolveResult.Sat || r is SolveResult.Unsat) winnerFlag.store(true)
                 }
                 r
             }
@@ -122,18 +129,18 @@ class Portfolio<P : SolverParams>(
     ): MinimizeResult = coroutineScope {
         // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity
         // equality and CAS would fail spuriously on autoboxed Doubles.
-        val sharedBoundBits = AtomicLong(java.lang.Double.doubleToRawLongBits(Double.POSITIVE_INFINITY))
+        val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
         val bestSample = AtomicReference<Sample?>(null)
         val cancelled = AtomicBoolean(false)
-        val token: Cancellation = { cancelled.get() }
+        val token: Cancellation = { cancelled.load() }
 
-        fun readBound(): Double = java.lang.Double.longBitsToDouble(sharedBoundBits.get())
+        fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
 
         @Suppress("UNCHECKED_CAST")
         val workerParams = paramsWithBound(params.withCancellation(token) as P, ::readBound)
 
         val deferreds = workers.map { session ->
-            async(Dispatchers.Default) {
+            async {
                 var local: MinimizeResult = MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
                 for (r in session.improvements(objective, workerParams)) {
                     when (r) {
@@ -143,7 +150,7 @@ class Portfolio<P : SolverParams>(
                         }
                         is MinimizeResult.Optimal -> {
                             updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
-                            cancelled.set(true)
+                            cancelled.store(true)
                             local = r
                             break
                         }
@@ -170,15 +177,21 @@ class Portfolio<P : SolverParams>(
         val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
         if (directOptimal != null) return@coroutineScope directOptimal
 
-        val anyUnknown = results.any { it is MinimizeResult.Unknown }
-        val sample = bestSample.get()
+        // "Dirty" Unknown = a worker ran out of budget / hit a timeout / got cancelled
+        // before fully exploring. SearchExhausted is *clean* — the worker's search space
+        // was fully covered; absence of a local incumbent only reflects external pruning,
+        // not incomplete work.
+        val anyDirtyUnknown = results.any { r ->
+            r is MinimizeResult.Unknown && r.reason != TerminationReason.SearchExhausted
+        }
+        val sample = bestSample.load()
         val finalBound = readBound()
         if (sample != null) {
-            return@coroutineScope if (anyUnknown) MinimizeResult.BestFound(
+            return@coroutineScope if (anyDirtyUnknown) MinimizeResult.BestFound(
                 sample, finalBound, TerminationReason.BudgetExhausted,
             ) else MinimizeResult.Optimal(sample, finalBound)
         }
-        if (anyUnknown) MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+        if (anyDirtyUnknown) MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
         else MinimizeResult.Infeasible()
     }
 
@@ -189,11 +202,11 @@ class Portfolio<P : SolverParams>(
         sample: Sample,
     ) {
         while (true) {
-            val curBits = boundBits.get()
-            val cur = java.lang.Double.longBitsToDouble(curBits)
+            val curBits = boundBits.load()
+            val cur = Double.fromBits(curBits)
             if (objective >= cur) return
-            val newBits = java.lang.Double.doubleToRawLongBits(objective)
-            if (boundBits.compareAndSet(curBits, newBits)) { best.set(sample); return }
+            val newBits = objective.toRawBits()
+            if (boundBits.compareAndSet(curBits, newBits)) { best.store(sample); return }
         }
     }
 
@@ -204,7 +217,7 @@ class Portfolio<P : SolverParams>(
      */
     fun samples(params: P): Flow<Sample> = channelFlow {
         for (session in workers) {
-            launch(Dispatchers.Default) {
+            launch {
                 // Capture the worker coroutine's Job and bridge its cancellation state
                 // into the (non-suspending) Cancellation predicate the engine checks.
                 val job = coroutineContext[Job]!!

@@ -25,6 +25,7 @@ kotlin {
         commonMain.dependencies {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             api("com.eignex:skema:0.1.1")
             implementation("com.eignex:kumulant:0.1.1")
             implementation("com.eignex:kpermute:1.1.2")
@@ -33,14 +34,6 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
-        }
-        // The parallel Portfolio coordinator lives on JVM only — it relies on
-        // kotlinx-coroutines (multiplatform but most idiomatic here) plus
-        // java.util.concurrent.atomic primitives that don't have direct JS / WASM analogs.
-        jvmMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-        }
-        jvmTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
     }

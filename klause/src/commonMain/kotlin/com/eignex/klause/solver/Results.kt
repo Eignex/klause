@@ -14,6 +14,15 @@ enum class TerminationReason {
     Timeout,
     /** Cooperative [Cancellation] token tripped. */
     Cancelled,
+    /**
+     * Complete-backend search space fully explored — no further work to do — but the
+     * verdict can't be expressed as Sat / Unsat / Optimal / Infeasible because some
+     * stronger context (external bound sharing in a parallel portfolio, an opaque
+     * pruning predicate) made the absolute proof unsound from this worker's vantage
+     * point. The caller (typically a portfolio reducer) combines this with peer
+     * results to decide the global verdict.
+     */
+    SearchExhausted,
 }
 
 /**

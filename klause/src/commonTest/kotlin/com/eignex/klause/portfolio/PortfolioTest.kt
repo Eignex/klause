@@ -11,16 +11,17 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.TimeSource
 
 class PortfolioTest {
 
     @Test
-    fun `portfolio solve on satisfiable problem returns sat`() = runBlocking {
+    fun `portfolio solve on satisfiable problem returns sat`() = runTest {
         val problem = exactlyOneOver(4)
         val workers = List(4) { i -> BacktrackSolver(problem).session() }
         Portfolio(workers).use { p ->
@@ -30,7 +31,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio solve on unsat problem returns unsat`() = runBlocking {
+    fun `portfolio solve on unsat problem returns unsat`() = runTest {
         // x ∧ ¬x → trivially unsat
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
@@ -48,17 +49,17 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio samples fans in from all workers and respects collector cancellation`() = runBlocking {
+    fun `portfolio samples fans in from all workers and respects collector cancellation`() = runTest {
         val problem = exactlyOneOver(5)
         val workers = List(4) { LocalSearchSolver(problem).session() }
         Portfolio(workers).use { p ->
             // take(20) cancels the upstream flow after 20 samples — every worker's
             // sequence must terminate promptly when the collector stops.
-            val started = System.currentTimeMillis()
+            val started = TimeSource.Monotonic.markNow()
             val samples = p.samples(LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 1L))
                 .take(20)
                 .toList()
-            val elapsed = System.currentTimeMillis() - started
+            val elapsed = started.elapsedNow().inWholeMilliseconds
             assertEquals(20, samples.size)
             assertTrue(elapsed < 5_000, "take(20) should be quick on a small problem; took ${elapsed}ms")
             // Every sample is a valid exactly-one configuration.
@@ -69,7 +70,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio with one worker behaves like the underlying session`() = runBlocking {
+    fun `portfolio with one worker behaves like the underlying session`() = runTest {
         val problem = exactlyOneOver(3)
         val solo = LocalSearchSolver(problem).session()
         Portfolio(listOf(solo)).use { p ->
@@ -81,7 +82,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio minimize returns the global best across workers`() = runBlocking {
+    fun `portfolio minimize returns the global best across workers`() = runTest {
         // minimize x + 2y subject to x + y >= 3, x ∈ [0..5], y ∈ [0..5]. Optimum = 3.
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
@@ -107,7 +108,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `exhaustive strategy runs every worker to budget`() = runBlocking {
+    fun `exhaustive strategy runs every worker to budget`() = runTest {
         val problem = exactlyOneOver(3)
         val workers = List(2) { BacktrackSolver(problem).session() }
         Portfolio(workers, strategy = PortfolioStrategy.Exhaustive).use { p ->

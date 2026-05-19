@@ -201,9 +201,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     val externalShared = params.objectiveBoundSupplier != null
                     yield(when {
                         externalShared && best != null ->
-                            MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
+                            MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted)
                         externalShared ->
-                            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                            MinimizeResult.Unknown(TerminationReason.SearchExhausted)
                         best != null -> MinimizeResult.Optimal(best, bestObj)
                         else -> MinimizeResult.Infeasible(outcome.core)
                     })
