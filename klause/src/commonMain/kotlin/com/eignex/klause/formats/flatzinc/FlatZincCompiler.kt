@@ -72,6 +72,12 @@ internal class FlatZincCompiler(
      *  `klause_enum_labels([...])` annotations on the var decl. */
     internal val enumLabelsByVar = HashMap<String, List<String>>()
 
+    /** Per `var set of E: S` declaration, the bool-indicator decomposition. Populated by
+     *  [processDecl] when it sees a [FznType.SetOfInt]; consumed by the FZN writer to
+     *  reconstruct `{a, b, c}` MiniZinc output. Set predicates (`set_in`, `set_subset`,
+     *  `set_card`, ...) dispatch through these indicator bools at constraint-emit time. */
+    internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
+
     fun compile(): FlatZincProgram {
         for (decl in model.varDecls) processDecl(decl)
         for (c in model.constraints) processConstraint(c)
@@ -99,6 +105,7 @@ internal class FlatZincCompiler(
             outputItems = model.output?.let { compileOutput(it) } ?: synthesizeOutputItems(),
             defaultBacktrackParams = compileSearchAnnotation(),
             enumLabelsByVar = enumLabelsByVar.toMap(),
+            setVarsByName = setVarsByName.toMap(),
         )
     }
 
@@ -189,10 +196,7 @@ internal class FlatZincCompiler(
             }
             FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
-            is FznType.SetOfInt -> failHere(
-                "variable `${d.name}`: set-of-int variables are not supported; " +
-                "ask MiniZinc to decompose sets (omit `set` from the solver's native predicates)"
-            )
+            is FznType.SetOfInt -> allocSetVar(d.name, t)
             is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar)
         }
         recordEnumLabels(d)
@@ -294,6 +298,30 @@ internal class FlatZincCompiler(
         intVars[name] = id
         return id
     }
+    /**
+     * Materialise a `var set of E: name` declaration as one indicator bool per universe
+     * element. Resolves the universe to a sorted ascending int array; allocates one bool
+     * per element; records the layout in [setVarsByName] for downstream constraint dispatch
+     * and FZN output reconstruction.
+     */
+    internal fun allocSetVar(name: String, type: FznType.SetOfInt) {
+        val elements = universeElements(type.element, name)
+        val indicatorIds = IntArray(elements.size) { i ->
+            allocBool("__set_${name}_${elements[i]}")
+        }
+        setVarsByName[name] = SetVarLayout(name, elements, indicatorIds)
+    }
+
+    /** Resolve the universe of a `var set of E` declaration to a sorted ascending int array. */
+    internal fun universeElements(elem: FznType, ownerName: String): IntArray = when (elem) {
+        is FznType.IntRange -> {
+            require(elem.lo <= elem.hi) { "set `$ownerName`: empty universe ${elem.lo}..${elem.hi}" }
+            IntArray((elem.hi - elem.lo + 1).toInt()) { (elem.lo + it).toInt() }
+        }
+        is FznType.IntSet -> elem.values.map { it.toInt() }.toIntArray().also { it.sort() }
+        else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
+    }
+
     internal fun allocFloat(name: String, lo: Double, hi: Double): Int {
         val id = intDomains.size
         intDomains.add(IntDomain(0, floatBuckets - 1))

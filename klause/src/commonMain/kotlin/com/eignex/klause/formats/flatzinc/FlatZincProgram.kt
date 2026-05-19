@@ -46,7 +46,43 @@ data class FlatZincProgram(
      * solutions back to enum tags.
      */
     val enumLabelsByVar: Map<String, List<String>> = emptyMap(),
+    /**
+     * For each `var set of E: S` declaration, the bool-indicator decomposition. klause has
+     * no native set-domain type — every set var is materialised as one indicator bool per
+     * universe element. `setVarsByName["S"].elements[i]` is the integer value of element `i`;
+     * `setVarsByName["S"].indicatorBoolIds[i]` is the klause bool var that's `true` iff that
+     * element is in the set. The writer reconstructs `{e1, e2, ...}` MiniZinc output by
+     * walking these in tandem.
+     */
+    val setVarsByName: Map<String, SetVarLayout> = emptyMap(),
 )
+
+/** Bool-indicator decomposition of a `var set of E` declaration. Element values are stored
+ *  in ascending order; [indicatorBoolIds] is parallel — `indicatorBoolIds[i]` is the bool
+ *  var whose value tracks `elements[i] ∈ S`. */
+data class SetVarLayout(
+    val name: String,
+    val elements: IntArray,
+    val indicatorBoolIds: IntArray,
+) {
+    init {
+        require(elements.size == indicatorBoolIds.size) { "SetVarLayout: parallel arrays of unequal length" }
+    }
+    val universeSize: Int get() = elements.size
+
+    override fun equals(other: Any?): Boolean {
+        if (other !is SetVarLayout) return false
+        return name == other.name &&
+            elements.contentEquals(other.elements) &&
+            indicatorBoolIds.contentEquals(other.indicatorBoolIds)
+    }
+    override fun hashCode(): Int {
+        var h = name.hashCode()
+        h = 31 * h + elements.contentHashCode()
+        h = 31 * h + indicatorBoolIds.contentHashCode()
+        return h
+    }
+}
 
 /** Top-level solve directive parsed from `solve satisfy ;` / `solve minimize x ;` etc. */
 sealed interface SolveDirective {

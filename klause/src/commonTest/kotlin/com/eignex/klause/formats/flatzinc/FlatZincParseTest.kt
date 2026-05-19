@@ -271,17 +271,27 @@ class FlatZincParseTest {
     }
 
     @Test
-    fun `set var declines with clear error`() {
+    fun `set var lowers to indicator bool decomposition`() {
         val src = """
             var set of 1..5: s;
             solve satisfy;
         """.trimIndent()
-        try {
-            parseFlatZinc(src)
-            error("expected FlatZincParseException")
-        } catch (e: FlatZincParseException) {
-            assertTrue(e.message!!.contains("set"), "got: ${e.message}")
-        }
+        val program = parseFlatZinc(src)
+        val layout = program.setVarsByName.getValue("s")
+        assertEquals(listOf(1, 2, 3, 4, 5), layout.elements.toList())
+        assertEquals(5, layout.indicatorBoolIds.size)
+        assertEquals(5, program.problem.numBoolVars)
+    }
+
+    @Test
+    fun `set var with sparse universe uses sorted element list`() {
+        val src = """
+            var set of {7, 2, 11}: s;
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val layout = program.setVarsByName.getValue("s")
+        assertEquals(listOf(2, 7, 11), layout.elements.toList())
     }
 
     @Test

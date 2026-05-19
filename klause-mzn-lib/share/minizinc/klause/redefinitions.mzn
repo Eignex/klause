@@ -160,6 +160,19 @@ predicate table_int(array[int] of var int: x, array[int, int] of int: t);
 predicate regular(array[int] of var int: x, int: Q, int: S,
                   array[int, int] of int: d, int: q0, set of int: F);
 
+% Set variables and predicates. Klause materialises each `var set of E: S` as one
+% indicator bool per universe element; the set predicates below dispatch to bool-level
+% Clause / PseudoBoolean / ReifiedLinear factors over those indicators. set_in supports
+% constant-int elements only today; set_in_reif likewise.
+predicate set_in(var int: x, var set of int: S);
+predicate set_in_reif(var int: x, var set of int: S, var bool: r);
+predicate set_subset(var set of int: S, var set of int: T);
+predicate set_eq(var set of int: S, var set of int: T);
+predicate set_card(var set of int: S, var int: n);
+predicate set_union(var set of int: S, var set of int: T, var set of int: U);
+predicate set_intersect(var set of int: S, var set of int: T, var set of int: U);
+predicate set_diff(var set of int: S, var set of int: T, var set of int: U);
+
 % Scheduling / disjunctive (legacy klause coverage; kept native for completeness).
 predicate circuit(array[int] of var int: x);
 predicate subcircuit(array[int] of var int: x);

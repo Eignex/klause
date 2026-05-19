@@ -181,6 +181,19 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
     "redundant_constraint", "fzn_redundant_constraint" -> emitAnnotationConstraint(c)
 
+    // Set predicates: bool-indicator decomposition. Each `var set of E` materialises as one
+    // bool per universe element; set algebra becomes bool algebra over those indicators.
+    "set_in", "fzn_set_in" -> emitSetIn(c, reified = false)
+    "set_in_reif", "fzn_set_in_reif" -> emitSetIn(c, reified = true)
+    "set_subset", "fzn_set_subset" -> emitSetSubset(c)
+    "set_eq", "fzn_set_eq" -> emitSetEq(c)
+    "set_card", "fzn_set_card" -> emitSetCard(c)
+    "set_union", "fzn_set_union" -> emitSetUnion(c)
+    "set_intersect", "fzn_set_intersect" -> emitSetIntersect(c)
+    "set_diff", "fzn_set_diff" -> emitSetDiff(c)
+    // all_disjoint / set_partition_into need array-of-set-of-int handling that the FZN
+    // parser doesn't expose yet; deferred until set-var arrays are first-class.
+
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
 }
 
@@ -1256,3 +1269,261 @@ internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
     val lit = resolveBoolLit(c.args[0])
     factors.add(Clause(intArrayOf(lit)))
 }
+
+// ===== Set predicates: bool-indicator decomposition =====
+//
+// Each `var set of E: S` was materialised by [allocSetVar] into one bool per universe
+// element. The helpers below lower set algebra to bool algebra over those indicators —
+// every set constraint reduces to clauses, cardinality, or pseudo-Boolean sums we already
+// have factors for.
+
+/** Resolve a set var reference to its layout. Set literals as parameters (e.g. `set of int: u = {1,3}`)
+ *  are not handled here — they belong on the constraint side as constant universes. */
+internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout {
+    val name = (e as? FznExpr.Ident)?.name
+        ?: failHere("expected a set var name, got ${e::class.simpleName}")
+    return setVarsByName[name] ?: failHere("`$name` is not a set var")
+}
+
+/** Resolve a set-literal expression to its element list (sorted ascending). */
+internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e) {
+    is FznExpr.IntSetLit -> e.values.map { it.toInt() }.toIntArray().also { it.sort() }
+    is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
+    is FznExpr.Ident -> {
+        // Parameter set: resolve via params map.
+        val pv = params[e.name] ?: failHere("undefined set parameter `${e.name}`")
+        when (pv) {
+            is FlatZincCompiler.ParamValue.IntSet -> pv.values.map { it.toInt() }.toIntArray().also { it.sort() }
+            else -> failHere("`${e.name}` is not a set parameter")
+        }
+    }
+    else -> failHere("expected a set literal, got ${e::class.simpleName}")
+}
+
+/** `set_in(x, S)` and `set_in_reif(x, S, r)`. Only the constant-x form is supported in this
+ *  first cut — when `x` is an int constant we look up the indicator bool directly. Var-int x
+ *  would need a reified equality channel per universe element; deferred. */
+internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
+    require(c.args.size == if (reified) 3 else 2)
+    val elem = c.args[0]
+    val sExpr = c.args[1]
+    val xConst = (elem as? FznExpr.IntLit)?.value?.toInt()
+        ?: failHere("set_in: only constant-int element is supported today (got ${elem::class.simpleName})")
+    val layout = resolveSetVar(sExpr)
+    val idx = layout.elements.binarySearch(xConst)
+    if (idx < 0) {
+        // Element is outside S's declared universe → x ∉ S unconditionally.
+        if (reified) {
+            val r = resolveBoolLit(c.args[2])
+            factors.add(Clause(intArrayOf(Lit.negate(r))))
+        } else {
+            failHere("set_in: element $xConst outside set `${layout.name}`'s universe")
+        }
+        return
+    }
+    val indicator = layout.indicatorBoolIds[idx]
+    if (reified) {
+        val r = resolveBoolLit(c.args[2])
+        // r ↔ indicator: two clauses.
+        factors.add(Clause(intArrayOf(Lit.negate(r), Lit.make(indicator, true))))
+        factors.add(Clause(intArrayOf(r, Lit.make(indicator, false))))
+    } else {
+        factors.add(Clause(intArrayOf(Lit.make(indicator, true))))
+    }
+}
+
+/** `set_subset(S, T)`. For each universe element: `Sᵢ ⇒ Tᵢ`. Elements only in S's universe
+ *  but not T's must be excluded from S. */
+internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint) {
+    require(c.args.size == 2)
+    val s = resolveSetVar(c.args[0])
+    val t = resolveSetVar(c.args[1])
+    for (i in s.elements.indices) {
+        val e = s.elements[i]
+        val sBit = s.indicatorBoolIds[i]
+        val tIdx = t.elements.binarySearch(e)
+        if (tIdx < 0) {
+            // Element of S's universe not in T's universe → must not be in S.
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
+        } else {
+            // Sᵢ ⇒ Tᵢ : clause [¬Sᵢ, Tᵢ].
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(t.indicatorBoolIds[tIdx], true))))
+        }
+    }
+}
+
+/** `set_eq(S, T)`. Element-wise iff over the union of universes; elements only in one
+ *  universe must be false in the corresponding set. */
+internal fun FlatZincCompiler.emitSetEq(c: FznConstraint) {
+    require(c.args.size == 2)
+    val s = resolveSetVar(c.args[0])
+    val t = resolveSetVar(c.args[1])
+    // Elements in S only must be false in S.
+    for (i in s.elements.indices) {
+        val e = s.elements[i]
+        val sBit = s.indicatorBoolIds[i]
+        val tIdx = t.elements.binarySearch(e)
+        if (tIdx < 0) {
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
+        } else {
+            val tBit = t.indicatorBoolIds[tIdx]
+            // sBit ↔ tBit
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, true))))
+            factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, false))))
+        }
+    }
+    // Elements in T only must be false in T.
+    for (i in t.elements.indices) {
+        val e = t.elements[i]
+        if (s.elements.binarySearch(e) < 0) {
+            factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
+        }
+    }
+}
+
+/** `set_card(S, n)`. Σ indicator_S[e] = n. n can be a constant or an int var; lowers to a
+ *  pseudo-Boolean linear constraint either way. */
+internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
+    require(c.args.size == 2)
+    val s = resolveSetVar(c.args[0])
+    val nExpr = c.args[1]
+    when (nExpr) {
+        is FznExpr.IntLit -> {
+            // Σ Sᵢ = const → bool_lin_eq. PseudoBoolean takes literals (Lit-encoded), not
+            // raw var ids; wrap each indicator as a positive literal.
+            val coeffs = IntArray(s.indicatorBoolIds.size) { 1 }
+            val lits = IntArray(s.indicatorBoolIds.size) { Lit.make(s.indicatorBoolIds[it], true) }
+            factors.add(com.eignex.klause.solver.factor.PseudoBoolean(
+                coeffs, lits, com.eignex.klause.ast.PbOp.EQ, nExpr.value.toInt()
+            ))
+        }
+        is FznExpr.Ident -> {
+            // Σ Sᵢ = nVar → int_lin_eq([1...1, -1], [indicator channel ints..., nVar], 0).
+            // We channel each bool indicator to a 0/1 int, then post the linear.
+            val nVar = resolveIntVar(nExpr)
+            val channels = IntArray(s.indicatorBoolIds.size) { i ->
+                val ch = allocInt("__card_chan_${s.name}_${s.elements[i]}", 0, 1)
+                factors.add(ReifiedLinear(
+                    auxBoolVar = s.indicatorBoolIds[i],
+                    coeffs = intArrayOf(1), vars = intArrayOf(ch),
+                    op = LinearOp.EQ, bound = 1,
+                ))
+                ch
+            }
+            val coefs = IntArray(channels.size + 1) { if (it < channels.size) 1 else -1 }
+            val vars = IntArray(channels.size + 1) { if (it < channels.size) channels[it] else nVar }
+            factors.add(Linear(coefs, vars, LinearOp.EQ, 0))
+        }
+        else -> failHere("set_card: second arg must be int var or constant, got ${nExpr::class.simpleName}")
+    }
+}
+
+/** `set_union(S, T, U)`. For each element of U's universe: `Uᵢ ↔ (Sᵢ ∨ Tᵢ)`. Elements
+ *  outside U's universe but in S or T's must not be in S/T. */
+internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
+    require(c.args.size == 3)
+    val s = resolveSetVar(c.args[0])
+    val t = resolveSetVar(c.args[1])
+    val u = resolveSetVar(c.args[2])
+    for (i in u.elements.indices) {
+        val e = u.elements[i]
+        val uBit = u.indicatorBoolIds[i]
+        val sIdx = s.elements.binarySearch(e)
+        val tIdx = t.elements.binarySearch(e)
+        when {
+            sIdx >= 0 && tIdx >= 0 -> {
+                val sBit = s.indicatorBoolIds[sIdx]
+                val tBit = t.indicatorBoolIds[tIdx]
+                // Uᵢ ↔ (Sᵢ ∨ Tᵢ): three clauses.
+                factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(uBit, true))))
+                factors.add(Clause(intArrayOf(Lit.make(tBit, false), Lit.make(uBit, true))))
+                factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(sBit, true), Lit.make(tBit, true))))
+            }
+            sIdx >= 0 -> {
+                // Uᵢ ↔ Sᵢ
+                val sBit = s.indicatorBoolIds[sIdx]
+                factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(uBit, true))))
+                factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(uBit, false))))
+            }
+            tIdx >= 0 -> {
+                val tBit = t.indicatorBoolIds[tIdx]
+                factors.add(Clause(intArrayOf(Lit.make(tBit, false), Lit.make(uBit, true))))
+                factors.add(Clause(intArrayOf(Lit.make(tBit, true), Lit.make(uBit, false))))
+            }
+            else -> {
+                // Element only in U's universe — neither S nor T can contribute, so Uᵢ = false.
+                factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
+            }
+        }
+    }
+    // Elements in S or T's universe but not U's must be excluded from S/T.
+    for (i in s.elements.indices) {
+        if (u.elements.binarySearch(s.elements[i]) < 0) {
+            factors.add(Clause(intArrayOf(Lit.make(s.indicatorBoolIds[i], false))))
+        }
+    }
+    for (i in t.elements.indices) {
+        if (u.elements.binarySearch(t.elements[i]) < 0) {
+            factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
+        }
+    }
+}
+
+/** `set_intersect(S, T, U)`. For each element of U's universe: `Uᵢ ↔ (Sᵢ ∧ Tᵢ)`. Elements
+ *  outside U but in both S and T's universes must not be in both (or unconstrained — we
+ *  leave them unconstrained, since intersection only needs U to track the conjunction). */
+internal fun FlatZincCompiler.emitSetIntersect(c: FznConstraint) {
+    require(c.args.size == 3)
+    val s = resolveSetVar(c.args[0])
+    val t = resolveSetVar(c.args[1])
+    val u = resolveSetVar(c.args[2])
+    for (i in u.elements.indices) {
+        val e = u.elements[i]
+        val uBit = u.indicatorBoolIds[i]
+        val sIdx = s.elements.binarySearch(e)
+        val tIdx = t.elements.binarySearch(e)
+        if (sIdx >= 0 && tIdx >= 0) {
+            val sBit = s.indicatorBoolIds[sIdx]
+            val tBit = t.indicatorBoolIds[tIdx]
+            // Uᵢ ↔ (Sᵢ ∧ Tᵢ): three clauses.
+            factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(sBit, true))))
+            factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(tBit, true))))
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, false), Lit.make(uBit, true))))
+        } else {
+            // Element not in both S and T's universes → can't be in intersection.
+            factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
+        }
+    }
+}
+
+/** `set_diff(S, T, U)`. For each element of U's universe: `Uᵢ ↔ (Sᵢ ∧ ¬Tᵢ)`. */
+internal fun FlatZincCompiler.emitSetDiff(c: FznConstraint) {
+    require(c.args.size == 3)
+    val s = resolveSetVar(c.args[0])
+    val t = resolveSetVar(c.args[1])
+    val u = resolveSetVar(c.args[2])
+    for (i in u.elements.indices) {
+        val e = u.elements[i]
+        val uBit = u.indicatorBoolIds[i]
+        val sIdx = s.elements.binarySearch(e)
+        if (sIdx < 0) {
+            // Element not in S → can't be in S \ T.
+            factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
+            continue
+        }
+        val sBit = s.indicatorBoolIds[sIdx]
+        val tIdx = t.elements.binarySearch(e)
+        if (tIdx < 0) {
+            // Element in S but not in T's universe → Uᵢ ↔ Sᵢ.
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(uBit, true))))
+            factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(uBit, false))))
+        } else {
+            val tBit = t.indicatorBoolIds[tIdx]
+            // Uᵢ ↔ (Sᵢ ∧ ¬Tᵢ): three clauses.
+            factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(sBit, true))))
+            factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(tBit, false))))
+            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, true), Lit.make(uBit, true))))
+        }
+    }
+}
+

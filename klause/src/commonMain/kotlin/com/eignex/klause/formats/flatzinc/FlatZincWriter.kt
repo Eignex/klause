@@ -20,8 +20,12 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample): String {
             }
         }
     } else {
-        // Default output: every declared bool / int / float var, in declaration order.
+        // Default output: every declared bool / int / float / set var, in declaration order.
+        // Skip bool vars whose names start with `__set_` — those are internal set indicator
+        // bools synthesized by `allocSetVar`, not user-declared.
+        val setIndicatorBools = program.setVarsByName.values.flatMap { it.indicatorBoolIds.toList() }.toSet()
         for ((name, id) in program.boolVarsByName) {
+            if (id in setIndicatorBools) continue
             sb.append("$name = ${sample.bools[id]};\n")
         }
         for ((name, id) in program.intVarsByName) {
@@ -31,16 +35,36 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample): String {
         for ((name, b) in program.floatVarsByName) {
             sb.append("$name = ${b.valueOf(sample.ints[b.varId])};\n")
         }
+        for ((name, layout) in program.setVarsByName) {
+            sb.append("$name = ${renderSet(sample, layout)};\n")
+        }
     }
     sb.append("----------\n")
     return sb.toString()
 }
 
 private fun renderScalar(program: FlatZincProgram, sample: Sample, name: String): String {
+    program.setVarsByName[name]?.let { return renderSet(sample, it) }
     program.boolVarsByName[name]?.let { return sample.bools[it].toString() }
     program.floatVarsByName[name]?.let { b -> return b.valueOf(sample.ints[b.varId]).toString() }
     program.intVarsByName[name]?.let { return sample.ints[it].toString() }
     throw IllegalArgumentException("output: unknown var `$name`")
+}
+
+/** Reconstruct MiniZinc set output `{a, b, c}` from indicator bools. Emits an empty `{}`
+ *  when no element is in the set. */
+private fun renderSet(sample: Sample, layout: SetVarLayout): String {
+    val sb = StringBuilder("{")
+    var first = true
+    for (i in layout.elements.indices) {
+        if (sample.bools[layout.indicatorBoolIds[i]]) {
+            if (!first) sb.append(", ")
+            sb.append(layout.elements[i])
+            first = false
+        }
+    }
+    sb.append("}")
+    return sb.toString()
 }
 
 private fun renderArray(program: FlatZincProgram, sample: Sample, name: String): String {
