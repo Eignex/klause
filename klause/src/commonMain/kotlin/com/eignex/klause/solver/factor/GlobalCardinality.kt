@@ -164,12 +164,16 @@ class GlobalCardinality(
         val n = xs.size
         val m = cover.size
         val coverSet = coverIndexByValue.keys
+        // LCG antecedents: the union of every xs var's int trail. Same coarse approach
+        // as AllDifferent — every prune/tighten in GCC reasoning involves all xs vars'
+        // domains, so attributing to all of them is sound (analyzer minimization shrinks).
+        val gccAntecedents = composeGccAntecedents(state)
         if (closed) {
             for (x in xs) {
                 val d = state.intDomains[x]
                 val toRemove = ArrayList<Int>()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (v in toRemove) if (!state.excludeIntValue(x, v)) return false
+                for (v in toRemove) if (!state.excludeIntValue(x, v, gccAntecedents)) return false
             }
         }
         val definite = IntArray(m)
@@ -182,8 +186,8 @@ class GlobalCardinality(
                 if (target in d) possible[k]++
             }
             if (countVars != null) {
-                if (!state.tightenIntMin(countVars[k], definite[k])) return false
-                if (!state.tightenIntMax(countVars[k], possible[k])) return false
+                if (!state.tightenIntMin(countVars[k], definite[k], gccAntecedents)) return false
+                if (!state.tightenIntMax(countVars[k], possible[k], gccAntecedents)) return false
             } else {
                 if (countLow!![k] > possible[k]) return false
                 if (countHigh!![k] < definite[k]) return false
@@ -307,7 +311,7 @@ class GlobalCardinality(
                 if (eIdx < 0) continue
                 if (flow.flowOf(eIdx) > 0) continue  // active in current flow; alive.
                 if (sccId[varNode[i]] == sccId[covNode[k]]) continue  // may carry flow elsewhere.
-                if (!state.excludeIntValue(xs[i], cover[k])) return false
+                if (!state.excludeIntValue(xs[i], cover[k], gccAntecedents)) return false
             }
             // If the var→other arc exists but cannot carry flow in any feasible flow,
             // every non-cover value in dom(xᵢ) is dead — prune them all.
@@ -316,10 +320,23 @@ class GlobalCardinality(
                 val d = state.intDomains[xs[i]]
                 val toRemove = ArrayList<Int>()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (v in toRemove) if (!state.excludeIntValue(xs[i], v)) return false
+                for (v in toRemove) if (!state.excludeIntValue(xs[i], v, gccAntecedents)) return false
             }
         }
         return true
+    }
+
+    /** Coarse LCG antecedents: union of every `xs` var's int trail. Used for every
+     *  prune / tighten in GCC propagation — minimization can shrink redundancy. */
+    private fun composeGccAntecedents(state: PropagationState): IntArray? {
+        val seen = HashSet<Int>()
+        val out = ArrayList<Int>()
+        for (v in xs) {
+            state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+            state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+        }
+        if (out.isEmpty()) return null
+        return out.toIntArray()
     }
 
     /**

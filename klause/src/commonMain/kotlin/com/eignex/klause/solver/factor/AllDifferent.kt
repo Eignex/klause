@@ -261,17 +261,34 @@ class AllDifferent(
 
         // Prune: any var→value edge that's neither matched, nor in the same SCC, nor
         // reachable from a free value cannot extend to a perfect matching and must be
-        // removed from the variable's domain.
+        // removed from the variable's domain. LCG antecedents: each prune's reason is
+        // the union of every *other* var's int antecedents — those domains together
+        // determined the matching/SCC structure that forbade this value.
+        val antecedents = composeAllDifferentAntecedents(state)
         for (i in 0 until n) {
             for (vid in valuesPerVar[i]) {
                 if (matchVar[i] == vid) continue
                 val valNode = n + vid
                 if (sccId[i] == sccId[valNode]) continue
                 if (reachedFromFree[valNode]) continue
-                if (!state.excludeIntValue(vars[i], idToValue[vid])) return false
+                if (!state.excludeIntValue(vars[i], idToValue[vid], antecedents)) return false
             }
         }
         return true
+    }
+
+    /** Union the int antecedents of every var in this AllDifferent — coarse but sound
+     *  reason for any Régin-SCC prune (every other var's bounds participated in the
+     *  matching/SCC analysis). Returns `null` when no var has recorded antecedents. */
+    private fun composeAllDifferentAntecedents(state: PropagationState): IntArray? {
+        val seen = HashSet<Int>()
+        val out = ArrayList<Int>()
+        for (v in vars) {
+            state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+            state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+        }
+        if (out.isEmpty()) return null
+        return out.toIntArray()
     }
 
     /** Hopcroft-Karp-style augmenting-path search for max bipartite matching. Returns
