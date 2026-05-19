@@ -10,6 +10,7 @@ import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
+import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Sequence as SequenceFactor
@@ -83,6 +84,9 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "value_precede_chain_int", "fzn_value_precede_chain_int" -> emitValuePrecedeChain(c)
     "sequence", "fzn_sequence" -> emitSequence(c)
     "knapsack", "fzn_knapsack" -> emitKnapsack(c)
+    "bin_packing", "fzn_bin_packing" -> emitBinPacking(c, BinPacking.Mode.UniformCapacity)
+    "bin_packing_capa", "fzn_bin_packing_capa" -> emitBinPacking(c, BinPacking.Mode.PerBinCapacity)
+    "bin_packing_load", "fzn_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -321,6 +325,55 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/**
+ * `bin_packing(capacity, bins, weights)` — `mode = UniformCapacity`.
+ * `bin_packing_capa(capacities, bins, weights)` — `mode = PerBinCapacity`.
+ * `bin_packing_load(load, bins, weights)` — `mode = LoadVars`.
+ *
+ * Bin index offset is inferred from the first item's bin-var domain (MZN's 1-based default).
+ */
+internal fun FlatZincCompiler.emitBinPacking(c: FznConstraint, mode: BinPacking.Mode) {
+    require(c.args.size == 3)
+    val bins: IntArray
+    val weights: IntArray
+    var uniformCap = 0
+    var caps: IntArray? = null
+    var loads: IntArray? = null
+    when (mode) {
+        BinPacking.Mode.UniformCapacity -> {
+            uniformCap = evalIntConst(c.args[0]).toInt()
+            bins = evalIntVarArray(c.args[1])
+            weights = evalIntConstArray(c.args[2])
+        }
+        BinPacking.Mode.PerBinCapacity -> {
+            caps = evalIntConstArray(c.args[0])
+            bins = evalIntVarArray(c.args[1])
+            weights = evalIntConstArray(c.args[2])
+        }
+        BinPacking.Mode.LoadVars -> {
+            loads = evalIntVarArray(c.args[0])
+            bins = evalIntVarArray(c.args[1])
+            weights = evalIntConstArray(c.args[2])
+        }
+    }
+    val numBins = caps?.size ?: loads?.size ?: run {
+        // Uniform capacity has no array sizing the bin count; infer from the bin vars'
+        // max declared domain.
+        var maxBin = Int.MIN_VALUE
+        for (b in bins) {
+            val d = intDomains[b]
+            if (d.max > maxBin) maxBin = d.max
+        }
+        if (maxBin == Int.MIN_VALUE) 0 else maxBin
+    }
+    val offset = if (bins.isNotEmpty()) intDomains[bins[0]].min else 1
+    factors.add(BinPacking(
+        bins = bins, weights = weights, mode = mode,
+        uniformCapacity = uniformCap, capacities = caps, loadVars = loads,
+        numBins = numBins, binOffset = offset,
+    ))
 }
 
 /** `knapsack(weights, profits, xs, w, p)`. */
