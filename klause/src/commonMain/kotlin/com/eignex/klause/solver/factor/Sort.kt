@@ -64,16 +64,17 @@ class Sort(
                 if (state.intDomains[ys[i]].min != xv[i]) return false
             }
         }
+        val antYs = state.composeIntVarAntecedents(ys)
+        val antXs = state.composeIntVarAntecedents(xs)
         // ys non-decreasing.
         for (i in 0 until ys.size - 1) {
             val lo = state.intDomains[ys[i]].min
-            if (!state.tightenIntMin(ys[i + 1], lo)) return false
+            if (!state.tightenIntMin(ys[i + 1], lo, antYs)) return false
         }
         for (i in ys.size - 2 downTo 0) {
             val hi = state.intDomains[ys[i + 1]].max
-            if (!state.tightenIntMax(ys[i], hi)) return false
+            if (!state.tightenIntMax(ys[i], hi, antYs)) return false
         }
-        // ys[0] = min(xs); ys[n-1] = max(xs). Propagate via tightest-bound matching.
         var xsMinOfMins = Int.MAX_VALUE
         var xsMinOfMaxes = Int.MAX_VALUE
         var xsMaxOfMins = Int.MIN_VALUE
@@ -85,19 +86,16 @@ class Sort(
             if (d.min > xsMaxOfMins) xsMaxOfMins = d.min
             if (d.max > xsMaxOfMaxes) xsMaxOfMaxes = d.max
         }
-        // ys[0] ∈ [xsMinOfMins, xsMinOfMaxes] (could be the smallest, bounded by smallest-of-maxes).
-        if (!state.tightenIntMin(ys[0], xsMinOfMins)) return false
-        if (!state.tightenIntMax(ys[0], xsMinOfMaxes)) return false
-        // ys[n-1] ∈ [xsMaxOfMins, xsMaxOfMaxes].
+        if (!state.tightenIntMin(ys[0], xsMinOfMins, antXs)) return false
+        if (!state.tightenIntMax(ys[0], xsMinOfMaxes, antXs)) return false
         val n = ys.size
-        if (!state.tightenIntMin(ys[n - 1], xsMaxOfMins)) return false
-        if (!state.tightenIntMax(ys[n - 1], xsMaxOfMaxes)) return false
-        // Mirror: each xs[i] ∈ [ys[0].min, ys[n-1].max] (xs's value must appear in ys).
+        if (!state.tightenIntMin(ys[n - 1], xsMaxOfMins, antXs)) return false
+        if (!state.tightenIntMax(ys[n - 1], xsMaxOfMaxes, antXs)) return false
         val yLo = state.intDomains[ys[0]].min
         val yHi = state.intDomains[ys[n - 1]].max
         for (x in xs) {
-            if (!state.tightenIntMin(x, yLo)) return false
-            if (!state.tightenIntMax(x, yHi)) return false
+            if (!state.tightenIntMin(x, yLo, antYs)) return false
+            if (!state.tightenIntMax(x, yHi, antYs)) return false
         }
         return true
     }

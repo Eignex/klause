@@ -83,8 +83,9 @@ class SymmetricAllDifferent(
             val target = d.min - indexOffset
             if (target !in xs.indices) return false
             val mirror = i + indexOffset
-            if (!state.tightenIntMin(xs[target], mirror)) return false
-            if (!state.tightenIntMax(xs[target], mirror)) return false
+            val ant = state.composeIntVarAntecedents(intArrayOf(xs[i]))
+            if (!state.tightenIntMin(xs[target], mirror, ant)) return false
+            if (!state.tightenIntMax(xs[target], mirror, ant)) return false
         }
         return true
     }

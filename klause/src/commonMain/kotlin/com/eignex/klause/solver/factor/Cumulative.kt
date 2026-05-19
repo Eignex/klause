@@ -285,7 +285,9 @@ class Cumulative(
                 } else break
             }
             if (newMin > state.intDomains[v].max) return false
-            if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin)) return false
+            // LCG antecedents: every start var's bounds contribute to the resource profile.
+            val ant = state.composeIntVarAntecedents(starts)
+            if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
             // Tighten dom.max downward.
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
@@ -295,7 +297,7 @@ class Cumulative(
                 } else break
             }
             if (newMax < state.intDomains[v].min) return false
-            if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax)) return false
+            if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
         }
         return true
     }

@@ -158,9 +158,12 @@ class BinPacking(
             Mode.PerBinCapacity -> for (k in 0 until numBins) {
                 if (definiteLoads[k] > capacities!![k]) return false
             }
-            Mode.LoadVars -> for (k in 0 until numBins) {
-                if (!state.tightenIntMin(loadVars!![k], definiteLoads[k])) return false
-                if (!state.tightenIntMax(loadVars[k], possibleLoads[k])) return false
+            Mode.LoadVars -> {
+                val ant = state.composeIntVarAntecedents(bins)
+                for (k in 0 until numBins) {
+                    if (!state.tightenIntMin(loadVars!![k], definiteLoads[k], ant)) return false
+                    if (!state.tightenIntMax(loadVars[k], possibleLoads[k], ant)) return false
+                }
             }
         }
         return true

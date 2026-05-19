@@ -134,7 +134,7 @@ class Inverse(
      * Also tightens domains to the legal index range. Full GAC waits for the next pass.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Tighten each f[i] to its legal value range g-indices + gOffset.
+        // Range tightens are structural (no input antecedents).
         val gLo = gOffset
         val gHi = gOffset + g.size - 1
         for (i in f.indices) {
@@ -147,22 +147,24 @@ class Inverse(
             if (!state.tightenIntMin(g[i], fLo)) return false
             if (!state.tightenIntMax(g[i], fHi)) return false
         }
-        // Singleton forcing.
+        // Singleton-forcing: the source var's int trail antecedents drive the pin.
         for (i in f.indices) {
             val d = state.intDomains[f[i]]
             if (d.min != d.max) continue
             val gIdx = d.min - gOffset
             if (gIdx !in g.indices) return false
-            if (!state.tightenIntMin(g[gIdx], i + fOffset)) return false
-            if (!state.tightenIntMax(g[gIdx], i + fOffset)) return false
+            val ant = state.composeIntVarAntecedents(intArrayOf(f[i]))
+            if (!state.tightenIntMin(g[gIdx], i + fOffset, ant)) return false
+            if (!state.tightenIntMax(g[gIdx], i + fOffset, ant)) return false
         }
         for (i in g.indices) {
             val d = state.intDomains[g[i]]
             if (d.min != d.max) continue
             val fIdx = d.min - fOffset
             if (fIdx !in f.indices) return false
-            if (!state.tightenIntMin(f[fIdx], i + gOffset)) return false
-            if (!state.tightenIntMax(f[fIdx], i + gOffset)) return false
+            val ant = state.composeIntVarAntecedents(intArrayOf(g[i]))
+            if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) return false
+            if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) return false
         }
         return true
     }

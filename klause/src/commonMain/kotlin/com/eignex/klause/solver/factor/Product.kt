@@ -67,7 +67,7 @@ class Product(
         val da = state.intDomains[a]
         val db = state.intDomains[b]
         val (pLo, pHi) = cornerProductRange(da, db)
-        if (!tightenLong(state, result, pLo, pHi)) return false
+        if (!tightenLong(state, result, pLo, pHi, state.composeIntVarAntecedents(intArrayOf(a, b)))) return false
 
         // Reverse — narrow `a` from result/b, then narrow `b` from result/a.
         //
@@ -94,12 +94,13 @@ class Product(
         // common case after upstream propagation has shaved most of the domain.
         val drFinal = state.intDomains[result]
         if (0 !in drFinal.min..drFinal.max) {
+            val antR = state.composeIntVarAntecedents(intArrayOf(result))
             val daFinal = state.intDomains[a]
-            if (daFinal.min == 0 && !state.tightenIntMin(a, 1)) return false
-            if (daFinal.max == 0 && !state.tightenIntMax(a, -1)) return false
+            if (daFinal.min == 0 && !state.tightenIntMin(a, 1, antR)) return false
+            if (daFinal.max == 0 && !state.tightenIntMax(a, -1, antR)) return false
             val dbFinal = state.intDomains[b]
-            if (dbFinal.min == 0 && !state.tightenIntMin(b, 1)) return false
-            if (dbFinal.max == 0 && !state.tightenIntMax(b, -1)) return false
+            if (dbFinal.min == 0 && !state.tightenIntMin(b, 1, antR)) return false
+            if (dbFinal.max == 0 && !state.tightenIntMax(b, -1, antR)) return false
         }
         return true
     }
@@ -140,7 +141,12 @@ class Product(
             }
         }
         if (tLo > tHi) return false
-        return tightenLong(state, target, tLo, tHi)
+        // Antecedents: union of result and the divisor var. The factor's a/b/result form
+        // a triangle; the third var is the target being tightened, the other two drove it.
+        val others = if (target == a) intArrayOf(b, result)
+                     else if (target == b) intArrayOf(a, result)
+                     else intArrayOf(a, b)
+        return tightenLong(state, target, tLo, tHi, state.composeIntVarAntecedents(others))
     }
 
     /**
@@ -165,7 +171,10 @@ class Product(
             hi = floorDivLong(rLo, divisor)
         }
         if (lo > hi) return false
-        return tightenLong(state, target, lo, hi)
+        val others = if (target == a) intArrayOf(b, result)
+                     else if (target == b) intArrayOf(a, result)
+                     else intArrayOf(a, b)
+        return tightenLong(state, target, lo, hi, state.composeIntVarAntecedents(others))
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -247,11 +256,11 @@ class Product(
         return minOf(p1, p2, p3, p4) to maxOf(p1, p2, p3, p4)
     }
 
-private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long): Boolean {
+private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long, ant: IntArray? = null): Boolean {
         if (lo > Int.MAX_VALUE || hi < Int.MIN_VALUE) return false
         val loI = if (lo < Int.MIN_VALUE) Int.MIN_VALUE else lo.toInt()
         val hiI = if (hi > Int.MAX_VALUE) Int.MAX_VALUE else hi.toInt()
-        if (!state.tightenIntMin(v, loI)) return false
-        if (!state.tightenIntMax(v, hiI)) return false
+        if (!state.tightenIntMin(v, loI, ant)) return false
+        if (!state.tightenIntMax(v, hiI, ant)) return false
         return true
     }}

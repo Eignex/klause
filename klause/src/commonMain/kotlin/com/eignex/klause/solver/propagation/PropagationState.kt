@@ -83,6 +83,26 @@ class PropagationState(
     /** Number of decisions pushed so far. Equals the maximum level. */
     val numDecisions: Int get() = levelToDecisionVar.size
 
+    /** Union the LCG-style int antecedents stored on every var in [vars] — both
+     *  [intMinAntecedents] and [intMaxAntecedents] — into a single bool-literal array
+     *  suitable for passing as the `antecedents` parameter on a subsequent tighten /
+     *  exclude. Used by int-domain factors (AllDifferent, GCC, Element, Cumulative,
+     *  Sort, ...) that emit a constraint-wide reason: every involved var's current
+     *  domain bounds participate in the deduction.
+     *
+     *  Returns `null` when no var has recorded antecedents — the analyzer then treats
+     *  the resulting int-fact as a level-0-style leaf. */
+    fun composeIntVarAntecedents(vars: IntArray): IntArray? {
+        val seen = HashSet<Int>()
+        val out = ArrayList<Int>()
+        for (v in vars) {
+            intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+            intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+        }
+        if (out.isEmpty()) return null
+        return out.toIntArray()
+    }
+
     /** True iff every decision on the trail so far is a bool decision (no int pin
      *  decisions). Lets conflict-reason fallbacks emit a sound "negate the current
      *  bool partial assignment" nogood without needing int-bound literals — the clause

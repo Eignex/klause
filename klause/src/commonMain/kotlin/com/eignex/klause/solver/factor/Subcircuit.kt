@@ -162,8 +162,9 @@ class Subcircuit(val succ: IntArray) : LocalSearchFactor {
             var newMax = d.max
             while (newMax > newMin && taker[newMax] != -1 && taker[newMax] != i) newMax--
             if (newMin > newMax) return false
-            if (newMin != d.min && !state.tightenIntMin(v, newMin)) return false
-            if (newMax != d.max && !state.tightenIntMax(v, newMax)) return false
+            val ant = state.composeIntVarAntecedents(succ)
+            if (newMin != d.min && !state.tightenIntMin(v, newMin, ant)) return false
+            if (newMax != d.max && !state.tightenIntMax(v, newMax, ant)) return false
         }
         return true
     }

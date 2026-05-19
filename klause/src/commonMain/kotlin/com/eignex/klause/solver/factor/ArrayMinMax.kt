@@ -81,8 +81,9 @@ class ArrayMinMax(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val antXs = state.composeIntVarAntecedents(xs)
+        val antResult = state.composeIntVarAntecedents(intArrayOf(result))
         if (max) {
-            // result ≤ max(xs.max) and result ≥ max(xs.min).
             var hiBound = Int.MIN_VALUE
             var loBound = Int.MIN_VALUE
             for (i in xs) {
@@ -90,11 +91,10 @@ class ArrayMinMax(
                 if (d.max > hiBound) hiBound = d.max
                 if (d.min > loBound) loBound = d.min
             }
-            if (!state.tightenIntMax(result, hiBound)) return false
-            if (!state.tightenIntMin(result, loBound)) return false
-            // Every xs[i].max ≤ result.max.
+            if (!state.tightenIntMax(result, hiBound, antXs)) return false
+            if (!state.tightenIntMin(result, loBound, antXs)) return false
             val rMax = state.intDomains[result].max
-            for (i in xs) if (!state.tightenIntMax(i, rMax)) return false
+            for (i in xs) if (!state.tightenIntMax(i, rMax, antResult)) return false
         } else {
             var loBound = Int.MAX_VALUE
             var hiBound = Int.MAX_VALUE
@@ -103,10 +103,10 @@ class ArrayMinMax(
                 if (d.min < loBound) loBound = d.min
                 if (d.max < hiBound) hiBound = d.max
             }
-            if (!state.tightenIntMin(result, loBound)) return false
-            if (!state.tightenIntMax(result, hiBound)) return false
+            if (!state.tightenIntMin(result, loBound, antXs)) return false
+            if (!state.tightenIntMax(result, hiBound, antXs)) return false
             val rMin = state.intDomains[result].min
-            for (i in xs) if (!state.tightenIntMin(i, rMin)) return false
+            for (i in xs) if (!state.tightenIntMin(i, rMin, antResult)) return false
         }
         return true
     }

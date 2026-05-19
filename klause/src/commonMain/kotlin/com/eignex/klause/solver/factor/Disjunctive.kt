@@ -157,7 +157,7 @@ class Disjunctive(
                 } else break
             }
             if (newMax < state.intDomains[v].min) return false
-            if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax)) return false
+            if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, state.composeIntVarAntecedents(starts))) return false
         }
         return true
     }
@@ -206,7 +206,7 @@ class Disjunctive(
             }
             if (newMinI != di.min) {
                 if (newMinI > di.max) return false
-                if (!state.tightenIntMin(vi, newMinI)) return false
+                if (!state.tightenIntMin(vi, newMinI, state.composeIntVarAntecedents(starts))) return false
             }
         }
         return true
@@ -254,7 +254,7 @@ class Disjunctive(
             }
             if (newMinI != di.min) {
                 if (newMinI > di.max) return false
-                if (!state.tightenIntMin(vi, newMinI)) return false
+                if (!state.tightenIntMin(vi, newMinI, state.composeIntVarAntecedents(starts))) return false
             }
         }
         // Backward pass: tighten start_i.max via the symmetric overflow.
@@ -284,7 +284,7 @@ class Disjunctive(
             }
             if (newMaxI != di.max) {
                 if (newMaxI < di.min) return false
-                if (!state.tightenIntMax(vi, newMaxI)) return false
+                if (!state.tightenIntMax(vi, newMaxI, state.composeIntVarAntecedents(starts))) return false
             }
         }
         return true

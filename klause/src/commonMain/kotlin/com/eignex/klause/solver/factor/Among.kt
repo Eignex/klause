@@ -105,8 +105,9 @@ class Among(
             if (allIn) definite++
             if (anyIn) possible++
         }
-        if (!state.tightenIntMin(n, definite)) return false
-        if (!state.tightenIntMax(n, possible)) return false
+        val ant = state.composeIntVarAntecedents(xs)
+        if (!state.tightenIntMin(n, definite, ant)) return false
+        if (!state.tightenIntMax(n, possible, ant)) return false
         return true
     }
 }

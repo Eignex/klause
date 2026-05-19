@@ -133,25 +133,27 @@ class Monotone(
         val bump = if (strict) 1 else 0
         when (direction) {
             Direction.Increasing -> {
-                // Forward: xs[i+1].min >= xs[i].min + bump.
                 for (i in 0 until xs.size - 1) {
                     val lo = state.intDomains[xs[i]].min + bump
-                    if (!state.tightenIntMin(xs[i + 1], lo)) return false
+                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i]))
+                    if (!state.tightenIntMin(xs[i + 1], lo, ant)) return false
                 }
-                // Backward: xs[i].max <= xs[i+1].max - bump.
                 for (i in xs.size - 2 downTo 0) {
                     val hi = state.intDomains[xs[i + 1]].max - bump
-                    if (!state.tightenIntMax(xs[i], hi)) return false
+                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i + 1]))
+                    if (!state.tightenIntMax(xs[i], hi, ant)) return false
                 }
             }
             Direction.Decreasing -> {
                 for (i in 0 until xs.size - 1) {
                     val hi = state.intDomains[xs[i]].max - bump
-                    if (!state.tightenIntMax(xs[i + 1], hi)) return false
+                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i]))
+                    if (!state.tightenIntMax(xs[i + 1], hi, ant)) return false
                 }
                 for (i in xs.size - 2 downTo 0) {
                     val lo = state.intDomains[xs[i + 1]].min + bump
-                    if (!state.tightenIntMin(xs[i], lo)) return false
+                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i + 1]))
+                    if (!state.tightenIntMin(xs[i], lo, ant)) return false
                 }
             }
         }

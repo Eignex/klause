@@ -85,17 +85,16 @@ class Table(
             for (col in 0 until arity) supports[col].add(tuples[row * arity + col])
         }
         if (!anyFeasible) return false
-        // Tighten each column to its supports' bounds; exclude domain values that no row supports.
+        val ant = state.composeIntVarAntecedents(xs)
         for (col in 0 until arity) {
             val sup = supports[col]
             val minSup = sup.min(); val maxSup = sup.max()
-            if (!state.tightenIntMin(xs[col], minSup)) return false
-            if (!state.tightenIntMax(xs[col], maxSup)) return false
-            // Punch out interior values not in the support set (sparse-domain-aware).
+            if (!state.tightenIntMin(xs[col], minSup, ant)) return false
+            if (!state.tightenIntMax(xs[col], maxSup, ant)) return false
             val d = state.intDomains[xs[col]]
             val toRemove = ArrayList<Int>()
             d.forEach { value -> if (value !in sup) toRemove.add(value) }
-            for (v in toRemove) if (!state.excludeIntValue(xs[col], v)) return false
+            for (v in toRemove) if (!state.excludeIntValue(xs[col], v, ant)) return false
         }
         return true
     }

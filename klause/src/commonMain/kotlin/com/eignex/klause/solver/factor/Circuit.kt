@@ -131,7 +131,10 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // 1. Tighten each succ[i] to the domain [0, n).
+        // LCG antecedents: every Circuit prune depends on the joint state of all
+        // succ vars (Hamiltonian-cycle reasoning is global). Union once at entry.
+        val ant = state.composeIntVarAntecedents(succ)
+        // 1. Tighten each succ[i] to the domain [0, n). Structural; antecedent null.
         for (i in succ.indices) {
             val v = succ[i]
             val d = state.intDomains[v]
@@ -144,7 +147,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         if (n == 1) {
             val v = succ[0]
             val d = state.intDomains[v]
-            if (0 !in d) return false  // sparse-aware: 0 could be a hole
+            if (0 !in d) return false
             if (d.min != 0 && !state.tightenIntMin(v, 0)) return false
             if (d.max != 0 && !state.tightenIntMax(v, 0)) return false
             return true
@@ -154,9 +157,9 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
             val v = succ[i]
             val d = state.intDomains[v]
             if (d.min == i && d.min < d.max) {
-                if (!state.tightenIntMin(v, d.min + 1)) return false
+                if (!state.tightenIntMin(v, d.min + 1, ant)) return false
             } else if (d.max == i && d.min < d.max) {
-                if (!state.tightenIntMax(v, d.max - 1)) return false
+                if (!state.tightenIntMax(v, d.max - 1, ant)) return false
             } else if (d.min == d.max && d.min == i) {
                 return false
             }
@@ -182,8 +185,8 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
             var newMax = d.max
             while (newMax > newMin && pred[newMax] != -1 && pred[newMax] != i) newMax--
             if (newMin > newMax) return false
-            if (newMin != d.min && !state.tightenIntMin(v, newMin)) return false
-            if (newMax != d.max && !state.tightenIntMax(v, newMax)) return false
+            if (newMin != d.min && !state.tightenIntMin(v, newMin, ant)) return false
+            if (newMax != d.max && !state.tightenIntMax(v, newMax, ant)) return false
         }
         // 5. Cycle-detect on singletons: walk the singleton-successor graph from each
         //    unvisited node. If a closed cycle has length < n, it's a sub-cycle that
@@ -233,17 +236,14 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
                 if (chainNodes > n) return false
             }
             if (chainNodes == n) {
-                // Chain spans all n nodes; succ[i] = start is the only completion.
-                if (start !in d) return false  // sparse-aware
-                if (!state.tightenIntMin(v, start)) return false
-                if (!state.tightenIntMax(v, start)) return false
+                if (start !in d) return false
+                if (!state.tightenIntMin(v, start, ant)) return false
+                if (!state.tightenIntMax(v, start, ant)) return false
             } else {
-                // chainNodes < n; setting succ[i] = start would close a sub-cycle. Shave
-                // if `start` lies at a domain endpoint.
                 if (start == d.min && d.min < d.max) {
-                    if (!state.tightenIntMin(v, d.min + 1)) return false
+                    if (!state.tightenIntMin(v, d.min + 1, ant)) return false
                 } else if (start == d.max && d.min < d.max) {
-                    if (!state.tightenIntMax(v, d.max - 1)) return false
+                    if (!state.tightenIntMax(v, d.max - 1, ant)) return false
                 } else if (d.min == d.max && d.min == start) {
                     return false
                 }

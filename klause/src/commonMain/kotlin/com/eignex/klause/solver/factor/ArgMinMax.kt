@@ -73,12 +73,11 @@ class ArgMinMax(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // idx ∈ [indexOffset, indexOffset + xs.size - 1].
+        // idx ∈ [indexOffset, indexOffset + xs.size - 1]. These bound facts are
+        // structural (true from the factor's existence) so antecedents are null.
         if (!state.tightenIntMin(idx, indexOffset)) return false
         if (!state.tightenIntMax(idx, indexOffset + xs.size - 1)) return false
         // If all operands are singleton, compute the true argextreme and force idx to match.
-        // This is the singleton-violation check that keeps weak propagation sound — without
-        // it the search yields models where idx points anywhere within range.
         var allSingleton = true
         for (x in xs) {
             val d = state.intDomains[x]
@@ -92,8 +91,9 @@ class ArgMinMax(
                 if (extreme(v, bestVal)) { bestPos = i; bestVal = v }
             }
             val expected = bestPos + indexOffset
-            if (!state.tightenIntMin(idx, expected)) return false
-            if (!state.tightenIntMax(idx, expected)) return false
+            val ant = state.composeIntVarAntecedents(xs)
+            if (!state.tightenIntMin(idx, expected, ant)) return false
+            if (!state.tightenIntMax(idx, expected, ant)) return false
         }
         return true
     }

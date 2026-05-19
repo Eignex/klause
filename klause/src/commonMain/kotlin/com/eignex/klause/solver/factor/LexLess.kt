@@ -99,8 +99,11 @@ class LexLess(
             // Mixed-or-non-singleton: apply the weakest sound bound xs[i] ≤ ys[i]. Per-
             // index strict-< inference at the *last* compared position would tighten by 1,
             // but the existence of a future witness keeps full strictness out of scope here.
-            if (!state.tightenIntMax(xs[i], dy.max)) return false
-            if (!state.tightenIntMin(ys[i], dx.min)) return false
+            // Antecedents: each tighten depends on the matching var's current bound.
+            val antFromY = state.composeIntVarAntecedents(intArrayOf(ys[i]))
+            val antFromX = state.composeIntVarAntecedents(intArrayOf(xs[i]))
+            if (!state.tightenIntMax(xs[i], dy.max, antFromY)) return false
+            if (!state.tightenIntMin(ys[i], dx.min, antFromX)) return false
             return true
         }
         // Walked the entire compared prefix with everything singleton-equal.
