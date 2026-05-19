@@ -4,8 +4,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.kumulant.bandit.MultiArmedBandit
-import com.eignex.kumulant.bandit.UCB1
+import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
+import com.eignex.kumulant.bandit.univariate.UCB1
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

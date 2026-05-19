@@ -6,8 +6,8 @@ import com.eignex.klause.solver.localsearch.meta.FreedVars
 import com.eignex.klause.solver.localsearch.meta.GreedyConstructionRepair
 import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
 import com.eignex.klause.solver.localsearch.meta.RepairOperator
-import com.eignex.kumulant.bandit.BetaBernoulliTS
-import com.eignex.kumulant.bandit.MultiArmedBandit
+import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
+import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit

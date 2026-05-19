@@ -2,8 +2,8 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.propagation.PropagationResult
-import com.eignex.kumulant.bandit.MultiArmedBandit
-import com.eignex.kumulant.bandit.UCB1
+import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
+import com.eignex.kumulant.bandit.univariate.UCB1
 import kotlin.random.Random
 
 /**

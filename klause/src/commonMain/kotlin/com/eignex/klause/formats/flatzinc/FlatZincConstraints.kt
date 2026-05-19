@@ -84,6 +84,9 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "float_lin_le", "float_lin_eq", "float_lin_ne" -> emitFloatLinear(c, reified = false)
     "float_lin_le_reif", "float_lin_eq_reif", "float_lin_ne_reif" -> emitFloatLinear(c, reified = true)
 
+    // int↔float coercion: bind the int var to the float var's bucket index.
+    "int2float" -> emitInt2Float(c)
+
     // Global
     "all_different_int" -> emitAllDifferent(c)
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
@@ -454,6 +457,31 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
         }
         realConstraints.add(com.eignex.klause.solver.RealLinearConstraint(coefs, floatIds, op, bound))
     }
+}
+
+/**
+ * `int2float(x_int, y_float)` — coerce x's int value into y's float value. y is
+ * backed by a bucket-index int var with `value(idx) = lo + idx * step`. The
+ * constraint is `x = lo + idx_y * step`, which rearranges (after scaling by
+ * [floatScale]) to a single linear equality over (x, idx_y). Identity buckets
+ * (step=1.0, lo integer) are the common case from `var int → var float` lifts.
+ */
+internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
+    require(c.args.size == 2)
+    val xInt = resolveIntVar(c.args[0])
+    val yName = (c.args[1] as? FznExpr.Ident)?.name
+        ?: failHere("int2float: second arg must be a float var identifier")
+    val yBk = floatVars[yName] ?: failHere("`$yName` is not a float var")
+    val step = if (yBk.buckets > 1) (yBk.hi - yBk.lo) / (yBk.buckets - 1) else 0.0
+    // floatScale·x − floatScale·step·idx_y = floatScale·lo.
+    val cX = floatScale.toLong()
+    val cIdxY = (-step * floatScale).roundToLong()
+    val bound = (yBk.lo * floatScale).roundToLong()
+    factors.add(Linear(
+        intArrayOf(cX.toInt(), cIdxY.toInt()),
+        intArrayOf(xInt, yBk.varId),
+        LinearOp.EQ, bound.toInt(),
+    ))
 }
 
 internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing> = when (e) {

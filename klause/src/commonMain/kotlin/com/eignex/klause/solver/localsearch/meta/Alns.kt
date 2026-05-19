@@ -10,8 +10,8 @@ import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSession
-import com.eignex.kumulant.bandit.RouletteWheelBandit
 import com.eignex.kumulant.bandit.UnivariateBandit
+import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
 import kotlin.random.Random
 
 /**
@@ -63,8 +63,8 @@ class Alns(
      *  draws from this stream. Users supplying custom bandits are responsible for
      *  those bandits' RNGs (kumulant bandits each take a `random: Random` parameter). */
     val rng: Random = Random.Default,
-    val destroyBandit: UnivariateBandit<*> = RouletteWheelBandit(destroyOperators.size, random = rng),
-    val repairBandit: UnivariateBandit<*> = RouletteWheelBandit(repairOperators.size, random = rng),
+    val destroyBandit: UnivariateBandit = RouletteWheelBandit(destroyOperators.size, random = rng),
+    val repairBandit: UnivariateBandit = RouletteWheelBandit(repairOperators.size, random = rng),
     /** Optional session for cross-iteration state. When provided, [InnerLsRepair] (and
      *  any other repair operator that reads `context.session`) routes through it so
      *  DDFW factor weights and per-variable activity recency survive across iterations.
@@ -76,11 +76,11 @@ class Alns(
     init {
         require(destroyOperators.isNotEmpty()) { "Need at least one destroy operator" }
         require(repairOperators.isNotEmpty()) { "Need at least one repair operator" }
-        require(destroyOperators.size == destroyBandit.snapshot().size) {
-            "destroyBandit arm count ${destroyBandit.snapshot().size} doesn't match destroyOperators ${destroyOperators.size}"
+        require(destroyOperators.size == destroyBandit.nbrArms) {
+            "destroyBandit arm count ${destroyBandit.nbrArms} doesn't match destroyOperators ${destroyOperators.size}"
         }
-        require(repairOperators.size == repairBandit.snapshot().size) {
-            "repairBandit arm count ${repairBandit.snapshot().size} doesn't match repairOperators ${repairOperators.size}"
+        require(repairOperators.size == repairBandit.nbrArms) {
+            "repairBandit arm count ${repairBandit.nbrArms} doesn't match repairOperators ${repairOperators.size}"
         }
         require(destroyFraction in 0.0..1.0) { "destroyFraction must be in [0, 1], got $destroyFraction" }
     }

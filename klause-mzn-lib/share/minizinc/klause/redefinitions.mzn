@@ -76,6 +76,10 @@ predicate float_lin_ne_reif(array[int] of float: as,
 % Multiplication.
 predicate int_times(var int: a, var int: b, var int: c);
 
+% int → float coercion. klause's FlatZincCompiler emits a Linear factor
+% binding x's int value to y's bucket index.
+predicate int2float(var int: x, var float: y);
+
 % Globals — klause has native factors for these. MiniZinc routes them directly to
 % klause's FlatZinc compiler instead of decomposing in its standard library.
 predicate all_different_int(array[int] of var int: x);
