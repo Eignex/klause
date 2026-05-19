@@ -3,8 +3,13 @@ package com.eignex.klause.solver.propagation
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.GlobalCardinality
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
@@ -157,6 +162,110 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(learned.literals.isNotEmpty(),
             "ReifiedCardinality conflict should produce non-empty learned clause")
+    }
+
+    @Test
+    fun `Linear int-domain conflict produces learned clause via coarse default`() {
+        // Two ReifiedLinears share aux x:
+        //   x ↔ (var0 = 5) and x ↔ (var1 = 5).
+        // Linear: var0 + var1 = 5 (each [0, 9], tightens to [0, 5] at bake).
+        // At bake, neither ReifiedLinear's propagate fires (sumLo/sumHi span the bound),
+        // so x stays unassigned. Decision x=true pins both var0=5 and var1=5 → Linear
+        // sees sum=10 ≠ 5 → return false. Default conflictReason emits [¬x].
+        val problem = Problem(
+            numBoolVars = 1, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
+            factors = listOf(
+                com.eignex.klause.solver.factor.ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1), vars = intArrayOf(0),
+                    op = LinearOp.EQ, bound = 5,
+                ),
+                com.eignex.klause.solver.factor.ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1), vars = intArrayOf(1),
+                    op = LinearOp.EQ, bound = 5,
+                ),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 5),
+            ),
+        )
+        val session = PropagationSession(problem)
+        val r = session.pinBool(0, true)
+        val unsat = assertIs<PropagationResult.Unsat>(r)
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
+        assertTrue(Lit.make(0, false) in learned.literals.toSet(),
+            "Linear int-domain conflict should learn [¬x], got ${learned.literals.toList()}")
+    }
+
+    @Test
+    fun `AllDifferent int-domain conflict produces learned clause via coarse default`() {
+        // Two ReifiedLinears share aux x, forcing var0 = var1 = 0 when x=true.
+        // AllDifferent then sees a singleton-conflict at value 0.
+        val problem = Problem(
+            numBoolVars = 1, numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = listOf(
+                com.eignex.klause.solver.factor.ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1), vars = intArrayOf(0),
+                    op = LinearOp.EQ, bound = 0,
+                ),
+                com.eignex.klause.solver.factor.ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1), vars = intArrayOf(1),
+                    op = LinearOp.EQ, bound = 0,
+                ),
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3),
+            ),
+        )
+        val session = PropagationSession(problem)
+        val r = session.pinBool(0, true)
+        val unsat = assertIs<PropagationResult.Unsat>(r)
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
+        assertTrue(Lit.make(0, false) in learned.literals.toSet(),
+            "AllDifferent conflict should learn [¬x], got ${learned.literals.toList()}")
+    }
+
+    @Test
+    fun `GlobalCardinality int-domain conflict produces learned clause via coarse default`() {
+        // 4 ints [0, 2], GCC requires value=1 exactly twice. Three ReifiedLinears share
+        // aux x: forcing var0=var1=var2=1 when x=true. GCC sees definite=3 > hi=2 → fail.
+        val problem = Problem(
+            numBoolVars = 1, numIntVars = 4,
+            intDomains = arrayOf(
+                IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
+            ),
+            factors = listOf(
+                com.eignex.klause.solver.factor.ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1), vars = intArrayOf(0),
+                    op = LinearOp.EQ, bound = 1,
+                ),
+                com.eignex.klause.solver.factor.ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1), vars = intArrayOf(1),
+                    op = LinearOp.EQ, bound = 1,
+                ),
+                com.eignex.klause.solver.factor.ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1), vars = intArrayOf(2),
+                    op = LinearOp.EQ, bound = 1,
+                ),
+                GlobalCardinality(
+                    xs = intArrayOf(0, 1, 2, 3),
+                    cover = intArrayOf(1),
+                    countLow = intArrayOf(2),
+                    countHigh = intArrayOf(2),
+                    closed = false,
+                ),
+            ),
+        )
+        val session = PropagationSession(problem)
+        val r = session.pinBool(0, true)
+        val unsat = assertIs<PropagationResult.Unsat>(r)
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
+        assertTrue(Lit.make(0, false) in learned.literals.toSet(),
+            "GCC conflict should learn [¬x], got ${learned.literals.toList()}")
     }
 
     @Test

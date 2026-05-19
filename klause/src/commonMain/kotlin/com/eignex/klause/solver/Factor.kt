@@ -63,10 +63,45 @@ interface Factor {
      * generation). Returns `null` for factors that can't produce a clause-form reason;
      * the analyzer falls back to chronological backtrack in that case.
      *
-     * For [com.eignex.klause.solver.factor.Clause] this is literally the clause's
-     * `literals` array — all of which are false when propagate returns false. Other
-     * factor types (Linear, Cardinality, AllDifferent) don't yet implement it; future
-     * work extends conflict analysis to those by giving each a custom Nogood.
+     * Bool-pinning factors (Clause, Cardinality, PseudoBoolean, ReifiedCardinality,
+     * ReifiedPseudoBoolean, Xor) override this with a sharp factor-specific clause.
+     * The default implementation handles int-domain factors (Linear, AllDifferent,
+     * GlobalCardinality, Element, Cumulative, etc.) by returning a sound but coarse
+     * "negate the current bool partial assignment" clause via
+     * [defaultBoolPinsConflictReason] — suppressed when int decisions are on the
+     * trail (full LCG int-bound literals would be needed for that case).
      */
-    fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+    fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        defaultBoolPinsConflictReason(state)
+}
+
+/**
+ * Sound but coarse clause-form nogood used as the default [Factor.conflictReason] for
+ * int-domain factors: the disjunction of every currently-pinned bool literal's
+ * false-form. Says "the current bool partial assignment forced this dead-end". Returns
+ * `null` (forcing analyzer fallback to chronological backtrack) when:
+ *   - no bool vars are currently pinned, or
+ *   - any int decision is on the trail — including it as antecedent would be unsound
+ *     since the int decision is part of the cause but not captured in the clause.
+ *
+ * The analyzer's minimization step (self-subsuming resolution) typically shrinks this
+ * coarse seed substantially: implied pins resolve against their antecedents and only
+ * the actual UIP plus relevant decisions remain. So the practical learned clause is
+ * usually much shorter than [Factor.conflictReason]'s return value.
+ */
+internal fun defaultBoolPinsConflictReason(state: PropagationState): IntArray? {
+    if (!state.allDecisionsAreBool()) return null
+    val numBool = state.problem.numBoolVars
+    var count = 0
+    for (i in 0 until numBool) {
+        if (state.boolValues[i] != null) count++
+    }
+    if (count == 0) return null
+    val out = IntArray(count)
+    var w = 0
+    for (i in 0 until numBool) {
+        val b = state.boolValues[i] ?: continue
+        out[w++] = com.eignex.klause.solver.Lit.make(i, !b)
+    }
+    return out
 }

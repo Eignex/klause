@@ -83,6 +83,18 @@ class PropagationState(
     /** Number of decisions pushed so far. Equals the maximum level. */
     val numDecisions: Int get() = levelToDecisionVar.size
 
+    /** True iff every decision on the trail so far is a bool decision (no int pin
+     *  decisions). Lets conflict-reason fallbacks emit a sound "negate the current
+     *  bool partial assignment" nogood without needing int-bound literals — the clause
+     *  is sound exactly when no int decision is partly responsible for the conflict. */
+    fun allDecisionsAreBool(): Boolean {
+        val numBool = problem.numBoolVars
+        for (lvl in 0 until levelToDecisionVar.size) {
+            if (levelToDecisionVar[lvl] >= numBool) return false
+        }
+        return true
+    }
+
     /** Level any pin created during the current factor invocation inherits. Set by the driver. */
     internal var currentLevel: Int = 0
 
