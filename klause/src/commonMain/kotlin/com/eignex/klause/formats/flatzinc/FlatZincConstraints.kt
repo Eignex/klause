@@ -10,6 +10,7 @@ import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
+import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Sequence as SequenceFactor
 import com.eignex.klause.solver.factor.ValuePrecede
@@ -81,6 +82,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "value_precede_int", "fzn_value_precede_int" -> emitValuePrecede(c)
     "value_precede_chain_int", "fzn_value_precede_chain_int" -> emitValuePrecedeChain(c)
     "sequence", "fzn_sequence" -> emitSequence(c)
+    "knapsack", "fzn_knapsack" -> emitKnapsack(c)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -319,6 +321,17 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `knapsack(weights, profits, xs, w, p)`. */
+internal fun FlatZincCompiler.emitKnapsack(c: FznConstraint) {
+    require(c.args.size == 5)
+    val weights = evalIntConstArray(c.args[0])
+    val profits = evalIntConstArray(c.args[1])
+    val xs = evalIntVarArray(c.args[2])
+    val w = resolveIntVar(c.args[3])
+    val p = resolveIntVar(c.args[4])
+    factors.add(Knapsack(weights, profits, xs, w, p))
 }
 
 /** `sequence(xs, low, high, k, S)` — sliding-window cardinality. Argument order in MZN's
