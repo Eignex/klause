@@ -94,19 +94,37 @@ class ReifiedPseudoBoolean(
             PbOp.GE -> sumHi < bnd
             PbOp.EQ -> sumLo > bnd || sumHi < bnd
         }
-        if (alwaysHolds) return state.pinBool(auxBoolVar, true)
-        if (neverHolds) return state.pinBool(auxBoolVar, false)
+        // For aux pins: the precondition is the current pinning of the constraint
+        // literals — pbFalseFormAntecedents collects them as currently-false lits.
+        if (alwaysHolds) {
+            val ant = pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0)
+            return state.pinBool(auxBoolVar, true, ant)
+        }
+        if (neverHolds) {
+            val ant = pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0)
+            return state.pinBool(auxBoolVar, false, ant)
+        }
 
         val aux = state.boolValues[auxBoolVar] ?: return true
+        // Aux is pinned — its current pinning is the context that selects which side of
+        // the reification we're propagating. Pass it as `extraLit` so downstream pins
+        // record it as an antecedent (the aux pin's false-form is `Lit.make(aux, !aux)`).
+        val auxAntecedent = Lit.make(auxBoolVar, !aux)
         return if (aux) {
-            propagatePbBounds(state, weights, literals, op, bnd)
+            propagatePbBounds(state, weights, literals, op, bnd, extraLit = auxAntecedent)
         } else when (op) {
-            PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1)
-            PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1)
-            // ¬EQ → "sum ≠ bound". No PbOp.NE exists; inline the NE bounds-check (analog
-            // of `LinearOp.NE` in `propagateLinearBounds`).
-            PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd)
+            PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = auxAntecedent)
+            PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = auxAntecedent)
+            PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = auxAntecedent)
         }
+    }
+
+    /** Clause-form nogood: the disjunction of every pinned literal's false-form. Includes
+     *  the aux var when it's pinned (its current pinning selected the propagation path
+     *  that failed). */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0
+        return pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxLit)
     }
 
     /**
@@ -120,6 +138,7 @@ class ReifiedPseudoBoolean(
         weights: IntArray,
         literals: IntArray,
         bound: Long,
+        extraLit: Int = 0,
     ): Boolean {
         val n = literals.size
         val litLo = LongArray(n)
@@ -155,9 +174,11 @@ class ReifiedPseudoBoolean(
             val falseOk = !(otherLo == bound && otherHi == bound)
             if (!trueOk && !falseOk) return false
             if (!trueOk) {
-                if (!state.pinBool(v, !Lit.isPositive(literals[i]))) return false
+                val ant = pbFalseFormAntecedents(state, literals, excludeVar = v, extraLit = extraLit)
+                if (!state.pinBool(v, !Lit.isPositive(literals[i]), ant)) return false
             } else if (!falseOk) {
-                if (!state.pinBool(v, Lit.isPositive(literals[i]))) return false
+                val ant = pbFalseFormAntecedents(state, literals, excludeVar = v, extraLit = extraLit)
+                if (!state.pinBool(v, Lit.isPositive(literals[i]), ant)) return false
             }
         }
         return true

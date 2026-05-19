@@ -107,11 +107,46 @@ class Xor(
         val parityIfTrue = pinnedParity xor posOdd
         val parityIfFalse = pinnedParity xor negOdd
         return when {
-            parityIfTrue == targetParity && parityIfFalse != targetParity -> state.pinBool(v, true)
-            parityIfFalse == targetParity && parityIfTrue != targetParity -> state.pinBool(v, false)
+            parityIfTrue == targetParity && parityIfFalse != targetParity ->
+                state.pinBool(v, true, parityAntecedents(state, excludeVar = v))
+            parityIfFalse == targetParity && parityIfTrue != targetParity ->
+                state.pinBool(v, false, parityAntecedents(state, excludeVar = v))
             parityIfTrue != targetParity && parityIfFalse != targetParity -> false
             else -> true  // both work (shouldn't happen when var has odd parity contribution)
         }
+    }
+
+    /**
+     * Clause-form nogood when [propagate] returns false. XOR parity errors aren't natively
+     * clause-form (an n-arity XOR needs 2^(n-1) clauses for full equivalence); we emit
+     * the weak but sound "at least one of these currently-pinned literals must flip"
+     * clause — i.e., the disjunction of currently-*false* literals across all assigned
+     * vars. Blocks re-exploring the exact dead-end assignment; subsequent propagations
+     * of the same XOR will still re-derive parity inferences from new pin paths.
+     */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        return parityAntecedents(state, excludeVar = -1)
+    }
+
+    /** Collect one currently-false literal per pinned variable (excluding [excludeVar]).
+     *  Each entry is the literal whose value is false under the current assignment for
+     *  that variable; together they describe "the partial assignment that forced this
+     *  pin / drove parity to violation". */
+    private fun parityAntecedents(state: PropagationState, excludeVar: Int): IntArray? {
+        var n = 0
+        for (v in boolVars) {
+            if (v == excludeVar) continue
+            if (state.boolValues[v] != null) n++
+        }
+        if (n == 0) return null
+        val out = IntArray(n)
+        var w = 0
+        for (v in boolVars) {
+            if (v == excludeVar) continue
+            val b = state.boolValues[v] ?: continue
+            out[w++] = Lit.make(v, !b)  // the literal that's currently false for this var
+        }
+        return out
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

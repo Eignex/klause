@@ -137,6 +137,88 @@ class Cardinality(
         else propagateScanning(state)
 
     /**
+     * Clause-form nogood when [propagate] returns false. Two failure modes:
+     *  - min-side: `trueCount + unassigned < min` — too many literals are forced false to
+     *    ever reach `min` true. The disjunction of currently-false literals must contain
+     *    at least one truth.
+     *  - max-side: `trueCount > max` — too many literals are forced true. Their negations
+     *    form the violated disjunction (at least one must actually be false).
+     */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        var trueCount = 0
+        var falseCount = 0
+        for (lit in literals) {
+            val b = state.boolValues[Lit.variable(lit)] ?: continue
+            if (Lit.evaluate(lit, b)) trueCount++ else falseCount++
+        }
+        if (literals.size - falseCount < min) {
+            val out = IntArray(falseCount)
+            var w = 0
+            for (lit in literals) {
+                val b = state.boolValues[Lit.variable(lit)] ?: continue
+                if (!Lit.evaluate(lit, b)) out[w++] = lit
+            }
+            return out
+        }
+        if (trueCount > max) {
+            val out = IntArray(trueCount)
+            var w = 0
+            for (lit in literals) {
+                val b = state.boolValues[Lit.variable(lit)] ?: continue
+                if (Lit.evaluate(lit, b)) out[w++] = Lit.negate(lit)
+            }
+            return out
+        }
+        return null
+    }
+
+    /** Collect every currently-false literal in [literals] whose variable differs from
+     *  [excludeVar]. Returned as the antecedents array for a pin: their collectively being
+     *  false is exactly what forced the pin. Returns `null` if nothing to record (only the
+     *  unit lit itself was undetermined). */
+    private fun antecedentsForTruePin(state: PropagationState, excludeVar: Int): IntArray? {
+        var n = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            if (v == excludeVar) continue
+            val b = state.boolValues[v] ?: continue
+            if (!Lit.evaluate(lit, b)) n++
+        }
+        if (n == 0) return null
+        val out = IntArray(n)
+        var w = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            if (v == excludeVar) continue
+            val b = state.boolValues[v] ?: continue
+            if (!Lit.evaluate(lit, b)) out[w++] = lit
+        }
+        return out
+    }
+
+    /** Mirror of [antecedentsForTruePin] for at-most pins: antecedents are the negations
+     *  of currently-true literals, since their being true forced this pin to false. */
+    private fun antecedentsForFalsePin(state: PropagationState, excludeVar: Int): IntArray? {
+        var n = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            if (v == excludeVar) continue
+            val b = state.boolValues[v] ?: continue
+            if (Lit.evaluate(lit, b)) n++
+        }
+        if (n == 0) return null
+        val out = IntArray(n)
+        var w = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            if (v == excludeVar) continue
+            val b = state.boolValues[v] ?: continue
+            if (Lit.evaluate(lit, b)) out[w++] = Lit.negate(lit)
+        }
+        return out
+    }
+
+    /**
      * Watched-literal propagation. The watches array packed into [PropagationState.refPayload]
      * stores the at-least watch indices in `[0, atLeastWatchSize)` and the at-most watch
      * indices in `[atLeastWatchSize, atLeastWatchSize + atMostWatchSize)`. Each side runs
@@ -228,7 +310,8 @@ class Cardinality(
             val v = Lit.variable(lit)
             val b = state.boolValues[v]
             if (b == null) {
-                if (!state.pinBool(v, Lit.isPositive(lit))) return false
+                val ant = antecedentsForTruePin(state, v)
+                if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
             } else if (!Lit.evaluate(lit, b)) {
                 return false  // already false → conflict; can't make it true
             }
@@ -245,7 +328,8 @@ class Cardinality(
             val v = Lit.variable(lit)
             val b = state.boolValues[v]
             if (b == null) {
-                if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+                val ant = antecedentsForFalsePin(state, v)
+                if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
             } else if (Lit.evaluate(lit, b)) {
                 return false  // already true → conflict
             }
@@ -283,18 +367,24 @@ class Cardinality(
         if (trueCount > max) return false
         if (trueCount + unassigned < min) return false
         if (trueCount == max && unassigned > 0) {
+            // At-most saturated: pin every remaining unassigned literal to false.
+            // Antecedent: negations of all currently-true literals.
+            val ant = antecedentsForFalsePin(state, excludeVar = -1)
             for (lit in literals) {
                 val v = Lit.variable(lit)
                 if (state.boolValues[v] != null) continue
-                if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+                if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
             }
             return true
         }
         if (trueCount + unassigned == min && unassigned > 0) {
+            // At-least tight: pin every remaining unassigned literal to true.
+            // Antecedent: all currently-false literals.
+            val ant = antecedentsForTruePin(state, excludeVar = -1)
             for (lit in literals) {
                 val v = Lit.variable(lit)
                 if (state.boolValues[v] != null) continue
-                if (!state.pinBool(v, Lit.isPositive(lit))) return false
+                if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
             }
         }
         return true

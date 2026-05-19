@@ -112,24 +112,35 @@ class ReifiedCardinality(
         // Fact about the body: definitely in [min, max], or definitely outside?
         val definitelyIn = minPossible >= min && maxPossible <= max
         val definitelyOut = maxPossible < min || minPossible > max
-        if (definitelyIn) return state.pinBool(auxBoolVar, true)
-        if (definitelyOut) return state.pinBool(auxBoolVar, false)
+        if (definitelyIn) {
+            val ant = pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0)
+            return state.pinBool(auxBoolVar, true, ant)
+        }
+        if (definitelyOut) {
+            val ant = pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0)
+            return state.pinBool(auxBoolVar, false, ant)
+        }
 
         val aux = state.boolValues[auxBoolVar] ?: return true
+        // Aux is pinned — thread its current pinning into each derived literal pin so 1UIP
+        // can resolve back through this reification.
+        val auxAntecedent = Lit.make(auxBoolVar, !aux)
         if (aux) {
             // aux pinned true → body must hold: count ∈ [min, max]. Mirror Cardinality's
             // boundary-forcing pass.
             if (trueCount == max && unassigned > 0) {
+                val ant = pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxAntecedent)
                 for (lit in literals) {
                     val v = Lit.variable(lit)
                     if (state.boolValues[v] != null) continue
-                    if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+                    if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
                 }
             } else if (trueCount + unassigned == min && unassigned > 0) {
+                val ant = pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxAntecedent)
                 for (lit in literals) {
                     val v = Lit.variable(lit)
                     if (state.boolValues[v] != null) continue
-                    if (!state.pinBool(v, Lit.isPositive(lit))) return false
+                    if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
                 }
             }
             return true
@@ -161,10 +172,11 @@ class ReifiedCardinality(
                 // unassigned literal must flip true.
                 val need = max - trueCount + 1
                 if (need == unassigned) {
+                    val ant = pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxAntecedent)
                     for (lit in literals) {
                         val v = Lit.variable(lit)
                         if (state.boolValues[v] != null) continue
-                        if (!state.pinBool(v, Lit.isPositive(lit))) return false
+                        if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
                     }
                 }
             }
@@ -173,10 +185,11 @@ class ReifiedCardinality(
                 // when that cap is zero, force every unassigned literal false.
                 val cap = min - trueCount - 1
                 if (cap == 0) {
+                    val ant = pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxAntecedent)
                     for (lit in literals) {
                         val v = Lit.variable(lit)
                         if (state.boolValues[v] != null) continue
-                        if (!state.pinBool(v, !Lit.isPositive(lit))) return false
+                        if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
                     }
                 }
             }
@@ -202,4 +215,13 @@ class ReifiedCardinality(
         }
     }
 
-    private fun inRange(count: Int): Boolean = count in min..max}
+    private fun inRange(count: Int): Boolean = count in min..max
+
+    /** Clause-form nogood for any pin failure: every currently-pinned constraint literal's
+     *  false-form, plus the aux literal when pinned. The current pinning collectively
+     *  forced the propagation path that failed. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0
+        return pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxLit)
+    }
+}

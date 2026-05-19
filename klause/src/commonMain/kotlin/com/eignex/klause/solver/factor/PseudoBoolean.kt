@@ -64,6 +64,14 @@ class PseudoBoolean(
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         propagatePbBounds(state, weights, literals, op, bound.toLong())
 
+    /** Clause-form nogood when propagation fails: the disjunction of each pinned
+     *  literal's false-form. The current pinning across the constraint's literals
+     *  forced the sum into the infeasible range; flipping any one of them is a
+     *  necessary condition for a satisfying solution. Sound but coarse — analyzer
+     *  minimization typically trims redundant literals during 1UIP resolution. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = 0)
+
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
         if (!violates(sum)) return
@@ -126,9 +134,51 @@ internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: In
 }
 
 /**
+ * Build a clause-form antecedent set for a pin emitted by [propagatePbBounds] /
+ * [propagatePbNotEqual]: each currently-pinned constraint literal (excluding the var
+ * about to be pinned, which is still unassigned) expressed in its currently-*false*
+ * polarity, plus an optional context literal (e.g. the reif var for
+ * [ReifiedPseudoBoolean]). Returns `null` when nothing was pinned and no context lit —
+ * meaning the pin is a level-0 fact with no logical preconditions.
+ */
+internal fun pbFalseFormAntecedents(
+    state: PropagationState,
+    literals: IntArray,
+    excludeVar: Int,
+    extraLit: Int,  // 0 == no extra literal
+): IntArray? {
+    var n = 0
+    if (extraLit != 0) n++
+    val seen = HashSet<Int>()
+    for (lit in literals) {
+        val v = Lit.variable(lit)
+        if (v == excludeVar) continue
+        if (extraLit != 0 && v == Lit.variable(extraLit)) continue
+        if (!seen.add(v)) continue
+        if (state.boolValues[v] != null) n++
+    }
+    if (n == 0) return null
+    val out = IntArray(n)
+    var w = 0
+    if (extraLit != 0) out[w++] = extraLit
+    seen.clear()
+    for (lit in literals) {
+        val v = Lit.variable(lit)
+        if (v == excludeVar) continue
+        if (extraLit != 0 && v == Lit.variable(extraLit)) continue
+        if (!seen.add(v)) continue
+        val b = state.boolValues[v] ?: continue
+        out[w++] = Lit.make(v, !b)
+    }
+    return out
+}
+
+/**
  * Shared bounds-propagation routine for `Σ weights[i] * lit_i ⟨op⟩ bound`. Used by
  * [PseudoBoolean] directly and by [ReifiedPseudoBoolean] when its aux Boolean is pinned.
- * Returns `false` iff the constraint is infeasible.
+ * Returns `false` iff the constraint is infeasible. [extraLit] is an optional context
+ * literal (currently false in state) to include in every pin's antecedents — used by
+ * [ReifiedPseudoBoolean] to thread its reif-var pin into each implied propagation.
  */
 internal fun propagatePbBounds(
     state: PropagationState,
@@ -136,6 +186,7 @@ internal fun propagatePbBounds(
     literals: IntArray,
     op: PbOp,
     bound: Long,
+    extraLit: Int = 0,
 ): Boolean {
     val n = literals.size
     val litLo = LongArray(n)
@@ -173,9 +224,11 @@ internal fun propagatePbBounds(
         val falseOk = pbFeasible(op, otherLo, otherHi, bound)
         if (!trueOk && !falseOk) return false
         if (!trueOk) {
-            if (!state.pinBool(v, !Lit.isPositive(literals[i]))) return false
+            val ant = pbFalseFormAntecedents(state, literals, excludeVar = v, extraLit = extraLit)
+            if (!state.pinBool(v, !Lit.isPositive(literals[i]), ant)) return false
         } else if (!falseOk) {
-            if (!state.pinBool(v, Lit.isPositive(literals[i]))) return false
+            val ant = pbFalseFormAntecedents(state, literals, excludeVar = v, extraLit = extraLit)
+            if (!state.pinBool(v, Lit.isPositive(literals[i]), ant)) return false
         }
     }
     return true
