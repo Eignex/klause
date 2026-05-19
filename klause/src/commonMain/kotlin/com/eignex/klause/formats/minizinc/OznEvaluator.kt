@@ -181,10 +181,13 @@ internal class OznEvaluator(items: List<OznItem>) {
     private fun evalCall(c: OznExpr.Call, ctx: Context): OznValue {
         val args = c.args.map { eval(it, ctx) }
         return when (c.name) {
-            "show", "showInt", "showFloat", "show_int", "show_float", "fix",
+            "show", "showInt", "showFloat", "show_int", "show_float",
             "format", "format_justify_string", "showDzn", "show_dzn", "show2dDzn",
             "showJSON", "show_json" ->
                 OznValue.StringV(stringifyForShow(args.last()))
+            // `fix(x)` strips var-ness in MZN — for output evaluation it's an identity
+            // function: the value is already fully concrete here.
+            "fix" -> args[0]
             "show2d" -> OznValue.StringV(stringify2d(args[0]))
             "show3d" -> OznValue.StringV(stringify3d(args[0]))
             "array1d" -> {
@@ -359,6 +362,8 @@ internal class OznEvaluator(items: List<OznItem>) {
             "-" -> if (asFloat) OznValue.FloatV(lf - rf) else OznValue.IntV(li - ri)
             "*" -> if (asFloat) OznValue.FloatV(lf * rf) else OznValue.IntV(li * ri)
             "/" -> if (asFloat) OznValue.FloatV(lf / rf) else OznValue.IntV(li / ri)
+            "div" -> OznValue.IntV(li / ri)
+            "mod" -> OznValue.IntV(li % ri)
             "<" -> OznValue.BoolV(if (asFloat) lf < rf else li < ri)
             "<=" -> OznValue.BoolV(if (asFloat) lf <= rf else li <= ri)
             ">" -> OznValue.BoolV(if (asFloat) lf > rf else li > ri)

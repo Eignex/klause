@@ -183,7 +183,11 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parseMultiplicative(): OznExpr {
         var left = parseRange()
-        while (peek().kind == OznTokenKind.PUNCT && peek().text in setOf("*", "/")) {
+        while (true) {
+            val t = peek()
+            val isPunct = t.kind == OznTokenKind.PUNCT && t.text in setOf("*", "/")
+            val isKw = t.kind == OznTokenKind.KEYWORD && t.text in setOf("div", "mod")
+            if (!isPunct && !isKw) break
             val op = advance().text
             val right = parseRange()
             left = OznExpr.Binary(op, left, right)

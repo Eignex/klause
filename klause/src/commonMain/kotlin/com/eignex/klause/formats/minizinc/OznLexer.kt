@@ -103,6 +103,7 @@ internal class OznLexer(private val source: String) {
             "true", "false" -> OznTokenKind.BOOL
             "output", "array", "set", "of", "var", "int", "bool", "float", "string",
             "if", "then", "elseif", "else", "endif", "in", "where", "let", "not", "xor",
+            "div", "mod",
             "show", "show2d", "show3d", "show_int", "show_float", "fix",
             "array1d", "array2d", "array3d", "array4d", "array5d", "array6d",
             "min", "max", "abs", "sum", "product",
