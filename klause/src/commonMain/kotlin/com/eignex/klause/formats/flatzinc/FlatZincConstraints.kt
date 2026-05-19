@@ -2,6 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
@@ -58,6 +59,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     // Global
     "all_different_int" -> emitAllDifferent(c)
+    "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -279,6 +281,12 @@ internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing
         else -> failHere("`${e.name}` is not a float var array")
     }
     else -> failHere("expected float var array, got ${e::class.simpleName}")
+}
+
+internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
+    require(c.args.size == 1)
+    val vars = evalIntVarArray(c.args[0])
+    factors.add(AllDifferentExceptZero(vars))
 }
 
 internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
