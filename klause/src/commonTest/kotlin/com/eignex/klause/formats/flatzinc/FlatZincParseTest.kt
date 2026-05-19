@@ -200,16 +200,17 @@ class FlatZincParseTest {
 
     @Test
     fun `unsupported builtin throws`() {
+        // `not_a_real_builtin` is a deliberately fake name that no klause emitter handles.
         val src = """
             var 0..5: x;
-            constraint table_int([x], [[1], [3], [5]]);
+            constraint not_a_real_builtin(x);
             solve satisfy;
         """.trimIndent()
         try {
             parseFlatZinc(src)
             error("expected FlatZincParseException")
         } catch (e: FlatZincParseException) {
-            assertTrue(e.message!!.contains("table_int"), "got: ${e.message}")
+            assertTrue(e.message!!.contains("not_a_real_builtin"), "got: ${e.message}")
         }
     }
 

@@ -51,7 +51,16 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "bool_xor" -> emitBoolXor(c)
     "array_bool_or" -> emitArrayBoolOr(c)
     "array_bool_and" -> emitArrayBoolAnd(c)
+    "array_bool_xor" -> emitArrayBoolXor(c)
     "bool2int" -> emitBool2Int(c)
+    "bool_and", "bool_and_reif" -> emitBoolAndOr(c, and = true)
+    "bool_or", "bool_or_reif" -> emitBoolAndOr(c, and = false)
+    "bool_xor_reif" -> emitBoolXorReif(c)
+    "bool_le" -> emitBoolCmp(c, lt = false, reified = false)
+    "bool_lt" -> emitBoolCmp(c, lt = true, reified = false)
+    "bool_eq_reif" -> emitBoolCmpReif(c, eq = true, le = false, lt = false)
+    "bool_le_reif" -> emitBoolCmpReif(c, eq = false, le = true, lt = false)
+    "bool_lt_reif" -> emitBoolCmpReif(c, eq = false, le = false, lt = true)
 
     // Int comparisons (binary)
     "int_le", "int_lt", "int_eq", "int_ne", "int_ge", "int_gt" -> emitIntCmp(c)
@@ -195,6 +204,85 @@ internal fun FlatZincCompiler.emitArrayBoolAnd(c: FznConstraint) {
     // r ↔ (⋀ lits): (⋁ ¬lits ∨ r) and for each lit l: (¬r ∨ l).
     factors.add(Clause(lits.map { Lit.negate(it) }.toIntArray() + intArrayOf(r)))
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(r), l)))
+}
+
+/** `bool_and(a, b, r)` / `bool_or(a, b, r)` — pairwise variants, both already reified. */
+internal fun FlatZincCompiler.emitBoolAndOr(c: FznConstraint, and: Boolean) {
+    require(c.args.size == 3)
+    val a = resolveBoolLit(c.args[0])
+    val b = resolveBoolLit(c.args[1])
+    val r = resolveBoolLit(c.args[2])
+    if (and) {
+        // r ↔ (a ∧ b):  (¬r ∨ a), (¬r ∨ b), (r ∨ ¬a ∨ ¬b).
+        factors.add(Clause(intArrayOf(Lit.negate(r), a)))
+        factors.add(Clause(intArrayOf(Lit.negate(r), b)))
+        factors.add(Clause(intArrayOf(r, Lit.negate(a), Lit.negate(b))))
+    } else {
+        // r ↔ (a ∨ b):  (r ∨ ¬a), (r ∨ ¬b), (¬r ∨ a ∨ b).
+        factors.add(Clause(intArrayOf(r, Lit.negate(a))))
+        factors.add(Clause(intArrayOf(r, Lit.negate(b))))
+        factors.add(Clause(intArrayOf(Lit.negate(r), a, b)))
+    }
+}
+
+/** `bool_xor_reif(a, b, r)` — r ↔ (a ⊕ b). Equivalent to `bool_xor(a, b, r)` which klause
+ *  emits via the [Xor] factor with target-parity 0 over (a, b, r). */
+internal fun FlatZincCompiler.emitBoolXorReif(c: FznConstraint) {
+    require(c.args.size == 3)
+    val lits = intArrayOf(resolveBoolLit(c.args[0]), resolveBoolLit(c.args[1]), resolveBoolLit(c.args[2]))
+    factors.add(Xor(lits, targetParity = 0))
+}
+
+/** `array_bool_xor(arr)` — parity sum of `arr` is true (i.e. an odd number of literals
+ *  are true). Encodes as a single [Xor] factor with target parity 1. */
+internal fun FlatZincCompiler.emitArrayBoolXor(c: FznConstraint) {
+    require(c.args.size == 1)
+    val lits = evalBoolVarArray(c.args[0])
+    factors.add(Xor(lits, targetParity = 1))
+}
+
+/** `bool_le(a, b)`: a ≤ b ⇔ ¬a ∨ b.  `bool_lt(a, b)`: a < b ⇔ ¬a ∧ b. */
+internal fun FlatZincCompiler.emitBoolCmp(c: FznConstraint, lt: Boolean, reified: Boolean) {
+    require(c.args.size == if (reified) 3 else 2)
+    val a = resolveBoolLit(c.args[0])
+    val b = resolveBoolLit(c.args[1])
+    if (lt) {
+        // a < b  ⇔  ¬a ∧ b: two unit clauses.
+        factors.add(Clause(intArrayOf(Lit.negate(a))))
+        factors.add(Clause(intArrayOf(b)))
+    } else {
+        factors.add(Clause(intArrayOf(Lit.negate(a), b)))
+    }
+}
+
+/** Reified bool comparison: `r ↔ (a ⟨op⟩ b)`. */
+internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, eq: Boolean, le: Boolean, lt: Boolean) {
+    require(c.args.size == 3)
+    val a = resolveBoolLit(c.args[0])
+    val b = resolveBoolLit(c.args[1])
+    val r = resolveBoolLit(c.args[2])
+    when {
+        eq -> {
+            // r ↔ (a = b) ⇔ ¬(a ⊕ b). Equivalent to bool_xor(a, b, ¬r).
+            factors.add(Xor(intArrayOf(a, b, Lit.negate(r)), targetParity = 0))
+        }
+        le -> {
+            // r ↔ (a → b) ⇔ r ↔ (¬a ∨ b).
+            // (¬r ∨ ¬a ∨ b), (r ∨ a), (r ∨ ¬b)
+            factors.add(Clause(intArrayOf(Lit.negate(r), Lit.negate(a), b)))
+            factors.add(Clause(intArrayOf(r, a)))
+            factors.add(Clause(intArrayOf(r, Lit.negate(b))))
+        }
+        lt -> {
+            // r ↔ (¬a ∧ b).
+            // r → ¬a:  (¬r ∨ ¬a)
+            // r → b:   (¬r ∨ b)
+            // (¬a ∧ b) → r:  (a ∨ ¬b ∨ r)
+            factors.add(Clause(intArrayOf(Lit.negate(r), Lit.negate(a))))
+            factors.add(Clause(intArrayOf(Lit.negate(r), b)))
+            factors.add(Clause(intArrayOf(a, Lit.negate(b), r)))
+        }
+    }
 }
 
 internal fun FlatZincCompiler.emitBool2Int(c: FznConstraint) {
