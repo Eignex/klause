@@ -156,8 +156,11 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, ascending = false, strict = true)
 
     // Array min/max
-    "array_int_maximum", "fzn_array_int_maximum" -> emitArrayMinMax(c, max = true)
-    "array_int_minimum", "fzn_array_int_minimum" -> emitArrayMinMax(c, max = false)
+    "array_int_maximum", "fzn_array_int_maximum",
+    "maximum_int", "fzn_maximum_int" -> emitArrayMinMax(c, max = true)
+    "array_int_minimum", "fzn_array_int_minimum",
+    "minimum_int", "fzn_minimum_int" -> emitArrayMinMax(c, max = false)
+    "exactly_int", "fzn_exactly_int" -> emitExactly(c)
 
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
 }
@@ -992,6 +995,17 @@ internal fun FlatZincCompiler.emitArrayMinMax(c: FznConstraint, max: Boolean) {
     val result = resolveIntVar(c.args[0])
     val xs = evalIntVarArray(c.args[1])
     factors.add(ArrayMinMax(result = result, xs = xs, max = max))
+}
+
+/** `exactly_int(n, xs, v)` — n equals #{i : xs[i] = v}. Reuses the [Count] factor with
+ *  `op = Eq` and a constant target count channeled through an aux singleton int. */
+internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
+    require(c.args.size == 3)
+    val n = evalIntConst(c.args[0]).toInt()
+    val xs = evalIntVarArray(c.args[1])
+    val v = evalIntConst(c.args[2]).toInt()
+    val nVar = allocInt("__exactly_n_${v}", n, n)
+    factors.add(Count(xs, v, Count.Op.Eq, nVar))
 }
 
 /** `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
