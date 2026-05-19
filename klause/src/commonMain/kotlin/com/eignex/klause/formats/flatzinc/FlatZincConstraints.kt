@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.NValue
+import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
@@ -76,6 +77,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "lex_lesseq_int", "fzn_lex_lesseq_int" -> emitLexLess(c, strict = false)
     "arg_max_int", "fzn_arg_max_int" -> emitArgMinMax(c, max = true)
     "arg_min_int", "fzn_arg_min_int" -> emitArgMinMax(c, max = false)
+    "value_precede_int", "fzn_value_precede_int" -> emitValuePrecede(c)
+    "value_precede_chain_int", "fzn_value_precede_chain_int" -> emitValuePrecedeChain(c)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -314,6 +317,26 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `value_precede_int(s, t, xs)` — single pair-of-values predicate. */
+internal fun FlatZincCompiler.emitValuePrecede(c: FznConstraint) {
+    require(c.args.size == 3)
+    val s = evalIntConst(c.args[0]).toInt()
+    val t = evalIntConst(c.args[1]).toInt()
+    val xs = evalIntVarArray(c.args[2])
+    factors.add(ValuePrecede(s, t, xs))
+}
+
+/** `value_precede_chain_int(values, xs)` — equivalent to a chain of [ValuePrecede] for
+ *  every consecutive `(values[i], values[i+1])` pair. */
+internal fun FlatZincCompiler.emitValuePrecedeChain(c: FznConstraint) {
+    require(c.args.size == 2)
+    val values = evalIntConstArray(c.args[0])
+    val xs = evalIntVarArray(c.args[1])
+    for (i in 0 until values.size - 1) {
+        factors.add(ValuePrecede(values[i], values[i + 1], xs))
+    }
 }
 
 /** `arg_max_int(xs, idx)` / `arg_min_int(xs, idx)`. MiniZinc emits arg-of-extreme with the
