@@ -14,6 +14,7 @@ import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.NValue
+import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.Sequence as SequenceFactor
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.ValuePrecede
@@ -92,6 +93,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "diffn", "fzn_diffn" -> emitDiffn(c, nonStrict = false)
     "diffn_nonstrict", "fzn_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
     "table_int", "fzn_table_int" -> emitTable(c)
+    "regular", "fzn_regular" -> emitRegular(c)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -330,6 +332,31 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/**
+ * `regular(seq, Q, S, d, q0, F)` — DFA acceptance.
+ *  - `seq`: var int array
+ *  - `Q`: int (state count)
+ *  - `S`: int (alphabet size)
+ *  - `d`: 2D int array (Q × S), flattened
+ *  - `q0`: int (initial state)
+ *  - `F`: set of int (accepting states)
+ */
+internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
+    require(c.args.size == 6)
+    val seq = evalIntVarArray(c.args[0])
+    val Q = evalIntConst(c.args[1]).toInt()
+    val S = evalIntConst(c.args[2]).toInt()
+    val transitions = evalIntConstArray(c.args[3])
+    val q0 = evalIntConst(c.args[4]).toInt()
+    val fSet = c.args[5]
+    val accepting: IntArray = when (fSet) {
+        is FznExpr.IntSetLit -> IntArray(fSet.values.size) { fSet.values[it].toInt() }
+        is FznExpr.IntRangeLit -> IntArray((fSet.hi - fSet.lo + 1).toInt()) { (fSet.lo + it).toInt() }
+        else -> failHere("regular: expected set literal for F, got ${fSet::class.simpleName}")
+    }
+    factors.add(Regular(seq, Q, S, transitions, q0, accepting))
 }
 
 /**
