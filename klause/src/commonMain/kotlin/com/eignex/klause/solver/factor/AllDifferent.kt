@@ -27,12 +27,10 @@ class AllDifferent(
         require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
     }
 
-    // Propagation strength: bound-consistent (Puget-style) via Hall-interval detection.
-    // Full Régin GAC would punch holes in non-contiguous interior domains, but klause's
-    // [com.eignex.klause.solver.IntDomain] is a contiguous interval — endpoint tightening
-    // is the strongest representable inference, so bound consistency is the theoretical
-    // ceiling here. Régin SCC residual reasoning would only help if IntDomain ever grew
-    // a sparse-value representation.
+    // Propagation strength: full GAC via Régin's matching + SCC algorithm. IntDomain
+    // supports interior holes, so non-matching value pruning lands at the variable
+    // domain level. Subsumes singleton conflict, singleton-value removal, Hall-interval
+    // detection, and global pigeonhole.
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = vars
@@ -123,118 +121,179 @@ class AllDifferent(
     private fun occurrences(intVar: Int): Int = occurrencesByVar[intVar]
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // ---- 1. Singleton conflicts. ----------------------------------------------------
-        val taken = HashSet<Int>()
-        for (v in vars) {
-            val d = state.intDomains[v]
-            if (d.min != d.max) continue
-            if (!taken.add(d.min)) return false
+        val n = vars.size
+
+        // Build compact value-id mapping and per-var sorted value-id lists from current
+        // domains. Cost: O(Σ |dom(xᵢ)|).
+        val valueId = HashMap<Int, Int>()
+        val idToValue = ArrayList<Int>()
+        val valuesPerVar = Array(n) { i ->
+            val d = state.intDomains[vars[i]]
+            val list = IntArray(d.size)
+            var k = 0
+            d.forEach { v ->
+                val id = valueId.getOrPut(v) { idToValue.add(v); idToValue.size - 1 }
+                list[k++] = id
+            }
+            list
         }
-        // ---- 2. Remove singleton-taken values from every other var's domain. ----------
-        // With sparse domain support, this is full GAC on singleton conflicts (not just
-        // endpoint shaving): if a singleton var holds value `t`, every non-singleton var's
-        // domain has `t` punched out — even when `t` is interior to that var's range.
-        if (taken.isNotEmpty()) {
-            for (v in vars) {
-                val d = state.intDomains[v]
-                if (d.min == d.max) continue
-                for (t in taken) {
-                    // Skip values outside this var's bounds — quick rejection for the common
-                    // case where many singletons are far from any given var's domain.
-                    if (t < d.min || t > d.max) continue
-                    if (!state.excludeIntValue(v, t)) return false
+        val numValues = idToValue.size
+        if (numValues < n) return false  // pigeonhole.
+
+        // Maximum bipartite matching via successive augmenting paths. O(n · |E|).
+        val matchVar = IntArray(n) { -1 }
+        val matchVal = IntArray(numValues) { -1 }
+        val visited = BooleanArray(numValues)
+        for (i in 0 until n) {
+            for (j in visited.indices) visited[j] = false
+            if (!tryAugment(i, valuesPerVar, matchVar, matchVal, visited)) return false
+        }
+
+        // Build directed graph (Régin orientation):
+        //  - Matched edges: value → var.
+        //  - Non-matched in-domain edges: var → value.
+        // Tarjan SCC over the combined node set (vars 0..n-1, values n..n+numValues-1).
+        val total = n + numValues
+        val adj = Array(total) { IntArray(0) }
+        val adjCount = IntArray(total)
+        for (i in 0 until n) {
+            for (vid in valuesPerVar[i]) {
+                if (matchVar[i] == vid) adjCount[n + vid]++ else adjCount[i]++
+            }
+        }
+        for (i in 0 until total) adj[i] = IntArray(adjCount[i])
+        val adjFill = IntArray(total)
+        for (i in 0 until n) {
+            for (vid in valuesPerVar[i]) {
+                if (matchVar[i] == vid) {
+                    val src = n + vid
+                    adj[src][adjFill[src]++] = i
+                } else {
+                    adj[i][adjFill[i]++] = n + vid
                 }
             }
         }
-        // ---- 3. Hall-interval detection (bound consistency). ---------------------------
-        // For each candidate interval [a, b] over var-endpoint pairs, count vars whose
-        // *entire* domain falls inside it. Two cases of interest:
-        //   count > span  → pigeonhole infeasibility, [a, b] can't host that many vars.
-        //   count = span  → Hall interval: the vars inside it monopolise all `span`
-        //                   values, so other vars get any overlap with [a, b] pruned.
-        //
-        // Endpoint enumeration is complete for Hall-interval discovery: any Hall interval
-        // [a, b] has a equal to some var's domain min (extending leftward only loosens
-        // membership) and b equal to some var's domain max. We collect distinct min /
-        // max values and iterate the cartesian product. Cost is O(|mins| * |maxes| * n);
-        // for typical AllDifferent sizes (n ≤ ~50) this is well within budget.
-        val mins = HashSet<Int>()
-        val maxes = HashSet<Int>()
-        for (v in vars) {
-            val d = state.intDomains[v]
-            mins.add(d.min)
-            maxes.add(d.max)
+
+        // BFS from free values (matchVal[v] == -1) forward through `adj`. Any node
+        // reachable corresponds to an edge that participates in *some* maximum matching
+        // (alternating-path argument).
+        val reachedFromFree = BooleanArray(total)
+        val queue = IntArray(total)
+        var qHead = 0
+        var qTail = 0
+        for (vid in 0 until numValues) {
+            if (matchVal[vid] == -1) {
+                val node = n + vid
+                reachedFromFree[node] = true
+                queue[qTail++] = node
+            }
         }
-        for (a in mins) {
-            for (b in maxes) {
-                if (b < a) continue
-                var count = 0
-                for (v in vars) {
-                    val d = state.intDomains[v]
-                    if (d.min >= a && d.max <= b) count++
+        while (qHead < qTail) {
+            val u = queue[qHead++]
+            for (w in adj[u]) {
+                if (!reachedFromFree[w]) {
+                    reachedFromFree[w] = true
+                    queue[qTail++] = w
                 }
-                val span = b - a + 1
-                if (count > span) return false
-                if (count == span && count > 0 && count < vars.size) {
-                    // Hall interval — prune from non-Hall-set vars. Three sub-cases:
-                    //  - var's domain fully inside [a, b] → it's a Hall-set member, skip.
-                    //  - var's max ∈ [a, b] (left-overlap)          → tighten max down to a - 1.
-                    //  - var's min ∈ [a, b] (right-overlap)         → tighten min up to b + 1.
-                    //  - var spans across (min < a AND max > b)     → punch every Hall
-                    //    value out individually via excludeIntValue (sparse domain
-                    //    representation handles the interior holes).
-                    for (v in vars) {
-                        val d = state.intDomains[v]
-                        if (d.min >= a && d.max <= b) continue
-                        when {
-                            d.max in a..b -> {
-                                if (!state.tightenIntMax(v, a - 1)) return false
+            }
+        }
+
+        // Tarjan SCC. Iterative to avoid stack blowup on large n.
+        val sccId = IntArray(total) { -1 }
+        run {
+            val index = IntArray(total) { -1 }
+            val lowlink = IntArray(total)
+            val onStack = BooleanArray(total)
+            val tarjanStack = IntArray(total)
+            var stackTop = 0
+            var nextIndex = 0
+            var nextScc = 0
+            val callStack = IntArray(total)
+            val iterStack = IntArray(total)
+            for (start in 0 until total) {
+                if (index[start] != -1) continue
+                var depth = 0
+                callStack[depth] = start
+                iterStack[depth] = 0
+                index[start] = nextIndex
+                lowlink[start] = nextIndex
+                nextIndex++
+                tarjanStack[stackTop++] = start
+                onStack[start] = true
+                while (depth >= 0) {
+                    val v = callStack[depth]
+                    val it = iterStack[depth]
+                    val neigh = adj[v]
+                    if (it < neigh.size) {
+                        iterStack[depth] = it + 1
+                        val w = neigh[it]
+                        if (index[w] == -1) {
+                            depth++
+                            callStack[depth] = w
+                            iterStack[depth] = 0
+                            index[w] = nextIndex
+                            lowlink[w] = nextIndex
+                            nextIndex++
+                            tarjanStack[stackTop++] = w
+                            onStack[w] = true
+                        } else if (onStack[w]) {
+                            if (index[w] < lowlink[v]) lowlink[v] = index[w]
+                        }
+                    } else {
+                        if (lowlink[v] == index[v]) {
+                            while (true) {
+                                val w = tarjanStack[--stackTop]
+                                onStack[w] = false
+                                sccId[w] = nextScc
+                                if (w == v) break
                             }
-                            d.min in a..b -> {
-                                if (!state.tightenIntMin(v, b + 1)) return false
-                            }
-                            d.min < a && d.max > b -> {
-                                // Spanning across; punch every Hall value out.
-                                for (h in a..b) {
-                                    if (h !in d) continue
-                                    if (!state.excludeIntValue(v, h)) return false
-                                }
-                            }
-                            // else: no overlap with [a, b] at all → nothing to do.
+                            nextScc++
+                        }
+                        depth--
+                        if (depth >= 0) {
+                            val parent = callStack[depth]
+                            if (lowlink[v] < lowlink[parent]) lowlink[parent] = lowlink[v]
                         }
                     }
                 }
             }
         }
-        // ---- 4. Global pigeonhole (cheap last-line check). ------------------------------
-        // After Hall pruning the per-interval pigeonhole would catch any remaining
-        // infeasibility, but the old "available values across all non-pinned vars" check
-        // is cheap and catches the universal-Hall case (k = nonPinned, [a, b] spanning
-        // everything) when Hall enumeration above happened to miss it because the union
-        // isn't contiguous. Vars can have wider domains than the declared union
-        // [domainMin, domainMin+domainSize) at Problem-construction time (full alignment
-        // is asserted only at LocalSearchState init), so clip each var's effective domain
-        // to the declared union before tallying.
-        val domainMax = domainMin + domainSize - 1
-        val covered = BooleanArray(domainSize)
-        var nonPinned = 0
-        for (v in vars) {
-            val d = state.intDomains[v]
-            if (d.min == d.max) continue
-            nonPinned++
-            val lo = maxOf(d.min, domainMin)
-            val hi = minOf(d.max, domainMax)
-            for (value in lo..hi) {
-                if (value in taken) continue
-                covered[value - domainMin] = true
+
+        // Prune: any var→value edge that's neither matched, nor in the same SCC, nor
+        // reachable from a free value cannot extend to a perfect matching and must be
+        // removed from the variable's domain.
+        for (i in 0 until n) {
+            for (vid in valuesPerVar[i]) {
+                if (matchVar[i] == vid) continue
+                val valNode = n + vid
+                if (sccId[i] == sccId[valNode]) continue
+                if (reachedFromFree[valNode]) continue
+                if (!state.excludeIntValue(vars[i], idToValue[vid])) return false
             }
         }
-        if (nonPinned > 0) {
-            var available = 0
-            for (c in covered) if (c) available++
-            if (available < nonPinned) return false
-        }
         return true
+    }
+
+    /** Hopcroft-Karp-style augmenting-path search for max bipartite matching. Returns
+     *  true iff variable [i] can be matched (possibly re-routing earlier matches). */
+    private fun tryAugment(
+        i: Int,
+        valuesPerVar: Array<IntArray>,
+        matchVar: IntArray,
+        matchVal: IntArray,
+        visited: BooleanArray,
+    ): Boolean {
+        for (vid in valuesPerVar[i]) {
+            if (visited[vid]) continue
+            visited[vid] = true
+            val holder = matchVal[vid]
+            if (holder == -1 || tryAugment(holder, valuesPerVar, matchVar, matchVal, visited)) {
+                matchVar[i] = vid
+                matchVal[vid] = i
+                return true
+            }
+        }
+        return false
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
