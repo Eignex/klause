@@ -750,18 +750,108 @@ internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
     factors.add(Clause(intArrayOf(Lit.make(pa, true), Lit.make(pb, true))))
 }
 
+/**
+ * `int_div(a, b, q)` — truncated-toward-zero `q = a / b`. Encoded as:
+ *  - `q · b + rem = a` (via [Product] on `q · b` and a [Linear] sum)
+ *  - `|rem| < |b|` (via two [Linear]s gated by aux bool indicating sign of `b`)
+ *  - `sign(rem) ∈ {0, sign(a)}` (truncated semantics — via reified linears)
+ *
+ * Klause-internal `int_div` uses Euclidean div elsewhere; this emitter implements
+ * FlatZinc's truncated semantics specifically. `b = 0` is left to propagation (the
+ * caller's responsibility — typical models constrain `b != 0` via domains).
+ */
 internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
-    // int_div(a, b, r): r = a div b, truncated-toward-zero (FlatZinc semantics).
-    // Klause's main div is Euclidean; here we encode truncated explicitly:
-    //   r * b + rem = a,  |rem| < |b|,  rem * a ≥ 0.
     require(c.args.size == 3)
-    failHere("`int_div` is not yet supported; klause's truncated-div FZN encoding is TODO. " +
-        "Use `int_mod`-free formulations or switch to a backend with native int_div.")
+    val a = resolveIntVar(c.args[0])
+    val b = resolveIntVar(c.args[1])
+    val q = resolveIntVar(c.args[2])
+    encodeTruncDivMod(a, b, q, remVar = null)
 }
 
+/** `int_mod(a, b, rem)` — same constraint shape as [emitIntDiv], but with `rem` exposed
+ *  and `q` allocated as the auxiliary quotient. */
 internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
     require(c.args.size == 3)
-    failHere("`int_mod` is not yet supported in the FZN compiler; same encoding as int_div, TODO.")
+    val a = resolveIntVar(c.args[0])
+    val b = resolveIntVar(c.args[1])
+    val rem = resolveIntVar(c.args[2])
+    encodeTruncDivMod(a, b, qVar = null, remVar = rem)
+}
+
+/**
+ * Encodes a truncated `a = q*b + r` with `|r| < |b|` and `sign(r) = sign(a)` when `r != 0`.
+ * Allocates whichever of `q` / `r` wasn't supplied. The aux quotient/remainder gets a
+ * domain wide enough to span the algebraically possible range.
+ */
+internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remVar: Int?) {
+    val dA = intDomains[a]
+    val dB = intDomains[b]
+    val bMag = maxOf(kotlin.math.abs(dB.min), kotlin.math.abs(dB.max))
+    val aMag = maxOf(kotlin.math.abs(dA.min), kotlin.math.abs(dA.max))
+    val qDomain = if (bMag == 0) intArrayOf(-aMag, aMag)  // b's domain is {0} — degenerate
+                  else intArrayOf(-aMag - 1, aMag + 1)
+    val rDomain = intArrayOf(-bMag + 1, bMag - 1)
+    val q = qVar ?: allocInt("__div_q_${a}_${b}", qDomain[0], qDomain[1])
+    val rem = remVar ?: allocInt("__div_r_${a}_${b}", rDomain[0], rDomain[1])
+    // Otherwise tighten the provided var to the algebraic span (sound bound).
+    if (qVar != null) {
+        // Best-effort tighten via factor of equality on the aux range — we don't have direct
+        // domain mutation here, so rely on propagation to discover this.
+    }
+    // q · b = prod (aux), then prod + rem = a.
+    val prod = allocInt("__div_prod_${a}_${b}", -aMag - bMag - 1, aMag + bMag + 1)
+    factors.add(com.eignex.klause.solver.factor.Product(a = q, b = b, result = prod))
+    factors.add(com.eignex.klause.solver.factor.Linear(
+        coeffs = intArrayOf(1, 1, -1),
+        vars = intArrayOf(prod, rem, a),
+        op = com.eignex.klause.solver.factor.LinearOp.EQ,
+        bound = 0,
+    ))
+    // |rem| < |b|: encode as rem < |b| AND -rem < |b|, where |b| via aux.
+    // Simpler equivalent: rem ≤ |b| - 1 and rem ≥ -|b| + 1. We channel |b| via int_abs.
+    val absB = allocInt("__div_absb_${a}_${b}", 0, bMag)
+    // Replicate int_abs(b, absB): absB ≥ b, absB ≥ -b, (absB = b ∨ absB = -b).
+    factors.add(com.eignex.klause.solver.factor.Linear(intArrayOf(1, -1), intArrayOf(b, absB),
+        com.eignex.klause.solver.factor.LinearOp.LE, 0))
+    factors.add(com.eignex.klause.solver.factor.Linear(intArrayOf(-1, -1), intArrayOf(b, absB),
+        com.eignex.klause.solver.factor.LinearOp.LE, 0))
+    val absBpa = allocBool("__div_absb_pa_${a}_${b}")
+    val absBpb = allocBool("__div_absb_pb_${a}_${b}")
+    factors.add(com.eignex.klause.solver.factor.ReifiedLinear(absBpa, intArrayOf(1, -1),
+        intArrayOf(absB, b), com.eignex.klause.solver.factor.LinearOp.EQ, 0))
+    factors.add(com.eignex.klause.solver.factor.ReifiedLinear(absBpb, intArrayOf(1, 1),
+        intArrayOf(absB, b), com.eignex.klause.solver.factor.LinearOp.EQ, 0))
+    factors.add(com.eignex.klause.solver.factor.Clause(
+        intArrayOf(Lit.make(absBpa, true), Lit.make(absBpb, true))))
+    // rem ≤ absB - 1: rem - absB ≤ -1.
+    factors.add(com.eignex.klause.solver.factor.Linear(intArrayOf(1, -1), intArrayOf(rem, absB),
+        com.eignex.klause.solver.factor.LinearOp.LE, -1))
+    // rem ≥ -absB + 1: -rem - absB ≤ -1.
+    factors.add(com.eignex.klause.solver.factor.Linear(intArrayOf(-1, -1), intArrayOf(rem, absB),
+        com.eignex.klause.solver.factor.LinearOp.LE, -1))
+    // Truncated semantics: sign(rem) = sign(a) when rem != 0.
+    //   rem > 0 → a ≥ 0;  rem < 0 → a ≤ 0;  rem = 0 → no constraint.
+    // Encode as: rem > 0 → a ≥ 1   (sign-aligned for non-zero rem) AND
+    //            rem < 0 → a ≤ -1
+    // Both via reified linears.
+    val remPos = allocBool("__div_rempos_${a}_${b}")
+    val remNeg = allocBool("__div_remneg_${a}_${b}")
+    factors.add(com.eignex.klause.solver.factor.ReifiedLinear(remPos, intArrayOf(1),
+        intArrayOf(rem), com.eignex.klause.solver.factor.LinearOp.GE, 1))
+    factors.add(com.eignex.klause.solver.factor.ReifiedLinear(remNeg, intArrayOf(1),
+        intArrayOf(rem), com.eignex.klause.solver.factor.LinearOp.LE, -1))
+    val aNonNeg = allocBool("__div_apos_${a}_${b}")
+    val aNonPos = allocBool("__div_aneg_${a}_${b}")
+    factors.add(com.eignex.klause.solver.factor.ReifiedLinear(aNonNeg, intArrayOf(1),
+        intArrayOf(a), com.eignex.klause.solver.factor.LinearOp.GE, 0))
+    factors.add(com.eignex.klause.solver.factor.ReifiedLinear(aNonPos, intArrayOf(1),
+        intArrayOf(a), com.eignex.klause.solver.factor.LinearOp.LE, 0))
+    // remPos → aNonNeg:  ¬remPos ∨ aNonNeg
+    factors.add(com.eignex.klause.solver.factor.Clause(
+        intArrayOf(Lit.make(remPos, false), Lit.make(aNonNeg, true))))
+    // remNeg → aNonPos:  ¬remNeg ∨ aNonPos
+    factors.add(com.eignex.klause.solver.factor.Clause(
+        intArrayOf(Lit.make(remNeg, false), Lit.make(aNonPos, true))))
 }
 
 /**
