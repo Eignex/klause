@@ -7,6 +7,7 @@ import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.Count
+import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Cardinality
@@ -104,6 +105,11 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "count_ge", "fzn_count_geq", "count_geq" -> emitCountOp(c, Count.Op.Ge)
     "count_gt", "fzn_count_gt" -> emitCountOp(c, Count.Op.Gt)
     "among", "fzn_among" -> emitAmong(c)
+    "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, lowUp = false, closed = false)
+    "global_cardinality_closed", "fzn_global_cardinality_closed" -> emitGcc(c, lowUp = false, closed = true)
+    "global_cardinality_low_up", "fzn_global_cardinality_low_up" -> emitGcc(c, lowUp = true, closed = false)
+    "global_cardinality_low_up_closed", "fzn_global_cardinality_low_up_closed" -> emitGcc(c, lowUp = true, closed = true)
+    "distribute", "fzn_distribute" -> emitDistribute(c)
 
     // Ordering
     "increasing_int", "fzn_increasing_int" -> emitMonotone(c, ascending = true, strict = false)
@@ -649,6 +655,41 @@ internal fun FlatZincCompiler.emitCountOp(c: FznConstraint, op: Count.Op) {
         // through ReifiedLinear + an integer-sum link.
         emitCountEq(c)
     }
+}
+
+/**
+ * Unified `global_cardinality*` dispatch. Signatures:
+ *  - `gcc(xs, cover[], counts[])`
+ *  - `gcc_closed(xs, cover[], counts[])`
+ *  - `gcc_low_up(xs, cover[], lo[], up[])`
+ *  - `gcc_low_up_closed(xs, cover[], lo[], up[])`
+ */
+internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: Boolean) {
+    require(c.args.size == if (lowUp) 4 else 3)
+    val xs = evalIntVarArray(c.args[0])
+    val cover = evalIntConstArray(c.args[1])
+    if (lowUp) {
+        val lo = evalIntConstArray(c.args[2])
+        val up = evalIntConstArray(c.args[3])
+        factors.add(GlobalCardinality(
+            xs = xs, cover = cover, countLow = lo, countHigh = up, closed = closed,
+        ))
+    } else {
+        val countVars = evalIntVarArray(c.args[2])
+        factors.add(GlobalCardinality(
+            xs = xs, cover = cover, countVars = countVars, closed = closed,
+        ))
+    }
+}
+
+/** `distribute(card[], value[], base[])` — alias for `gcc(base, value, card)` (older
+ *  MiniZinc syntax; equivalent semantics, parameter order shuffled). */
+internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
+    require(c.args.size == 3)
+    val card = evalIntVarArray(c.args[0])
+    val value = evalIntConstArray(c.args[1])
+    val base = evalIntVarArray(c.args[2])
+    factors.add(GlobalCardinality(xs = base, cover = value, countVars = card))
 }
 
 /** `among(n, xs, S)` — `S` is a constant set literal or range. */
