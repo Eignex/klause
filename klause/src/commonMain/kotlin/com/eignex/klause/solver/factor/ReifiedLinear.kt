@@ -93,22 +93,57 @@ class ReifiedLinear(
             LinearOp.EQ -> sumLo > bnd || sumHi < bnd
             LinearOp.NE -> sumLo == bnd && sumHi == bnd
         }
-        if (alwaysHolds) return state.pinBool(auxBoolVar, true)
-        if (neverHolds) return state.pinBool(auxBoolVar, false)
+        // Aux pin antecedents: union of the int-fact antecedents that drove sumLo/sumHi
+        // into the always/never-holds region. LCG-style transitive reasoning — each int
+        // bound's recorded `intMinAntecedents` / `intMaxAntecedents` traces back to the
+        // bool decisions that established it.
+        if (alwaysHolds) {
+            val ant = composeAuxAntecedents(state, alwaysHolds = true)
+            return state.pinBool(auxBoolVar, true, ant)
+        }
+        if (neverHolds) {
+            val ant = composeAuxAntecedents(state, alwaysHolds = false)
+            return state.pinBool(auxBoolVar, false, ant)
+        }
 
         val aux = state.boolValues[auxBoolVar] ?: return true
+        // Thread the aux's current pinning as an extra antecedent for every implied int
+        // tighten — the body-propagation path was selected by this pin, so any subsequent
+        // conflict must trace back through it.
+        val auxAntecedent = com.eignex.klause.solver.Lit.make(auxBoolVar, !aux)
         return if (aux) {
-            propagateLinearBounds(state, coeffs, vars, op, bnd)
+            propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = auxAntecedent)
         } else {
-            // Negate: ¬LE → GE bnd+1; ¬GE → LE bnd-1; ¬EQ → NE (boundary-tightening
-            // only — propagateLinearBounds handles NE the same as Linear does); ¬NE → EQ.
             when (op) {
-                LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1)
-                LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1)
-                LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd)
-                LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd)
+                LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1, extraLit = auxAntecedent)
+                LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1, extraLit = auxAntecedent)
+                LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, extraLit = auxAntecedent)
+                LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, extraLit = auxAntecedent)
             }
         }
+    }
+
+    /**
+     * Compose aux-pin antecedents from the int-fact antecedents that drove the
+     * always/never-holds inference. For each var:
+     *   - alwaysHolds && (LE | NE-high | EQ): max side of positive-coeff vars,
+     *     min side of negative-coeff vars (whichever side moved sumHi down/up).
+     *   - alwaysHolds && (GE | NE-low): opposite.
+     *   - neverHolds: mirror of alwaysHolds.
+     *
+     * Pragmatically we union *both sides* across all vars — sound but coarser; the
+     * analyzer's minimization shrinks redundant entries. A tighter implementation
+     * would inspect each var's coefficient sign and only emit the relevant side.
+     */
+    private fun composeAuxAntecedents(state: PropagationState, alwaysHolds: Boolean): IntArray? {
+        val seen = HashSet<Int>()
+        val out = ArrayList<Int>()
+        for (v in vars) {
+            state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+            state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+        }
+        if (out.isEmpty()) return null
+        return out.toIntArray()
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

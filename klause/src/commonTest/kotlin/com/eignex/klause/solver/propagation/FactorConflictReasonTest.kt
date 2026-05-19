@@ -13,8 +13,10 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -266,6 +268,61 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(Lit.make(0, false) in learned.literals.toSet(),
             "GCC conflict should learn [¬x], got ${learned.literals.toList()}")
+    }
+
+    @Test
+    fun `LCG plumbing records int antecedents through reified linear chain`() {
+        // Unit test for the LCG foundation: verify that bool decisions chain into
+        // int antecedents via ReifiedLinear's body propagation and aux pin.
+        //
+        //   A: x ↔ (v0 = 5). Decision x=true at level 1.
+        //   - ReifiedLinear A.propagate at aux=true calls propagateLinearBounds with
+        //     extraLit=¬x → tightenIntMin/Max(v0, 5, [¬x]).
+        //   - PropagationState.intMinAntecedents[0] and .intMaxAntecedents[0] = [¬x].
+        //
+        //   C: z ↔ (v0 ≥ 4). Wakes when v0 tightens.
+        //   - alwaysHolds (sumLo=5≥4) → pin z=true with composeAuxAntecedents reading
+        //     v0's int antecedents = [¬x].
+        //   - PropagationState.boolAntecedents[z] = [¬x].
+        //
+        // Demonstrates the int-trail chain back to the bool decision. (Whether the
+        // analyzer can actually exploit this chain in `minimize()` requires extending
+        // `isRedundant` to substitute via int trail — separate from this plumbing layer.)
+        val problem = Problem(
+            numBoolVars = 2, numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 9)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 4),
+            ),
+        )
+        val session = PropagationSession(problem)
+        // Use PropagationState directly for low-level assertions.
+        val r = session.pinBool(0, true)
+        assertIs<PropagationResult.Implied>(r)
+        // Reach into PropagationState — the session's snapshot has the post-pin facts.
+        val ant = problem.factors.let {
+            // Build a fresh state and replay the pin to inspect antecedents.
+            val s = com.eignex.klause.solver.propagation.PropagationState(
+                problem, com.eignex.klause.solver.Assumptions.None,
+            )
+            s.pinBoolAsDecision(0, true)
+            // Run propagation to fixpoint.
+            val confl = s.runToFixpoint(allFactors = false)
+            assertTrue(confl == null, "unexpected conflict at level 1")
+            s
+        }
+        // v0 should be pinned to 5 with antecedents [¬x] on both bounds.
+        assertTrue(ant.intMinAntecedents[0] != null,
+            "v0.min antecedents should be set by ReifiedLinear A's body propagation")
+        val xLit = Lit.make(0, false)  // ¬x = the false-form of the pinned x=true.
+        assertTrue(xLit in ant.intMinAntecedents[0]!!.toSet(),
+            "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}")
+        // z (bool var 1) implied true; its boolAntecedents should trace through to ¬x.
+        val zAnt = ant.boolAntecedents[1]
+        assertTrue(zAnt != null, "z's antecedents should be set by ReifiedLinear C's aux pin")
+        assertTrue(xLit in zAnt!!.toSet(),
+            "z's antecedents should contain ¬x (via composed int trail), got ${zAnt.toList()}")
     }
 
     @Test

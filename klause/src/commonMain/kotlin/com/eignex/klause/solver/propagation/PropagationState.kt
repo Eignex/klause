@@ -295,6 +295,24 @@ class PropagationState(
     val boolAntecedents: Array<IntArray?> = arrayOfNulls(problem.numBoolVars)
 
     /**
+     * Bool literals that forced the most-recent tightening of `intDomains[v].min`. Null
+     * when no factor recorded antecedents — analyzer treats as a leaf, same as a
+     * decision. Mirrors [boolAntecedents] on the int side; used by factors that pin
+     * bools based on int-domain state (e.g. [com.eignex.klause.solver.factor.ReifiedLinear])
+     * so the aux pin's antecedents transitively reference the bool decisions that
+     * narrowed the int domain.
+     *
+     * Note: only the *current* tightening is tracked. If a factor at level 1 sets
+     * `v.min = 3` and another at level 2 sets `v.min = 5`, this array holds the level-2
+     * tightening's antecedents — analyzer reasoning about why `v.min = 3` later is lost.
+     * Full LCG with bound atoms `[v ≥ k]` solves this; for now the single-slot
+     * approximation suffices for the common bool-decisions-cause-int-facts pattern.
+     */
+    val intMinAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
+    /** Mirror of [intMinAntecedents] for the upper-bound side. */
+    val intMaxAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
+
+    /**
      * Chronological journal of bool pins, decisions and implications interleaved. Used by
      * [com.eignex.klause.solver.propagation.ConflictAnalyzer] to walk the implication
      * graph in reverse pin order — the standard 1UIP loop needs to resolve against the
@@ -361,7 +379,7 @@ class PropagationState(
         levelToDecisionVar.add(problem.numBoolVars + v)
         currentLevel = levelToDecisionVar.size
         currentFactor = -1
-        return setIntImpl(v, value)
+        return setIntImpl(v, value, null)
     }
 
     fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value, antecedents = null)
@@ -371,15 +389,25 @@ class PropagationState(
      *  fine, the analyzer just treats this pin as a leaf in the implication graph. */
     fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean =
         pinBoolImpl(v, value, antecedents)
-    fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo)
-    fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi)
-    fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value)
+    fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo, null)
+    /** Variant that records [antecedents] — bool literals (false in the current state)
+     *  whose collective truth forced this lower-bound tightening. Used by the conflict
+     *  analyzer to walk the implication graph backwards through int-domain factors. */
+    fun tightenIntMin(v: Int, lo: Int, antecedents: IntArray?): Boolean =
+        tightenIntMinImpl(v, lo, antecedents)
+    fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi, null)
+    fun tightenIntMax(v: Int, hi: Int, antecedents: IntArray?): Boolean =
+        tightenIntMaxImpl(v, hi, antecedents)
+    fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value, null)
+    fun setInt(v: Int, value: Int, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
     /** Punch a hole in [v]'s domain at [value]. Returns `true` on success (including the
      *  no-op case when [value] is already absent), `false` on conflict (would empty the
      *  domain). When [value] is at the current endpoint, this is equivalent to a
      *  bound-tighten by one; when it's interior, it transitions the domain to sparse
      *  representation. */
-    fun excludeIntValue(v: Int, value: Int): Boolean = excludeIntValueImpl(v, value)
+    fun excludeIntValue(v: Int, value: Int): Boolean = excludeIntValueImpl(v, value, null)
+    fun excludeIntValue(v: Int, value: Int, antecedents: IntArray?): Boolean =
+        excludeIntValueImpl(v, value, antecedents)
 
     private fun pinBoolImpl(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
         val cur = boolValues[v]
@@ -402,7 +430,7 @@ class PropagationState(
         return true
     }
 
-    private fun tightenIntMinImpl(v: Int, lo: Int): Boolean {
+    private fun tightenIntMinImpl(v: Int, lo: Int, antecedents: IntArray?): Boolean {
         val d = intDomains[v]
         if (lo <= d.min) return true
         if (lo > d.max) {
@@ -419,11 +447,12 @@ class PropagationState(
         intDomains[v] = d.withMinAtLeast(lo)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMinReason[v] = currentFactor
+        intMinAntecedents[v] = antecedents
         dirtyInts.addLast(v)
         return true
     }
 
-    private fun tightenIntMaxImpl(v: Int, hi: Int): Boolean {
+    private fun tightenIntMaxImpl(v: Int, hi: Int, antecedents: IntArray?): Boolean {
         val d = intDomains[v]
         if (hi >= d.max) return true
         if (hi < d.min) {
@@ -435,6 +464,7 @@ class PropagationState(
         intDomains[v] = d.withMaxAtMost(hi)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMaxReason[v] = currentFactor
+        intMaxAntecedents[v] = antecedents
         dirtyInts.addLast(v)
         return true
     }
@@ -451,7 +481,7 @@ class PropagationState(
      * domain whose sole value is [value]). On conflict, seeds the factor core with the
      * level / reason fields already tracked for the min and max sides.
      */
-    private fun excludeIntValueImpl(v: Int, value: Int): Boolean {
+    private fun excludeIntValueImpl(v: Int, value: Int, antecedents: IntArray?): Boolean {
         val d = intDomains[v]
         if (value !in d) return true
         if (d.min == d.max && d.min == value) {
@@ -468,8 +498,14 @@ class PropagationState(
         // landed. Pure interior holes don't shift either endpoint; in that case the
         // current factor still becomes the relevant reason for any future propagator
         // walking back through this variable.
-        if (newDomain.min != d.min) intMinReason[v] = currentFactor
-        if (newDomain.max != d.max) intMaxReason[v] = currentFactor
+        if (newDomain.min != d.min) {
+            intMinReason[v] = currentFactor
+            intMinAntecedents[v] = antecedents
+        }
+        if (newDomain.max != d.max) {
+            intMaxReason[v] = currentFactor
+            intMaxAntecedents[v] = antecedents
+        }
         dirtyInts.addLast(v)
         return true
     }
@@ -480,8 +516,8 @@ class PropagationState(
         s.add(fid)
     }
 
-    private fun setIntImpl(v: Int, value: Int): Boolean =
-        tightenIntMinImpl(v, value) && tightenIntMaxImpl(v, value)
+    private fun setIntImpl(v: Int, value: Int, antecedents: IntArray?): Boolean =
+        tightenIntMinImpl(v, value, antecedents) && tightenIntMaxImpl(v, value, antecedents)
 
     private fun recordConflictLevels(a: Int, b: Int) {
         val s = HashSet<Int>()
@@ -592,6 +628,8 @@ class PropagationState(
         internal val intMinReason: IntArray,
         internal val intMaxReason: IntArray,
         internal val boolAntecedents: Array<IntArray?>,
+        internal val intMinAntecedents: Array<IntArray?>,
+        internal val intMaxAntecedents: Array<IntArray?>,
         internal val boolPinOrderSize: Int,
     )
 
@@ -606,6 +644,8 @@ class PropagationState(
         intMinReason = intMinReason.copyOf(),
         intMaxReason = intMaxReason.copyOf(),
         boolAntecedents = boolAntecedents.copyOf(),
+        intMinAntecedents = intMinAntecedents.copyOf(),
+        intMaxAntecedents = intMaxAntecedents.copyOf(),
         boolPinOrderSize = boolPinOrder.size,
     )
 
@@ -619,6 +659,8 @@ class PropagationState(
         for (i in s.intMinReason.indices) intMinReason[i] = s.intMinReason[i]
         for (i in s.intMaxReason.indices) intMaxReason[i] = s.intMaxReason[i]
         for (i in s.boolAntecedents.indices) boolAntecedents[i] = s.boolAntecedents[i]
+        for (i in s.intMinAntecedents.indices) intMinAntecedents[i] = s.intMinAntecedents[i]
+        for (i in s.intMaxAntecedents.indices) intMaxAntecedents[i] = s.intMaxAntecedents[i]
         boolPinOrder.truncateTo(s.boolPinOrderSize)
         levelToDecisionVar.clear()
         for (v in s.decisionVars) levelToDecisionVar.add(v)

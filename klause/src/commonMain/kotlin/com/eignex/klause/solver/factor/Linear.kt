@@ -128,9 +128,40 @@ class Linear(
 }
 
 /**
+ * Compose LCG-style antecedents for an int-bound tightening on `vars[excludeIdx]` driven by
+ * the `Σ coeffs · vars ⟨op⟩ bound` constraint. Unions:
+ *   - [extraLit] (e.g. the reif var's false-form for [ReifiedLinear]),
+ *   - the [PropagationState.intMinAntecedents] / [PropagationState.intMaxAntecedents] of
+ *     every other var in the constraint.
+ *
+ * Each int fact's antecedents transitively trace back to the bool decisions that established
+ * it; the analyzer's 1UIP loop resolves through them. Returns `null` when nothing was
+ * recorded (no extraLit, all other vars' int antecedents unset).
+ */
+internal fun collectLinearTightenAntecedents(
+    state: PropagationState,
+    vars: IntArray,
+    excludeIdx: Int,
+    extraLit: Int,
+): IntArray? {
+    val seen = HashSet<Int>()
+    val out = ArrayList<Int>()
+    if (extraLit != 0) { out.add(extraLit); seen.add(extraLit) }
+    for (j in vars.indices) {
+        if (j == excludeIdx) continue
+        val v = vars[j]
+        state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+        state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+    }
+    if (out.isEmpty()) return null
+    return out.toIntArray()
+}
+
+/**
  * Shared bounds-propagation routine for `Σ coeffs[i] * vars[i] ⟨op⟩ bound`. Used by [Linear]
  * directly and by [ReifiedLinear] when its aux Boolean is pinned. Returns `false` iff the
- * domains became jointly infeasible.
+ * domains became jointly infeasible. [extraLit] is an optional context literal (typically the
+ * reif aux's false-form) appended to every int-tighten's antecedents.
  */
 internal fun propagateLinearBounds(
     state: PropagationState,
@@ -138,6 +169,7 @@ internal fun propagateLinearBounds(
     vars: IntArray,
     op: LinearOp,
     bound: Long,
+    extraLit: Int = 0,
 ): Boolean {
     val n = vars.size
     val rLo = LongArray(n)
@@ -160,22 +192,19 @@ internal fun propagateLinearBounds(
         LinearOp.NE -> if (sumLo == bound && sumHi == bound) return false
     }
     if (op == LinearOp.NE) {
-        // NE: when the "rest" of the sum collapses to a single point, the i-th term must
-        // avoid one specific value. With sparse-domain support we can punch that value
-        // out even when it's interior to the variable's domain (not just at an endpoint).
         for (i in 0 until n) {
             val c = coeffs[i].toLong()
             if (c == 0L) continue
             val otherLo = sumLo - rLo[i]
             val otherHi = sumHi - rHi[i]
             if (otherLo != otherHi) continue
-            // c * x ≠ bound - otherLo → x ≠ (bound - otherLo) / c (only if exact).
             val rhs = bound - otherLo
             if (rhs % c != 0L) continue
             val forbidden = rhs / c
             if (forbidden < Int.MIN_VALUE || forbidden > Int.MAX_VALUE) continue
             val v = vars[i]
-            if (!state.excludeIntValue(v, forbidden.toInt())) return false
+            val ant = collectLinearTightenAntecedents(state, vars, i, extraLit)
+            if (!state.excludeIntValue(v, forbidden.toInt(), ant)) return false
         }
         return true
     }
@@ -185,20 +214,21 @@ internal fun propagateLinearBounds(
         val v = vars[i]
         val otherLo = sumLo - rLo[i]
         val otherHi = sumHi - rHi[i]
+        val ant = collectLinearTightenAntecedents(state, vars, i, extraLit)
         if (op == LinearOp.LE || op == LinearOp.EQ) {
             val slack = bound - otherLo
             if (c > 0) {
-                if (!tightenMaxClamped(state, v, floorDivLong(slack, c))) return false
+                if (!tightenMaxClamped(state, v, floorDivLong(slack, c), ant)) return false
             } else {
-                if (!tightenMinClamped(state, v, ceilDivLong(slack, c))) return false
+                if (!tightenMinClamped(state, v, ceilDivLong(slack, c), ant)) return false
             }
         }
         if (op == LinearOp.GE || op == LinearOp.EQ) {
             val needed = bound - otherHi
             if (c > 0) {
-                if (!tightenMinClamped(state, v, ceilDivLong(needed, c))) return false
+                if (!tightenMinClamped(state, v, ceilDivLong(needed, c), ant)) return false
             } else {
-                if (!tightenMaxClamped(state, v, floorDivLong(needed, c))) return false
+                if (!tightenMaxClamped(state, v, floorDivLong(needed, c), ant)) return false
             }
         }
     }
@@ -227,16 +257,16 @@ internal fun linearSumRange(
     return longArrayOf(lo, hi)
 }
 
-private fun tightenMinClamped(state: PropagationState, v: Int, newMin: Long): Boolean = when {
+private fun tightenMinClamped(state: PropagationState, v: Int, newMin: Long, ant: IntArray? = null): Boolean = when {
     newMin > Int.MAX_VALUE -> false
     newMin < Int.MIN_VALUE -> true
-    else -> state.tightenIntMin(v, newMin.toInt())
+    else -> state.tightenIntMin(v, newMin.toInt(), ant)
 }
 
-private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long): Boolean = when {
+private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long, ant: IntArray? = null): Boolean = when {
     newMax < Int.MIN_VALUE -> false
     newMax > Int.MAX_VALUE -> true
-    else -> state.tightenIntMax(v, newMax.toInt())
+    else -> state.tightenIntMax(v, newMax.toInt(), ant)
 }
 
 /** floor(a / b) with correct handling of negative operands. */
