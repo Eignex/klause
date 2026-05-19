@@ -5,6 +5,7 @@ import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Inverse
+import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
@@ -67,6 +68,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "nvalue", "fzn_nvalue" -> emitNValue(c, NValue.Mode.Eq)
     "atleast_nvalues", "fzn_atleast_nvalues" -> emitNValue(c, NValue.Mode.AtLeast)
     "atmost_nvalues", "fzn_atmost_nvalues" -> emitNValue(c, NValue.Mode.AtMost)
+    "lex_less_int", "fzn_lex_less_int" -> emitLexLess(c, strict = true)
+    "lex_lesseq_int", "fzn_lex_lesseq_int" -> emitLexLess(c, strict = false)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -294,6 +297,14 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `lex_less_int(xs, ys)` / `lex_lesseq_int(xs, ys)`. */
+internal fun FlatZincCompiler.emitLexLess(c: FznConstraint, strict: Boolean) {
+    require(c.args.size == 2)
+    val xs = evalIntVarArray(c.args[0])
+    val ys = evalIntVarArray(c.args[1])
+    factors.add(LexLess(xs, ys, strict))
 }
 
 /** `nvalue(n, xs)` / `atleast_nvalues(n, xs)` / `atmost_nvalues(n, xs)`. */
