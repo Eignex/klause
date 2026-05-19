@@ -155,10 +155,9 @@ predicate diffn(array[int] of var int: x, array[int] of var int: y,
 predicate diffn_nonstrict(array[int] of var int: x, array[int] of var int: y,
                           array[int] of int: w, array[int] of int: h);
 
-% Extensional / regular.
-predicate table_int(array[int] of var int: x, array[int, int] of int: t);
-predicate regular(array[int] of var int: x, int: Q, int: S,
-                  array[int, int] of int: d, int: q0, set of int: F);
+% Extensional / regular: the 2D-flattening wrappers live in separate files
+% (fzn_table_int.mzn, fzn_regular.mzn) so they can override the same-named
+% std files. They forward to klause_table_int / klause_regular respectively.
 
 % Set variables and predicates. Klause materialises each `var set of E: S` as one
 % indicator bool per universe element; the set predicates below dispatch to bool-level
