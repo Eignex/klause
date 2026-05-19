@@ -25,6 +25,11 @@ interface LocalSearchFactor : Factor {
      */
     fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
     fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
+    /**
+     * Δ in this factor's violation status if [element]'s membership in set var [setVar] were
+     * toggled. Default 0; factors that read set domains override.
+     */
+    fun deltaIfSetToggled(state: LocalSearchState, factorId: Int, setVar: Int, element: Int): Int = 0
 
     /**
      * Apply a committed move to this factor's payload. The assignment has already been
@@ -34,12 +39,18 @@ interface LocalSearchFactor : Factor {
      */
     fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
     fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+    /**
+     * Apply a committed set-toggle to this factor's payload. Toggle is self-inverting — the
+     * pre-toggle membership is `!state.assignment.setMember(setVar, element)`. Returns the
+     * violation delta produced by the toggle.
+     */
+    fun applySetToggle(state: LocalSearchState, factorId: Int, setVar: Int, element: Int): Int = 0
 
     /**
      * Suggest moves that would (or might) repair this factor when violated. The default lists
-     * a Boolean flip per [Factor.boolVars] member plus an `IntSet(±1)` per [Factor.intVars]
-     * member. Factors with structural insight (e.g. a comparator can snap to its bound)
-     * override this.
+     * a Boolean flip per [Factor.boolVars] member, an `IntSet(±1)` per [Factor.intVars]
+     * member, plus a `SetToggle` per (setVar, currently-in-possible-but-not-required element).
+     * Factors with structural insight (e.g. a comparator can snap to its bound) override this.
      */
     fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         for (b in boolVars) sink.addBoolFlip(b)
@@ -48,6 +59,14 @@ interface LocalSearchFactor : Factor {
             val d = state.problem.intDomains[i]
             if (cur < d.max) sink.addIntSet(i, cur + 1)
             if (cur > d.min) sink.addIntSet(i, cur - 1)
+        }
+        for (s in setVars) {
+            val sd = state.problem.setDomains[s]
+            // Toggle is legal on elements in possible-but-not-required: required elements
+            // must stay in, excluded elements must stay out.
+            sd.possible.forEachSet { e ->
+                if (!sd.required.get(e)) sink.addSetToggle(s, e)
+            }
         }
     }
 }

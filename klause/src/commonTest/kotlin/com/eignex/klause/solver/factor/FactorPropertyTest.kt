@@ -286,6 +286,10 @@ class FactorPropertyTest {
                         assertTrue(move.newValue != state.assignment.intValue(move.varId),
                             "${factor::class.simpleName} proposed no-op IntSet at ${move.newValue}")
                     }
+                    is Move.SetToggle -> {
+                        assertTrue(move.setVarId in factor.setVars,
+                            "${factor::class.simpleName} proposed SetToggle on var ${move.setVarId} not in setVars ${factor.setVars.toList()}")
+                    }
                     is Move.Compound -> { /* no factor proposes Compound today; covered by CompoundMoveTest */ }
                 }
 
@@ -319,6 +323,7 @@ class FactorPropertyTest {
             val predicted = when (move) {
                 is Move.BoolFlip -> factor.deltaIfBoolFlipped(state, 0, move.varId)
                 is Move.IntSet -> factor.deltaIfIntSet(state, 0, move.varId, move.newValue)
+                is Move.SetToggle -> factor.deltaIfSetToggled(state, 0, move.setVarId, move.element)
                 is Move.Compound -> error("pickRandomMove never returns Compound")
             }
             val violatedBefore = factor.isViolated(state, 0)
