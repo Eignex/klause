@@ -67,7 +67,7 @@ class Product(
         val da = state.intDomains[a]
         val db = state.intDomains[b]
         val (pLo, pHi) = cornerProductRange(da, db)
-        if (!tightenLong(state, result, pLo, pHi, state.composeIntVarAntecedents(intArrayOf(a, b)))) return false
+        if (!tightenLong(state, result, pLo, pHi, state.composeIntVarAtomAntecedents(intArrayOf(a, b)))) return false
 
         // Reverse — narrow `a` from result/b, then narrow `b` from result/a.
         //
@@ -94,7 +94,7 @@ class Product(
         // common case after upstream propagation has shaved most of the domain.
         val drFinal = state.intDomains[result]
         if (0 !in drFinal.min..drFinal.max) {
-            val antR = state.composeIntVarAntecedents(intArrayOf(result))
+            val antR = state.composeIntVarAtomAntecedents(intArrayOf(result))
             val daFinal = state.intDomains[a]
             if (daFinal.min == 0 && !state.tightenIntMin(a, 1, antR)) return false
             if (daFinal.max == 0 && !state.tightenIntMax(a, -1, antR)) return false
@@ -146,7 +146,7 @@ class Product(
         val others = if (target == a) intArrayOf(b, result)
                      else if (target == b) intArrayOf(a, result)
                      else intArrayOf(a, b)
-        return tightenLong(state, target, tLo, tHi, state.composeIntVarAntecedents(others))
+        return tightenLong(state, target, tLo, tHi, state.composeIntVarAtomAntecedents(others))
     }
 
     /**
@@ -174,7 +174,7 @@ class Product(
         val others = if (target == a) intArrayOf(b, result)
                      else if (target == b) intArrayOf(a, result)
                      else intArrayOf(a, b)
-        return tightenLong(state, target, lo, hi, state.composeIntVarAntecedents(others))
+        return tightenLong(state, target, lo, hi, state.composeIntVarAtomAntecedents(others))
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

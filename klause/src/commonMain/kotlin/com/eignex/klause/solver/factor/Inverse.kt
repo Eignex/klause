@@ -153,7 +153,7 @@ class Inverse(
             if (d.min != d.max) continue
             val gIdx = d.min - gOffset
             if (gIdx !in g.indices) return false
-            val ant = state.composeIntVarAntecedents(intArrayOf(f[i]))
+            val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
             if (!state.tightenIntMin(g[gIdx], i + fOffset, ant)) return false
             if (!state.tightenIntMax(g[gIdx], i + fOffset, ant)) return false
         }
@@ -162,7 +162,7 @@ class Inverse(
             if (d.min != d.max) continue
             val fIdx = d.min - fOffset
             if (fIdx !in f.indices) return false
-            val ant = state.composeIntVarAntecedents(intArrayOf(g[i]))
+            val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[i]))
             if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) return false
             if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) return false
         }

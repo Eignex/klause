@@ -98,11 +98,11 @@ class ReifiedLinear(
         // bound's recorded `intMinAntecedents` / `intMaxAntecedents` traces back to the
         // bool decisions that established it.
         if (alwaysHolds) {
-            val ant = composeAuxAntecedents(state, alwaysHolds = true)
+            val ant = composeAuxAntecedents(state)
             return state.pinBool(auxBoolVar, true, ant)
         }
         if (neverHolds) {
-            val ant = composeAuxAntecedents(state, alwaysHolds = false)
+            val ant = composeAuxAntecedents(state)
             return state.pinBool(auxBoolVar, false, ant)
         }
 
@@ -124,23 +124,14 @@ class ReifiedLinear(
     }
 
     /**
-     * Compose aux-pin antecedents from involved vars' int trails. Bool-literal union
-     * form — the analyzer resolves through them via the standard 1UIP loop. A sharper
-     * atom-lit form is available via [PropagationState.atomVarGe] / [atomVarLe], but
-     * adopting it requires extending [com.eignex.klause.solver.factor.Clause] and the
-     * watched-literal infrastructure to handle atom-var ids (currently sized to
-     * `numBoolVars`); that's the next LCG step.
+     * Compose aux-pin antecedents as per-bound atom-lits over the involved vars. For each
+     * var with `min` tighter than its initial domain, emit `¬[v ≥ d.min]`; similarly for
+     * the `max` side. The implicit clause `(⋀ premise atom-lits) → aux` resolves cleanly
+     * through 1UIP / self-subsuming minimization with finer granularity than the older
+     * bool-lit union would have given.
      */
-    private fun composeAuxAntecedents(state: PropagationState, alwaysHolds: Boolean): IntArray? {
-        val seen = HashSet<Int>()
-        val out = ArrayList<Int>()
-        for (v in vars) {
-            state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-            state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-        }
-        if (out.isEmpty()) return null
-        return out.toIntArray()
-    }
+    private fun composeAuxAntecedents(state: PropagationState): IntArray? =
+        state.composeIntVarAtomAntecedents(vars)
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)

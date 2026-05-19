@@ -326,18 +326,11 @@ class GlobalCardinality(
         return true
     }
 
-    /** Coarse LCG antecedents: union of every `xs` var's int trail. Used for every
-     *  prune / tighten in GCC propagation — minimization can shrink redundancy. */
-    private fun composeGccAntecedents(state: PropagationState): IntArray? {
-        val seen = HashSet<Int>()
-        val out = ArrayList<Int>()
-        for (v in xs) {
-            state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-            state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-        }
-        if (out.isEmpty()) return null
-        return out.toIntArray()
-    }
+    /** Per-bound atom-lit antecedents over every `xs` var — sound for any flow-based
+     *  prune / tighten (every var's bounds shaped the network). Minimization can collapse
+     *  redundant per-bound facts; resolution through 1UIP is finer than a bool-lit union. */
+    private fun composeGccAntecedents(state: PropagationState): IntArray? =
+        state.composeIntVarAtomAntecedents(xs)
 
     /**
      * Minimal Edmonds-Karp max-flow over an integer-capacity graph stored as parallel

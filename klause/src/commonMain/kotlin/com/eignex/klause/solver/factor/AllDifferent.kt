@@ -277,19 +277,11 @@ class AllDifferent(
         return true
     }
 
-    /** Union the int antecedents of every var in this AllDifferent — coarse but sound
-     *  reason for any Régin-SCC prune (every other var's bounds participated in the
-     *  matching/SCC analysis). Returns `null` when no var has recorded antecedents. */
-    private fun composeAllDifferentAntecedents(state: PropagationState): IntArray? {
-        val seen = HashSet<Int>()
-        val out = ArrayList<Int>()
-        for (v in vars) {
-            state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-            state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-        }
-        if (out.isEmpty()) return null
-        return out.toIntArray()
-    }
+    /** Per-bound atom-lit antecedents over every var in this AllDifferent — sound reason
+     *  for any Régin-SCC prune (every other var's bounds participated in the matching/SCC
+     *  analysis). Returns `null` when no var's bounds are tighter than its initial domain. */
+    private fun composeAllDifferentAntecedents(state: PropagationState): IntArray? =
+        state.composeIntVarAtomAntecedents(vars)
 
     /** Hopcroft-Karp-style augmenting-path search for max bipartite matching. Returns
      *  true iff variable [i] can be matched (possibly re-routing earlier matches). */

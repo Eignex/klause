@@ -135,7 +135,7 @@ class NValue(
             if (d.min == d.max) singletons.add(d.min)
         }
         val minDistinct = singletons.size
-        val ant = state.composeIntVarAntecedents(xs)
+        val ant = state.composeIntVarAtomAntecedents(xs)
         when (mode) {
             Mode.Eq -> {
                 if (!state.tightenIntMin(n, minDistinct, ant)) return false

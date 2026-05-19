@@ -133,7 +133,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // LCG antecedents: every Circuit prune depends on the joint state of all
         // succ vars (Hamiltonian-cycle reasoning is global). Union once at entry.
-        val ant = state.composeIntVarAntecedents(succ)
+        val ant = state.composeIntVarAtomAntecedents(succ)
         // 1. Tighten each succ[i] to the domain [0, n). Structural; antecedent null.
         for (i in succ.indices) {
             val v = succ[i]

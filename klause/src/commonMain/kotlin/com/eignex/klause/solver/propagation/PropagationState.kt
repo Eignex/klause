@@ -83,21 +83,39 @@ class PropagationState(
     /** Number of decisions pushed so far. Equals the maximum level. */
     val numDecisions: Int get() = levelToDecisionVar.size
 
-    /** Union the LCG-style int antecedents stored on every var in [vars] — both
-     *  [intMinAntecedents] and [intMaxAntecedents] — into a single bool-literal array
-     *  suitable for passing as the `antecedents` parameter on a subsequent tighten /
-     *  exclude. Used by int-domain factors (AllDifferent, GCC, Element, Cumulative,
-     *  Sort, ...) that emit a constraint-wide reason: every involved var's current
-     *  domain bounds participate in the deduction.
+    /** Emit per-bound atom-lit antecedents for every var in [vars]. For each var,
+     *  if its current `min` is tighter than the initial domain min, emit `¬[v ≥ d.min]`;
+     *  similarly for the `max` side. The deduction's implicit clause is then
+     *  `(⋀ premises) → result`, which as antecedents-on-result is the disjunction of the
+     *  premises' negations.
      *
-     *  Returns `null` when no var has recorded antecedents — the analyzer then treats
-     *  the resulting int-fact as a level-0-style leaf. */
-    fun composeIntVarAntecedents(vars: IntArray): IntArray? {
-        val seen = HashSet<Int>()
+     *  Used by int-domain factors (AllDifferent, GCC, Element, Cumulative, Sort, ...)
+     *  that emit a constraint-wide reason: every involved var's current bounds participate
+     *  in the deduction. Per-bound atom-lits give 1UIP / minimization finer resolution than
+     *  the coarser bool-lit union that the antecedents-of-antecedents would unfold to.
+     *
+     *  Returns `null` when no var's bounds have been tightened past the initial domain —
+     *  the analyzer then treats the resulting int-fact as a level-0-style leaf. */
+    fun composeIntVarAtomAntecedents(vars: IntArray): IntArray? {
+        val seen = HashSet<Long>()
         val out = ArrayList<Int>()
         for (v in vars) {
-            intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-            intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+            val d = intDomains[v]
+            val orig = problem.intDomains[v]
+            if (d.min > orig.min) {
+                val key = (v.toLong() shl 33) or (0L shl 32) or
+                          (d.min.toLong() - Int.MIN_VALUE.toLong())
+                if (seen.add(key)) out.add(
+                    com.eignex.klause.solver.Lit.make(atomVarGe(v, d.min), false)
+                )
+            }
+            if (d.max < orig.max) {
+                val key = (v.toLong() shl 33) or (1L shl 32) or
+                          (d.max.toLong() - Int.MIN_VALUE.toLong())
+                if (seen.add(key)) out.add(
+                    com.eignex.klause.solver.Lit.make(atomVarLe(v, d.max), false)
+                )
+            }
         }
         if (out.isEmpty()) return null
         return out.toIntArray()

@@ -52,7 +52,7 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
             if (d.max < commonMax) commonMax = d.max
         }
         if (commonMin > commonMax) return false
-        val ant = state.composeIntVarAntecedents(xs)
+        val ant = state.composeIntVarAtomAntecedents(xs)
         for (v in xs) {
             if (!state.tightenIntMin(v, commonMin, ant)) return false
             if (!state.tightenIntMax(v, commonMax, ant)) return false

@@ -135,24 +135,24 @@ class Monotone(
             Direction.Increasing -> {
                 for (i in 0 until xs.size - 1) {
                     val lo = state.intDomains[xs[i]].min + bump
-                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i]))
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))
                     if (!state.tightenIntMin(xs[i + 1], lo, ant)) return false
                 }
                 for (i in xs.size - 2 downTo 0) {
                     val hi = state.intDomains[xs[i + 1]].max - bump
-                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i + 1]))
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i + 1]))
                     if (!state.tightenIntMax(xs[i], hi, ant)) return false
                 }
             }
             Direction.Decreasing -> {
                 for (i in 0 until xs.size - 1) {
                     val hi = state.intDomains[xs[i]].max - bump
-                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i]))
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))
                     if (!state.tightenIntMax(xs[i + 1], hi, ant)) return false
                 }
                 for (i in xs.size - 2 downTo 0) {
                     val lo = state.intDomains[xs[i + 1]].min + bump
-                    val ant = state.composeIntVarAntecedents(intArrayOf(xs[i + 1]))
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i + 1]))
                     if (!state.tightenIntMin(xs[i], lo, ant)) return false
                 }
             }

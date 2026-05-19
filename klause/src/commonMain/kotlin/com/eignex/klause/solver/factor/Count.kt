@@ -108,7 +108,7 @@ class Count(
             if (all) definite++
             if (any) possible++
         }
-        val ant = state.composeIntVarAntecedents(xs)
+        val ant = state.composeIntVarAtomAntecedents(xs)
         if (!state.tightenIntMin(n, definite, ant)) return false
         if (!state.tightenIntMax(n, possible, ant)) return false
         return true

@@ -65,7 +65,7 @@ class Member(
             // Restrict y's domain to the value set.
             val toRemove = ArrayList<Int>()
             dy.forEach { if (it !in values) toRemove.add(it) }
-            val ant = state.composeIntVarAntecedents(xs)
+            val ant = state.composeIntVarAtomAntecedents(xs)
             for (v in toRemove) if (!state.excludeIntValue(y, v, ant)) return false
         }
         return true

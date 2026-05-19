@@ -81,8 +81,8 @@ class ArrayMinMax(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val antXs = state.composeIntVarAntecedents(xs)
-        val antResult = state.composeIntVarAntecedents(intArrayOf(result))
+        val antXs = state.composeIntVarAtomAntecedents(xs)
+        val antResult = state.composeIntVarAtomAntecedents(intArrayOf(result))
         if (max) {
             var hiBound = Int.MIN_VALUE
             var loBound = Int.MIN_VALUE

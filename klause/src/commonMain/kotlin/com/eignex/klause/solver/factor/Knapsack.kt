@@ -113,7 +113,7 @@ class Knapsack(
         }
         if (wLo > Int.MAX_VALUE || wHi < Int.MIN_VALUE) return false
         if (pLo > Int.MAX_VALUE || pHi < Int.MIN_VALUE) return false
-        val ant = state.composeIntVarAntecedents(xs)
+        val ant = state.composeIntVarAtomAntecedents(xs)
         if (!state.tightenIntMin(w, wLo.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt(), ant)) return false
         if (!state.tightenIntMax(w, wHi.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), ant)) return false
         if (!state.tightenIntMin(p, pLo.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt(), ant)) return false

@@ -85,7 +85,7 @@ class Table(
             for (col in 0 until arity) supports[col].add(tuples[row * arity + col])
         }
         if (!anyFeasible) return false
-        val ant = state.composeIntVarAntecedents(xs)
+        val ant = state.composeIntVarAtomAntecedents(xs)
         for (col in 0 until arity) {
             val sup = supports[col]
             val minSup = sup.min(); val maxSup = sup.max()

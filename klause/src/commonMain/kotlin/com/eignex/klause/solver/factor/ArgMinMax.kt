@@ -91,7 +91,7 @@ class ArgMinMax(
                 if (extreme(v, bestVal)) { bestPos = i; bestVal = v }
             }
             val expected = bestPos + indexOffset
-            val ant = state.composeIntVarAntecedents(xs)
+            val ant = state.composeIntVarAtomAntecedents(xs)
             if (!state.tightenIntMin(idx, expected, ant)) return false
             if (!state.tightenIntMax(idx, expected, ant)) return false
         }

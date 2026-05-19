@@ -113,7 +113,7 @@ class AllDifferentExceptZero(
         }
         // Punch every singleton-taken value out of every other var's domain.
         if (taken.isNotEmpty()) {
-            val ant = state.composeIntVarAntecedents(xs)
+            val ant = state.composeIntVarAtomAntecedents(xs)
             for (v in xs) {
                 val d = state.intDomains[v]
                 if (d.min == d.max) continue

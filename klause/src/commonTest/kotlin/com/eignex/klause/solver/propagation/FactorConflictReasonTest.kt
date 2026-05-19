@@ -313,17 +313,24 @@ class FactorConflictReasonTest {
             assertTrue(confl == null, "unexpected conflict at level 1")
             s
         }
-        // v0 should be pinned to 5 with antecedents [¬x] on both bounds.
+        // v0 should be pinned to 5 with antecedents that include ¬x (the extraLit
+        // wired through propagateLinearBounds).
         assertTrue(ant.intMinAntecedents[0] != null,
             "v0.min antecedents should be set by ReifiedLinear A's body propagation")
         val xLit = Lit.make(0, false)  // ¬x = the false-form of the pinned x=true.
         assertTrue(xLit in ant.intMinAntecedents[0]!!.toSet(),
             "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}")
-        // z (bool var 1) implied true; its boolAntecedents should trace through to ¬x.
+        // z (bool var 1) implied true; its boolAntecedents now contain the *atom-lit*
+        // form ¬[v0≥5] and ¬[v0≤5] — the per-bound premise atoms — rather than the
+        // coarser ¬x union. Resolution through these atoms still traces back to ¬x via
+        // their own antecedents = intMin/MaxAntecedents[v0] = [¬x].
         val zAnt = ant.boolAntecedents[1]
         assertTrue(zAnt != null, "z's antecedents should be set by ReifiedLinear C's aux pin")
-        assertTrue(xLit in zAnt!!.toSet(),
-            "z's antecedents should contain ¬x (via composed int trail), got ${zAnt.toList()}")
+        val ge5 = Lit.make(ant.atomVarGe(0, 5), false)
+        val le5 = Lit.make(ant.atomVarLe(0, 5), false)
+        val zAntSet = zAnt!!.toSet()
+        assertTrue(ge5 in zAntSet && le5 in zAntSet,
+            "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}")
     }
 
     @Test
@@ -366,11 +373,19 @@ class FactorConflictReasonTest {
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         val lits = learned.literals.toSet()
-        assertTrue(Lit.make(0, false) in lits,
-            "learned should contain ¬x, got ${learned.literals.toList()}")
-        // LCG win: y resolved away by minimization (its antecedent ¬x already in clause).
+        // With atom-lit antecedents, the learned clause is the per-bound nogood
+        // ¬[v0≥5] ∨ ¬[v0≤5] (i.e. v0 ≠ 5) — strictly stronger than [¬x] over the int
+        // semantics: it rules out every assignment that forces v0=5 from any source, not
+        // just x=true. Minimization still resolves y away (y's atom-lit antecedents are
+        // already in the clause).
         assertFalse(Lit.make(1, true) in lits,
             "LCG should resolve y away; got ${learned.literals.toList()}")
+        // We can't easily look up the atom-var ids without a state handle, but we can
+        // assert the shape: every literal points at an atom var (id ≥ numBoolVars=3).
+        for (l in learned.literals) {
+            assertTrue(Lit.variable(l) >= 3,
+                "expected only atom-lit literals (var ≥ 3), got var ${Lit.variable(l)} in ${learned.literals.toList()}")
+        }
     }
 
     @Test
@@ -411,16 +426,20 @@ class FactorConflictReasonTest {
         assertEquals(3, state.intDomains[1].min)
         assertEquals(3, state.intDomains[1].max)
         // Allocate atom [v1 ≥ 3]: should hold (currently true), level 1 (when v1.min
-        // was tightened by Linear), antecedents from intMinAntecedents[v1] = [¬x].
+        // was tightened by Linear), antecedents from intMinAntecedents[v1] — which under
+        // the atom-lit migration are the per-bound premise atoms over v0: ¬[v0≥5] and
+        // ¬[v0≤5] (Linear's collectLinearTightenAntecedents emits these for the other vars).
         val atomVarGE3 = state.atomVarGe(1, 3)
         val atomId = state.atomIdOf(atomVarGE3)
         assertEquals(1, state.atomValue[atomId], "atom [v1≥3] should hold (v1.min=3≥3)")
         assertEquals(1, state.atomLevel[atomId], "atom became known at level 1")
         val ant = state.atomAntecedents[atomId]
         assertTrue(ant != null, "atom should have antecedents from intMinAntecedents[v1]")
-        val xLit = Lit.make(0, false)  // ¬x — the false-form when x is true.
-        assertTrue(xLit in ant!!.toSet(),
-            "atom antecedents should contain ¬x, got ${ant.toList()}")
+        val ge5 = Lit.make(state.atomVarGe(0, 5), false)
+        val le5 = Lit.make(state.atomVarLe(0, 5), false)
+        val antSet = ant!!.toSet()
+        assertTrue(ge5 in antSet && le5 in antSet,
+            "atom antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${ant.toList()}")
         // Allocate a second atom [v1 ≥ 10] — should be false (v1.max=3 < 10).
         val atomVarGE10 = state.atomVarGe(1, 10)
         val atomId10 = state.atomIdOf(atomVarGE10)

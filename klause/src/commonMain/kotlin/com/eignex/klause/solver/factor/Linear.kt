@@ -150,8 +150,16 @@ internal fun collectLinearTightenAntecedents(
     for (j in vars.indices) {
         if (j == excludeIdx) continue
         val v = vars[j]
-        state.intMinAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
-        state.intMaxAntecedents[v]?.let { for (l in it) if (seen.add(l)) out.add(l) }
+        val d = state.intDomains[v]
+        val orig = state.problem.intDomains[v]
+        if (d.min > orig.min) {
+            val lit = com.eignex.klause.solver.Lit.make(state.atomVarGe(v, d.min), false)
+            if (seen.add(lit)) out.add(lit)
+        }
+        if (d.max < orig.max) {
+            val lit = com.eignex.klause.solver.Lit.make(state.atomVarLe(v, d.max), false)
+            if (seen.add(lit)) out.add(lit)
+        }
     }
     if (out.isEmpty()) return null
     return out.toIntArray()

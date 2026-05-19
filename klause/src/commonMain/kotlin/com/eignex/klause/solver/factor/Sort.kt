@@ -64,8 +64,8 @@ class Sort(
                 if (state.intDomains[ys[i]].min != xv[i]) return false
             }
         }
-        val antYs = state.composeIntVarAntecedents(ys)
-        val antXs = state.composeIntVarAntecedents(xs)
+        val antYs = state.composeIntVarAtomAntecedents(ys)
+        val antXs = state.composeIntVarAtomAntecedents(xs)
         // ys non-decreasing.
         for (i in 0 until ys.size - 1) {
             val lo = state.intDomains[ys[i]].min
