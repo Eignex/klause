@@ -9,6 +9,7 @@ import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Subcircuit
@@ -82,6 +83,12 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "at_least_int" -> emitAtLeast(c)
     "at_most_int" -> emitAtMost(c)
     "count_eq" -> emitCountEq(c)
+
+    // Ordering
+    "increasing_int", "fzn_increasing_int" -> emitMonotone(c, ascending = true, strict = false)
+    "decreasing_int", "fzn_decreasing_int" -> emitMonotone(c, ascending = false, strict = false)
+    "strictly_increasing_int", "fzn_strictly_increasing_int" -> emitMonotone(c, ascending = true, strict = true)
+    "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, ascending = false, strict = true)
 
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
 }
@@ -511,6 +518,16 @@ internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
         else -> failHere("unhandled reified int cmp `${c.name}`")
     }
     factors.add(ReifiedLinear(r, coeffs, vars, op, bound))
+}
+
+/** `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
+ *  ordering, lowered to a single [Monotone] factor. */
+internal fun FlatZincCompiler.emitMonotone(c: FznConstraint, ascending: Boolean, strict: Boolean) {
+    require(c.args.size == 1)
+    val xs = evalIntVarArray(c.args[0])
+    if (xs.size < 2) return  // 0- or 1-element array is trivially monotone.
+    val direction = if (ascending) Monotone.Direction.Increasing else Monotone.Direction.Decreasing
+    factors.add(Monotone(xs, direction, strict))
 }
 
 internal fun FlatZincCompiler.emitAtLeast(c: FznConstraint) {
