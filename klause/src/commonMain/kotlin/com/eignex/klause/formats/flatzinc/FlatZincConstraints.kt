@@ -162,6 +162,19 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "minimum_int", "fzn_minimum_int" -> emitArrayMinMax(c, max = false)
     "exactly_int", "fzn_exactly_int" -> emitExactly(c)
 
+    // Bool variants of int globals — channel each bool lit to a 0/1 int and reuse the
+    // existing int factor. Channels are allocated lazily per constraint; the engine
+    // handles deduplication via standard propagation.
+    "increasing_bool", "fzn_increasing_bool" -> emitMonotoneBool(c, ascending = true, strict = false)
+    "decreasing_bool", "fzn_decreasing_bool" -> emitMonotoneBool(c, ascending = false, strict = false)
+    "strictly_increasing_bool", "fzn_strictly_increasing_bool" -> emitMonotoneBool(c, ascending = true, strict = true)
+    "strictly_decreasing_bool", "fzn_strictly_decreasing_bool" -> emitMonotoneBool(c, ascending = false, strict = true)
+    "lex_less_bool", "fzn_lex_less_bool" -> emitLexLessBool(c, strict = true)
+    "lex_lesseq_bool", "fzn_lex_lesseq_bool" -> emitLexLessBool(c, strict = false)
+    "arg_max_bool", "fzn_arg_max_bool" -> emitArgMinMaxBool(c, max = true)
+    "arg_min_bool", "fzn_arg_min_bool" -> emitArgMinMaxBool(c, max = false)
+    "table_bool", "fzn_table_bool" -> emitTableBool(c)
+
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
 }
 
@@ -1010,6 +1023,64 @@ internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
 
 /** `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
  *  ordering, lowered to a single [Monotone] factor. */
+/**
+ * Channel a bool literal array into a parallel int-var array with domain [0, 1] each.
+ * Adds a ReifiedLinear per literal that ties `lit ↔ (channel = 1)`. Returns the new int
+ * var ids in the same order. Used by the bool-variant dispatches that reuse int factors.
+ */
+internal fun FlatZincCompiler.channelBoolsToInts(lits: IntArray, tag: String): IntArray {
+    return IntArray(lits.size) { i ->
+        val ch = allocInt("__chan_${tag}_$i", 0, 1)
+        // lit ↔ (ch = 1): ReifiedLinear with auxBoolVar = variable of lit, polarity-aware.
+        // For a positive literal: aux = lit's var directly.
+        // For a negative literal: lit = ¬b, so b ↔ (ch = 0) which is the same as ¬b ↔ (ch = 1).
+        val (auxVar, useNegatedTarget) = Lit.variable(lits[i]) to !Lit.isPositive(lits[i])
+        factors.add(ReifiedLinear(
+            auxBoolVar = auxVar,
+            coeffs = intArrayOf(1), vars = intArrayOf(ch),
+            op = LinearOp.EQ,
+            bound = if (useNegatedTarget) 0 else 1,
+        ))
+        ch
+    }
+}
+
+internal fun FlatZincCompiler.emitMonotoneBool(c: FznConstraint, ascending: Boolean, strict: Boolean) {
+    require(c.args.size == 1)
+    val lits = evalBoolVarArray(c.args[0])
+    if (lits.size < 2) return
+    val ints = channelBoolsToInts(lits, "mono")
+    val direction = if (ascending) Monotone.Direction.Increasing else Monotone.Direction.Decreasing
+    factors.add(Monotone(ints, direction, strict))
+}
+
+internal fun FlatZincCompiler.emitLexLessBool(c: FznConstraint, strict: Boolean) {
+    require(c.args.size == 2)
+    val xLits = evalBoolVarArray(c.args[0])
+    val yLits = evalBoolVarArray(c.args[1])
+    val xs = channelBoolsToInts(xLits, "lex_x")
+    val ys = channelBoolsToInts(yLits, "lex_y")
+    factors.add(LexLess(xs, ys, strict))
+}
+
+internal fun FlatZincCompiler.emitArgMinMaxBool(c: FznConstraint, max: Boolean) {
+    require(c.args.size == 2)
+    val xLits = evalBoolVarArray(c.args[0])
+    val idx = resolveIntVar(c.args[1])
+    val xs = channelBoolsToInts(xLits, "argmm")
+    val offset = intDomains[idx].min
+    factors.add(ArgMinMax(idx = idx, xs = xs, max = max, indexOffset = offset))
+}
+
+internal fun FlatZincCompiler.emitTableBool(c: FznConstraint) {
+    require(c.args.size == 2)
+    val xLits = evalBoolVarArray(c.args[0])
+    val tuplesBool = evalBoolConstArray(c.args[1])
+    val xs = channelBoolsToInts(xLits, "tbl")
+    val tuples = IntArray(tuplesBool.size) { if (tuplesBool[it]) 1 else 0 }
+    factors.add(Table(xs, tuples))
+}
+
 internal fun FlatZincCompiler.emitMonotone(c: FznConstraint, ascending: Boolean, strict: Boolean) {
     require(c.args.size == 1)
     val xs = evalIntVarArray(c.args[0])
