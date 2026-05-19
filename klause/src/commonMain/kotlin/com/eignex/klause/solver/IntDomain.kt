@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.binarySearchInt
+
 /**
  * Integer-variable domain. Conceptually a finite set of integers; physically a
  * `[min..max]` interval with an optional sorted list of interior holes for sparse
@@ -50,7 +52,7 @@ class IntDomain private constructor(
     operator fun contains(value: Int): Boolean {
         if (value < min || value > max) return false
         if (holes == null) return true
-        return holes.binarySearch(value) < 0
+        return holes.binarySearchInt(value) < 0
     }
 
     fun clamp(value: Int): Int = if (value < min) min else if (value > max) max else value
@@ -74,7 +76,7 @@ class IntDomain private constructor(
             value == min -> {
                 var newMin = min + 1
                 if (holes != null) {
-                    while (newMin <= max && holes.binarySearch(newMin) >= 0) newMin++
+                    while (newMin <= max && holes.binarySearchInt(newMin) >= 0) newMin++
                 }
                 check(newMin <= max) { "Empty domain after excludeValue($value)" }
                 // Trim holes now <= newMin (they were either between old min and new min, or are now the endpoint).
@@ -84,7 +86,7 @@ class IntDomain private constructor(
             value == max -> {
                 var newMax = max - 1
                 if (holes != null) {
-                    while (newMax >= min && holes.binarySearch(newMax) >= 0) newMax--
+                    while (newMax >= min && holes.binarySearchInt(newMax) >= 0) newMax--
                 }
                 check(newMax >= min) { "Empty domain after excludeValue($value)" }
                 val newHoles = trimHolesAbove(holes, newMax - 1)
@@ -108,7 +110,7 @@ class IntDomain private constructor(
         check(newMin <= max) { "withMinAtLeast($newMin) empties domain [$min..$max]" }
         var m = newMin
         if (holes != null) {
-            while (m <= max && holes.binarySearch(m) >= 0) m++
+            while (m <= max && holes.binarySearchInt(m) >= 0) m++
         }
         check(m <= max) { "withMinAtLeast($newMin): only holes remained above $newMin" }
         val newHoles = trimHolesBelow(holes, m + 1)
@@ -120,7 +122,7 @@ class IntDomain private constructor(
         check(newMax >= min) { "withMaxAtMost($newMax) empties domain [$min..$max]" }
         var m = newMax
         if (holes != null) {
-            while (m >= min && holes.binarySearch(m) >= 0) m--
+            while (m >= min && holes.binarySearchInt(m) >= 0) m--
         }
         check(m >= min) { "withMaxAtMost($newMax): only holes remained below $newMax" }
         val newHoles = trimHolesAbove(holes, m - 1)
@@ -221,7 +223,7 @@ class IntDomain private constructor(
         }
 
         private fun insertSorted(holes: IntArray, value: Int): IntArray {
-            val idx = holes.binarySearch(value)
+            val idx = holes.binarySearchInt(value)
             if (idx >= 0) return holes  // already excluded; idempotent
             val insertAt = -(idx + 1)
             val out = IntArray(holes.size + 1)

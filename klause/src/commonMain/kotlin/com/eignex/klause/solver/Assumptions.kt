@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.binarySearchInt
+
 /**
  * Per-call constraint on the solver: pin specific variables to specific values for the
  * duration of the call. Compatible with all the entry points on [Solver] and
@@ -38,18 +40,18 @@ class Assumptions internal constructor(
     val numBools: Int get() = boolKeys.size
     val numInts: Int get() = intKeys.size
 
-    fun isFrozenBool(id: Int): Boolean = boolKeys.binarySearch(id) >= 0
-    fun isFrozenInt(id: Int): Boolean = intKeys.binarySearch(id) >= 0
+    fun isFrozenBool(id: Int): Boolean = boolKeys.binarySearchInt(id) >= 0
+    fun isFrozenInt(id: Int): Boolean = intKeys.binarySearchInt(id) >= 0
 
     /** Pinned value for bool [id], or `null` if it isn't an assumption. */
     fun boolValueOrNull(id: Int): Boolean? {
-        val idx = boolKeys.binarySearch(id)
+        val idx = boolKeys.binarySearchInt(id)
         return if (idx >= 0) boolValues[idx] else null
     }
 
     /** Pinned value for int [id], or `null` if it isn't an assumption. */
     fun intValueOrNull(id: Int): Int? {
-        val idx = intKeys.binarySearch(id)
+        val idx = intKeys.binarySearchInt(id)
         return if (idx >= 0) intValues[idx] else null
     }
 
@@ -92,7 +94,7 @@ class Assumptions internal constructor(
     /** Return a fresh [Assumptions] that also pins bool [id] to [value]. Existing
      *  bool pin on [id] is overwritten. */
     fun withBool(id: Int, value: Boolean): Assumptions {
-        val idx = boolKeys.binarySearch(id)
+        val idx = boolKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = boolValues.copyOf(); nv[idx] = value
             Assumptions(boolKeys, nv, intKeys, intValues)
@@ -112,7 +114,7 @@ class Assumptions internal constructor(
     /** Return a fresh [Assumptions] that also pins int [id] to [value]. Existing
      *  int pin on [id] is overwritten. */
     fun withInt(id: Int, value: Int): Assumptions {
-        val idx = intKeys.binarySearch(id)
+        val idx = intKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = intValues.copyOf(); nv[idx] = value
             Assumptions(boolKeys, boolValues, intKeys, nv)

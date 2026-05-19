@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.propagation
 
+import com.eignex.klause.util.binarySearchInt
+
 /**
  * Result of [com.eignex.klause.solver.Problem.propagate]. Either a (possibly empty) set of
  * literals/values forced beyond the input assumptions, or a sound (but incomplete) proof of
@@ -32,12 +34,12 @@ sealed interface PropagationResult {
         val numInts: Int get() = intKeys.size
 
         fun boolValueOrNull(id: Int): Boolean? {
-            val idx = boolKeys.binarySearch(id)
+            val idx = boolKeys.binarySearchInt(id)
             return if (idx >= 0) boolValues[idx] else null
         }
 
         fun intValueOrNull(id: Int): Int? {
-            val idx = intKeys.binarySearch(id)
+            val idx = intKeys.binarySearchInt(id)
             return if (idx >= 0) intValues[idx] else null
         }
 

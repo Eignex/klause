@@ -145,7 +145,7 @@ class AllDifferentTest {
     }
 
     @Test
-    fun `hall interval detects infeasibility (pigeonhole over interval)`() {
+    fun `hall interval detects infeasibility - pigeonhole over interval`() {
         // Four vars all confined to [1, 3] — 4 vars but only 3 values. Hall-interval
         // count > span detects infeasibility at propagation time.
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)
