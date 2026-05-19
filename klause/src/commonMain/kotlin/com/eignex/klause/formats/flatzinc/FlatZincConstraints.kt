@@ -6,6 +6,7 @@ import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Among
+import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
@@ -73,6 +74,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "atmost_nvalues", "fzn_atmost_nvalues" -> emitNValue(c, NValue.Mode.AtMost)
     "lex_less_int", "fzn_lex_less_int" -> emitLexLess(c, strict = true)
     "lex_lesseq_int", "fzn_lex_lesseq_int" -> emitLexLess(c, strict = false)
+    "arg_max_int", "fzn_arg_max_int" -> emitArgMinMax(c, max = true)
+    "arg_min_int", "fzn_arg_min_int" -> emitArgMinMax(c, max = false)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -311,6 +314,17 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `arg_max_int(xs, idx)` / `arg_min_int(xs, idx)`. MiniZinc emits arg-of-extreme with the
+ *  array first, idx second; the FZN form is identical. Index offset is inferred from idx's
+ *  declared domain (MZN's 1-based default → domain.min = 1). */
+internal fun FlatZincCompiler.emitArgMinMax(c: FznConstraint, max: Boolean) {
+    require(c.args.size == 2)
+    val xs = evalIntVarArray(c.args[0])
+    val idx = resolveIntVar(c.args[1])
+    val offset = intDomains[idx].min  // typically 1 for MiniZinc default
+    factors.add(ArgMinMax(idx = idx, xs = xs, max = max, indexOffset = offset))
 }
 
 /** `lex_less_int(xs, ys)` / `lex_lesseq_int(xs, ys)`. */
