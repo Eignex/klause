@@ -185,14 +185,18 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // bool per universe element; set algebra becomes bool algebra over those indicators.
     "set_in", "fzn_set_in" -> emitSetIn(c, reified = false)
     "set_in_reif", "fzn_set_in_reif" -> emitSetIn(c, reified = true)
-    "set_subset", "fzn_set_subset" -> emitSetSubset(c)
-    "set_eq", "fzn_set_eq" -> emitSetEq(c)
+    "set_subset", "fzn_set_subset" -> emitSetSubset(c, reified = false)
+    "set_subset_reif", "fzn_set_subset_reif" -> emitSetSubset(c, reified = true)
+    "set_eq", "fzn_set_eq" -> emitSetEq(c, reified = false)
+    "set_eq_reif", "fzn_set_eq_reif" -> emitSetEq(c, reified = true)
+    "set_ne", "fzn_set_ne" -> emitSetNe(c, reified = false)
+    "set_ne_reif", "fzn_set_ne_reif" -> emitSetNe(c, reified = true)
     "set_card", "fzn_set_card" -> emitSetCard(c)
     "set_union", "fzn_set_union" -> emitSetUnion(c)
     "set_intersect", "fzn_set_intersect" -> emitSetIntersect(c)
     "set_diff", "fzn_set_diff" -> emitSetDiff(c)
-    // all_disjoint / set_partition_into need array-of-set-of-int handling that the FZN
-    // parser doesn't expose yet; deferred until set-var arrays are first-class.
+    "all_disjoint", "fzn_all_disjoint" -> emitAllDisjoint(c)
+    "set_partition_into", "fzn_set_partition_into" -> emitSetPartitionInto(c)
 
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
 }
@@ -1278,11 +1282,16 @@ internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
 // have factors for.
 
 /** Resolve a set var reference to its layout. Set literals as parameters (e.g. `set of int: u = {1,3}`)
- *  are not handled here — they belong on the constraint side as constant universes. */
-internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout {
-    val name = (e as? FznExpr.Ident)?.name
-        ?: failHere("expected a set var name, got ${e::class.simpleName}")
-    return setVarsByName[name] ?: failHere("`$name` is not a set var")
+ *  are not handled here — they belong on the constraint side as constant universes. Accepts
+ *  both plain idents (`s`) and array accesses (`a[2]`) into a set-var array. */
+internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout = when (e) {
+    is FznExpr.Ident -> setVarsByName[e.name] ?: failHere("`${e.name}` is not a set var")
+    is FznExpr.ArrayAccess -> {
+        val arr = arrays[e.name] as? FlatZincArray.SetVars
+            ?: failHere("`${e.name}` is not a set var array")
+        arr.layouts[e.index - 1]
+    }
+    else -> failHere("expected a set var reference, got ${e::class.simpleName}")
 }
 
 /** Resolve a set-literal expression to its element list (sorted ascending). */
@@ -1300,21 +1309,32 @@ internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e)
     else -> failHere("expected a set literal, got ${e::class.simpleName}")
 }
 
-/** `set_in(x, S)` and `set_in_reif(x, S, r)`. Only the constant-x form is supported in this
- *  first cut — when `x` is an int constant we look up the indicator bool directly. Var-int x
- *  would need a reified equality channel per universe element; deferred. */
+/** `set_in(x, S)` and `set_in_reif(x, S, r)`. Two forms depending on `x`:
+ *   - Constant int: direct lookup of the indicator bool for that element.
+ *   - Var int: per-element channel `chanᵥ ↔ (x = v)` for every `v` in `x`'s domain,
+ *     plus the constraint `chanᵥ ⇒ indicatorᵥ` for v ∈ universe(S) and `chanᵥ = false`
+ *     for v ∉ universe(S). For reified, `r ↔ ⋁ (chanᵥ ∧ indicatorᵥ)` via aux ANDs.
+ */
 internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
     require(c.args.size == if (reified) 3 else 2)
     val elem = c.args[0]
     val sExpr = c.args[1]
-    val xConst = (elem as? FznExpr.IntLit)?.value?.toInt()
-        ?: failHere("set_in: only constant-int element is supported today (got ${elem::class.simpleName})")
     val layout = resolveSetVar(sExpr)
+    if (elem is FznExpr.IntLit) {
+        emitSetInConst(elem.value.toInt(), layout, if (reified) c.args[2] else null)
+        return
+    }
+    // Var-int element path.
+    val xVar = resolveIntVar(elem)
+    val dom = intDomains[xVar]
+    emitSetInVarInt(xVar, dom.min, dom.max, layout, if (reified) c.args[2] else null)
+}
+
+private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, rExpr: FznExpr?) {
     val idx = layout.elements.binarySearch(xConst)
     if (idx < 0) {
-        // Element is outside S's declared universe → x ∉ S unconditionally.
-        if (reified) {
-            val r = resolveBoolLit(c.args[2])
+        if (rExpr != null) {
+            val r = resolveBoolLit(rExpr)
             factors.add(Clause(intArrayOf(Lit.negate(r))))
         } else {
             failHere("set_in: element $xConst outside set `${layout.name}`'s universe")
@@ -1322,9 +1342,8 @@ internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
         return
     }
     val indicator = layout.indicatorBoolIds[idx]
-    if (reified) {
-        val r = resolveBoolLit(c.args[2])
-        // r ↔ indicator: two clauses.
+    if (rExpr != null) {
+        val r = resolveBoolLit(rExpr)
         factors.add(Clause(intArrayOf(Lit.negate(r), Lit.make(indicator, true))))
         factors.add(Clause(intArrayOf(r, Lit.make(indicator, false))))
     } else {
@@ -1332,53 +1351,328 @@ internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
     }
 }
 
-/** `set_subset(S, T)`. For each universe element: `Sᵢ ⇒ Tᵢ`. Elements only in S's universe
- *  but not T's must be excluded from S. */
-internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint) {
-    require(c.args.size == 2)
-    val s = resolveSetVar(c.args[0])
-    val t = resolveSetVar(c.args[1])
-    for (i in s.elements.indices) {
-        val e = s.elements[i]
-        val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearch(e)
-        if (tIdx < 0) {
-            // Element of S's universe not in T's universe → must not be in S.
-            factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
+private fun FlatZincCompiler.emitSetInVarInt(
+    xVar: Int, xLo: Int, xHi: Int, layout: SetVarLayout, rExpr: FznExpr?,
+) {
+    val membershipLits = ArrayList<Int>()
+    for (v in xLo..xHi) {
+        // chanᵥ ↔ (x = v) via int_lin_eq_reif([1], [x], v, chanᵥ).
+        val chan = allocBool("__set_in_chan_${layout.name}_$v")
+        factors.add(ReifiedLinear(
+            auxBoolVar = chan,
+            coeffs = intArrayOf(1), vars = intArrayOf(xVar),
+            op = LinearOp.EQ, bound = v,
+        ))
+        val setIdx = layout.elements.binarySearch(v)
+        if (rExpr == null) {
+            // Non-reified: x ∈ S must hold.
+            if (setIdx < 0) {
+                // x = v would put x outside S's universe → forbid.
+                factors.add(Clause(intArrayOf(Lit.make(chan, false))))
+            } else {
+                // chanᵥ ⇒ indicatorᵥ : (¬chanᵥ ∨ indicatorᵥ)
+                factors.add(Clause(intArrayOf(
+                    Lit.make(chan, false),
+                    Lit.make(layout.indicatorBoolIds[setIdx], true),
+                )))
+            }
         } else {
-            // Sᵢ ⇒ Tᵢ : clause [¬Sᵢ, Tᵢ].
-            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(t.indicatorBoolIds[tIdx], true))))
+            // Reified: build per-element AND aux_v ↔ (chanᵥ ∧ indicatorᵥ), then r ↔ ⋁ aux_v.
+            if (setIdx < 0) {
+                // chanᵥ → r = false. Captured by membershipLits not including v.
+                // No clause needed: aux_v would be permanently false.
+                continue
+            }
+            val ind = layout.indicatorBoolIds[setIdx]
+            val aux = allocBool("__set_in_aux_${layout.name}_$v")
+            // aux ↔ (chan ∧ indicator): (¬aux ∨ chan), (¬aux ∨ indicator), (aux ∨ ¬chan ∨ ¬indicator).
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(chan, true))))
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(ind, true))))
+            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(chan, false), Lit.make(ind, false))))
+            membershipLits += Lit.make(aux, true)
+        }
+    }
+    if (rExpr != null) {
+        val r = resolveBoolLit(rExpr)
+        // r ↔ ⋁ membershipLits.
+        val lits = membershipLits.toIntArray()
+        if (lits.isEmpty()) {
+            // No element of x's domain is in S's universe → r must be false.
+            factors.add(Clause(intArrayOf(Lit.negate(r))))
+        } else {
+            // r → ⋁ aux : (¬r ∨ aux1 ∨ ... ∨ auxn)
+            factors.add(Clause(intArrayOf(Lit.negate(r)) + lits))
+            // each auxᵢ → r : (¬auxᵢ ∨ r)
+            for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), r)))
         }
     }
 }
 
-/** `set_eq(S, T)`. Element-wise iff over the union of universes; elements only in one
- *  universe must be false in the corresponding set. */
-internal fun FlatZincCompiler.emitSetEq(c: FznConstraint) {
-    require(c.args.size == 2)
+/** `set_subset(S, T)` / `set_subset_reif(S, T, r)`. Non-reified: for each universe element
+ *  of S, `Sᵢ ⇒ Tᵢ` (with elements outside T's universe forced absent from S).
+ *  Reified: per element, channel `auxᵢ ↔ (Sᵢ ⇒ Tᵢ)`, then `r ↔ ⋀ auxᵢ`. */
+internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) {
+    require(c.args.size == if (reified) 3 else 2)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
-    // Elements in S only must be false in S.
+    if (!reified) {
+        for (i in s.elements.indices) {
+            val e = s.elements[i]
+            val sBit = s.indicatorBoolIds[i]
+            val tIdx = t.elements.binarySearch(e)
+            if (tIdx < 0) {
+                factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
+            } else {
+                factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(t.indicatorBoolIds[tIdx], true))))
+            }
+        }
+        return
+    }
+    val r = resolveBoolLit(c.args[2])
+    val auxes = ArrayList<Int>(s.elements.size)
     for (i in s.elements.indices) {
-        val e = s.elements[i]
         val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearch(e)
+        val tIdx = t.elements.binarySearch(s.elements[i])
+        val aux = allocBool("__subset_aux_${s.name}_${t.name}_${s.elements[i]}")
+        auxes += Lit.make(aux, true)
         if (tIdx < 0) {
-            factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
+            // aux ↔ ¬Sᵢ : two clauses.
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(sBit, false))))
+            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(sBit, true))))
         } else {
             val tBit = t.indicatorBoolIds[tIdx]
-            // sBit ↔ tBit
-            factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, true))))
-            factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, false))))
+            // aux ↔ (¬Sᵢ ∨ Tᵢ): three clauses.
+            // (¬aux ∨ ¬Sᵢ ∨ Tᵢ), (Sᵢ ∨ aux), (¬Tᵢ ∨ aux)
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(sBit, false), Lit.make(tBit, true))))
+            factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(aux, true))))
+            factors.add(Clause(intArrayOf(Lit.make(tBit, false), Lit.make(aux, true))))
         }
     }
-    // Elements in T only must be false in T.
+    reifyAndOfLits(auxes.toIntArray(), r)
+}
+
+/** `r ↔ ⋀ lits`. Decomposes to one big OR (the "r false implies some lit false" direction)
+ *  plus one binary clause per lit (the "r true implies lit true" direction). */
+internal fun FlatZincCompiler.reifyAndOfLits(lits: IntArray, r: Int) {
+    factors.add(Clause(lits.map { Lit.negate(it) }.toIntArray() + intArrayOf(r)))
+    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(r), l)))
+}
+
+/** `set_eq(S, T)` / `set_eq_reif(S, T, r)`. Non-reified: per element of S ∪ T's universe,
+ *  `Sᵢ ↔ Tᵢ`; elements only in one universe force the corresponding indicator false.
+ *  Reified: per element, channel `auxᵢ ↔ (Sᵢ ↔ Tᵢ)`, then `r ↔ ⋀ auxᵢ`. */
+internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
+    require(c.args.size == if (reified) 3 else 2)
+    val s = resolveSetVar(c.args[0])
+    val t = resolveSetVar(c.args[1])
+    if (!reified) {
+        for (i in s.elements.indices) {
+            val e = s.elements[i]
+            val sBit = s.indicatorBoolIds[i]
+            val tIdx = t.elements.binarySearch(e)
+            if (tIdx < 0) {
+                factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
+            } else {
+                val tBit = t.indicatorBoolIds[tIdx]
+                factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, true))))
+                factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, false))))
+            }
+        }
+        for (i in t.elements.indices) {
+            if (s.elements.binarySearch(t.elements[i]) < 0) {
+                factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
+            }
+        }
+        return
+    }
+    val r = resolveBoolLit(c.args[2])
+    val auxes = ArrayList<Int>()
+    val emitEqAux: (Int, Int, Int) -> Unit = { sBit, tBit, aux ->
+        // aux ↔ (Sᵢ = Tᵢ): four clauses from the truth table.
+        // (S=0,T=0,aux=0): S∨T∨aux. (0,1,1): S∨¬T∨¬aux.
+        // (1,0,1): ¬S∨T∨¬aux. (1,1,0): ¬S∨¬T∨aux.
+        factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, true), Lit.make(aux, true))))
+        factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, false), Lit.make(aux, false))))
+        factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, true), Lit.make(aux, false))))
+        factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, false), Lit.make(aux, true))))
+    }
+    for (i in s.elements.indices) {
+        val sBit = s.indicatorBoolIds[i]
+        val tIdx = t.elements.binarySearch(s.elements[i])
+        val aux = allocBool("__eq_aux_${s.name}_${t.name}_${s.elements[i]}")
+        auxes.add(Lit.make(aux, true))
+        if (tIdx < 0) {
+            // No counterpart in T → aux ↔ ¬Sᵢ.
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(sBit, false))))
+            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(sBit, true))))
+        } else {
+            emitEqAux(sBit, t.indicatorBoolIds[tIdx], aux)
+        }
+    }
     for (i in t.elements.indices) {
-        val e = t.elements[i]
-        if (s.elements.binarySearch(e) < 0) {
-            factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
+        if (s.elements.binarySearch(t.elements[i]) < 0) {
+            val tBit = t.indicatorBoolIds[i]
+            val aux = allocBool("__eq_aux_${s.name}_${t.name}_only_t_${t.elements[i]}")
+            auxes.add(Lit.make(aux, true))
+            // aux ↔ ¬Tᵢ.
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(tBit, false))))
+            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(tBit, true))))
         }
     }
+    reifyAndOfLits(auxes.toIntArray(), r)
+}
+
+/** `set_ne(S, T)` / `set_ne_reif(S, T, r)`. Allocates an `eq` aux mirroring `set_eq_reif`'s
+ *  channel, then ties `r = ¬eq` (reified) or `eq = false` (non-reified). */
+internal fun FlatZincCompiler.emitSetNe(c: FznConstraint, reified: Boolean) {
+    require(c.args.size == if (reified) 3 else 2)
+    val s = resolveSetVar(c.args[0])
+    val t = resolveSetVar(c.args[1])
+    // Allocate the eq-channel and run the per-element decomposition over it.
+    val eqLit = if (reified) {
+        val r = resolveBoolLit(c.args[2])
+        val eqAux = allocBool("__set_ne_eq_${s.name}_${t.name}")
+        val eqLit = Lit.make(eqAux, true)
+        // r ↔ ¬eq:  (r ∨ eq), (¬r ∨ ¬eq)
+        factors.add(Clause(intArrayOf(r, eqLit)))
+        factors.add(Clause(intArrayOf(Lit.negate(r), Lit.negate(eqLit))))
+        eqLit
+    } else {
+        // Hard inequality: force eq = false.
+        val eqAux = allocBool("__set_ne_eq_${s.name}_${t.name}")
+        val eqLit = Lit.make(eqAux, true)
+        factors.add(Clause(intArrayOf(Lit.negate(eqLit))))
+        eqLit
+    }
+    emitSetEqChannel(s, t, eqLit)
+}
+
+/** Resolve a set-var-array argument to a list of [SetVarLayout]. Accepts either an array
+ *  name (registered as [FlatZincArray.SetVars]) or an inline array literal of set var idents. */
+internal fun FlatZincCompiler.resolveSetVarArray(e: FznExpr): List<SetVarLayout> = when (e) {
+    is FznExpr.Ident -> when (val a = arrays[e.name]) {
+        is FlatZincArray.SetVars -> a.layouts
+        else -> failHere("`${e.name}` is not an array of set vars")
+    }
+    is FznExpr.ArrayLit -> e.elements.map { resolveSetVar(it) }
+    else -> failHere("expected an array of set vars, got ${e::class.simpleName}")
+}
+
+/** `all_disjoint(arr)` — every pair of sets in [arr] has empty intersection. For each
+ *  pair (Sᵢ, Sⱼ) and each element `e` shared between their universes, post the binary
+ *  mutex clause `¬Sᵢ[e] ∨ ¬Sⱼ[e]`. */
+internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
+    require(c.args.size == 1)
+    val sets = resolveSetVarArray(c.args[0])
+    for (i in sets.indices) for (j in i + 1 until sets.size) {
+        val a = sets[i]; val b = sets[j]
+        for (ai in a.elements.indices) {
+            val bi = b.elements.binarySearch(a.elements[ai])
+            if (bi >= 0) {
+                factors.add(Clause(intArrayOf(
+                    Lit.make(a.indicatorBoolIds[ai], false),
+                    Lit.make(b.indicatorBoolIds[bi], false),
+                )))
+            }
+        }
+    }
+}
+
+/** `set_partition_into(arr, U)` — sets in [arr] are pairwise disjoint AND their union
+ *  equals U. Reuses `emitAllDisjoint`'s pairwise mutex; adds for each `e` in U's universe
+ *  the clause `Uₑ ↔ ⋁ᵢ Sᵢ[e]` plus the universe-mismatch exclusions (elements outside
+ *  U but in some Sᵢ's universe must be absent from Sᵢ).
+ *
+ *  When `U` is a set literal (not a var), treats it as a fully-determined universe: every
+ *  element of `U` must be covered by exactly one set; elements outside `U` can't appear in
+ *  any set. */
+internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
+    require(c.args.size == 2)
+    val sets = resolveSetVarArray(c.args[0])
+    emitAllDisjoint(FznConstraint("all_disjoint", listOf(c.args[0]), emptyList()))
+    val uExpr = c.args[1]
+    val universe: IntArray = if (uExpr is FznExpr.Ident && setVarsByName.containsKey(uExpr.name)) {
+        // U is a set var: cover & disjointness over U's universe; per-element `Uₑ ↔ ⋁ Sᵢ[e]`.
+        val u = setVarsByName.getValue(uExpr.name)
+        for (i in u.elements.indices) {
+            val e = u.elements[i]
+            val uBit = u.indicatorBoolIds[i]
+            val parts = ArrayList<Int>()
+            for (s in sets) {
+                val si = s.elements.binarySearch(e)
+                if (si >= 0) parts += Lit.make(s.indicatorBoolIds[si], true)
+            }
+            if (parts.isEmpty()) {
+                // No set can contain e; force Uₑ = false.
+                factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
+            } else {
+                // (¬Uₑ ∨ S₁[e] ∨ ... ∨ Sₙ[e])
+                factors.add(Clause(intArrayOf(Lit.make(uBit, false)) + parts.toIntArray()))
+                // (Sᵢ[e] → Uₑ) for each part.
+                for (p in parts) factors.add(Clause(intArrayOf(Lit.negate(p), Lit.make(uBit, true))))
+            }
+        }
+        u.elements
+    } else {
+        // U is a constant set literal — cover exactly its elements; forbid extras.
+        val uniq = resolveSetLiteral(uExpr)
+        for (e in uniq) {
+            // ⋁ᵢ Sᵢ[e] = true (since e must be in the partition).
+            val parts = ArrayList<Int>()
+            for (s in sets) {
+                val si = s.elements.binarySearch(e)
+                if (si >= 0) parts += Lit.make(s.indicatorBoolIds[si], true)
+            }
+            if (parts.isEmpty()) {
+                failHere("set_partition_into: element $e in U has no set containing it")
+            }
+            factors.add(Clause(parts.toIntArray()))
+        }
+        uniq
+    }
+    // Elements in some Sᵢ's universe but not in U must be excluded from Sᵢ.
+    for (s in sets) {
+        for (i in s.elements.indices) {
+            if (universe.binarySearch(s.elements[i]) < 0) {
+                factors.add(Clause(intArrayOf(Lit.make(s.indicatorBoolIds[i], false))))
+            }
+        }
+    }
+}
+
+/** Channel: `eqLit ↔ (S = T)`. Shared by `set_eq_reif` and `set_ne_reif`. Same lowering
+ *  as `emitSetEq(reified=true)` but parameterised by the channel literal instead of
+ *  pulling it from the constraint args. */
+internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout, r: Int) {
+    val auxes = ArrayList<Int>()
+    val emitEqAux: (Int, Int, Int) -> Unit = { sBit, tBit, aux ->
+        factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, true), Lit.make(aux, true))))
+        factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, false), Lit.make(aux, false))))
+        factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, true), Lit.make(aux, false))))
+        factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, false), Lit.make(aux, true))))
+    }
+    for (i in s.elements.indices) {
+        val sBit = s.indicatorBoolIds[i]
+        val tIdx = t.elements.binarySearch(s.elements[i])
+        val aux = allocBool("__eq_aux_${s.name}_${t.name}_${s.elements[i]}")
+        auxes.add(Lit.make(aux, true))
+        if (tIdx < 0) {
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(sBit, false))))
+            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(sBit, true))))
+        } else {
+            emitEqAux(sBit, t.indicatorBoolIds[tIdx], aux)
+        }
+    }
+    for (i in t.elements.indices) {
+        if (s.elements.binarySearch(t.elements[i]) < 0) {
+            val tBit = t.indicatorBoolIds[i]
+            val aux = allocBool("__eq_aux_${s.name}_${t.name}_only_t_${t.elements[i]}")
+            auxes.add(Lit.make(aux, true))
+            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(tBit, false))))
+            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(tBit, true))))
+        }
+    }
+    reifyAndOfLits(auxes.toIntArray(), r)
 }
 
 /** `set_card(S, n)`. Σ indicator_S[e] = n. n can be a constant or an int var; lowers to a

@@ -172,6 +172,12 @@ predicate set_card(var set of int: S, var int: n);
 predicate set_union(var set of int: S, var set of int: T, var set of int: U);
 predicate set_intersect(var set of int: S, var set of int: T, var set of int: U);
 predicate set_diff(var set of int: S, var set of int: T, var set of int: U);
+predicate set_subset_reif(var set of int: S, var set of int: T, var bool: r);
+predicate set_eq_reif(var set of int: S, var set of int: T, var bool: r);
+predicate set_ne(var set of int: S, var set of int: T);
+predicate set_ne_reif(var set of int: S, var set of int: T, var bool: r);
+predicate all_disjoint(array[int] of var set of int: a);
+predicate set_partition_into(array[int] of var set of int: a, var set of int: u);
 
 % Scheduling / disjunctive (legacy klause coverage; kept native for completeness).
 predicate circuit(array[int] of var int: x);

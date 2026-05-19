@@ -235,6 +235,18 @@ internal class FlatZincCompiler(
             params[name] = ParamValue.Array(arr)
             return
         }
+        // Array-of-set-of-int: materialise each element as its own SetVarLayout under name
+        // `<arr>[<i>]`, and register the array as FlatZincArray.SetVars.
+        if (type.element is FznType.SetOfInt) {
+            val layouts = ArrayList<SetVarLayout>(type.length)
+            for (i in 0 until type.length) {
+                val elemName = "$name[${i + 1}]"
+                allocSetVar(elemName, type.element)
+                layouts.add(setVarsByName.getValue(elemName))
+            }
+            arrays[name] = FlatZincArray.SetVars(name, layouts)
+            return
+        }
         // Variable array — allocate one var per element. The initializer may either be an
         // array literal aliasing other vars, or absent (we allocate fresh).
         val length = type.length

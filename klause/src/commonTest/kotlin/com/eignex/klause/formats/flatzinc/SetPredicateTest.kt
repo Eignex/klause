@@ -187,6 +187,222 @@ class SetPredicateTest {
     }
 
     @Test
+    fun `set_in with var int x forces x into the set`() {
+        val src = """
+            var 1..3: x;
+            var set of 1..3: s;
+            constraint set_in(x, s);
+            constraint set_card(s, 1);
+            constraint int_eq(x, 2);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        val xId = program.intVarsByName.getValue("x")
+        assertEquals(2, sat.assignment.ints[xId])
+        val layout = program.setVarsByName.getValue("s")
+        val twoIdx = layout.elements.indexOf(2)
+        assertTrue(sat.assignment.bools[layout.indicatorBoolIds[twoIdx]])
+    }
+
+    @Test
+    fun `set_in_reif with var int x channels r to membership`() {
+        // Force x = 3, s = {3}. r must be true since 3 ∈ s.
+        val src = """
+            var 1..3: x;
+            var bool: r;
+            var set of 1..3: s;
+            constraint int_eq(x, 3);
+            constraint set_in(3, s);
+            constraint set_card(s, 1);
+            constraint set_in_reif(x, s, r);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(res)
+        assertTrue(sat.assignment.bools[program.boolVarsByName.getValue("r")])
+    }
+
+    @Test
+    fun `set_in_reif false when x is not a member`() {
+        // x = 1, s = {2}. r must be false.
+        val src = """
+            var 1..3: x;
+            var bool: r;
+            var set of 1..3: s;
+            constraint int_eq(x, 1);
+            constraint set_in(2, s);
+            constraint set_card(s, 1);
+            constraint set_in_reif(x, s, r);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(res)
+        assertTrue(!sat.assignment.bools[program.boolVarsByName.getValue("r")])
+    }
+
+    @Test
+    fun `set_subset_reif fires when subset relation holds`() {
+        // Make s = {1, 2}, t = {1, 2, 3}; r must be true.
+        val src = """
+            var bool: r;
+            var set of 1..3: s;
+            var set of 1..3: t;
+            constraint set_in(1, s);
+            constraint set_in(2, s);
+            constraint set_in(1, t);
+            constraint set_in(2, t);
+            constraint set_in(3, t);
+            constraint set_card(s, 2);
+            constraint set_subset_reif(s, t, r);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        assertTrue(sat.assignment.bools[program.boolVarsByName.getValue("r")],
+            "r must be true when s ⊆ t")
+    }
+
+    @Test
+    fun `set_subset_reif fires false when subset relation fails`() {
+        // s = {1, 3}, t = {1, 2}. r must be false.
+        val src = """
+            var bool: r;
+            var set of 1..3: s;
+            var set of 1..3: t;
+            constraint set_in(1, s);
+            constraint set_in(3, s);
+            constraint set_card(s, 2);
+            constraint set_in(1, t);
+            constraint set_in(2, t);
+            constraint set_card(t, 2);
+            constraint set_subset_reif(s, t, r);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 1L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        assertTrue(!sat.assignment.bools[program.boolVarsByName.getValue("r")],
+            "r must be false when 3 ∈ s but 3 ∉ t")
+    }
+
+    @Test
+    fun `set_eq_reif holds when sets coincide`() {
+        val src = """
+            var bool: r;
+            var set of 1..3: s;
+            var set of 1..3: t;
+            constraint set_in(1, s);
+            constraint set_in(3, s);
+            constraint set_card(s, 2);
+            constraint set_in(1, t);
+            constraint set_in(3, t);
+            constraint set_card(t, 2);
+            constraint set_eq_reif(s, t, r);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 2L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        assertTrue(sat.assignment.bools[program.boolVarsByName.getValue("r")])
+    }
+
+    @Test
+    fun `set_eq_reif false when one element differs`() {
+        val src = """
+            var bool: r;
+            var set of 1..3: s;
+            var set of 1..3: t;
+            constraint set_in(1, s);
+            constraint set_card(s, 1);
+            constraint set_in(2, t);
+            constraint set_card(t, 1);
+            constraint set_eq_reif(s, t, r);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        assertTrue(!sat.assignment.bools[program.boolVarsByName.getValue("r")])
+    }
+
+    @Test
+    fun `set_ne forces inequality`() {
+        val src = """
+            var set of 1..2: s;
+            var set of 1..2: t;
+            constraint set_in(1, s);
+            constraint set_card(s, 1);
+            constraint set_ne(s, t);
+            constraint set_card(t, 1);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        val sLayout = program.setVarsByName.getValue("s")
+        val tLayout = program.setVarsByName.getValue("t")
+        // s = {1}, t must differ from s — under the constraints, t = {2}.
+        val sMembers = sLayout.elements.filterIndexed { i, _ -> sat.assignment.bools[sLayout.indicatorBoolIds[i]] }
+        val tMembers = tLayout.elements.filterIndexed { i, _ -> sat.assignment.bools[tLayout.indicatorBoolIds[i]] }
+        assertTrue(sMembers != tMembers, "s=$sMembers t=$tMembers should differ")
+    }
+
+    @Test
+    fun `all_disjoint enforces pairwise empty intersection`() {
+        val src = """
+            array[1..3] of var set of 1..3: a;
+            constraint set_in(1, a[1]);
+            constraint set_in(2, a[2]);
+            constraint set_in(3, a[3]);
+            constraint all_disjoint(a);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        // Read each set; ensure intersection is empty.
+        val sets = (1..3).map { i -> program.setVarsByName.getValue("a[$i]") }
+        val membersOf: (SetVarLayout) -> Set<Int> = { layout ->
+            layout.elements.filterIndexed { idx, _ -> sat.assignment.bools[layout.indicatorBoolIds[idx]] }.toSet()
+        }
+        for (i in sets.indices) for (j in i + 1 until sets.size) {
+            val m1 = membersOf(sets[i])
+            val m2 = membersOf(sets[j])
+            assertTrue(m1.intersect(m2).isEmpty(),
+                "sets a[${i+1}]=$m1 and a[${j+1}]=$m2 must be disjoint")
+        }
+    }
+
+    @Test
+    fun `set_partition_into covers universe with disjoint sets`() {
+        val src = """
+            array[1..2] of var set of 1..4: a;
+            var set of 1..4: u;
+            constraint set_partition_into(a, u);
+            constraint set_card(u, 4);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 3L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        val sets = (1..2).map { i -> program.setVarsByName.getValue("a[$i]") }
+        val u = program.setVarsByName.getValue("u")
+        val membersOf: (SetVarLayout) -> Set<Int> = { layout ->
+            layout.elements.filterIndexed { idx, _ -> sat.assignment.bools[layout.indicatorBoolIds[idx]] }.toSet()
+        }
+        val all = sets.flatMap { membersOf(it) }
+        val uniq = all.toSet()
+        assertEquals(all.size, uniq.size, "sets must be disjoint")
+        assertEquals(membersOf(u), uniq, "union must equal u")
+        assertEquals(setOf(1, 2, 3, 4), uniq)
+    }
+
+    @Test
     fun `FZN writer reconstructs set output from indicators`() {
         val src = """
             var set of 1..3: s;

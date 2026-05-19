@@ -75,6 +75,12 @@ private fun renderArray(program: FlatZincProgram, sample: Sample, name: String):
         is FlatZincArray.BoolParam -> arr.values.joinTo(sb, ", ") { it.toString() }
         is FlatZincArray.IntParam -> arr.values.joinTo(sb, ", ") { it.toString() }
         is FlatZincArray.FloatParam -> arr.values.joinTo(sb, ", ") { it.toString() }
+        is FlatZincArray.SetVars -> {
+            for ((i, layout) in arr.layouts.withIndex()) {
+                if (i > 0) sb.append(", ")
+                sb.append(renderSet(sample, layout))
+            }
+        }
         is FlatZincArray.Vars -> {
             for (i in arr.varIds.indices) {
                 if (i > 0) sb.append(", ")

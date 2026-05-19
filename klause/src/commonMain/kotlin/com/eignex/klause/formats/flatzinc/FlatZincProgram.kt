@@ -136,6 +136,15 @@ sealed interface FlatZincArray {
         override val length: Int get() = varIds.size
         enum class ElementKind { Bool, Int, Float }
     }
+
+    /** Array of set vars: each element is its own [SetVarLayout] (bool-indicator
+     *  decomposition). `all_disjoint`, `set_partition_into`, etc. dispatch through this. */
+    data class SetVars(
+        override val name: String,
+        val layouts: List<SetVarLayout>,
+    ) : FlatZincArray {
+        override val length: Int get() = layouts.size
+    }
 }
 
 /**
