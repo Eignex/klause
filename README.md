@@ -158,7 +158,12 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[Format/SMT-LIB]` to_real / to_int casts. Either bucket reals onto bounded ints or reject the benchmark.
 - `[Format/SMT-LIB]` Let-binding expansion in the SMT-LIB parser.
 - `[Format/SMT-LIB]` Unbounded integers in BacktrackSolver. Pairs with the bound-inference item above.
-- `[Format/FlatZinc]` Native set variables (the parser declines set decls cleanly today). Claim set support and decompose to indicator-bool arrays at klause level so MZN stops handing sets back as ints.
+- `[CP+LS]` Native set variables with max-level propagation. Today the FZN parser declines `var set of ...` cleanly. The target is a first-class `SetDomain(required, possible)` over a statically-bounded universe — propagating tighter than MZN's default bool-indicator decomposition, which is where Gecode/Choco beat us on set-heavy Challenge problems (set partition, social golfer, Steiner, anything with hard cardinality). Stages:
+  1. Engine plumbing — `Problem.numSetVars` + `setDomains`, `PropagationState` set arrays with `requireElement` / `excludeElement` primitives, `PropagationSession` snapshot extension, `Sample.sets`.
+  2. LS integration — `LocalSearchState` set assignments, `SetToggle(setId, element)` move, factor `setVars` + `deltaIfSetToggled` hooks, default repair-move generation.
+  3. Core catalog — `SetIn`, `SetSubset`, `SetCard`, `SetUnion`, `SetIntersect`, `SetDiff`, `LinkSetToBools` (so MZN's bool-decomposed predicates can coexist with native set vars in the same model).
+  4. Hard catalog — `AllDisjoint`, `SetPartition`, `SetEq`, `SetLex`, `SetSymDiff`; FZN dispatch arms; declare `set_*` predicates native in `redefinitions.mzn`.
+  5. Challenge-corpus shake-out on set-heavy instances.
 - `[Format/FlatZinc]` Read the paired `.ozn` mapping file so MZN enum tag names round-trip into klause's `nominal(...)` schema field without callers having to inject `klause_enum_labels(...)` annotations manually.
 - `[Format/FlatZinc]` Full Challenge-corpus parse-pass test. Drive `mzn2fzn` over [minizinc-benchmarks](https://github.com/MiniZinc/minizinc-benchmarks) and [libminizinc/tests](https://github.com/MiniZinc/libminizinc/tree/master/tests/spec); assert every produced `.fzn` parses + compiles. Surfaces FZN-spec quirks (set vars, optional types, edge-case decompositions). Regression gate before Challenge submission; CI installs MiniZinc from the official tarball.
 - `[Format/XCSP3]` Parser for XCSP3 XML, including extension tables and intension predicates.
