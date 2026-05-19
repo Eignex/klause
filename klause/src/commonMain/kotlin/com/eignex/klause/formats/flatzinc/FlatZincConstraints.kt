@@ -6,6 +6,7 @@ import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.Sort
+import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Among
@@ -89,6 +90,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "all_equal_int", "fzn_all_equal_int" -> emitAllEqual(c)
     "member_int", "fzn_member_int" -> emitMember(c)
     "sort", "fzn_sort" -> emitSort(c)
+    "symmetric_all_different", "fzn_symmetric_all_different" -> emitSymmetricAllDifferent(c)
     "inverse", "fzn_inverse" -> emitInverse(c, withOffsets = false)
     "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
     "nvalue", "fzn_nvalue" -> emitNValue(c, NValue.Mode.Eq)
@@ -449,6 +451,14 @@ internal fun FlatZincCompiler.emitSort(c: FznConstraint) {
     val xs = evalIntVarArray(c.args[0])
     val ys = evalIntVarArray(c.args[1])
     factors.add(Sort(xs, ys))
+}
+
+/** `symmetric_all_different(xs)` — self-inverse permutation. */
+internal fun FlatZincCompiler.emitSymmetricAllDifferent(c: FznConstraint) {
+    require(c.args.size == 1)
+    val xs = evalIntVarArray(c.args[0])
+    val offset = if (xs.isNotEmpty()) intDomains[xs[0]].min else 0
+    factors.add(SymmetricAllDifferent(xs, indexOffset = offset))
 }
 
 /**
