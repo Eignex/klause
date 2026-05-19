@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.NValue
+import com.eignex.klause.solver.factor.Sequence as SequenceFactor
 import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
@@ -79,6 +80,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "arg_min_int", "fzn_arg_min_int" -> emitArgMinMax(c, max = false)
     "value_precede_int", "fzn_value_precede_int" -> emitValuePrecede(c)
     "value_precede_chain_int", "fzn_value_precede_chain_int" -> emitValuePrecedeChain(c)
+    "sequence", "fzn_sequence" -> emitSequence(c)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -317,6 +319,23 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `sequence(xs, low, high, k, S)` — sliding-window cardinality. Argument order in MZN's
+ *  FZN emission is `xs, low, high, k, S`. */
+internal fun FlatZincCompiler.emitSequence(c: FznConstraint) {
+    require(c.args.size == 5)
+    val xs = evalIntVarArray(c.args[0])
+    val low = evalIntConst(c.args[1]).toInt()
+    val high = evalIntConst(c.args[2]).toInt()
+    val k = evalIntConst(c.args[3]).toInt()
+    val setLit = c.args[4]
+    val values: IntArray = when (setLit) {
+        is FznExpr.IntSetLit -> IntArray(setLit.values.size) { setLit.values[it].toInt() }
+        is FznExpr.IntRangeLit -> IntArray((setLit.hi - setLit.lo + 1).toInt()) { (setLit.lo + it).toInt() }
+        else -> failHere("sequence: expected set literal as 5th arg, got ${setLit::class.simpleName}")
+    }
+    factors.add(SequenceFactor(low, high, k, xs, values))
 }
 
 /** `value_precede_int(s, t, xs)` — single pair-of-values predicate. */
