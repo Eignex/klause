@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.ArrayMinMax
+import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
@@ -60,6 +61,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // Global
     "all_different_int" -> emitAllDifferent(c)
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
+    "inverse", "fzn_inverse" -> emitInverse(c, withOffsets = false)
+    "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -287,6 +290,27 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `inverse(f, g)` (2 args) and `inverse_offsets(f, fOff, g, gOff)` (4 args). */
+internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean) {
+    if (withOffsets) {
+        require(c.args.size == 4)
+        val f = evalIntVarArray(c.args[0])
+        val fOff = evalIntConst(c.args[1]).toInt()
+        val g = evalIntVarArray(c.args[2])
+        val gOff = evalIntConst(c.args[3]).toInt()
+        factors.add(Inverse(f, g, fOff, gOff))
+    } else {
+        require(c.args.size == 2)
+        val f = evalIntVarArray(c.args[0])
+        val g = evalIntVarArray(c.args[1])
+        // MiniZinc emits inverse with 1-based indexing by default; infer offset from
+        // domain.min of the first var of each array (typical FZN convention).
+        val fOff = if (f.isNotEmpty()) intDomains[f[0]].min else 0
+        val gOff = if (g.isNotEmpty()) intDomains[g[0]].min else 0
+        factors.add(Inverse(f, g, fOff, gOff))
+    }
 }
 
 internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
