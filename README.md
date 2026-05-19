@@ -149,8 +149,6 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[Sampling]` Hash-based uniform sampling (UniGen2-style). XOR-slice the model space, sample within a slice.
 - `[Sampling]` Approximate model counting (ApproxMC). Same XOR-hashing primitive as UniGen.
 - `[Sampling]` Weighted projected sampling (WAPS / KUS).
-- `[Docs]` Tutorial covering schema, constraints, and backend selection.
-- `[Docs]` Dokka site for the KDoc.
 - `[Format/SMT-LIB]` Parser covering the finite-domain integer subset (QF_LIA in SMT-LIB terminology). Lets klause run SMT-LIB benchmarks.
 - `[Format/SMT-LIB]` Static bound inference for int vars declared with full-range or unbounded domains. Error out cleanly when no bound is provable.
 - `[Format/SMT-LIB]` Distinct over arbitrary terms (booleans, mixed bool/int).
