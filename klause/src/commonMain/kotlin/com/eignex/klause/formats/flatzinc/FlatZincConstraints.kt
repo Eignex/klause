@@ -5,6 +5,7 @@ import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Inverse
+import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
@@ -63,6 +64,9 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
     "inverse", "fzn_inverse" -> emitInverse(c, withOffsets = false)
     "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
+    "nvalue", "fzn_nvalue" -> emitNValue(c, NValue.Mode.Eq)
+    "atleast_nvalues", "fzn_atleast_nvalues" -> emitNValue(c, NValue.Mode.AtLeast)
+    "atmost_nvalues", "fzn_atmost_nvalues" -> emitNValue(c, NValue.Mode.AtMost)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -290,6 +294,14 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/** `nvalue(n, xs)` / `atleast_nvalues(n, xs)` / `atmost_nvalues(n, xs)`. */
+internal fun FlatZincCompiler.emitNValue(c: FznConstraint, mode: NValue.Mode) {
+    require(c.args.size == 2)
+    val n = resolveIntVar(c.args[0])
+    val xs = evalIntVarArray(c.args[1])
+    factors.add(NValue(n, xs, mode))
 }
 
 /** `inverse(f, g)` (2 args) and `inverse_offsets(f, fOff, g, gOff)` (4 args). */
