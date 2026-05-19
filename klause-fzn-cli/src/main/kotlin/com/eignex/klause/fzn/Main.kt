@@ -4,6 +4,7 @@ import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
+import com.eignex.klause.formats.minizinc.OznApplier
 import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
 import com.eignex.klause.solver.MinimizeResult
@@ -45,6 +46,17 @@ fun main(args: Array<String>) {
     val engine = opts.engine ?: System.getProperty("klause.fzn.engine") ?: "backtrack"
     dispatch(engine.lowercase(), program, opts)
 }
+
+/** Lazily-loaded .ozn applier when [Options.oznPath] is set; lets klause render the
+ *  human-readable MZN output natively (drop-in for MiniZinc's `solns2out`). */
+private fun loadOznApplier(opts: Options): OznApplier? =
+    opts.oznPath?.let { OznApplier(File(it).readText()) }
+
+/** Render one solution: prefer the .ozn applier when supplied; otherwise fall back to
+ *  the standard FZN solution writer (the `--no-ozn` / `needsSolns2Out: true` path). */
+private fun renderSolution(
+    applier: OznApplier?, program: FlatZincProgram, sample: com.eignex.klause.solver.Sample,
+): String = applier?.render(program, sample) ?: writeFlatZincSolution(program, sample)
 
 private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
     when (engine) {
@@ -113,6 +125,7 @@ private fun <P : SolverParams> runSatisfy(
     program: FlatZincProgram,
     opts: Options,
 ) {
+    val applier = loadOznApplier(opts)
     val limit = if (opts.allSolutions) opts.solutionCap ?: Long.MAX_VALUE else 1L
     var produced = 0L
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
@@ -122,7 +135,7 @@ private fun <P : SolverParams> runSatisfy(
             println("=====UNKNOWN=====")
             return
         }
-        print(writeFlatZincSolution(program, sample))
+        print(renderSolution(applier, program, sample))
         produced++
         if (produced >= limit) break
     }
@@ -155,6 +168,7 @@ private fun <P : SolverParams> runOptimize(
         runOptimizeViaEnumerate(solver, params, program, objVarId, maximize, opts)
         return
     }
+    val applier = loadOznApplier(opts)
     // Streaming branch-and-bound: yield each improving incumbent, then a terminal verdict.
     val objective = if (maximize) program.problem.maximizeInt(objVarId)
                     else program.problem.minimizeInt(objVarId)
@@ -162,7 +176,7 @@ private fun <P : SolverParams> runOptimize(
     for (step in optimizer.improvements(objective, params)) {
         when (step) {
             is MinimizeResult.WithSample -> {
-                print(writeFlatZincSolution(program, step.sample))
+                print(renderSolution(applier, program, step.sample))
                 produced++
                 if (step is MinimizeResult.Optimal) {
                     println("==========")
@@ -191,6 +205,7 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     maximize: Boolean,
     opts: Options,
 ) {
+    val applier = loadOznApplier(opts)
     var best: Sample? = null
     var bestObj = if (maximize) Int.MIN_VALUE else Int.MAX_VALUE
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
@@ -201,7 +216,7 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
         if (improved) {
             bestObj = v
             best = sample
-            print(writeFlatZincSolution(program, sample))
+            print(renderSolution(applier, program, sample))
         }
     }
     if (best == null) {
@@ -221,6 +236,9 @@ private data class Options(
     val randomSeed: Long?,
     val verbose: Boolean,
     val statistics: Boolean,
+    /** Optional `.ozn` file rendered by klause's native applier in place of MiniZinc's
+     *  `solns2out`. When `null`, the FZN-format `name = value;` output is emitted. */
+    val oznPath: String?,
 )
 
 /**
@@ -237,6 +255,7 @@ private fun parseArgs(args: Array<String>): Options {
     var verbose = false
     var statistics = false
     var fznPath: String? = null
+    var oznPath: String? = null
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
@@ -247,6 +266,7 @@ private fun parseArgs(args: Array<String>): Options {
             "-t", "--time-limit" -> { timeLimitMs = args[++i].toLong(); i++ }
             "-r" -> { randomSeed = args[++i].toLong(); i++ }
             "-e", "--engine" -> { engine = args[++i]; i++ }
+            "--ozn" -> { oznPath = args[++i]; i++ }
             else -> {
                 if (a.startsWith("-")) {
                     System.err.println("klause-fzn: ignoring unknown flag $a")
@@ -263,5 +283,5 @@ private fun parseArgs(args: Array<String>): Options {
         System.err.println("usage: klause-fzn [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics)
+    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath)
 }
