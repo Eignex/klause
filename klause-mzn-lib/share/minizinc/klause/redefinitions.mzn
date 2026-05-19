@@ -79,7 +79,11 @@ predicate int_times(var int: a, var int: b, var int: c);
 % Globals — klause has native factors for these. MiniZinc routes them directly to
 % klause's FlatZinc compiler instead of decomposing in its standard library.
 predicate all_different_int(array[int] of var int: x);
+predicate all_equal_int(array[int] of var int: x);
 predicate alldifferent_except_0(array[int] of var int: x);
+predicate symmetric_all_different(array[int] of var int: x);
+predicate member_int(array[int] of var int: x, var int: y);
+predicate sort(array[int] of var int: x, array[int] of var int: y);
 
 % Counting.
 predicate count_eq(array[int] of var int: x, var int: y, var int: c);
@@ -119,8 +123,11 @@ predicate inverse_offsets(array[int] of var int: f, int: fOff,
 % Array reductions.
 predicate array_int_maximum(var int: m, array[int] of var int: x);
 predicate array_int_minimum(var int: m, array[int] of var int: x);
+predicate maximum_int(var int: m, array[int] of var int: x);
+predicate minimum_int(var int: m, array[int] of var int: x);
 predicate arg_max_int(array[int] of var int: x, var int: i);
 predicate arg_min_int(array[int] of var int: x, var int: i);
+predicate exactly_int(int: n, array[int] of var int: x, int: v);
 
 % Ordering.
 predicate increasing_int(array[int] of var int: x);
