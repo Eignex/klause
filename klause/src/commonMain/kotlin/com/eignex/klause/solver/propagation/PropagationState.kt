@@ -340,6 +340,101 @@ class PropagationState(
     /** Mirror of [intMinAntecedents] for the upper-bound side. */
     val intMaxAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
 
+    // -------- Bound-atom registry (LCG with virtual int-bound literals) --------
+    //
+    // An "atom" represents a fact like `[x ≥ k]` or `[x ≤ k]`. Each atom gets a virtual
+    // variable id past the bool var space (`numBoolVars + atomId`), so atom *literals*
+    // — encoded with [com.eignex.klause.solver.Lit.make] using that virtual id — slot
+    // into the same array structure the analyzer already understands. Allocation is
+    // lazy: an atom only enters the registry when a factor first references it as an
+    // antecedent or conflict-reason literal.
+    //
+    // Atom truth, level, and antecedents are *snapshotted at allocation time* from the
+    // current `intDomains` / `intLevel` / `intMin/MaxAntecedents`. This avoids the cost
+    // of maintaining a full history of bound changes and matches how factors already
+    // use the current state to derive their reasons. The atom is then immutable for the
+    // life of the snapshot; restore drops atoms allocated after the snapshot point.
+
+    /** Atom id → (intVar, kind = 0 for GE / 1 for LE, threshold). Packed into a single
+     *  long for the reverse lookup; stored separately here for fast iteration. */
+    internal val atomIntVar: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    /** 0 = `[x ≥ k]`, 1 = `[x ≤ k]`. */
+    internal val atomKind: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    /** Threshold value `k` for the atom. */
+    internal val atomThreshold: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    /** Truth of the atom at allocation time. `true` = atom holds (bound met),
+     *  `false` = atom is currently violated (bound not met). Never null — allocation
+     *  is only ever requested for atoms whose truth can be derived from current
+     *  domains. */
+    internal val atomValue: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()  // 1 / 0
+    /** Decision level at which the atom became true (or 0 for atoms that were already
+     *  true at problem-bake time). Mirrors [boolLevel] for atoms. */
+    internal val atomLevel: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    /** Per-atom antecedents — bool literals (or other atom literals via their virtual
+     *  ids) whose collective truth forced this atom. Mirrors [boolAntecedents]. */
+    internal val atomAntecedents: ArrayList<IntArray?> = ArrayList()
+
+    /** Reverse lookup: packed key `(intVar << 33) | (kind << 32) | (threshold + INT_MAX)`
+     *  → atomId. Allows O(1) re-allocation checks. */
+    private val atomByKey: HashMap<Long, Int> = HashMap()
+
+    private fun atomKey(intVar: Int, kind: Int, threshold: Int): Long {
+        // Threshold can be negative; bias by Int.MIN_VALUE to keep it non-negative within
+        // the lower 32 bits. Kind takes bit 32; intVar takes bits 33..63.
+        val biased = threshold.toLong() - Int.MIN_VALUE.toLong()
+        return (intVar.toLong() shl 33) or (kind.toLong() shl 32) or biased
+    }
+
+    /** Allocate (or look up) the atom for `[intVar ≥ threshold]` and return its virtual
+     *  variable id (past the bool var space). Pair with [com.eignex.klause.solver.Lit.make]
+     *  to encode as a positive or negative literal. */
+    fun atomVarGe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = 0, threshold = threshold)
+
+    /** Allocate (or look up) the atom for `[intVar ≤ threshold]`. */
+    fun atomVarLe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = 1, threshold = threshold)
+
+    /** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
+    fun atomLitGe(intVar: Int, threshold: Int): Int =
+        com.eignex.klause.solver.Lit.make(atomVarGe(intVar, threshold), true)
+    fun atomLitLe(intVar: Int, threshold: Int): Int =
+        com.eignex.klause.solver.Lit.make(atomVarLe(intVar, threshold), true)
+
+    /** True iff [v] is an atom-id (past the bool var space). Used by the conflict
+     *  analyzer to dispatch between bool-trail and atom-table lookups. */
+    fun isAtomVar(v: Int): Boolean = v >= problem.numBoolVars
+
+    /** Translate a virtual atom-var id back to its 0-based atom index. */
+    fun atomIdOf(v: Int): Int = v - problem.numBoolVars
+
+    private fun allocAtom(intVar: Int, kind: Int, threshold: Int): Int {
+        val key = atomKey(intVar, kind, threshold)
+        atomByKey[key]?.let { return problem.numBoolVars + it }
+        val d = intDomains[intVar]
+        // Atom value derived from current domain bound.
+        val holds = when (kind) {
+            0 -> d.min >= threshold
+            1 -> d.max <= threshold
+            else -> error("unknown atom kind $kind")
+        }
+        // Level / antecedents snapshotted from the relevant int-trail entry.
+        val level: Int
+        val ant: IntArray?
+        when {
+            !holds -> { level = 0; ant = null }   // atom currently false: leaf-style
+            kind == 0 -> { level = intLevel[intVar]; ant = intMinAntecedents[intVar] }
+            else      -> { level = intLevel[intVar]; ant = intMaxAntecedents[intVar] }
+        }
+        val id = atomIntVar.size
+        atomIntVar.add(intVar)
+        atomKind.add(kind)
+        atomThreshold.add(threshold)
+        atomValue.add(if (holds) 1 else 0)
+        atomLevel.add(level)
+        atomAntecedents.add(ant)
+        atomByKey[key] = id
+        return problem.numBoolVars + id
+    }
+
     /**
      * Chronological journal of bool pins, decisions and implications interleaved. Used by
      * [com.eignex.klause.solver.propagation.ConflictAnalyzer] to walk the implication
@@ -662,6 +757,7 @@ class PropagationState(
         internal val intMinAntecedents: Array<IntArray?>,
         internal val intMaxAntecedents: Array<IntArray?>,
         internal val boolPinOrderSize: Int,
+        internal val atomCount: Int,
     )
 
     fun snapshot(): Snapshot = Snapshot(
@@ -678,6 +774,7 @@ class PropagationState(
         intMinAntecedents = intMinAntecedents.copyOf(),
         intMaxAntecedents = intMaxAntecedents.copyOf(),
         boolPinOrderSize = boolPinOrder.size,
+        atomCount = atomIntVar.size,
     )
 
     fun restore(s: Snapshot) {
@@ -693,6 +790,21 @@ class PropagationState(
         for (i in s.intMinAntecedents.indices) intMinAntecedents[i] = s.intMinAntecedents[i]
         for (i in s.intMaxAntecedents.indices) intMaxAntecedents[i] = s.intMaxAntecedents[i]
         boolPinOrder.truncateTo(s.boolPinOrderSize)
+        // Atoms allocated after the snapshot are removed wholesale — their virtual var
+        // ids would dangle otherwise. Pre-snapshot atoms keep their snapshot-time
+        // truth/level/antecedents (immutable post-allocation).
+        while (atomIntVar.size > s.atomCount) {
+            val id = atomIntVar.size - 1
+            val key = atomKey(atomIntVar[id], atomKind[id], atomThreshold[id])
+            atomByKey.remove(key)
+            atomIntVar.truncateTo(id)
+            atomKind.truncateTo(id)
+            atomThreshold.truncateTo(id)
+            atomValue.truncateTo(id)
+            atomLevel.truncateTo(id)
+            // ArrayList — remove last.
+            atomAntecedents.removeAt(atomAntecedents.size - 1)
+        }
         levelToDecisionVar.clear()
         for (v in s.decisionVars) levelToDecisionVar.add(v)
         // Aborted pushes may have left dirty queue entries behind; drop them.

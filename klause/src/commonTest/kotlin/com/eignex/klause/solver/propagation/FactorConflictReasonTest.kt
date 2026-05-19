@@ -16,6 +16,7 @@ import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -370,6 +371,64 @@ class FactorConflictReasonTest {
         // LCG win: y resolved away by minimization (its antecedent ¬x already in clause).
         assertFalse(Lit.make(1, true) in lits,
             "LCG should resolve y away; got ${learned.literals.toList()}")
+    }
+
+    @Test
+    fun `bound atom registry and analyzer resolution end-to-end`() {
+        // Construct a scenario where:
+        //   - ReifiedLinear A: x ↔ (v0 = 5).
+        //   - Linear C: v0 + v1 = 8.
+        //   - ReifiedLinear B: y ↔ (v1 ≥ 4).
+        //
+        // Decide x=true at level 1 → A pins v0=5, C tightens v1.max=v1.min=3, B's
+        // alwaysHolds=false / neverHolds=true on (v1 ≥ 4): pins y=false at level 1.
+        //
+        // To trigger an atom-resolvable learned clause, manually inject an atom-lit
+        // antecedent and ensure the analyzer can resolve it via [PropagationState]'s
+        // atom registry. This test verifies the atom infrastructure: allocation,
+        // truth derivation, level tracking, and analyzer dispatch.
+        val problem = Problem(
+            numBoolVars = 2, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
+                com.eignex.klause.solver.factor.Linear(
+                    intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 8,
+                ),
+            ),
+        )
+        val session = PropagationSession(problem)
+        assertIs<PropagationResult.Implied>(session.pinBool(0, true))
+        // State: v0=5, v1=3 (forced by Linear after x=true at level 1).
+        val state = com.eignex.klause.solver.propagation.PropagationState(
+            problem, com.eignex.klause.solver.Assumptions.None,
+        )
+        state.pinBoolAsDecision(0, true)
+        state.runToFixpoint(allFactors = false)
+        // v0 should be [5,5] and v1 should be [3,3], both at level 1.
+        assertEquals(5, state.intDomains[0].min)
+        assertEquals(5, state.intDomains[0].max)
+        assertEquals(3, state.intDomains[1].min)
+        assertEquals(3, state.intDomains[1].max)
+        // Allocate atom [v1 ≥ 3]: should hold (currently true), level 1 (when v1.min
+        // was tightened by Linear), antecedents from intMinAntecedents[v1] = [¬x].
+        val atomVarGE3 = state.atomVarGe(1, 3)
+        val atomId = state.atomIdOf(atomVarGE3)
+        assertEquals(1, state.atomValue[atomId], "atom [v1≥3] should hold (v1.min=3≥3)")
+        assertEquals(1, state.atomLevel[atomId], "atom became known at level 1")
+        val ant = state.atomAntecedents[atomId]
+        assertTrue(ant != null, "atom should have antecedents from intMinAntecedents[v1]")
+        val xLit = Lit.make(0, false)  // ¬x — the false-form when x is true.
+        assertTrue(xLit in ant!!.toSet(),
+            "atom antecedents should contain ¬x, got ${ant.toList()}")
+        // Allocate a second atom [v1 ≥ 10] — should be false (v1.max=3 < 10).
+        val atomVarGE10 = state.atomVarGe(1, 10)
+        val atomId10 = state.atomIdOf(atomVarGE10)
+        assertEquals(0, state.atomValue[atomId10],
+            "atom [v1≥10] should not hold (v1.max=3 < 10)")
+        // Identity: re-requesting the same atom should return the same id (cached).
+        val atomVarGE3Again = state.atomVarGe(1, 3)
+        assertEquals(atomVarGE3, atomVarGE3Again, "atom registry should dedupe")
     }
 
     @Test

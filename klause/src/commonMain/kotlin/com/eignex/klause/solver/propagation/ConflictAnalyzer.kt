@@ -100,70 +100,53 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         val currentLevel = state.currentLevel
         if (currentLevel <= 0) return AnalysisResult.NotApplicable
 
-        // Standard 1UIP loop:
-        //   `seen[v]`        — variable already in the working reason set
-        //   `currentLevelCount` — variables at the current level still pending resolution
-        //   `learned`        — literals already promoted to the learned clause (lower-level
-        //                       literals + non-Clause leaves)
+        // Standard 1UIP loop with bool + atom support. The `seen` array spans
+        // [0, numBoolVars + atomCount): low indices are bool vars (walked via
+        // boolPinOrder), high indices are virtual atom-vars (resolved via
+        // atomAntecedents — atoms have no chronological pin order, just allocation order,
+        // so we sweep them after the bool trail is exhausted at currentLevel).
         val numBoolVars = state.problem.numBoolVars
-        val seen = BooleanArray(numBoolVars)
+        val atomCount = state.atomIntVar.size
+        val seen = BooleanArray(numBoolVars + atomCount)
         var currentLevelCount = 0
         val learned = ArrayList<Int>(seedReason.size)
 
-        // Process the seed reason: each literal in it is currently false in [state] (since
-        // the conflict factor returned false). The variable was pinned to make that literal
-        // false; bumping `seen` for it adds it to the resolution working set.
         ingestReason(seedReason, seen, learned, currentLevel) {
             currentLevelCount++
         }
 
         if (currentLevelCount == 0) {
-            // Every literal in the conflict reason was at a level < current — the conflict
-            // is fundamentally lower. The learned clause is the conflict reason directly
-            // (negated); [finalizeClause] computes backjump level from the literals' levels.
             return finalizeClause(learned, currentLevel)
         }
 
-        // Walk the pin trail backwards, resolving against the most-recently-pinned
-        // variable still in the working set.
         var pinIdx = state.boolPinOrder.size - 1
         while (true) {
-            // Find the next variable in the trail that's in `seen` (still pending) and at
-            // the current level.
+            // Pick a current-level pivot: prefer the most-recent bool from the pin trail
+            // (1UIP canonical order); if none, fall back to any atom-var at currentLevel.
             var pivot = -1
             while (pinIdx >= 0) {
                 val v = state.boolPinOrder[pinIdx]
                 pinIdx--
-                if (seen[v] && state.boolLevel[v] == currentLevel) {
-                    pivot = v
-                    break
-                }
+                if (seen[v] && state.boolLevel[v] == currentLevel) { pivot = v; break }
             }
             if (pivot < 0) {
-                // No more current-level vars to resolve — shouldn't happen unless the
-                // trail was truncated mid-conflict (we always resolve at least one). Treat
-                // remaining seen-current-level vars as leaves and fall through.
-                break
+                // Look for an atom pivot at currentLevel.
+                for (id in 0 until atomCount) {
+                    val v = numBoolVars + id
+                    if (seen[v] && state.atomLevel[id] == currentLevel) { pivot = v; break }
+                }
+                if (pivot < 0) break
             }
             seen[pivot] = false
             currentLevelCount--
             if (currentLevelCount == 0) {
-                // UIP reached. The pivot is the asserting literal at the current level.
-                // Its literal in the learned clause is the *negation* of its current
-                // pinned value — because the learned clause says "if everything else is
-                // as it was, pivot can't be at its current value".
-                val pivotPinned = state.boolValues[pivot] ?: error("UIP variable $pivot is unpinned")
-                learned.add(Lit.make(pivot, !pivotPinned))
+                learned.add(uipLit(pivot))
                 return finalizeClause(learned, currentLevel)
             }
-            // Not yet UIP — replace pivot with its antecedents (resolution).
-            val antecedents = state.boolAntecedents[pivot]
+            val antecedents = antecedentsOf(pivot)
                 ?: run {
-                    // No antecedents recorded → treat pivot as a leaf. Promote its literal
-                    // directly and stop trying to resolve.
-                    val pivotPinned = state.boolValues[pivot] ?: error("pivot $pivot unpinned")
-                    learned.add(Lit.make(pivot, !pivotPinned))
-                    // Drain the rest of `seen` similarly.
+                    // Leaf pivot — promote and drain the rest.
+                    learned.add(uipLit(pivot))
                     drainSeenAsLeaves(seen, learned)
                     return finalizeClause(learned, currentLevel)
                 }
@@ -171,10 +154,28 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                 currentLevelCount++
             }
         }
-        // Defensive fallback when the trail walk doesn't reach UIP (shouldn't normally
-        // happen): emit whatever's in `seen` as leaves.
         drainSeenAsLeaves(seen, learned)
         return finalizeClause(learned, currentLevel)
+    }
+
+    /** Produce the literal for [pivot] as it should appear in the learned clause —
+     *  the negation of its current truth value, for both bool and atom pivots. */
+    private fun uipLit(pivot: Int): Int {
+        val numBoolVars = state.problem.numBoolVars
+        return if (pivot < numBoolVars) {
+            val pinned = state.boolValues[pivot] ?: error("UIP bool var $pivot unpinned")
+            Lit.make(pivot, !pinned)
+        } else {
+            val atomId = pivot - numBoolVars
+            val holds = state.atomValue[atomId] != 0
+            Lit.make(pivot, !holds)  // atom-var lit; lit's positivity is the negation of current truth
+        }
+    }
+
+    private fun antecedentsOf(v: Int): IntArray? {
+        val numBoolVars = state.problem.numBoolVars
+        return if (v < numBoolVars) state.boolAntecedents[v]
+        else state.atomAntecedents[v - numBoolVars]
     }
 
     /**
@@ -208,14 +209,18 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      */
     private fun minimize(learned: ArrayList<Int>, currentLevel: Int): ArrayList<Int> {
         if (learned.size <= 1) return learned
-        val inClause = BooleanArray(state.problem.numBoolVars)
-        for (lit in learned) inClause[Lit.variable(lit)] = true
+        // inClause covers the combined bool + atom var space so atom-lit literals
+        // participate in the redundancy check.
+        val inClause = BooleanArray(state.problem.numBoolVars + state.atomIntVar.size)
+        for (lit in learned) {
+            val v = Lit.variable(lit)
+            if (v < inClause.size) inClause[v] = true
+        }
         val cache = HashMap<Int, Boolean>(learned.size * 4)
         val toDrop = HashSet<Int>()
         for (lit in learned) {
             val v = Lit.variable(lit)
-            // Never drop the UIP — it's the asserting literal.
-            if (state.boolLevel[v] == currentLevel) continue
+            if (levelOf(v) == currentLevel) continue  // never drop UIP
             if (isRedundant(v, inClause, cache)) toDrop.add(v)
         }
         if (toDrop.isEmpty()) return learned
@@ -237,14 +242,14 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         v: Int, inClause: BooleanArray, cache: HashMap<Int, Boolean>,
     ): Boolean {
         cache[v]?.let { return it }
-        val antecedents = state.boolAntecedents[v] ?: run {
+        val antecedents = antecedentsOf(v) ?: run {
             cache[v] = false; return false
         }
         for (lit in antecedents) {
             val u = Lit.variable(lit)
             if (u == v) continue
-            if (state.boolLevel[u] <= 0) continue           // level-0 fact: implied by problem alone
-            if (inClause[u]) continue                       // already in clause: not introducing a new dependency
+            if (levelOf(u) <= 0) continue
+            if (u < inClause.size && inClause[u]) continue
             if (!isRedundant(u, inClause, cache)) {
                 cache[v] = false
                 return false
@@ -254,45 +259,66 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         return true
     }
 
+    /** Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
+     *  and atom vars (via [PropagationState.atomLevel]). */
+    private fun levelOf(v: Int): Int {
+        val numBoolVars = state.problem.numBoolVars
+        return if (v < numBoolVars) state.boolLevel[v]
+        else state.atomLevel[v - numBoolVars]
+    }
+
     /**
      * Add each literal in [reason] to either the working `seen` set (if it's at
      * [currentLevel] — resolution will continue through it) or directly to [learned]
      * (lower level — it's part of the final clause). Increments [bumpCurrentLevel] for
      * each new-at-current-level variable so the caller can track resolution progress.
      */
-    private inline fun ingestReason(
+    private fun ingestReason(
         reason: IntArray,
         seen: BooleanArray,
         learned: ArrayList<Int>,
         currentLevel: Int,
         bumpCurrentLevel: () -> Unit,
     ) {
+        val numBoolVars = state.problem.numBoolVars
         for (lit in reason) {
             val v = Lit.variable(lit)
+            if (v >= seen.size) continue  // atom allocated after analyzer started; shouldn't happen
             if (seen[v]) continue
-            val lvl = state.boolLevel[v]
-            if (lvl <= 0) continue  // top-level (problem-implied) — not load-bearing
+            val lvl = levelOf(v)
+            if (lvl <= 0) continue
             seen[v] = true
             if (lvl == currentLevel) {
                 bumpCurrentLevel()
             } else {
-                // Lower-level variable: its literal in the learned clause is the negation
-                // of its currently-pinned value, mirroring the UIP literal's encoding.
-                val pinned = state.boolValues[v] ?: error("seen var $v not pinned")
-                learned.add(Lit.make(v, !pinned))
+                // Lower-level variable: emit its currently-false-form literal.
+                if (v < numBoolVars) {
+                    val pinned = state.boolValues[v] ?: error("seen var $v not pinned")
+                    learned.add(Lit.make(v, !pinned))
+                } else {
+                    val atomId = v - numBoolVars
+                    val holds = state.atomValue[atomId] != 0
+                    learned.add(Lit.make(v, !holds))
+                }
             }
         }
     }
 
-    /** Convert every still-seen variable into a literal in [learned]. Used as a fallback
-     *  path when antecedent chasing terminates short of UIP. */
+    /** Convert every still-seen variable into a literal in [learned]. */
     private fun drainSeenAsLeaves(seen: BooleanArray, learned: ArrayList<Int>) {
+        val numBoolVars = state.problem.numBoolVars
         for (v in seen.indices) {
             if (!seen[v]) continue
-            val pinned = state.boolValues[v] ?: continue
-            // Avoid double-adding if this var's lit is already in `learned`.
+            val lit: Int = if (v < numBoolVars) {
+                val pinned = state.boolValues[v] ?: continue
+                Lit.make(v, !pinned)
+            } else {
+                val atomId = v - numBoolVars
+                val holds = state.atomValue[atomId] != 0
+                Lit.make(v, !holds)
+            }
             if (learned.any { Lit.variable(it) == v }) continue
-            learned.add(Lit.make(v, !pinned))
+            learned.add(lit)
         }
     }
 
@@ -306,7 +332,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     private fun lbdOf(learned: List<Int>): Int {
         if (learned.isEmpty()) return 0
         val seenLevels = HashSet<Int>(learned.size)
-        for (lit in learned) seenLevels.add(state.boolLevel[Lit.variable(lit)])
+        for (lit in learned) seenLevels.add(levelOf(Lit.variable(lit)))
         return seenLevels.size
     }
 
@@ -320,7 +346,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     private fun backjumpLevelOf(learned: List<Int>, currentLevel: Int): Int {
         var best = 0
         for (lit in learned) {
-            val lvl = state.boolLevel[Lit.variable(lit)]
+            val lvl = levelOf(Lit.variable(lit))
             if (lvl < currentLevel && lvl > best) best = lvl
         }
         return best
