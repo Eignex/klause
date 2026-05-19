@@ -5,6 +5,8 @@ import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Inverse
+import com.eignex.klause.solver.factor.Among
+import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Cardinality
@@ -95,7 +97,13 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // Counting
     "at_least_int" -> emitAtLeast(c)
     "at_most_int" -> emitAtMost(c)
-    "count_eq" -> emitCountEq(c)
+    "count_eq", "fzn_count_eq" -> emitCountOp(c, Count.Op.Eq)
+    "count_neq", "fzn_count_neq" -> emitCountOp(c, Count.Op.Ne)
+    "count_le", "fzn_count_leq", "count_leq" -> emitCountOp(c, Count.Op.Le)
+    "count_lt", "fzn_count_lt" -> emitCountOp(c, Count.Op.Lt)
+    "count_ge", "fzn_count_geq", "count_geq" -> emitCountOp(c, Count.Op.Ge)
+    "count_gt", "fzn_count_gt" -> emitCountOp(c, Count.Op.Gt)
+    "among", "fzn_among" -> emitAmong(c)
 
     // Ordering
     "increasing_int", "fzn_increasing_int" -> emitMonotone(c, ascending = true, strict = false)
@@ -623,6 +631,44 @@ internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) {
         Lit.make(aux, true)
     }
     factors.add(Cardinality(lits, min = 0, max = n))
+}
+
+/** Unified `count_{eq,neq,le,lt,ge,gt}(xs, v, n)`. When `v` is a constant int the dispatch
+ *  lands on the [Count] factor directly. When `v` is a variable (only emitted for count_eq
+ *  in practice) we fall back to the existing reified-decomposition path. */
+internal fun FlatZincCompiler.emitCountOp(c: FznConstraint, op: Count.Op) {
+    require(c.args.size == 3)
+    val xs = evalIntVarArray(c.args[0])
+    val vConst = evalIntConstOrNull(c.args[1])?.toInt()
+    val n = resolveIntVar(c.args[2])
+    if (vConst != null) {
+        factors.add(Count(xs, vConst, op, n))
+    } else {
+        if (op != Count.Op.Eq) failHere("count_$op with variable v not supported; only count_eq")
+        // Delegate to the older reified-decomposition path that channels b_i ↔ xs[i]=v
+        // through ReifiedLinear + an integer-sum link.
+        emitCountEq(c)
+    }
+}
+
+/** `among(n, xs, S)` — `S` is a constant set literal or range. */
+internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
+    require(c.args.size == 3)
+    val n = resolveIntVar(c.args[0])
+    val xs = evalIntVarArray(c.args[1])
+    val setLit = c.args[2]
+    val values: IntArray = when (setLit) {
+        is FznExpr.IntSetLit -> IntArray(setLit.values.size) { setLit.values[it].toInt() }
+        is FznExpr.IntRangeLit -> IntArray((setLit.hi - setLit.lo + 1).toInt()) { (setLit.lo + it).toInt() }
+        is FznExpr.Ident -> {
+            val p = params[setLit.name] ?: failHere("undefined parameter `${setLit.name}` in among")
+            (p as? FlatZincCompiler.ParamValue.IntSet)?.values?.let { vs ->
+                IntArray(vs.size) { vs[it].toInt() }
+            } ?: failHere("`${setLit.name}` is not an int-set parameter")
+        }
+        else -> failHere("among: expected set literal or parameter, got ${setLit::class.simpleName}")
+    }
+    factors.add(Among(n, xs, values))
 }
 
 internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
