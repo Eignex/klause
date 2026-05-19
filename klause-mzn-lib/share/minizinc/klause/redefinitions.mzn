@@ -80,6 +80,25 @@ predicate int_times(var int: a, var int: b, var int: c);
 % binding x's int value to y's bucket index.
 predicate int2float(var int: x, var float: y);
 
+% Float scalar comparisons + min/max/times. All lowered inside klause via
+% bucket-index arithmetic (Linear / ReifiedLinear / Table factors); declared
+% native so MiniZinc skips its float decomposition.
+predicate float_eq(var float: a, var float: b);
+predicate float_eq_reif(var float: a, var float: b, var bool: r);
+predicate float_le(var float: a, var float: b);
+predicate float_le_reif(var float: a, var float: b, var bool: r);
+predicate float_lt(var float: a, var float: b);
+predicate float_lt_reif(var float: a, var float: b, var bool: r);
+predicate float_ne(var float: a, var float: b);
+predicate float_ne_reif(var float: a, var float: b, var bool: r);
+predicate float_lin_lt(array[int] of float: as, array[int] of var float: bs, float: c);
+predicate float_lin_lt_reif(array[int] of float: as, array[int] of var float: bs,
+                            float: c, var bool: r);
+predicate float_min(var float: a, var float: b, var float: c);
+predicate float_max(var float: a, var float: b, var float: c);
+predicate float_times(var float: a, var float: b, var float: c);
+predicate float_div(var float: a, var float: b, var float: c);
+
 % Globals — klause has native factors for these. MiniZinc routes them directly to
 % klause's FlatZinc compiler instead of decomposing in its standard library.
 predicate all_different_int(array[int] of var int: x);
@@ -179,6 +198,12 @@ predicate set_subset_reif(var set of int: S, var set of int: T, var bool: r);
 predicate set_eq_reif(var set of int: S, var set of int: T, var bool: r);
 predicate set_ne(var set of int: S, var set of int: T);
 predicate set_ne_reif(var set of int: S, var set of int: T, var bool: r);
+predicate set_le(var set of int: S, var set of int: T);
+predicate set_le_reif(var set of int: S, var set of int: T, var bool: r);
+predicate set_lt(var set of int: S, var set of int: T);
+predicate set_lt_reif(var set of int: S, var set of int: T, var bool: r);
+predicate array_set_element(var int: x, array[int] of set of int: y, var set of int: z);
+predicate array_var_set_element(var int: x, array[int] of var set of int: y, var set of int: z);
 predicate all_disjoint(array[int] of var set of int: a);
 predicate set_partition_into(array[int] of var set of int: a, var set of int: u);
 

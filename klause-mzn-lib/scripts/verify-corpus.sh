@@ -90,19 +90,19 @@ while IFS= read -r -d '' mzn; do
     # speeds it up since we're not running the solver here.
     args=(--solver "$SOLVER_MSC" -c "$mzn" -o "$fzn" --no-output-ozn)
     [[ -n "$dzn" ]] && args+=("$dzn")
-    if timeout "${FLATTEN_TIMEOUT_S}s" minizinc "${args[@]}" >"$err" 2>&1; then
-      :
-    else
-      rc=$?
+    # Capture minizinc's exit code without aborting the sweep. The script header is
+    # `set -uo pipefail` (no `-e`), so the non-zero exit is observable via `$?`
+    # without triggering early termination.
+    rc=0
+    timeout "${FLATTEN_TIMEOUT_S}s" minizinc "${args[@]}" >"$err" 2>&1 || rc=$?
+    if (( rc != 0 )); then
       if (( rc == 124 )); then
         echo "$rel,timeout,"
         timeout_count=$((timeout_count + 1))
-        rm -f "$fzn" "$err"
-        continue
+      else
+        echo "$rel,mzn-error,"
+        mzn_error_count=$((mzn_error_count + 1))
       fi
-      # MiniZinc itself failed.
-      echo "$rel,mzn-error,"
-      mzn_error_count=$((mzn_error_count + 1))
       rm -f "$fzn" "$err"
       continue
     fi

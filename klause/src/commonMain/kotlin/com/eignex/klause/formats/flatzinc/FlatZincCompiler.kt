@@ -387,7 +387,17 @@ internal class FlatZincCompiler(
                 evalFloatConst(lit.elements[it])
             })
         }
-        is FznType.SetOfInt -> failHere("parameter array `$name`: set-of-int not supported")
+        is FznType.SetOfInt -> FlatZincArray.IntSetParam(name, lit.elements.map { e ->
+            val arr: IntArray = when (e) {
+                is FznExpr.IntSetLit -> IntArray(e.values.size) { e.values[it].toInt() }
+                is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
+                is FznExpr.Ident -> (params[e.name] as? ParamValue.IntSet)?.let { p ->
+                    IntArray(p.values.size) { p.values[it].toInt() }
+                } ?: failHere("`${e.name}` is not an int-set parameter")
+                else -> failHere("set-of-int array `$name`: unexpected element ${e::class.simpleName}")
+            }
+            arr.also { it.sort() }
+        })
         is FznType.Array -> failHere("nested arrays not supported")
     }
 

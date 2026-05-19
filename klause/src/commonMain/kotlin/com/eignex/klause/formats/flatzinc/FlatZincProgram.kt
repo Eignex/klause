@@ -125,6 +125,12 @@ sealed interface FlatZincArray {
     data class FloatParam(override val name: String, val values: DoubleArray) : FlatZincArray {
         override val length: Int get() = values.size
     }
+    /** Parameter array of set-of-int constants. Each `values[i]` is a sorted int array
+     *  giving the elements of the i-th set. Read by `array_set_element` to materialise
+     *  the per-universe-element selection mask. */
+    data class IntSetParam(override val name: String, val values: List<IntArray>) : FlatZincArray {
+        override val length: Int get() = values.size
+    }
     /** Variable array: each element is a klause var id. `elementKind` says how to read it. */
     data class Vars(
         override val name: String,
