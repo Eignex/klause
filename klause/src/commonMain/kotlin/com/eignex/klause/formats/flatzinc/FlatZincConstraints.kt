@@ -15,6 +15,7 @@ import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Sequence as SequenceFactor
+import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
@@ -90,6 +91,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "bin_packing_load", "fzn_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
     "diffn", "fzn_diffn" -> emitDiffn(c, nonStrict = false)
     "diffn_nonstrict", "fzn_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
+    "table_int", "fzn_table_int" -> emitTable(c)
     "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -328,6 +330,17 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+/**
+ * `table_int(xs, tuples)`. The `tuples` arg is a row-major 2D-array literal; we flatten it
+ * to a 1D `IntArray` and feed the [Table] factor along with the arity inferred from xs.
+ */
+internal fun FlatZincCompiler.emitTable(c: FznConstraint) {
+    require(c.args.size == 2)
+    val xs = evalIntVarArray(c.args[0])
+    val tuples = evalIntConstArray(c.args[1])
+    factors.add(Table(xs, tuples))
 }
 
 /** `diffn(xs, ys, widths, heights)` / `diffn_nonstrict(...)` — 2D rectangle non-overlap. */
