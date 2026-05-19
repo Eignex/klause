@@ -3,6 +3,8 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
+import com.eignex.klause.solver.factor.AllEqual
+import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Among
@@ -83,6 +85,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // Global
     "all_different_int" -> emitAllDifferent(c)
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
+    "all_equal_int", "fzn_all_equal_int" -> emitAllEqual(c)
+    "member_int", "fzn_member_int" -> emitMember(c)
     "inverse", "fzn_inverse" -> emitInverse(c, withOffsets = false)
     "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
     "nvalue", "fzn_nvalue" -> emitNValue(c, NValue.Mode.Eq)
@@ -420,6 +424,21 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     factors.add(AllDifferentExceptZero(vars))
+}
+
+internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
+    require(c.args.size == 1)
+    val vars = evalIntVarArray(c.args[0])
+    if (vars.size < 2) return
+    factors.add(AllEqual(vars))
+}
+
+/** `member_int(xs, y)`. */
+internal fun FlatZincCompiler.emitMember(c: FznConstraint) {
+    require(c.args.size == 2)
+    val xs = evalIntVarArray(c.args[0])
+    val y = resolveIntVar(c.args[1])
+    factors.add(Member(xs, y))
 }
 
 /**
