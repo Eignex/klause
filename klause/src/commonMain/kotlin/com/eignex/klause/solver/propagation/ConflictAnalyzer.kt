@@ -71,13 +71,34 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     fun analyze(conflictFactorId: Int): AnalysisResult {
         val factor = state.factorAt(conflictFactorId)
         val seedReason = factor.conflictReason(state, conflictFactorId) ?: return AnalysisResult.NotApplicable
-        val currentLevel = state.currentLevel
-        if (currentLevel <= 0) {
-            // Conflict at level 0 means UNSAT-by-bake; no learned clause helps a higher
-            // level since there is none. Return NotApplicable and let the engine
-            // surface the result through the usual Unsat path.
-            return AnalysisResult.NotApplicable
+        return analyzeFromSeed(seedReason)
+    }
+
+    /**
+     * Decision-vs-prior-pin conflict path: when [PropagationState.pinBoolAsDecision]
+     * fails because the var was already pinned to the opposite value, no factor's
+     * `propagate` fired and `currentFactor` is `-1`. The implicit violated clause is:
+     *   `(prior pin's antecedents) ∨ Lit.make(v, !prior_value)`
+     * — every literal currently false in the state, exactly matching the analyzer's
+     * "seed reason" contract. Falls through to the same 1UIP loop as [analyze].
+     */
+    fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult {
+        val priorValue = state.boolValues[conflictedVar] ?: return AnalysisResult.NotApplicable
+        val priorAnt = state.boolAntecedents[conflictedVar]
+        // The just-attempted decision lit (currently false in state because the prior
+        // pin still holds and pinBoolImpl rejected the new value).
+        val decisionLit = com.eignex.klause.solver.Lit.make(conflictedVar, !priorValue)
+        val seed = if (priorAnt == null) intArrayOf(decisionLit)
+        else IntArray(priorAnt.size + 1).also {
+            for (i in priorAnt.indices) it[i] = priorAnt[i]
+            it[priorAnt.size] = decisionLit
         }
+        return analyzeFromSeed(seed)
+    }
+
+    private fun analyzeFromSeed(seedReason: IntArray): AnalysisResult {
+        val currentLevel = state.currentLevel
+        if (currentLevel <= 0) return AnalysisResult.NotApplicable
 
         // Standard 1UIP loop:
         //   `seen[v]`        — variable already in the working reason set

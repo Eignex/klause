@@ -189,8 +189,12 @@ class PropagationSession(val problem: Problem) {
         // antecedent to seed analysis with.
         val learned: ConflictAnalyzer.AnalysisResult? = run {
             val failingFid = state.currentFactor
-            if (failingFid < 0) null
-            else ConflictAnalyzer(state).analyze(failingFid)
+            when {
+                failingFid >= 0 -> ConflictAnalyzer(state).analyze(failingFid)
+                state.lastDecisionConflictVar >= 0 ->
+                    ConflictAnalyzer(state).analyzeDecisionConflict(state.lastDecisionConflictVar)
+                else -> null
+            }
         }
         state.restore(levelStates.last().snap)
         return PropagationResult.Unsat(bools, ints, levels, factors, learned)

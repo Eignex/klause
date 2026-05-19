@@ -326,6 +326,53 @@ class FactorConflictReasonTest {
     }
 
     @Test
+    fun `LCG end-to-end decision-vs-pin conflict learns clause through int trail`() {
+        // 3 bools x (var 0), y (var 1), z (var 2). 1 int v0 in [0, 9].
+        //   A: x ↔ (v0 = 5).
+        //   B: y ↔ (v0 = 3).
+        //   C: z ↔ (v0 ≥ 4).
+        //
+        // x=true at level 1:
+        //   - A pins v0 = 5 with int antecedents [¬x].
+        //   - B sees v0=[5,5], EQ 3, neverHolds → pins y=false at level 1 with bool
+        //     antecedents composed from v0's int antecedents = [¬x].
+        //   - C sees v0=[5,5], GE 4, alwaysHolds → pins z=true at level 1 with antecedents [¬x].
+        //
+        // Now decide y=true at level 2 → decision-level conflict (y already pinned false).
+        // The new `analyzeDecisionConflict` path seeds from y's prior antecedents [¬x]
+        // plus the just-decided lit y, runs 1UIP and minimization.
+        //
+        // Without LCG plumbing: y's antecedents would be null (no factor records the
+        // int trail). Analyzer would return NotApplicable, engine falls back to
+        // chronological backtrack.
+        //
+        // With LCG: y's antecedents are [¬x] (composed from v0's int trail). The
+        // minimizer resolves y against its antecedent (¬x is in the clause), drops y.
+        // Learned clause = [¬x] — strictly stronger than [¬x, ¬y] which a vanilla
+        // CDCL with leaf antecedents would learn.
+        val problem = Problem(
+            numBoolVars = 3, numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 9)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.GE, 4),
+            ),
+        )
+        val session = PropagationSession(problem)
+        assertIs<PropagationResult.Implied>(session.pinBool(0, true))
+        val r = session.pinBool(1, true)  // y=true; conflicts with implied y=false.
+        val unsat = assertIs<PropagationResult.Unsat>(r)
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
+        val lits = learned.literals.toSet()
+        assertTrue(Lit.make(0, false) in lits,
+            "learned should contain ¬x, got ${learned.literals.toList()}")
+        // LCG win: y resolved away by minimization (its antecedent ¬x already in clause).
+        assertFalse(Lit.make(1, true) in lits,
+            "LCG should resolve y away; got ${learned.literals.toList()}")
+    }
+
+    @Test
     fun `Xor conflict analyzer learns clause containing decision`() {
         // a ⊕ b = 1. With Clauses forcing a, b both true on x=true → parity 0, conflict.
         val problem = Problem(

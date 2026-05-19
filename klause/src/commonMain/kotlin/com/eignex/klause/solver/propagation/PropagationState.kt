@@ -127,6 +127,14 @@ class PropagationState(
      */
     internal var conflictSeedFactors: MutableSet<Int>? = null
 
+    /** Var whose pinned value was contradicted by a decision-level pin attempt (i.e.
+     *  `pinBoolAsDecision` tried to set the opposite value of an existing pin). `-1` when
+     *  no such conflict is active. Lets the conflict analyzer learn from a
+     *  decision-vs-prior-pin contradiction by seeding from the prior pin's antecedents
+     *  plus the just-decided lit — without this, the analyzer falls back to chronological
+     *  backtrack on any conflict that doesn't come from a factor's `propagate`. */
+    internal var lastDecisionConflictVar: Int = -1
+
     /**
      * Per-factor mutable scratch space — mirrors [com.eignex.klause.solver.localsearch.LocalSearchState.refPayload]
      * on the LS side. Factors stash propagation-time bookkeeping here keyed by their own
@@ -415,10 +423,13 @@ class PropagationState(
             if (cur == value) return true
             // Conflict — record levels of both contributors, and seed the factor core with
             // the prior pin's reason (whichever factor forced `cur`, if any) plus the
-            // currently-running factor (if any).
+            // currently-running factor (if any). Also record [v] so the analyzer can
+            // synthesise a clause-form seed from the prior pin's antecedents when this
+            // is a decision-level vs prior-pin contradiction (currentFactor == -1).
             recordConflictLevels(boolLevel[v], currentLevel)
             seedConflictFactor(boolReason[v])
             seedConflictFactor(currentFactor)
+            if (currentFactor < 0) lastDecisionConflictVar = v
             return false
         }
         boolValues[v] = value
@@ -669,6 +680,7 @@ class PropagationState(
         dirtyInts.clear()
         conflictLevels = null
         conflictSeedFactors = null
+        lastDecisionConflictVar = -1
         currentLevel = 0
         currentFactor = -1
     }
