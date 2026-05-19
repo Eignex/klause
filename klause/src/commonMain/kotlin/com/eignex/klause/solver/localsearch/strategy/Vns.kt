@@ -123,7 +123,7 @@ class Vns(
             val pick = raw[state.rng.nextInt(raw.size)]
             // Compound forbids nesting; flatten if the factor itself proposed a Compound.
             when (pick) {
-                is Move.BoolFlip, is Move.IntSet, is Move.SetToggle -> parts.add(pick)
+                is Move.BoolFlip, is Move.IntSet -> parts.add(pick)
                 is Move.Compound -> for (p in pick.parts) parts.add(p)
             }
         }

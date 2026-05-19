@@ -12,19 +12,12 @@ sealed interface Move {
     data class IntSet(val varId: Int, val newValue: Int) : Move
 
     /**
-     * Toggle membership of [element] in set variable [setVarId] — if the element is currently
-     * in the set, remove it; otherwise add it. Self-inverting (apply twice = no-op), which
-     * lets the LS engine use the standard apply-revert evaluation path for Compound parts.
-     */
-    data class SetToggle(val setVarId: Int, val element: Int) : Move
-
-    /**
      * Two or more single-variable moves applied as one transition. The engine commits
      * each part in `parts` order, but break score / net delta / tabu are evaluated
      * against the full post-state — so a Compound that resolves a conflict via two
      * coupled changes can score better than either part alone.
      *
-     * Parts must be `BoolFlip`, `IntSet`, or `SetToggle` (no Compound-of-Compound); the LS engine
+     * Parts must be `BoolFlip` or `IntSet` (no Compound-of-Compound); the LS engine
      * uses apply-then-revert to evaluate cost diffs, which only works for invertible
      * primitives. Constructed via [com.eignex.klause.solver.localsearch.MoveSink.addCompound];
      * a Compound is tabu if *any* part is tabu (conservative).

@@ -54,22 +54,12 @@ class PropagationState(
     /** Per-int current domain (copy of [Problem.intDomains], narrowed as propagation proceeds). */
     val intDomains: Array<IntDomain> = Array(problem.numIntVars) { problem.intDomains[it] }
 
-    /** Per-set-var "required" membership bitsets — elements that MUST be in the set. Copy of
-     *  [Problem.setDomains] tightened upward as propagation forces elements in. */
-    val setRequired: Array<Bits> = Array(problem.numSetVars) { problem.setDomains[it].required.copy() }
-
-    /** Per-set-var "possible" membership bitsets — elements that MAY be in the set. Copy of
-     *  [Problem.setDomains] tightened downward as propagation rules elements out. */
-    val setPossible: Array<Bits> = Array(problem.numSetVars) { problem.setDomains[it].possible.copy() }
-
     /** Vars whose pin/domain changed since the driver last drained them. Primitive int
      *  ring buffers to avoid the autoboxing tax `ArrayDeque<Int>` pays on every push/poll. */
     private val dirtyBools: com.eignex.klause.util.IntArrayDeque =
         com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
     private val dirtyInts: com.eignex.klause.util.IntArrayDeque =
         com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
-    private val dirtySets: com.eignex.klause.util.IntArrayDeque =
-        com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numSetVars.coerceAtLeast(8))
 
     /** False iff seeding the assumptions themselves already produced a contradiction. */
     var seeded: Boolean = true
@@ -379,46 +369,6 @@ class PropagationState(
      *  representation. */
     fun excludeIntValue(v: Int, value: Int): Boolean = excludeIntValueImpl(v, value)
 
-    /**
-     * Force [element] into the set var [v]'s required set. Returns `false` iff `element`
-     * was already excluded from `possible` (contradiction). Marks [v] dirty when this
-     * actually adds the element so dependent factors wake up.
-     */
-    fun requireElement(v: Int, element: Int): Boolean {
-        val req = setRequired[v]
-        if (req.get(element)) return true
-        if (!setPossible[v].get(element)) {
-            // Contradiction: element is excluded but a propagator demands it. We don't yet
-            // track per-set-element reasons / levels — record currentLevel only. Conflict
-            // analysis treats this as a chronological-backtrack failure (same as factors
-            // without conflictReason hooks).
-            recordConflictLevels(currentLevel, currentLevel)
-            seedConflictFactor(currentFactor)
-            return false
-        }
-        req.set(element)
-        dirtySets.addLast(v)
-        return true
-    }
-
-    /**
-     * Remove [element] from the set var [v]'s possible set. Returns `false` iff `element`
-     * was already in `required` (contradiction). Marks [v] dirty when this actually drops
-     * the element.
-     */
-    fun excludeElement(v: Int, element: Int): Boolean {
-        val poss = setPossible[v]
-        if (!poss.get(element)) return true
-        if (setRequired[v].get(element)) {
-            recordConflictLevels(currentLevel, currentLevel)
-            seedConflictFactor(currentFactor)
-            return false
-        }
-        poss.clear(element)
-        dirtySets.addLast(v)
-        return true
-    }
-
     private fun pinBoolImpl(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
         val cur = boolValues[v]
         if (cur != null) {
@@ -528,9 +478,6 @@ class PropagationState(
         conflictLevels = s
     }
 
-    /** Pop one set var that's been dirtied since the last call, or `-1` if none. */
-    fun pollDirtySet(): Int = if (dirtySets.isEmpty()) -1 else dirtySets.removeFirst()
-
     /** Pop one bool var that's been dirtied since the last call, or `-1` if none. */
     fun pollDirtyBool(): Int = if (dirtyBools.isEmpty()) -1 else dirtyBools.removeFirst()
 
@@ -626,8 +573,6 @@ class PropagationState(
         internal val boolAssigned: Bits,
         internal val boolValueBits: Bits,
         internal val intDomains: Array<IntDomain>,
-        internal val setRequired: Array<Bits>,
-        internal val setPossible: Array<Bits>,
         internal val boolLevel: IntArray,
         internal val intLevel: IntArray,
         internal val decisionVars: IntArray,
@@ -642,8 +587,6 @@ class PropagationState(
         boolAssigned = boolAssigned.copy(),
         boolValueBits = boolValueBits.copy(),
         intDomains = intDomains.copyOf(),
-        setRequired = Array(setRequired.size) { setRequired[it].copy() },
-        setPossible = Array(setPossible.size) { setPossible[it].copy() },
         boolLevel = boolLevel.copyOf(),
         intLevel = intLevel.copyOf(),
         decisionVars = levelToDecisionVar.toIntArray(),
@@ -658,8 +601,6 @@ class PropagationState(
         boolAssigned.copyFrom(s.boolAssigned)
         boolValueBits.copyFrom(s.boolValueBits)
         for (i in s.intDomains.indices) intDomains[i] = s.intDomains[i]
-        for (i in s.setRequired.indices) setRequired[i].copyFrom(s.setRequired[i])
-        for (i in s.setPossible.indices) setPossible[i].copyFrom(s.setPossible[i])
         for (i in s.boolLevel.indices) boolLevel[i] = s.boolLevel[i]
         for (i in s.intLevel.indices) intLevel[i] = s.intLevel[i]
         for (i in s.boolReason.indices) boolReason[i] = s.boolReason[i]
@@ -672,7 +613,6 @@ class PropagationState(
         // Aborted pushes may have left dirty queue entries behind; drop them.
         dirtyBools.clear()
         dirtyInts.clear()
-        dirtySets.clear()
         conflictLevels = null
         conflictSeedFactors = null
         currentLevel = 0
@@ -707,12 +647,6 @@ class PropagationState(
                     if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
                 }
             }
-            while (true) {
-                val v = pollDirtySet(); if (v < 0) break
-                for (fid in problem.setOccurrences[v]) {
-                    if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
-                }
-            }
             // Optional seed — used by [PropagationSession.addLearnedClause] to force the
             // newly-stored learned clause to fire on the next propagation cycle (it would
             // otherwise sit dormant since the watcher index only wakes on false-going
@@ -743,12 +677,6 @@ class PropagationState(
             while (true) {
                 val v = pollDirtyInt(); if (v < 0) break
                 for (other in problem.intOccurrences[v]) {
-                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
-                }
-            }
-            while (true) {
-                val v = pollDirtySet(); if (v < 0) break
-                for (other in problem.setOccurrences[v]) {
                     if (!pending[other]) { pending[other] = true; queue.addLast(other) }
                 }
             }

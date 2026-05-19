@@ -25,20 +25,13 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         moves += Move.IntSet(varId, newValue)
     }
 
-    /** Toggle membership of [element] in set var [setVarId]. No freeze check today —
-     *  [com.eignex.klause.solver.Assumptions] does not yet track per-set assumptions. */
-    fun addSetToggle(setVarId: Int, element: Int) {
-        moves += Move.SetToggle(setVarId, element)
-    }
-
     /** Add a multi-variable atomic transition. Skips the move entirely if any part
      *  would touch a frozen variable — a Compound is all-or-nothing. */
     fun addCompound(parts: List<Move>) {
         for (p in parts) when (p) {
             is Move.BoolFlip -> if (assumptions.isFrozenBool(p.varId)) return
             is Move.IntSet -> if (assumptions.isFrozenInt(p.varId)) return
-            is Move.SetToggle -> { /* no freeze tracking for sets yet */ }
-            is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet/SetToggle)")
+            is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet)")
         }
         moves += Move.Compound(parts)
     }

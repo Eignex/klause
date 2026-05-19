@@ -10,14 +10,9 @@ import kotlin.random.Random
 class Assignment(
     val numBoolVars: Int,
     val numIntVars: Int,
-    val numSetVars: Int = 0,
-    /** Universe size per set var — needed to allocate the membership bitsets. Length
-     *  must equal [numSetVars] when non-empty; empty IntArray when there are no set vars. */
-    val setUniverseSizes: IntArray = IntArray(0),
 ) {
     private val bits: Bits = Bits(numBoolVars)
     private val ints: IntArray = IntArray(numIntVars)
-    private val sets: Array<Bits> = Array(numSetVars) { Bits(setUniverseSizes[it]) }
 
     fun boolValue(varId: Int): Boolean = bits.get(varId)
 
@@ -47,72 +42,28 @@ class Assignment(
         }
     }
 
-    /** Element membership in the set var [setId]. */
-    fun setMember(setId: Int, element: Int): Boolean = sets[setId].get(element)
-
-    /** Add [element] to the set var [setId]. */
-    fun setInclude(setId: Int, element: Int) { sets[setId].set(element) }
-
-    /** Remove [element] from the set var [setId]. */
-    fun setExclude(setId: Int, element: Int) { sets[setId].clear(element) }
-
-    /** Read-only snapshot of the set var's current members as sorted ints. */
-    fun setMembers(setId: Int): IntArray = sets[setId].toIntArray()
-
     fun snapshot(): Sample = Sample(
         bools = BooleanArray(numBoolVars) { bits.get(it) },
         ints = ints.copyOf(),
-        sets = Array(numSetVars) { sets[it].toIntArray() },
     )
 }
 
-/**
- * Immutable assignment snapshot yielded by the solver. [sets] is empty for problems that
- * declared no set vars; for set-var problems each element is the sorted-ascending int array
- * of element slot ids currently in that set.
- */
-data class Sample(
-    val bools: BooleanArray,
-    val ints: IntArray,
-    val sets: Array<IntArray> = emptyArray(),
-) {
+/** Immutable assignment snapshot yielded by the solver. */
+data class Sample(val bools: BooleanArray, val ints: IntArray) {
 
     /** Hamming distance to [other]: number of variable slots that differ. Caller must
-     *  ensure same arity (same numBoolVars / numIntVars / numSetVars and universes); not
-     *  bounds-checked. Used by diversity post-filters on `enumerate` / `samples`. Set vars
-     *  contribute the symmetric-difference count of element slots. */
+     *  ensure same arity (same numBoolVars / numIntVars); not bounds-checked. Used by
+     *  diversity post-filters on `enumerate` / `samples` across every backend. */
     fun hammingDistanceTo(other: Sample): Int {
         var d = 0
         for (i in bools.indices) if (bools[i] != other.bools[i]) d++
         for (i in ints.indices) if (ints[i] != other.ints[i]) d++
-        for (i in sets.indices) {
-            val a = sets[i]
-            val b = other.sets[i]
-            // Symmetric difference over two sorted IntArrays.
-            var ai = 0; var bi = 0
-            while (ai < a.size && bi < b.size) {
-                when {
-                    a[ai] < b[bi] -> { d++; ai++ }
-                    a[ai] > b[bi] -> { d++; bi++ }
-                    else -> { ai++; bi++ }
-                }
-            }
-            d += (a.size - ai) + (b.size - bi)
-        }
         return d
     }
 
     override fun equals(other: Any?): Boolean {
         if (other !is Sample) return false
-        if (!bools.contentEquals(other.bools)) return false
-        if (!ints.contentEquals(other.ints)) return false
-        if (sets.size != other.sets.size) return false
-        for (i in sets.indices) if (!sets[i].contentEquals(other.sets[i])) return false
-        return true
+        return bools.contentEquals(other.bools) && ints.contentEquals(other.ints)
     }
-    override fun hashCode(): Int {
-        var h = 31 * bools.contentHashCode() + ints.contentHashCode()
-        for (s in sets) h = 31 * h + s.contentHashCode()
-        return h
-    }
+    override fun hashCode(): Int = 31 * bools.contentHashCode() + ints.contentHashCode()
 }

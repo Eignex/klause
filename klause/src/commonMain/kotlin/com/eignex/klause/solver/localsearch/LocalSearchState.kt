@@ -21,8 +21,6 @@ class LocalSearchState(
     val assignment: Assignment = Assignment(
         numBoolVars = problem.numBoolVars,
         numIntVars = problem.numIntVars,
-        numSetVars = problem.numSetVars,
-        setUniverseSizes = IntArray(problem.numSetVars) { problem.setDomains[it].universeSize },
     )
     val violated: IntSwapSet = IntSwapSet(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
@@ -44,23 +42,18 @@ class LocalSearchState(
     var step: Long = 0L
         private set
 
-    /** Step at which each variable was last flipped or set. Index encoding:
-     *   - bool ids: `[0, numBoolVars)`
-     *   - int ids: `numBoolVars + intVar`
-     *   - set ids: `numBoolVars + numIntVars + setVar`
-     *  Set toggles touch the set-var slot (not the individual element), keeping the array
-     *  size bounded by var count rather than universe size.
+    /** Step at which each variable was last flipped or set. Index is the bool var id for
+     *  Boolean vars (`[0, numBoolVars)`); int var ids are offset by `numBoolVars`.
      *  Reset to zero on [restart] — used only for tabu / CCA-window decisions within a
      *  single restart epoch. For cross-epoch activity tracking, see [touchCount]. */
-    val lastTouched: LongArray =
-        LongArray(problem.numBoolVars + problem.numIntVars + problem.numSetVars)
+    val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars)
 
-    /** Cumulative count of moves applied to each variable. Same indexing as [lastTouched].
-     *  Survives [restart] so it measures activity across the whole search run, not just the
-     *  current restart epoch. Captured by [com.eignex.klause.solver.localsearch.WarmState]
-     *  for ALNS's `activityBiased` destroy operator. */
-    val touchCount: IntArray =
-        IntArray(problem.numBoolVars + problem.numIntVars + problem.numSetVars)
+    /** Cumulative count of moves applied to each variable. Same indexing as [lastTouched]
+     *  (bool ids first, int ids offset by `numBoolVars`). Survives [restart] so it
+     *  measures activity across the whole search run, not just the current restart epoch.
+     *  Captured by [com.eignex.klause.solver.localsearch.WarmState] for ALNS's
+     *  `activityBiased` destroy operator. */
+    val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars)
 
     /** Lazy cache for [breakScore] of `Move.BoolFlip`. Entry `v` is fresh iff
      *  `boolBreakValid[v]`; otherwise the cached value is stale and must be recomputed. The
@@ -129,9 +122,6 @@ class LocalSearchState(
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
     val intConfChange: BooleanArray = BooleanArray(problem.numIntVars) { true }
 
-    /** Configuration-Checking flag per set variable. See [boolConfChange]. */
-    val setConfChange: BooleanArray = BooleanArray(problem.numSetVars) { true }
-
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
         // Overwrite the assumed slots so the assignment starts feasible w.r.t. the caller's pins.
@@ -139,22 +129,9 @@ class LocalSearchState(
             if (assignment.boolValue(id) != value) assignment.flipBool(id)
         }
         assumptions.forEachInt { id, value -> assignment.setInt(id, value) }
-        // Set vars: start with the required mask, then coin-flip each possible-but-not-required
-        // element. Stays inside the static (LB, UB) domain by construction.
-        for (s in 0 until problem.numSetVars) {
-            val sd = problem.setDomains[s]
-            sd.possible.forEachSet { e ->
-                val keep = sd.required.get(e) || rng.nextBoolean()
-                if (keep && !assignment.setMember(s, e)) assignment.setInclude(s, e)
-                else if (!keep && assignment.setMember(s, e)) assignment.setExclude(s, e)
-            }
-            // Clear any leftover bits outside possible (defensive — randomize() doesn't touch
-            // set slots so this is normally already clean).
-        }
         for (i in lastTouched.indices) lastTouched[i] = 0L
         for (i in boolConfChange.indices) boolConfChange[i] = true
         for (i in intConfChange.indices) intConfChange[i] = true
-        for (i in setConfChange.indices) setConfChange[i] = true
         step = 0L
         recompute()
     }
@@ -176,7 +153,6 @@ class LocalSearchState(
     fun apply(move: Move): Unit = when (move) {
         is Move.BoolFlip -> applyBoolFlip(move.varId)
         is Move.IntSet -> applyIntSet(move.varId, move.newValue)
-        is Move.SetToggle -> applySetToggle(move.setVarId, move.element)
         is Move.Compound -> { for (p in move.parts) apply(p) }
     }
 
@@ -200,11 +176,6 @@ class LocalSearchState(
         is Move.IntSet -> {
             var count = 0
             forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
-            count
-        }
-        is Move.SetToggle -> {
-            var count = 0
-            forEachSetFactorDelta(move.setVarId, move.element) { _, d -> if (d > 0) count++ }
             count
         }
         is Move.Compound -> evaluateCompound(move).breakScore
@@ -255,8 +226,6 @@ class LocalSearchState(
                 obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))
             } else 0.0
         }
-        // No linear-objective channel for set vars yet — toggle doesn't change linear cost.
-        is Move.SetToggle -> 0.0
         is Move.Compound -> {
             // Linear deltas are additive over parts evaluated against the initial
             // assignment — same convention as the single-move delta.
@@ -281,11 +250,6 @@ class LocalSearchState(
         is Move.IntSet -> {
             var sum = 0
             forEachIntFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
-            sum
-        }
-        is Move.SetToggle -> {
-            var sum = 0
-            forEachSetFactorDelta(move.setVarId, move.element) { _, d -> sum += d }
             sum
         }
         is Move.Compound -> evaluateCompound(move).netDelta
@@ -326,24 +290,6 @@ class LocalSearchState(
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 
-    private fun applySetToggle(setVar: Int, element: Int) {
-        if (assignment.setMember(setVar, element)) assignment.setExclude(setVar, element)
-        else assignment.setInclude(setVar, element)
-        val touchedFactors = problem.setOccurrences[setVar]
-        for (factorId in touchedFactors) {
-            val factor = factors[factorId]
-            updateViolation(factorId, factor.applySetToggle(this, factorId, setVar, element))
-        }
-        invalidateBoolBreakNeighbourhood(touchedFactors)
-        markNeighborConfChange(touchedFactors)
-        setConfChange[setVar] = false
-        step++
-        val slot = problem.numBoolVars + problem.numIntVars + setVar
-        lastTouched[slot] = step
-        if (touchCount[slot] < Int.MAX_VALUE) touchCount[slot]++
-        if (cost < bestCostSeen) bestCostSeen = cost
-    }
-
     private fun invalidateBoolBreakNeighbourhood(factorIds: IntArray) {
         for (factorId in factorIds) {
             val f = factors[factorId]
@@ -356,7 +302,6 @@ class LocalSearchState(
             val f = factors[factorId]
             for (v in f.boolVars) boolConfChange[v] = true
             for (v in f.intVars) intConfChange[v] = true
-            for (v in f.setVars) setConfChange[v] = true
         }
     }
 
@@ -376,15 +321,6 @@ class LocalSearchState(
     ) {
         for (factorId in problem.intOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
-        }
-    }
-
-    /** Same as [forEachBoolFactorDelta] but for a `SetToggle` of [element] on set var [v]. */
-    inline fun forEachSetFactorDelta(
-        v: Int, element: Int, action: (factorId: Int, delta: Int) -> Unit,
-    ) {
-        for (factorId in problem.setOccurrences[v]) {
-            action(factorId, factors[factorId].deltaIfSetToggled(this, factorId, v, element))
         }
     }
 
@@ -428,8 +364,6 @@ class LocalSearchState(
         return when (move) {
             is Move.BoolFlip -> isTabooSlot(move.varId, tenure)
             is Move.IntSet -> isTabooSlot(problem.numBoolVars + move.varId, tenure)
-            is Move.SetToggle -> isTabooSlot(
-                problem.numBoolVars + problem.numIntVars + move.setVarId, tenure)
             is Move.Compound -> move.parts.any { isTaboo(it, tenure) }
         }
     }
@@ -454,7 +388,6 @@ class LocalSearchState(
         val oldViolatedIds: Set<Int> = violated.toIntArray().toHashSet()
         val oldBoolConf = boolConfChange.copyOf()
         val oldIntConf = intConfChange.copyOf()
-        val oldSetConf = setConfChange.copyOf()
         // Capture inverse per part (BoolFlip self-inverts; IntSet needs current value).
         val inverses = ArrayList<Move>(move.parts.size)
         for (p in move.parts) inverses += inverseOf(p)
@@ -477,7 +410,6 @@ class LocalSearchState(
         for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
         for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
         for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
-        for (i in oldSetConf.indices) setConfChange[i] = oldSetConf[i]
         bestCostSeen = oldBestCost
 
         return CompoundEval(breakScore = breakCount, netDelta = netDelta)
@@ -486,15 +418,12 @@ class LocalSearchState(
     private fun inverseOf(part: Move): Move = when (part) {
         is Move.BoolFlip -> part
         is Move.IntSet -> Move.IntSet(part.varId, assignment.intValue(part.varId))
-        // Toggle is self-inverting.
-        is Move.SetToggle -> part
         is Move.Compound -> error("Compound parts are primitive by construction")
     }
 
     private fun slotOf(part: Move): Int = when (part) {
         is Move.BoolFlip -> part.varId
         is Move.IntSet -> problem.numBoolVars + part.varId
-        is Move.SetToggle -> problem.numBoolVars + problem.numIntVars + part.setVarId
         is Move.Compound -> error("Compound parts are primitive by construction")
     }
 

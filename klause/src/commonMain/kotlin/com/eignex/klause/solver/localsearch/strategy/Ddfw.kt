@@ -69,13 +69,6 @@ open class Ddfw(
                 }
                 sum
             }
-            is Move.SetToggle -> {
-                var sum = 0.0
-                state.forEachSetFactorDelta(move.setVarId, move.element) { fid, d ->
-                    if (d > 0) sum += w[fid]
-                }
-                sum
-            }
             // Approximate: sum weighted-break across parts. Over-counts when a factor
             // newly broken by part i is re-satisfied by part j. Biased pessimistic for
             // Compound moves vs single-var picks, which is acceptable for DDFW's greedy

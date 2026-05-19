@@ -27,14 +27,6 @@ internal val EmptyIntArray: IntArray = IntArray(0)
 interface Factor {
     val boolVars: IntArray
     val intVars: IntArray
-    /**
-     * Set-valued variables this factor touches. Default empty for factors that don't
-     * participate in set-domain propagation — every existing klause factor lands here. Set
-     * factors override to name the [com.eignex.klause.solver.SetDomain] ids they read /
-     * tighten via [com.eignex.klause.solver.propagation.PropagationState.requireElement] /
-     * [com.eignex.klause.solver.propagation.PropagationState.excludeElement].
-     */
-    val setVars: IntArray get() = EmptyIntArray
 
     /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything

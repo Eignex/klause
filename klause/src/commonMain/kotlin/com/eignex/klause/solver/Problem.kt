@@ -24,13 +24,6 @@ class Problem(
     val factors: List<Factor>,
     val floatMetadata: FloatMetadata? = null,
     /**
-     * Set-valued variables, ids `[0, numSetVars)` indexing [setDomains]. Empty by default —
-     * problems built before native sets landed (and every front-end that decomposes sets to
-     * bool indicators) still see `numSetVars = 0` with no behaviour change.
-     */
-    val numSetVars: Int = 0,
-    val setDomains: Array<SetDomain> = emptyArray(),
-    /**
      * Opt-in failed-literal probing at bake time. When `true`, every free bool variable is
      * tested with both polarities: if pinning one polarity propagates Unsat, the other
      * polarity is permanently folded into [baked]. Iterated to a fixed point. Cost is
@@ -44,14 +37,10 @@ class Problem(
         require(intDomains.size == numIntVars) {
             "intDomains size ${intDomains.size} != numIntVars $numIntVars"
         }
-        require(setDomains.size == numSetVars) {
-            "setDomains size ${setDomains.size} != numSetVars $numSetVars"
-        }
     }
 
     val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
     val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }
-    val setOccurrences: Array<IntArray> = invert(numSetVars) { it.setVars }
 
     /**
      * [boolOccurrences] minus factors that use per-literal wakeup (see
@@ -80,7 +69,6 @@ class Problem(
         val f = factors[fid]
         for (v in f.boolVars) for (o in boolOccurrences[v]) if (o != fid) seen.add(o)
         for (v in f.intVars) for (o in intOccurrences[v]) if (o != fid) seen.add(o)
-        for (v in f.setVars) for (o in setOccurrences[v]) if (o != fid) seen.add(o)
         seen.toIntArray()
     }
 
