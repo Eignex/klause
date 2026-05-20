@@ -143,4 +143,5 @@ Each item is tagged with its workstream: `[CP]` complete-search engine and propa
 - `[Perf]` Bucket-queue or pairing-heap VSIDS / dom-wdeg variable picker.
 - `[Perf]` Bitset-backed `IntDomain` for narrow spans.
 - `[Perf]` Move-pool inlining: pack `BoolFlip` / `IntSet` into a `Long`-backed `MoveSink` lane.
-- `[Perf]` Opt `Cardinality`, `PseudoBoolean`, `Xor` into incremental `updateBoolBreakMakeForFlip`.
+- `[Perf]` Opt `Cardinality`, `PseudoBoolean`, `Xor` into incremental `updateBoolBreakMakeForFlip`; extend to `Reified{Cardinality,PseudoBoolean,Linear}` / `IntCmpReified` once the base three land.
+- `[Perf]` Add `updateIntBreakMakeForIntSet` hook mirroring the bool path; convert `Linear`, `BinPacking`, `Knapsack`, `GlobalCardinality`, `AllDifferent` family, `AllEqual`, `Among`, `Count`, `NValue`, `Member`, `Inverse`, `Monotone`, `Sequence`.
