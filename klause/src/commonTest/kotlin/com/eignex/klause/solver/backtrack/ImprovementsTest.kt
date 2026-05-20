@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
@@ -21,7 +22,7 @@ class ImprovementsTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val seq = BacktrackSolver(problem).improvements(obj, BacktrackParams(
@@ -50,7 +51,7 @@ class ImprovementsTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(3, 5)),
-            factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val seq = BacktrackSolver(problem).improvements(obj, BacktrackParams(randomSeed = 0L)).toList()
@@ -64,7 +65,7 @@ class ImprovementsTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 7)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val solver = BacktrackSolver(problem)

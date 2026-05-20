@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cardinality
@@ -58,7 +59,7 @@ class HeuristicCallbackTest {
         // pushes across the tree. For a 3-bool unconstrained problem with binary
         // branching, the tree has 2 + 4 + 8 = 14 successful pins.
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList())
+            factors = emptyArray())
         val h = CountingHeuristics()
         val samples = BacktrackSolver(problem).enumerate(BacktrackParams(
             randomSeed = 0L, variableHeuristic = h, valueHeuristic = h,
@@ -81,7 +82,7 @@ class HeuristicCallbackTest {
         // (a ∨ b), then (a ∨ ¬b) forces b=false → conflict. Same on a=true. Guaranteed
         // DFS-level Unsat regardless of value ordering.
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
                 com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
@@ -123,7 +124,7 @@ class HeuristicCallbackTest {
         // This test just verifies the search runs cleanly with them — no NPE, no
         // exception. The actual semantic test is "no callback override breaks the build."
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList())
+            factors = emptyArray())
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).toList()
     }
 }

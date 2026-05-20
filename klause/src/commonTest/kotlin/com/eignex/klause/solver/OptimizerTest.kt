@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 
@@ -37,7 +38,7 @@ class OptimizerTest {
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
-            factors = listOf(com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
+            factors = arrayOf<Factor>(com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val sample = LocalSearchSolver(problem)
@@ -52,7 +53,7 @@ class OptimizerTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
+            factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
         val sample = LocalSearchSolver(problem)
@@ -79,7 +80,7 @@ class OptimizerTest {
     fun `local search optimizer returns null when infeasible`() {
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),

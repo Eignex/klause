@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -18,7 +19,7 @@ class LexLessTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 2) },
-            factors = listOf(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)),
+            factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
             val xs = listOf(sample.ints[0], sample.ints[1])
@@ -32,7 +33,7 @@ class LexLessTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 1) },
-            factors = listOf(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = false)),
+            factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = false)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -47,7 +48,7 @@ class LexLessTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 1) },
-            factors = listOf(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)),
+            factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }

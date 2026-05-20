@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -16,7 +17,7 @@ class MonotoneTest {
         return Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 5) },
-            factors = listOf(Monotone(intArrayOf(0, 1, 2, 3), direction, strict)),
+            factors = arrayOf<Factor>(Monotone(intArrayOf(0, 1, 2, 3), direction, strict)),
         )
     }
 
@@ -53,7 +54,7 @@ class MonotoneTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 2) },
-            factors = listOf(Monotone(intArrayOf(0, 1, 2, 3), Monotone.Direction.Increasing, strict = true)),
+            factors = arrayOf<Factor>(Monotone(intArrayOf(0, 1, 2, 3), Monotone.Direction.Increasing, strict = true)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
@@ -66,7 +67,7 @@ class MonotoneTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(3, 5), IntDomain(0, 5), IntDomain(0, 5)),
-            factors = listOf(Monotone(intArrayOf(0, 1, 2), Monotone.Direction.Increasing, strict = true)),
+            factors = arrayOf<Factor>(Monotone(intArrayOf(0, 1, 2), Monotone.Direction.Increasing, strict = true)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

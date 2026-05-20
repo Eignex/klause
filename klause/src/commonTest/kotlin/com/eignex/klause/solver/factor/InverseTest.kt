@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -18,7 +19,7 @@ class InverseTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 6,
             intDomains = Array(6) { IntDomain(0, 2) },
-            factors = listOf(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
+            factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -34,7 +35,7 @@ class InverseTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 6,
             intDomains = Array(6) { IntDomain(1, 3) },
-            factors = listOf(Inverse(
+            factors = arrayOf<Factor>(Inverse(
                 f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5),
                 fOffset = 1, gOffset = 1,
             )),
@@ -56,7 +57,7 @@ class InverseTest {
                 IntDomain(2, 2), IntDomain(0, 2), IntDomain(0, 2),
                 IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
             ),
-            factors = listOf(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
+            factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

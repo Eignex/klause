@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.propagation.VarKind
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -21,7 +22,7 @@ class DecisionLevelTest {
         // The clause's vars are {0, 1} → conflictLevels = {1, 3}. Level 2 (z) is irrelevant.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -37,7 +38,7 @@ class DecisionLevelTest {
     fun `constraint-only Unsat has empty levels`() {
         val p = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -53,7 +54,7 @@ class DecisionLevelTest {
         // leaving x=false pinned; propagation now implies y=true.
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -114,7 +115,7 @@ class DecisionLevelTest {
         // unrelated). Then pinning y=false at level 3 → conflictLevels = {1, 3}.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -131,7 +132,7 @@ class DecisionLevelTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -145,7 +146,7 @@ class DecisionLevelTest {
     fun `seed pins occupy levels 1 through N`() {
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val u = assertIs<PropagationResult.Unsat>(
             p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false)))

@@ -14,7 +14,7 @@ class AssumptionsTest {
     @Test
     fun `sample should fix bool assumption to requested value`() {
         // Two bools, no constraints. Without assumptions both can be either value.
-        val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
+        val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val solver = LocalSearchSolver(problem)
         repeat(20) { seed ->
             val sample = solver.sample(
@@ -31,7 +31,7 @@ class AssumptionsTest {
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(min = 0, max = 100)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val solver = LocalSearchSolver(problem)
         repeat(20) { seed ->
@@ -46,7 +46,7 @@ class AssumptionsTest {
     @Test
     fun `minimize should respect bool assumption`() {
         // 4 bools, objective rewards every true; without assumptions optimal is "all true".
-        val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
+        val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val solver = LocalSearchSolver(problem)
         val obj = LinearObjective(boolWeights = doubleArrayOf(-1.0, -1.0, -1.0, -1.0))
         val sample = solver.minimize(
@@ -66,7 +66,7 @@ class AssumptionsTest {
 
     @Test
     fun `samples should honour assumptions across the stream`() {
-        val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
+        val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val solver = LocalSearchSolver(problem)
         val draws = solver.samples(
             LocalSearchParams(

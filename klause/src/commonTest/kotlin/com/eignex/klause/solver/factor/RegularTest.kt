@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -19,7 +20,7 @@ class RegularTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 2) },
-            factors = listOf(Regular(
+            factors = arrayOf<Factor>(Regular(
                 seq = intArrayOf(0, 1, 2, 3),
                 numStates = 2,
                 alphabetSize = 2,
@@ -41,7 +42,7 @@ class RegularTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 1) },
-            factors = listOf(Regular(
+            factors = arrayOf<Factor>(Regular(
                 seq = intArrayOf(0, 1, 2, 3),
                 numStates = 2, alphabetSize = 2,
                 transitions = intArrayOf(1, 2, 1, 2),

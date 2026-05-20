@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -18,7 +19,7 @@ class BinPackingTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = Array(3) { IntDomain(1, 2) },
-            factors = listOf(BinPacking(
+            factors = arrayOf<Factor>(BinPacking(
                 bins = intArrayOf(0, 1, 2),
                 weights = intArrayOf(4, 4, 4),
                 mode = BinPacking.Mode.UniformCapacity,
@@ -35,7 +36,7 @@ class BinPackingTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 2) },
-            factors = listOf(BinPacking(
+            factors = arrayOf<Factor>(BinPacking(
                 bins = intArrayOf(0, 1, 2, 3),
                 weights = intArrayOf(3, 2, 2, 3),
                 mode = BinPacking.Mode.PerBinCapacity,
@@ -60,7 +61,7 @@ class BinPackingTest {
                 IntDomain(1, 1), IntDomain(1, 1), IntDomain(1, 1),
                 IntDomain(0, 10), IntDomain(0, 10),
             ),
-            factors = listOf(BinPacking(
+            factors = arrayOf<Factor>(BinPacking(
                 bins = intArrayOf(0, 1, 2),
                 weights = intArrayOf(2, 2, 2),
                 mode = BinPacking.Mode.LoadVars,

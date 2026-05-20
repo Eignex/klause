@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.DomWdeg
@@ -26,7 +27,7 @@ class BacktrackSolverTest {
         // (x0 ∨ x1)
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val r = BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -38,7 +39,7 @@ class BacktrackSolverTest {
     fun `solve returns UNSAT on contradiction`() {
         val p = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -53,7 +54,7 @@ class BacktrackSolverTest {
         // load-bearing for the contradiction, and the propagation-graph BFS captures both.
         val p = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -72,7 +73,7 @@ class BacktrackSolverTest {
         // are load-bearing — the BFS through reason-arrays must collect every one.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),                                  // x0
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),              // ¬x0 ∨ x1
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),              // ¬x1 ∨ x2
@@ -94,7 +95,7 @@ class BacktrackSolverTest {
         // not yet watched).
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(clause))
+            factors = arrayOf<Factor>(clause))
         val state = com.eignex.klause.solver.propagation.PropagationState(problem, Assumptions.None)
         // Initially watching the literals at indices 0 and 1 — the positive forms of v0 and v1.
         assertEquals(1, state.boolWatchersByLit[Lit.make(0, true)].size,
@@ -118,7 +119,7 @@ class BacktrackSolverTest {
         // 0 at-most watches since max == n) drives this exactly.
         val problem = Problem(
             numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality(
+            factors = arrayOf<Factor>(Cardinality(
                 literals = IntArray(8) { Lit.make(it, true) },
                 min = 2, max = 8,
             )),
@@ -140,7 +141,7 @@ class BacktrackSolverTest {
         // when its (n - max + 1) = 7 watches can't find a non-true replacement.
         val problem = Problem(
             numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality(
+            factors = arrayOf<Factor>(Cardinality(
                 literals = IntArray(8) { Lit.make(it, true) },
                 min = 0, max = 2,
             )),
@@ -163,7 +164,7 @@ class BacktrackSolverTest {
         // the at-most side should fire and detect the over-budget condition.
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality.exactlyOne(IntArray(4) { Lit.make(it, true) })),
+            factors = arrayOf<Factor>(Cardinality.exactlyOne(IntArray(4) { Lit.make(it, true) })),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(
             assumptions = Assumptions(bools = mapOf(0 to true, 1 to true)),
@@ -181,7 +182,7 @@ class BacktrackSolverTest {
         // the one remaining non-false literal as a replacement watch and detect unit.
         val problem = Problem(
             numBoolVars = 50, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(IntArray(50) { Lit.make(it, true) })),
+            factors = arrayOf<Factor>(Clause(IntArray(50) { Lit.make(it, true) })),
         )
         val pins = mutableMapOf<Int, Boolean>()
         for (v in 0 until 49) pins[v] = false
@@ -204,7 +205,7 @@ class BacktrackSolverTest {
         // this (a single-reason scheme would lose whichever side was set first).
         val p = Problem(
             numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 10)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
             ),
@@ -222,7 +223,7 @@ class BacktrackSolverTest {
         // cap after 2 decisions → Unknown. A generous budget reaches SAT.
         val p = Problem(
             numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val tight = BacktrackSolver(p).solve(BacktrackParams(
             maxDecisions = Long.MAX_VALUE, maxInstructions = 2L, randomSeed = 0L,
@@ -239,7 +240,7 @@ class BacktrackSolverTest {
         // (x0 ∨ x1) with x0=false pinned → x1 must be true in the SAT witness.
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val r = BacktrackSolver(p).solve(BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false))))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -252,7 +253,7 @@ class BacktrackSolverTest {
         // exactly-one over 4 vars → 4 models.
         val p = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality.exactlyOne(intArrayOf(
+            factors = arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(
                 Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
             ))),
         )
@@ -271,7 +272,7 @@ class BacktrackSolverTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 2)),
-            factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
         )
         val models = BacktrackSolver(p).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
         assertEquals(setOf(1, 2), models.map { it.ints[0] }.toSet())
@@ -282,7 +283,7 @@ class BacktrackSolverTest {
         // Hard-to-find problem with tiny budget.
         val p = Problem(
             numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 // Force exactly one of 10 vars to be true; budget=1 won't find it.
                 Cardinality.exactlyOne((0..9).map { Lit.make(it, true) }.toIntArray()),
             ),
@@ -299,7 +300,7 @@ class BacktrackSolverTest {
         // exactly-one over 4 vars with weights — minimum at the cheapest.
         val p = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality.exactlyOne(intArrayOf(
+            factors = arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(
                 Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
             ))),
         )
@@ -316,7 +317,7 @@ class BacktrackSolverTest {
         // we should get only a few.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality(
+            factors = arrayOf<Factor>(Cardinality(
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
                 min = 1, max = 3,
             )),
@@ -339,7 +340,7 @@ class BacktrackSolverTest {
         // doesn't break correctness vs. the default random heuristic.
         val problem = Problem(
             numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Cardinality.exactlyOne(intArrayOf(
                     Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
                 )),
@@ -369,7 +370,7 @@ class BacktrackSolverTest {
         // crash on the early return.
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -384,7 +385,7 @@ class BacktrackSolverTest {
         // all-unpinned 5-bool problem. v3 should win.
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val vsids = Vsids()
         // Bump v3 directly via the rich onConflict signature. Use varRef = v3 and an
@@ -407,12 +408,12 @@ class BacktrackSolverTest {
         // should resize cleanly without crashing.
         val vsids = Vsids()
         val p1 = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true)))))
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
         val r1 = BacktrackSolver(p1).solve(BacktrackParams(variableHeuristic = vsids))
         assertIs<SolveResult.Sat>(r1)
 
         val p2 = Problem(numBoolVars = 7, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(6, true)))))
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(6, true)))))
         val r2 = BacktrackSolver(p2).solve(BacktrackParams(variableHeuristic = vsids))
         assertIs<SolveResult.Sat>(r2)
         assertEquals(true, r2.assignment.bools[6])
@@ -424,7 +425,7 @@ class BacktrackSolverTest {
         // dom/wdeg picking.
         val satProblem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Cardinality.exactlyOne(intArrayOf(
                     Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
                 )),
@@ -438,7 +439,7 @@ class BacktrackSolverTest {
 
         val unsatProblem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -457,7 +458,7 @@ class BacktrackSolverTest {
         // call onConflict(v3) directly, then ask `pick` on a fresh session.
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true)))),  // unit on v0
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),  // unit on v0
         )
         val base = RandomVariable
         val lc = LastConflict(base)
@@ -475,7 +476,7 @@ class BacktrackSolverTest {
     fun `last-conflict clears its pending var on successful commit`() {
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val lc = LastConflict(SmallestDomain)
         lc.onConflict(VarRef.Bool(2))
@@ -493,7 +494,7 @@ class BacktrackSolverTest {
         // Functional check: LastConflict(Vsids()) finds SAT on a conflict-heavy instance.
         val problem = Problem(
             numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Cardinality.exactlyOne(intArrayOf(
                     Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
                 )),
@@ -513,7 +514,7 @@ class BacktrackSolverTest {
     fun `samples yields models without dedup window`() {
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList(),  // 4 models total
+            factors = emptyArray(),  // 4 models total
         )
         val models = BacktrackSolver(p).samples(BacktrackParams(randomSeed = 0L)).take(80).toList()
         assertEquals(80, models.size, "samples is infinite for feasible problems; take(80) drains exactly 80")

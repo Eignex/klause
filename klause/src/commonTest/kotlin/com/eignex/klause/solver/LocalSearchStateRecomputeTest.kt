@@ -1,4 +1,5 @@
 package com.eignex.klause.solver
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -116,7 +117,7 @@ class LocalSearchStateRecomputeTest {
 
     private fun boolHeavyCase(): Case {
 
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true), Lit.make(4, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(4, false))),
@@ -137,7 +138,7 @@ class LocalSearchStateRecomputeTest {
     private fun intHeavyCase(): Case {
 
         val intDomains = arrayOf(IntDomain(-3, 3), IntDomain(-3, 3), IntDomain(0, 5))
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             Linear(coeffs = intArrayOf(2, -1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.LE, 4),
             Linear(coeffs = intArrayOf(1, 1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.GE, -1),
             com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 4),
@@ -149,7 +150,7 @@ class LocalSearchStateRecomputeTest {
     private fun mixedReifiedCase(): Case {
 
         val intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-2, 3))
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             ReifiedLinear(
                 auxBoolVar = 0,
                 coeffs = intArrayOf(2, -1),
@@ -170,7 +171,7 @@ class LocalSearchStateRecomputeTest {
     private fun permutationCase(): Case {
 
         val intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3))
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4),
             com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
             com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(3), LinearOp.GE, 1),

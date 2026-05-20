@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
@@ -21,7 +22,7 @@ class CircuitTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
     }
 
@@ -72,7 +73,7 @@ class CircuitTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         // Just verify the problem can be solved — full propagation correctness requires
         // PropagationState plumbing which is BacktrackSolver-internal. Skip detailed checks.
@@ -166,7 +167,7 @@ class CircuitTest {
         val problem = com.eignex.klause.solver.Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val assumptions = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 1, 1 to 2, 2 to 3))
         val result = problem.propagate(assumptions)
@@ -183,7 +184,7 @@ class CircuitTest {
         val problem = com.eignex.klause.solver.Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         // succ[0] = 2 and succ[1] = 2 → two predecessors of node 2.
         val assumptions = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 2, 1 to 2))

@@ -1,5 +1,6 @@
 package com.eignex.klause.cnf
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Product
@@ -16,7 +17,7 @@ class SignedProductCoverageTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(-4, 3), IntDomain(-4, 3), IntDomain(-16, 16)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val cnf = BitBlaster.compile(problem)
         for (av in -4..3) for (bv in -4..3) for (rv in -16..16) {
@@ -44,7 +45,7 @@ class SignedProductCoverageTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(-2, 2), IntDomain(-2, 2), IntDomain(-4, 4)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val cnf = BitBlaster.compile(problem)
         for (av in -2..2) for (bv in -2..2) for (rv in -4..4) {

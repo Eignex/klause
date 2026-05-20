@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
@@ -15,7 +16,7 @@ class BranchAndBoundTest {
     fun `minimize finds the all-zeros assignment under a positive linear objective`() {
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
@@ -27,7 +28,7 @@ class BranchAndBoundTest {
     fun `minimize picks the cheapest int-var value under a positive coefficient`() {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(2, 9)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
@@ -39,7 +40,7 @@ class BranchAndBoundTest {
     fun `minimize picks the highest int-var value under a negative coefficient`() {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 7)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(-1.0))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
@@ -58,7 +59,7 @@ class BranchAndBoundTest {
         val n = 16
         val problem = Problem(
             numBoolVars = n, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
         val sample = BacktrackSolver(problem).minimize(
@@ -90,7 +91,7 @@ class BranchAndBoundTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 1.0, 1.0))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.propagation.PropagationResult
 
@@ -19,7 +20,7 @@ class IncrementalSessionTest {
         // post-first-push state — confirms snapshot/restore is faithful.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -57,7 +58,7 @@ class IncrementalSessionTest {
         // After Unsat return, decisionLevel must equal 1 (the failed push didn't stick).
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -77,7 +78,7 @@ class IncrementalSessionTest {
         // problem.propagate would return for the same assumption set.
         val p = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
@@ -100,7 +101,7 @@ class IncrementalSessionTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-            factors = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2)),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -130,7 +131,7 @@ class IncrementalSessionTest {
         // (x ∨ y) seeded with x=false y=false directly: conflict detected during seed.
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         val u = assertIs<PropagationResult.Unsat>(
@@ -168,7 +169,7 @@ class IncrementalSessionTest {
         val p = Problem(
             numBoolVars = 2, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
             ),
@@ -188,7 +189,7 @@ class IncrementalSessionTest {
         // exactly-one over 4 vars. Pin three to false → the fourth is implied true.
         val p = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality.exactlyOne(intArrayOf(
+            factors = arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(
                 Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
             ))),
         )

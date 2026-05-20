@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -20,7 +21,7 @@ class SortTest {
                 IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2),
                 IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9),
             ),
-            factors = listOf(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
+            factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -38,7 +39,7 @@ class SortTest {
                 IntDomain(1, 1), IntDomain(2, 2), IntDomain(1, 1),
                 IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9),
             ),
-            factors = listOf(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
+            factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

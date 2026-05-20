@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -17,7 +18,7 @@ class ArrayMinMaxTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 5)),
-            factors = listOf(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true)),
+            factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -29,7 +30,7 @@ class ArrayMinMaxTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 5)),
-            factors = listOf(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = false)),
+            factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = false)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -42,7 +43,7 @@ class ArrayMinMaxTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 10)),
-            factors = listOf(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true)),
+            factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

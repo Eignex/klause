@@ -138,7 +138,7 @@ class Compiler {
                     numBoolVars = numBoolVars,
                     numIntVars = numIntVars,
                     intDomains = intDomains.toTypedArray(),
-                    factors = factors.toList(),
+                    factors = factors.toTypedArray(),
                     floatMetadata = metadata,
                 ),
                 boolVarIdByName = boolVarIdByName.toMap(),

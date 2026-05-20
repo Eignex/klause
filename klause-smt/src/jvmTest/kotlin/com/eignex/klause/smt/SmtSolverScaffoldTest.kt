@@ -1,5 +1,6 @@
 package com.eignex.klause.smt
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -19,7 +20,7 @@ class SmtSolverScaffoldTest {
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
         ))
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(factor))
+            factors = arrayOf<Factor>(factor))
         val result = SmtSolver(problem).solve(SmtParams())
         val sat = result as? SolveResult.Sat
         assertNotNull(sat, "expected SAT verdict, got $result")
@@ -31,7 +32,7 @@ class SmtSolverScaffoldTest {
     fun `unsat instance returns Unsat`() {
         // AtMost(0) AND AtLeast(1) — contradictory.
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Cardinality.atMostOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(0, false), Lit.make(1, false))),
             ))
@@ -52,7 +53,7 @@ class SmtSolverScaffoldTest {
             bound = 2,
         )
         val unsatProblem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(factor1, factor2))
+            factors = arrayOf<Factor>(factor1, factor2))
         val result = SmtSolver(unsatProblem).solve(SmtParams())
         assertIs<SolveResult.Unsat>(result)
     }
@@ -63,7 +64,7 @@ class SmtSolverScaffoldTest {
         // GENERATE_UNSAT_CORE so we expect both factor ids to be reported.
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true))),
                 com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -82,7 +83,7 @@ class SmtSolverScaffoldTest {
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
         ))
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(factor))
+            factors = arrayOf<Factor>(factor))
         val result = SmtSolver(problem).solve(SmtParams(
             assumptions = Assumptions(bools = mapOf(2 to true)),
         ))

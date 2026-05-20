@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchSession
@@ -19,7 +20,7 @@ class LocalSearchSessionTest {
         // satisfied / unsatisfied neighbours, producing non-default weights quickly.
         return Problem(
             numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Cardinality.exactlyOne(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
                 Cardinality.exactlyOne(intArrayOf(Lit.make(4, true), Lit.make(5, true))),

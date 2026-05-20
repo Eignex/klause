@@ -1,5 +1,6 @@
 package com.eignex.klause.logicng
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -19,7 +20,7 @@ class LogicNGSessionTest {
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
         ))
         return Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(factor))
+            factors = arrayOf<Factor>(factor))
     }
 
     @Test

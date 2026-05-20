@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.propagation.VarKind
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -19,7 +20,7 @@ class PropagationSessionTest {
     fun `push pins agree with one-shot propagate`() {
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -39,7 +40,7 @@ class PropagationSessionTest {
         // (x0 ∨ x1). After pinning x0=false x1=false → Unsat. Pop one → feasible again.
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         assertIs<PropagationResult.Implied>(s.seed(Assumptions.None))
@@ -69,7 +70,7 @@ class PropagationSessionTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
@@ -98,7 +99,7 @@ class PropagationSessionTest {
         // (x0 ∨ x1) — seed with x0=false; expect implied {1: true}.
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
         val r = s.seed(Assumptions(bools = mapOf(0 to false)))

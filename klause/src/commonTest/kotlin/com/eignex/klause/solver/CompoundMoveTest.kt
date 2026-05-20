@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -18,7 +19,7 @@ class CompoundMoveTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setInt(0, 5)

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
@@ -23,7 +24,7 @@ class RegretHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 3), IntDomain(0, 9)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 5.0, 0.0))
         val session = PropagationSession(problem)
@@ -36,7 +37,7 @@ class RegretHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         // Zero coefficients → all regrets 0; base = InputOrder returns v0.
         val obj = LinearObjective(intCoefficients = doubleArrayOf(0.0, 0.0))
@@ -50,7 +51,7 @@ class RegretHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 4)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(-1.0))  // maximise → try high first
         val session = PropagationSession(problem)
@@ -63,7 +64,7 @@ class RegretHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 4)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(2.0))
         val session = PropagationSession(problem)
@@ -78,7 +79,7 @@ class RegretHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = listOf(Linear(
+            factors = arrayOf<Factor>(Linear(
                 coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
                 op = LinearOp.GE, bound = 3,
             )),

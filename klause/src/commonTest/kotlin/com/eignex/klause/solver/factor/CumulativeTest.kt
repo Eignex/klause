@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -32,7 +33,7 @@ class CumulativeTest {
         return Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
     }
 
@@ -52,7 +53,7 @@ class CumulativeTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val baked = p.baked
         assertTrue(
@@ -96,7 +97,7 @@ class CumulativeTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setInt(0, 0)
@@ -140,7 +141,7 @@ class CumulativeTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions(ints = mapOf(0 to 0, 1 to 0)))
         assertTrue(result is PropagationResult.Unsat, "double-booking at capacity must fail; got $result")
@@ -161,7 +162,7 @@ class CumulativeTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 4)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
@@ -180,7 +181,7 @@ class CumulativeTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 6)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions(ints = mapOf(1 to 2)))
         assertTrue(result is PropagationResult.Unsat, "overlap with mandatory part must fail; got $result")

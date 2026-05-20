@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.InputOrder
@@ -28,7 +29,7 @@ class SparseDomainEndToEndTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(1, 5), IntDomain(3, 3), IntDomain(5, 5)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 5),
             ),
         )
@@ -49,7 +50,7 @@ class SparseDomainEndToEndTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(1, 5), IntDomain(3, 3), IntDomain(5, 5)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 5),
             ),
         )
@@ -68,7 +69,7 @@ class SparseDomainEndToEndTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(1, 5), IntDomain(2, 2)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(
                     coeffs = intArrayOf(1, 1),
                     vars = intArrayOf(0, 1),
@@ -92,7 +93,7 @@ class SparseDomainEndToEndTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(1, 5), IntDomain(3, 3), IntDomain(5, 5)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 5),
             ),
         )
@@ -116,7 +117,7 @@ class SparseDomainEndToEndTest {
             intDomains = arrayOf(
                 IntDomain(1, 10), IntDomain(3, 3), IntDomain(5, 5), IntDomain(7, 7),
             ),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 1, domainSize = 10),
             ),
         )

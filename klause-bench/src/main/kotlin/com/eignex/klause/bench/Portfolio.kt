@@ -1,6 +1,7 @@
 package com.eignex.klause.bench
 
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -25,7 +26,7 @@ object Portfolio {
 
     val sat: List<Entry> = listOf(
         Entry("threeClauses",
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
@@ -33,7 +34,7 @@ object Portfolio {
             expectedSat = true,
         ),
         Entry("cardXor",
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
                     min = 2, max = 3),
                 Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), targetParity = 1),
@@ -41,7 +42,7 @@ object Portfolio {
             expectedSat = true,
         ),
         Entry("pseudoBoolean",
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 PseudoBoolean(
                     weights = intArrayOf(2, 3, 1, 1),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
@@ -54,7 +55,7 @@ object Portfolio {
         Entry("linearLE",
             Problem(numBoolVars = 0, numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, 4),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
@@ -64,12 +65,12 @@ object Portfolio {
         Entry("permutation3",
             Problem(numBoolVars = 0, numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-                factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3))),
+                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3))),
             expectedSat = true,
         ),
         Entry("mixedBoolInt",
             Problem(numBoolVars = 2, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
                 )),
@@ -77,7 +78,7 @@ object Portfolio {
         ),
         // Cardinality stress (combo MODEL6, scaled down).
         Entry("cardinalityStress",
-            Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Cardinality((0..5).map { Lit.make(it, true) }.toIntArray(), min = 0, max = 3),
                 Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 3, max = 8),
                 Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
@@ -89,7 +90,7 @@ object Portfolio {
         ),
         // Reified implication + cardinality + weighted PB on the same flags (combo CSP1).
         Entry("pbReifiedMix",
-            Problem(numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 ReifiedCardinality(auxBoolVar = 4,
                     literals = intArrayOf(Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(4, true))),
@@ -110,7 +111,7 @@ object Portfolio {
         ),
         // Hand-rolled 3-SAT, 12 vars / 30 clauses (combo LARGE4 at portfolio scale).
         Entry("smallRandom3sat",
-            Problem(numBoolVars = 12, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 12, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(7, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(4, true), Lit.make(8, false))),
                 Clause(intArrayOf(Lit.make(2, true), Lit.make(5, false), Lit.make(9, true))),
@@ -147,7 +148,7 @@ object Portfolio {
         // Nominal type pegs an int cost (a=30, b=50, c=80); cap excludes c.
         Entry("budgetCampaign",
             Problem(numBoolVars = 3, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 100)),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Cardinality.exactlyOne(intArrayOf(
                         Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
                     )),
@@ -165,7 +166,7 @@ object Portfolio {
 
     val unsat: List<Entry> = listOf(
         Entry("clauseContradiction",
-            Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             )),
@@ -173,7 +174,7 @@ object Portfolio {
         ),
         Entry("intEqContradiction",
             Problem(numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
                 )),
@@ -182,7 +183,7 @@ object Portfolio {
         Entry("pigeonhole",
             Problem(numBoolVars = 0, numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
-                factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2))),
+                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2))),
             expectedSat = false,
         ),
     )

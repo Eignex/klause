@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.cnf.CnfProblem
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -66,7 +67,7 @@ object Dimacs {
         }
         require(current == null) { "DIMACS file ends mid-clause (no terminating 0)" }
         require(numVars >= 0) { "DIMACS file has no `p cnf` header" }
-        return Problem(numBoolVars = numVars, numIntVars = 0, intDomains = emptyArray(), factors = clauses)
+        return Problem(numBoolVars = numVars, numIntVars = 0, intDomains = emptyArray(), factors = Array<Factor>(clauses.size) { clauses[it] })
     }
 
     /**
@@ -147,7 +148,7 @@ object Dimacs {
         // Allocate one relaxation bool per soft clause appended after the original vars.
         val numOriginal = numVars
         val totalVars = numOriginal + softClauses.size
-        val factors = mutableListOf<Clause>()
+        val factors = mutableListOf<Factor>()
         factors.addAll(hardClauses)
         val weights = DoubleArray(totalVars)
         for ((i, soft) in softClauses.withIndex()) {
@@ -164,7 +165,7 @@ object Dimacs {
             numBoolVars = totalVars,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = factors,
+            factors = factors.toTypedArray(),
         )
         return WcnfProblem(problem, LinearObjective(boolWeights = weights), numOriginal)
     }

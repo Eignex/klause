@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -19,7 +20,7 @@ class SolutionGuidedTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 4)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
@@ -33,7 +34,7 @@ class SolutionGuidedTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 4)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
@@ -49,7 +50,7 @@ class SolutionGuidedTest {
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
@@ -65,7 +66,7 @@ class SolutionGuidedTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(2, 4)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
@@ -79,7 +80,7 @@ class SolutionGuidedTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 3) },
-            factors = listOf(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(
             variableHeuristic = SmallestDomain,
@@ -102,7 +103,7 @@ class SolutionGuidedTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(
             valueHeuristic = spy, randomSeed = 0L,

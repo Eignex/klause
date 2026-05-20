@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -16,7 +17,7 @@ class BoundSacProbingTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.GE, bound = 2),
             ),
             probeIntBounds = true,
@@ -44,7 +45,7 @@ class BoundSacProbingTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 // x - y = 0 (x = y).
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
                 // x + y ≥ 2.
@@ -63,7 +64,7 @@ class BoundSacProbingTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 2),
             ),
@@ -90,7 +91,7 @@ class BoundSacProbingTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.Table(
                     xs = intArrayOf(0, 1),
                     tuples = intArrayOf(0, 0, 3, 3),
@@ -113,7 +114,7 @@ class BoundSacProbingTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2),
             ),
@@ -133,7 +134,7 @@ class BoundSacProbingTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2),
             ),

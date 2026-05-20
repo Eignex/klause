@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -35,7 +36,7 @@ class PortfolioTest {
         // x ∧ ¬x → trivially unsat
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -90,7 +91,7 @@ class PortfolioTest {
                 com.eignex.klause.solver.IntDomain(0, 5),
                 com.eignex.klause.solver.IntDomain(0, 5),
             ),
-            factors = listOf(com.eignex.klause.solver.factor.Linear(
+            factors = arrayOf<Factor>(com.eignex.klause.solver.factor.Linear(
                 coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
                 op = com.eignex.klause.solver.factor.LinearOp.GE, bound = 3,
             )),

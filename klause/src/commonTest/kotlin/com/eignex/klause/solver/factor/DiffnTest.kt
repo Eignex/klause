@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -18,7 +19,7 @@ class DiffnTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 1) },
-            factors = listOf(Diffn(
+            factors = arrayOf<Factor>(Diffn(
                 xs = intArrayOf(0, 2), ys = intArrayOf(1, 3),
                 widths = intArrayOf(2, 2), heights = intArrayOf(2, 2),
             )),
@@ -38,7 +39,7 @@ class DiffnTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 0)),
-            factors = listOf(Diffn(
+            factors = arrayOf<Factor>(Diffn(
                 xs = intArrayOf(0, 2), ys = intArrayOf(1, 3),
                 widths = intArrayOf(1, 1), heights = intArrayOf(1, 1),
             )),
@@ -53,7 +54,7 @@ class DiffnTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 0) },
-            factors = listOf(Diffn(
+            factors = arrayOf<Factor>(Diffn(
                 xs = intArrayOf(0, 2), ys = intArrayOf(1, 3),
                 widths = intArrayOf(2, 2), heights = intArrayOf(2, 2),
             )),

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -20,7 +21,7 @@ class CountAmongTest {
                 IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3),
                 IntDomain(2, 2),
             ),
-            factors = listOf(Count(xs = intArrayOf(0, 1, 2, 3), v = 1, op = Count.Op.Eq, n = 4)),
+            factors = arrayOf<Factor>(Count(xs = intArrayOf(0, 1, 2, 3), v = 1, op = Count.Op.Eq, n = 4)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -36,7 +37,7 @@ class CountAmongTest {
                 IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4),
                 IntDomain(3, 3),
             ),
-            factors = listOf(Count(xs = intArrayOf(0, 1, 2, 3), v = 2, op = Count.Op.Le, n = 4)),
+            factors = arrayOf<Factor>(Count(xs = intArrayOf(0, 1, 2, 3), v = 2, op = Count.Op.Le, n = 4)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -52,7 +53,7 @@ class CountAmongTest {
                 IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4),
                 IntDomain(0, 4),
             ),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Count(xs = intArrayOf(0, 1, 2, 3), v = 3, op = Count.Op.Ge, n = 4),
                 Count(xs = intArrayOf(0, 1, 2, 3), v = 3, op = Count.Op.Ge, n = 4),  // dup ok
             ),
@@ -72,7 +73,7 @@ class CountAmongTest {
                 IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5),
                 IntDomain(2, 2),
             ),
-            factors = listOf(Among(n = 4, xs = intArrayOf(0, 1, 2, 3), values = intArrayOf(1, 3, 5))),
+            factors = arrayOf<Factor>(Among(n = 4, xs = intArrayOf(0, 1, 2, 3), values = intArrayOf(1, 3, 5))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

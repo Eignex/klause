@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -17,7 +18,7 @@ class TableTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 3) },
-            factors = listOf(Table(
+            factors = arrayOf<Factor>(Table(
                 xs = intArrayOf(0, 1),
                 tuples = intArrayOf(0, 1, 2, 3),
             )),
@@ -35,7 +36,7 @@ class TableTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(1, 1), IntDomain(1, 1)),
-            factors = listOf(Table(
+            factors = arrayOf<Factor>(Table(
                 xs = intArrayOf(0, 1),
                 tuples = intArrayOf(0, 1, 2, 3),
             )),
@@ -50,7 +51,7 @@ class TableTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 9) },
-            factors = listOf(Table(
+            factors = arrayOf<Factor>(Table(
                 xs = intArrayOf(0, 1, 2),
                 tuples = intArrayOf(1, 2, 3, 1, 4, 5, 7, 8, 9),
             )),

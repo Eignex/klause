@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.meta
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.meta.Alns
 import com.eignex.klause.solver.localsearch.meta.DestroyOperator
 import com.eignex.klause.solver.localsearch.meta.FreedVars
@@ -27,7 +28,7 @@ class AlnsTest {
 
     @Test
     fun `random destroy returns expected fraction`() {
-        val problem = Problem(numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
+        val problem = Problem(numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val incumbent = Sample(BooleanArray(10) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(10) { 1.0 })
         val freed = DestroyOperator.Random.destroy(Random(0), problem, incumbent, obj, fraction = 0.3)
@@ -46,7 +47,7 @@ class AlnsTest {
         // stay within one component).
         val fA = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
         val fB = Cardinality.atLeastOne(IntArray(4) { Lit.make(it + 4, true) })
-        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = listOf(fA, fB))
+        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(fA, fB))
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
         // Free 2 of 8 = fraction 0.25. Starts from one component and stays inside it.
@@ -63,7 +64,7 @@ class AlnsTest {
         // BFS must re-seed into the second component after exhausting the first.
         val fA = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
         val fB = Cardinality.atLeastOne(IntArray(4) { Lit.make(it + 4, true) })
-        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = listOf(fA, fB))
+        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(fA, fB))
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.75)
@@ -77,7 +78,7 @@ class AlnsTest {
     fun `worst objective destroy picks high contribution vars`() {
         // 4 bool vars, only var 3 is set true and has the largest weight; destroy fraction 0.25 → 1 var.
         // WorstObjective should pick var 3.
-        val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
+        val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val incumbent = Sample(booleanArrayOf(false, false, false, true), IntArray(0))
         val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 2.0, 3.0, 100.0))
         val freed = DestroyOperator.WorstObjective.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
@@ -277,7 +278,7 @@ class AlnsTest {
     fun `freed vars empty triggers reward and continue`() {
         // Edge case: destroy op returns empty set. ALNS should reward (rejectedReward) and not crash.
         val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true)))))
+            factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true)))))
         val objective = LinearObjective(boolWeights = doubleArrayOf(1.0))
         val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }
         val inner = LocalSearchSolver(problem)

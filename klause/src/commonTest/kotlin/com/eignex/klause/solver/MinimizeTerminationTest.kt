@@ -19,7 +19,7 @@ class MinimizeTerminationTest {
             numBoolVars = 4,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val solver = LocalSearchSolver(problem)
         // All-zero weights → every assignment evaluates to 0; greedy descent never improves.

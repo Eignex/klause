@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.propagation
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -28,7 +29,7 @@ class ConflictAnalyzerTest {
         // current-level var remains → UIP = a. Learned clause: [¬a].
         val problem = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),  // ¬a ∨ b
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))), // ¬a ∨ ¬b
             ),
@@ -65,7 +66,7 @@ class ConflictAnalyzerTest {
         // level 1.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
             ),
@@ -90,7 +91,7 @@ class ConflictAnalyzerTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(com.eignex.klause.solver.IntDomain(0, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.Linear(
                     intArrayOf(1), intArrayOf(0),
                     com.eignex.klause.solver.factor.LinearOp.EQ, 5,
@@ -110,7 +111,7 @@ class ConflictAnalyzerTest {
         // is empty so no jump is requested, but the engine still arrives at Unsat.
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -129,7 +130,7 @@ class ConflictAnalyzerTest {
         // re-pin a=true post-learn, and observe the cascade.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
             ),
@@ -157,7 +158,7 @@ class ConflictAnalyzerTest {
         // learned-clause list, which would be a public API concession).
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),    // a ∨ b
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),    // ¬a ∨ c
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),   // ¬b ∨ ¬c
@@ -190,7 +191,7 @@ class ConflictAnalyzerTest {
         // two distinct decision levels (1 and 2) → LBD = 2 (glue-clause boundary).
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
             ),
@@ -207,7 +208,7 @@ class ConflictAnalyzerTest {
         // Drive a search that learns multiple clauses, then prune.
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
@@ -247,7 +248,7 @@ class ConflictAnalyzerTest {
         // watcher index points at the new ids.
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
         val state = PropagationState(problem, com.eignex.klause.solver.Assumptions.None)
         val baseFid = problem.numFactors
@@ -309,7 +310,7 @@ class ConflictAnalyzerTest {
         // also in clause). Drop b. Result: just {¬a}.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
@@ -333,7 +334,7 @@ class ConflictAnalyzerTest {
         // the resulting assignment satisfies every original clause.
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
@@ -366,7 +367,7 @@ class ConflictAnalyzerTest {
         // sealed AdvanceOutcome path don't break the no-conflict happy path.
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),  // ¬a ∨ b
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),

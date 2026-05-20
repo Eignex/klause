@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -26,7 +27,7 @@ class ReifiedCardinalityPropTest {
         // = 2 = unassigned. So every unassigned literal must be forced true.
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 // Force v0 = true.
                 Clause(intArrayOf(Lit.make(0, true))),
                 // ReifiedCardinality: aux=v3, lits=[v0, v1, v2], min=1, max=2.
@@ -58,7 +59,7 @@ class ReifiedCardinalityPropTest {
         //   unassigned → infeasible. cap == 0 → both literals forced false.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedCardinality(
                     auxBoolVar = 2,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
@@ -82,7 +83,7 @@ class ReifiedCardinalityPropTest {
         // conflicts with the prior aux=false pin → Unsat surfaced via revertAndUnsat.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(1, true))),
                 ReifiedCardinality(
@@ -102,7 +103,7 @@ class ReifiedCardinalityPropTest {
         // Sanity: the aux=true case still pins all unassigned to !pos when trueCount == max.
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),  // force v0 = true
                 ReifiedCardinality(
                     auxBoolVar = 3,

@@ -19,7 +19,7 @@ class BoolViewTest {
             numBoolVars = numBoolVars,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         return PropagationState(problem, Assumptions.None)
     }

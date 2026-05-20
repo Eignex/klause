@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
@@ -19,7 +20,7 @@ class SubcircuitTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
     }
 
@@ -68,7 +69,7 @@ class SubcircuitTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 6,
             intDomains = Array(6) { IntDomain(0, 5) },
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
         // Two 3-cycles: 0→1→2→0 and 3→4→5→3. All included, but two cycles → violated.

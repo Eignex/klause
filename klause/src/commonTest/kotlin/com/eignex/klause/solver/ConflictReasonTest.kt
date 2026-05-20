@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationResult
 
 import com.eignex.klause.solver.factor.Cardinality
@@ -18,7 +19,7 @@ class ConflictReasonTest {
         // Two clauses (x), (¬x): infeasible without any input.
         val p = Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -34,7 +35,7 @@ class ConflictReasonTest {
         // x0 ∨ x1, with x0 = x1 = false pinned → Unsat with both inputs in the conflict set.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val r = p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false, 2 to true)))
         val u = assertIs<PropagationResult.Unsat>(r)
@@ -56,7 +57,7 @@ class ConflictReasonTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 10)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
             ),
@@ -73,7 +74,7 @@ class ConflictReasonTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
         val r = p.propagate(Assumptions(ints = mapOf(0 to 1, 1 to 1)))
         val u = assertIs<PropagationResult.Unsat>(r)
@@ -86,7 +87,7 @@ class ConflictReasonTest {
         // (x ∨ y), pin x=false y=false z=true. z is unrelated; conflict is {x, y}.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Cardinality.exactlyOne(intArrayOf(Lit.make(2, true))),
             ),

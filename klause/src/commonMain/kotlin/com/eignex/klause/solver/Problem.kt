@@ -21,7 +21,7 @@ class Problem(
     val numBoolVars: Int,
     val numIntVars: Int,
     val intDomains: Array<IntDomain>,
-    val factors: List<Factor>,
+    val factors: Array<Factor>,
     val floatMetadata: FloatMetadata? = null,
     /**
      * Opt-in failed-literal probing at bake time. When `true`, every free bool variable is
@@ -71,6 +71,35 @@ class Problem(
             "intDomains size ${intDomains.size} != numIntVars $numIntVars"
         }
     }
+
+    /**
+     * Convenience overload taking factors as a [List]. Internally stored as an [Array] for
+     * tighter hot-loop iteration; callers building a [MutableList] and then constructing the
+     * problem can use this overload without converting first.
+     */
+    constructor(
+        numBoolVars: Int,
+        numIntVars: Int,
+        intDomains: Array<IntDomain>,
+        factors: List<Factor>,
+        floatMetadata: FloatMetadata? = null,
+        probeFailedLiterals: Boolean = false,
+        probeIntBounds: Boolean = false,
+        probeIntHoles: Boolean = false,
+        probeBudgetPerVar: Int = Int.MAX_VALUE,
+        probeTotalBudget: Int = Int.MAX_VALUE,
+    ) : this(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        intDomains = intDomains,
+        factors = Array(factors.size) { factors[it] },
+        floatMetadata = floatMetadata,
+        probeFailedLiterals = probeFailedLiterals,
+        probeIntBounds = probeIntBounds,
+        probeIntHoles = probeIntHoles,
+        probeBudgetPerVar = probeBudgetPerVar,
+        probeTotalBudget = probeTotalBudget,
+    )
 
     val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
     val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }

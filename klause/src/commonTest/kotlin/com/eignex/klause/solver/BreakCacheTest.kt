@@ -1,4 +1,5 @@
 package com.eignex.klause.solver
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -36,7 +37,7 @@ class BreakCacheTest {
         val numBool = 4
         val numInt = 2
         val intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5))
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
             Cardinality(
@@ -77,7 +78,7 @@ class BreakCacheTest {
     @Test
     fun `restart clears stale cache`() {
 
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
         )
         val problem = Problem(2, 0, emptyArray(), factors)

@@ -92,7 +92,7 @@ internal class FlatZincCompiler(
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),
-            factors = factors,
+            factors = factors.toTypedArray(),
             floatMetadata = floatMetadata,
         )
         return FlatZincProgram(

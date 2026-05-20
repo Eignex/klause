@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -23,7 +24,7 @@ class ImpactHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(2, 2)),
-            factors = listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
         )
         val session = PropagationSession(problem)
         // Bake completes seeding; baseline session has v1 = 2 and v0 ∈ {0, 1, 3} effectively.
@@ -46,7 +47,7 @@ class ImpactHeuristicTest {
             intDomains = arrayOf(
                 IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 0),
             ),
-            factors = listOf(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
         val session = PropagationSession(problem)
         val values = Impact()
@@ -64,7 +65,7 @@ class ImpactHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 4) },
-            factors = listOf(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(
             variableHeuristic = SmallestDomain,
@@ -82,7 +83,7 @@ class ImpactHeuristicTest {
         val problem = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = listOf(Linear(
+            factors = arrayOf<Factor>(Linear(
                 coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
                 op = LinearOp.LE, bound = 7,
             )),
@@ -104,7 +105,7 @@ class ImpactHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 99)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val values = Impact(maxProbes = 4)
@@ -121,7 +122,7 @@ class ImpactHeuristicTest {
         val problem = Problem(
             numBoolVars = 1, numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val values = Impact().values(session, VarRef.Bool(0), Random(0L)).toList()
@@ -136,7 +137,7 @@ class ImpactHeuristicTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(2, 2)),
-            factors = listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
         )
         val session = PropagationSession(problem)
         Impact().values(session, VarRef.IntVar(0), Random(0L)).toList()

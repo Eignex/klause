@@ -1,5 +1,6 @@
 package com.eignex.klause.cnf
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.IntDomain
@@ -51,7 +52,7 @@ class SolverVsBitBlasterTest {
     private fun satPortfolio(): List<SatCase> = listOf(
 
         SatCase("threeClauses",
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
@@ -59,14 +60,14 @@ class SolverVsBitBlasterTest {
         ),
 
         SatCase("cardXor",
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)), min = 2, max = 3),
                 Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), targetParity = 1),
             )),
         ),
 
         SatCase("pseudoBoolean",
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 PseudoBoolean(
                     weights = intArrayOf(2, 3, 1, 1),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
@@ -77,7 +78,7 @@ class SolverVsBitBlasterTest {
         ),
 
         SatCase("linearLE",
-            Problem(numBoolVars = 0, numIntVars = 2, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), factors = listOf(
+            Problem(numBoolVars = 0, numIntVars = 2, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), factors = arrayOf<Factor>(
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, 4),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
@@ -85,13 +86,13 @@ class SolverVsBitBlasterTest {
         ),
 
         SatCase("permutation3",
-            Problem(numBoolVars = 0, numIntVars = 3, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)), factors = listOf(
+            Problem(numBoolVars = 0, numIntVars = 3, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)), factors = arrayOf<Factor>(
                 AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3),
             )),
         ),
 
         SatCase("mixedBoolInt",
-            Problem(numBoolVars = 2, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)), factors = listOf(
+            Problem(numBoolVars = 2, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)), factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
             )),
@@ -101,21 +102,21 @@ class SolverVsBitBlasterTest {
     private fun unsatPortfolio(): List<SatCase> = listOf(
 
         SatCase("clauseContradiction",
-            Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = listOf(
+            Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             )),
         ),
 
         SatCase("intEqContradiction",
-            Problem(numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)), factors = listOf(
+            Problem(numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)), factors = arrayOf<Factor>(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
             )),
         ),
 
         SatCase("pigeonhole",
-            Problem(numBoolVars = 0, numIntVars = 3, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)), factors = listOf(
+            Problem(numBoolVars = 0, numIntVars = 3, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)), factors = arrayOf<Factor>(
                 AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2),
             )),
         ),

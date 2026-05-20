@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.strategy
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.strategy.Ddfw
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -39,7 +40,7 @@ class DdfwTest {
     @Test
     fun `weights change after flips on overconstrained problem`() {
 
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
@@ -60,7 +61,7 @@ class DdfwTest {
 
     @Test
     fun `weights survive restart`() {
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
@@ -83,7 +84,7 @@ class DdfwTest {
 
     @Test
     fun `total weight drift is bounded on connected problem`() {
-        val factors = listOf(
+        val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),

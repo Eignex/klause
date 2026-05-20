@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.IntDomain
@@ -18,7 +19,7 @@ class AllDifferentTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(20).toList()
@@ -36,7 +37,7 @@ class AllDifferentTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(15).toList()
@@ -56,7 +57,7 @@ class AllDifferentTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
         state.assignment.setInt(0, 5)
@@ -92,7 +93,7 @@ class AllDifferentTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
         state.assignment.setInt(0, 0)
@@ -132,7 +133,7 @@ class AllDifferentTest {
                 IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3),  // Hall set on [1, 3]
                 IntDomain(2, 5),                                     // overlapping intruder
             ),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         // BacktrackSolver runs propagation to fixpoint at session init.
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
@@ -152,7 +153,7 @@ class AllDifferentTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         // Bake-time propagation should mark the problem Unsat.
         val baked = problem.baked
@@ -173,7 +174,7 @@ class AllDifferentTest {
                 IntDomain(4, 7),                     // min 4 ∈ [3, 4] → push to 5
                 IntDomain(1, 3),                     // max 3 ∈ [3, 4] → push to 2
             ),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val v2 = session.intDomain(2)
@@ -195,7 +196,7 @@ class AllDifferentTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 5)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val d1 = session.intDomain(1)
@@ -218,7 +219,7 @@ class AllDifferentTest {
                 IntDomain(3, 5), IntDomain(3, 5), IntDomain(3, 5),  // Hall set on [3, 5]
                 IntDomain(1, 7),                                     // spanning intruder
             ),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val d3 = session.intDomain(3)
@@ -238,7 +239,7 @@ class AllDifferentTest {
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 2)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
 
         assertFails {

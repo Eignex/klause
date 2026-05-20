@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -22,7 +23,7 @@ class ReginGacTest {
             numBoolVars = 0,
             numIntVars = domains.size,
             intDomains = domains,
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         return PropagationState(problem, Assumptions.None)
     }
@@ -32,7 +33,7 @@ class ReginGacTest {
             numBoolVars = 0,
             numIntVars = domains.size,
             intDomains = domains,
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         return PropagationState(problem, Assumptions.None)
     }
@@ -187,7 +188,7 @@ class ReginGacTest {
                 IntDomain(3, 7).excludeValue(4).excludeValue(5).excludeValue(6),
                 IntDomain(0, 3), IntDomain(0, 3),
             ),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val state = PropagationState(problem, Assumptions.None)
         assertTrue(factor.propagate(state, factorId = 0))

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
@@ -23,7 +24,7 @@ class KnapsackTest {
                 IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
                 IntDomain(0, 5), IntDomain(0, 100),
             ),
-            factors = listOf(Knapsack(
+            factors = arrayOf<Factor>(Knapsack(
                 weights = intArrayOf(2, 3, 5),
                 profits = intArrayOf(3, 4, 8),
                 xs = intArrayOf(0, 1, 2),
@@ -48,7 +49,7 @@ class KnapsackTest {
                 IntDomain(0, 0), IntDomain(0, 0), IntDomain(1, 1),
                 IntDomain(0, 10), IntDomain(0, 100),
             ),
-            factors = listOf(Knapsack(
+            factors = arrayOf<Factor>(Knapsack(
                 weights = intArrayOf(2, 3, 5),
                 profits = intArrayOf(3, 4, 8),
                 xs = intArrayOf(0, 1, 2),

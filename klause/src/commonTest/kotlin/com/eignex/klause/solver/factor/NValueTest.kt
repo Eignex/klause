@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -21,7 +22,7 @@ class NValueTest {
                 IntDomain(1, 1), IntDomain(1, 1), IntDomain(2, 2), IntDomain(3, 3),
                 IntDomain(0, 5),
             ),
-            factors = listOf(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.Eq)),
+            factors = arrayOf<Factor>(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.Eq)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -37,7 +38,7 @@ class NValueTest {
                 IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3),
                 IntDomain(4, 4),
             ),
-            factors = listOf(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.AtLeast)),
+            factors = arrayOf<Factor>(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.AtLeast)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -55,7 +56,7 @@ class NValueTest {
                 IntDomain(1, 5), IntDomain(1, 5), IntDomain(1, 5), IntDomain(1, 5),
                 IntDomain(2, 2),
             ),
-            factors = listOf(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.AtMost)),
+            factors = arrayOf<Factor>(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.AtMost)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

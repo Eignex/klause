@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -17,7 +18,7 @@ class SymmetricAllDifferentTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 3) },
-            factors = listOf(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
+            factors = arrayOf<Factor>(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(40).forEach { sample ->
             for (i in 0..3) {
@@ -33,7 +34,7 @@ class SymmetricAllDifferentTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(2, 2), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
+            factors = arrayOf<Factor>(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

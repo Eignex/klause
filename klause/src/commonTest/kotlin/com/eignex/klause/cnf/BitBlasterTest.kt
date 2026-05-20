@@ -1,6 +1,7 @@
 package com.eignex.klause.cnf
 
 import com.eignex.klause.ast.IntCmpOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -121,7 +122,7 @@ class BitBlasterTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Cardinality.atMostOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
             ),
@@ -146,7 +147,7 @@ class BitBlasterTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
         )
         val cnf = BitBlaster.compile(problem)
         val dimacs = cnf.toDimacs()

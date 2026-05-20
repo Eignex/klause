@@ -1,5 +1,6 @@
 package com.eignex.klause.logicng
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -145,7 +146,7 @@ class LogicNGSolverTest {
                 numBoolVars = 4,
                 numIntVars = 0,
                 intDomains = emptyArray(),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
                     Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
                     Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
@@ -158,7 +159,7 @@ class LogicNGSolverTest {
                 numBoolVars = 0,
                 numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, 4),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
@@ -171,7 +172,7 @@ class LogicNGSolverTest {
                 numBoolVars = 0,
                 numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-                factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
             ),
         ),
     )
@@ -183,7 +184,7 @@ class LogicNGSolverTest {
                 numBoolVars = 1,
                 numIntVars = 0,
                 intDomains = emptyArray(),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Clause(intArrayOf(Lit.make(0, true))),
                     Clause(intArrayOf(Lit.make(0, false))),
                 )
@@ -195,7 +196,7 @@ class LogicNGSolverTest {
                 numBoolVars = 0,
                 numIntVars = 1,
                 intDomains = arrayOf(IntDomain(0, 3)),
-                factors = listOf(
+                factors = arrayOf<Factor>(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
                 )
@@ -207,7 +208,7 @@ class LogicNGSolverTest {
                 numBoolVars = 0,
                 numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
-                factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)),
+                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)),
             ),
         ),
     )

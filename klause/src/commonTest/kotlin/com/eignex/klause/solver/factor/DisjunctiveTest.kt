@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -24,7 +25,7 @@ class DisjunctiveTest {
         return Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
     }
 
@@ -59,7 +60,7 @@ class DisjunctiveTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 5)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
@@ -85,7 +86,7 @@ class DisjunctiveTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 4)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
@@ -138,7 +139,7 @@ class DisjunctiveTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(5, 5), IntDomain(5, 5)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Unsat, "two tasks pinned at same time must fail; got $result")

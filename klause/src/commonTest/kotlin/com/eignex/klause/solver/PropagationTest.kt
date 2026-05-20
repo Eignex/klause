@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationResult
 
 import com.eignex.klause.ast.IntCmpOp
@@ -93,7 +94,7 @@ class PropagationTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val r = implied(p.propagate())
         assertTrue(r.isEmpty)
@@ -162,7 +163,7 @@ class PropagationTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = listOf(Cardinality(
+            factors = arrayOf<Factor>(Cardinality(
                 literals = intArrayOf(lit(0, true), lit(1, true), lit(2, true)),
                 min = 0, max = 1,
             )),
@@ -178,7 +179,7 @@ class PropagationTest {
             numBoolVars = 2,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = listOf(Cardinality(
+            factors = arrayOf<Factor>(Cardinality(
                 literals = intArrayOf(lit(0, true), lit(1, true)),
                 min = 1, max = 2,
             )),
@@ -194,7 +195,7 @@ class PropagationTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = listOf(Cardinality(
+            factors = arrayOf<Factor>(Cardinality(
                 literals = intArrayOf(lit(0, true), lit(1, true), lit(2, true)),
                 min = 0, max = 1,
             )),
@@ -208,7 +209,7 @@ class PropagationTest {
         // Add Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 5) to force a singleton outcome.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 10)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
             ),
@@ -222,7 +223,7 @@ class PropagationTest {
         // x in [0..3], aux ↔ (x ≤ 5) → aux must be true.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)),
+            factors = arrayOf<Factor>(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)),
         )
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to true), r.bools)
@@ -233,7 +234,7 @@ class PropagationTest {
         // x in [0..3], aux ↔ (x ≥ 10), pin aux=true → never holds → Unsat.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, 10)),
+            factors = arrayOf<Factor>(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, 10)),
         )
         assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(0 to true))))
     }
@@ -243,7 +244,7 @@ class PropagationTest {
         // aux ↔ (#true in {x1, x2} ≤ 1). x1=x2=true means body=false → aux=false.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(ReifiedCardinality(
+            factors = arrayOf<Factor>(ReifiedCardinality(
                 auxBoolVar = 0, literals = intArrayOf(lit(1, true), lit(2, true)), min = 0, max = 1,
             )),
         )
@@ -259,7 +260,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
-            factors = listOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 10)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 10)),
         )
         val r = implied(p.propagate(Assumptions(ints = mapOf(1 to 3))))
         // x must be 0 (since 2x ≤ 10 - 9 = 1 → x ≤ 0; combined with domain ≥ 0 → singleton)
@@ -272,7 +273,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(2, 2), IntDomain(0, 10)),
-            factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 5)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 5)),
         )
         val r = implied(p.propagate())
         assertEquals(3, r.ints[1])
@@ -284,7 +285,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
-            factors = listOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.GE, 100)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.GE, 100)),
         )
         assertIs<PropagationResult.Unsat>(p.propagate())
     }
@@ -295,7 +296,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 0)),
-            factors = listOf(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5)),
         )
         val r = implied(p.propagate())
         // y forced to 0, x's domain narrowed: 0 already pinned for y. Force Linear(intArrayOf(1), intArrayOf(x), LinearOp.LE, 3) to get singleton
@@ -303,7 +304,7 @@ class PropagationTest {
         val p2 = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 0)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
             ),
@@ -317,7 +318,7 @@ class PropagationTest {
         // x0 + x1 + 3*x2 ≤ 2: must have x2 = false (since 3 > 2 - 0).
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(PseudoBoolean(
+            factors = arrayOf<Factor>(PseudoBoolean(
                 weights = intArrayOf(1, 1, 3),
                 literals = intArrayOf(lit(0, true), lit(1, true), lit(2, true)),
                 op = PbOp.LE, bound = 2,
@@ -332,7 +333,7 @@ class PropagationTest {
         // 1*x0 + 5*x1 ≥ 5: with x1 pinned false, x0 alone can't reach 5 → Unsat
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(PseudoBoolean(
+            factors = arrayOf<Factor>(PseudoBoolean(
                 weights = intArrayOf(1, 5),
                 literals = intArrayOf(lit(0, true), lit(1, true)),
                 op = PbOp.GE, bound = 5,
@@ -346,7 +347,7 @@ class PropagationTest {
         // 2*x0 + 3*x1 = 5: with x0 pinned true, x1 must be true (2+3=5); with x0 false, 3x1=5 unsat.
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(PseudoBoolean(
+            factors = arrayOf<Factor>(PseudoBoolean(
                 weights = intArrayOf(2, 3),
                 literals = intArrayOf(lit(0, true), lit(1, true)),
                 op = PbOp.EQ, bound = 5,
@@ -361,7 +362,7 @@ class PropagationTest {
         // XOR(x0, x1, x2) = 1 (odd). Pin x0=true, x1=false → x2 must be false (to keep odd count).
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Xor(intArrayOf(lit(0, true), lit(1, true), lit(2, true)), targetParity = 1)),
+            factors = arrayOf<Factor>(Xor(intArrayOf(lit(0, true), lit(1, true), lit(2, true)), targetParity = 1)),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true, 1 to false))))
         assertEquals(false, r.bools[2])
@@ -372,7 +373,7 @@ class PropagationTest {
         // XOR(x0, x1) = 1; pin both true → parity 0 ≠ 1 → Unsat
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(Xor(intArrayOf(lit(0, true), lit(1, true)), targetParity = 1)),
+            factors = arrayOf<Factor>(Xor(intArrayOf(lit(0, true), lit(1, true)), targetParity = 1)),
         )
         assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(0 to true, 1 to true))))
     }
@@ -383,7 +384,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(3, 3)),
-            factors = listOf(ReifiedLinear(
+            factors = arrayOf<Factor>(ReifiedLinear(
                 auxBoolVar = 0, coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
                 op = LinearOp.LE, bound = 5,
             )),
@@ -394,7 +395,7 @@ class PropagationTest {
         val p2 = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(3, 3)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
             ),
@@ -409,7 +410,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            factors = listOf(ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)),
+            factors = arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)),
         )
         val r = implied(p.propagate())
         assertEquals(true, r.bools[0])
@@ -420,7 +421,7 @@ class PropagationTest {
         // x0,x1 bool; aux ↔ (5*x0 + 5*x1 ≥ 20) → never holds (max 10) → aux=false
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(ReifiedPseudoBoolean(
+            factors = arrayOf<Factor>(ReifiedPseudoBoolean(
                 auxBoolVar = 0, weights = intArrayOf(5, 5),
                 literals = intArrayOf(lit(1, true), lit(2, true)),
                 op = PbOp.GE, bound = 20,
@@ -437,7 +438,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(2, 3), IntDomain(4, 5), IntDomain(-100, 100)),
-            factors = listOf(Product(a = 0, b = 1, result = 2), Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 8)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2), Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 8)),
         )
         val r = implied(p.propagate())
         assertEquals(8, r.ints[2])
@@ -450,7 +451,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-1, 4), IntDomain(-1000, 1000)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Product(a = 0, b = 1, result = 2),
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 12),
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 12),
@@ -466,7 +467,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 10)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 10)),
         )
         assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(ints = mapOf(0 to 5, 1 to 5))))
     }
@@ -477,7 +478,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
-            factors = listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)),
         )
         assertIs<PropagationResult.Unsat>(p.propagate())
     }
@@ -489,7 +490,7 @@ class PropagationTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
             ),
@@ -505,7 +506,7 @@ class PropagationTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Cardinality(intArrayOf(lit(0, true), lit(1, true)), 1, 1),
                 Clause(intArrayOf(lit(0, false), lit(2, true))),
             ),

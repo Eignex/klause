@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.IntDomain
@@ -46,7 +47,7 @@ class FactorConflictReasonTest {
         // containing ¬x (the UIP).
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 forceFalseIf(trigger = 4, target = 0),
                 forceFalseIf(trigger = 4, target = 1),
                 forceFalseIf(trigger = 4, target = 2),
@@ -73,7 +74,7 @@ class FactorConflictReasonTest {
         // Then cardinality propagate sees trueCount=2 > max=1 → conflict.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),  // ¬x ∨ a
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),  // ¬x ∨ b
                 Cardinality(
@@ -95,7 +96,7 @@ class FactorConflictReasonTest {
         // 3a + 4b ≤ 5 ; force a, b true on x=true via Clauses → sum=7 > 5, conflict.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),  // ¬x ∨ a
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),  // ¬x ∨ b
                 PseudoBoolean(
@@ -119,7 +120,7 @@ class FactorConflictReasonTest {
         // a=true, b=true → body violates → conflict inside ReifiedPseudoBoolean.
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(3, false), Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(3, false), Lit.make(1, true))),
                 ReifiedPseudoBoolean(
@@ -147,7 +148,7 @@ class FactorConflictReasonTest {
         // are both false, count + unassigned = 1 < 2 → body violates ⇒ propagate fails.
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 forceFalseIf(trigger = 4, target = 0),
                 forceFalseIf(trigger = 4, target = 1),
                 forceFalseIf(trigger = 4, target = 2),
@@ -178,7 +179,7 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1), vars = intArrayOf(0),
@@ -207,7 +208,7 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 1, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1), vars = intArrayOf(0),
@@ -238,7 +239,7 @@ class FactorConflictReasonTest {
             intDomains = arrayOf(
                 IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
             ),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1), vars = intArrayOf(0),
@@ -292,7 +293,7 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 2, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 9)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
                 ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 4),
             ),
@@ -361,7 +362,7 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 3, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 9)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
                 ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
                 ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.GE, 4),
@@ -405,7 +406,7 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 2, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
                 com.eignex.klause.solver.factor.Linear(
                     intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 8,
@@ -464,7 +465,7 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val state = com.eignex.klause.solver.propagation.PropagationState(
             problem, com.eignex.klause.solver.Assumptions.None,
@@ -497,7 +498,7 @@ class FactorConflictReasonTest {
         // a ⊕ b = 1. With Clauses forcing a, b both true on x=true → parity 0, conflict.
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
                 Xor(literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)), targetParity = 1),

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -16,7 +17,7 @@ class AllEqualTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 4) },
-            factors = listOf(AllEqual(intArrayOf(0, 1, 2))),
+            factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1, 2))),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
             val v = sample.ints[0]
@@ -30,7 +31,7 @@ class AllEqualTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(1, 5), IntDomain(3, 7), IntDomain(4, 8)),
-            factors = listOf(AllEqual(intArrayOf(0, 1, 2))),
+            factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1, 2))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -44,7 +45,7 @@ class AllEqualTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(5, 9)),
-            factors = listOf(AllEqual(intArrayOf(0, 1))),
+            factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1))),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }

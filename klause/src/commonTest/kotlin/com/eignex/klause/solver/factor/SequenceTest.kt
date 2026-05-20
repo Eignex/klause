@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -18,7 +19,7 @@ class SequenceTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 6,
             intDomains = Array(6) { IntDomain(0, 1) },
-            factors = listOf(Sequence(low = 1, high = 2, k = 3,
+            factors = arrayOf<Factor>(Sequence(low = 1, high = 2, k = 3,
                 xs = intArrayOf(0, 1, 2, 3, 4, 5),
                 values = intArrayOf(1))),
         )
@@ -37,7 +38,7 @@ class SequenceTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 1) },
-            factors = listOf(Sequence(low = 1, high = 3, k = 3,
+            factors = arrayOf<Factor>(Sequence(low = 1, high = 3, k = 3,
                 xs = intArrayOf(0, 1, 2, 3),
                 values = intArrayOf(0))),
         )

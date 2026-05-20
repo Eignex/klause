@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -16,7 +17,7 @@ class ActivityBasedSearchTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 4) },
-            factors = listOf(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(
             variableHeuristic = ActivityBasedSearch(),
@@ -33,7 +34,7 @@ class ActivityBasedSearchTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 9) },
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val abs = ActivityBasedSearch()
@@ -58,7 +59,7 @@ class ActivityBasedSearchTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 9) },
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val abs = ActivityBasedSearch(decay = 0.95)
@@ -79,7 +80,7 @@ class ActivityBasedSearchTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 9) },
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val abs = ActivityBasedSearch(resetOnRestart = true)

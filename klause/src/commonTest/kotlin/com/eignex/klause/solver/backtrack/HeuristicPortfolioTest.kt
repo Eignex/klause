@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -16,7 +17,7 @@ class HeuristicPortfolioTest {
     private fun simpleAllDifferent(n: Int) = Problem(
         numBoolVars = 0, numIntVars = n,
         intDomains = Array(n) { IntDomain(0, n - 1) },
-        factors = listOf(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
+        factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
     )
 
     @Test

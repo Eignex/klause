@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -19,7 +20,7 @@ class ConflictOrderingTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 4) },
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val cos = ConflictOrdering(InputOrder)
@@ -31,7 +32,7 @@ class ConflictOrderingTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 4) },
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val cos = ConflictOrdering(InputOrder)
@@ -47,7 +48,7 @@ class ConflictOrderingTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 4) },
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val cos = ConflictOrdering(InputOrder)
@@ -64,7 +65,7 @@ class ConflictOrderingTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 4) },
-            factors = emptyList(),
+            factors = emptyArray(),
         )
         val session = PropagationSession(problem)
         val cos = ConflictOrdering(InputOrder)
@@ -82,7 +83,7 @@ class ConflictOrderingTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 4) },
-            factors = listOf(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(
             variableHeuristic = ConflictOrdering(DomWdeg()),

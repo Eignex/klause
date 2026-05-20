@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.Clause
@@ -91,7 +92,7 @@ class CancellationTest {
         // x ∧ ¬x — direct contradiction
         return Problem(
             numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
@@ -99,5 +100,5 @@ class CancellationTest {
     }
 
     private fun unconstrainedBools(numVars: Int): Problem =
-        Problem(numBoolVars = numVars, numIntVars = 0, intDomains = emptyArray(), factors = emptyList())
+        Problem(numBoolVars = numVars, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
 }

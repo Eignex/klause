@@ -1,5 +1,6 @@
 package com.eignex.klause.z3
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -34,7 +35,7 @@ class Z3OptimizerTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
-            factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val sample = Z3Solver(problem).minimize(objective, Z3Params()).assignment
@@ -47,7 +48,7 @@ class Z3OptimizerTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
+            factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
         val z3Sample = Z3Solver(problem).minimize(objective, Z3Params()).assignment
@@ -64,7 +65,7 @@ class Z3OptimizerTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
             ),
         )

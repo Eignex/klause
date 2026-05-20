@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationResult
 
 import com.eignex.klause.ast.PbOp
@@ -19,7 +20,7 @@ class ReifiedEqNegationTest {
         val p = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(3, 6), IntDomain(0, 5)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedLinear(auxBoolVar = 0,
                     coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
                     op = LinearOp.EQ, bound = 5),
@@ -40,7 +41,7 @@ class ReifiedEqNegationTest {
         val p = Problem(
             numBoolVars = 1, numIntVars = 2,
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(2, 2)),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedLinear(auxBoolVar = 0,
                     coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
                     op = LinearOp.EQ, bound = 5),
@@ -62,7 +63,7 @@ class ReifiedEqNegationTest {
         // Pinning aux=false should yield Unsat.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedPseudoBoolean(auxBoolVar = 2,
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
@@ -79,7 +80,7 @@ class ReifiedEqNegationTest {
         // Pin lit0=true, lit1=false → sum = 2. aux=false is consistent.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedPseudoBoolean(auxBoolVar = 2,
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
@@ -96,7 +97,7 @@ class ReifiedEqNegationTest {
         // we need 2 + 3*lit1 ≠ 5. So 3*lit1 ≠ 3 → lit1 ≠ true → lit1 = false.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = listOf(
+            factors = arrayOf<Factor>(
                 ReifiedPseudoBoolean(auxBoolVar = 2,
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),

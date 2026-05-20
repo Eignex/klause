@@ -1,5 +1,6 @@
 package com.eignex.klause.cnf
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Product
@@ -16,7 +17,7 @@ class ProductCoverageTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(factor),
+            factors = arrayOf<Factor>(factor),
         )
         val cnf = BitBlaster.compile(problem)
         for (av in 0..3) for (bv in 0..3) for (rv in 0..3) {

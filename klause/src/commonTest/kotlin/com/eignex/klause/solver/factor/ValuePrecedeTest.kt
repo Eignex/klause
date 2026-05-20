@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -16,7 +17,7 @@ class ValuePrecedeTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 2) },
-            factors = listOf(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2, 3))),
+            factors = arrayOf<Factor>(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2, 3))),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
             val ints = sample.ints.toList()
@@ -36,7 +37,7 @@ class ValuePrecedeTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(2, 2), IntDomain(0, 2), IntDomain(1, 1)),
-            factors = listOf(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))),
+            factors = arrayOf<Factor>(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }

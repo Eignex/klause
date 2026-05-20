@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -19,7 +20,7 @@ class GlobalCardinalityTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 8,
             intDomains = Array(8) { i -> if (i < 5) IntDomain(0, 2) else IntDomain(0, 5) },
-            factors = listOf(GlobalCardinality(
+            factors = arrayOf<Factor>(GlobalCardinality(
                 xs = intArrayOf(0, 1, 2, 3, 4),
                 cover = intArrayOf(0, 1, 2),
                 countVars = intArrayOf(5, 6, 7),
@@ -41,7 +42,7 @@ class GlobalCardinalityTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 6,
             intDomains = Array(6) { IntDomain(0, 2) },
-            factors = listOf(GlobalCardinality(
+            factors = arrayOf<Factor>(GlobalCardinality(
                 xs = intArrayOf(0, 1, 2, 3, 4, 5),
                 cover = intArrayOf(0, 1, 2),
                 countLow = intArrayOf(1, 1, 1),
@@ -63,7 +64,7 @@ class GlobalCardinalityTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 5) },
-            factors = listOf(GlobalCardinality(
+            factors = arrayOf<Factor>(GlobalCardinality(
                 xs = intArrayOf(0, 1, 2),
                 cover = intArrayOf(1, 2, 3),
                 countLow = intArrayOf(0, 0, 0),

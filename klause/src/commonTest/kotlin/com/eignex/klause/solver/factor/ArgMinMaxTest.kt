@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -17,7 +18,7 @@ class ArgMinMaxTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 5,
             intDomains = arrayOf(IntDomain(1, 1), IntDomain(3, 3), IntDomain(2, 2), IntDomain(3, 3), IntDomain(0, 3)),
-            factors = listOf(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = true)),
+            factors = arrayOf<Factor>(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = true)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -29,7 +30,7 @@ class ArgMinMaxTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 5,
             intDomains = arrayOf(IntDomain(5, 5), IntDomain(1, 1), IntDomain(3, 3), IntDomain(1, 1), IntDomain(0, 3)),
-            factors = listOf(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = false)),
+            factors = arrayOf<Factor>(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = false)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -42,7 +43,7 @@ class ArgMinMaxTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 5,
             intDomains = arrayOf(IntDomain(1, 1), IntDomain(3, 3), IntDomain(2, 2), IntDomain(3, 3), IntDomain(1, 4)),
-            factors = listOf(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = true, indexOffset = 1)),
+            factors = arrayOf<Factor>(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = true, indexOffset = 1)),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

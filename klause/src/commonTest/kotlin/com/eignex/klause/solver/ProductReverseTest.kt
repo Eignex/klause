@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationResult
 
 import com.eignex.klause.solver.factor.Product
@@ -15,7 +16,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-10, 10), IntDomain(3, 3), IntDomain(6, 9)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val r = assertIs<PropagationResult.Implied>(p.propagate())
         // With result in [6..9] and b=3, a should be narrowed.
@@ -32,7 +33,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 100), IntDomain(5, 5), IntDomain(15, 15)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val r = assertIs<PropagationResult.Implied>(p.propagate())
         assertEquals(3, r.ints[0])
@@ -44,7 +45,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(4, 4), IntDomain(0, 100), IntDomain(12, 12)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val r = assertIs<PropagationResult.Implied>(p.propagate())
         assertEquals(3, r.ints[1])
@@ -56,7 +57,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-10, 10), IntDomain(-2, -2), IntDomain(-6, -6)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val r = assertIs<PropagationResult.Implied>(p.propagate())
         assertEquals(3, r.ints[0])
@@ -68,7 +69,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 100), IntDomain(4, 4), IntDomain(5, 5)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         assertIs<PropagationResult.Unsat>(p.propagate())
     }
@@ -81,7 +82,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(2, 4), IntDomain(10, 20)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         // Use a session to read the resulting domains directly.
         val session = com.eignex.klause.solver.propagation.PropagationSession(p)
@@ -99,7 +100,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(-4, -2), IntDomain(10, 20)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(p)
         val daAfter = session.intDomain(0)
@@ -119,7 +120,7 @@ class ProductReverseTest {
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(-2, 3), IntDomain(10, 20)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(p)
         val daAfter = session.intDomain(0)
@@ -142,7 +143,7 @@ class ProductReverseTest {
             numBoolVars = 0, numIntVars = 3,
             // a's domain starts at 0 so endpoint exclusion can fire.
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(1, 5), IntDomain(10, 20)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(p)
         val daAfter = session.intDomain(0)
@@ -156,14 +157,14 @@ class ProductReverseTest {
         val pSat = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-5, 5), IntDomain(0, 0), IntDomain(0, 0)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         assertIs<PropagationResult.Implied>(pSat.propagate())
 
         val pUnsat = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(-5, 5), IntDomain(0, 0), IntDomain(5, 5)),
-            factors = listOf(Product(a = 0, b = 1, result = 2)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         assertIs<PropagationResult.Unsat>(pUnsat.propagate())
     }

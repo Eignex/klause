@@ -12,7 +12,7 @@ class PropagationStateExcludeTest {
 
     private fun state(domains: Array<IntDomain>): PropagationState {
         val p = Problem(
-            numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = emptyList(),
+            numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = emptyArray(),
         )
         return PropagationState(p, Assumptions.None)
     }

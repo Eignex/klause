@@ -40,7 +40,7 @@ class LubyRestartTest {
         // 16 independent bools with weights 1..16; optimum is all-false.
         val n = 16
         val problem = Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList())
+            factors = emptyArray())
         val obj = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
         val result = BacktrackSolver(problem).minimize(
             obj,
@@ -68,7 +68,7 @@ class LubyRestartTest {
         // (false). The next leaf reached should respect the saved phases where the
         // backtrack still permits — DFS toggles only the most recently flipped var.
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyList())
+            factors = emptyArray())
         val params = BacktrackParams(
             randomSeed = 0L,
             phaseSaving = true,

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -17,7 +18,7 @@ class AllDifferentExceptZeroTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 3) },
-            factors = listOf(AllDifferentExceptZero(intArrayOf(0, 1, 2, 3))),
+            factors = arrayOf<Factor>(AllDifferentExceptZero(intArrayOf(0, 1, 2, 3))),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
             // Tally non-zero values.
@@ -32,7 +33,7 @@ class AllDifferentExceptZeroTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 3) },
-            factors = listOf(AllDifferentExceptZero(intArrayOf(0, 1, 2, 3, 4))),
+            factors = arrayOf<Factor>(AllDifferentExceptZero(intArrayOf(0, 1, 2, 3, 4))),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -46,7 +47,7 @@ class AllDifferentExceptZeroTest {
         val problem = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(2, 2), IntDomain(2, 2), IntDomain(0, 3)),
-            factors = listOf(AllDifferentExceptZero(intArrayOf(0, 1, 2))),
+            factors = arrayOf<Factor>(AllDifferentExceptZero(intArrayOf(0, 1, 2))),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }
