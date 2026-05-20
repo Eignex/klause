@@ -55,13 +55,21 @@ class LocalSearchState(
      *  `activityBiased` destroy operator. */
     val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars)
 
-    /** Lazy cache for [breakScore] of `Move.BoolFlip`. Entry `v` is fresh iff
-     *  `boolBreakValid[v]`; otherwise the cached value is stale and must be recomputed. The
-     *  cache is invalidated for every variable in the factor-neighbourhood of an applied
-     *  move (so a flip of `u` invalidates `u` itself plus every other var sharing a factor
-     *  with `u`). `IntSet` break scores are not cached — the target value widens the key. */
-    private val boolBreakCache: IntArray = IntArray(problem.numBoolVars)
-    private val boolBreakValid: BooleanArray = BooleanArray(problem.numBoolVars)
+    /** Eagerly-maintained make/break vectors for `Move.BoolFlip`. Entry `boolBreakCount[v]`
+     *  is the count of currently-satisfied factors that would become violated if `v` is
+     *  flipped; `boolMakeCount[v]` is the symmetric count of currently-violated factors that
+     *  would become satisfied. Both updated incrementally inside [applyBoolFlip] and
+     *  [applyIntSet] for every var in the factor-neighbourhood of the move. Strategies that
+     *  query break/make per pick (probSat, WalkSat, DDFW) read these in O(1).
+     *
+     *  Cost shifts from "first query post-flip pays O(occurrences × arity)" to "each flip
+     *  pays O(Σ arity²) over its factor neighbourhood, queries are O(1)". The total work
+     *  per (flip, query) round is comparable; the win is predictable latency — no cold-miss
+     *  spike on the first query after a flip, and no boolean valid-flag bookkeeping. SAT-LS
+     *  literature (YalSAT, NuWLS) maintains these vectors; the further O(1)-per-update
+     *  refinement (numTrueLits per Clause + critical-literal tracking) is a follow-up. */
+    internal val boolBreakCount: IntArray = IntArray(problem.numBoolVars)
+    internal val boolMakeCount: IntArray = IntArray(problem.numBoolVars)
 
     var cost: Int = 0
         internal set
@@ -139,12 +147,22 @@ class LocalSearchState(
     fun recompute() {
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0
-        for (v in boolBreakValid.indices) boolBreakValid[v] = false
+        for (v in boolBreakCount.indices) { boolBreakCount[v] = 0; boolMakeCount[v] = 0 }
         factors.forEachIndexed { id, factor ->
             factor.initialize(this, id)
             if (factor.isViolated(this, id)) {
                 violated.add(id)
                 cost++
+            }
+        }
+        // Initialize break/make vectors from factor deltas. After initialize() each factor's
+        // payload is current; deltaIfBoolFlipped reads it.
+        for (id in 0 until problem.numFactors) {
+            val f = factors[id]
+            for (w in f.boolVars) {
+                val d = f.deltaIfBoolFlipped(this, id, w)
+                if (d > 0) boolBreakCount[w]++
+                else if (d < 0) boolMakeCount[w]++
             }
         }
         if (cost < bestCostSeen) bestCostSeen = cost
@@ -163,22 +181,26 @@ class LocalSearchState(
      * asking each factor for its `deltaIf*`.
      */
     fun breakScore(move: Move): Int = when (move) {
-        is Move.BoolFlip -> {
-            val v = move.varId
-            if (boolBreakValid[v]) boolBreakCache[v] else {
-                var count = 0
-                forEachBoolFactorDelta(v) { _, d -> if (d > 0) count++ }
-                boolBreakCache[v] = count
-                boolBreakValid[v] = true
-                count
-            }
-        }
+        is Move.BoolFlip -> boolBreakCount[move.varId]
         is Move.IntSet -> {
             var count = 0
             forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
             count
         }
         is Move.Compound -> evaluateCompound(move).breakScore
+    }
+
+    /** Count of currently-violated factors that would become satisfied if [move] were
+     *  applied. Symmetric to [breakScore]. O(1) for `BoolFlip` via [boolMakeCount];
+     *  O(arity) for `IntSet`. Used by probSat/SATLike-style strategies that want both. */
+    fun makeScore(move: Move): Int = when (move) {
+        is Move.BoolFlip -> boolMakeCount[move.varId]
+        is Move.IntSet -> {
+            var count = 0
+            forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
+            count
+        }
+        is Move.Compound -> 0  // Compound make rarely useful; skip the apply-revert dance.
     }
 
     /**
@@ -256,13 +278,32 @@ class LocalSearchState(
     }
 
     private fun applyBoolFlip(boolVar: Int) {
-        assignment.flipBool(boolVar)
         val touchedFactors = problem.boolOccurrences[boolVar]
+        // Phase 1: subtract current break/make contributions for every var in every
+        // touched factor — the post-flip world won't have the same deltas.
+        for (factorId in touchedFactors) {
+            val f = factors[factorId]
+            for (w in f.boolVars) {
+                val d = f.deltaIfBoolFlipped(this, factorId, w)
+                if (d > 0) boolBreakCount[w]--
+                else if (d < 0) boolMakeCount[w]--
+            }
+        }
+        // Phase 2: commit the flip and let each factor update its incremental payload.
+        assignment.flipBool(boolVar)
         for (factorId in touchedFactors) {
             val factor = factors[factorId]
             updateViolation(factorId, factor.applyBoolFlip(this, factorId, boolVar))
         }
-        invalidateBoolBreakNeighbourhood(touchedFactors)
+        // Phase 3: add back contributions reflecting the new state.
+        for (factorId in touchedFactors) {
+            val f = factors[factorId]
+            for (w in f.boolVars) {
+                val d = f.deltaIfBoolFlipped(this, factorId, w)
+                if (d > 0) boolBreakCount[w]++
+                else if (d < 0) boolMakeCount[w]++
+            }
+        }
         markNeighborConfChange(touchedFactors)
         boolConfChange[boolVar] = false
         step++
@@ -274,13 +315,30 @@ class LocalSearchState(
     private fun applyIntSet(intVar: Int, newValue: Int) {
         val old = assignment.intValue(intVar)
         if (old == newValue) return
-        assignment.setInt(intVar, newValue)
         val touchedFactors = problem.intOccurrences[intVar]
+        // Phase 1: subtract bool break/make contributions for every bool var in every
+        // touched factor — the int change shifts their per-var deltas.
+        for (factorId in touchedFactors) {
+            val f = factors[factorId]
+            for (w in f.boolVars) {
+                val d = f.deltaIfBoolFlipped(this, factorId, w)
+                if (d > 0) boolBreakCount[w]--
+                else if (d < 0) boolMakeCount[w]--
+            }
+        }
+        assignment.setInt(intVar, newValue)
         for (factorId in touchedFactors) {
             val factor = factors[factorId]
             updateViolation(factorId, factor.applyIntSet(this, factorId, intVar, old))
         }
-        invalidateBoolBreakNeighbourhood(touchedFactors)
+        for (factorId in touchedFactors) {
+            val f = factors[factorId]
+            for (w in f.boolVars) {
+                val d = f.deltaIfBoolFlipped(this, factorId, w)
+                if (d > 0) boolBreakCount[w]++
+                else if (d < 0) boolMakeCount[w]++
+            }
+        }
         markNeighborConfChange(touchedFactors)
         intConfChange[intVar] = false
         step++
@@ -288,13 +346,6 @@ class LocalSearchState(
         lastTouched[slot] = step
         if (touchCount[slot] < Int.MAX_VALUE) touchCount[slot]++
         if (cost < bestCostSeen) bestCostSeen = cost
-    }
-
-    private fun invalidateBoolBreakNeighbourhood(factorIds: IntArray) {
-        for (factorId in factorIds) {
-            val f = factors[factorId]
-            for (v in f.boolVars) boolBreakValid[v] = false
-        }
     }
 
     private fun markNeighborConfChange(factorIds: IntArray) {
