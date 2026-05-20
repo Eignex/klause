@@ -83,6 +83,16 @@ class LexLess(
      * relationship). Strong enough to detect singleton-pinned violations; per-suffix
      * Hall reasoning is deferred to the next strength pass.
      */
+    /** Reason when [propagate] returns false: the current bound atoms of every paired
+     *  index up to the first non-singleton-equal position, since the propagator
+     *  decides exclusively on bounds (no interior-hole pruning). Sound. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        val combined = IntArray(xs.size + ys.size).also {
+            xs.copyInto(it, 0); ys.copyInto(it, xs.size)
+        }
+        return collectLinearTightenAntecedents(state, combined, excludeIdx = -1, extraLit = 0)
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val len = minOf(xs.size, ys.size)
         var i = 0
