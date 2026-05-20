@@ -129,11 +129,11 @@ val text = cnf.toDimacs()
 Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP backtrack + propagation, `[LS+CP]` cross-cutting, `[API]` cross-backend solver API, `[Sampling]` model counting / uniform sampling, `[Format]` input format parsers, `[Backend]` external solver adapters, `[Perf]` post-benchmark optimization, `[Docs]`, `[Infra]`.
 
 - `[Infra]` Maven Central publishing, CI.
-- `[CP]` Cumulative edge-finding: full Vilím Θ-tree-based EST/LCT-update edge-finding past the current time-tabling + Vilím-2002 overload check. The overload check catches infeasibility time-tabling alone misses; edge-finding's matching EST/LCT bound tightenings on individual tasks are the next strength step.
-- `[CP]` Tighter Hall-set / sweep-prefix `conflictReason` overrides past the current hole-and-bound antecedent set. The atom-eq literal alphabet (`atomVarEq` kind=2, with `[v ≠ k]` as its negative-polarity lit) and the Hall-style `collectHoleAndBoundAntecedents` reason — citing every post-bake domain hole alongside bound shifts — are wired into AllDifferent, GlobalCardinality, Regular, AllDifferentExceptZero, Inverse, Member. Sweep-prefix tightening (cite only the prefix of holes/bounds that actually justifies each prune) is the strict refinement.
-- `[CP]` SAC ordering follow-ups past today's smallest-domain-first heuristic: wdeg / activity-weighted prioritisation (probe vars in factors that have recently fired conflicts first) and randomised tie-breaking when budget is hit mid-pass.
-- `[CP/Optimize]` Core-guided optimization (OLL / RC2-style) for weighted soft-constraint problems. Drives the lower bound via assumption-grounded unsat cores while BnB drives the upper bound — modern CP-SAT runs both.
-- `[CP/Optimize]` LP-relaxation bounding during BnB. CP-SAT's signature lift over pure CP: fold an LP of (linear factors + relaxed integrality) and use LP-LB + reduced costs for pruning + value ordering. Multi-week effort; flag-gated.
+- `[CP]` Vilím Θ-tree edge-finding for `Cumulative` past time-tabling + the Vilím-2002 overload check.
+- `[CP]` Sweep-prefix tightening of hole-aware `conflictReason` — cite only the prefix of holes/bounds that justifies each prune, not the whole filtered domain.
+- `[CP]` wdeg / activity-weighted SAC probe ordering past the smallest-domain-first default; randomised tie-breaking when budget is hit mid-pass.
+- `[CP/Optimize]` Core-guided optimization (OLL / RC2). Lower bound via assumption-grounded unsat cores, upper bound via BnB — modern CP-SAT runs both.
+- `[CP/Optimize]` LP-relaxation bounding during BnB. Fold linear factors into an LP, use LP-LB + reduced costs for pruning and value ordering. Flag-gated, multi-week.
 - `[LS]` Multi-core LS portfolio finishing touches for the MZN Challenge LS track: best-feasible sharing as warm-start hints, shared kumulant stats in Relaxed mode for a restart-level bandit, worker-config factory handing each worker a distinct `(strategy, seed)`.
 - `[LS]` ALNS: problem-specific destroy operators (cumulative time-window slides) and regret-based / best-improving construction repairs.
 - `[LS]` ILS: basin-hopping-style large-jump perturbation and multi-parent / linkage-aware crossover.
