@@ -129,7 +129,7 @@ val text = cnf.toDimacs()
 Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP backtrack + propagation, `[LS+CP]` cross-cutting, `[API]` cross-backend solver API, `[Sampling]` model counting / uniform sampling, `[Format]` input format parsers, `[Backend]` external solver adapters, `[Perf]` post-benchmark optimization, `[Docs]`, `[Infra]`.
 
 - `[Infra]` Maven Central publishing, CI.
-- `[CP]` Vilím Θ-tree edge-finding for `Cumulative` past time-tabling + the Vilím-2002 overload check.
+- `[CP]` Vilím Θ-tree edge-finding for `Cumulative` past time-tabling and the energy-overload check.
 - `[CP]` Sweep-prefix tightening of hole-aware `conflictReason` — cite only the prefix of holes/bounds that justifies each prune, not the whole filtered domain.
 - `[CP]` wdeg / activity-weighted SAC probe ordering past the smallest-domain-first default; randomised tie-breaking when budget is hit mid-pass.
 - `[CP/Optimize]` Core-guided optimization (OLL / RC2). Lower bound via assumption-grounded unsat cores, upper bound via BnB — modern CP-SAT runs both.
