@@ -37,6 +37,31 @@ class CumulativeTest {
     }
 
     @Test
+    fun `overload check detects energy infeasibility that time-tabling misses`() {
+        // 3 tasks, each duration 3, resource 1; capacity 1; start domains all [0, 3].
+        // No task has a compulsory part on its own (each window is 6 wide with duration 3),
+        // so time-tabling alone observes no mandatory overlap and accepts the state.
+        // Total energy = 3 × 3 = 9, available capacity × span = 1 × (3+3 − 0) = 6. The
+        // overload check fires.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1, 2),
+            durations = intArrayOf(3, 3, 3),
+            resources = intArrayOf(1, 1, 1),
+            capacity = 1,
+        )
+        val p = Problem(
+            numBoolVars = 0, numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(factor),
+        )
+        val baked = p.baked
+        assertTrue(
+            baked is PropagationResult.Unsat,
+            "overload check should mark this as Unsat at bake time, got $baked",
+        )
+    }
+
+    @Test
     fun `non-overlapping schedule satisfies the cumulative bound`() {
         val problem = threeTasksUnary()
         val state = LocalSearchState(problem, Random(0))

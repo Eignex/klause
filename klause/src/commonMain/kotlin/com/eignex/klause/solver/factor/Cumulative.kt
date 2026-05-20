@@ -234,6 +234,35 @@ class Cumulative(
         for (i in 0 until n) {
             if (durations[i] > 0 && resources[i] > capacity) return false
         }
+        // Overload check (Vilím 2002 / Schutt-Feydy-Stuckey 2009 simplified). For each
+        // anchor LCT τ, let Ω(τ) = { j : LCT(j) ≤ τ }; if Σ_{j∈Ω} dur(j)·res(j) exceeds
+        // capacity · (τ − EST(Ω)), the instance is infeasible. Catches conflicts that
+        // time-tabling misses (no compulsory parts but combined energy overflows).
+        // O(n log n): sort tasks by LCT, accumulate Energy and min-EST in scan order.
+        run {
+            val idx = IntArray(n) { it }
+            // Stable sort by (lct, est) so multiple tasks with the same LCT all anchor
+            // through one another in the same iteration.
+            val lcts = IntArray(n) { i ->
+                val d = state.intDomains[starts[i]]
+                d.max + durations[i]
+            }
+            val ests = IntArray(n) { i -> state.intDomains[starts[i]].min }
+            // Sort indices by lcts[idx[i]] ascending.
+            val sorted = idx.sortedBy { lcts[it] }.toIntArray()
+            var totalEnergy = 0L
+            var minEst = Int.MAX_VALUE
+            for (k in 0 until n) {
+                val j = sorted[k]
+                val e = durations[j].toLong() * resources[j].toLong()
+                if (e == 0L) continue
+                totalEnergy += e
+                if (ests[j] < minEst) minEst = ests[j]
+                val tau = lcts[j]
+                val slack = (tau.toLong() - minEst.toLong()) * capacity.toLong()
+                if (totalEnergy > slack) return false
+            }
+        }
         // 1. Build mandatory profile as an event list. Each task contributes one (lst, +r)
         //    and one (ect, -r) when lst < ect; otherwise no compulsory part.
         val events = ArrayList<IntArray>(n * 2)
