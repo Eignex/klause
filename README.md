@@ -126,7 +126,7 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-Each item is tagged with its workstream: `[CP]` complete-search engine and propagators, `[LS]` local-search engine and strategies, `[Backend]` external adapters and distribution, `[Perf]` cross-cutting optimizations (post-benchmark or clearly better regardless of benchmarks).
+Each item is tagged with its workstream: `[CP]` complete-search engine and propagators, `[LS]` local-search engine and strategies, `[Backend]` external adapters and distribution.
 
 - `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
 - `[CP]` Sweep-prefix tightening of hole-aware `conflictReason`.
