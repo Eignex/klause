@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.kumulant.stat.decay.EwmaMeanStat
+import kotlin.math.sqrt
 
 /**
  * Adaptive parameter controller in the spirit of Hoos 2002's adaptive WalkSAT noise.
@@ -84,5 +85,38 @@ class NoiseController(
         bestCostSeen = Int.MAX_VALUE
         stallCount = 0
         ewma?.reset()
+    }
+
+    companion object {
+        /**
+         * Derive a sensible [ewmaAlpha] from problem size and the per-restart flip budget,
+         * for callers that want EWMA-mode without hand-tuning. The effective window of an
+         * EWMA is roughly `1/α` observations, so the rule trades two pressures:
+         *
+         *  - **Bigger problems want longer windows.** Per-flip cost noise scales with the
+         *    number of violated factors; a longer window rejects more of that jitter. The
+         *    target window grows as `√numVars` (not linear — variance of mean-of-N is
+         *    `σ²/N`, so √N is the natural rate to keep signal-to-noise constant).
+         *  - **Short flip budgets want shorter windows.** A window longer than ~5% of the
+         *    flip budget consumes most of the search in warm-up and never reacts. Cap the
+         *    window at `flipBudget / 20`.
+         *
+         * The result is clipped to `[0.02, 0.5]` — α < 0.02 (window > 50) is more EWMA
+         * than reactive controller; α > 0.5 (window < 2) is effectively the best-cost mode
+         * with extra arithmetic.
+         *
+         * @param numVars total Boolean + integer variable count (`problem.numBoolVars +
+         *                problem.numIntVars`).
+         * @param flipBudget the per-restart flip budget the strategy will run against
+         *                   (typically [LocalSearchParams.maxFlips]).
+         */
+        fun autoEwmaAlpha(numVars: Int, flipBudget: Int): Double {
+            require(numVars >= 0) { "numVars must be non-negative, got $numVars" }
+            require(flipBudget > 0) { "flipBudget must be positive, got $flipBudget" }
+            val sizeWindow = sqrt(numVars.toDouble()).coerceAtLeast(5.0)
+            val budgetWindow = (flipBudget / 20).coerceAtLeast(5).toDouble()
+            val window = minOf(sizeWindow, budgetWindow)
+            return (1.0 / window).coerceIn(0.02, 0.5)
+        }
     }
 }

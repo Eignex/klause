@@ -86,6 +86,21 @@ class AdaptiveStrategyTest {
     }
 
     @Test
+    fun `auto ewma alpha scales window with problem size and flip budget`() {
+        // Tiny problem, generous budget → window floored at 5, α = 0.2.
+        assertEquals(0.2, NoiseController.autoEwmaAlpha(numVars = 4, flipBudget = 100_000), 1e-9)
+        // Medium problem, generous budget → window = sqrt(100) = 10, α = 0.1.
+        assertEquals(0.1, NoiseController.autoEwmaAlpha(numVars = 100, flipBudget = 100_000), 1e-9)
+        // Huge problem, generous budget → window = sqrt(10_000) = 100, clipped at α = 0.02.
+        assertEquals(0.02, NoiseController.autoEwmaAlpha(numVars = 10_000, flipBudget = 1_000_000), 1e-9)
+        // Tiny flip budget caps the window: flipBudget/20 = 5 dominates over sqrt(400)=20.
+        assertEquals(0.2, NoiseController.autoEwmaAlpha(numVars = 400, flipBudget = 100), 1e-9)
+        // Result always in (0, 1].
+        val alpha = NoiseController.autoEwmaAlpha(numVars = 1_000_000, flipBudget = 1)
+        assertTrue(alpha in 0.02..0.5, "alpha out of clip range: $alpha")
+    }
+
+    @Test
     fun `adaptive walk sat finds feasible samples`() {
         val schema = CardinalityS()
         val compiled = schema.compile()
