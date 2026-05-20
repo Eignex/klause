@@ -144,7 +144,7 @@ class Problem(
         var changed = true
         while (changed) {
             changed = false
-            for (v in 0 until numIntVars) {
+            for (v in sacProbeOrder(acc)) {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= probeBudgetPerVar) continue
                 if (totalCalls >= probeTotalBudget) return acc
@@ -207,6 +207,21 @@ class Problem(
      * and re-probe. Returns the strengthened [PropagationResult.Implied], or [Unsat]
      * if the problem turns out to be infeasible.
      */
+    /** Probe-order heuristic: visit int vars in ascending current-domain-size order so
+     *  the budget gets spent on the most-constrained vars first (smaller domains tend
+     *  to yield more deductions per probe). Ties break by var id for determinism. */
+    private fun sacProbeOrder(acc: PropagationResult.Implied): IntArray {
+        val order = IntArray(numIntVars) { it }
+        val sizes = IntArray(numIntVars) { v ->
+            if (acc.intValueOrNull(v) != null) return@IntArray 1
+            val orig = intDomains[v]
+            val lo = acc.intMinOrNullCompat(v) ?: orig.min
+            val hi = acc.intMaxOrNullCompat(v) ?: orig.max
+            (hi - lo + 1).coerceAtLeast(1)
+        }
+        return order.toTypedArray().sortedWith(compareBy({ sizes[it] }, { it })).toIntArray()
+    }
+
     private fun probeBoundSac(base: PropagationResult.Implied): PropagationResult {
         var acc: PropagationResult.Implied = base
         val perVarCalls = IntArray(numIntVars)
@@ -214,7 +229,7 @@ class Problem(
         var changed = true
         while (changed) {
             changed = false
-            for (v in 0 until numIntVars) {
+            for (v in sacProbeOrder(acc)) {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= probeBudgetPerVar) continue
                 if (totalCalls >= probeTotalBudget) return acc
