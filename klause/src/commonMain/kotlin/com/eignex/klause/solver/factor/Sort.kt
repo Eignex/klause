@@ -54,6 +54,10 @@ class Sort(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Bound-only conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // All-singleton sanity: when every operand is pinned, ys must equal sorted xs.
         var allSingleton = true

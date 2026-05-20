@@ -72,6 +72,10 @@ class ArgMinMax(
         return 0
     }
 
+    /** Bound-only conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // idx ∈ [indexOffset, indexOffset + xs.size - 1]. These bound facts are
         // structural (true from the factor's existence) so antecedents are null.

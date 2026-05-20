@@ -61,6 +61,10 @@ class SymmetricAllDifferent(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Bound-only conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Tighten each xs[i] into the legal index range.
         val lo = indexOffset
