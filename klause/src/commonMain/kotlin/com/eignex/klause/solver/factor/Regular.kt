@@ -74,82 +74,70 @@ class Regular(
         return q in acceptingSet
     }
 
+    /** Number of 64-bit words needed to bitmask `numStates`. */
+    private val stateWords: Int = (numStates + 63) ushr 6
+
     /**
-     * Pesant's layered-DAG GAC propagator, bitmask-encoded for ≤64-state DFAs (covers
-     * the vast majority of MZN models). Build the unrolled DFA across `n = seq.size`
-     * layers; forward[i] is a Long where bit `q-1` marks state `q` forward-reachable
-     * at layer `i`; backward[i] marks co-reachable states.
+     * Pesant's layered-DAG GAC propagator, bitmask-encoded. Build the unrolled DFA
+     * across `n = seq.size` layers; per layer, a `stateWords`-long bitmask records
+     * which states are forward-reachable (resp. co-reachable from accepting).
      *
      * Pruning: at each layer, a symbol `s ∈ dom(seq[i])` survives iff `∃ q` forward-
      * reachable at `i` whose transition `δ(q, s)` is co-reachable at `i+1`. Non-
      * surviving symbols are removed from `dom(seq[i])`. Conflict iff the initial
      * state is not co-reachable at layer 0.
      *
-     * For DFAs with more than 64 states, falls back to the singleton-only check
-     * pending a multi-Long bitmask extension.
+     * Memory: two `LongArray((n+1) * stateWords)` per call — `O(n · Q/64)` longs.
+     * For Q ≤ 64 this collapses to two `LongArray(n+1)`; for larger Q the multi-
+     * Long encoding still avoids per-layer object allocation.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        if (numStates > 64) return propagateSingletonOnly(state)
         val n = seq.size
-        // forward[i]: bitmask of forward-reachable states at layer i (bit q-1 ⇒ state q).
-        val forward = LongArray(n + 1)
-        forward[0] = 1L shl (q0 - 1)
+        val w = stateWords
+        val forward = LongArray((n + 1) * w)
+        // Layer 0: only q0 is reachable.
+        setBit(forward, 0, q0 - 1)
         for (i in 0 until n) {
-            val src = forward[i]
-            if (src == 0L) return false  // empty layer ⇒ infeasible.
+            if (isLayerEmpty(forward, i)) return false
             val d = state.intDomains[seq[i]]
-            var dst = 0L
             d.forEach { s ->
-                var bits = src
-                while (bits != 0L) {
-                    val q = bits.countTrailingZeroBits() + 1
+                forEachStateInLayer(forward, i) { q ->
                     val nx = delta(q, s)
-                    if (nx != 0) dst = dst or (1L shl (nx - 1))
-                    bits = bits and (bits - 1)
+                    if (nx != 0) setBit(forward, i + 1, nx - 1)
                 }
             }
-            forward[i + 1] = dst
         }
-        // backward[i]: bitmask of co-reachable states at layer i.
-        val backward = LongArray(n + 1)
-        var acc = 0L
-        for (q in accepting) if (q in 1..numStates) acc = acc or (1L shl (q - 1))
-        backward[n] = forward[n] and acc
-        if (backward[n] == 0L) return false
+        val backward = LongArray((n + 1) * w)
+        for (q in accepting) if (q in 1..numStates) setBit(backward, n, q - 1)
+        // Intersect with forward[n] so we only keep states actually reachable.
+        for (k in 0 until w) {
+            backward[n * w + k] = backward[n * w + k] and forward[n * w + k]
+        }
+        if (isLayerEmpty(backward, n)) return false
         for (i in n - 1 downTo 0) {
-            val srcMask = forward[i]
-            val nextMask = backward[i + 1]
-            var aliveSrc = 0L
             val d = state.intDomains[seq[i]]
-            var bits = srcMask
-            while (bits != 0L) {
-                val q = bits.countTrailingZeroBits() + 1
+            forEachStateInLayer(forward, i) { q ->
                 var alive = false
                 d.forEach { s ->
                     val nx = delta(q, s)
-                    if (nx != 0 && (nextMask and (1L shl (nx - 1))) != 0L) alive = true
+                    if (nx != 0 && testBit(backward, i + 1, nx - 1)) alive = true
                 }
-                if (alive) aliveSrc = aliveSrc or (1L shl (q - 1))
-                bits = bits and (bits - 1)
+                if (alive) setBit(backward, i, q - 1)
             }
-            backward[i] = aliveSrc
         }
-        if ((backward[0] and (1L shl (q0 - 1))) == 0L) return false
+        if (!testBit(backward, 0, q0 - 1)) return false
         // Per-position symbol pruning.
         val ant = state.composeIntVarAtomAntecedents(seq)
         for (i in 0 until n) {
-            val srcMask = forward[i]
-            val nextMask = backward[i + 1]
             val d = state.intDomains[seq[i]]
             val toRemove = ArrayList<Int>()
             d.forEach { s ->
                 var live = false
-                var bits = srcMask
-                while (bits != 0L && !live) {
-                    val q = bits.countTrailingZeroBits() + 1
-                    val nx = delta(q, s)
-                    if (nx != 0 && (nextMask and (1L shl (nx - 1))) != 0L) live = true
-                    bits = bits and (bits - 1)
+                forEachStateInLayer(forward, i) { q ->
+                    if (!live) {
+                        val nx = delta(q, s)
+                        if (nx != 0 && testBit(backward, i + 1, nx - 1)) live = true
+                    }
                 }
                 if (!live) toRemove.add(s)
             }
@@ -158,18 +146,28 @@ class Regular(
         return true
     }
 
-    private fun propagateSingletonOnly(state: PropagationState): Boolean {
-        var allSingleton = true
-        for (v in seq) {
-            val d = state.intDomains[v]
-            if (d.min != d.max) { allSingleton = false; break }
+    private inline fun setBit(bits: LongArray, layer: Int, bit: Int) {
+        bits[layer * stateWords + (bit ushr 6)] = bits[layer * stateWords + (bit ushr 6)] or (1L shl (bit and 63))
+    }
+
+    private inline fun testBit(bits: LongArray, layer: Int, bit: Int): Boolean =
+        (bits[layer * stateWords + (bit ushr 6)] and (1L shl (bit and 63))) != 0L
+
+    private fun isLayerEmpty(bits: LongArray, layer: Int): Boolean {
+        val base = layer * stateWords
+        for (k in 0 until stateWords) if (bits[base + k] != 0L) return false
+        return true
+    }
+
+    private inline fun forEachStateInLayer(bits: LongArray, layer: Int, action: (Int) -> Unit) {
+        val base = layer * stateWords
+        for (k in 0 until stateWords) {
+            var w = bits[base + k]
+            while (w != 0L) {
+                val q = (k shl 6) + w.countTrailingZeroBits() + 1
+                if (q <= numStates) action(q)
+                w = w and (w - 1)
+            }
         }
-        if (!allSingleton) return true
-        var q = q0
-        for (v in seq) {
-            q = delta(q, state.intDomains[v].min)
-            if (q == 0) return false
-        }
-        return q in acceptingSet
     }
 }
