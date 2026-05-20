@@ -94,30 +94,31 @@ class Knapsack(
     }
 
     /**
-     * Bound-tighten `w` and `p` against the per-element coefficient ranges. For
-     * coefficient `c_i ≥ 0`, the contribution range is `[c_i · d_i.min, c_i · d_i.max]`;
-     * for `c_i < 0` it's `[c_i · d_i.max, c_i · d_i.min]`. Sum the per-element extremes
-     * to bound the totals.
+     * Knapsack reduces to two simultaneous linear equalities:
+     *  - `Σ weights[i] · xs[i] - w = 0`
+     *  - `Σ profits[i] · xs[i] - p = 0`
+     *
+     * Both equalities are bound-propagated via the shared [propagateLinearBounds] routine,
+     * which not only tightens [w] / [p] from per-element coefficient ranges but also
+     * propagates back: knowing `w`'s upper bound prunes high-end values of each `xs[i]`
+     * whose minimum forced contribution exceeds the remaining slack. This subsumes the
+     * old one-way bound-tighten-only behaviour.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        var wLo = 0L; var wHi = 0L
-        var pLo = 0L; var pHi = 0L
-        for (i in xs.indices) {
-            val d = state.intDomains[xs[i]]
-            val wc = weights[i].toLong()
-            val pc = profits[i].toLong()
-            if (wc >= 0) { wLo += wc * d.min; wHi += wc * d.max }
-            else        { wLo += wc * d.max; wHi += wc * d.min }
-            if (pc >= 0) { pLo += pc * d.min; pHi += pc * d.max }
-            else        { pLo += pc * d.max; pHi += pc * d.min }
-        }
-        if (wLo > Int.MAX_VALUE || wHi < Int.MIN_VALUE) return false
-        if (pLo > Int.MAX_VALUE || pHi < Int.MIN_VALUE) return false
-        val ant = state.composeIntVarAtomAntecedents(xs)
-        if (!state.tightenIntMin(w, wLo.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt(), ant)) return false
-        if (!state.tightenIntMax(w, wHi.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), ant)) return false
-        if (!state.tightenIntMin(p, pLo.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt(), ant)) return false
-        if (!state.tightenIntMax(p, pHi.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), ant)) return false
+        val n = xs.size
+        // Linear form: append the sum-variable with coefficient -1 so the equality reads
+        // `Σ coeffs · vars = 0`.
+        val weightCoeffs = IntArray(n + 1).also { weights.copyInto(it); it[n] = -1 }
+        val profitCoeffs = IntArray(n + 1).also { profits.copyInto(it); it[n] = -1 }
+        val weightVars = IntArray(n + 1).also { xs.copyInto(it); it[n] = w }
+        val profitVars = IntArray(n + 1).also { xs.copyInto(it); it[n] = p }
+        if (!propagateLinearBounds(state, weightCoeffs, weightVars, LinearOp.EQ, 0L)) return false
+        if (!propagateLinearBounds(state, profitCoeffs, profitVars, LinearOp.EQ, 0L)) return false
         return true
     }
+
+    /** Reason on conflict: full participating-var bound atoms. The two-equality view
+     *  pins the conflict on the joint domain bounds, like [Linear]. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 }
