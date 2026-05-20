@@ -279,29 +279,35 @@ class LocalSearchState(
 
     private fun applyBoolFlip(boolVar: Int) {
         val touchedFactors = problem.boolOccurrences[boolVar]
-        // Phase 1: subtract current break/make contributions for every var in every
-        // touched factor — the post-flip world won't have the same deltas.
+        // Phase 1: brute-force factors — subtract pre-flip break/make contributions.
+        // Incremental factors handle the entire delta in updateBoolBreakMakeForFlip below.
         for (factorId in touchedFactors) {
             val f = factors[factorId]
+            if (f.maintainsBreakMakeIncrementally) continue
             for (w in f.boolVars) {
                 val d = f.deltaIfBoolFlipped(this, factorId, w)
                 if (d > 0) boolBreakCount[w]--
                 else if (d < 0) boolMakeCount[w]--
             }
         }
-        // Phase 2: commit the flip and let each factor update its incremental payload.
+        // Phase 2: commit the flip and let each factor update its own payload.
         assignment.flipBool(boolVar)
         for (factorId in touchedFactors) {
             val factor = factors[factorId]
             updateViolation(factorId, factor.applyBoolFlip(this, factorId, boolVar))
         }
-        // Phase 3: add back contributions reflecting the new state.
+        // Phase 3: brute-force factors — add post-flip contributions.
+        // Incremental factors apply their O(1) / O(arity) update.
         for (factorId in touchedFactors) {
             val f = factors[factorId]
-            for (w in f.boolVars) {
-                val d = f.deltaIfBoolFlipped(this, factorId, w)
-                if (d > 0) boolBreakCount[w]++
-                else if (d < 0) boolMakeCount[w]++
+            if (f.maintainsBreakMakeIncrementally) {
+                f.updateBoolBreakMakeForFlip(this, factorId, boolVar)
+            } else {
+                for (w in f.boolVars) {
+                    val d = f.deltaIfBoolFlipped(this, factorId, w)
+                    if (d > 0) boolBreakCount[w]++
+                    else if (d < 0) boolMakeCount[w]++
+                }
             }
         }
         markNeighborConfChange(touchedFactors)

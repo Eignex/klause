@@ -50,4 +50,22 @@ interface LocalSearchFactor : Factor {
             if (cur > d.min) sink.addIntSet(i, cur - 1)
         }
     }
+
+    /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]
+     *  and [LocalSearchState.boolMakeCount] incrementally via [updateBoolBreakMakeForFlip],
+     *  skipping the engine's brute-force O(arity²) per-flip subtract-add cycle.
+     *
+     *  Factors that override should: (a) set this to true, (b) implement
+     *  [updateBoolBreakMakeForFlip] so the post-flip counts match what brute-force would
+     *  produce, (c) maintain whatever internal state the update needs (e.g. `numTrueLits`
+     *  in [LocalSearchState.intPayload]). Default `false` keeps the brute-force fallback. */
+    val maintainsBreakMakeIncrementally: Boolean get() = false
+
+    /** Adjust [LocalSearchState.boolBreakCount] / [LocalSearchState.boolMakeCount] after
+     *  [flippedVar] has been flipped. Called *after* the assignment is updated and after
+     *  this factor's own [applyBoolFlip] has run, so any internal payload is current.
+     *
+     *  Only invoked when [maintainsBreakMakeIncrementally] is true. Net adjustment must
+     *  equal the brute-force "subtract pre-flip per-var deltas, add post-flip" pattern. */
+    fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {}
 }

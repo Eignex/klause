@@ -67,10 +67,12 @@ class Clause(
         // Reseat watches: prefer two distinct true literals; fall back to two distinct indices.
         var first = -1
         var second = -1
+        var trueCount = 0
         for (i in literals.indices) {
             if (litTrue(state, i)) {
+                trueCount++
                 if (first == -1) first = i
-                else if (second == -1) { second = i; break }
+                else if (second == -1) second = i
             }
         }
         if (first == -1) {
@@ -84,6 +86,7 @@ class Clause(
             w.w2 = second
         }
         state.refPayload[factorId] = w
+        state.intPayload[factorId] = trueCount
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -149,6 +152,14 @@ class Clause(
         var w1NowTrue = litTrue(state, w.w1)
         var w2NowTrue = if (w.w2 >= 0) litTrue(state, w.w2) else false
 
+        // Update numTrueLits: the flipped var appears in exactly one literal (no tautologies
+        // by construction). Determine whether that literal went true→false or false→true.
+        val li = litIndexByVar[boolVar]
+        if (li >= 0) {
+            val nowTrue = litTrue(state, li)
+            state.intPayload[factorId] += if (nowTrue) 1 else -1
+        }
+
         // If a watch went true → false, look for another true literal to rewatch.
         if (!w1NowTrue) {
             val replacement = findTrueLitExcept(state, w.w1, w.w2)
@@ -169,6 +180,70 @@ class Clause(
         val nowViolated = !isSatisfied
         val wasViolated = !wasSatisfied
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    /** O(arity) — but typically O(1) — update of [LocalSearchState.boolBreakCount] /
+     *  [LocalSearchState.boolMakeCount] in response to [flippedVar] being flipped.
+     *
+     *  Only the 0↔1 and 1↔2 transitions of `numTrueLits` change break/make contributions:
+     *   - `0→1`: clause was violated (every var made it satisfiable); now critically sat
+     *     with [flippedVar] as the critical literal.
+     *   - `1→0`: critical was [flippedVar]; now violated; every var becomes a make candidate.
+     *   - `1→2`: previous critical (now non-critical) loses its break.
+     *   - `2→1`: the remaining true literal becomes critical and gains a break.
+     *
+     *  Transitions 2↔3, 3↔4, ... touch no break/make state. */
+    override fun updateBoolBreakMakeForFlip(
+        state: LocalSearchState, factorId: Int, flippedVar: Int,
+    ) {
+        val li = litIndexByVar[flippedVar]
+        if (li < 0) return  // flippedVar isn't in this clause (shouldn't happen via occurrence list)
+        val newCount = state.intPayload[factorId]
+        val nowTrue = litTrue(state, li)
+        // Old count was newCount - (delta), where delta = ±1 depending on lit transition.
+        val oldCount = if (nowTrue) newCount - 1 else newCount + 1
+        when {
+            oldCount == 0 && newCount == 1 -> {
+                // Was violated → critically sat. Drop the makeCount contribution every var
+                // had, add the breakCount for the new critical (the flipped var's lit).
+                for (v in boolVars) state.boolMakeCount[v]--
+                state.boolBreakCount[flippedVar]++
+            }
+            oldCount == 1 && newCount == 0 -> {
+                // Critically sat → violated. The pre-flip critical was the flipped var's
+                // lit (since that's the lit that went true→false). Drop its break; add
+                // make for every var.
+                state.boolBreakCount[flippedVar]--
+                for (v in boolVars) state.boolMakeCount[v]++
+            }
+            oldCount == 1 && newCount == 2 -> {
+                // Old critical (the other true lit) is no longer critical.
+                val oldCriticalIdx = findTrueLitExceptIndex(state, li)
+                if (oldCriticalIdx >= 0) {
+                    state.boolBreakCount[Lit.variable(literals[oldCriticalIdx])]--
+                }
+            }
+            oldCount == 2 && newCount == 1 -> {
+                // The remaining true lit becomes critical.
+                val newCriticalIdx = findTrueLitExceptIndex(state, li)
+                if (newCriticalIdx >= 0) {
+                    state.boolBreakCount[Lit.variable(literals[newCriticalIdx])]++
+                }
+            }
+            // 2↔3, 3↔4, ...: no change to break/make contributions.
+        }
+    }
+
+    /** Find a literal index other than [excludeIdx] that's currently true. Used by the
+     *  incremental break/make update to identify the (old or new) critical literal. */
+    private fun findTrueLitExceptIndex(state: LocalSearchState, excludeIdx: Int): Int {
+        for (i in literals.indices) {
+            if (i == excludeIdx) continue
+            if (litTrue(state, i)) return i
+        }
+        return -1
     }
 
     /**
