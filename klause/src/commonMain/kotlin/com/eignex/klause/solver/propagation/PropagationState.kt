@@ -650,6 +650,23 @@ class PropagationState(
         for (i in ik.indices) {
             if (!setIntAsDecision(ik[i], iv[i])) return false
         }
+        // Non-singleton bound tightenings ride at the same decision level as int pins —
+        // they're seed-time inputs, not propagated conclusions. Each takes its own level
+        // so the conflict analyzer can attribute backjumps to the specific tightening.
+        val minK = a.intMinKeys; val minV = a.intMinValues
+        for (i in minK.indices) {
+            levelToDecisionVar.add(problem.numBoolVars + minK[i])
+            currentLevel = levelToDecisionVar.size
+            currentFactor = -1
+            if (!tightenIntMinImpl(minK[i], minV[i], null)) return false
+        }
+        val maxK = a.intMaxKeys; val maxV = a.intMaxValues
+        for (i in maxK.indices) {
+            levelToDecisionVar.add(problem.numBoolVars + maxK[i])
+            currentLevel = levelToDecisionVar.size
+            currentFactor = -1
+            if (!tightenIntMaxImpl(maxK[i], maxV[i], null)) return false
+        }
         return true
     }
 

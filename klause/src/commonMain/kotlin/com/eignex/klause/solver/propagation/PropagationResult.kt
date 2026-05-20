@@ -23,10 +23,17 @@ sealed interface PropagationResult {
         val boolKeys: IntArray,
         /** Forced values aligned with [boolKeys]. */
         val boolValues: BooleanArray,
-        /** Int var ids in ascending order. */
+        /** Int var ids forced to a singleton value, ascending. */
         val intKeys: IntArray,
         /** Forced values aligned with [intKeys]. */
         val intValues: IntArray,
+        /** Int var ids whose lower bound was tightened (but not yet singleton). Disjoint
+         *  from [intKeys]; ascending. Populated by bound-SAC and any future propagation
+         *  that wants to expose non-singleton deductions. */
+        val intMinKeys: IntArray = IntArray(0),
+        val intMinValues: IntArray = IntArray(0),
+        val intMaxKeys: IntArray = IntArray(0),
+        val intMaxValues: IntArray = IntArray(0),
     ) : PropagationResult {
 
         val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
@@ -41,6 +48,24 @@ sealed interface PropagationResult {
         fun intValueOrNull(id: Int): Int? {
             val idx = intKeys.binarySearchInt(id)
             return if (idx >= 0) intValues[idx] else null
+        }
+
+        fun intMinOrNullCompat(id: Int): Int? {
+            val idx = intMinKeys.binarySearchInt(id)
+            return if (idx >= 0) intMinValues[idx] else null
+        }
+
+        fun intMaxOrNullCompat(id: Int): Int? {
+            val idx = intMaxKeys.binarySearchInt(id)
+            return if (idx >= 0) intMaxValues[idx] else null
+        }
+
+        inline fun forEachIntMin(action: (id: Int, value: Int) -> Unit) {
+            for (i in intMinKeys.indices) action(intMinKeys[i], intMinValues[i])
+        }
+
+        inline fun forEachIntMax(action: (id: Int, value: Int) -> Unit) {
+            for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
         }
 
         inline fun forEachBool(action: (id: Int, value: Boolean) -> Unit) {
@@ -60,6 +85,10 @@ sealed interface PropagationResult {
                 boolValues = boolValues.copyOf(),
                 intKeys = intKeys.copyOf(),
                 intValues = intValues.copyOf(),
+                intMinKeys = intMinKeys.copyOf(),
+                intMinValues = intMinValues.copyOf(),
+                intMaxKeys = intMaxKeys.copyOf(),
+                intMaxValues = intMaxValues.copyOf(),
             )
 
         /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
@@ -112,17 +141,22 @@ sealed interface PropagationResult {
             val Empty: Implied = Implied(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
-             *  normalises to the primitive sorted-array form. */
+             *  normalises to the primitive sorted-array form. Optional bound-tightening
+             *  args support SAC-at-root and any future producer of non-singleton deductions. */
             operator fun invoke(
                 bools: Map<Int, Boolean> = emptyMap(),
                 ints: Map<Int, Int> = emptyMap(),
+                intMinKeys: IntArray = IntArray(0),
+                intMinValues: IntArray = IntArray(0),
+                intMaxKeys: IntArray = IntArray(0),
+                intMaxValues: IntArray = IntArray(0),
             ): Implied {
-                if (bools.isEmpty() && ints.isEmpty()) return Empty
+                if (bools.isEmpty() && ints.isEmpty() && intMinKeys.isEmpty() && intMaxKeys.isEmpty()) return Empty
                 val bKeys = bools.keys.toIntArray().also { it.sort() }
                 val bVals = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) }
                 val iKeys = ints.keys.toIntArray().also { it.sort() }
                 val iVals = IntArray(iKeys.size) { ints.getValue(iKeys[it]) }
-                return Implied(bKeys, bVals, iKeys, iVals)
+                return Implied(bKeys, bVals, iKeys, iVals, intMinKeys, intMinValues, intMaxKeys, intMaxValues)
             }
         }
     }

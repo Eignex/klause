@@ -32,6 +32,18 @@ class Problem(
      * and don't want the construction overhead.
      */
     val probeFailedLiterals: Boolean = false,
+    /**
+     * Opt-in bound-SAC (singleton arc consistency) probing at bake time. After
+     * [probeFailedLiterals] settles, every int var with a multi-value domain has its
+     * min and max probed: pin the bound, propagate, and if Unsat, tighten the bound by
+     * one and loop. Captures bound-level deductions the per-call propagator misses
+     * because they require hypothetical reasoning across factors. Cost is
+     * `O(Σ |dom(v)|_extreme × propagate)`; result rides in [baked] as bound
+     * tightenings (non-singleton) and pins (when SAC narrows a var to a single value).
+     * Interior-hole SAC (probing values strictly between min and max) is left for a
+     * follow-up — it needs Implied/Assumptions to carry hole sets too.
+     */
+    val probeIntBounds: Boolean = false,
 ) {
     init {
         require(intDomains.size == numIntVars) {
@@ -85,8 +97,116 @@ class Problem(
 
     private fun computeBaked(): PropagationResult {
         val initial = propagate(Assumptions.None)
-        if (!probeFailedLiterals || initial is PropagationResult.Unsat) return initial
-        return probeFreeBools(initial as PropagationResult.Implied)
+        if (initial is PropagationResult.Unsat) return initial
+        var result: PropagationResult = initial
+        if (probeFailedLiterals) {
+            result = probeFreeBools(result as PropagationResult.Implied)
+            if (result is PropagationResult.Unsat) return result
+        }
+        if (probeIntBounds) {
+            result = probeBoundSac(result as PropagationResult.Implied)
+        }
+        return result
+    }
+
+    /**
+     * Bound-SAC fixed-point loop. Probes the min and max of each multi-value int var
+     * under the current [base]; an Unsat result lets us tighten that bound by one
+     * and re-probe. Returns the strengthened [PropagationResult.Implied], or [Unsat]
+     * if the problem turns out to be infeasible.
+     */
+    private fun probeBoundSac(base: PropagationResult.Implied): PropagationResult {
+        var acc: PropagationResult.Implied = base
+        var changed = true
+        while (changed) {
+            changed = false
+            for (v in 0 until numIntVars) {
+                // Skip vars already pinned to a singleton by the running baseline.
+                if (acc.intValueOrNull(v) != null) continue
+                val orig = intDomains[v]
+                val curMin = acc.intMinOrNullCompat(v) ?: orig.min
+                val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
+                if (curMin >= curMax) continue
+                val accAsAssumptions = acc.toAssumptions()
+                val pinMin = propagate(accAsAssumptions.withInt(v, curMin))
+                if (pinMin is PropagationResult.Unsat) {
+                    val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
+                    val r = propagate(tightened)
+                    if (r is PropagationResult.Unsat) return r
+                    // Record the forced tightening explicitly — `propagate` filters out
+                    // tightenings that match the assumption seed, so we must add ours
+                    // back manually before unioning downstream effects.
+                    acc = addMinToImplied(acc, v, curMin + 1)
+                    acc = mergeImplied(acc, r as PropagationResult.Implied)
+                    changed = true
+                    continue
+                }
+                val pinMax = propagate(accAsAssumptions.withInt(v, curMax))
+                if (pinMax is PropagationResult.Unsat) {
+                    val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
+                    val r = propagate(tightened)
+                    if (r is PropagationResult.Unsat) return r
+                    acc = addMaxToImplied(acc, v, curMax - 1)
+                    acc = mergeImplied(acc, r as PropagationResult.Implied)
+                    changed = true
+                }
+            }
+        }
+        return acc
+    }
+
+    private fun addMinToImplied(a: PropagationResult.Implied, v: Int, newMin: Int): PropagationResult.Implied {
+        val mins = HashMap<Int, Int>()
+        a.forEachIntMin { k, vv -> mins[k] = vv }
+        mins[v] = maxOf(mins[v] ?: Int.MIN_VALUE, newMin)
+        val maxes = HashMap<Int, Int>()
+        a.forEachIntMax { k, vv -> maxes[k] = vv }
+        val minK = mins.keys.toIntArray().also { it.sort() }
+        val maxK = maxes.keys.toIntArray().also { it.sort() }
+        return PropagationResult.Implied(
+            bools = a.bools, ints = a.ints,
+            intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+            intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+        )
+    }
+
+    private fun addMaxToImplied(a: PropagationResult.Implied, v: Int, newMax: Int): PropagationResult.Implied {
+        val mins = HashMap<Int, Int>()
+        a.forEachIntMin { k, vv -> mins[k] = vv }
+        val maxes = HashMap<Int, Int>()
+        a.forEachIntMax { k, vv -> maxes[k] = vv }
+        maxes[v] = minOf(maxes[v] ?: Int.MAX_VALUE, newMax)
+        val minK = mins.keys.toIntArray().also { it.sort() }
+        val maxK = maxes.keys.toIntArray().also { it.sort() }
+        return PropagationResult.Implied(
+            bools = a.bools, ints = a.ints,
+            intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+            intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+        )
+    }
+
+    /** Union two [Implied]s by replaying everything from [b] into the [a] base. */
+    private fun mergeImplied(
+        a: PropagationResult.Implied,
+        b: PropagationResult.Implied,
+    ): PropagationResult.Implied {
+        val bools = HashMap(a.bools); b.forEachBool { k, v -> bools[k] = v }
+        val ints = HashMap(a.ints); b.forEachInt { k, v -> ints[k] = v }
+        val mins = HashMap<Int, Int>(); a.forEachIntMin { k, v -> mins[k] = v }
+        b.forEachIntMin { k, v -> mins[k] = maxOf(mins[k] ?: Int.MIN_VALUE, v) }
+        val maxes = HashMap<Int, Int>(); a.forEachIntMax { k, v -> maxes[k] = v }
+        b.forEachIntMax { k, v -> maxes[k] = minOf(maxes[k] ?: Int.MAX_VALUE, v) }
+        // Drop now-pinned vars from the bound maps.
+        for (k in ints.keys) { mins.remove(k); maxes.remove(k) }
+        val minK = mins.keys.toIntArray().also { it.sort() }
+        val maxK = maxes.keys.toIntArray().also { it.sort() }
+        return PropagationResult.Implied(
+            bools = bools, ints = ints,
+            intMinKeys = minK,
+            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+            intMaxKeys = maxK,
+            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+        )
     }
 
     /**
@@ -176,18 +296,33 @@ class Problem(
         }
         val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iMinKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iMinVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iMaxKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iMaxVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         for (v in 0 until numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
                 if (assumptions.intValueOrNull(v) == d.min) continue
                 iKeys.add(v); iVals.add(d.min)
+                continue
             }
+            // Non-singleton: emit bound tightenings relative to the effective seed bounds.
+            val orig = intDomains[v]
+            val seedMin = maxOf(orig.min, assumptions.intMinOrNull(v) ?: Int.MIN_VALUE)
+            val seedMax = minOf(orig.max, assumptions.intMaxOrNull(v) ?: Int.MAX_VALUE)
+            if (d.min > seedMin) { iMinKeys.add(v); iMinVals.add(d.min) }
+            if (d.max < seedMax) { iMaxKeys.add(v); iMaxVals.add(d.max) }
         }
         return PropagationResult.Implied(
             boolKeys = bKeys.toIntArray(),
             boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
             intValues = iVals.toIntArray(),
+            intMinKeys = iMinKeys.toIntArray(),
+            intMinValues = iMinVals.toIntArray(),
+            intMaxKeys = iMaxKeys.toIntArray(),
+            intMaxValues = iMaxVals.toIntArray(),
         )
     }
 

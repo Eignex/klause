@@ -30,10 +30,19 @@ class Assumptions internal constructor(
     val boolKeys: IntArray,
     /** Pinned values aligned with [boolKeys]. */
     val boolValues: BooleanArray,
-    /** Int var ids, ascending. */
+    /** Int var ids pinned to an exact value, ascending. */
     val intKeys: IntArray,
     /** Pinned values aligned with [intKeys]. */
     val intValues: IntArray,
+    /** Int var ids with an additional `≥ minValue` lower-bound tightening (no exact pin),
+     *  ascending. Disjoint from [intKeys]. Used by SAC-at-root to record bound deductions
+     *  that aren't yet singletons. */
+    val intMinKeys: IntArray = IntArray(0),
+    val intMinValues: IntArray = IntArray(0),
+    /** Int var ids with an additional `≤ maxValue` upper-bound tightening (no exact pin),
+     *  ascending. Disjoint from [intKeys]. */
+    val intMaxKeys: IntArray = IntArray(0),
+    val intMaxValues: IntArray = IntArray(0),
 ) {
 
     val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
@@ -53,6 +62,26 @@ class Assumptions internal constructor(
     fun intValueOrNull(id: Int): Int? {
         val idx = intKeys.binarySearchInt(id)
         return if (idx >= 0) intValues[idx] else null
+    }
+
+    /** Lower-bound tightening for int [id], or `null` if none. */
+    fun intMinOrNull(id: Int): Int? {
+        val idx = intMinKeys.binarySearchInt(id)
+        return if (idx >= 0) intMinValues[idx] else null
+    }
+
+    /** Upper-bound tightening for int [id], or `null` if none. */
+    fun intMaxOrNull(id: Int): Int? {
+        val idx = intMaxKeys.binarySearchInt(id)
+        return if (idx >= 0) intMaxValues[idx] else null
+    }
+
+    inline fun forEachIntMin(action: (id: Int, value: Int) -> Unit) {
+        for (i in intMinKeys.indices) action(intMinKeys[i], intMinValues[i])
+    }
+
+    inline fun forEachIntMax(action: (id: Int, value: Int) -> Unit) {
+        for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
     }
 
     /** Primitive iteration over bool pins in ascending-key order. No allocation. */
@@ -97,7 +126,7 @@ class Assumptions internal constructor(
         val idx = boolKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = boolValues.copyOf(); nv[idx] = value
-            Assumptions(boolKeys, nv, intKeys, intValues)
+            Assumptions(boolKeys, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(boolKeys.size + 1)
@@ -107,17 +136,40 @@ class Assumptions internal constructor(
             nk[insert] = id; nv[insert] = value
             boolKeys.copyInto(nk, insert + 1, insert)
             boolValues.copyInto(nv, insert + 1, insert)
-            Assumptions(nk, nv, intKeys, intValues)
+            Assumptions(nk, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues)
         }
     }
 
     /** Return a fresh [Assumptions] that also pins int [id] to [value]. Existing
-     *  int pin on [id] is overwritten. */
+     *  int pin on [id] is overwritten; any prior bound tightening on [id] is dropped
+     *  since the exact pin subsumes it. */
     fun withInt(id: Int, value: Int): Assumptions {
+        val minIdx = intMinKeys.binarySearchInt(id)
+        val maxIdx = intMaxKeys.binarySearchInt(id)
+        val newMinK: IntArray
+        val newMinV: IntArray
+        if (minIdx >= 0) {
+            newMinK = IntArray(intMinKeys.size - 1)
+            newMinV = IntArray(intMinKeys.size - 1)
+            intMinKeys.copyInto(newMinK, 0, 0, minIdx)
+            intMinValues.copyInto(newMinV, 0, 0, minIdx)
+            intMinKeys.copyInto(newMinK, minIdx, minIdx + 1)
+            intMinValues.copyInto(newMinV, minIdx, minIdx + 1)
+        } else { newMinK = intMinKeys; newMinV = intMinValues }
+        val newMaxK: IntArray
+        val newMaxV: IntArray
+        if (maxIdx >= 0) {
+            newMaxK = IntArray(intMaxKeys.size - 1)
+            newMaxV = IntArray(intMaxKeys.size - 1)
+            intMaxKeys.copyInto(newMaxK, 0, 0, maxIdx)
+            intMaxValues.copyInto(newMaxV, 0, 0, maxIdx)
+            intMaxKeys.copyInto(newMaxK, maxIdx, maxIdx + 1)
+            intMaxValues.copyInto(newMaxV, maxIdx, maxIdx + 1)
+        } else { newMaxK = intMaxKeys; newMaxV = intMaxValues }
         val idx = intKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = intValues.copyOf(); nv[idx] = value
-            Assumptions(boolKeys, boolValues, intKeys, nv)
+            Assumptions(boolKeys, boolValues, intKeys, nv, newMinK, newMinV, newMaxK, newMaxV)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intKeys.size + 1)
@@ -127,7 +179,46 @@ class Assumptions internal constructor(
             nk[insert] = id; nv[insert] = value
             intKeys.copyInto(nk, insert + 1, insert)
             intValues.copyInto(nv, insert + 1, insert)
-            Assumptions(boolKeys, boolValues, nk, nv)
+            Assumptions(boolKeys, boolValues, nk, nv, newMinK, newMinV, newMaxK, newMaxV)
+        }
+    }
+
+    /** Return a fresh [Assumptions] with [id]'s lower bound tightened to at least [value].
+     *  Used by SAC-at-root to accumulate non-singleton deductions. */
+    fun withTightenedMin(id: Int, value: Int): Assumptions {
+        val idx = intMinKeys.binarySearchInt(id)
+        return if (idx >= 0) {
+            val nv = intMinValues.copyOf(); nv[idx] = maxOf(nv[idx], value)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, nv, intMaxKeys, intMaxValues)
+        } else {
+            val insert = -(idx + 1)
+            val nk = IntArray(intMinKeys.size + 1)
+            val nv = IntArray(intMinKeys.size + 1)
+            intMinKeys.copyInto(nk, 0, 0, insert)
+            intMinValues.copyInto(nv, 0, 0, insert)
+            nk[insert] = id; nv[insert] = value
+            intMinKeys.copyInto(nk, insert + 1, insert)
+            intMinValues.copyInto(nv, insert + 1, insert)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, nk, nv, intMaxKeys, intMaxValues)
+        }
+    }
+
+    /** Return a fresh [Assumptions] with [id]'s upper bound tightened to at most [value]. */
+    fun withTightenedMax(id: Int, value: Int): Assumptions {
+        val idx = intMaxKeys.binarySearchInt(id)
+        return if (idx >= 0) {
+            val nv = intMaxValues.copyOf(); nv[idx] = minOf(nv[idx], value)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, nv)
+        } else {
+            val insert = -(idx + 1)
+            val nk = IntArray(intMaxKeys.size + 1)
+            val nv = IntArray(intMaxKeys.size + 1)
+            intMaxKeys.copyInto(nk, 0, 0, insert)
+            intMaxValues.copyInto(nv, 0, 0, insert)
+            nk[insert] = id; nv[insert] = value
+            intMaxKeys.copyInto(nk, insert + 1, insert)
+            intMaxValues.copyInto(nv, insert + 1, insert)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, nk, nv)
         }
     }
 
