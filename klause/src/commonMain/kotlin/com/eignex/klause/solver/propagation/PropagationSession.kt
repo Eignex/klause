@@ -26,8 +26,23 @@ class PropagationSession(val problem: Problem) {
         val snap: PropagationState.Snapshot,
         val implied: PropagationResult.Implied,
     )
-    /** `levelStates[L]` is the state right after level [L]'s fixpoint. Index 0 = post-bake. */
-    private val levelStates: MutableList<LevelState> = mutableListOf()
+    /** `levelStates[L]` is the state right after level [L]'s fixpoint. Index 0 = post-bake.
+     *  Array-backed stack with explicit [levelTop]; grows by doubling. */
+    private var levelStates: Array<LevelState?> = arrayOfNulls(8)
+    private var levelTop: Int = 0
+    private fun levelLast(): LevelState = levelStates[levelTop - 1]!!
+    private fun levelPush(s: LevelState) {
+        if (levelTop == levelStates.size) levelStates = levelStates.copyOf(levelStates.size * 2)
+        levelStates[levelTop++] = s
+    }
+    private fun levelPop() {
+        levelTop--
+        levelStates[levelTop] = null
+    }
+    private fun levelTruncateAfterRoot() {
+        for (i in 1 until levelTop) levelStates[i] = null
+        levelTop = 1
+    }
     private val pinnedBools: LinkedHashMap<Int, Boolean> = LinkedHashMap()
     private val pinnedInts: LinkedHashMap<Int, Int> = LinkedHashMap()
     private val trail: ArrayDeque<Pair<VarKind, Int>> = ArrayDeque()
@@ -50,7 +65,7 @@ class PropagationSession(val problem: Problem) {
             )
         }
         val baseline = computeImplied()
-        levelStates.add(LevelState(state.snapshot(), baseline))
+        levelPush(LevelState(state.snapshot(), baseline))
         lastImplied = baseline
     }
 
@@ -70,12 +85,12 @@ class PropagationSession(val problem: Problem) {
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
-        state.restore(levelStates[0].snap)
-        if (levelStates.size > 1) levelStates.subList(1, levelStates.size).clear()
+        state.restore(levelStates[0]!!.snap)
+        if (levelTop > 1) levelTruncateAfterRoot()
         pinnedBools.clear()
         pinnedInts.clear()
         trail.clear()
-        lastImplied = levelStates[0].implied
+        lastImplied = levelStates[0]!!.implied
 
         // Seed bool then int pins from the primitive sorted arrays. Iterating directly
         // (vs. forEachBool / forEachInt) lets us `return` the first Unsat without a
@@ -90,7 +105,7 @@ class PropagationSession(val problem: Problem) {
             val r = pushInt(ik[i], iv[i])
             if (r is PropagationResult.Unsat) return r
         }
-        lastImplied = levelStates.last().implied
+        lastImplied = levelLast().implied
         return computeImplied()
     }
 
@@ -149,26 +164,26 @@ class PropagationSession(val problem: Problem) {
     fun learnedClauseLbd(learnedIndex: Int): Int = state.learnedClauseLbd(learnedIndex)
 
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
-        if (pinnedBools[v] == value) return levelStates.last().implied
+        if (pinnedBools[v] == value) return levelLast().implied
         if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         pinnedBools[v] = value
         trail.addLast(VarKind.Bool to v)
         val implied = computeImplied()
-        levelStates.add(LevelState(state.snapshot(), implied))
+        levelPush(LevelState(state.snapshot(), implied))
         return implied
     }
 
     private fun pushInt(v: Int, value: Int): PropagationResult {
-        if (pinnedInts[v] == value) return levelStates.last().implied
+        if (pinnedInts[v] == value) return levelLast().implied
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         pinnedInts[v] = value
         trail.addLast(VarKind.Int to v)
         val implied = computeImplied()
-        levelStates.add(LevelState(state.snapshot(), implied))
+        levelPush(LevelState(state.snapshot(), implied))
         return implied
     }
 
@@ -196,7 +211,7 @@ class PropagationSession(val problem: Problem) {
                 else -> null
             }
         }
-        state.restore(levelStates.last().snap)
+        state.restore(levelLast().snap)
         return PropagationResult.Unsat(bools, ints, levels, factors, learned)
     }
 
@@ -220,10 +235,10 @@ class PropagationSession(val problem: Problem) {
                 VarKind.Bool -> pinnedBools.remove(v)
                 VarKind.Int -> pinnedInts.remove(v)
             }
-            levelStates.removeAt(levelStates.size - 1)
+            levelPop()
         }
-        state.restore(levelStates.last().snap)
-        lastImplied = levelStates.last().implied
+        state.restore(levelLast().snap)
+        lastImplied = levelLast().implied
     }
 
     /** Pop until [v] of [kind] is no longer pinned. No-op if [v] is already unpinned. */
