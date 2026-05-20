@@ -299,45 +299,54 @@ object RandomVariable : VariableHeuristic {
 class DomWdeg : VariableHeuristic {
 
     private var factorWeights: DoubleArray = DoubleArray(0)
+    // Combined bool+int heap keyed on `wdeg(v) = Σ factorWeights[f]`; the dom(v) divider
+    // is applied at pick time via an upper-bound prune. See [pickByActivityWithDomDivider].
+    private var heap: IndexedMaxHeap? = null
+    private var problemRef: Problem? = null
+    private var numBoolCached: Int = 0
+    private var numIntCached: Int = 0
+    private val pickSkipBuffer = IntArrayList(16)
+    /** Conflict bumps that arrived before the first [pick] (so before we'd captured the
+     *  problem reference). Applied as part of the next [pick]'s heap init. */
+    private val pendingBumps = IntArrayList(8)
 
-    private fun ensureSized(numFactors: Int) {
-        if (factorWeights.size != numFactors) {
-            // Default initial weight is 1.0 — every factor contributes its degree before
-            // any conflict is observed (classical dom/deg behaviour).
-            factorWeights = DoubleArray(numFactors) { 1.0 }
+    private fun ensureInitialized(problem: Problem) {
+        if (heap != null && problemRef === problem) return
+        val numFactors = problem.numFactors
+        if (factorWeights.size != numFactors) factorWeights = DoubleArray(numFactors) { 1.0 }
+        val numBool = problem.numBoolVars
+        val numInt = problem.numIntVars
+        val h = IndexedMaxHeap(numBool + numInt)
+        // Seed each var's key with Σ factorWeights[f] over its occurrence list.
+        for (v in 0 until numBool) {
+            var sum = 0.0
+            for (fid in problem.boolOccurrences[v]) sum += factorWeights[fid]
+            h.insert(v, sum)
+        }
+        for (v in 0 until numInt) {
+            var sum = 0.0
+            for (fid in problem.intOccurrences[v]) sum += factorWeights[fid]
+            h.insert(numBool + v, sum)
+        }
+        heap = h
+        problemRef = problem
+        numBoolCached = numBool
+        numIntCached = numInt
+        // Drain any conflict bumps that arrived before initialization.
+        if (pendingBumps.size > 0) {
+            for (i in 0 until pendingBumps.size) applyFactorBump(problem, pendingBumps[i])
+            pendingBumps.clear()
         }
     }
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
-        val problem = session.problem
-        ensureSized(problem.numFactors)
-        var best: VarRef? = null
-        var bestScore = Double.NEGATIVE_INFINITY
-        for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) != null) continue
-            // Bool domain size = 2 when unpinned.
-            val score = wdegBool(problem, v) / 2.0
-            if (score > bestScore) { bestScore = score; best = VarRef.Bool(v) }
-        }
-        for (v in 0 until problem.numIntVars) {
-            val dom = session.intDomain(v).size
-            if (dom <= 1) continue
-            val score = wdegInt(problem, v) / dom.toDouble()
-            if (score > bestScore) { bestScore = score; best = VarRef.IntVar(v) }
-        }
-        return best
-    }
-
-    private fun wdegBool(problem: Problem, v: Int): Double {
-        var sum = 0.0
-        for (fid in problem.boolOccurrences[v]) sum += factorWeights[fid]
-        return sum
-    }
-
-    private fun wdegInt(problem: Problem, v: Int): Double {
-        var sum = 0.0
-        for (fid in problem.intOccurrences[v]) sum += factorWeights[fid]
-        return sum
+        ensureInitialized(session.problem)
+        return pickByActivityWithDomDivider(
+            heap = heap!!,
+            session = session,
+            numBool = numBoolCached,
+            skip = pickSkipBuffer,
+        )
     }
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
@@ -345,10 +354,67 @@ class DomWdeg : VariableHeuristic {
         // by a backward BFS through the propagation graph (see
         // PropagationState.extractConflictFactors), so this captures all contributing
         // constraints, not just the single failing one.
+        val problem = problemRef
         for (fid in unsat.conflictFactors) {
-            if (fid < factorWeights.size) factorWeights[fid] += 1.0
+            if (fid >= factorWeights.size) continue
+            factorWeights[fid] += 1.0
+            if (problem != null) applyFactorBump(problem, fid) else pendingBumps.add(fid)
         }
     }
+
+    /** Push the `+1` weight change on factor [fid] into every var in its scope's heap key. */
+    private fun applyFactorBump(problem: Problem, fid: Int) {
+        val h = heap ?: return
+        val factor = problem.factors[fid]
+        for (b in factor.boolVars) h.updateKey(b, h.keyOf(b) + 1.0)
+        for (i in factor.intVars) {
+            val id = numBoolCached + i
+            h.updateKey(id, h.keyOf(id) + 1.0)
+        }
+    }
+}
+
+/**
+ * Shared `argmax key(v) / dom(v)` walk used by [DomWdeg] and [ActivityBasedSearch]. The
+ * [heap] is keyed on the un-divided score (wdeg or activity); we extract in descending key
+ * order and stop once `key / 2.0` (the best score any remaining var could achieve with the
+ * tightest possible domain = 2) falls below the current best. Pops are restored at the end
+ * so the heap stays complete across calls.
+ *
+ * Bool ids live in `0..numBool-1`; int ids are stored at `numBool + v` in the heap.
+ */
+private fun pickByActivityWithDomDivider(
+    heap: IndexedMaxHeap,
+    session: PropagationSession,
+    numBool: Int,
+    skip: IntArrayList,
+): VarRef? {
+    skip.clear()
+    var best: VarRef? = null
+    var bestScore = Double.NEGATIVE_INFINITY
+    while (heap.size > 0) {
+        val topId = heap.peekMax()
+        val activity = heap.keyOf(topId)
+        // Upper bound on the score of any remaining var: activity / 2 (dom is ≥ 2 when free).
+        if (activity / 2.0 <= bestScore) break
+        heap.extractMax()
+        skip.add(topId)
+        if (topId < numBool) {
+            if (session.boolValue(topId) == null) {
+                val score = activity / 2.0
+                if (score > bestScore) { bestScore = score; best = VarRef.Bool(topId) }
+            }
+        } else {
+            val intId = topId - numBool
+            val dom = session.intDomain(intId).size
+            if (dom > 1) {
+                val score = activity / dom.toDouble()
+                if (score > bestScore) { bestScore = score; best = VarRef.IntVar(intId) }
+            }
+        }
+    }
+    for (i in 0 until skip.size) heap.restore(skip[i])
+    return best
 }
 
 /**
@@ -447,63 +513,65 @@ class ActivityBasedSearch(
     }
 
     private var increment: Double = 1.0
-    private var boolActivity: DoubleArray = DoubleArray(0)
-    private var intActivity: DoubleArray = DoubleArray(0)
+    // Combined bool+int heap keyed on raw activity; dom(v) divider applied at pick time.
+    // Shares [pickByActivityWithDomDivider] with [DomWdeg].
+    private var heap: IndexedMaxHeap? = null
+    private var numBoolCached: Int = 0
+    private var numIntCached: Int = 0
+    private val pickSkipBuffer = IntArrayList(16)
 
     private fun ensureSized(numBool: Int, numInt: Int) {
-        if (boolActivity.size != numBool) boolActivity = DoubleArray(numBool) { 1.0 }
-        if (intActivity.size != numInt) intActivity = DoubleArray(numInt) { 1.0 }
+        if (heap != null && numBoolCached == numBool && numIntCached == numInt) return
+        val h = IndexedMaxHeap(numBool + numInt)
+        for (i in 0 until numBool + numInt) h.insert(i, 1.0)
+        heap = h
+        numBoolCached = numBool
+        numIntCached = numInt
     }
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         ensureSized(problem.numBoolVars, problem.numIntVars)
-        var best: VarRef? = null
-        var bestScore = Double.NEGATIVE_INFINITY
-        for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) != null) continue
-            val score = boolActivity[v] / 2.0
-            if (score > bestScore) { bestScore = score; best = VarRef.Bool(v) }
-        }
-        for (v in 0 until problem.numIntVars) {
-            val sz = session.intDomain(v).size
-            if (sz <= 1) continue
-            val score = intActivity[v] / sz
-            if (score > bestScore) { bestScore = score; best = VarRef.IntVar(v) }
-        }
-        return best
+        return pickByActivityWithDomDivider(
+            heap = heap!!,
+            session = session,
+            numBool = numBoolCached,
+            skip = pickSkipBuffer,
+        )
     }
 
     override fun onPropagation(implied: PropagationResult.Implied) {
-        ensureSized(boolActivity.size, intActivity.size)
+        val h = heap ?: return
         implied.forEachBool { id, _ ->
-            if (id < boolActivity.size) boolActivity[id] += increment
+            if (id < numBoolCached) h.updateKey(id, h.keyOf(id) + increment)
         }
         implied.forEachInt { id, _ ->
-            if (id < intActivity.size) intActivity[id] += increment
+            if (id < numIntCached) {
+                val combined = numBoolCached + id
+                h.updateKey(combined, h.keyOf(combined) + increment)
+            }
         }
     }
 
     override fun onCommit(varRef: VarRef) {
         // Implicit decay: grow increment so future bumps are larger (equivalent to dividing
-        // every prior activity by `decay`, without touching the arrays). Same trick as VSIDS.
+        // every prior activity by `decay`, without touching the keys). Same trick as VSIDS.
         increment /= decay
         if (increment > rescaleThreshold) rescaleAll()
     }
 
     override fun onRestart() {
         if (resetOnRestart) {
-            for (i in boolActivity.indices) boolActivity[i] = 1.0
-            for (i in intActivity.indices) intActivity[i] = 1.0
+            val h = heap ?: return
+            h.resetAllKeysInIdOrder(1.0)
             increment = 1.0
         }
     }
 
     private fun rescaleAll() {
-        val k = 1.0 / rescaleThreshold
-        for (i in boolActivity.indices) boolActivity[i] *= k
-        for (i in intActivity.indices) intActivity[i] *= k
-        increment *= k
+        val h = heap ?: return
+        h.scaleKeys(1.0 / rescaleThreshold)
+        increment *= 1.0 / rescaleThreshold
     }
 }
 
