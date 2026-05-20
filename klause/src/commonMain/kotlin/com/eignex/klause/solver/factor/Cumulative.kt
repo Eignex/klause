@@ -221,6 +221,13 @@ class Cumulative(
      * (not to the horizon length), so the propagator stays cheap even on RCPSP instances
      * with planning horizons in the tens of thousands.
      */
+    /** Conflict reason: starts-bound atoms of every task. Cumulative is bound-only
+     *  (sweep-line time-tabling tightens start mins/maxes, never excludes interior
+     *  start values), so citing the current bound atoms of every task captures the
+     *  full cause of any capacity-overload conflict. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, starts, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
         // Per-task resource feasibility.
