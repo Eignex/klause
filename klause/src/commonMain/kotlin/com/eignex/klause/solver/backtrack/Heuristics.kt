@@ -3,6 +3,8 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.util.IndexedMaxHeap
+import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
@@ -171,64 +173,90 @@ class Vsids(
     }
 
     private var increment: Double = 1.0
-    private var boolActivity: DoubleArray = DoubleArray(0)
-    private var intActivity: DoubleArray = DoubleArray(0)
+    // Combined index space: 0..numBool-1 are bool ids; numBool..numBool+numInt-1 are int ids
+    // offset by numBool. One indexed max-heap over both gives O(log n) bumps and amortised
+    // O((1 + pinned-skip) · log n) picks instead of the O(numBool + numInt) linear scan the
+    // hand-rolled loop did.
+    private var heap: IndexedMaxHeap? = null
+    private var numBoolCached: Int = 0
+    private var numIntCached: Int = 0
+    // Scratch buffer for picks: ids extracted but rejected because pinned. Restored at the
+    // end of pick() so the heap stays complete across calls. Field rather than local so it
+    // doesn't re-allocate per pick.
+    private val pickSkipBuffer = IntArrayList(16)
 
-    /** Resize the activity arrays the first time we see a session — keeps the heuristic
-     *  reusable across problems with different shapes. */
     private fun ensureSized(numBool: Int, numInt: Int) {
-        if (boolActivity.size != numBool) boolActivity = DoubleArray(numBool)
-        if (intActivity.size != numInt) intActivity = DoubleArray(numInt)
+        if (heap != null && numBoolCached == numBool && numIntCached == numInt) return
+        val h = IndexedMaxHeap(numBool + numInt)
+        for (i in 0 until numBool + numInt) h.insert(i, 0.0)
+        heap = h
+        numBoolCached = numBool
+        numIntCached = numInt
     }
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         ensureSized(problem.numBoolVars, problem.numIntVars)
-        var best: VarRef? = null
-        var bestActivity = Double.NEGATIVE_INFINITY
-        for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) != null) continue
-            val a = boolActivity[v]
-            if (a > bestActivity) { bestActivity = a; best = VarRef.Bool(v) }
+        val h = heap!!
+        pickSkipBuffer.clear()
+        var result: VarRef? = null
+        while (h.size > 0) {
+            val id = h.extractMax()
+            if (id < numBoolCached) {
+                if (session.boolValue(id) == null) { result = VarRef.Bool(id); break }
+            } else {
+                val intId = id - numBoolCached
+                if (session.intDomain(intId).size > 1) { result = VarRef.IntVar(intId); break }
+            }
+            pickSkipBuffer.add(id)
         }
-        for (v in 0 until problem.numIntVars) {
-            if (session.intDomain(v).size <= 1) continue
-            val a = intActivity[v]
-            if (a > bestActivity) { bestActivity = a; best = VarRef.IntVar(v) }
+        // Restore every popped-but-pinned id (and the winner — it stays in the heap so
+        // subsequent bumps can find it) at their stored keys. Pinned ones become candidates
+        // again once propagation backtracks past their pin point.
+        if (result != null) {
+            when (result) {
+                is VarRef.Bool -> h.restore(result.varId)
+                is VarRef.IntVar -> h.restore(result.varId + numBoolCached)
+            }
         }
-        return best
+        for (i in 0 until pickSkipBuffer.size) h.restore(pickSkipBuffer.get(i))
+        return result
     }
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
-        ensureSized(boolActivity.size.coerceAtLeast(0), intActivity.size.coerceAtLeast(0))
+        val h = heap ?: return
         // Bump every decision variable in the conflict reason set, plus the failed
         // decision itself (in case it isn't already in the set — typically it is).
-        for (b in unsat.conflictBools) bumpBool(b)
-        for (i in unsat.conflictInts) bumpInt(i)
+        for (b in unsat.conflictBools) bumpBool(h, b)
+        for (i in unsat.conflictInts) bumpInt(h, i)
         when (varRef) {
-            is VarRef.Bool -> bumpBool(varRef.varId)
-            is VarRef.IntVar -> bumpInt(varRef.varId)
+            is VarRef.Bool -> bumpBool(h, varRef.varId)
+            is VarRef.IntVar -> bumpInt(h, varRef.varId)
         }
         // Grow the increment for the next conflict — implicit multiplicative decay of
-        // every prior activity by `decay`, without touching the arrays.
+        // every prior activity by `decay`, without touching the keys.
         increment /= decay
-        if (increment > rescaleThreshold) rescaleAll()
+        if (increment > rescaleThreshold) rescaleAll(h)
     }
 
-    private fun bumpBool(v: Int) {
-        if (v < boolActivity.size) boolActivity[v] += increment
-    }
-    private fun bumpInt(v: Int) {
-        if (v < intActivity.size) intActivity[v] += increment
+    private fun bumpBool(h: IndexedMaxHeap, v: Int) {
+        if (v >= numBoolCached) return
+        h.updateKey(v, h.keyOf(v) + increment)
     }
 
-    /** Divide every activity (and [increment]) by [rescaleThreshold] so the relative
-     *  ordering is preserved but we step well clear of `Double.MAX_VALUE`. Standard
-     *  MiniSAT rescale. */
-    private fun rescaleAll() {
+    private fun bumpInt(h: IndexedMaxHeap, v: Int) {
+        if (v >= numIntCached) return
+        val id = numBoolCached + v
+        h.updateKey(id, h.keyOf(id) + increment)
+    }
+
+    /** Scale every activity (and [increment]) by `1/rescaleThreshold` so the relative
+     *  ordering is preserved but we step well clear of `Double.MAX_VALUE`. Standard MiniSAT
+     *  rescale; the heap's [IndexedMaxHeap.scaleKeys] applies the uniform factor without
+     *  resifting. */
+    private fun rescaleAll(h: IndexedMaxHeap) {
         val k = 1.0 / rescaleThreshold
-        for (i in boolActivity.indices) boolActivity[i] *= k
-        for (i in intActivity.indices) intActivity[i] *= k
+        h.scaleKeys(k)
         increment *= k
     }
 }
