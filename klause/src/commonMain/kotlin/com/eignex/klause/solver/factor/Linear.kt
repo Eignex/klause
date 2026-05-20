@@ -62,6 +62,14 @@ class Linear(
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         propagateLinearBounds(state, coeffs, vars, op, bound.toLong())
 
+    /** Reason set when [propagate] returns false: the current-bound atoms of every
+     *  participating var in their currently-false polarity. The sum's reachable range
+     *  proves infeasibility against [bound]; flipping any one of these bounds is a
+     *  necessary condition for satisfiability. Sound; analyzer 1UIP minimisation
+     *  trims redundancies. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
+
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
         if (!violates(sum)) return
