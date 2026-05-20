@@ -142,10 +142,9 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[LS]` Optional SAPS strategy as a multiplicative-weighting alternative to additive DDFW. Low priority — DDFW covers the weight-learning niche.
 - `[LS]` Richer VNS: VND (exhaust each k before promotion), per-level neighbourhood operators (swap-only at N2, 3-opt at N3), skewed-VNS accepting mild worsening at higher k.
 - `[LS]` Problem-aware move generation for globals not yet covered: cumulative time-window slides, lex-aware moves for `lexLeq` / `lexLt`, reified-factor diversification. Extension point is per-factor `proposeRepairMoves`.
-- `[Sampling]` Hash-based uniform sampling (UniGen2-style). XOR-slice the model space, sample within a slice.
-- `[Sampling]` Approximate model counting (ApproxMC). Same XOR-hashing primitive as UniGen.
+- `[Sampling]` Hash-based uniform sampling (UniGen2-style) — tracked in [#15](https://github.com/Eignex/klause/issues/15).
+- `[Sampling]` Approximate model counting (ApproxMC) — tracked in [#16](https://github.com/Eignex/klause/issues/16).
 - `[Sampling]` Weighted projected sampling (WAPS / KUS).
-- `[Format/SMT-LIB]` Finite-domain QF_LIA parser + follow-ups — tracked in [#2](https://github.com/Eignex/klause/issues/2).
 - `[Perf]` Native bitset set-propagators where benchmarking shows bool-decomposition's per-bool propagator dispatch is the bottleneck. For sets with large universes (>256 elements) and many set algebra operations per propagation cycle, bitset throughput on `(LB, UB)` representations beats N independent bool propagator calls by a constant factor. Cost is engine plumbing (set domain arrays in `PropagationState`, dedicated move type, snapshot extension). Revisit only with profiling data.
 - `[Backend]` klause-smt `Optimizer.minimize()` via JavaSMT's `OptimizationProverEnvironment` (Z3 / MathSAT5-only — others need an external linear-search loop).
 - `[Perf]` Audit `PropagationSession` snapshot cost. 9 array copies per push today (`boolValues`, `intDomains`, `boolLevel`, `intLevel`, `decisionVars`, `boolReason`, `intMinReason`, `intMaxReason`, `boolAntecedents`); consider pooling, a flat delta-trail journal, or a dirty-field bitmask copying only modified arrays.
