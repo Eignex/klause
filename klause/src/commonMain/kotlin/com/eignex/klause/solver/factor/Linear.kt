@@ -165,7 +165,18 @@ internal fun collectHoleAndBoundAntecedents(
 ): IntArray? {
     val seen = HashSet<Int>()
     val out = IntArrayList()
+    // Sweep-prefix tightening: collect *only* antecedents tied to decision levels > 0 when
+    // any such exist in scope. A var with `intLevel[v] <= 0` was tightened at root level —
+    // its restriction is a global fact that the resolution analyzer would minimize out
+    // anyway. Pre-stripping shrinks the seed clause and saves analyzer cycles.
+    //
+    // Fallback: if every var in scope is at root level (currentLevel == 0 conflict, or all
+    // restrictions are unit-propagated globals), keep everything — the level-0 reason is
+    // the only seed available and is needed for unsat-core construction.
+    var anyAboveRoot = false
+    for (v in vars) if (state.intLevel[v] > 0) { anyAboveRoot = true; break }
     for (v in vars) {
+        if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val d = state.intDomains[v]
         val orig = state.problem.intDomains[v]
         if (d.min > orig.min) {
@@ -198,9 +209,17 @@ internal fun collectLinearTightenAntecedents(
     val seen = HashSet<Int>()
     val out = IntArrayList()
     if (extraLit != 0) { out.add(extraLit); seen.add(extraLit) }
+    // Same sweep-prefix tightening as [collectHoleAndBoundAntecedents]: drop level-0 vars
+    // when at least one non-excluded var has been tightened above the root level.
+    var anyAboveRoot = false
+    for (j in vars.indices) {
+        if (j == excludeIdx) continue
+        if (state.intLevel[vars[j]] > 0) { anyAboveRoot = true; break }
+    }
     for (j in vars.indices) {
         if (j == excludeIdx) continue
         val v = vars[j]
+        if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val d = state.intDomains[v]
         val orig = state.problem.intDomains[v]
         if (d.min > orig.min) {
