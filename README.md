@@ -126,7 +126,7 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-Each item is tagged with its workstream: `[CP]` complete-search engine and propagators, `[LS]` local-search engine and strategies, `[Backend]` external adapters and distribution, `[Perf]` post-benchmark optimizations.
+Each item is tagged with its workstream: `[CP]` complete-search engine and propagators, `[LS]` local-search engine and strategies, `[Backend]` external adapters and distribution, `[Perf]` cross-cutting optimizations (post-benchmark or clearly better regardless of benchmarks).
 
 - `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
 - `[CP]` Sweep-prefix tightening of hole-aware `conflictReason`.
@@ -139,9 +139,9 @@ Each item is tagged with its workstream: `[CP]` complete-search engine and propa
 - `[LS]` ILS: basin-hopping perturbation and linkage-aware crossover.
 - `[LS]` Richer VNS: VND, per-level neighbourhood operators, skewed-VNS.
 - `[LS]` Problem-aware moves for `cumulative`, `lexLeq` / `lexLt`, and reified factors.
-- `[Perf]` Pool / delta-trail `PropagationSession` snapshots to cut the 9 array copies per push.
-- `[Perf]` Bucket-queue or pairing-heap VSIDS / dom-wdeg variable picker.
-- `[Perf]` Bitset-backed `IntDomain` for narrow spans.
-- `[Perf]` Move-pool inlining: pack `BoolFlip` / `IntSet` into a `Long`-backed `MoveSink` lane.
+- `[CP]` Pool / delta-trail `PropagationSession` snapshots to cut the 9 array copies per push.
+- `[CP]` Bucket-queue or pairing-heap VSIDS / dom-wdeg variable picker.
+- `[CP]` Bitset-backed `IntDomain` for narrow spans.
+- `[LS]` Move-pool inlining: pack `BoolFlip` / `IntSet` into a `Long`-backed `MoveSink` lane.
 - `[LS]` Opt `Cardinality`, `PseudoBoolean`, `Xor` into incremental `updateBoolBreakMakeForFlip`; extend to `Reified{Cardinality,PseudoBoolean,Linear}` / `IntCmpReified` once the base three land.
 - `[LS]` Add `updateIntBreakMakeForIntSet` hook mirroring the bool path; convert `Linear`, `BinPacking`, `Knapsack`, `GlobalCardinality`, `AllDifferent` family, `AllEqual`, `Among`, `Count`, `NValue`, `Member`, `Inverse`, `Monotone`, `Sequence`.
