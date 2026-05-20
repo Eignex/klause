@@ -124,9 +124,17 @@ internal class FlatZincCompiler(
         val (varStr, valStr) = extractStrategies(ann) ?: return null
         val varH = mapVariableStrategy(varStr) ?: return null
         val valH = mapValueStrategy(valStr) ?: return null
+        // For minimize / maximize, wrap the chosen value heuristic in SolutionGuided so
+        // each new incumbent biases the next descent toward "near the last good solution"
+        // — the standard SOTA phase-saving-for-BnB pattern.
+        val wrappedValH = when (model.solve) {
+            is FznSolve.Minimize, is FznSolve.Maximize ->
+                com.eignex.klause.solver.backtrack.SolutionGuided(valH)
+            is FznSolve.Satisfy -> valH
+        }
         return com.eignex.klause.solver.backtrack.BacktrackParams(
             variableHeuristic = varH,
-            valueHeuristic = valH,
+            valueHeuristic = wrappedValH,
         )
     }
 

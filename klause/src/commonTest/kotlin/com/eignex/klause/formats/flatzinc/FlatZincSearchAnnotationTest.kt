@@ -68,6 +68,44 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
+    fun `minimize wraps value heuristic in SolutionGuided`() {
+        val src = """
+            var 0..5: x;
+            constraint int_lin_le([1], [x], 3);
+            solve :: int_search([x], input_order, indomain_min, complete) minimize x;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val params = assertNotNull(program.defaultBacktrackParams)
+        val sg = params.valueHeuristic as? com.eignex.klause.solver.backtrack.SolutionGuided
+        assertNotNull(sg, "minimize should wrap valueHeuristic in SolutionGuided")
+    }
+
+    @Test
+    fun `maximize wraps value heuristic in SolutionGuided`() {
+        val src = """
+            var 0..5: x;
+            constraint int_lin_le([1], [x], 3);
+            solve :: int_search([x], input_order, indomain_max, complete) maximize x;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val params = assertNotNull(program.defaultBacktrackParams)
+        val sg = params.valueHeuristic as? com.eignex.klause.solver.backtrack.SolutionGuided
+        assertNotNull(sg, "maximize should wrap valueHeuristic in SolutionGuided")
+    }
+
+    @Test
+    fun `satisfy does not wrap value heuristic`() {
+        val src = """
+            var 0..5: x;
+            constraint int_lin_le([1], [x], 3);
+            solve :: int_search([x], input_order, indomain_min, complete) satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val params = assertNotNull(program.defaultBacktrackParams)
+        assertEquals(IndomainMin, params.valueHeuristic)
+    }
+
+    @Test
     fun `unrecognised strategy names yield null`() {
         val src = """
             var 0..5: x;
