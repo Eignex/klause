@@ -91,6 +91,10 @@ class Regular(
      * For Q ≤ 64 this collapses to two `LongArray(n+1)`; for larger Q the multi-
      * Long encoding still avoids per-layer object allocation.
      */
+    /** Hole-aware conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, seq)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = seq.size
         val w = stateWords

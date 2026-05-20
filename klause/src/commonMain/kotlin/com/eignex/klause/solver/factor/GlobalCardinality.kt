@@ -159,6 +159,10 @@ class GlobalCardinality(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
+    /** Hole-aware conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, intVars)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // ---- 1. Count tightening + closure --------------------------------------------
         val n = xs.size

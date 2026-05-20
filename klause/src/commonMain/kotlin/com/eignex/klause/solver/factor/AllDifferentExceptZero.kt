@@ -102,6 +102,10 @@ class AllDifferentExceptZero(
     /** Count of unordered pairs from [k] indistinguishable elements: k * (k-1) / 2. */
     private fun pairsAt(k: Int): Int = if (k <= 1) 0 else k * (k - 1) / 2
 
+    /** Hole-aware conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, xs)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Singleton conflicts on non-zero values.
         val taken = HashSet<Int>()

@@ -425,11 +425,20 @@ class PropagationState(
     /** Allocate (or look up) the atom for `[intVar ≤ threshold]`. */
     fun atomVarLe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = 1, threshold = threshold)
 
+    /** Allocate (or look up) the atom for `[intVar = value]`. The negative-polarity literal
+     *  of this atom encodes `[intVar ≠ value]`; share the same atom id rather than allocating
+     *  a dedicated `Ne` kind. */
+    fun atomVarEq(intVar: Int, value: Int): Int = allocAtom(intVar, kind = 2, threshold = value)
+
     /** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
     fun atomLitGe(intVar: Int, threshold: Int): Int =
         com.eignex.klause.solver.Lit.make(atomVarGe(intVar, threshold), true)
     fun atomLitLe(intVar: Int, threshold: Int): Int =
         com.eignex.klause.solver.Lit.make(atomVarLe(intVar, threshold), true)
+    fun atomLitEq(intVar: Int, value: Int): Int =
+        com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), true)
+    fun atomLitNe(intVar: Int, value: Int): Int =
+        com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), false)
 
     /** True iff [v] is an atom-id (past the bool var space). Used by the conflict
      *  analyzer to dispatch between bool-trail and atom-table lookups. */
@@ -476,6 +485,9 @@ class PropagationState(
                  else    tightenIntMaxImpl(intVar, k - 1, antecedents)    // [v ≥ k] false → v ≤ k-1
             1 -> if (pos) tightenIntMaxImpl(intVar, k, antecedents)       // [v ≤ k] true → v.max ≤ k
                  else    tightenIntMinImpl(intVar, k + 1, antecedents)    // [v ≤ k] false → v ≥ k+1
+            2 -> if (pos) tightenIntMinImpl(intVar, k, antecedents) &&    // [v = k] true → v = k
+                          tightenIntMaxImpl(intVar, k, antecedents)
+                 else    excludeIntValueImpl(intVar, k, antecedents)      // [v = k] false → v ≠ k
             else -> error("unknown atom kind")
         }
     }
@@ -496,8 +508,24 @@ class PropagationState(
         } else {
             atomValue.add(if (truth) 1 else 0)
             atomLevel.add(intLevel[intVar])
-            atomAntecedents[id] = if (kind == 0) intMinAntecedents[intVar]
-                                  else          intMaxAntecedents[intVar]
+            atomAntecedents[id] = when (kind) {
+                0 -> intMinAntecedents[intVar]
+                1 -> intMaxAntecedents[intVar]
+                2 -> {
+                    // Eq atom at alloc: true (singleton {k}) cited by both bounds; false
+                    // (k below min or above max) cited by the side that excludes it; hole
+                    // case falls back to null (treated as structural leaf by analyzer).
+                    val d = intDomains[intVar]
+                    if (truth == true) {
+                        composeIntVarAtomAntecedents(intArrayOf(intVar))
+                    } else when {
+                        threshold < d.min -> intMinAntecedents[intVar]
+                        threshold > d.max -> intMaxAntecedents[intVar]
+                        else -> null
+                    }
+                }
+                else -> null
+            }
         }
         atomByKey[key] = id
         val list = atomsByIntVar.getOrPut(intVar) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
@@ -516,6 +544,11 @@ class PropagationState(
             1 -> when {
                 d.max <= k -> true
                 d.min > k -> false
+                else -> null
+            }
+            2 -> when {
+                d.min == d.max && d.min == k -> true        // singleton {k} → eq true
+                k !in d -> false                            // k absent → eq false
                 else -> null
             }
             else -> error("unknown atom kind")

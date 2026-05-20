@@ -47,6 +47,10 @@ class Member(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Hole-aware conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, intVars)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Singleton-y check: if y is singleton and no xs[i]'s domain contains y's value, fail.
         val dy = state.intDomains[y]

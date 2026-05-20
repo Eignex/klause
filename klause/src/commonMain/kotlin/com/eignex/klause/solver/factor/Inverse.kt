@@ -136,6 +136,10 @@ class Inverse(
      * derivable from `f[i]=j ⇔ g[j]=i`; the only stronger reasoning would be matching-
      * based (Hall sets), which inverse's bijection structure rarely needs in practice.
      */
+    /** Hole-aware conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, intVars)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Range tightens are structural (no input antecedents).
         val gLo = gOffset

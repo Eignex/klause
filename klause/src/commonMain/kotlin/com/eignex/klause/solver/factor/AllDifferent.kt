@@ -120,6 +120,13 @@ class AllDifferent(
 
     private fun occurrences(intVar: Int): Int = occurrencesByVar[intVar]
 
+    /** Hall-style conflict reason: cites bound atoms plus `[v ≠ value]` literals for every
+     *  domain hole each var has accumulated post-bake. Tighter than bound-only because two
+     *  bounds can describe many interior configurations, but the matching/SCC pruning only
+     *  fires for the specific filtered domains we saw. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, vars)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = vars.size
 

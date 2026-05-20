@@ -146,6 +146,48 @@ class Linear(
  * it; the analyzer's 1UIP loop resolves through them. Returns `null` when nothing was
  * recorded (no extraLit, all other vars' int antecedents unset).
  */
+/**
+ * Hole-aware antecedent collection for propagators that prune interior values (AllDifferent,
+ * GlobalCardinality, Regular, AllDifferentExceptZero, Inverse, Member). Cites:
+ *   - bound atoms when current min/max are tighter than initial,
+ *   - `[v ≠ value]` atom-lits for every value in the original domain that's currently
+ *     excluded from the live domain.
+ *
+ * Together these literals describe the exact filtered domains the propagator reasoned over,
+ * so the resulting conflict clause is a Hall-style reason rather than a bound-only one.
+ * Allocates `atomVarEq` atoms on demand for each cited hole. Returns `null` when nothing is
+ * tighter than the original (caller falls back to default antecedents).
+ */
+internal fun collectHoleAndBoundAntecedents(
+    state: PropagationState,
+    vars: IntArray,
+): IntArray? {
+    val seen = HashSet<Int>()
+    val out = ArrayList<Int>()
+    for (v in vars) {
+        val d = state.intDomains[v]
+        val orig = state.problem.intDomains[v]
+        if (d.min > orig.min) {
+            val lit = com.eignex.klause.solver.Lit.make(state.atomVarGe(v, d.min), false)
+            if (seen.add(lit)) out.add(lit)
+        }
+        if (d.max < orig.max) {
+            val lit = com.eignex.klause.solver.Lit.make(state.atomVarLe(v, d.max), false)
+            if (seen.add(lit)) out.add(lit)
+        }
+        val lo = maxOf(d.min, orig.min)
+        val hi = minOf(d.max, orig.max)
+        for (value in lo..hi) {
+            if (value in orig && value !in d) {
+                val lit = state.atomLitNe(v, value)
+                if (seen.add(lit)) out.add(lit)
+            }
+        }
+    }
+    if (out.isEmpty()) return null
+    return out.toIntArray()
+}
+
 internal fun collectLinearTightenAntecedents(
     state: PropagationState,
     vars: IntArray,
