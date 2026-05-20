@@ -149,12 +149,7 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[Sampling]` Hash-based uniform sampling (UniGen2-style). XOR-slice the model space, sample within a slice.
 - `[Sampling]` Approximate model counting (ApproxMC). Same XOR-hashing primitive as UniGen.
 - `[Sampling]` Weighted projected sampling (WAPS / KUS).
-- `[Format/SMT-LIB]` Parser covering the finite-domain integer subset (QF_LIA in SMT-LIB terminology). Lets klause run SMT-LIB benchmarks.
-- `[Format/SMT-LIB]` Static bound inference for int vars declared with full-range or unbounded domains. Error out cleanly when no bound is provable.
-- `[Format/SMT-LIB]` Distinct over arbitrary terms (booleans, mixed bool/int).
-- `[Format/SMT-LIB]` to_real / to_int casts. Either bucket reals onto bounded ints or reject the benchmark.
-- `[Format/SMT-LIB]` Let-binding expansion in the SMT-LIB parser.
-- `[Format/SMT-LIB]` Unbounded integers in BacktrackSolver. Pairs with the bound-inference item above.
+- `[Format/SMT-LIB]` Finite-domain QF_LIA parser + follow-ups — tracked in [#2](https://github.com/Eignex/klause/issues/2).
 - `[Format/FlatZinc]` Set-var follow-ups: (a) reified union/intersect/diff if MZN models actually use them (rare — the unreified forms are the common path); (b) `var set of E: S = { ... }` initializer (constant set var) — today only `var set of E: S` with no value is accepted.
 - `[Perf]` Native bitset set-propagators where benchmarking shows bool-decomposition's per-bool propagator dispatch is the bottleneck. For sets with large universes (>256 elements) and many set algebra operations per propagation cycle, bitset throughput on `(LB, UB)` representations beats N independent bool propagator calls by a constant factor. Cost is engine plumbing (set domain arrays in `PropagationState`, dedicated move type, snapshot extension). Revisit only with profiling data.
 - `[Format/XCSP3]` Parser for XCSP3 XML, including extension tables and intension predicates.
