@@ -44,6 +44,14 @@ class Problem(
      * follow-up — it needs Implied/Assumptions to carry hole sets too.
      */
     val probeIntBounds: Boolean = false,
+    /**
+     * Opt-in interior-hole SAC. Builds on [probeIntBounds]: after bound-SAC settles,
+     * each multi-value int var has its interior values (strictly between current min
+     * and max) probed; on Unsat the value is recorded as an interior hole in [baked].
+     * Cost is `O(Σ |dom(v)| × propagate)` per pass; use sparingly on large domains.
+     * Implies [probeIntBounds].
+     */
+    val probeIntHoles: Boolean = false,
 ) {
     init {
         require(intDomains.size == numIntVars) {
@@ -103,10 +111,74 @@ class Problem(
             result = probeFreeBools(result as PropagationResult.Implied)
             if (result is PropagationResult.Unsat) return result
         }
-        if (probeIntBounds) {
+        if (probeIntBounds || probeIntHoles) {
             result = probeBoundSac(result as PropagationResult.Implied)
+            if (result is PropagationResult.Unsat) return result
+        }
+        if (probeIntHoles) {
+            result = probeIntHoles(result as PropagationResult.Implied)
         }
         return result
+    }
+
+    /** Interior-value SAC: probe every value strictly between each multi-value int var's
+     *  current min and max. Iterates with bound-SAC interleaved so that hole-discovered
+     *  tightenings can lift bounds and vice versa. */
+    private fun probeIntHoles(base: PropagationResult.Implied): PropagationResult {
+        var acc: PropagationResult.Implied = base
+        var changed = true
+        while (changed) {
+            changed = false
+            for (v in 0 until numIntVars) {
+                if (acc.intValueOrNull(v) != null) continue
+                val orig = intDomains[v]
+                val curMin = acc.intMinOrNullCompat(v) ?: orig.min
+                val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
+                if (curMin >= curMax) continue
+                val accAsAssumptions = acc.toAssumptions()
+                // Skip values already known excluded (in orig holes, or in acc holes).
+                for (k in (curMin + 1) until curMax) {
+                    if (k !in orig) continue
+                    var alreadyHole = false
+                    for (i in 0 until acc.intHoleVarIds.size) {
+                        if (acc.intHoleVarIds[i] == v && acc.intHoleValues[i] == k) {
+                            alreadyHole = true; break
+                        }
+                    }
+                    if (alreadyHole) continue
+                    val pin = propagate(accAsAssumptions.withInt(v, k))
+                    if (pin is PropagationResult.Unsat) {
+                        val r = propagate(accAsAssumptions.withIntHole(v, k))
+                        if (r is PropagationResult.Unsat) return r
+                        acc = addHoleToImplied(acc, v, k)
+                        acc = mergeImplied(acc, r as PropagationResult.Implied)
+                        changed = true
+                    }
+                }
+            }
+        }
+        return acc
+    }
+
+    private fun addHoleToImplied(a: PropagationResult.Implied, v: Int, value: Int): PropagationResult.Implied {
+        val holeSet = HashSet<Long>()
+        a.forEachIntHole { id, vv ->
+            holeSet.add((id.toLong() shl 32) or (vv.toLong() and 0xFFFFFFFFL))
+        }
+        holeSet.add((v.toLong() shl 32) or (value.toLong() and 0xFFFFFFFFL))
+        val sorted = holeSet.toLongArray().also { it.sort() }
+        val ids = IntArray(sorted.size) { (sorted[it] ushr 32).toInt() }
+        val vals = IntArray(sorted.size) { sorted[it].toInt() }
+        val mins = HashMap<Int, Int>(); a.forEachIntMin { k, vv -> mins[k] = vv }
+        val maxes = HashMap<Int, Int>(); a.forEachIntMax { k, vv -> maxes[k] = vv }
+        val minK = mins.keys.toIntArray().also { it.sort() }
+        val maxK = maxes.keys.toIntArray().also { it.sort() }
+        return PropagationResult.Implied(
+            bools = a.bools, ints = a.ints,
+            intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+            intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+            intHoleVarIds = ids, intHoleValues = vals,
+        )
     }
 
     /**
@@ -167,6 +239,7 @@ class Problem(
             bools = a.bools, ints = a.ints,
             intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
             intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+            intHoleVarIds = a.intHoleVarIds.copyOf(), intHoleValues = a.intHoleValues.copyOf(),
         )
     }
 
@@ -182,6 +255,7 @@ class Problem(
             bools = a.bools, ints = a.ints,
             intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
             intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+            intHoleVarIds = a.intHoleVarIds.copyOf(), intHoleValues = a.intHoleValues.copyOf(),
         )
     }
 
@@ -196,16 +270,28 @@ class Problem(
         b.forEachIntMin { k, v -> mins[k] = maxOf(mins[k] ?: Int.MIN_VALUE, v) }
         val maxes = HashMap<Int, Int>(); a.forEachIntMax { k, v -> maxes[k] = v }
         b.forEachIntMax { k, v -> maxes[k] = minOf(maxes[k] ?: Int.MAX_VALUE, v) }
-        // Drop now-pinned vars from the bound maps.
-        for (k in ints.keys) { mins.remove(k); maxes.remove(k) }
+        // Holes — union.
+        val holes = HashSet<Long>()
+        a.forEachIntHole { id, v -> holes.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
+        b.forEachIntHole { id, v -> holes.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
+        // Drop now-pinned vars from the bound and hole sets.
+        for (k in ints.keys) {
+            mins.remove(k); maxes.remove(k)
+            holes.removeAll { (it ushr 32).toInt() == k }
+        }
         val minK = mins.keys.toIntArray().also { it.sort() }
         val maxK = maxes.keys.toIntArray().also { it.sort() }
+        val holesSorted = holes.toLongArray().also { it.sort() }
+        val holeIds = IntArray(holesSorted.size) { (holesSorted[it] ushr 32).toInt() }
+        val holeVals = IntArray(holesSorted.size) { holesSorted[it].toInt() }
         return PropagationResult.Implied(
             bools = bools, ints = ints,
             intMinKeys = minK,
             intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
             intMaxKeys = maxK,
             intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+            intHoleVarIds = holeIds,
+            intHoleValues = holeVals,
         )
     }
 
@@ -300,6 +386,8 @@ class Problem(
         val iMinVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         val iMaxKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         val iMaxVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iHoleIds = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iHoleVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         for (v in 0 until numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
@@ -313,6 +401,20 @@ class Problem(
             val seedMax = minOf(orig.max, assumptions.intMaxOrNull(v) ?: Int.MAX_VALUE)
             if (d.min > seedMin) { iMinKeys.add(v); iMinVals.add(d.min) }
             if (d.max < seedMax) { iMaxKeys.add(v); iMaxVals.add(d.max) }
+            // Interior holes: values strictly between current (d.min, d.max) that are in
+            // [orig] but absent from [d]. Skip values already in the seed assumption's
+            // hole set so we only emit newly-derived ones.
+            for (value in (d.min + 1) until d.max) {
+                if (value in orig && value !in d) {
+                    // Cheap O(n) skip if same hole present in seed.
+                    var preExisting = false
+                    for (i in 0 until assumptions.intHoleVarIds.size) {
+                        if (assumptions.intHoleVarIds[i] == v &&
+                            assumptions.intHoleValues[i] == value) { preExisting = true; break }
+                    }
+                    if (!preExisting) { iHoleIds.add(v); iHoleVals.add(value) }
+                }
+            }
         }
         return PropagationResult.Implied(
             boolKeys = bKeys.toIntArray(),
@@ -323,6 +425,8 @@ class Problem(
             intMinValues = iMinVals.toIntArray(),
             intMaxKeys = iMaxKeys.toIntArray(),
             intMaxValues = iMaxVals.toIntArray(),
+            intHoleVarIds = iHoleIds.toIntArray(),
+            intHoleValues = iHoleVals.toIntArray(),
         )
     }
 

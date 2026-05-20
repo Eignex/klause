@@ -34,6 +34,10 @@ sealed interface PropagationResult {
         val intMinValues: IntArray = IntArray(0),
         val intMaxKeys: IntArray = IntArray(0),
         val intMaxValues: IntArray = IntArray(0),
+        /** Interior holes: parallel `(varId, value)` rows in lex order. Each row
+         *  encodes `v ≠ value`, with `value` strictly between v's current min and max. */
+        val intHoleVarIds: IntArray = IntArray(0),
+        val intHoleValues: IntArray = IntArray(0),
     ) : PropagationResult {
 
         val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
@@ -68,6 +72,10 @@ sealed interface PropagationResult {
             for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
         }
 
+        inline fun forEachIntHole(action: (id: Int, value: Int) -> Unit) {
+            for (i in intHoleVarIds.indices) action(intHoleVarIds[i], intHoleValues[i])
+        }
+
         inline fun forEachBool(action: (id: Int, value: Boolean) -> Unit) {
             for (i in boolKeys.indices) action(boolKeys[i], boolValues[i])
         }
@@ -89,6 +97,8 @@ sealed interface PropagationResult {
                 intMinValues = intMinValues.copyOf(),
                 intMaxKeys = intMaxKeys.copyOf(),
                 intMaxValues = intMaxValues.copyOf(),
+                intHoleVarIds = intHoleVarIds.copyOf(),
+                intHoleValues = intHoleValues.copyOf(),
             )
 
         /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
@@ -150,13 +160,18 @@ sealed interface PropagationResult {
                 intMinValues: IntArray = IntArray(0),
                 intMaxKeys: IntArray = IntArray(0),
                 intMaxValues: IntArray = IntArray(0),
+                intHoleVarIds: IntArray = IntArray(0),
+                intHoleValues: IntArray = IntArray(0),
             ): Implied {
-                if (bools.isEmpty() && ints.isEmpty() && intMinKeys.isEmpty() && intMaxKeys.isEmpty()) return Empty
+                if (bools.isEmpty() && ints.isEmpty() &&
+                    intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()) return Empty
                 val bKeys = bools.keys.toIntArray().also { it.sort() }
                 val bVals = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) }
                 val iKeys = ints.keys.toIntArray().also { it.sort() }
                 val iVals = IntArray(iKeys.size) { ints.getValue(iKeys[it]) }
-                return Implied(bKeys, bVals, iKeys, iVals, intMinKeys, intMinValues, intMaxKeys, intMaxValues)
+                return Implied(bKeys, bVals, iKeys, iVals,
+                    intMinKeys, intMinValues, intMaxKeys, intMaxValues,
+                    intHoleVarIds, intHoleValues)
             }
         }
     }

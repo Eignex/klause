@@ -43,6 +43,13 @@ class Assumptions internal constructor(
      *  ascending. Disjoint from [intKeys]. */
     val intMaxKeys: IntArray = IntArray(0),
     val intMaxValues: IntArray = IntArray(0),
+    /** Interior holes: parallel `(varId, value)` rows, lexicographically sorted by
+     *  `(varId, value)`. Each row encodes `v ≠ value` for that var. Disjoint from
+     *  [intKeys]; values strictly inside the var's [min, max] bounds (or its assumed
+     *  bounds). Used by SAC-at-root to record value-level deductions that fall between
+     *  bound shifts. */
+    val intHoleVarIds: IntArray = IntArray(0),
+    val intHoleValues: IntArray = IntArray(0),
 ) {
 
     val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
@@ -84,6 +91,10 @@ class Assumptions internal constructor(
         for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
     }
 
+    inline fun forEachIntHole(action: (id: Int, value: Int) -> Unit) {
+        for (i in intHoleVarIds.indices) action(intHoleVarIds[i], intHoleValues[i])
+    }
+
     /** Primitive iteration over bool pins in ascending-key order. No allocation. */
     inline fun forEachBool(action: (id: Int, value: Boolean) -> Unit) {
         for (i in boolKeys.indices) action(boolKeys[i], boolValues[i])
@@ -102,8 +113,10 @@ class Assumptions internal constructor(
      * Primitive sorted-merge in O(n + m); no `HashMap`, no autoboxing.
      */
     fun mergedWith(other: Assumptions): Assumptions {
-        if (other.isEmpty) return this
-        if (this.isEmpty) return other
+        if (other.isEmpty &&
+            other.intMinKeys.isEmpty() && other.intMaxKeys.isEmpty() && other.intHoleVarIds.isEmpty()) return this
+        if (this.isEmpty &&
+            intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()) return other
         val mergedBoolKeys = ArrayList<Int>(boolKeys.size + other.boolKeys.size)
         val mergedBoolValues = ArrayList<Boolean>(boolKeys.size + other.boolKeys.size)
         sortedMergeBools(boolKeys, boolValues, other.boolKeys, other.boolValues,
@@ -112,11 +125,40 @@ class Assumptions internal constructor(
         val mergedIntValues = ArrayList<Int>(intKeys.size + other.intKeys.size)
         sortedMergeInts(intKeys, intValues, other.intKeys, other.intValues,
             mergedIntKeys, mergedIntValues)
+        // Bound tightenings: take max for mins, min for maxes; on overlap with an
+        // exact int pin from either side, drop the bound (the pin subsumes).
+        val pinned = HashSet<Int>()
+        for (k in mergedIntKeys) pinned.add(k)
+        val minMap = HashMap<Int, Int>()
+        forEachIntMin { k, v -> if (k !in pinned) minMap[k] = v }
+        other.forEachIntMin { k, v ->
+            if (k !in pinned) minMap[k] = maxOf(minMap[k] ?: Int.MIN_VALUE, v)
+        }
+        val maxMap = HashMap<Int, Int>()
+        forEachIntMax { k, v -> if (k !in pinned) maxMap[k] = v }
+        other.forEachIntMax { k, v ->
+            if (k !in pinned) maxMap[k] = minOf(maxMap[k] ?: Int.MAX_VALUE, v)
+        }
+        val minK = minMap.keys.toIntArray().also { it.sort() }
+        val maxK = maxMap.keys.toIntArray().also { it.sort() }
+        // Holes: union of (varId, value) pairs, dropping pinned vars.
+        val holeSet = HashSet<Long>()
+        forEachIntHole { id, v -> if (id !in pinned) holeSet.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
+        other.forEachIntHole { id, v -> if (id !in pinned) holeSet.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
+        val holes = holeSet.toLongArray().also { it.sort() }
+        val holeIds = IntArray(holes.size) { (holes[it] ushr 32).toInt() }
+        val holeVals = IntArray(holes.size) { holes[it].toInt() }
         return Assumptions(
             boolKeys = mergedBoolKeys.toIntArray(),
             boolValues = BooleanArray(mergedBoolValues.size) { mergedBoolValues[it] },
             intKeys = mergedIntKeys.toIntArray(),
             intValues = mergedIntValues.toIntArray(),
+            intMinKeys = minK,
+            intMinValues = IntArray(minK.size) { minMap.getValue(minK[it]) },
+            intMaxKeys = maxK,
+            intMaxValues = IntArray(maxK.size) { maxMap.getValue(maxK[it]) },
+            intHoleVarIds = holeIds,
+            intHoleValues = holeVals,
         )
     }
 
@@ -126,7 +168,7 @@ class Assumptions internal constructor(
         val idx = boolKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = boolValues.copyOf(); nv[idx] = value
-            Assumptions(boolKeys, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues)
+            Assumptions(boolKeys, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(boolKeys.size + 1)
@@ -136,7 +178,7 @@ class Assumptions internal constructor(
             nk[insert] = id; nv[insert] = value
             boolKeys.copyInto(nk, insert + 1, insert)
             boolValues.copyInto(nv, insert + 1, insert)
-            Assumptions(nk, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues)
+            Assumptions(nk, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
         }
     }
 
@@ -169,7 +211,7 @@ class Assumptions internal constructor(
         val idx = intKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = intValues.copyOf(); nv[idx] = value
-            Assumptions(boolKeys, boolValues, intKeys, nv, newMinK, newMinV, newMaxK, newMaxV)
+            Assumptions(boolKeys, boolValues, intKeys, nv, newMinK, newMinV, newMaxK, newMaxV, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intKeys.size + 1)
@@ -179,7 +221,7 @@ class Assumptions internal constructor(
             nk[insert] = id; nv[insert] = value
             intKeys.copyInto(nk, insert + 1, insert)
             intValues.copyInto(nv, insert + 1, insert)
-            Assumptions(boolKeys, boolValues, nk, nv, newMinK, newMinV, newMaxK, newMaxV)
+            Assumptions(boolKeys, boolValues, nk, nv, newMinK, newMinV, newMaxK, newMaxV, intHoleVarIds, intHoleValues)
         }
     }
 
@@ -189,7 +231,7 @@ class Assumptions internal constructor(
         val idx = intMinKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = intMinValues.copyOf(); nv[idx] = maxOf(nv[idx], value)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, nv, intMaxKeys, intMaxValues)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, nv, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intMinKeys.size + 1)
@@ -199,8 +241,42 @@ class Assumptions internal constructor(
             nk[insert] = id; nv[insert] = value
             intMinKeys.copyInto(nk, insert + 1, insert)
             intMinValues.copyInto(nv, insert + 1, insert)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, nk, nv, intMaxKeys, intMaxValues)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, nk, nv, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
         }
+    }
+
+    /** Return a fresh [Assumptions] with [id ≠ value] punched in as an interior-hole
+     *  assumption. Idempotent if the hole already exists. Caller is responsible for
+     *  ensuring [value] is in the var's current effective domain — the engine will
+     *  raise on attempts to exclude a singleton's sole value, mirroring tighten-on-pin. */
+    fun withIntHole(id: Int, value: Int): Assumptions {
+        // Find insertion point via linear walk over the (id, value) sorted rows.
+        // Hole sets are small in practice (each SAC iteration adds at most one), so
+        // sticking to O(n) keeps code readable; binary search by lex pair is the
+        // next step if profiling shows it.
+        var lo = 0
+        var hi = intHoleVarIds.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            val midId = intHoleVarIds[mid]
+            val midVal = intHoleValues[mid]
+            val cmp = if (midId != id) midId - id else midVal - value
+            when {
+                cmp < 0 -> lo = mid + 1
+                cmp > 0 -> hi = mid
+                else -> return this  // already present
+            }
+        }
+        val insert = lo
+        val nk = IntArray(intHoleVarIds.size + 1)
+        val nv = IntArray(intHoleValues.size + 1)
+        intHoleVarIds.copyInto(nk, 0, 0, insert)
+        intHoleValues.copyInto(nv, 0, 0, insert)
+        nk[insert] = id; nv[insert] = value
+        intHoleVarIds.copyInto(nk, insert + 1, insert)
+        intHoleValues.copyInto(nv, insert + 1, insert)
+        return Assumptions(boolKeys, boolValues, intKeys, intValues,
+            intMinKeys, intMinValues, intMaxKeys, intMaxValues, nk, nv)
     }
 
     /** Return a fresh [Assumptions] with [id]'s upper bound tightened to at most [value]. */
@@ -208,7 +284,7 @@ class Assumptions internal constructor(
         val idx = intMaxKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = intMaxValues.copyOf(); nv[idx] = minOf(nv[idx], value)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, nv)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, nv, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intMaxKeys.size + 1)
@@ -218,7 +294,7 @@ class Assumptions internal constructor(
             nk[insert] = id; nv[insert] = value
             intMaxKeys.copyInto(nk, insert + 1, insert)
             intMaxValues.copyInto(nv, insert + 1, insert)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, nk, nv)
+            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, nk, nv, intHoleVarIds, intHoleValues)
         }
     }
 
@@ -243,7 +319,13 @@ class Assumptions internal constructor(
         return boolKeys.contentEquals(other.boolKeys) &&
             boolValues.contentEquals(other.boolValues) &&
             intKeys.contentEquals(other.intKeys) &&
-            intValues.contentEquals(other.intValues)
+            intValues.contentEquals(other.intValues) &&
+            intMinKeys.contentEquals(other.intMinKeys) &&
+            intMinValues.contentEquals(other.intMinValues) &&
+            intMaxKeys.contentEquals(other.intMaxKeys) &&
+            intMaxValues.contentEquals(other.intMaxValues) &&
+            intHoleVarIds.contentEquals(other.intHoleVarIds) &&
+            intHoleValues.contentEquals(other.intHoleValues)
     }
 
     override fun hashCode(): Int {
@@ -251,6 +333,12 @@ class Assumptions internal constructor(
         h = 31 * h + boolValues.contentHashCode()
         h = 31 * h + intKeys.contentHashCode()
         h = 31 * h + intValues.contentHashCode()
+        h = 31 * h + intMinKeys.contentHashCode()
+        h = 31 * h + intMinValues.contentHashCode()
+        h = 31 * h + intMaxKeys.contentHashCode()
+        h = 31 * h + intMaxValues.contentHashCode()
+        h = 31 * h + intHoleVarIds.contentHashCode()
+        h = 31 * h + intHoleValues.contentHashCode()
         return h
     }
 

@@ -667,6 +667,13 @@ class PropagationState(
             currentFactor = -1
             if (!tightenIntMaxImpl(maxK[i], maxV[i], null)) return false
         }
+        val holeIds = a.intHoleVarIds; val holeVals = a.intHoleValues
+        for (i in holeIds.indices) {
+            levelToDecisionVar.add(problem.numBoolVars + holeIds[i])
+            currentLevel = levelToDecisionVar.size
+            currentFactor = -1
+            if (!excludeIntValueImpl(holeIds[i], holeVals[i], null)) return false
+        }
         return true
     }
 

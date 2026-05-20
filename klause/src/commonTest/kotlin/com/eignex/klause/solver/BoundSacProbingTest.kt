@@ -75,6 +75,38 @@ class BoundSacProbingTest {
     }
 
     @Test
+    fun `interior-hole SAC excludes an unreachable middle value`() {
+        // x ∈ [0..2], y ∈ [0..2], x = y, x + y must be even (encoded as x + y ∈ {0,2,4} via
+        // a Table). With Table over y and x: actually simplest is Linear: x = y AND
+        // x + y != 2 (encoded by `1*x + 1*y != 2` — but we don't have NE Linear. Use Table.)
+        //
+        // Simpler test: 3 vars, x = y, x + y = 2 OR x + y = 4. That is two solutions:
+        // (1,1) and (2,2). So x = y, x ∈ {1, 2}. Interior value x = 0 should be excluded.
+        // Without bound-SAC alone, x.min lifts to 1 trivially (x + y ≥ 2). So bound-SAC
+        // already captures this. We need a case with interior hole.
+        //
+        // x ∈ [0..3], y ∈ [0..3], x = y, x + y ∈ {0, 6} (two Linear OR'd... no OR primitive).
+        // Use Table: tuples = [(0,0), (3,3)]. With x = y reified-implicit via Table.
+        val p = Problem(
+            numBoolVars = 0, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                com.eignex.klause.solver.factor.Table(
+                    xs = intArrayOf(0, 1),
+                    tuples = intArrayOf(0, 0, 3, 3),
+                ),
+            ),
+            probeIntBounds = true,
+            probeIntHoles = true,
+        )
+        val baked = assertIs<PropagationResult.Implied>(p.baked)
+        // x's allowed values are {0, 3}. So interior 1, 2 are holes.
+        val xHoles = mutableSetOf<Int>()
+        baked.forEachIntHole { id, v -> if (id == 0) xHoles.add(v) }
+        assertEquals(setOf(1, 2), xHoles, "interior-hole SAC should mark x ≠ 1 and x ≠ 2")
+    }
+
+    @Test
     fun `bound SAC off does not tighten`() {
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
