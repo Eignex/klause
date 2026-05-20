@@ -52,6 +52,19 @@ class Problem(
      * Implies [probeIntBounds].
      */
     val probeIntHoles: Boolean = false,
+    /**
+     * Cap on per-var probe calls during bake-time SAC. After this many `propagate` calls
+     * targeting one var (across both bound and hole probing), the loop stops probing
+     * that var for the remainder of the bake. Defaults to unlimited; set to a small
+     * positive number for very wide domains to prevent pathological construction cost.
+     */
+    val probeBudgetPerVar: Int = Int.MAX_VALUE,
+    /**
+     * Cap on total probe calls across all vars and all SAC passes during bake. Once
+     * exceeded, the SAC loops exit gracefully with whatever tightenings they've
+     * accumulated so far. Unlimited by default.
+     */
+    val probeTotalBudget: Int = Int.MAX_VALUE,
 ) {
     init {
         require(intDomains.size == numIntVars) {
@@ -126,18 +139,23 @@ class Problem(
      *  tightenings can lift bounds and vice versa. */
     private fun probeIntHoles(base: PropagationResult.Implied): PropagationResult {
         var acc: PropagationResult.Implied = base
+        val perVarCalls = IntArray(numIntVars)
+        var totalCalls = 0
         var changed = true
         while (changed) {
             changed = false
             for (v in 0 until numIntVars) {
                 if (acc.intValueOrNull(v) != null) continue
+                if (perVarCalls[v] >= probeBudgetPerVar) continue
+                if (totalCalls >= probeTotalBudget) return acc
                 val orig = intDomains[v]
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
                 val accAsAssumptions = acc.toAssumptions()
-                // Skip values already known excluded (in orig holes, or in acc holes).
                 for (k in (curMin + 1) until curMax) {
+                    if (perVarCalls[v] >= probeBudgetPerVar) break
+                    if (totalCalls >= probeTotalBudget) return acc
                     if (k !in orig) continue
                     var alreadyHole = false
                     for (i in 0 until acc.intHoleVarIds.size) {
@@ -146,8 +164,10 @@ class Problem(
                         }
                     }
                     if (alreadyHole) continue
+                    perVarCalls[v]++; totalCalls++
                     val pin = propagate(accAsAssumptions.withInt(v, k))
                     if (pin is PropagationResult.Unsat) {
+                        perVarCalls[v]++; totalCalls++
                         val r = propagate(accAsAssumptions.withIntHole(v, k))
                         if (r is PropagationResult.Unsat) return r
                         acc = addHoleToImplied(acc, v, k)
@@ -189,32 +209,38 @@ class Problem(
      */
     private fun probeBoundSac(base: PropagationResult.Implied): PropagationResult {
         var acc: PropagationResult.Implied = base
+        val perVarCalls = IntArray(numIntVars)
+        var totalCalls = 0
         var changed = true
         while (changed) {
             changed = false
             for (v in 0 until numIntVars) {
-                // Skip vars already pinned to a singleton by the running baseline.
                 if (acc.intValueOrNull(v) != null) continue
+                if (perVarCalls[v] >= probeBudgetPerVar) continue
+                if (totalCalls >= probeTotalBudget) return acc
                 val orig = intDomains[v]
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
                 val accAsAssumptions = acc.toAssumptions()
+                perVarCalls[v]++; totalCalls++
                 val pinMin = propagate(accAsAssumptions.withInt(v, curMin))
                 if (pinMin is PropagationResult.Unsat) {
+                    perVarCalls[v]++; totalCalls++
                     val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
                     val r = propagate(tightened)
                     if (r is PropagationResult.Unsat) return r
-                    // Record the forced tightening explicitly — `propagate` filters out
-                    // tightenings that match the assumption seed, so we must add ours
-                    // back manually before unioning downstream effects.
                     acc = addMinToImplied(acc, v, curMin + 1)
                     acc = mergeImplied(acc, r as PropagationResult.Implied)
                     changed = true
                     continue
                 }
+                if (perVarCalls[v] >= probeBudgetPerVar) continue
+                if (totalCalls >= probeTotalBudget) return acc
+                perVarCalls[v]++; totalCalls++
                 val pinMax = propagate(accAsAssumptions.withInt(v, curMax))
                 if (pinMax is PropagationResult.Unsat) {
+                    perVarCalls[v]++; totalCalls++
                     val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
                     val r = propagate(tightened)
                     if (r is PropagationResult.Unsat) return r
