@@ -126,14 +126,14 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP backtrack + propagation, `[LS+CP]` cross-cutting, `[API]` cross-backend solver API, `[Sampling]` model counting / uniform sampling, `[Format]` input format parsers, `[Backend]` external solver adapters, `[Perf]` post-benchmark optimization, `[Docs]`, `[Infra]`.
+Each item is tagged with its workstream: `[CP]` complete-search engine and propagators, `[LS]` local-search engine and strategies, `[Backend]` external adapters and distribution, `[Perf]` post-benchmark optimizations.
 
-- `[Infra]` Maven Central publishing, CI.
 - `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
 - `[CP]` Sweep-prefix tightening of hole-aware `conflictReason`.
 - `[CP]` wdeg / activity-weighted SAC probe ordering; randomised tie-breaking.
-- `[CP/Optimize]` Core-guided optimization (OLL / RC2).
-- `[CP/Optimize]` LP-relaxation bounding during BnB.
+- `[CP]` Core-guided optimization (OLL / RC2).
+- `[CP]` LP-relaxation bounding during BnB.
+- `[CP]` Native bitset set-propagators for set algebra over large universes.
 - `[LS]` Multi-core LS portfolio: best-feasible sharing, shared kumulant stats for a restart-level bandit, worker-config factory.
 - `[LS]` ALNS: cumulative time-window destroy operators and regret-based / best-improving repairs.
 - `[LS]` ILS: basin-hopping perturbation and linkage-aware crossover.
@@ -142,9 +142,9 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[LS]` SAPS strategy.
 - `[LS]` Richer VNS: VND, per-level neighbourhood operators, skewed-VNS.
 - `[LS]` Problem-aware moves for `cumulative`, `lexLeq` / `lexLt`, and reified factors.
-- `[Sampling]` Weighted projected sampling (WAPS / KUS).
-- `[Perf]` Native bitset set-propagators for set algebra over large universes.
+- `[Backend]` Maven Central publishing, CI.
 - `[Backend]` klause-smt `Optimizer.minimize()` via JavaSMT's `OptimizationProverEnvironment`.
+- `[Backend]` Weighted projected sampling (WAPS / KUS) via d-DNNF compiler bridge.
 - `[Perf]` Pool / delta-trail `PropagationSession` snapshots to cut the 9 array copies per push.
 - `[Perf]` Bucket-queue or pairing-heap VSIDS / dom-wdeg variable picker.
 - `[Perf]` Bitset-backed `IntDomain` for narrow spans.
