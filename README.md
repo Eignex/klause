@@ -129,8 +129,6 @@ val text = cnf.toDimacs()
 Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP backtrack + propagation, `[LS+CP]` cross-cutting, `[API]` cross-backend solver API, `[Sampling]` model counting / uniform sampling, `[Format]` input format parsers, `[Backend]` external solver adapters, `[Perf]` post-benchmark optimization, `[Docs]`, `[Infra]`.
 
 - `[Infra]` Maven Central publishing, CI.
-- `[CP]` Online heuristic learning for variable / value selection via [kumulant](https://github.com/eignex/kumulant)'s `BayesianLinearRegression` — LinUCB / Linear Thompson Sampling over per-(var, value) features (domain size, activity, depth, last-conflict distance, value offset, recency, propagator failure rate). Per-instance posterior only; cross-instance reuse goes through the portfolio-selector lane below.
-- `[CP]` Pre-trained portfolio selector. Inspects the problem (factor-kind counts, domain shapes, graph topology, objective structure) and picks a `(VariableHeuristic, ValueHeuristic)` config — or bandit priors over a config palette — at session construction. Model is trained offline in a separate pipeline; klause exposes feature extraction + telemetry hooks and accepts the trained artifact as a constructor parameter. No disk reads, no DB, no implicit filesystem state inside klause.
 - `[CP]` Stronger native propagators for globals still on weak (singleton-violation-check) propagation. Upgrade in priority order: Pesant layered-DAG for `Regular`; sweep-line for `Diffn`; STR2/STR3 / GAC-Schema for `Table`; flow-based for `Knapsack`; bound-consistency for `Inverse`; lex-conflict propagator for `LexLess` / `LexLesseq`.
 - `[LS]` Multi-core LS portfolio finishing touches for the MZN Challenge LS track: best-feasible sharing as warm-start hints, shared kumulant stats in Relaxed mode for a restart-level bandit, worker-config factory handing each worker a distinct `(strategy, seed)`.
 - `[LS]` ALNS: problem-specific destroy operators (cumulative time-window slides) and regret-based / best-improving construction repairs.
@@ -140,12 +138,6 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[LS]` Optional SAPS strategy as a multiplicative-weighting alternative to additive DDFW. Low priority — DDFW covers the weight-learning niche.
 - `[LS]` Richer VNS: VND (exhaust each k before promotion), per-level neighbourhood operators (swap-only at N2, 3-opt at N3), skewed-VNS accepting mild worsening at higher k.
 - `[LS]` Problem-aware move generation for globals not yet covered: cumulative time-window slides, lex-aware moves for `lexLeq` / `lexLt`, reified-factor diversification. Extension point is per-factor `proposeRepairMoves`.
-- `[LS]` Apply LinUCB / Linear Thompson Sampling inside LS itself (not just CP). Concrete targets:
-  - `LinearThompsonStrategy` — replace WalkSat/ProbSat/DDFW hardcoded scoring with an *online* bandit over candidate moves; features: `breakScore`, `netDelta`, `shapedObjectiveDelta`, `tabu / confChange flags`, `lastTouched distance`, factor-graph degree. Posterior lives in `WarmState`, per-session only — cross-instance is the portfolio selector's job.
-  - Adaptive parameter tuning — bandit over `noise` / `cb` / `increment` instead of `NoiseController`'s bump-on-stall.
-  - Contextual ILS acceptance from `(objective_delta, stall_count, iteration_fraction)`.
-  - ALNS `flipsPerIteration` — bandit over `{quick, standard, deep}` profiles by recent-improvement context.
-- `[LS+CP]` Telemetry pipeline feeding the offline portfolio-selector trainer. klause emits per-session features (var/constraint fingerprint) and outcomes (final objective, time-to-best, conflicts, flips) as a serialisable record; downstream tooling collects + trains. klause persists nothing.
 - `[Sampling]` Hash-based uniform sampling (UniGen2-style). XOR-slice the model space, sample within a slice.
 - `[Sampling]` Approximate model counting (ApproxMC). Same XOR-hashing primitive as UniGen.
 - `[Sampling]` Weighted projected sampling (WAPS / KUS).
