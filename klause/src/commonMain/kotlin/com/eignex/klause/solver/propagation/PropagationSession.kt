@@ -30,6 +30,18 @@ class PropagationSession(val problem: Problem) {
      *  Array-backed stack with explicit [levelTop]; grows by doubling. */
     private var levelStates: Array<LevelState?> = arrayOfNulls(8)
     private var levelTop: Int = 0
+    /** Pool of [PropagationState.Snapshot] buffers freed by [levelPop] /
+     *  [levelTruncateAfterRoot], reused by [makeSnapshot] in place of fresh allocation. Each
+     *  buffer's arrays match the state's capacity; the per-push cost shrinks from ~10
+     *  `copyOf` allocations to ~10 `copyInto` overwrites of recycled buffers. */
+    private val snapshotPool: ArrayDeque<PropagationState.Snapshot> = ArrayDeque()
+    private fun makeSnapshot(): PropagationState.Snapshot {
+        val buf = snapshotPool.removeLastOrNull() ?: state.allocateSnapshotBuffer()
+        return state.snapshotInto(buf)
+    }
+    private fun recycle(s: PropagationState.Snapshot) {
+        snapshotPool.addLast(s)
+    }
     private fun levelLast(): LevelState = levelStates[levelTop - 1]!!
     private fun levelPush(s: LevelState) {
         if (levelTop == levelStates.size) levelStates = levelStates.copyOf(levelStates.size * 2)
@@ -37,10 +49,16 @@ class PropagationSession(val problem: Problem) {
     }
     private fun levelPop() {
         levelTop--
+        val ls = levelStates[levelTop]
         levelStates[levelTop] = null
+        if (ls != null) recycle(ls.snap)
     }
     private fun levelTruncateAfterRoot() {
-        for (i in 1 until levelTop) levelStates[i] = null
+        for (i in 1 until levelTop) {
+            val ls = levelStates[i]
+            levelStates[i] = null
+            if (ls != null) recycle(ls.snap)
+        }
         levelTop = 1
     }
     private val pinnedBools: LinkedHashMap<Int, Boolean> = LinkedHashMap()
@@ -65,7 +83,7 @@ class PropagationSession(val problem: Problem) {
             )
         }
         val baseline = computeImplied()
-        levelPush(LevelState(state.snapshot(), baseline))
+        levelPush(LevelState(makeSnapshot(), baseline))
         lastImplied = baseline
     }
 
@@ -171,7 +189,7 @@ class PropagationSession(val problem: Problem) {
         pinnedBools[v] = value
         trail.addLast(VarKind.Bool to v)
         val implied = computeImplied()
-        levelPush(LevelState(state.snapshot(), implied))
+        levelPush(LevelState(makeSnapshot(), implied))
         return implied
     }
 
@@ -183,7 +201,7 @@ class PropagationSession(val problem: Problem) {
         pinnedInts[v] = value
         trail.addLast(VarKind.Int to v)
         val implied = computeImplied()
-        levelPush(LevelState(state.snapshot(), implied))
+        levelPush(LevelState(makeSnapshot(), implied))
         return implied
     }
 

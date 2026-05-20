@@ -968,49 +968,89 @@ class PropagationState(
         fun snapshotCopy(): SnapshottablePayload
     }
 
+    /**
+     * Per-level state capture. Fields are `val` but their array/Bits contents are mutable in
+     * place: [snapshotInto] uses [Bits.copyFrom] / [IntArray.copyInto] to overwrite the
+     * buffers, letting [PropagationSession]'s pool reuse a Snapshot across pushes rather
+     * than allocating ~10 fresh arrays per decision level.
+     *
+     * [decisionVars] is grow-able (one entry per decision level), so it stays an
+     * [IntArrayList] reused via [IntArrayList.clear]; ditto [snapshottablePayloads] which
+     * the factor implementor refreshes on demand.
+     */
     class Snapshot internal constructor(
         internal val boolAssigned: Bits,
         internal val boolValueBits: Bits,
         internal val intDomains: Array<IntDomain>,
         internal val boolLevel: IntArray,
         internal val intLevel: IntArray,
-        internal val decisionVars: IntArray,
+        internal val decisionVars: com.eignex.klause.util.IntArrayList,
         internal val boolReason: IntArray,
         internal val intMinReason: IntArray,
         internal val intMaxReason: IntArray,
         internal val boolAntecedents: Array<IntArray?>,
         internal val intMinAntecedents: Array<IntArray?>,
         internal val intMaxAntecedents: Array<IntArray?>,
-        internal val boolPinOrderSize: Int,
-        internal val atomCount: Int,
         internal val snapshottablePayloads: HashMap<Int, SnapshottablePayload>,
+    ) {
+        internal var boolPinOrderSize: Int = 0
+        internal var atomCount: Int = 0
+    }
+
+    /**
+     * Allocate a fresh [Snapshot] sized to this state's current capacities. Used by
+     * [PropagationSession] to seed its snapshot pool; subsequent pushes call
+     * [snapshotInto] to overwrite contents instead of allocating new arrays.
+     */
+    fun allocateSnapshotBuffer(): Snapshot = Snapshot(
+        boolAssigned = boolAssigned.copy(),
+        boolValueBits = boolValueBits.copy(),
+        intDomains = intDomains.copyOf(),
+        boolLevel = boolLevel.copyOf(),
+        intLevel = intLevel.copyOf(),
+        decisionVars = com.eignex.klause.util.IntArrayList(initialCapacity = 8),
+        boolReason = boolReason.copyOf(),
+        intMinReason = intMinReason.copyOf(),
+        intMaxReason = intMaxReason.copyOf(),
+        boolAntecedents = boolAntecedents.copyOf(),
+        intMinAntecedents = intMinAntecedents.copyOf(),
+        intMaxAntecedents = intMaxAntecedents.copyOf(),
+        snapshottablePayloads = HashMap(),
     )
 
-    fun snapshot(): Snapshot {
-        // Capture per-factor payloads that opted into snapshot via [SnapshottablePayload].
-        val payloads = HashMap<Int, SnapshottablePayload>()
+    /** Fill [target] with the current state in place, no array allocation. Returns [target]
+     *  for fluent chaining. Callers must ensure [target] was sized for the same problem
+     *  (allocated via [allocateSnapshotBuffer] on this state). */
+    fun snapshotInto(target: Snapshot): Snapshot {
+        target.boolAssigned.copyFrom(boolAssigned)
+        target.boolValueBits.copyFrom(boolValueBits)
+        intDomains.copyInto(target.intDomains)
+        boolLevel.copyInto(target.boolLevel)
+        intLevel.copyInto(target.intLevel)
+        target.decisionVars.clear()
+        for (i in 0 until levelToDecisionVar.size) target.decisionVars.add(levelToDecisionVar[i])
+        boolReason.copyInto(target.boolReason)
+        intMinReason.copyInto(target.intMinReason)
+        intMaxReason.copyInto(target.intMaxReason)
+        boolAntecedents.copyInto(target.boolAntecedents)
+        intMinAntecedents.copyInto(target.intMinAntecedents)
+        intMaxAntecedents.copyInto(target.intMaxAntecedents)
+        target.boolPinOrderSize = boolPinOrder.size
+        target.atomCount = atomIntVar.size
+        // Refresh per-factor SnapshottablePayload captures. The factor's `snapshotCopy()` is
+        // free to allocate; we keep this map reused across snapshots but stale keys for
+        // factors that no longer have a SnapshottablePayload are cleared so they don't leak.
+        target.snapshottablePayloads.clear()
         for (i in _refPayload.indices) {
             val p = _refPayload[i]
-            if (p is SnapshottablePayload) payloads[i] = p.snapshotCopy()
+            if (p is SnapshottablePayload) target.snapshottablePayloads[i] = p.snapshotCopy()
         }
-        return Snapshot(
-            boolAssigned = boolAssigned.copy(),
-            boolValueBits = boolValueBits.copy(),
-            intDomains = intDomains.copyOf(),
-            boolLevel = boolLevel.copyOf(),
-            intLevel = intLevel.copyOf(),
-            decisionVars = levelToDecisionVar.toIntArray(),
-            boolReason = boolReason.copyOf(),
-            intMinReason = intMinReason.copyOf(),
-            intMaxReason = intMaxReason.copyOf(),
-            boolAntecedents = boolAntecedents.copyOf(),
-            intMinAntecedents = intMinAntecedents.copyOf(),
-            intMaxAntecedents = intMaxAntecedents.copyOf(),
-            boolPinOrderSize = boolPinOrder.size,
-            atomCount = atomIntVar.size,
-            snapshottablePayloads = payloads,
-        )
+        return target
     }
+
+    /** Allocate-and-fill convenience. Equivalent to `snapshotInto(allocateSnapshotBuffer())`
+     *  but expressed as a single call for callers that don't pool. */
+    fun snapshot(): Snapshot = snapshotInto(allocateSnapshotBuffer())
 
     fun restore(s: Snapshot) {
         boolAssigned.copyFrom(s.boolAssigned)
@@ -1065,7 +1105,7 @@ class PropagationState(
         }
         dirtyAtomFactors.clear()
         levelToDecisionVar.clear()
-        for (v in s.decisionVars) levelToDecisionVar.add(v)
+        for (i in 0 until s.decisionVars.size) levelToDecisionVar.add(s.decisionVars[i])
         // Aborted pushes may have left dirty queue entries behind; drop them.
         dirtyBools.clear()
         dirtyInts.clear()
