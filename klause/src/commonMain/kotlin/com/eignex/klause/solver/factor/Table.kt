@@ -66,10 +66,17 @@ class Table(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Hole-aware conflict reason — cites every post-bake domain hole and bound shift
+     *  across [xs], matching the per-prune antecedent set used in [propagate]. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, xs)
+
     /**
      * Tighten each column's domain to the union of values at that column over feasible
      * rows. A row is feasible iff every column's tuple value lies in the corresponding
-     * variable's current domain. If no row is feasible, fail.
+     * variable's current domain. If no row is feasible, fail. Per-prune antecedents use
+     * the same hole-aware reason — every excluded value in any column influenced which
+     * tuples remained supports.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val supports = Array(arity) { HashSet<Int>() }
@@ -85,7 +92,7 @@ class Table(
             for (col in 0 until arity) supports[col].add(tuples[row * arity + col])
         }
         if (!anyFeasible) return false
-        val ant = state.composeIntVarAtomAntecedents(xs)
+        val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
             val sup = supports[col]
             val minSup = sup.min(); val maxSup = sup.max()
