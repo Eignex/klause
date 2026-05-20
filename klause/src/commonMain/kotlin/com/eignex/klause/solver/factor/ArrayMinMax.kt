@@ -80,6 +80,10 @@ class ArrayMinMax(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
+    /** Bound-only conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val antXs = state.composeIntVarAtomAntecedents(xs)
         val antResult = state.composeIntVarAtomAntecedents(intArrayOf(result))

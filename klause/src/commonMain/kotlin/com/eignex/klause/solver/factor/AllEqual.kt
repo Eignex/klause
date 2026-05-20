@@ -42,6 +42,10 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Bound-only conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Common domain = ∩ dom(xs[i]) — implement as [maxOfMins, minOfMaxes].
         var commonMin = Int.MIN_VALUE

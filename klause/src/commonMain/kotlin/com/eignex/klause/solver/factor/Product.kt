@@ -62,6 +62,10 @@ class Product(
         return (if (now) 1 else 0) - (if (was) 1 else 0)
     }
 
+    /** Bound-only conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Forward: result ⊆ corner product range of (a, b).
         val da = state.intDomains[a]

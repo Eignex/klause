@@ -129,6 +129,10 @@ class Monotone(
      * chain in O(n) when domains are intervals; for sparse domains the same calls preserve
      * holes via the engine's `withMinAtLeast` / `withMaxAtMost`.
      */
+    /** Bound-only conflict reason. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val bump = if (strict) 1 else 0
         when (direction) {
