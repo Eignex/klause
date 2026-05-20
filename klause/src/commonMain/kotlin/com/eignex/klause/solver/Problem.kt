@@ -65,6 +65,13 @@ class Problem(
      * accumulated so far. Unlimited by default.
      */
     val probeTotalBudget: Int = Int.MAX_VALUE,
+    /**
+     * Seed for the RNG that breaks ties in the wdeg-weighted SAC probe order. Equal-score
+     * vars get a random permutation each outer pass so a fixed-point loop on a flat
+     * weight landscape doesn't keep visiting the same first var. Deterministic for a
+     * given seed.
+     */
+    val probeSeed: Long = 0L,
 ) {
     init {
         require(intDomains.size == numIntVars) {
@@ -88,6 +95,7 @@ class Problem(
         probeIntHoles: Boolean = false,
         probeBudgetPerVar: Int = Int.MAX_VALUE,
         probeTotalBudget: Int = Int.MAX_VALUE,
+        probeSeed: Long = 0L,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -99,6 +107,7 @@ class Problem(
         probeIntHoles = probeIntHoles,
         probeBudgetPerVar = probeBudgetPerVar,
         probeTotalBudget = probeTotalBudget,
+        probeSeed = probeSeed,
     )
 
     val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
@@ -166,11 +175,15 @@ class Problem(
             if (result is PropagationResult.Unsat) return result
         }
         if (probeIntBounds || probeIntHoles) {
-            result = probeBoundSac(result as PropagationResult.Implied)
+            // wdeg state shared across bound-SAC and hole-SAC: a probe failure under bound-SAC
+            // raises factor weights that then steer hole-SAC's first iteration, and vice versa.
+            val factorWeights = DoubleArray(factors.size) { 1.0 }
+            val rng = kotlin.random.Random(probeSeed)
+            result = probeBoundSac(result as PropagationResult.Implied, factorWeights, rng)
             if (result is PropagationResult.Unsat) return result
-        }
-        if (probeIntHoles) {
-            result = probeIntHoles(result as PropagationResult.Implied)
+            if (probeIntHoles) {
+                result = probeIntHoles(result as PropagationResult.Implied, factorWeights, rng)
+            }
         }
         return result
     }
@@ -178,14 +191,18 @@ class Problem(
     /** Interior-value SAC: probe every value strictly between each multi-value int var's
      *  current min and max. Iterates with bound-SAC interleaved so that hole-discovered
      *  tightenings can lift bounds and vice versa. */
-    private fun probeIntHoles(base: PropagationResult.Implied): PropagationResult {
+    private fun probeIntHoles(
+        base: PropagationResult.Implied,
+        factorWeights: DoubleArray,
+        rng: kotlin.random.Random,
+    ): PropagationResult {
         var acc: PropagationResult.Implied = base
         val perVarCalls = IntArray(numIntVars)
         var totalCalls = 0
         var changed = true
         while (changed) {
             changed = false
-            for (v in sacProbeOrder(acc)) {
+            for (v in sacProbeOrder(acc, factorWeights, rng)) {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= probeBudgetPerVar) continue
                 if (totalCalls >= probeTotalBudget) return acc
@@ -208,6 +225,7 @@ class Problem(
                     perVarCalls[v]++; totalCalls++
                     val pin = propagate(accAsAssumptions.withInt(v, k))
                     if (pin is PropagationResult.Unsat) {
+                        bumpFactorWeights(pin, factorWeights)
                         perVarCalls[v]++; totalCalls++
                         val r = propagate(accAsAssumptions.withIntHole(v, k))
                         if (r is PropagationResult.Unsat) return r
@@ -248,29 +266,59 @@ class Problem(
      * and re-probe. Returns the strengthened [PropagationResult.Implied], or [Unsat]
      * if the problem turns out to be infeasible.
      */
-    /** Probe-order heuristic: visit int vars in ascending current-domain-size order so
-     *  the budget gets spent on the most-constrained vars first (smaller domains tend
-     *  to yield more deductions per probe). Ties break by var id for determinism. */
-    private fun sacProbeOrder(acc: PropagationResult.Implied): IntArray {
-        val order = IntArray(numIntVars) { it }
-        val sizes = IntArray(numIntVars) { v ->
-            if (acc.intValueOrNull(v) != null) return@IntArray 1
+    /** Probe-order heuristic: wdeg / dom — sort descending by `Σ factorWeights[f] / dom(v)`
+     *  so the budget is spent first on vars that are heavily-constrained relative to their
+     *  remaining domain. Each Unsat probe bumps the weights of the factors in its conflict
+     *  via [bumpFactorWeights], so failing probes steer the next pass toward related vars
+     *  (the classic wdeg adaptation). Ties break by a per-pass random key (deterministic
+     *  for a given [probeSeed]) — this avoids the deterministic-id-order bias that the
+     *  prior dom-sized order would inherit when every var has the same dom and weight. */
+    private fun sacProbeOrder(
+        acc: PropagationResult.Implied,
+        factorWeights: DoubleArray,
+        rng: kotlin.random.Random,
+    ): IntArray {
+        val scores = DoubleArray(numIntVars) { v ->
+            if (acc.intValueOrNull(v) != null) return@DoubleArray Double.NEGATIVE_INFINITY
             val orig = intDomains[v]
             val lo = acc.intMinOrNullCompat(v) ?: orig.min
             val hi = acc.intMaxOrNullCompat(v) ?: orig.max
-            (hi - lo + 1).coerceAtLeast(1)
+            val dom = (hi - lo + 1).coerceAtLeast(1)
+            var wdeg = 0.0
+            val occ = intOccurrences[v]
+            for (i in occ.indices) wdeg += factorWeights[occ[i]]
+            wdeg / dom
         }
-        return order.toTypedArray().sortedWith(compareBy({ sizes[it] }, { it })).toIntArray()
+        val tie = IntArray(numIntVars) { rng.nextInt() }
+        val boxed = Array(numIntVars) { it }
+        boxed.sortWith(Comparator { a, b ->
+            val sa = scores[a]; val sb = scores[b]
+            if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
+        })
+        return IntArray(numIntVars) { boxed[it] }
     }
 
-    private fun probeBoundSac(base: PropagationResult.Implied): PropagationResult {
+    /** Bump every factor implicated in an Unsat conflict by 1.0. This is the wdeg update
+     *  rule: factors that repeatedly fail under hypothetical pins gain weight and steer
+     *  the SAC probe order toward the vars they mention on subsequent passes. */
+    private fun bumpFactorWeights(unsat: PropagationResult.Unsat, factorWeights: DoubleArray) {
+        for (f in unsat.conflictFactors) {
+            if (f in factorWeights.indices) factorWeights[f] += 1.0
+        }
+    }
+
+    private fun probeBoundSac(
+        base: PropagationResult.Implied,
+        factorWeights: DoubleArray,
+        rng: kotlin.random.Random,
+    ): PropagationResult {
         var acc: PropagationResult.Implied = base
         val perVarCalls = IntArray(numIntVars)
         var totalCalls = 0
         var changed = true
         while (changed) {
             changed = false
-            for (v in sacProbeOrder(acc)) {
+            for (v in sacProbeOrder(acc, factorWeights, rng)) {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= probeBudgetPerVar) continue
                 if (totalCalls >= probeTotalBudget) return acc
@@ -282,6 +330,7 @@ class Problem(
                 perVarCalls[v]++; totalCalls++
                 val pinMin = propagate(accAsAssumptions.withInt(v, curMin))
                 if (pinMin is PropagationResult.Unsat) {
+                    bumpFactorWeights(pinMin, factorWeights)
                     perVarCalls[v]++; totalCalls++
                     val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
                     val r = propagate(tightened)
@@ -296,6 +345,7 @@ class Problem(
                 perVarCalls[v]++; totalCalls++
                 val pinMax = propagate(accAsAssumptions.withInt(v, curMax))
                 if (pinMax is PropagationResult.Unsat) {
+                    bumpFactorWeights(pinMax, factorWeights)
                     perVarCalls[v]++; totalCalls++
                     val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
                     val r = propagate(tightened)
