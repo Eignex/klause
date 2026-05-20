@@ -1,9 +1,14 @@
 package com.eignex.klause.smt
 
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
 import org.sosy_lab.common.ShutdownNotifier
 import org.sosy_lab.common.configuration.Configuration
@@ -11,6 +16,8 @@ import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
 import org.sosy_lab.java_smt.api.BooleanFormula
 import org.sosy_lab.java_smt.api.Model
+import org.sosy_lab.java_smt.api.NumeralFormula.RationalFormula
+import org.sosy_lab.java_smt.api.OptimizationProverEnvironment
 import org.sosy_lab.java_smt.api.SolverContext
 import org.sosy_lab.java_smt.api.SolverContext.ProverOptions
 
@@ -34,7 +41,7 @@ import org.sosy_lab.java_smt.api.SolverContext.ProverOptions
  * (a one-shot session is opened and immediately closed). Native `minimize()` comes in a
  * follow-up.
  */
-class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
+class SmtSolver(override val problem: Problem) : Solver<SmtParams>, Optimizer<SmtParams> {
 
     /**
      * Open an [SmtSession] holding ONE [org.sosy_lab.java_smt.api.SolverContext] +
@@ -46,6 +53,83 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
 
     /** Open a session with a specific backend (and any other initial param defaults). */
     fun session(initialParams: SmtParams): SmtSession = SmtSession(this, initialParams)
+
+    /**
+     * Linear-objective minimisation via JavaSMT's [OptimizationProverEnvironment]. Only
+     * Z3 and MathSAT5 implement optimization in JavaSMT today — other backends throw
+     * [UnsupportedOperationException] from [SolverContext.newOptimizationProverEnvironment],
+     * which propagates up to the caller. Pick [SmtParams.solver] accordingly.
+     *
+     * The objective `Σ wᵢ · bᵢ + Σ cᵢ · iᵢ + constant` is built over rationals (bool
+     * indicators lifted via `ifThenElse`, ints cast via `castToRational`). Non-Linear
+     * [Objective] subtypes throw at runtime — JavaSMT has no generic objective callback.
+     */
+    override fun minimize(objective: Objective, params: SmtParams): MinimizeResult {
+        require(objective is LinearObjective) {
+            "SmtSolver only supports LinearObjective; got ${objective::class.simpleName}"
+        }
+        val context = newContext(params)
+        try {
+            val opt: OptimizationProverEnvironment =
+                context.newOptimizationProverEnvironment(ProverOptions.GENERATE_MODELS)
+            opt.use { prover ->
+                val t = SmtTranslator.translate(problem, context.formulaManager)
+                for (c in t.auxiliary) prover.addConstraint(c)
+                for (c in t.factorFormulas) prover.addConstraint(c)
+                addAssumptions(params, t.encoding, prover)
+                val objExpr = buildObjective(objective, t.encoding)
+                prover.minimize(objExpr)
+                return when (prover.check()) {
+                    OptimizationProverEnvironment.OptStatus.OPT -> {
+                        val sample = decode(prover.getModel(), t.encoding)
+                        MinimizeResult.Optimal(sample, objective.evaluate(sample))
+                    }
+                    OptimizationProverEnvironment.OptStatus.UNSAT -> MinimizeResult.Infeasible()
+                    OptimizationProverEnvironment.OptStatus.UNDEF ->
+                        MinimizeResult.Unknown(TerminationReason.Timeout)
+                }
+            }
+        } finally {
+            context.close()
+        }
+    }
+
+    /** Build `Σ wᵢ · bᵢ + Σ cᵢ · iᵢ + constant` as a single [RationalFormula]. Bools are
+     *  lifted to `b ? 1 : 0`; ints are cast from the integer formula manager to rationals
+     *  via [castIntToRational]. Skips zero-weight terms to keep the formula small. */
+    private fun buildObjective(obj: LinearObjective, encoding: SmtEncoding): RationalFormula {
+        val rmgr = encoding.fm.rationalFormulaManager
+        val bmgr = encoding.fm.booleanFormulaManager
+        var acc: RationalFormula = rmgr.makeNumber(obj.constant)
+        for (b in obj.boolWeights.indices) {
+            val w = obj.boolWeights[b]
+            if (w == 0.0) continue
+            val term = bmgr.ifThenElse(encoding.boolFormulas[b], rmgr.makeNumber(w), rmgr.makeNumber(0.0))
+            acc = rmgr.add(acc, term)
+        }
+        for (i in obj.intCoefficients.indices) {
+            val c = obj.intCoefficients[i]
+            if (c == 0.0) continue
+            val asReal = castIntToRational(encoding.intFormulas[i], encoding)
+            acc = rmgr.add(acc, rmgr.multiply(rmgr.makeNumber(c), asReal))
+        }
+        return acc
+    }
+
+    /** Cross-theory cast from an integer formula to a rational formula. JavaSMT's
+     *  `RationalFormulaManager` accepts an integer formula directly in arithmetic
+     *  operations on backends that support mixed arithmetic; for the lean path we wrap
+     *  via a fresh rational variable equated to the int. */
+    private fun castIntToRational(
+        intF: org.sosy_lab.java_smt.api.NumeralFormula.IntegerFormula,
+        encoding: SmtEncoding,
+    ): RationalFormula {
+        // RationalFormulaManager.add accepts IntegerFormula via covariance on most backends,
+        // but the static return type forces a NumeralFormula. Multiplying 1 × intF yields a
+        // RationalFormula whose value tracks the int.
+        val rmgr = encoding.fm.rationalFormulaManager
+        return rmgr.multiply(rmgr.makeNumber(1L), intF as org.sosy_lab.java_smt.api.NumeralFormula)
+    }
 
     override fun solve(params: SmtParams): SolveResult {
         val context = newContext(params)
@@ -123,7 +207,7 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams> {
     private fun addAssumptions(
         params: SmtParams,
         encoding: SmtEncoding,
-        prover: org.sosy_lab.java_smt.api.ProverEnvironment,
+        prover: org.sosy_lab.java_smt.api.BasicProverEnvironment<*>,
     ) {
         val bmgr = encoding.fm.booleanFormulaManager
         val imgr = encoding.fm.integerFormulaManager
