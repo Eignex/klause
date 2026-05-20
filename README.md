@@ -129,26 +129,24 @@ val text = cnf.toDimacs()
 Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP backtrack + propagation, `[LS+CP]` cross-cutting, `[API]` cross-backend solver API, `[Sampling]` model counting / uniform sampling, `[Format]` input format parsers, `[Backend]` external solver adapters, `[Perf]` post-benchmark optimization, `[Docs]`, `[Infra]`.
 
 - `[Infra]` Maven Central publishing, CI.
-- `[CP]` Vilím Θ-tree edge-finding for `Cumulative` past time-tabling and the energy-overload check.
-- `[CP]` Sweep-prefix tightening of hole-aware `conflictReason` — cite only the prefix of holes/bounds that justifies each prune, not the whole filtered domain.
-- `[CP]` wdeg / activity-weighted SAC probe ordering past the smallest-domain-first default; randomised tie-breaking when budget is hit mid-pass.
-- `[CP/Optimize]` Core-guided optimization (OLL / RC2). Lower bound via assumption-grounded unsat cores, upper bound via BnB — modern CP-SAT runs both.
-- `[CP/Optimize]` LP-relaxation bounding during BnB. Fold linear factors into an LP, use LP-LB + reduced costs for pruning and value ordering. Flag-gated, multi-week.
-- `[LS]` Multi-core LS portfolio finishing touches for the MZN Challenge LS track: best-feasible sharing as warm-start hints, shared kumulant stats in Relaxed mode for a restart-level bandit, worker-config factory handing each worker a distinct `(strategy, seed)`.
-- `[LS]` ALNS: problem-specific destroy operators (cumulative time-window slides) and regret-based / best-improving construction repairs.
-- `[LS]` ILS: basin-hopping-style large-jump perturbation and multi-parent / linkage-aware crossover.
-- `[LS]` Auto-tune `NoiseController.ewmaAlpha` from problem size + flip budget so callers don't set it manually.
-- `[LS]` Extend cost shaping past `LinearObjective`. Linear is O(1) coefficient lookup; arbitrary `Objective` subtypes need apply-revert with full re-eval per candidate — not justified for typical workloads.
-- `[LS]` Optional SAPS strategy as a multiplicative-weighting alternative to additive DDFW. Low priority — DDFW covers the weight-learning niche.
-- `[LS]` Richer VNS: VND (exhaust each k before promotion), per-level neighbourhood operators (swap-only at N2, 3-opt at N3), skewed-VNS accepting mild worsening at higher k.
-- `[LS]` Problem-aware move generation for globals not yet covered: cumulative time-window slides, lex-aware moves for `lexLeq` / `lexLt`, reified-factor diversification. Extension point is per-factor `proposeRepairMoves`.
-- `[Sampling]` Hash-based uniform sampling (UniGen2-style) — tracked in [#15](https://github.com/Eignex/klause/issues/15).
-- `[Sampling]` Approximate model counting (ApproxMC) — tracked in [#16](https://github.com/Eignex/klause/issues/16).
+- `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
+- `[CP]` Sweep-prefix tightening of hole-aware `conflictReason`.
+- `[CP]` wdeg / activity-weighted SAC probe ordering; randomised tie-breaking.
+- `[CP/Optimize]` Core-guided optimization (OLL / RC2).
+- `[CP/Optimize]` LP-relaxation bounding during BnB.
+- `[LS]` Multi-core LS portfolio: best-feasible sharing, shared kumulant stats for a restart-level bandit, worker-config factory.
+- `[LS]` ALNS: cumulative time-window destroy operators and regret-based / best-improving repairs.
+- `[LS]` ILS: basin-hopping perturbation and linkage-aware crossover.
+- `[LS]` Auto-tune `NoiseController.ewmaAlpha` from problem size and flip budget.
+- `[LS]` Cost shaping for non-`LinearObjective` objectives.
+- `[LS]` SAPS strategy.
+- `[LS]` Richer VNS: VND, per-level neighbourhood operators, skewed-VNS.
+- `[LS]` Problem-aware moves for `cumulative`, `lexLeq` / `lexLt`, and reified factors.
 - `[Sampling]` Weighted projected sampling (WAPS / KUS).
-- `[Perf]` Native bitset set-propagators where benchmarking shows bool-decomposition's per-bool propagator dispatch is the bottleneck. For sets with large universes (>256 elements) and many set algebra operations per propagation cycle, bitset throughput on `(LB, UB)` representations beats N independent bool propagator calls by a constant factor. Cost is engine plumbing (set domain arrays in `PropagationState`, dedicated move type, snapshot extension). Revisit only with profiling data.
-- `[Backend]` klause-smt `Optimizer.minimize()` via JavaSMT's `OptimizationProverEnvironment` (Z3 / MathSAT5-only — others need an external linear-search loop).
-- `[Perf]` Audit `PropagationSession` snapshot cost. 9 array copies per push today (`boolValues`, `intDomains`, `boolLevel`, `intLevel`, `decisionVars`, `boolReason`, `intMinReason`, `intMaxReason`, `boolAntecedents`); consider pooling, a flat delta-trail journal, or a dirty-field bitmask copying only modified arrays.
-- `[Perf]` VSIDS `pick` scans every unpinned variable (linear in `numBoolVars + numIntVars`). Swap for a bucket queue or pairing heap → O(log n); `bumpBool` / `bumpInt` reposition on activity update. Same upgrade for dom/wdeg (key by `wdeg/dom`).
-- `[Perf]` Bitset-backed `IntDomain` for narrow spans — third internal variant alongside contiguous + sparse-IntArray, O(1) contains / excludeValue. Multi-week, touches every propagator's hot path.
-- `[Perf]` Move-pool inlining: pack `BoolFlip` / `IntSet` into a `Long` and back `MoveSink` with a `LongArray` primitive lane; keep an ArrayList for `Compound` parts. Touches every strategy.
-- `[Perf]` Opt non-Clause factors into incremental `updateBoolBreakMakeForFlip` — `Cardinality` (track current sat count vs `min`/`max` bounds), `PseudoBoolean` (track weighted sum vs bound), `Xor` (parity flip is O(1) per touched var). Currently fall back to brute-force O(Σ arity²) per flip.
+- `[Perf]` Native bitset set-propagators for set algebra over large universes.
+- `[Backend]` klause-smt `Optimizer.minimize()` via JavaSMT's `OptimizationProverEnvironment`.
+- `[Perf]` Pool / delta-trail `PropagationSession` snapshots to cut the 9 array copies per push.
+- `[Perf]` Bucket-queue or pairing-heap VSIDS / dom-wdeg variable picker.
+- `[Perf]` Bitset-backed `IntDomain` for narrow spans.
+- `[Perf]` Move-pool inlining: pack `BoolFlip` / `IntSet` into a `Long`-backed `MoveSink` lane.
+- `[Perf]` Opt `Cardinality`, `PseudoBoolean`, `Xor` into incremental `updateBoolBreakMakeForFlip`.
