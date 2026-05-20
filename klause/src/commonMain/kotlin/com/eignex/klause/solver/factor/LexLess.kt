@@ -93,6 +93,24 @@ class LexLess(
         return collectLinearTightenAntecedents(state, combined, excludeIdx = -1, extraLit = 0)
     }
 
+    /**
+     * Chained-prefix bound propagator (Frisch et al. 2002, simplified).
+     *
+     * Walk index `i` from 0 while `xs[i]` and `ys[i]` are "definitely equal" (both
+     * singleton with the same value). At the first ambiguous position `alpha`:
+     *  - If `xs[α].max < ys[α].min`: relation forced satisfied, return true.
+     *  - If `xs[α].min > ys[α].max`: relation forced failed, return false.
+     *  - Else: tighten `xs[α].max ≤ ys[α].max`, `ys[α].min ≥ xs[α].min`.
+     *  - If after tightening both become singleton-equal, advance to `α+1` and repeat
+     *    — the "chained" part of the propagator that fires when each round forces
+     *    enough to expose the next ambiguous position.
+     *
+     * Strict mode: if we reach the end of the compared prefix without finding any
+     * position that could strictly decide the relation, then the prefix is fixed-
+     * equal; strict-mode forces a strict break somewhere, so the last comparable
+     * position must satisfy `xs[end] < ys[end]`. This is handled by the loop's
+     * tail: when `i == len` (all-equal prefix), apply the length-based tiebreak.
+     */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val len = minOf(xs.size, ys.size)
         var i = 0
@@ -101,26 +119,36 @@ class LexLess(
             val dy = state.intDomains[ys[i]]
             if (dx.min == dx.max && dy.min == dy.max) {
                 when {
-                    dx.min < dy.min -> return true   // relation fixed in our favour, tail unconstrained
-                    dx.min > dy.min -> return false  // violated at index i
-                    else -> { i++; continue }        // equal — advance into prefix
+                    dx.min < dy.min -> return true   // relation forced, tail unconstrained
+                    dx.min > dy.min -> return false  // violated at i
+                    else -> { i++; continue }        // equal — advance
                 }
             }
-            // Mixed-or-non-singleton: apply the weakest sound bound xs[i] ≤ ys[i]. Per-
-            // index strict-< inference at the *last* compared position would tighten by 1,
-            // but the existence of a future witness keeps full strictness out of scope here.
-            // Antecedents: each tighten depends on the matching var's current bound.
+            // Forced satisfaction: xs[i] can't reach ys[i]'s range, so xs <_lex ys.
+            if (dx.max < dy.min) return true
+            // Forced failure: even the smallest xs[i] is above the largest ys[i].
+            if (dx.min > dy.max) return false
+            // Bound tightening: xs[i] ≤ ys[i] is necessary for the relation to hold,
+            // since position i would otherwise decide the comparison against us.
             val antFromY = state.composeIntVarAtomAntecedents(intArrayOf(ys[i]))
             val antFromX = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))
             if (!state.tightenIntMax(xs[i], dy.max, antFromY)) return false
             if (!state.tightenIntMin(ys[i], dx.min, antFromX)) return false
-            return true
+            // Re-read after the tightening.
+            val dx2 = state.intDomains[xs[i]]
+            val dy2 = state.intDomains[ys[i]]
+            // If still ambiguous, we can't propagate further with bound-only reasoning.
+            if (!(dx2.min == dx2.max && dy2.min == dy2.max)) return true
+            // Now both singleton: equal means advance into the prefix; otherwise the
+            // earlier checks would have caught the inequality.
+            if (dx2.min != dy2.min) return dx2.min < dy2.min
+            i++
         }
         // Walked the entire compared prefix with everything singleton-equal.
         return when {
-            xs.size == ys.size -> !strict  // equal arrays: strict fails, non-strict succeeds
-            xs.size < ys.size -> true       // xs is shorter prefix: succeeds both modes
-            else -> false                   // ys is shorter prefix: fails both modes
+            xs.size == ys.size -> !strict
+            xs.size < ys.size -> true
+            else -> false
         }
     }
 }
