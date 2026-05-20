@@ -13,6 +13,27 @@ interface Objective {
 }
 
 /**
+ * Opt-in extension for non-[LinearObjective] objectives that can compute their per-move
+ * change incrementally. The local-search engine's cost-shaping path (see
+ * `LocalSearchState.shapedObjectiveDelta`) calls [deltaIfApplied] to fold the objective into
+ * per-move scoring without materialising a [Sample] for every candidate move. Without this
+ * interface, non-Linear objectives are only considered at "best feasible" evaluation time —
+ * the descent itself is objective-blind.
+ *
+ * Implementations must return the exact value `evaluate(applyMove(current)) − evaluate(current)`
+ * for the current [Assignment] and the proposed [Move]. The move is *not* applied — the
+ * engine asks about hypothetical deltas while picking the next step.
+ *
+ * For piecewise-linear or coordinate-separable objectives the body is typically O(1) per
+ * Bool/IntSet move and O(parts) per Compound. If your objective can't compute an
+ * incremental delta cheaper than full re-evaluation, prefer not to implement this — the
+ * default unshaped path is faster than apply/evaluate/revert per scored move.
+ */
+interface IncrementalObjective : Objective {
+    fun deltaIfApplied(assignment: Assignment, move: Move): Double
+}
+
+/**
  * Σ boolWeights[b] · 1[bool[b]] + Σ intCoefficients[i] · int[i] + constant.
  *
  * - [boolWeights] indexes by the original-problem bool var id; size must equal

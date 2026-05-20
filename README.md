@@ -137,7 +137,6 @@ Each item is tagged with its workstream: `[CP]` complete-search engine and propa
 - `[LS]` Multi-core LS portfolio: best-feasible sharing, shared kumulant stats for a restart-level bandit, worker-config factory.
 - `[LS]` ALNS: cumulative time-window destroy operators and regret-based / best-improving repairs.
 - `[LS]` ILS: basin-hopping perturbation and linkage-aware crossover.
-- `[LS]` Cost shaping for non-`LinearObjective` objectives.
 - `[LS]` Richer VNS: VND, per-level neighbourhood operators, skewed-VNS.
 - `[LS]` Problem-aware moves for `cumulative`, `lexLeq` / `lexLt`, and reified factors.
 - `[Perf]` Pool / delta-trail `PropagationSession` snapshots to cut the 9 array copies per push.

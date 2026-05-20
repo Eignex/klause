@@ -118,6 +118,64 @@ class CostShapingTest {
     }
 
     @Test
+    fun `incremental objective drives shaped delta for non-linear objectives`() {
+        // |2·b0 - b1 - 1| — a piecewise-linear objective that LinearObjective can't express.
+        // Implement IncrementalObjective so the LS engine can fold it into shaped descent.
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        state.assignment.setBool(0, false)
+        state.assignment.setBool(1, false)
+        state.recompute()
+        val abs = object : IncrementalObjective {
+            override fun evaluate(sample: Sample): Double {
+                val b0 = if (sample.bools[0]) 1 else 0
+                val b1 = if (sample.bools[1]) 1 else 0
+                return kotlin.math.abs(2.0 * b0 - b1 - 1.0)
+            }
+            override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
+                val before = score(assignment.boolValue(0), assignment.boolValue(1))
+                val after = when (move) {
+                    is Move.BoolFlip -> when (move.varId) {
+                        0 -> score(!assignment.boolValue(0), assignment.boolValue(1))
+                        1 -> score(assignment.boolValue(0), !assignment.boolValue(1))
+                        else -> before
+                    }
+                    else -> before
+                }
+                return after - before
+            }
+            private fun score(b0: Boolean, b1: Boolean): Double {
+                val x = if (b0) 1 else 0
+                val y = if (b1) 1 else 0
+                return kotlin.math.abs(2.0 * x - y - 1.0)
+            }
+        }
+        state.objective = abs
+        state.shapingLambda = 1.0
+        // Current (b0=F, b1=F): |0 - 0 - 1| = 1.
+        // Flip b0 → T: |2 - 0 - 1| = 1, delta = 0.
+        // Flip b1 → T: |0 - 1 - 1| = 2, delta = +1.
+        assertEquals(0.0, state.shapedObjectiveDelta(Move.BoolFlip(0)), 1e-9)
+        assertEquals(1.0, state.shapedObjectiveDelta(Move.BoolFlip(1)), 1e-9)
+    }
+
+    @Test
+    fun `non-incremental non-linear objective falls through to zero shaped delta`() {
+        // Generic Objective that doesn't implement IncrementalObjective — shaping must
+        // return 0.0 (descent objective-blind) rather than crash or apply-revert.
+        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        state.recompute()
+        state.objective = object : Objective {
+            override fun evaluate(sample: Sample): Double = 42.0
+        }
+        state.shapingLambda = 1.0
+        assertEquals(0.0, state.shapedObjectiveDelta(Move.BoolFlip(0)))
+    }
+
+    @Test
     fun `linear shaping minimize on exact one cardinality finds the cheapest pick`() {
         // Same setup as OptimizerTest's exactly-one weighted case, but using shaped descent.
         val factor = Cardinality.exactlyOne(intArrayOf(

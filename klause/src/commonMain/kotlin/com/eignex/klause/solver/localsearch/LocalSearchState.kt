@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.IncrementalObjective
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Objective
@@ -213,9 +214,15 @@ class LocalSearchState(
      * [breakScore]; the engine populates the relevant fields on `minimize` and leaves
      * them at defaults otherwise.
      *
-     * Only [LinearObjective] is shaped today (O(1) coefficient lookup per move).
-     * Non-linear objectives would require an apply-revert with full re-evaluation; the
-     * benefit doesn't justify the state churn so they fall through to the unshaped path.
+     * Two fast paths are recognised:
+     *  - [LinearObjective]: O(1) coefficient lookup per Bool/IntSet move (existing path).
+     *  - [IncrementalObjective]: caller-supplied `deltaIfApplied`. Lets piecewise-linear,
+     *    abs-of-linear, max-of-linear, etc. objectives drive shaped descent at whatever
+     *    cost they can manage.
+     *
+     * Anything else returns `0.0` — generic non-incremental objectives would require an
+     * apply-revert with full re-evaluation per scored candidate, defeating the point of
+     * a per-move score.
      */
     fun shapedBreakScore(move: Move): Double =
         breakScore(move).toDouble() + shapedObjectiveDelta(move)
@@ -223,15 +230,20 @@ class LocalSearchState(
     /**
      * Lambda-multiplied objective delta contribution for shaping any per-move score:
      * `shapingLambda * objectiveDelta(move)`. Returns `0.0` when shaping is off
-     * (no objective, lambda = 0, or non-Linear objective). Strategies that compose
-     * objective-aware scores (DDFW's weighted break, ProbSat's exponent input) add
-     * this on top of their base metric.
+     * (no objective, lambda = 0) or the objective doesn't support incremental deltas
+     * (neither [LinearObjective] nor [IncrementalObjective]). Strategies that compose
+     * objective-aware scores (DDFW's weighted break, ProbSat's exponent input) add this
+     * on top of their base metric.
      */
     fun shapedObjectiveDelta(move: Move): Double {
         val obj = objective ?: return 0.0
         if (shapingLambda == 0.0) return 0.0
-        if (obj !is LinearObjective) return 0.0
-        return shapingLambda * linearObjectiveDelta(move, obj)
+        val delta = when (obj) {
+            is LinearObjective -> linearObjectiveDelta(move, obj)
+            is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
+            else -> return 0.0
+        }
+        return shapingLambda * delta
     }
 
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double = when (move) {
