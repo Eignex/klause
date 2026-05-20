@@ -155,9 +155,8 @@ Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP
 - `[Format/SMT-LIB]` to_real / to_int casts. Either bucket reals onto bounded ints or reject the benchmark.
 - `[Format/SMT-LIB]` Let-binding expansion in the SMT-LIB parser.
 - `[Format/SMT-LIB]` Unbounded integers in BacktrackSolver. Pairs with the bound-inference item above.
-- `[Format/FlatZinc]` Set-var follow-ups: (a) reified union/intersect/diff if MZN models actually use them (rare — the unreified forms are the common path); (b) set_le/set_lt lexicographic ordering on the indicator bool arrays; (c) `var set of E: S = { ... }` initializer (constant set var) — today only `var set of E: S` with no value is accepted.
+- `[Format/FlatZinc]` Set-var follow-ups: (a) reified union/intersect/diff if MZN models actually use them (rare — the unreified forms are the common path); (b) `var set of E: S = { ... }` initializer (constant set var) — today only `var set of E: S` with no value is accepted.
 - `[Perf]` Native bitset set-propagators where benchmarking shows bool-decomposition's per-bool propagator dispatch is the bottleneck. For sets with large universes (>256 elements) and many set algebra operations per propagation cycle, bitset throughput on `(LB, UB)` representations beats N independent bool propagator calls by a constant factor. Cost is engine plumbing (set domain arrays in `PropagationState`, dedicated move type, snapshot extension). Revisit only with profiling data.
-- `[Format/FlatZinc]` Read the paired `.ozn` mapping file so MZN enum tag names round-trip into klause's `nominal(...)` schema field without callers having to inject `klause_enum_labels(...)` annotations manually.
 - `[Format/XCSP3]` Parser for XCSP3 XML, including extension tables and intension predicates.
 - `[Backend]` klause-smt `Optimizer.minimize()` via JavaSMT's `OptimizationProverEnvironment` (Z3 / MathSAT5-only — others need an external linear-search loop).
 - `[Backend]` klause-choco adapter. JVM-only wrapper around Choco-solver as a reference CP oracle and benchmark target. Mature global catalog, battle-tested FZN parser; klause-factor mapping is near 1:1.
