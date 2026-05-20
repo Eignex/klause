@@ -121,14 +121,14 @@ class Assumptions internal constructor(
         val mergedBoolValues = ArrayList<Boolean>(boolKeys.size + other.boolKeys.size)
         sortedMergeBools(boolKeys, boolValues, other.boolKeys, other.boolValues,
             mergedBoolKeys, mergedBoolValues)
-        val mergedIntKeys = ArrayList<Int>(intKeys.size + other.intKeys.size)
-        val mergedIntValues = ArrayList<Int>(intKeys.size + other.intKeys.size)
+        val mergedIntKeys = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
+        val mergedIntValues = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
         sortedMergeInts(intKeys, intValues, other.intKeys, other.intValues,
             mergedIntKeys, mergedIntValues)
         // Bound tightenings: take max for mins, min for maxes; on overlap with an
         // exact int pin from either side, drop the bound (the pin subsumes).
         val pinned = HashSet<Int>()
-        for (k in mergedIntKeys) pinned.add(k)
+        for (i in 0 until mergedIntKeys.size) pinned.add(mergedIntKeys[i])
         val minMap = HashMap<Int, Int>()
         forEachIntMin { k, v -> if (k !in pinned) minMap[k] = v }
         other.forEachIntMin { k, v ->
@@ -392,7 +392,7 @@ class Assumptions internal constructor(
 
         private fun sortedMergeInts(
             ak: IntArray, av: IntArray, bk: IntArray, bv: IntArray,
-            outK: ArrayList<Int>, outV: ArrayList<Int>,
+            outK: com.eignex.klause.util.IntArrayList, outV: com.eignex.klause.util.IntArrayList,
         ) {
             var i = 0; var j = 0
             while (i < ak.size && j < bk.size) {

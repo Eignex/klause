@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.IntArrayList
 
 /**
  * First-UIP (Unique Implication Point) conflict analyzer — the classical CDCL clause-learning
@@ -109,7 +110,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         val atomCount = state.atomIntVar.size
         val seen = BooleanArray(numBoolVars + atomCount)
         var currentLevelCount = 0
-        val learned = ArrayList<Int>(seedReason.size)
+        val learned = IntArrayList(seedReason.size)
 
         ingestReason(seedReason, seen, learned, currentLevel) {
             currentLevelCount++
@@ -183,7 +184,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      * on the final clause and wrap into [AnalysisResult.Learned]. Single tail call from
      * every exit path of [analyze] so all exit shapes get the same post-processing.
      */
-    private fun finalizeClause(learned: ArrayList<Int>, currentLevel: Int): AnalysisResult.Learned {
+    private fun finalizeClause(learned: IntArrayList, currentLevel: Int): AnalysisResult.Learned {
         val minimized = minimize(learned, currentLevel)
         return AnalysisResult.Learned(
             minimized.toIntArray(),
@@ -207,25 +208,30 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      * typical SAT-style instances, with knock-on improvements to watcher-list traversal
      * cost during future propagation.
      */
-    private fun minimize(learned: ArrayList<Int>, currentLevel: Int): ArrayList<Int> {
+    private fun minimize(learned: IntArrayList, currentLevel: Int): IntArrayList {
         if (learned.size <= 1) return learned
-        // inClause covers the combined bool + atom var space so atom-lit literals
-        // participate in the redundancy check.
-        val inClause = BooleanArray(state.problem.numBoolVars + state.atomIntVar.size)
-        for (lit in learned) {
-            val v = Lit.variable(lit)
+        val universeSize = state.problem.numBoolVars + state.atomIntVar.size
+        val inClause = BooleanArray(universeSize)
+        for (i in 0 until learned.size) {
+            val v = Lit.variable(learned[i])
             if (v < inClause.size) inClause[v] = true
         }
         val cache = HashMap<Int, Boolean>(learned.size * 4)
-        val toDrop = HashSet<Int>()
-        for (lit in learned) {
-            val v = Lit.variable(lit)
-            if (levelOf(v) == currentLevel) continue  // never drop UIP
-            if (isRedundant(v, inClause, cache)) toDrop.add(v)
+        val toDrop = BooleanArray(universeSize)
+        var dropCount = 0
+        for (i in 0 until learned.size) {
+            val v = Lit.variable(learned[i])
+            if (v >= universeSize) continue
+            if (levelOf(v) == currentLevel) continue
+            if (isRedundant(v, inClause, cache)) { toDrop[v] = true; dropCount++ }
         }
-        if (toDrop.isEmpty()) return learned
-        val out = ArrayList<Int>(learned.size - toDrop.size)
-        for (lit in learned) if (Lit.variable(lit) !in toDrop) out.add(lit)
+        if (dropCount == 0) return learned
+        val out = IntArrayList(learned.size - dropCount)
+        for (i in 0 until learned.size) {
+            val lit = learned[i]
+            val v = Lit.variable(lit)
+            if (v >= universeSize || !toDrop[v]) out.add(lit)
+        }
         return out
     }
 
@@ -276,7 +282,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     private fun ingestReason(
         reason: IntArray,
         seen: BooleanArray,
-        learned: ArrayList<Int>,
+        learned: IntArrayList,
         currentLevel: Int,
         bumpCurrentLevel: () -> Unit,
     ) {
@@ -305,7 +311,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     }
 
     /** Convert every still-seen variable into a literal in [learned]. */
-    private fun drainSeenAsLeaves(seen: BooleanArray, learned: ArrayList<Int>) {
+    private fun drainSeenAsLeaves(seen: BooleanArray, learned: IntArrayList) {
         val numBoolVars = state.problem.numBoolVars
         for (v in seen.indices) {
             if (!seen[v]) continue
@@ -317,7 +323,11 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                 val holds = state.atomCurrentTruth(atomId) ?: continue
                 Lit.make(v, !holds)
             }
-            if (learned.any { Lit.variable(it) == v }) continue
+            var present = false
+            for (i in 0 until learned.size) {
+                if (Lit.variable(learned[i]) == v) { present = true; break }
+            }
+            if (present) continue
             learned.add(lit)
         }
     }
@@ -329,10 +339,10 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      * length or activity. Forgetting policies typically keep clauses with LBD ≤ 2
      * forever ("glue clauses") and drop high-LBD clauses first.
      */
-    private fun lbdOf(learned: List<Int>): Int {
-        if (learned.isEmpty()) return 0
+    private fun lbdOf(learned: IntArrayList): Int {
+        if (learned.size == 0) return 0
         val seenLevels = HashSet<Int>(learned.size)
-        for (lit in learned) seenLevels.add(levelOf(Lit.variable(lit)))
+        for (i in 0 until learned.size) seenLevels.add(levelOf(Lit.variable(learned[i])))
         return seenLevels.size
     }
 
@@ -343,10 +353,10 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      * the UIP literal remains undetermined) and propagation can re-fire it as a forced
      * pin.
      */
-    private fun backjumpLevelOf(learned: List<Int>, currentLevel: Int): Int {
+    private fun backjumpLevelOf(learned: IntArrayList, currentLevel: Int): Int {
         var best = 0
-        for (lit in learned) {
-            val lvl = levelOf(Lit.variable(lit))
+        for (i in 0 until learned.size) {
+            val lvl = levelOf(Lit.variable(learned[i]))
             if (lvl < currentLevel && lvl > best) best = lvl
         }
         return best

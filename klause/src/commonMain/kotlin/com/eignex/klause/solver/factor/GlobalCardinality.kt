@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * Global Cardinality Constraint (GCC). Covers the four MiniZinc variants in one factor:
@@ -175,9 +176,9 @@ class GlobalCardinality(
         if (closed) {
             for (x in xs) {
                 val d = state.intDomains[x]
-                val toRemove = ArrayList<Int>()
+                val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (v in toRemove) if (!state.excludeIntValue(x, v, gccAntecedents)) return false
+                for (k in 0 until toRemove.size) if (!state.excludeIntValue(x, toRemove[k], gccAntecedents)) return false
             }
         }
         val definite = IntArray(m)
@@ -322,9 +323,9 @@ class GlobalCardinality(
             val oIdx = xToOtherEdgeIdx[i]
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[varNode[i]] != sccId[otherNode]) {
                 val d = state.intDomains[xs[i]]
-                val toRemove = ArrayList<Int>()
+                val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (v in toRemove) if (!state.excludeIntValue(xs[i], v, gccAntecedents)) return false
+                for (k in 0 until toRemove.size) if (!state.excludeIntValue(xs[i], toRemove[k], gccAntecedents)) return false
             }
         }
         return true
@@ -343,10 +344,10 @@ class GlobalCardinality(
      * pushed on edge `e` shows up as `originalCap - cap[e]` for forward edges.
      */
     private class FlowBuilder(val numNodes: Int) {
-        private val adj: Array<ArrayList<Int>> = Array(numNodes) { ArrayList() }
-        private val edgeTo = ArrayList<Int>()
-        private val cap = ArrayList<Int>()
-        private val originalCap = ArrayList<Int>()
+        private val adj: Array<IntArrayList> = Array(numNodes) { IntArrayList() }
+        private val edgeTo = IntArrayList()
+        private val cap = IntArrayList()
+        private val originalCap = IntArrayList()
 
         fun addEdge(u: Int, v: Int, c: Int): Int {
             val eIdx = edgeTo.size
@@ -371,7 +372,9 @@ class GlobalCardinality(
                 var found = false
                 while (qHead < qTail && !found) {
                     val u = queue[qHead++]
-                    for (eIdx in adj[u]) {
+                    val neigh = adj[u]
+                    for (k in 0 until neigh.size) {
+                        val eIdx = neigh[k]
                         val v = edgeTo[eIdx]
                         if (parentEdge[v] != -1 || cap[eIdx] <= 0) continue
                         parentEdge[v] = eIdx
@@ -391,8 +394,8 @@ class GlobalCardinality(
                 cur = sink
                 while (cur != source) {
                     val eIdx = parentEdge[cur]
-                    cap[eIdx] -= bottleneck
-                    cap[eIdx xor 1] += bottleneck
+                    cap[eIdx] = cap[eIdx] - bottleneck
+                    cap[eIdx xor 1] = cap[eIdx xor 1] + bottleneck
                     cur = edgeTo[eIdx xor 1]
                 }
                 total += bottleneck

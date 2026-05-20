@@ -7,6 +7,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.factor.ceilDivLong
 import com.eignex.klause.solver.factor.floorDivLong
+import com.eignex.klause.util.IntArrayList
 
 enum class LinearOp { LE, EQ, GE, NE }
 
@@ -163,7 +164,7 @@ internal fun collectHoleAndBoundAntecedents(
     vars: IntArray,
 ): IntArray? {
     val seen = HashSet<Int>()
-    val out = ArrayList<Int>()
+    val out = IntArrayList()
     for (v in vars) {
         val d = state.intDomains[v]
         val orig = state.problem.intDomains[v]
@@ -184,7 +185,7 @@ internal fun collectHoleAndBoundAntecedents(
             }
         }
     }
-    if (out.isEmpty()) return null
+    if (out.size == 0) return null
     return out.toIntArray()
 }
 
@@ -195,7 +196,7 @@ internal fun collectLinearTightenAntecedents(
     extraLit: Int,
 ): IntArray? {
     val seen = HashSet<Int>()
-    val out = ArrayList<Int>()
+    val out = IntArrayList()
     if (extraLit != 0) { out.add(extraLit); seen.add(extraLit) }
     for (j in vars.indices) {
         if (j == excludeIdx) continue
@@ -211,7 +212,7 @@ internal fun collectLinearTightenAntecedents(
             if (seen.add(lit)) out.add(lit)
         }
     }
-    if (out.isEmpty()) return null
+    if (out.size == 0) return null
     return out.toIntArray()
 }
 

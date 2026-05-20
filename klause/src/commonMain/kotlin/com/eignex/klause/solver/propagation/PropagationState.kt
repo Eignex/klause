@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Bits
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.IntArrayList
 
 /**
  * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
@@ -98,7 +99,7 @@ class PropagationState(
      *  the analyzer then treats the resulting int-fact as a level-0-style leaf. */
     fun composeIntVarAtomAntecedents(vars: IntArray): IntArray? {
         val seen = HashSet<Long>()
-        val out = ArrayList<Int>()
+        val out = IntArrayList()
         for (v in vars) {
             val d = intDomains[v]
             val orig = problem.intDomains[v]
@@ -117,7 +118,7 @@ class PropagationState(
                 )
             }
         }
-        if (out.isEmpty()) return null
+        if (out.size == 0) return null
         return out.toIntArray()
     }
 

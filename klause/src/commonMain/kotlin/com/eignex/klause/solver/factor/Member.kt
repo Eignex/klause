@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `member_int(xs, y)` — `y` equals at least one of the `xs[i]`. The dual of
@@ -67,10 +68,10 @@ class Member(
             val values = HashSet<Int>()
             for (x in xs) values.add(state.intDomains[x].min)
             // Restrict y's domain to the value set.
-            val toRemove = ArrayList<Int>()
+            val toRemove = IntArrayList()
             dy.forEach { if (it !in values) toRemove.add(it) }
             val ant = state.composeIntVarAtomAntecedents(xs)
-            for (v in toRemove) if (!state.excludeIntValue(y, v, ant)) return false
+            for (k in 0 until toRemove.size) if (!state.excludeIntValue(y, toRemove[k], ant)) return false
         }
         return true
     }

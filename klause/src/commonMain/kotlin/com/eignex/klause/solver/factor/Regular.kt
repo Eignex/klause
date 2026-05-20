@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `regular(seq, Q, S, d, q0, F)` — the sequence `seq` is accepted by the DFA with
@@ -134,7 +135,7 @@ class Regular(
         val ant = state.composeIntVarAtomAntecedents(seq)
         for (i in 0 until n) {
             val d = state.intDomains[seq[i]]
-            val toRemove = ArrayList<Int>()
+            val toRemove = IntArrayList()
             d.forEach { s ->
                 var live = false
                 forEachStateInLayer(forward, i) { q ->
@@ -145,7 +146,7 @@ class Regular(
                 }
                 if (!live) toRemove.add(s)
             }
-            for (v in toRemove) if (!state.excludeIntValue(seq[i], v, ant)) return false
+            for (k in 0 until toRemove.size) if (!state.excludeIntValue(seq[i], toRemove[k], ant)) return false
         }
         return true
     }

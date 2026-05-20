@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `intVars[i] != intVars[j]` for every pair `i < j`. Stored payload:
@@ -133,7 +134,7 @@ class AllDifferent(
         // Build compact value-id mapping and per-var sorted value-id lists from current
         // domains. Cost: O(Σ |dom(xᵢ)|).
         val valueId = HashMap<Int, Int>()
-        val idToValue = ArrayList<Int>()
+        val idToValue = IntArrayList()
         val valuesPerVar = Array(n) { i ->
             val d = state.intDomains[vars[i]]
             val list = IntArray(d.size)

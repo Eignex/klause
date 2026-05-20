@@ -112,13 +112,14 @@ class Problem(
      * index instead. Identical to [boolOccurrences] when no factor opts in.
      */
     val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
-        val watcherFids = HashSet<Int>()
+        val watcherFid = BooleanArray(factors.size)
+        var any = false
         for (i in factors.indices) {
-            if (factors[i].initialBoolWatchers != null) watcherFids.add(i)
+            if (factors[i].initialBoolWatchers != null) { watcherFid[i] = true; any = true }
         }
-        if (watcherFids.isEmpty()) boolOccurrences
+        if (!any) boolOccurrences
         else Array(numBoolVars) { v ->
-            boolOccurrences[v].filter { it !in watcherFids }.toIntArray()
+            boolOccurrences[v].filter { !watcherFid[it] }.toIntArray()
         }
     }
 
@@ -126,12 +127,23 @@ class Problem(
      * For each factor, the ids of every other factor sharing at least one variable.
      * Used by clause-weighting strategies (DDFW) to find candidate weight donors.
      */
-    val factorNeighbors: Array<IntArray> = Array(factors.size) { fid ->
-        val seen = HashSet<Int>()
-        val f = factors[fid]
-        for (v in f.boolVars) for (o in boolOccurrences[v]) if (o != fid) seen.add(o)
-        for (v in f.intVars) for (o in intOccurrences[v]) if (o != fid) seen.add(o)
-        seen.toIntArray()
+    val factorNeighbors: Array<IntArray> = run {
+        val n = factors.size
+        val mark = BooleanArray(n)
+        val touched = com.eignex.klause.util.IntArrayList()
+        Array(n) { fid ->
+            val f = factors[fid]
+            for (v in f.boolVars) for (o in boolOccurrences[v]) {
+                if (o != fid && !mark[o]) { mark[o] = true; touched.add(o) }
+            }
+            for (v in f.intVars) for (o in intOccurrences[v]) {
+                if (o != fid && !mark[o]) { mark[o] = true; touched.add(o) }
+            }
+            val out = touched.toIntArray()
+            for (i in 0 until touched.size) mark[touched[i]] = false
+            touched.clear()
+            out
+        }
     }
 
     val numFactors: Int get() = factors.size

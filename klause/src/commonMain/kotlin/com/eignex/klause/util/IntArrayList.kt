@@ -33,6 +33,17 @@ class IntArrayList(initialCapacity: Int = 8) {
 
     fun toIntArray(): IntArray = data.copyOf(size)
 
+    fun indexOf(value: Int): Int {
+        for (i in 0 until size) if (data[i] == value) return i
+        return -1
+    }
+
+    fun contains(value: Int): Boolean = indexOf(value) >= 0
+
+    fun isEmpty(): Boolean = size == 0
+
+    fun last(): Int = data[size - 1]
+
     inline fun forEach(action: (Int) -> Unit) {
         for (i in 0 until size) action(this[i])
     }

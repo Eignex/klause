@@ -39,4 +39,13 @@ class IntSwapSet(capacity: Int) {
     fun random(rng: Random): Int = elements[rng.nextInt(elements.size)]
 
     fun toIntArray(): IntArray = elements.toIntArray()
+
+    fun clear() {
+        for (i in 0 until elements.size) position[elements[i]] = -1
+        elements.clear()
+    }
+
+    inline fun forEach(action: (Int) -> Unit) {
+        for (i in 0 until size) action(this[i])
+    }
 }

@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `table_int(xs, tuples)` — the vector of `xs[i]` values must equal one of the rows of
@@ -128,9 +129,9 @@ class Table(
             if (!state.tightenIntMin(xs[col], minSup, ant)) return false
             if (!state.tightenIntMax(xs[col], maxSup, ant)) return false
             val d = state.intDomains[xs[col]]
-            val toRemove = ArrayList<Int>()
+            val toRemove = IntArrayList()
             d.forEach { value -> if (value !in sup) toRemove.add(value) }
-            for (v in toRemove) if (!state.excludeIntValue(xs[col], v, ant)) return false
+            for (k in 0 until toRemove.size) if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
         }
         return true
     }

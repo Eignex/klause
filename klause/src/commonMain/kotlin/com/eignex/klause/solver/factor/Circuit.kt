@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 
 /**
@@ -195,7 +196,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         val visited = BooleanArray(n)
         for (start in 0 until n) {
             if (visited[start]) continue
-            val path = ArrayList<Int>()
+            val path = IntArrayList()
             val onPath = BooleanArray(n)
             var cur = start
             while (cur in 0 until n && !visited[cur] && !onPath[cur]) {
@@ -205,13 +206,11 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
                 cur = sD.min
             }
             if (cur in 0 until n && onPath[cur]) {
-                // Closed cycle in singletons; check length against n.
                 val cycleStartIdx = path.indexOf(cur)
                 val cycleLen = path.size - cycleStartIdx
                 if (cycleLen < n) return false
-                // cycleLen == n: full Hamiltonian via singletons; legal.
             }
-            for (node in path) visited[node] = true
+            for (k in 0 until path.size) visited[path[k]] = true
         }
         // 6. Chain analysis: for each non-singleton, walk backward via pred[] to chain
         //    start; forbid (or force) chain start as successor.
@@ -298,13 +297,13 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         for (start in 0 until n) {
             if (cycleOf[start] != UNVISITED) continue
             // Walk; detect cycle.
-            val pathBuf = ArrayList<Int>()
+            val pathBuf = IntArrayList()
             var cur = start
-            while (cur >= 0 && cycleOf[cur] == UNVISITED && cur !in pathBuf) {
+            while (cur >= 0 && cycleOf[cur] == UNVISITED && !pathBuf.contains(cur)) {
                 pathBuf.add(cur)
                 cur = effective[cur]
             }
-            if (cur >= 0 && cur in pathBuf) {
+            if (cur >= 0 && pathBuf.contains(cur)) {
                 val cycleStartIdx = pathBuf.indexOf(cur)
                 for (idx in cycleStartIdx until pathBuf.size) cycleOf[pathBuf[idx]] = cycleId
                 cycleId++
