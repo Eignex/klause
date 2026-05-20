@@ -33,6 +33,17 @@ class Table(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
+    /** STR2 sparse-set state. [validTuples] holds tuple indices; the prefix
+     *  `[0, numValid)` is live (still feasible). On push the engine clones via
+     *  [snapshotCopy]; on pop the cloned state is restored, so [numValid] correctly
+     *  reflects the level we backjumped to. */
+    private class Str2State(
+        val validTuples: IntArray,
+        var numValid: Int,
+    ) : PropagationState.SnapshottablePayload {
+        override fun snapshotCopy(): Str2State = Str2State(validTuples.copyOf(), numValid)
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) {}
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -72,26 +83,44 @@ class Table(
         collectHoleAndBoundAntecedents(state, xs)
 
     /**
-     * Tighten each column's domain to the union of values at that column over feasible
-     * rows. A row is feasible iff every column's tuple value lies in the corresponding
-     * variable's current domain. If no row is feasible, fail. Per-prune antecedents use
-     * the same hole-aware reason — every excluded value in any column influenced which
-     * tuples remained supports.
+     * STR2 (Lecoutre 2011). The propagator maintains a sparse set of currently-feasible
+     * tuple indices in [Str2State] across propagator calls; on each fire it sweeps only
+     * the live prefix to drop newly-infeasible tuples and gather column supports.
+     * Backtrack correctness comes from [PropagationState.SnapshottablePayload]: push
+     * clones the state, pop restores it.
+     *
+     * Per-prune antecedents and the conflict reason are hole-aware via
+     * [collectHoleAndBoundAntecedents].
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val s = (state.refPayload[factorId] as? Str2State) ?: run {
+            val fresh = Str2State(IntArray(numTuples) { it }, numTuples)
+            state.refPayload[factorId] = fresh
+            fresh
+        }
         val supports = Array(arity) { HashSet<Int>() }
-        var anyFeasible = false
-        for (row in 0 until numTuples) {
+        var i = 0
+        while (i < s.numValid) {
+            val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
                 val v = tuples[row * arity + col]
                 if (v !in state.intDomains[xs[col]]) { feasible = false; break }
             }
-            if (!feasible) continue
-            anyFeasible = true
-            for (col in 0 until arity) supports[col].add(tuples[row * arity + col])
+            if (!feasible) {
+                val last = s.numValid - 1
+                if (i != last) {
+                    s.validTuples[i] = s.validTuples[last]
+                    s.validTuples[last] = row
+                }
+                s.numValid = last
+                // Don't advance i — the swapped-in tuple at i hasn't been checked.
+            } else {
+                for (col in 0 until arity) supports[col].add(tuples[row * arity + col])
+                i++
+            }
         }
-        if (!anyFeasible) return false
+        if (s.numValid == 0) return false
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
             val sup = supports[col]

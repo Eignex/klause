@@ -935,6 +935,14 @@ class PropagationState(
     // can rewind the state to a prior fixpoint without re-propagating. Dirty queues are not
     // snapshotted — the caller is expected to snapshot only between propagation cycles
     // (i.e. when dirty queues are empty).
+    /** Opt-in marker for [refPayload] entries that need to participate in snapshot /
+     *  restore. By default refPayload drifts across push/pop (Clause-watcher style); a
+     *  factor that maintains level-sensitive incremental state (e.g. STR2 Table's sparse
+     *  set of valid tuples) implements this to get correct backtrack behavior. */
+    interface SnapshottablePayload {
+        fun snapshotCopy(): SnapshottablePayload
+    }
+
     class Snapshot internal constructor(
         internal val boolAssigned: Bits,
         internal val boolValueBits: Bits,
@@ -950,24 +958,34 @@ class PropagationState(
         internal val intMaxAntecedents: Array<IntArray?>,
         internal val boolPinOrderSize: Int,
         internal val atomCount: Int,
+        internal val snapshottablePayloads: HashMap<Int, SnapshottablePayload>,
     )
 
-    fun snapshot(): Snapshot = Snapshot(
-        boolAssigned = boolAssigned.copy(),
-        boolValueBits = boolValueBits.copy(),
-        intDomains = intDomains.copyOf(),
-        boolLevel = boolLevel.copyOf(),
-        intLevel = intLevel.copyOf(),
-        decisionVars = levelToDecisionVar.toIntArray(),
-        boolReason = boolReason.copyOf(),
-        intMinReason = intMinReason.copyOf(),
-        intMaxReason = intMaxReason.copyOf(),
-        boolAntecedents = boolAntecedents.copyOf(),
-        intMinAntecedents = intMinAntecedents.copyOf(),
-        intMaxAntecedents = intMaxAntecedents.copyOf(),
-        boolPinOrderSize = boolPinOrder.size,
-        atomCount = atomIntVar.size,
-    )
+    fun snapshot(): Snapshot {
+        // Capture per-factor payloads that opted into snapshot via [SnapshottablePayload].
+        val payloads = HashMap<Int, SnapshottablePayload>()
+        for (i in _refPayload.indices) {
+            val p = _refPayload[i]
+            if (p is SnapshottablePayload) payloads[i] = p.snapshotCopy()
+        }
+        return Snapshot(
+            boolAssigned = boolAssigned.copy(),
+            boolValueBits = boolValueBits.copy(),
+            intDomains = intDomains.copyOf(),
+            boolLevel = boolLevel.copyOf(),
+            intLevel = intLevel.copyOf(),
+            decisionVars = levelToDecisionVar.toIntArray(),
+            boolReason = boolReason.copyOf(),
+            intMinReason = intMinReason.copyOf(),
+            intMaxReason = intMaxReason.copyOf(),
+            boolAntecedents = boolAntecedents.copyOf(),
+            intMinAntecedents = intMinAntecedents.copyOf(),
+            intMaxAntecedents = intMaxAntecedents.copyOf(),
+            boolPinOrderSize = boolPinOrder.size,
+            atomCount = atomIntVar.size,
+            snapshottablePayloads = payloads,
+        )
+    }
 
     fun restore(s: Snapshot) {
         boolAssigned.copyFrom(s.boolAssigned)
@@ -982,6 +1000,12 @@ class PropagationState(
         for (i in s.intMinAntecedents.indices) intMinAntecedents[i] = s.intMinAntecedents[i]
         for (i in s.intMaxAntecedents.indices) intMaxAntecedents[i] = s.intMaxAntecedents[i]
         boolPinOrder.truncateTo(s.boolPinOrderSize)
+        // Restore snapshottable per-factor payloads. Replaces the current entry with a
+        // *fresh* snapshotCopy of the snapshot's snapshotCopy — defensively copying so
+        // a later restore from the same Snapshot returns to the same logical state.
+        for ((fid, payload) in s.snapshottablePayloads) {
+            _refPayload[fid] = payload.snapshotCopy()
+        }
         // Atoms allocated after the snapshot are removed wholesale; their virtual var
         // ids and watcher registrations are dropped to avoid dangling. Pre-snapshot
         // atoms keep their state — but since the engine now tracks live atom truth
