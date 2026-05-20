@@ -142,9 +142,7 @@ Each item is tagged with its workstream: `[CP]` complete-search engine and propa
 - `[LS]` SAPS strategy.
 - `[LS]` Richer VNS: VND, per-level neighbourhood operators, skewed-VNS.
 - `[LS]` Problem-aware moves for `cumulative`, `lexLeq` / `lexLt`, and reified factors.
-- `[Backend]` Maven Central publishing, CI.
 - `[Backend]` klause-smt `Optimizer.minimize()` via JavaSMT's `OptimizationProverEnvironment`.
-- `[Backend]` Weighted projected sampling (WAPS / KUS) via d-DNNF compiler bridge.
 - `[Perf]` Pool / delta-trail `PropagationSession` snapshots to cut the 9 array copies per push.
 - `[Perf]` Bucket-queue or pairing-heap VSIDS / dom-wdeg variable picker.
 - `[Perf]` Bitset-backed `IntDomain` for narrow spans.
