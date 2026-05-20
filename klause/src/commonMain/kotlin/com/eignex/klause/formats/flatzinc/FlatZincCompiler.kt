@@ -196,7 +196,7 @@ internal class FlatZincCompiler(
             }
             FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
-            is FznType.SetOfInt -> allocSetVar(d.name, t)
+            is FznType.SetOfInt -> allocSetVar(d.name, t, d.value)
             is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar)
         }
         recordEnumLabels(d)
@@ -314,14 +314,27 @@ internal class FlatZincCompiler(
      * Materialise a `var set of E: name` declaration as one indicator bool per universe
      * element. Resolves the universe to a sorted ascending int array; allocates one bool
      * per element; records the layout in [setVarsByName] for downstream constraint dispatch
-     * and FZN output reconstruction.
+     * and FZN output reconstruction. If [initializer] is present (e.g. `= { 1, 3, 5 }` or
+     * `= 1..3`), pins each indicator bool to its constant value via a unit clause.
      */
-    internal fun allocSetVar(name: String, type: FznType.SetOfInt) {
+    internal fun allocSetVar(name: String, type: FznType.SetOfInt, initializer: FznExpr? = null) {
         val elements = universeElements(type.element, name)
         val indicatorIds = IntArray(elements.size) { i ->
             allocBool("__set_${name}_${elements[i]}")
         }
         setVarsByName[name] = SetVarLayout(name, elements, indicatorIds)
+        if (initializer != null) {
+            val members = resolveSetLiteral(initializer)
+            for (i in elements.indices) {
+                val inSet = members.binarySearch(elements[i]) >= 0
+                factors.add(Clause(intArrayOf(Lit.make(indicatorIds[i], inSet))))
+            }
+            for (m in members) {
+                if (elements.binarySearch(m) < 0) {
+                    failHere("set var `$name` initializer element $m outside declared universe")
+                }
+            }
+        }
     }
 
     /** Resolve the universe of a `var set of E` declaration to a sorted ascending int array. */
