@@ -75,11 +75,90 @@ class Regular(
     }
 
     /**
-     * Singleton-only forward run: when every `seq[i]` is a singleton, simulate and fail
-     * on rejection / non-accepting terminal state. Range-based per-position pruning awaits
-     * the layered-DAG implementation.
+     * Pesant's layered-DAG GAC propagator, bitmask-encoded for ≤64-state DFAs (covers
+     * the vast majority of MZN models). Build the unrolled DFA across `n = seq.size`
+     * layers; forward[i] is a Long where bit `q-1` marks state `q` forward-reachable
+     * at layer `i`; backward[i] marks co-reachable states.
+     *
+     * Pruning: at each layer, a symbol `s ∈ dom(seq[i])` survives iff `∃ q` forward-
+     * reachable at `i` whose transition `δ(q, s)` is co-reachable at `i+1`. Non-
+     * surviving symbols are removed from `dom(seq[i])`. Conflict iff the initial
+     * state is not co-reachable at layer 0.
+     *
+     * For DFAs with more than 64 states, falls back to the singleton-only check
+     * pending a multi-Long bitmask extension.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        if (numStates > 64) return propagateSingletonOnly(state)
+        val n = seq.size
+        // forward[i]: bitmask of forward-reachable states at layer i (bit q-1 ⇒ state q).
+        val forward = LongArray(n + 1)
+        forward[0] = 1L shl (q0 - 1)
+        for (i in 0 until n) {
+            val src = forward[i]
+            if (src == 0L) return false  // empty layer ⇒ infeasible.
+            val d = state.intDomains[seq[i]]
+            var dst = 0L
+            d.forEach { s ->
+                var bits = src
+                while (bits != 0L) {
+                    val q = bits.countTrailingZeroBits() + 1
+                    val nx = delta(q, s)
+                    if (nx != 0) dst = dst or (1L shl (nx - 1))
+                    bits = bits and (bits - 1)
+                }
+            }
+            forward[i + 1] = dst
+        }
+        // backward[i]: bitmask of co-reachable states at layer i.
+        val backward = LongArray(n + 1)
+        var acc = 0L
+        for (q in accepting) if (q in 1..numStates) acc = acc or (1L shl (q - 1))
+        backward[n] = forward[n] and acc
+        if (backward[n] == 0L) return false
+        for (i in n - 1 downTo 0) {
+            val srcMask = forward[i]
+            val nextMask = backward[i + 1]
+            var aliveSrc = 0L
+            val d = state.intDomains[seq[i]]
+            var bits = srcMask
+            while (bits != 0L) {
+                val q = bits.countTrailingZeroBits() + 1
+                var alive = false
+                d.forEach { s ->
+                    val nx = delta(q, s)
+                    if (nx != 0 && (nextMask and (1L shl (nx - 1))) != 0L) alive = true
+                }
+                if (alive) aliveSrc = aliveSrc or (1L shl (q - 1))
+                bits = bits and (bits - 1)
+            }
+            backward[i] = aliveSrc
+        }
+        if ((backward[0] and (1L shl (q0 - 1))) == 0L) return false
+        // Per-position symbol pruning.
+        val ant = state.composeIntVarAtomAntecedents(seq)
+        for (i in 0 until n) {
+            val srcMask = forward[i]
+            val nextMask = backward[i + 1]
+            val d = state.intDomains[seq[i]]
+            val toRemove = ArrayList<Int>()
+            d.forEach { s ->
+                var live = false
+                var bits = srcMask
+                while (bits != 0L && !live) {
+                    val q = bits.countTrailingZeroBits() + 1
+                    val nx = delta(q, s)
+                    if (nx != 0 && (nextMask and (1L shl (nx - 1))) != 0L) live = true
+                    bits = bits and (bits - 1)
+                }
+                if (!live) toRemove.add(s)
+            }
+            for (v in toRemove) if (!state.excludeIntValue(seq[i], v, ant)) return false
+        }
+        return true
+    }
+
+    private fun propagateSingletonOnly(state: PropagationState): Boolean {
         var allSingleton = true
         for (v in seq) {
             val d = state.intDomains[v]
