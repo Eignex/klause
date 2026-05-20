@@ -138,7 +138,6 @@ Each item is tagged with its workstream: `[CP]` complete-search engine and propa
 - `[LS]` ILS: basin-hopping perturbation and linkage-aware crossover.
 - `[LS]` Richer VNS: VND, per-level neighbourhood operators, skewed-VNS.
 - `[LS]` Problem-aware moves for `cumulative`, `lexLeq` / `lexLt`, and reified factors.
-- `[CP]` Bucket-queue or pairing-heap dom-wdeg / ABS variable picker (VSIDS is done; extend to the dom-divider heuristics).
 - `[CP]` Bitset-backed `IntDomain` for narrow spans.
 - `[LS]` Move-pool inlining: pack `BoolFlip` / `IntSet` into a `Long`-backed `MoveSink` lane.
 - `[LS]` Opt `Cardinality`, `PseudoBoolean`, `Xor` into incremental `updateBoolBreakMakeForFlip`; extend to `Reified{Cardinality,PseudoBoolean,Linear}` / `IntCmpReified` once the base three land.
