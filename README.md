@@ -129,7 +129,6 @@ val text = cnf.toDimacs()
 Each item is tagged with its workstream: `[LS]` local-search, `[CP]` complete CP backtrack + propagation, `[LS+CP]` cross-cutting, `[API]` cross-backend solver API, `[Sampling]` model counting / uniform sampling, `[Format]` input format parsers, `[Backend]` external solver adapters, `[Perf]` post-benchmark optimization, `[Docs]`, `[Infra]`.
 
 - `[Infra]` Maven Central publishing, CI.
-- `[CP]` Stronger native propagators for globals still on weak (singleton-violation-check) propagation. Upgrade in priority order: Pesant layered-DAG for `Regular`; sweep-line for `Diffn`; STR2/STR3 / GAC-Schema for `Table`; flow-based for `Knapsack`; bound-consistency for `Inverse`; lex-conflict propagator for `LexLess` / `LexLesseq`.
 - `[LS]` Multi-core LS portfolio finishing touches for the MZN Challenge LS track: best-feasible sharing as warm-start hints, shared kumulant stats in Relaxed mode for a restart-level bandit, worker-config factory handing each worker a distinct `(strategy, seed)`.
 - `[LS]` ALNS: problem-specific destroy operators (cumulative time-window slides) and regret-based / best-improving construction repairs.
 - `[LS]` ILS: basin-hopping-style large-jump perturbation and multi-parent / linkage-aware crossover.
