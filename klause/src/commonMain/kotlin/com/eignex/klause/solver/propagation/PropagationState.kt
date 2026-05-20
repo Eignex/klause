@@ -881,6 +881,10 @@ class PropagationState(
             // learned clause as their failing factor.
             val f = factorAt(fid)
             for (v in f.boolVars) {
+                // Skip atom-encoded literal ids (≥ numBoolVars) — they're int-bound
+                // atoms whose causation is captured through intMinReason / intMaxReason
+                // on the underlying int var, expanded below for this factor's intVars.
+                if (v >= problem.numBoolVars) continue
                 val r = boolReason[v]
                 if (r >= 0 && out.add(r)) frontier.addLast(r)
             }

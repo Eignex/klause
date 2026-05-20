@@ -123,6 +123,11 @@ class NValue(
      *
      * Stronger inference (Hall-style under [Mode.AtMost]) lands in the next propagation pass.
      */
+    /** Reason on conflict: bound atoms of every participating var. NValue tightens
+     *  only the count var `n`; conflicts are implied by the current bound facts. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Upper bound: |∪ dom(xs[i])| — domain enumeration via forEach.
         val unionValues = HashSet<Int>()

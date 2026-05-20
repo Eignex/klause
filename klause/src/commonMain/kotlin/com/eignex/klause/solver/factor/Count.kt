@@ -98,6 +98,10 @@ class Count(
      * A var is a definite-matcher when its *entire* domain satisfies the predicate; a
      * possible-matcher when *some* of its domain does.
      */
+    /** Bound-only conflict reason: cite bound atoms of every participating var. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         var definite = 0
         var possible = 0

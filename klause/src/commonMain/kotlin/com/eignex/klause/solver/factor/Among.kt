@@ -91,6 +91,10 @@ class Among(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
+    /** Bound-only conflict reason: cite bound atoms of every participating var. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         var definite = 0
         var possible = 0
