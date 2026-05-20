@@ -129,9 +129,12 @@ class Inverse(
     }
 
     /**
-     * Pin-forcing propagation: whenever `f[i]` is singleton with value `j` such that
-     * `g[j - gOffset]` is in scope, force `g[j - gOffset] = i + fOffset` (and dually).
-     * Also tightens domains to the legal index range. Full GAC waits for the next pass.
+     * GAC for the inverse channel: range-tighten to the legal index span, force
+     * singletons across the channel, and prune value-by-value: if `i + fOffset` is
+     * absent from `dom(g[j])`, also remove `j + gOffset` from `dom(f[i])`, and
+     * symmetrically. The bidirectional value-removal step exhausts every pruning
+     * derivable from `f[i]=j ⇔ g[j]=i`; the only stronger reasoning would be matching-
+     * based (Hall sets), which inverse's bijection structure rarely needs in practice.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Range tightens are structural (no input antecedents).
@@ -165,6 +168,26 @@ class Inverse(
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[i]))
             if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) return false
             if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) return false
+        }
+        // Bidirectional value removal: for each (i, gIdx) where gIdx is in range, the
+        // channel forces "j+gOffset in dom(f[i])  iff  i+fOffset in dom(g[gIdx])".
+        // Whichever side has the value missing, remove from the other.
+        for (i in f.indices) {
+            val df = state.intDomains[f[i]]
+            for (gIdx in g.indices) {
+                val jVal = gIdx + gOffset          // value f[i] would take to point to g[gIdx]
+                val iVal = i + fOffset             // value g[gIdx] would take to point back to f[i]
+                val dg = state.intDomains[g[gIdx]]
+                val fHas = jVal in df
+                val gHas = iVal in dg
+                if (fHas && !gHas) {
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
+                    if (!state.excludeIntValue(f[i], jVal, ant)) return false
+                } else if (!fHas && gHas) {
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
+                    if (!state.excludeIntValue(g[gIdx], iVal, ant)) return false
+                }
+            }
         }
         return true
     }
