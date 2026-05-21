@@ -124,6 +124,29 @@ val cnf = BitBlaster.compile(compiled.problem)
 val text = cnf.toDimacs()
 ```
 
+The CNF output is a side door to the SAT-ecosystem tooling, not a primary
+solving path — klause's native engines stay in charge of constraint reasoning.
+Bit-blasting earns its keep when the CNF-side ecosystem has a tool klause does
+not. Concretely:
+
+- Approximate model counting. Pipe the DIMACS into ApproxMC / GANAK for
+  (ε, δ)-PAC counts. SAT-based XOR-hashing is the empirical state of the art
+  for general counting; klause's own enumeration is exact and slower.
+- Hashing-based approximately-uniform sampling. UniGen-style samplers add
+  random XOR constraints over the CNF to draw witnesses with uniformity
+  guarantees the local-search engine cannot offer.
+- Weighted projected sampling. WAPS / KUS compile the projected CNF to d-DNNF
+  and draw weight-respecting samples from the circuit, useful for diverse
+  configurations over a chosen subset of vars.
+- External CDCL SAT solvers (Kissat, CaDiCaL, CryptoMiniSAT) for hard
+  combinatorial cores where their clause-learning machinery outperforms the
+  native backtrack. Adapter modules shell out to bundled native binaries.
+- MaxSAT and PB optimization back-ends. The CNF plus weights forms WCNF input
+  to RC2 / OLL when klause's native BnB minimize hits weak bounds.
+- DRAT-proof UNSAT certification. External SAT solvers emit drat-checkable
+  proofs; useful when a klause-infeasible model needs an independently
+  verifiable certificate.
+
 ## TODO
 
 Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
