@@ -10,60 +10,53 @@
 
 # Klause
 
-Klause is a Kotlin constraint programming library: finite-domain
-variables (bounded integers and Booleans) with arithmetic, comparisons,
-logic, and global constraints (allDifferent, gcc, table, cardinality,
-element, lex). Floats lower onto bucketed integers and nominals lower
-onto Boolean indicators. Usable from MiniZinc as a backend solver via
-the klause-mzn-lib package.
+Klause is a Kotlin constraint programming library. Variables are bounded
+integers, Booleans, floats (bucketed to integers), and nominals (one-hot
+encoded as Booleans). The DSL covers arithmetic, logic, comparisons, and a
+range of global constraints. MiniZinc models can use klause as a backend
+through klause-mzn-lib.
 
-Two native engines, both implementing the same Solver and Optimizer
-interfaces:
+Two native engines, both implementing Solver and Optimizer:
 
-- A local-search solver (adaptive probSAT default; WalkSat, DDFW,
-  simulated-annealing, CCA variants also available) for sampling and
-  stochastic solve. The default.
-- A complete CSP backtrack solver with propagation, configurable
-  variable and value heuristics, and true model-blocking enumeration.
+- A local-search engine (default: adaptive probSAT; also WalkSat, DDFW,
+  simulated annealing, CCA variants). Used for sampling and stochastic
+  solving.
+- A complete CSP backtrack engine with propagation, configurable
+  variable and value heuristics, branch-and-bound minimize, and
+  model-blocking enumeration.
 
-Optional adapter modules (klause-logicng for bit-blasted SAT,
-klause-z3 for SMT) let the same problem be shipped to an external
-solver when it helps; they're side doors, not the core.
+Optional adapter modules send the same problem to external solvers when
+useful: klause-logicng for bit-blasted SAT, klause-z3 for SMT. Side doors,
+not the core.
 
-Unlike most CP libraries, sampling is first-class. Drawing samples
-with replacement and enumerating without replacement are core
-operations, not afterthoughts. The combination of a constraint
-language, two native engines, and a sampling API is the niche: most
-CP libraries solve once and stop; klause is built for repeated,
-diverse, and incremental queries against the same constraint system.
+Sampling is first-class. Drawing samples with replacement and enumerating
+without replacement are core operations. Most CP libraries solve once and
+stop; klause is built for repeated, diverse, and incremental queries
+against the same model.
 
 Klause is not a MILP solver (objectives are linear over integers, not
-reals), not a full SMT solver (theory is finite-domain integers and
-Booleans, no bitvectors, arrays, strings, or quantifiers), and not
-intended for proving program properties. For those, reach for a MILP
-solver, Z3 or CVC5, or a verification framework respectively.
+reals), not a full SMT solver (no bitvectors, arrays, strings, or
+quantifiers), and not a verification framework. For those, reach for a
+MILP solver, Z3 or CVC5, or a proof assistant.
 
 ## Use cases
 
-Klause is aimed at problems where a constraint system is the model and
-the question is "give me some valid configurations" rather than "prove
-this assertion holds". Concretely:
+Klause targets problems where the constraint system is the model and the
+question is "give me some valid configurations" rather than "prove this
+assertion holds".
 
-- Constraint-aware test or fuzz input generation. Generate inputs that
-  satisfy structural invariants (allDifferent, table-encoded relations,
-  reified comparisons) so the downstream test exercises behaviour
-  rather than rejecting on input validation.
+- Constraint-aware test or fuzz input generation. Produce inputs that
+  satisfy structural invariants so the test exercises behaviour instead
+  of rejecting on input validation.
 - Diverse input sets for differential testing. Draw many valid samples
-  that are spread across the feasible region rather than clustered
-  around one corner.
+  spread across the feasible region, not clustered in one corner.
 - Configuration synthesis. Find a system configuration (feature flags,
-  resource caps, routing weights) that satisfies a set of business
-  rules, with optional weighted-objective ranking.
+  resource caps, routing weights) that satisfies the rules, optionally
+  ranked by a weighted objective.
 - Scheduling and assignment. Tasks to machines, students to rooms,
-  campaigns to budgets, given side constraints. Add a linear objective
-  to get cost-minimal feasibility.
+  campaigns to budgets. Add a linear objective for cost-minimal solutions.
 - Plan verification. Check that a proposed assignment satisfies all
-  declared constraints, and surface why it fails when it doesn't.
+  declared constraints, and report why it fails when it doesn't.
 
 ## Schema
 
@@ -85,16 +78,23 @@ class CampaignSchema : VariableSchema() {
 The DSL covers:
 
 - Boolean: and, or, implies, iff, not, xor.
-- Nominal: eq and ne against label literals.
-- Integer arithmetic: signed +, -, unary -, *, /, %, with Euclidean
-  division and modulo (remainder is always non-negative, matching
-  SMT-LIB QF_LIA) and variable-by-variable multiplication.
+- Nominal: eq, ne against label literals.
+- Integer arithmetic: +, -, *, /, % with Euclidean division and modulo
+  (remainder is always non-negative, matching SMT-LIB QF_LIA), including
+  variable-by-variable multiplication.
 - Comparisons: le, lt, ge, gt, eq, ne over arbitrary integer expressions.
-- Counting: atMost, atLeast, cardinality, pseudoBoolean and friends.
-- Global: gcc, allDifferent, circuit, subcircuit, cumulative, disjunctive.
-- Tabular: table, notTable.
-- Integer expressions: min, max, abs, element, ifThenElse.
-- Linking: channel, lexLeq, lexLt.
+- Counting: atMost, atLeast, cardinality, gcc, pseudoBoolean, among,
+  count, nValue.
+- Permutations and ordering: allDifferent, allDifferentExcept, allEqual,
+  inverse, sort, lexLeq, lexLt, valuePrecede.
+- Scheduling: cumulative and disjunctive with Vilim Theta-tree
+  edge-finding propagation.
+- Routing: circuit, subcircuit.
+- Packing: binPacking, knapsack.
+- Tabular: table, notTable, regular (DFA constraint).
+- Integer expressions: min, max, abs, element, member, argMin, argMax,
+  ifThenElse.
+- Linking: channel.
 
 ## Solving
 
@@ -124,28 +124,23 @@ val cnf = BitBlaster.compile(compiled.problem)
 val text = cnf.toDimacs()
 ```
 
-The CNF output is a side door to the SAT-ecosystem tooling, not a primary
-solving path — klause's native engines stay in charge of constraint reasoning.
-Bit-blasting earns its keep when the CNF-side ecosystem has a tool klause does
-not. Concretely:
+The CNF is for feeding into SAT-ecosystem tools, not a primary solving path.
+Use cases:
 
-- Approximate model counting. Pipe the DIMACS into ApproxMC / GANAK for
-  (ε, δ)-PAC counts. SAT-based XOR-hashing is the empirical state of the art
-  for general counting; klause's own enumeration is exact and slower.
-- Hashing-based approximately-uniform sampling. UniGen-style samplers add
-  random XOR constraints over the CNF to draw witnesses with uniformity
-  guarantees the local-search engine cannot offer.
-- Weighted projected sampling. WAPS / KUS compile the projected CNF to d-DNNF
-  and draw weight-respecting samples from the circuit, useful for diverse
-  configurations over a chosen subset of vars.
-- External CDCL SAT solvers (Kissat, CaDiCaL, CryptoMiniSAT) for hard
-  combinatorial cores where their clause-learning machinery outperforms the
-  native backtrack. Adapter modules shell out to bundled native binaries.
-- MaxSAT and PB optimization back-ends. The CNF plus weights forms WCNF input
-  to RC2 / OLL when klause's native BnB minimize hits weak bounds.
-- DRAT-proof UNSAT certification. External SAT solvers emit drat-checkable
-  proofs; useful when a klause-infeasible model needs an independently
-  verifiable certificate.
+- Approximate model counting through ApproxMC or GANAK. SAT-based XOR-hashing
+  gives counts with provable error bounds. Klause's own enumeration is exact
+  but slower on large problems.
+- Uniform sampling through UniGen. Adds random XOR constraints over the CNF
+  to draw samples close to uniformly, which local search cannot do.
+- Weighted sampling over a subset of variables through WAPS or KUS. Compiles
+  the relevant slice to a d-DNNF circuit and draws weighted samples from it.
+- External CDCL SAT solvers (Kissat, CaDiCaL, CryptoMiniSAT) for hard problems
+  where clause learning beats the native backtrack. The adapter modules call
+  the bundled binaries.
+- Optimization through MaxSAT or PB solvers (RC2, OLL) on WCNF input, when the
+  native minimize gives weak bounds.
+- Independent infeasibility checks. External solvers emit DRAT proofs of UNSAT
+  that can be verified separately.
 
 ## TODO
 
@@ -153,8 +148,8 @@ Grouped by workstream. CP covers the complete-search engine and propagators; LS 
 
 - [CP] Optional variables in the schema DSL: optIntVar(range) and optBoolVar() declarators returning (present, value) pairs; decoders surface present=false as absent in the result type.
 - [CP] Optional-variable lowering for comparisons and logical operators: reify each opt expression on the conjunction of involved presence bools so existing factors stay opt-ignorant.
-- [CP] Algebraic opt rewriting in Linear / Cardinality / PseudoBoolean / sum builders: accept presence-multiplied terms (present_i · value_i) so aggregating-by-sum constraints get native propagation without per-factor opt awareness.
-- [CP] Opt-aware Cumulative and Disjunctive variants: presents: BoolArray gating each task's energy and compulsory-part contribution; Θ-tree leaves stay inactive for absent tasks.
+- [CP] Algebraic opt rewriting in Linear / Cardinality / PseudoBoolean / sum builders: accept presence-multiplied terms (present_i * value_i) so aggregating-by-sum constraints get native propagation without per-factor opt awareness.
+- [CP] Opt-aware Cumulative and Disjunctive variants: presents: BoolArray gating each task's energy and compulsory-part contribution; Theta-tree leaves stay inactive for absent tasks.
 - [CP] Opt-aware AllDifferent / GCC / nValue / Count: variants taking presents: BoolArray that restrict counting and matching to the present subset; FlatZinc mappings for the opt versions of these globals.
 - [CP] Network flow DSL: networkFlow(arcs, balance, flow) and networkFlowCost(arcs, balance, weight, flow, cost) builders with decomposition lowering to per-node sum and weighted-sum.
 - [CP] Network flow propagator: dedicated min-cost-flow factor (SSP / cost-scaling) with reduced-cost arc pruning and infeasibility detection beyond the linear decomposition.
