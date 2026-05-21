@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.max
 import kotlin.math.min
 
@@ -37,11 +38,12 @@ import kotlin.math.min
  * time-tabling deduction. Bounds are tightened at the candidate-domain endpoints,
  * mirroring the rest of the factor catalog's bounds-consistency style.
  *
- * Time-tabling is the standard baseline for competitive cumulative propagation. Time-
- * table-edge-finding (Schutt-Feydy-Stuckey 2009) is the natural strengthening; energetic
- * reasoning (Baptiste-Le Pape-Nuijten) the second. Neither is implemented here yet — the
- * current strength matches Choco's default `cumulative_time` and is sufficient for the
- * Challenge JSP / RCPSP families this codebase has tests for.
+ * Time-tabling is the baseline, paired here with an O(n²) Vilím Θ-tree edge-finder
+ * (Vilím 2009 / Schutt-Feydy-Stuckey 2009) running off [CumulativeThetaTree]. The
+ * edge-finder catches energy-overflow deductions on subsets that have no compulsory
+ * profile, which time-tabling cannot see. The Θ-Λ tree variant lowering this to
+ * O(kn log n), and energetic reasoning (Baptiste-Le Pape-Nuijten), are deferred until
+ * profiling justifies them.
  *
  * Cost model is dense: the LS payload allocates an `IntArray` of size
  * `horizon = max_i(starts[i].max + durations[i]) − min_i(starts[i].min)`. For Challenge
@@ -263,6 +265,8 @@ class Cumulative(
                 if (totalEnergy > slack) return false
             }
         }
+        // Edge-finding pass (Vilím 2009 via Θ-tree envelope).
+        if (!edgeFindingPass(state)) return false
         // 1. Build mandatory profile as an event list. Each task contributes one (lst, +r)
         //    and one (ect, -r) when lst < ect; otherwise no compulsory part.
         val events = ArrayList<IntArray>(n * 2)
@@ -359,6 +363,86 @@ class Cumulative(
             if (effective + r > capacity) return true
         }
         return false
+    }
+
+    /**
+     * Vilím cumulative edge-finding using [CumulativeThetaTree].
+     *
+     * For each LCT threshold τ (swept in ascending order), the tree's active set Θ_τ
+     * contains every task j with `lct(j) ≤ τ`, and the root envelope
+     *   env(Θ_τ) = max_{Ω ⊆ Θ_τ, Ω ≠ ∅} (C · est(Ω) + e(Ω))
+     * captures the worst-case energy concentration at any anchor inside Θ_τ. The rule:
+     *   env(Θ_τ) + e_i > C · τ   ⇒   est(i) ≥ ⌈(env(Θ_τ) − (C − c_i) · τ) / c_i⌉
+     * for every task i with `lct(i) > τ`. The derivation is the standard
+     * energy-conservation argument over `[est(Ω), τ]`: if Ω's energy plus i's full
+     * energy would exceed the rectangle's capacity-area, i must end after Ω, which
+     * forces i's earliest start up by however much room c_i leaves outside Ω's anchor.
+     *
+     * Cost is O(m²) where m = active task count (tasks with positive duration and
+     * resource): one inner sweep over outside tasks per distinct LCT value. The Θ-Λ
+     * variant (Vilím 2009 §4) reduces this to O(km log m) and is the natural follow-up
+     * if cumulative propagation shows up in profiling on RCPSP-scale instances.
+     */
+    private fun edgeFindingPass(state: PropagationState): Boolean {
+        if (n < 2 || capacity == 0) return true
+        val active = IntArrayList()
+        for (i in 0 until n) {
+            if (durations[i] > 0 && resources[i] > 0) active.add(i)
+        }
+        val m = active.size
+        if (m < 2) return true
+
+        val taskIds = IntArray(m) { active[it] }
+        val ests = IntArray(m) { state.intDomains[starts[taskIds[it]]].min }
+        val lcts = IntArray(m) { state.intDomains[starts[taskIds[it]]].max + durations[taskIds[it]] }
+        val energies = LongArray(m) { durations[taskIds[it]].toLong() * resources[taskIds[it]].toLong() }
+        val cs = IntArray(m) { resources[taskIds[it]] }
+
+        // EST-ascending leaf positions. Stable on ties — choice doesn't affect the
+        // envelope recurrence since equal-EST leaves anchor at the same time.
+        val estOrder = (0 until m).sortedWith(compareBy({ ests[it] }, { it })).toIntArray()
+        val leafPos = IntArray(m)
+        for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
+
+        // LCT-ascending sweep order.
+        val lctOrder = (0 until m).sortedWith(compareBy({ lcts[it] }, { it })).toIntArray()
+
+        val tree = CumulativeThetaTree(n = m, capacity = capacity)
+        tree.setLeafOrder(leafPos)
+        val capL = capacity.toLong()
+        val ant = state.composeIntVarAtomAntecedents(starts)
+
+        var k = 0
+        while (k < m) {
+            val tau = lcts[lctOrder[k]]
+            // Insert every task at this LCT before testing — tasks with equal LCT all
+            // belong to Θ at threshold τ.
+            while (k < m && lcts[lctOrder[k]] == tau) {
+                val j = lctOrder[k]
+                tree.activate(j, ests[j], energies[j])
+                k++
+            }
+            if (k >= m) break
+            val envTheta = tree.envOfTheta()
+            val capTau = capL * tau.toLong()
+            // For every task still outside Θ (lct > τ), check the edge-finding rule.
+            for (ki in k until m) {
+                val i = lctOrder[ki]
+                val eI = energies[i]
+                val cI = cs[i]
+                if (envTheta + eI <= capTau) continue
+                val numerator = envTheta - (capacity - cI).toLong() * tau.toLong()
+                if (numerator <= 0L) continue
+                val newEstL = (numerator + cI - 1L) / cI.toLong()
+                if (newEstL > Int.MAX_VALUE.toLong()) continue
+                val newEst = newEstL.toInt()
+                val v = starts[taskIds[i]]
+                if (newEst > state.intDomains[v].min) {
+                    if (!state.tightenIntMin(v, newEst, ant)) return false
+                }
+            }
+        }
+        return true
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

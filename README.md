@@ -128,7 +128,6 @@ val text = cnf.toDimacs()
 
 Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
 
-- [CP] Vilím Θ-tree edge-finding propagator on the Θ-tree; integrate with the existing Cumulative bound propagator.
 - [CP] Bitset IntDomain variant (Long / LongArray) with bake-time selection by span width.
 - [CP] Migrate hot-path propagators (table, notIn, interior-SAC hole emission) to bitset domain operations.
 - [CP] Schema DSL set declarators: multiple(labels) and setVar(over = range), decoders, indicator-bool lowering.

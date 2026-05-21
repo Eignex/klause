@@ -222,4 +222,55 @@ class CumulativeTest {
         }
         for (t in occ.indices) assertTrue(occ[t] <= 1, "unary capacity broken at t=$t in ${starts.toList()}")
     }
+
+    @Test
+    fun `edge-finding tightens a start past where time-tabling can reach`() {
+        // A, B: duration 2, resource 2, start ∈ [0, 2]. Neither has a compulsory part
+        // (lst=2, ect=2). C: duration 2, resource 3, start ∈ [0, 10]. Capacity 3.
+        //
+        // Time-tabling builds no mandatory profile (no compulsory parts exist) and the
+        // overload check passes (energy 4+4+6=14 ≤ 3·12=36). But Θ = {A,B} has envelope
+        // C·est(Ω)+e(Ω) maximised at Ω={A,B} → 0+8 = 8. With τ=lct(Θ)=4 and C with c=3:
+        //   detection: 8 + 6 > 3·4 = 12  ✓
+        //   update:    est(C) ≥ ⌈(8 − (3−3)·4) / 3⌉ = ⌈8/3⌉ = 3.
+        // C's wide upper bound (10) keeps the problem feasible after the deduction so
+        // the result is Implied(intMin=3 for C), not Unsat.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1, 2),
+            durations = intArrayOf(2, 2, 2),
+            resources = intArrayOf(2, 2, 3),
+            capacity = 3,
+        )
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val result = problem.propagate(Assumptions.None)
+        assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
+        assertEquals(3, result.intMinOrNullCompat(2),
+            "edge-finding should push C's start min from 0 to 3")
+    }
+
+    @Test
+    fun `edge-finding is silent when no deduction applies`() {
+        // Three identical tasks comfortably fitting their windows. The edge-finder
+        // should not produce any spurious bound tightenings.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1, 2),
+            durations = intArrayOf(1, 1, 1),
+            resources = intArrayOf(1, 1, 1),
+            capacity = 3,
+        )
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val result = problem.propagate(Assumptions.None)
+        assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
+        assertEquals(null, result.intMinOrNullCompat(0))
+        assertEquals(null, result.intMinOrNullCompat(1))
+        assertEquals(null, result.intMinOrNullCompat(2))
+    }
 }
