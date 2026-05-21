@@ -128,7 +128,6 @@ val text = cnf.toDimacs()
 
 Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
 
-- [CP] Bitset IntDomain variant (Long / LongArray) with bake-time selection by span width.
 - [CP] Migrate hot-path propagators (table, notIn, interior-SAC hole emission) to bitset domain operations.
 - [CP] Schema DSL set declarators: multiple(labels) and setVar(over = range), decoders, indicator-bool lowering.
 - [CP] Schema DSL set expressions: inSet, subsetOf, disjointFrom, union, intersect, card.
@@ -137,6 +136,9 @@ Grouped by workstream. CP covers the complete-search engine and propagators; LS 
 - [CP] Core-guided optimization: assumption-based satisfy API (incremental unsat under hypotheses).
 - [CP] Core-guided optimization: OLL outer loop (unweighted MaxSAT, relax cores with cardinality constraints).
 - [CP] Core-guided optimization: RC2 weight handling for weighted MaxSAT and stratified weights.
+- [CP] Network flow DSL: networkFlow(arcs, balance, flow) and networkFlowCost(arcs, balance, weight, flow, cost) builders with decomposition lowering to per-node sum and weighted-sum.
+- [CP] Network flow propagator: dedicated min-cost-flow factor (SSP / cost-scaling) with reduced-cost arc pruning and infeasibility detection beyond the linear decomposition.
+- [CP] Network flow FlatZinc mapping: wire network_flow and network_flow_cost in klause-mzn-lib to the new builders, with redefinition fallback for backends without the propagator.
 - [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.
 - [LS] Incremental updateBoolBreakMakeForFlip for Cardinality, PseudoBoolean, Xor.
 - [LS] Extend incremental updateBoolBreakMakeForFlip to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.
