@@ -84,8 +84,9 @@ class CampaignSchema : VariableSchema() {
   to a bitset for narrow spans and a sorted hole list for wide ones.
 - **floatVar**: continuous-looking variable bucketed into a
   precision-controlled grid of integer buckets at compile time.
-- **Booleans**: implicit. Any comparison or Boolean operator produces a
-  Boolean-typed expression that can be reified into a BoolVar when needed.
+- **boolVar**: declares a free Boolean variable. Comparisons and Boolean
+  operators on other variable kinds also produce Boolean-typed expressions
+  implicitly, so most code never names a BoolVar directly.
 - **nominal**: picks one label from a fixed list, lowered internally to
   one-hot indicator bools with the standard exactly-one constraint.
 - **multiple and setVar**: set variables over a nominal universe or an int
