@@ -131,6 +131,7 @@ Each item is tagged with its workstream: `[CP]` complete-search engine and propa
 - `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
 - `[CP]` Core-guided optimization (OLL / RC2).
 - `[CP]` Native bitset set-propagators for set algebra over large universes.
+- `[CP]` Schema DSL for set vars: `multiple(labels…)` over a nominal universe and `setVar(over = range)` over an int universe, lowering to the existing indicator-bool layout.
 - `[LS]` Multi-core LS portfolio: best-feasible sharing, shared kumulant stats for a restart-level bandit, worker-config factory.
 - `[LS]` ALNS: cumulative time-window destroy operators and regret-based / best-improving repairs.
 - `[LS]` ILS: basin-hopping perturbation and linkage-aware crossover.
