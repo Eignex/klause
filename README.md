@@ -139,6 +139,14 @@ Grouped by workstream. CP covers the complete-search engine and propagators; LS 
 - [CP] Network flow DSL: networkFlow(arcs, balance, flow) and networkFlowCost(arcs, balance, weight, flow, cost) builders with decomposition lowering to per-node sum and weighted-sum.
 - [CP] Network flow propagator: dedicated min-cost-flow factor (SSP / cost-scaling) with reduced-cost arc pruning and infeasibility detection beyond the linear decomposition.
 - [CP] Network flow FlatZinc mapping: wire network_flow and network_flow_cost in klause-mzn-lib to the new builders, with redefinition fallback for backends without the propagator.
+- [CP] geost global: DSL builder, N-dimensional non-overlapping placement propagator (sweep-based, generalization of Diffn), and FlatZinc mapping for fzn_geost.
+- [CP] MDD global: DSL builder, propagator over multi-valued decision diagrams (incremental support counts on edges), and FlatZinc mapping for fzn_mdd.
+- [CP] cost_regular global: DSL builder, weighted-DFA propagator accumulating edge costs into a cost variable, and FlatZinc mapping for fzn_cost_regular.
+- [CP] cost_mdd global: DSL builder, weighted-MDD propagator, and FlatZinc mapping for fzn_cost_mdd.
+- [CP] path global: DSL builder, directed-path propagator over node/edge variables with reachability filtering, and FlatZinc mapping for fzn_path.
+- [CP] tree global: DSL builder, directed spanning-tree propagator with connectedness and acyclicity filtering, and FlatZinc mapping for fzn_tree.
+- [CP] arg_sort global: DSL builder, dedicated propagator over (values, permutation) stronger than Sort + Inverse decomposition, and FlatZinc mapping for fzn_arg_sort_int.
+- [CP] Generalized alldifferent_except: DSL builder taking an arbitrary excluded-value set, native propagator preserving free-value reasoning that remap-to-0 discards, and FlatZinc mapping for fzn_alldifferent_except.
 - [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.
 - [LS] Incremental updateBoolBreakMakeForFlip for Cardinality, PseudoBoolean, Xor.
 - [LS] Extend incremental updateBoolBreakMakeForFlip to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.
