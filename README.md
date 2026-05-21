@@ -130,7 +130,6 @@ Each item is tagged with its workstream: `[CP]` complete-search engine and propa
 
 - `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
 - `[CP]` Core-guided optimization (OLL / RC2).
-- `[CP]` LP-relaxation bounding during BnB.
 - `[CP]` Native bitset set-propagators for set algebra over large universes.
 - `[LS]` Multi-core LS portfolio: best-feasible sharing, shared kumulant stats for a restart-level bandit, worker-config factory.
 - `[LS]` ALNS: cumulative time-window destroy operators and regret-based / best-improving repairs.
