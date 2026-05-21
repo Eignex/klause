@@ -128,6 +128,7 @@ val text = cnf.toDimacs()
 
 Each item is tagged with its workstream: `[CP]` complete-search engine and propagators, `[LS]` local-search engine and strategies, `[Backend]` external adapters and distribution.
 
+- `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
 - `[CP]` Core-guided optimization (OLL / RC2).
 - `[CP]` Native bitset set-propagators for set algebra over large universes.
 - `[LS]` Multi-core LS portfolio: best-feasible sharing, shared kumulant stats for a restart-level bandit, worker-config factory.
