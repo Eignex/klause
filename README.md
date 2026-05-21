@@ -11,10 +11,12 @@
 # Klause
 
 Klause is a Kotlin constraint programming library. Variables are bounded
-integers, Booleans, floats (bucketed to integers), and nominals (one-hot
-encoded as Booleans). The DSL covers arithmetic, logic, comparisons, and a
-range of global constraints. MiniZinc models can use klause as a backend
-through klause-mzn-lib.
+integers, Booleans, floats (bucketed to integers), nominals (one-hot
+encoded as Booleans), and sets over either an int range or a nominal
+universe. Any variable can be declared optional, with constraints lowered
+to reified or aggregation-aware forms automatically. The DSL covers
+arithmetic, logic, comparisons, and a range of global constraints.
+MiniZinc models can use klause as a backend through klause-mzn-lib.
 
 Two native engines, both implementing Solver and Optimizer:
 
@@ -79,6 +81,12 @@ The DSL covers:
 
 - Boolean: and, or, implies, iff, not, xor.
 - Nominal: eq, ne against label literals.
+- Set: multiple(labels) over a nominal universe, setVar(over = range) over
+  an int range. Operations: inSet, subsetOf, disjointFrom, union, intersect,
+  card.
+- Optional: optIntVar and optBoolVar declarators return (present, value)
+  pairs. Comparisons reify on presence; aggregating constraints have
+  opt-aware variants.
 - Integer arithmetic: +, -, *, /, % with Euclidean division and modulo
   (remainder is always non-negative, matching SMT-LIB QF_LIA), including
   variable-by-variable multiplication.
@@ -86,12 +94,14 @@ The DSL covers:
 - Counting: atMost, atLeast, cardinality, gcc, pseudoBoolean, among,
   count, nValue.
 - Permutations and ordering: allDifferent, allDifferentExcept, allEqual,
-  inverse, sort, lexLeq, lexLt, valuePrecede.
+  inverse, sort, argSort, lexLeq, lexLt, valuePrecede.
 - Scheduling: cumulative and disjunctive with Vilim Theta-tree
-  edge-finding propagation.
-- Routing: circuit, subcircuit.
-- Packing: binPacking, knapsack.
-- Tabular: table, notTable, regular (DFA constraint).
+  edge-finding propagation; opt-aware variants for tasks that may not be
+  scheduled.
+- Routing: circuit, subcircuit, path, tree.
+- Packing: binPacking, knapsack, geost (N-dimensional non-overlap).
+- Network flow: networkFlow, networkFlowCost.
+- Tabular: table, notTable, regular (DFA), costRegular, mdd, costMdd.
 - Integer expressions: min, max, abs, element, member, argMin, argMax,
   ifThenElse.
 - Linking: channel.
