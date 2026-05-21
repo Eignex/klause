@@ -126,18 +126,35 @@ val text = cnf.toDimacs()
 
 ## TODO
 
-Each item is tagged with its workstream: `[CP]` complete-search engine and propagators, `[LS]` local-search engine and strategies.
+Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
 
-- `[CP]` Vilím Θ-tree edge-finding for `Cumulative`.
-- `[CP]` Core-guided optimization (OLL / RC2).
-- `[CP]` Native bitset set-propagators for set algebra over large universes.
-- `[CP]` Schema DSL for set vars: `multiple(labels…)` over a nominal universe and `setVar(over = range)` over an int universe, lowering to the existing indicator-bool layout.
-- `[LS]` Multi-core LS portfolio: best-feasible sharing, shared kumulant stats for a restart-level bandit, worker-config factory.
-- `[LS]` ALNS: cumulative time-window destroy operators and regret-based / best-improving repairs.
-- `[LS]` ILS: basin-hopping perturbation and linkage-aware crossover.
-- `[LS]` Richer VNS: VND, per-level neighbourhood operators, skewed-VNS.
-- `[LS]` Problem-aware moves for `cumulative`, `lexLeq` / `lexLt`, and reified factors.
-- `[CP]` Bitset-backed `IntDomain` for narrow spans.
-- `[LS]` Move-pool inlining: pack `BoolFlip` / `IntSet` into a `Long`-backed `MoveSink` lane.
-- `[LS]` Opt `Cardinality`, `PseudoBoolean`, `Xor` into incremental `updateBoolBreakMakeForFlip`; extend to `Reified{Cardinality,PseudoBoolean,Linear}` / `IntCmpReified` once the base three land.
-- `[LS]` Add `updateIntBreakMakeForIntSet` hook mirroring the bool path; convert `Linear`, `BinPacking`, `Knapsack`, `GlobalCardinality`, `AllDifferent` family, `AllEqual`, `Among`, `Count`, `NValue`, `Member`, `Inverse`, `Monotone`, `Sequence`.
+- [CP] Θ-tree data structure for Cumulative (cumulative-energy nodes, lazy resource envelope).
+- [CP] Vilím Θ-tree edge-finding propagator on the Θ-tree; integrate with the existing Cumulative bound propagator.
+- [CP] Bitset IntDomain variant (Long / LongArray) with bake-time selection by span width.
+- [CP] Migrate hot-path propagators (table, notIn, interior-SAC hole emission) to bitset domain operations.
+- [CP] Schema DSL set declarators: multiple(labels) and setVar(over = range), decoders, indicator-bool lowering.
+- [CP] Schema DSL set expressions: inSet, subsetOf, disjointFrom, union, intersect, card.
+- [CP] Native bitset set-propagators for set algebra over large universes.
+- [CP] Core-guided optimization: upgrade Unsat.conflictFactors to extract multi-factor cores from the propagation trail.
+- [CP] Core-guided optimization: assumption-based satisfy API (incremental unsat under hypotheses).
+- [CP] Core-guided optimization: OLL outer loop (unweighted MaxSAT, relax cores with cardinality constraints).
+- [CP] Core-guided optimization: RC2 weight handling for weighted MaxSAT and stratified weights.
+- [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.
+- [LS] Incremental updateBoolBreakMakeForFlip for Cardinality, PseudoBoolean, Xor.
+- [LS] Extend incremental updateBoolBreakMakeForFlip to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.
+- [LS] updateIntBreakMakeForIntSet hook framework mirroring the bool path.
+- [LS] Convert Linear, BinPacking, Knapsack to incremental updateIntBreakMakeForIntSet.
+- [LS] Convert GlobalCardinality, AllDifferent family, AllEqual to incremental updateIntBreakMakeForIntSet.
+- [LS] Convert Among, Count, NValue, Member, Inverse, Monotone, Sequence to incremental updateIntBreakMakeForIntSet.
+- [LS] Problem-aware moves for cumulative (resource-feasibility-preserving swaps and shifts).
+- [LS] Problem-aware moves for lexLeq / lexLt (lex-preserving swap neighbourhood).
+- [LS] Problem-aware moves for reified factors (toggle-driven sub-region exploration).
+- [LS] Richer VNS: VND (variable neighbourhood descent) over the existing neighbourhood ladder.
+- [LS] Richer VNS: per-level neighbourhood operators and skewed-VNS acceptance.
+- [LS] ILS: basin-hopping perturbation kick.
+- [LS] ILS: linkage-aware crossover.
+- [LS] ALNS: cumulative time-window destroy operators.
+- [LS] ALNS: regret-based and best-improving repair operators.
+- [LS] Multi-core LS portfolio: worker-config factory and per-worker strategy selection.
+- [LS] Multi-core LS portfolio: best-feasible sharing across workers.
+- [LS] Multi-core LS portfolio: shared kumulant stats for a restart-level bandit.
