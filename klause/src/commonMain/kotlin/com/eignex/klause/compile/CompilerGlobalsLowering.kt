@@ -27,6 +27,7 @@ import com.eignex.klause.ast.PathExpr
 import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 
 /**
  * Decompositions for the "newer" globals. Each [decomposeXxx] returns a [BoolExpr] in
@@ -238,6 +239,37 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
     val nodeP = expr.nodePresent
     val edgeP = expr.edgePresent
 
+    // Dedicated Path factor for reachability propagation (added on top of the
+    // degree/flow decomposition below).
+    val srcId = run {
+        val l = lift(expr.source); require(l is IntRef) { "path: source must lift to bare var" }
+        intVarOf(l.name)
+    }
+    val sinkId = run {
+        val l = lift(expr.sink); require(l is IntRef) { "path: sink must lift to bare var" }
+        intVarOf(l.name)
+    }
+    val nodeBoolIds = IntArray(n) { i ->
+        val lit = lowerToLit(nodeP[i])
+        require(Lit.isPositive(lit)) { "path: nodePresent[$i] must be a bare BoolRef" }
+        Lit.variable(lit)
+    }
+    val edgeBoolIds = IntArray(m) { e ->
+        val lit = lowerToLit(edgeP[e])
+        require(Lit.isPositive(lit)) { "path: edgePresent[$e] must be a bare BoolRef" }
+        Lit.variable(lit)
+    }
+    factors += com.eignex.klause.solver.factor.Path(
+        numNodes = n,
+        from = expr.from.toIntArray(),
+        to = expr.to.toIntArray(),
+        source = srcId,
+        sink = sinkId,
+        nodePresent = nodeBoolIds,
+        edgePresent = edgeBoolIds,
+        nodeOffset = off,
+    )
+
     val inArcs = Array(n) { mutableListOf<Int>() }
     val outArcs = Array(n) { mutableListOf<Int>() }
     for (e in 0 until m) {
@@ -327,6 +359,30 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
     val off = expr.nodeOffset
     val nodeP = expr.nodePresent
     val edgeP = expr.edgePresent
+
+    val rootId = run {
+        val l = lift(expr.root); require(l is IntRef) { "tree: root must lift to bare var" }
+        intVarOf(l.name)
+    }
+    val nodeBoolIds = IntArray(n) { i ->
+        val lit = lowerToLit(nodeP[i])
+        require(Lit.isPositive(lit)) { "tree: nodePresent[$i] must be a bare BoolRef" }
+        Lit.variable(lit)
+    }
+    val edgeBoolIds = IntArray(m) { e ->
+        val lit = lowerToLit(edgeP[e])
+        require(Lit.isPositive(lit)) { "tree: edgePresent[$e] must be a bare BoolRef" }
+        Lit.variable(lit)
+    }
+    factors += com.eignex.klause.solver.factor.Tree(
+        numNodes = n,
+        from = expr.from.toIntArray(),
+        to = expr.to.toIntArray(),
+        root = rootId,
+        nodePresent = nodeBoolIds,
+        edgePresent = edgeBoolIds,
+        nodeOffset = off,
+    )
 
     val inArcs = Array(n) { mutableListOf<Int>() }
     val outArcs = Array(n) { mutableListOf<Int>() }
