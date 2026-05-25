@@ -20,12 +20,14 @@ MiniZinc models can use klause as a backend through klause-mzn-lib.
 
 Two native engines, both implementing Solver and Optimizer:
 
-- A local-search engine (default: adaptive probSAT; also WalkSat, DDFW,
-  simulated annealing, CCA variants). Used for sampling and stochastic
-  solving.
-- A complete CSP backtrack engine with propagation, configurable
-  variable and value heuristics, branch-and-bound minimize, and
-  model-blocking enumeration.
+- A complete CSP backtrack engine (the default) with propagation,
+  configurable variable and value heuristics, branch-and-bound minimize,
+  and model-blocking enumeration. Used for proofs of unsat, optimal
+  bounds, and without-replacement enumeration.
+- A local-search engine (default strategy: adaptive probSAT; also
+  WalkSat, DDFW, simulated annealing, CCA variants). Used for stochastic
+  sampling and large-domain problems where complete search doesn't
+  finish in budget.
 
 Optional adapter modules send the same problem to external solvers when
 useful: klause-logicng for bit-blasted SAT, klause-z3 for SMT. Side doors,
@@ -161,21 +163,23 @@ class CampaignSchema : VariableSchema() {
 ```kotlin
 val schema = CampaignSchema()
 val compiled = schema.compile()
-val solver = LocalSearchSolver(compiled.problem)
+val solver = BacktrackSolver(compiled.problem)
 
-solver.enumerate(LocalSearchParams(maxFlips = 100_000)).take(20).forEach { s ->
+solver.enumerate(BacktrackParams()).take(20).forEach { s ->
     println("type=${compiled.decode(schema.type, s)} budget=${compiled.decode(schema.budget, s)}")
 }
 
 val weights = LinearObjective(boolWeights = doubleArrayOf(/* ... */))
-val best = solver.minimize(weights, LocalSearchParams(maxFlips = 100_000))
+val best = solver.minimize(weights, BacktrackParams())
 
 // Or point at one schema variable, MiniZinc-style:
-val cheapest = solver.minimize(compiled.minimize(schema.budget), LocalSearchParams(maxFlips = 100_000))
+val cheapest = solver.minimize(compiled.minimize(schema.budget), BacktrackParams())
 ```
 
-Local search is the default. Swap in the backtrack solver when you
-need completeness or true without-replacement enumeration.
+The backtrack engine is the default — it provides completeness, branch-and-bound
+optimality proofs, and without-replacement enumeration. Swap in `LocalSearchSolver`
+with `LocalSearchParams(maxFlips = ...)` when complete search is too slow on a
+large-domain problem or you want stochastic sampling with replacement.
 
 ## Bit-blasting
 
