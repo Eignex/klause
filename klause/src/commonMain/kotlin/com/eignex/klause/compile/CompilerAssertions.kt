@@ -100,6 +100,11 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
         is CountExprOpt -> assertCountOpt(expr)
         is NValueExprOpt -> assertNValueOpt(expr)
         is GccExprOpt -> assertGccOpt(expr)
+        is com.eignex.klause.ast.SetIn -> assertSetIn(expr)
+        is com.eignex.klause.ast.SetNominalIn -> assertSetNominalIn(expr)
+        is com.eignex.klause.ast.SetSubsetOf -> assertSetSubsetOf(expr)
+        is com.eignex.klause.ast.SetDisjoint -> assertSetDisjoint(expr)
+        is com.eignex.klause.ast.SetEq -> assertSetEq(expr)
         is TableConstraint -> assertExpr(expandTable(expr))
         is PseudoBooleanExpr -> {
             val lits = lowerAllBool(expr.lits)

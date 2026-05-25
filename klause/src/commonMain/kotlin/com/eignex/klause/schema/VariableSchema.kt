@@ -4,9 +4,11 @@ import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolSpec
 import com.eignex.klause.ast.FloatSpec
 import com.eignex.klause.ast.IntSpec
+import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.SchemaEntry
+import com.eignex.klause.ast.SetSpec
 import com.eignex.skema.Schema
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
@@ -80,6 +82,27 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
             )
             ReadOnlyProperty { _, _ -> handle }
         }
+
+    /**
+     * Set variable over an integer universe. Internally allocates one indicator bool per
+     * universe element; the decoder reads those indicators back to a [Set]<Int>. Use the
+     * infix operators in [com.eignex.klause.schema.SetHandles] to compose constraints.
+     *
+     * Example: `val chosen by setVar(0..9)` declares a set drawn from `{0, …, 9}`.
+     */
+    protected fun setVar(universe: IntRange) = setVar(universe.toList())
+
+    /** Set variable over a non-contiguous integer universe. */
+    protected fun setVar(universe: List<Int>) =
+        register(SetSpec(universe.distinct().sorted())) { IntSetHandle(it, universe.distinct().sorted()) }
+
+    /**
+     * Set variable over a nominal universe of labels. The labels are fixed at schema
+     * construction; the decoder returns a [Set]<String> of currently-selected labels.
+     */
+    protected fun multiple(vararg labels: String) = labels.toList().let { ls ->
+        register(MultipleSpec(ls)) { NominalSetHandle(it, ls) }
+    }
 
     /**
      * Optional nominal variable: declares a presence bool plus the underlying one-hot nominal.

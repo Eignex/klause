@@ -327,6 +327,104 @@ data class PseudoBooleanExpr(
 }
 
 // -----------------------------------------------------------------------------------
+//  Set variables
+// -----------------------------------------------------------------------------------
+// Set variables ship as a `(universe, indicator-bool array)` pair. The compiler allocates
+// one Boolean variable per universe element; the schema-level [SetSpec] carries the
+// universe so callers can later materialise unions / intersections / set literals over the
+// same element domain. A [MultipleSpec] is a set over a nominal universe of labels — the
+// nominal one-hot layer is materialised once and reused; both [SetSpec] and [MultipleSpec]
+// share the underlying indicator-bool encoding so set-expressions and -constraints work
+// uniformly on either kind.
+
+/** Set variable over an integer universe. The universe is fixed at schema-construction
+ *  time and need not be contiguous, though contiguous ranges are the common case. */
+@Serializable
+@SerialName("set")
+data class SetSpec(val universe: List<Int>) : VarSpec {
+    init { require(universe.isNotEmpty()) { "SetSpec needs a non-empty universe" } }
+}
+
+/** Set variable over a nominal universe of [labels]. Internally lowers to an indicator
+ *  bool per label, mirroring the encoding of [SetSpec] but typed against strings on the
+ *  decoder side. */
+@Serializable
+@SerialName("multiple")
+data class MultipleSpec(val labels: List<String>) : VarSpec {
+    init { require(labels.isNotEmpty()) { "MultipleSpec needs at least one label" } }
+}
+
+/** Anything that can be coerced into a [SetExpr] inside the constraint DSL — the
+ *  set-side analogue of [IntTerm] / [BoolTerm]. */
+interface SetTerm {
+    fun toSetExpr(): SetExpr
+}
+
+@Serializable
+sealed interface SetExpr : SetTerm {
+    override fun toSetExpr(): SetExpr = this
+}
+
+/** Reference to a named set variable. */
+@Serializable
+@SerialName("setref")
+data class SetRef(val name: String) : SetExpr
+
+/** Concrete set literal over an integer universe. */
+@Serializable
+@SerialName("setlit")
+data class SetLiteral(val elements: List<Int>) : SetExpr
+
+/** Concrete set literal over a nominal universe. The compiler resolves [labels] against
+ *  the operand's nominal universe at lowering time. */
+@Serializable
+@SerialName("setlitnom")
+data class SetNominalLiteral(val labels: List<String>) : SetExpr
+
+@Serializable
+@SerialName("setunion")
+data class SetUnion(val left: SetExpr, val right: SetExpr) : SetExpr
+
+@Serializable
+@SerialName("setisect")
+data class SetIntersect(val left: SetExpr, val right: SetExpr) : SetExpr
+
+@Serializable
+@SerialName("setdiff")
+data class SetDiff(val left: SetExpr, val right: SetExpr) : SetExpr
+
+/** Membership: `elem ∈ setExpr`. */
+@Serializable
+@SerialName("setin")
+data class SetIn(val elem: IntExpr, val set: SetExpr) : BoolExpr
+
+/** Nominal-label membership: `label ∈ setExpr`. Distinct AST node so the compiler can
+ *  route through the nominal universe lookup rather than treating it as an int. */
+@Serializable
+@SerialName("setinnom")
+data class SetNominalIn(val label: String, val set: SetExpr) : BoolExpr
+
+/** `left ⊆ right`. */
+@Serializable
+@SerialName("setsub")
+data class SetSubsetOf(val left: SetExpr, val right: SetExpr) : BoolExpr
+
+/** `left ∩ right = ∅`. */
+@Serializable
+@SerialName("setdis")
+data class SetDisjoint(val left: SetExpr, val right: SetExpr) : BoolExpr
+
+/** `left = right` over sets. */
+@Serializable
+@SerialName("seteq")
+data class SetEq(val left: SetExpr, val right: SetExpr) : BoolExpr
+
+/** Cardinality `|setExpr|` — returns the count of universe elements indicated true. */
+@Serializable
+@SerialName("setcard")
+data class SetCard(val set: SetExpr) : IntExpr
+
+// -----------------------------------------------------------------------------------
 //  Optional-variable globals
 // -----------------------------------------------------------------------------------
 // Each *Opt node mirrors its non-opt sibling but carries a parallel [presents] list of

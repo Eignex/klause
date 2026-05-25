@@ -47,6 +47,7 @@ internal fun Compiler.Build.lift(expr: IntExpr): IntExpr = when (expr) {
     is IntMul -> liftMul(expr.left, expr.right)
     is IntDiv -> liftDivMod(expr.num, expr.den, returnRemainder = false)
     is IntMod -> liftDivMod(expr.num, expr.den, returnRemainder = true)
+    is com.eignex.klause.ast.SetCard -> liftSetCard(expr)
 }
 
 /**

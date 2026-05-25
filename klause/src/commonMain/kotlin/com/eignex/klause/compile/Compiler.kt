@@ -90,6 +90,16 @@ class Compiler {
         val floatMetaBuckets = mutableListOf<Int>()
         val floatVarIdByName = mutableMapOf<String, Int>()  // float-id (metadata index) by name
         val floatMetaConstraints = mutableListOf<com.eignex.klause.solver.RealLinearConstraint>()
+        /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
+         *  `SetVarLayout`: for set var `S` over universe `[e_0, …, e_{n-1}]`,
+         *  `setLayouts["S"].indicatorBoolIds[i]` is the klause bool var that's `true` iff
+         *  `e_i ∈ S`. Both [com.eignex.klause.ast.SetSpec] (int universe) and
+         *  [com.eignex.klause.ast.MultipleSpec] (nominal universe) populate this — the
+         *  difference is the decoder shape (ints vs label strings). */
+        val setLayouts = mutableMapOf<String, SetLayout>()
+        /** Label → universe index for set vars whose universe is a nominal label list.
+         *  Empty for int-universe set vars. */
+        val setLabelOrder = mutableMapOf<String, List<String>>()
         var numBoolVars = 0
         var numIntVars = 0
         internal var auxIntCounter = 0
@@ -108,6 +118,24 @@ class Compiler {
                         factors += Cardinality.exactlyOne(lits)
                     }
                     is IntSpec -> intVarIdByName[name] = newIntVar(IntDomain(entry.min, entry.max))
+                    is com.eignex.klause.ast.SetSpec -> {
+                        // Allocate one indicator bool per universe element. Universe is
+                        // already deduplicated and sorted by [setVar]'s declarator.
+                        val universe = entry.universe.toIntArray()
+                        val indicators = IntArray(universe.size) { newBoolVar() }
+                        setLayouts[name] = SetLayout(universe, indicators)
+                    }
+                    is com.eignex.klause.ast.MultipleSpec -> {
+                        // Nominal universe: indicators are typed against labels, but the
+                        // encoding is the same — one bool per label. We synthesise a
+                        // synthetic int "id" (the label's index) for the universe so the
+                        // shared lowering machinery can treat both kinds uniformly.
+                        val labels = entry.labels
+                        val universe = IntArray(labels.size) { it }
+                        val indicators = IntArray(universe.size) { newBoolVar() }
+                        setLayouts[name] = SetLayout(universe, indicators)
+                        setLabelOrder[name] = labels
+                    }
                     is FloatSpec -> {
                         // Floats are bucketed inline so [Problem.factors] stays pure int+bool.
                         // The original real-valued view (interval, bucket count, int-var
@@ -151,6 +179,8 @@ class Compiler {
                 intVarIdByName = intVarIdByName.toMap(),
                 nominalIndicators = nominalIndicators.mapValues { it.value.toMap() },
                 floatDecoders = floatDecoders.toMap(),
+                setLayouts = setLayouts.toMap(),
+                setNominalLabels = setLabelOrder.toMap(),
             )
         }
 
@@ -210,6 +240,11 @@ class Compiler {
             is CountExprOpt -> reifyCountOpt(expr)
             is NValueExprOpt -> reifyNValueOpt(expr)
             is GccExprOpt -> reifyGccOpt(expr)
+            is com.eignex.klause.ast.SetIn -> reifySetIn(expr)
+            is com.eignex.klause.ast.SetNominalIn -> reifySetNominalIn(expr)
+            is com.eignex.klause.ast.SetSubsetOf -> reifySetSubsetOf(expr)
+            is com.eignex.klause.ast.SetDisjoint -> reifySetDisjoint(expr)
+            is com.eignex.klause.ast.SetEq -> reifySetEq(expr)
             is TableConstraint -> lowerToLit(expandTable(expr))
             is PseudoBooleanExpr -> {
                 val lits = lowerAllBool(expr.lits)

@@ -4,7 +4,9 @@ import com.eignex.klause.ast.FloatSpec
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.IntHandle
+import com.eignex.klause.schema.IntSetHandle
 import com.eignex.klause.schema.NominalHandle
+import com.eignex.klause.schema.NominalSetHandle
 import com.eignex.klause.schema.OptBoolHandle
 import com.eignex.klause.schema.OptIntHandle
 import com.eignex.klause.schema.OptNominalHandle
@@ -30,6 +32,13 @@ class CompiledProblem(
     val intVarIdByName: Map<String, Int>,
     val nominalIndicators: Map<String, Map<String, Int>>,
     val floatDecoders: Map<String, FloatSpec>,
+    /** Per-set-var indicator layout: parallel `(universe[i], indicatorBoolId[i])`. Used by
+     *  the set decoders to read indicator bools back into a [Set]. Nominal-set vars stash
+     *  their label order in [setNominalLabels] alongside this. */
+    val setLayouts: Map<String, com.eignex.klause.compile.SetLayout> = emptyMap(),
+    /** Label list (in universe-index order) for each nominal-set var. Empty map entry for
+     *  int-universe set vars. */
+    val setNominalLabels: Map<String, List<String>> = emptyMap(),
 ) {
     fun decode(handle: BoolHandle, sample: Sample): Boolean {
         val id = boolVarIdByName[handle.name]
@@ -68,6 +77,32 @@ class CompiledProblem(
     fun decode(handle: OptNominalHandle, sample: Sample): String? {
         if (!decode(handle.present, sample)) return null
         return decode(handle.value, sample)
+    }
+
+    /** Read a set var's indicators back into a `Set<Int>`. Universe elements whose
+     *  indicator bool is `true` in [sample] form the result; others are filtered out. */
+    fun decode(handle: IntSetHandle, sample: Sample): Set<Int> {
+        val layout = setLayouts[handle.name]
+            ?: error("No set variable named '${handle.name}'")
+        val out = LinkedHashSet<Int>()
+        for (i in 0 until layout.size) {
+            if (sample.bools[layout.indicatorBoolIds[i]]) out.add(layout.universe[i])
+        }
+        return out
+    }
+
+    /** Read a nominal-set var's indicators back into a `Set<String>` of currently-selected
+     *  labels. */
+    fun decode(handle: NominalSetHandle, sample: Sample): Set<String> {
+        val layout = setLayouts[handle.name]
+            ?: error("No nominal-set variable named '${handle.name}'")
+        val labels = setNominalLabels[handle.name]
+            ?: error("set '${handle.name}' is not a nominal-set var; use `decode(IntSetHandle, ...)` instead")
+        val out = LinkedHashSet<String>()
+        for (i in 0 until layout.size) {
+            if (sample.bools[layout.indicatorBoolIds[i]]) out.add(labels[i])
+        }
+        return out
     }
 
     fun decode(handle: FloatHandle, sample: Sample): Double {
