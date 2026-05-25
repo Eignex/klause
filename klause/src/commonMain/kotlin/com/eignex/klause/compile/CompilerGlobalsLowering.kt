@@ -144,6 +144,56 @@ internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
 //  network_flow / network_flow_cost
 // ----------------------------------------------------------------------------
 
+/** Top-level entry: emit the [com.eignex.klause.solver.factor.MinCostFlow] factor when
+ *  every flow term lifts to a bare [IntRef]. Falls back to the linear-per-node decomposition. */
+internal fun Compiler.Build.assertNetworkFlow(expr: NetworkFlowExpr) {
+    val lifted = expr.flow.map { lift(it) }
+    if (lifted.all { it is IntRef }) {
+        val flowIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+        factors += com.eignex.klause.solver.factor.MinCostFlow(
+            numNodes = expr.numNodes,
+            arcFrom = expr.arcFrom.toIntArray(),
+            arcTo = expr.arcTo.toIntArray(),
+            balance = expr.balance.toIntArray(),
+            flow = flowIds,
+            weight = null,
+            cost = -1,
+            nodeOffset = expr.nodeOffset,
+        )
+        return
+    }
+    assertExpr(decomposeNetworkFlow(expr))
+}
+
+internal fun Compiler.Build.assertNetworkFlowCost(expr: NetworkFlowCostExpr) {
+    val lifted = expr.flow.map { lift(it) }
+    val liftedCost = lift(expr.cost)
+    if (lifted.all { it is IntRef } && liftedCost is IntRef) {
+        val flowIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+        val costId = intVarOf(liftedCost.name)
+        factors += com.eignex.klause.solver.factor.MinCostFlow(
+            numNodes = expr.numNodes,
+            arcFrom = expr.arcFrom.toIntArray(),
+            arcTo = expr.arcTo.toIntArray(),
+            balance = expr.balance.toIntArray(),
+            flow = flowIds,
+            weight = expr.weight.toIntArray(),
+            cost = costId,
+            nodeOffset = expr.nodeOffset,
+        )
+        // Also emit the cost equality as a Linear factor for tight bound propagation.
+        // (The MinCostFlow factor only does interval-arithmetic bounds.)
+        val sumTerms = mutableListOf<IntExpr>()
+        for (a in expr.flow.indices) {
+            sumTerms += if (expr.weight[a] == 1) expr.flow[a] else IntScale(expr.weight[a], expr.flow[a])
+        }
+        sumTerms += IntScale(-1, expr.cost)
+        assertExpr(IntCompare(IntSum(sumTerms), IntCmpOp.EQ, IntLit(0)))
+        return
+    }
+    assertExpr(decomposeNetworkFlowCost(expr))
+}
+
 internal fun Compiler.Build.decomposeNetworkFlow(expr: NetworkFlowExpr): BoolExpr {
     val nNodes = expr.numNodes
     val off = expr.nodeOffset
