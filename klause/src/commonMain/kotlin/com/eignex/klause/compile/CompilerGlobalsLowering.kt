@@ -506,7 +506,34 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
 //  MDD / cost_mdd / cost_regular — table-based state-channel decompositions
 // ----------------------------------------------------------------------------
 
+/** Helper: build the [com.eignex.klause.solver.factor.Mdd] factor and emit it when
+ *  [seq] is all bare IntRefs. Falls back to the table-based decomposition. */
+internal fun Compiler.Build.assertMddNative(seqExpr: List<IntExpr>, numStatesPerLayer: List<Int>, layerStarts: List<Int>, transitions: List<Int>, initial: Int, accepting: List<Int>, recordStride: Int, costRef: IntRef? = null): Boolean {
+    val lifted = seqExpr.map { lift(it) }
+    if (lifted.all { it is IntRef }) {
+        val seqIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+        val costId = if (costRef != null) intVarOf(costRef.name) else -1
+        factors += com.eignex.klause.solver.factor.Mdd(
+            seq = seqIds,
+            numStatesPerLayer = numStatesPerLayer.toIntArray(),
+            layerStarts = layerStarts.toIntArray(),
+            transitions = transitions.toIntArray(),
+            initial = initial,
+            accepting = accepting.toIntArray(),
+            recordStride = recordStride,
+            cost = costId,
+        )
+        return true
+    }
+    return false
+}
+
 internal fun Compiler.Build.assertMdd(expr: MddExpr) {
+    if (assertMddNative(expr.seq, expr.numStatesPerLayer, expr.layerStarts, expr.transitions, expr.initial, expr.accepting, recordStride = 3)) return
+    assertMddDecomposed(expr)
+}
+
+internal fun Compiler.Build.assertMddDecomposed(expr: MddExpr) {
     val n = expr.seq.size
     // Allocate per-layer state vars: state[0..n]. state[0] = initial; state[n] ∈ accepting.
     val stateRefs = Array(n + 1) { i ->
@@ -543,6 +570,15 @@ internal fun Compiler.Build.assertMdd(expr: MddExpr) {
 }
 
 internal fun Compiler.Build.assertCostMdd(expr: CostMddExpr) {
+    val liftedCost = lift(expr.cost)
+    if (liftedCost is IntRef && assertMddNative(
+            expr.seq, expr.numStatesPerLayer, expr.layerStarts, expr.transitions,
+            expr.initial, expr.accepting, recordStride = 4, costRef = liftedCost,
+        )) return
+    assertCostMddDecomposed(expr)
+}
+
+internal fun Compiler.Build.assertCostMddDecomposed(expr: CostMddExpr) {
     val n = expr.seq.size
     val stateRefs = Array(n + 1) { i ->
         val ns = expr.numStatesPerLayer[i]
@@ -600,6 +636,35 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
     val Q = expr.numStates
     val S = expr.numSymbols
     val off = expr.symbolOffset
+
+    // Try the native MDD path first — expand uniform DFA transitions into per-layer tables.
+    val liftedSeq = expr.seq.map { lift(it) }
+    val liftedCost = lift(expr.cost)
+    if (liftedSeq.all { it is IntRef } && liftedCost is IntRef) {
+        // Build a single layer's transition rows then replicate per layer.
+        val baseRows = mutableListOf<Int>()
+        for (q in 0 until Q) for (s in 0 until S) {
+            val dst = expr.transitions[q * S + s]
+            if (dst == 0) continue
+            baseRows += q
+            baseRows += s + off
+            baseRows += dst - 1
+            baseRows += expr.weights[q * S + s]
+        }
+        if (baseRows.isNotEmpty()) {
+            val flatTrans = ArrayList<Int>()
+            val starts = IntArray(n + 1)
+            for (i in 0 until n) {
+                starts[i] = flatTrans.size
+                flatTrans.addAll(baseRows)
+            }
+            starts[n] = flatTrans.size
+            if (assertMddNative(
+                    expr.seq, List(n + 1) { Q }, starts.toList(), flatTrans,
+                    expr.initial, expr.accepting, recordStride = 4, costRef = liftedCost,
+                )) return
+        }
+    }
 
     val stateRefs = Array(n + 1) { IntRef(newAuxIntVar(IntDomain(0, Q - 1))) }
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
