@@ -241,6 +241,25 @@ internal fun Compiler.Build.decomposeNetworkFlowCost(expr: NetworkFlowCostExpr):
 //  geost
 // ----------------------------------------------------------------------------
 
+/** Top-level entry: emit [com.eignex.klause.solver.factor.Geost] when every origin is
+ *  a bare [IntRef]. */
+internal fun Compiler.Build.assertGeost(expr: GeostExpr) {
+    val lifted = expr.origin.map { lift(it) }
+    if (lifted.all { it is IntRef }) {
+        val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+        factors += com.eignex.klause.solver.factor.Geost(
+            numDims = expr.numDims,
+            numObjects = expr.numObjects,
+            origin = ids,
+            length = expr.length.toIntArray(),
+        )
+        // Also emit the pairwise OR-decomposition so multi-free-dim cases still propagate.
+        assertExpr(decomposeGeost(expr))
+        return
+    }
+    assertExpr(decomposeGeost(expr))
+}
+
 internal fun Compiler.Build.decomposeGeost(expr: GeostExpr): BoolExpr {
     val d = expr.numDims
     val n = expr.numObjects

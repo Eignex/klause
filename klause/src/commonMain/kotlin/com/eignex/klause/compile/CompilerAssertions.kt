@@ -94,7 +94,7 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
         is com.eignex.klause.ast.ArgSortExpr -> assertArgSort(expr)
         is com.eignex.klause.ast.NetworkFlowExpr -> assertNetworkFlow(expr)
         is com.eignex.klause.ast.NetworkFlowCostExpr -> assertNetworkFlowCost(expr)
-        is com.eignex.klause.ast.GeostExpr -> assertExpr(decomposeGeost(expr))
+        is com.eignex.klause.ast.GeostExpr -> assertGeost(expr)
         is com.eignex.klause.ast.PathExpr -> assertPath(expr)
         is com.eignex.klause.ast.TreeExpr -> assertTree(expr)
         is com.eignex.klause.ast.MddExpr -> assertMdd(expr)
