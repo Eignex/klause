@@ -62,6 +62,35 @@ class MinCostFlow(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val ant = state.composeIntVarAtomAntecedents(intVars)
+        // Component-level conservation check: in any connected component of the
+        // residual graph (arcs whose max capacity > 0 OR min capacity < 0 treated as
+        // bidirectional connectivity), Σ balance must be 0. Otherwise infeasible.
+        run {
+            val parent = IntArray(numNodes) { it }
+            fun find(x: Int): Int {
+                var r = x; while (parent[r] != r) r = parent[r]
+                var i = x; while (parent[i] != r) { val nx = parent[i]; parent[i] = r; i = nx }
+                return r
+            }
+            for (a in arcFrom.indices) {
+                val d = state.intDomains[flow[a]]
+                if (d.min == 0 && d.max == 0) continue  // arc carries no flow
+                val u = arcFrom[a] - nodeOffset
+                val v = arcTo[a] - nodeOffset
+                val ru = find(u); val rv = find(v)
+                if (ru != rv) parent[ru] = rv
+            }
+            val sums = IntArray(numNodes)
+            val active = BooleanArray(numNodes)
+            for (n in 0 until numNodes) {
+                val r = find(n)
+                sums[r] += balance[n]
+                active[r] = true
+            }
+            for (n in 0 until numNodes) {
+                if (active[n] && find(n) == n && sums[n] != 0) return false
+            }
+        }
         // Per-node: tighten inflow / outflow range using balance.
         for (n in 0 until numNodes) {
             // inflow min - outflow max ≤ balance ≤ inflow max - outflow min.
