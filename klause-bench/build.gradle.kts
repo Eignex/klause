@@ -94,6 +94,86 @@ tasks.register("downloadMzn") {
 
 /** One-shot task: regenerate the bundled JSON-SchemaDef sample file. Run as
  *  `./gradlew :klause-bench:dumpSchema`. */
+/** Opt-in: shallow-clone the libminizinc test suite into `build/mzn/libminizinc/`. The
+ *  suite owns MiniZinc's own correctness coverage (compiler edge cases plus solver
+ *  expectations under `tests/spec/unit/`); we use it as a stress source for parity. */
+tasks.register("downloadMznTestSuite") {
+    group = "tools"
+    description = "Shallow-clone MiniZinc/libminizinc into build/mzn/libminizinc/."
+    notCompatibleWithConfigurationCache("ProcessBuilder calls inside doLast capture Project")
+    val outDir = layout.buildDirectory.dir("mzn").get().asFile
+    val rootDirFile = rootDir
+    doLast {
+        outDir.mkdirs()
+        val target = File(outDir, "libminizinc")
+        if (target.exists() && target.list()?.isNotEmpty() == true) {
+            logger.lifecycle("[mzn-tests] already present at ${target.relativeTo(rootDirFile)}, skipping")
+            return@doLast
+        }
+        logger.lifecycle("[mzn-tests] cloning MiniZinc/libminizinc (shallow)")
+        val proc = ProcessBuilder(
+            "git", "clone", "--depth", "1",
+            "https://github.com/MiniZinc/libminizinc.git",
+            target.absolutePath,
+        ).directory(outDir).inheritIO().start()
+        val rc = proc.waitFor()
+        require(rc == 0) { "git clone failed (exit $rc)" }
+        val testCount = File(target, "tests/spec/unit").walk().count { it.isFile && it.extension == "mzn" }
+        logger.lifecycle("[mzn-tests] ready: $testCount .mzn files under build/mzn/libminizinc/tests/spec/unit/")
+    }
+}
+
+/** Opt-in: shallow-clone Hakank's MiniZinc model collection. Large, stylistically
+ *  varied, and overlapping with mzn-bench in spots — useful as a "long tail" parity
+ *  source. The repo is ~200 MB cloned. */
+tasks.register("downloadMznHakank") {
+    group = "tools"
+    description = "Shallow-clone hakank/hakank into build/mzn/hakank/ (MiniZinc subset)."
+    notCompatibleWithConfigurationCache("ProcessBuilder calls inside doLast capture Project")
+    val outDir = layout.buildDirectory.dir("mzn").get().asFile
+    val rootDirFile = rootDir
+    doLast {
+        outDir.mkdirs()
+        val target = File(outDir, "hakank")
+        if (target.exists() && target.list()?.isNotEmpty() == true) {
+            logger.lifecycle("[hakank] already present at ${target.relativeTo(rootDirFile)}, skipping")
+            return@doLast
+        }
+        logger.lifecycle("[hakank] cloning hakank/hakank (shallow, sparse-checkout for minizinc/)")
+        // Sparse-checkout so we don't clone the whole 1+ GB repo just for the MiniZinc dir.
+        val parent = outDir
+        val initProc = ProcessBuilder("git", "clone", "--filter=blob:none", "--no-checkout",
+            "--depth", "1", "https://github.com/hakank/hakank.git", target.absolutePath)
+            .directory(parent).inheritIO().start()
+        require(initProc.waitFor() == 0) { "git clone --no-checkout failed" }
+        require(ProcessBuilder("git", "sparse-checkout", "set", "minizinc")
+            .directory(target).inheritIO().start().waitFor() == 0) { "sparse-checkout set failed" }
+        require(ProcessBuilder("git", "checkout").directory(target).inheritIO().start().waitFor() == 0) {
+            "git checkout failed"
+        }
+        val mznCount = File(target, "minizinc").walk().count { it.isFile && it.extension == "mzn" }
+        logger.lifecycle("[hakank] ready: $mznCount .mzn files under build/mzn/hakank/minizinc/")
+    }
+}
+
+/** Run the MiniZinc parity sweep against one or more discovery sources and write a JSON
+ *  report. See [com.eignex.klause.bench.parity.MznParitySweepMain] for properties. */
+tasks.register<JavaExec>("runMznParity") {
+    group = "verification"
+    description = "MiniZinc parity sweep: compiles models against klause, compares to Gecode."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.MznParitySweepMain")
+    // Reuse the bench-prop forwarding to pick up -Dklause.parity.* knobs.
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.parity.")) systemProperty(key, v.toString())
+        }
+        systemProperty("klause.workspace.root", rootDir.absolutePath)
+    }
+    dependsOn(":klause-fzn-cli:installDist")
+}
+
 /** Opt-in: download SATLIB benchmark tarballs to `build/satlib/<set>/`. The bench
  *  harness picks them up automatically on the next `:klause-bench:run`. Tarballs are
  *  small (~300 KB each, 1000 instances of 20-50 vars). */

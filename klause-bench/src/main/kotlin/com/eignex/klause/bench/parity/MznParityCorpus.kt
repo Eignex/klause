@@ -1,0 +1,130 @@
+package com.eignex.klause.bench.parity
+
+import java.io.File
+
+/**
+ * Discovery for MiniZinc parity instances. Each instance is a `(model, optional data)` pair
+ * with a stable name; corpora pull from on-disk roots and produce the same shape so the
+ * parity runner doesn't care where instances came from.
+ *
+ * Roots and their layouts:
+ *
+ *  - **smoke** — `klause-mzn-lib/test-models/`. Tiny hand-curated models that we
+ *    consider mandatory parity (run in CI). One file per instance, no data files.
+ *  - **mzn-bench** — `klause-bench/build/mzn/minizinc-benchmarks/<problem>/`. The MiniZinc
+ *    Challenge benchmarks repo (cloned by `:klause-bench:downloadMzn`). Layout is one
+ *    directory per problem; each contains one or more `.mzn` models plus a sibling
+ *    `data/` directory of `.dzn` instances, or `.mzn` files that already inline their
+ *    data. We pair each `.dzn` with the first `.mzn` in the problem directory.
+ *  - **libminizinc-tests** — `klause-bench/build/mzn/libminizinc/tests/spec/unit/`. The
+ *    MiniZinc compiler's correctness test suite (cloned by `:klause-bench:downloadMznTestSuite`).
+ *    Layout is `.mzn` files with `// solver: …` / `// expected:` directives in comments.
+ *  - **hakank** — `klause-bench/build/mzn/hakank/`. Hakank's MiniZinc model collection
+ *    (cloned by `:klause-bench:downloadMznHakank`). Models with optional `.dzn`s next to
+ *    them; very large and stylistically varied, so it's gated behind an opt-in
+ *    [Source.HAKANK] flag.
+ */
+object MznParityCorpus {
+
+    data class Instance(
+        val name: String,
+        val mzn: File,
+        val dzn: File? = null,
+    )
+
+    enum class Source { SMOKE, MZN_BENCH, LIBMINIZINC_TESTS, HAKANK }
+
+    /** Resolve the workspace root by walking up from this class's location until we find
+     *  `klause-mzn-lib/`. Tests / Gradle tasks invoking the harness should set
+     *  `klause.workspace.root` to skip the walk. */
+    fun workspaceRoot(): File {
+        System.getProperty("klause.workspace.root")?.let { return File(it) }
+        // ../../../ from klause-bench/build/classes/.../parity at runtime.
+        var cur: File? = File(".").absoluteFile
+        while (cur != null) {
+            if (File(cur, "klause-mzn-lib").isDirectory) return cur
+            cur = cur.parentFile
+        }
+        error("could not locate workspace root (no klause-mzn-lib parent)")
+    }
+
+    fun discover(source: Source, root: File = workspaceRoot()): List<Instance> = when (source) {
+        Source.SMOKE -> discoverSmoke(root)
+        Source.MZN_BENCH -> discoverMznBench(root)
+        Source.LIBMINIZINC_TESTS -> discoverLibMinizincTests(root)
+        Source.HAKANK -> discoverHakank(root)
+    }
+
+    private fun discoverSmoke(root: File): List<Instance> {
+        val dir = File(root, "klause-mzn-lib/test-models")
+        if (!dir.isDirectory) return emptyList()
+        return dir.listFiles { f -> f.isFile && f.extension == "mzn" }
+            ?.sortedBy { it.name }
+            ?.map { Instance(it.nameWithoutExtension, it) }
+            ?: emptyList()
+    }
+
+    private fun discoverMznBench(root: File): List<Instance> {
+        val benchRoot = File(root, "klause-bench/build/mzn/minizinc-benchmarks")
+        if (!benchRoot.isDirectory) return emptyList()
+        val out = mutableListOf<Instance>()
+        val problemDirs = benchRoot.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
+            ?.sortedBy { it.name } ?: return emptyList()
+        for (pd in problemDirs) {
+            val mzns = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.sortedBy { it.name }
+                ?: continue
+            if (mzns.isEmpty()) continue
+            val primaryMzn = mzns.first()
+            val dataDir = File(pd, "data").takeIf { it.isDirectory } ?: pd
+            val dzns = dataDir.listFiles { f -> f.isFile && f.extension == "dzn" }?.sortedBy { it.name }
+            if (dzns.isNullOrEmpty()) {
+                // No data file: the .mzn must be self-contained.
+                out += Instance(pd.name, primaryMzn)
+            } else {
+                for (dzn in dzns) {
+                    out += Instance("${pd.name}/${dzn.nameWithoutExtension}", primaryMzn, dzn)
+                }
+            }
+        }
+        return out
+    }
+
+    private fun discoverLibMinizincTests(root: File): List<Instance> {
+        // libminizinc tests are organised under tests/spec/unit/<category>/ with .mzn files. The
+        // suite is owned by MiniZinc's CI; many files exercise compiler edge cases
+        // unrelated to solver correctness — keep this opt-in and assume the caller
+        // filters further in their harness.
+        val unitDir = File(root, "klause-bench/build/mzn/libminizinc/tests/spec/unit")
+        if (!unitDir.isDirectory) return emptyList()
+        return unitDir.walkTopDown()
+            .filter { it.isFile && it.extension == "mzn" }
+            .sortedBy { it.relativeTo(unitDir).path }
+            .map { f ->
+                val rel = f.relativeTo(unitDir).path.removeSuffix(".mzn")
+                Instance(rel, f)
+            }
+            .toList()
+    }
+
+    private fun discoverHakank(root: File): List<Instance> {
+        val hk = File(root, "klause-bench/build/mzn/hakank")
+        if (!hk.isDirectory) return emptyList()
+        return hk.walkTopDown()
+            .filter { it.isFile && it.extension == "mzn" }
+            .sortedBy { it.relativeTo(hk).path }
+            .map { f ->
+                val rel = f.relativeTo(hk).path.removeSuffix(".mzn")
+                Instance(rel, f)
+            }
+            .toList()
+    }
+
+    /** Resolve the `klause.msc` config that the parity runner needs. Resolved relative to
+     *  [workspaceRoot]. */
+    fun klauseMsc(root: File = workspaceRoot()): File =
+        File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")
+
+    /** Resolve the directory MiniZinc must search first to find klause's redefinitions. */
+    fun klauseMznLibDir(root: File = workspaceRoot()): File =
+        File(root, "klause-mzn-lib/share/minizinc/klause")
+}
