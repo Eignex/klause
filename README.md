@@ -211,12 +211,10 @@ Use cases:
 Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
 
 - [CP] Min-cost-flow upgrade: SSP / cost-scaling with reduced-cost arc pruning. The current MinCostFlow factor only does per-node interval-arithmetic bound propagation.
-- [CP] geost upgrade: full sweep-line propagation across all dimensions with kernel propagation. The current Geost factor handles forced-single-dim cases only.
+- [CP] geost upgrade: full sweep-line propagation across all dimensions with mandatory-part kernel propagation. The current Geost factor handles forced-single-dim cases only.
 - [CP] MDD upgrade: incremental forward/backward support-count maintenance (the current Mdd factor rebuilds reachability bitsets on every fire).
 - [CP] arg_sort upgrade: Régin-style matching propagation. The current ArgSort factor is bound-consistent on values + pairwise-distinct on perm + pin-based sortedness.
-- [CP] alldifferent_except upgrade: Régin's bipartite matching extended to ignore except-values. The current AllDifferentExcept factor is singleton-take only (same strength as the zero-only variant).
-- [CP] path / tree upgrade: SCC-based pruning of arcs that cannot lie on any source→sink path. The current Path / Tree factors do forward-only BFS reachability.
-- [CP] BitBlast support for the new native factors (ArgSort, Path, Tree, MinCostFlow, Geost, Mdd) — currently only the decomposition path is bit-blastable for these globals.
+- [CP] BitBlast lowering for the new factors that still lack it: ArgSort, Path, Tree, Mdd (AllDifferentExcept / MinCostFlow / Geost are in place).
 - [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
 - [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
 - [CP] Core-guided optimization: upgrade Unsat.conflictFactors to extract multi-factor cores from the propagation trail.
