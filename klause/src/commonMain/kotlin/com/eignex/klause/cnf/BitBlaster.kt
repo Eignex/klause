@@ -15,6 +15,8 @@ import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.AllDifferentExcept
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
+import com.eignex.klause.solver.factor.MinCostFlow
+import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.ast.PbOp
 
 /**
@@ -66,6 +68,8 @@ object BitBlaster {
                 is AllDifferentFactor -> emitAllDifferent(b, factor, intBits, intMin, boolMap)
                 is AllDifferentExceptZero -> emitAllDifferentExcept(b, factor.xs, intArrayOf(0), intBits, intMin)
                 is AllDifferentExcept -> emitAllDifferentExcept(b, factor.xs, factor.except, intBits, intMin)
+                is MinCostFlow -> emitMinCostFlow(b, factor, intBits, intMin, problem)
+                is Geost -> emitGeost(b, factor, intBits, intMin, problem)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -366,6 +370,61 @@ object BitBlaster {
         bits.copyInto(out, 0, 0, bits.size)
         for (i in bits.size until width) out[i] = sign
         return out
+    }
+
+    /** Bitblast [MinCostFlow] as per-node Linear[inflow − outflow = balance] + the optional
+     *  cost equation [Linear[Σ weight·flow − cost = 0]]. */
+    private fun emitMinCostFlow(
+        b: CnfBuilder,
+        f: MinCostFlow,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+        problem: Problem,
+    ) {
+        for (n in 0 until f.numNodes) {
+            val coeffs = mutableListOf<Int>()
+            val vars = mutableListOf<Int>()
+            for (a in f.arcTo.indices) {
+                if (f.arcTo[a] - f.nodeOffset == n) { coeffs += 1; vars += f.flow[a] }
+                else if (f.arcFrom[a] - f.nodeOffset == n) { coeffs += -1; vars += f.flow[a] }
+            }
+            if (vars.isEmpty()) {
+                if (f.balance[n] != 0) { b.addClause(IntArray(0)); return }
+                continue
+            }
+            emitLinear(b, Linear(coeffs.toIntArray(), vars.toIntArray(), LinearOp.EQ, f.balance[n]), intBits, intMin, problem)
+        }
+        if (f.cost >= 0 && f.weight != null) {
+            val coeffs = IntArray(f.flow.size + 1) { if (it < f.flow.size) f.weight[it] else -1 }
+            val vars = IntArray(f.flow.size + 1) { if (it < f.flow.size) f.flow[it] else f.cost }
+            emitLinear(b, Linear(coeffs, vars, LinearOp.EQ, 0), intBits, intMin, problem)
+        }
+    }
+
+    /** Bitblast [Geost] as pairwise Or-of-LE separation across dimensions. */
+    private fun emitGeost(
+        b: CnfBuilder,
+        f: Geost,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+        problem: Problem,
+    ) {
+        val d = f.numDims
+        val n = f.numObjects
+        for (i in 0 until n) for (j in i + 1 until n) {
+            val clauseLits = mutableListOf<Int>()
+            for (k in 0 until d) {
+                val oi = f.origin[i * d + k]
+                val oj = f.origin[j * d + k]
+                val si = f.length[i * d + k]
+                val sj = f.length[j * d + k]
+                // origin[i] − origin[j] ≤ −si.
+                clauseLits += buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(oi, oj), LinearOp.LE, -si, intBits, intMin)
+                // origin[j] − origin[i] ≤ −sj.
+                clauseLits += buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(oj, oi), LinearOp.LE, -sj, intBits, intMin)
+            }
+            b.addClause(clauseLits.toIntArray())
+        }
     }
 
     private fun emitLinear(b: CnfBuilder, f: Linear, intBits: Array<IntArray>, intMin: IntArray, problem: Problem) {

@@ -93,7 +93,7 @@ class NewGlobalsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        assertSolves(compiled, "network_flow")
+        assertBitblastsAndSat(compiled)
     }
 
     @Test
@@ -117,7 +117,7 @@ class NewGlobalsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        assertSolves(compiled, "network_flow_cost")
+        assertBitblastsAndSat(compiled)
     }
 
     @Test
@@ -137,7 +137,7 @@ class NewGlobalsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        assertSolves(compiled, "geost")
+        assertBitblastsAndSat(compiled)
     }
 
     @Test
