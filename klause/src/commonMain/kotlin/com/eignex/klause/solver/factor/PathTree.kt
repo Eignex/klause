@@ -118,32 +118,63 @@ class Path(
             }
         }
 
-        // Reachability: when source/sink are pinned, BFS over edges that aren't forced-false.
+        // Reachability + SCC pruning. When source/sink are pinned, do bidirectional BFS
+        // and prune any node/edge that can't appear on a source→sink path.
         val srcDom = state.intDomains[source]
         val sinkDom = state.intDomains[sink]
         if (srcDom.min == srcDom.max && sinkDom.min == sinkDom.max) {
             val src = srcDom.min - nodeOffset
             val snk = sinkDom.min - nodeOffset
-            // Source/sink present.
             if (!state.pinBool(nodePresent[src], true, ant)) return false
             if (!state.pinBool(nodePresent[snk], true, ant)) return false
-            // BFS from src using arcs not forced-false; mark reachable.
-            val reachable = BooleanArray(numNodes)
-            reachable[src] = true
-            val queue = ArrayDeque<Int>()
-            queue.add(src)
-            while (queue.isNotEmpty()) {
-                val v = queue.removeFirst()
-                for (e in outArcs[v]) {
-                    if (edgeState(state, e) == -1) continue
-                    val u = to[e] - nodeOffset
-                    if (!reachable[u] && nodeState(state, u) != -1) {
-                        reachable[u] = true
-                        queue.add(u)
+
+            // Forward reachable from src (over not-forced-false edges/nodes).
+            val fwd = BooleanArray(numNodes)
+            run {
+                fwd[src] = true
+                val q = ArrayDeque<Int>(); q.add(src)
+                while (q.isNotEmpty()) {
+                    val v = q.removeFirst()
+                    for (e in outArcs[v]) {
+                        if (edgeState(state, e) == -1) continue
+                        val u = to[e] - nodeOffset
+                        if (!fwd[u] && nodeState(state, u) != -1) { fwd[u] = true; q.add(u) }
                     }
                 }
             }
-            if (!reachable[snk]) return false
+            if (!fwd[snk]) return false
+
+            // Backward reachable to snk (reverse BFS on the same residual graph).
+            val bwd = BooleanArray(numNodes)
+            run {
+                bwd[snk] = true
+                val q = ArrayDeque<Int>(); q.add(snk)
+                while (q.isNotEmpty()) {
+                    val v = q.removeFirst()
+                    for (e in inArcs[v]) {
+                        if (edgeState(state, e) == -1) continue
+                        val u = from[e] - nodeOffset
+                        if (!bwd[u] && nodeState(state, u) != -1) { bwd[u] = true; q.add(u) }
+                    }
+                }
+            }
+
+            // A node lies on some src→snk path iff fwd[v] ∧ bwd[v]. Force-prune the rest.
+            for (v in 0 until numNodes) {
+                val present = state.boolValues[nodePresent[v]]
+                if (!(fwd[v] && bwd[v]) && present != false) {
+                    if (!state.pinBool(nodePresent[v], false, ant)) return false
+                }
+            }
+            // An edge lies on some src→snk path iff fwd[from] ∧ bwd[to] ∧ not-forced-false.
+            for (e in from.indices) {
+                if (edgeState(state, e) == -1) continue
+                val u = from[e] - nodeOffset
+                val w = to[e] - nodeOffset
+                if (!(fwd[u] && bwd[w])) {
+                    if (!state.pinBool(edgePresent[e], false, ant)) return false
+                }
+            }
         }
         return true
     }
@@ -180,25 +211,39 @@ class Tree(
         if (rd.min == rd.max) {
             val r = rd.min - nodeOffset
             if (!state.pinBool(nodePresent[r], true, ant)) return false
-            // Every forced-present non-root must be reachable from root via not-forced-false edges.
-            val reachable = BooleanArray(numNodes)
-            reachable[r] = true
-            val queue = ArrayDeque<Int>()
-            queue.add(r)
-            while (queue.isNotEmpty()) {
-                val v = queue.removeFirst()
+            // Forward reachable from root over not-forced-false edges/nodes.
+            val fwd = BooleanArray(numNodes)
+            fwd[r] = true
+            val q = ArrayDeque<Int>(); q.add(r)
+            while (q.isNotEmpty()) {
+                val v = q.removeFirst()
                 for (e in outArcs[v]) {
                     if (edgeState(state, e) == -1) continue
                     val u = to[e] - nodeOffset
-                    if (!reachable[u] && nodeState(state, u) != -1) {
-                        reachable[u] = true
-                        queue.add(u)
-                    }
+                    if (!fwd[u] && nodeState(state, u) != -1) { fwd[u] = true; q.add(u) }
                 }
             }
+            // Any forced-present node must be forward-reachable from root.
             for (v in 0 until numNodes) {
                 if (v == r) continue
-                if (nodeState(state, v) == 1 && !reachable[v]) return false
+                if (nodeState(state, v) == 1 && !fwd[v]) return false
+            }
+            // Any unreachable node cannot be present; prune.
+            for (v in 0 until numNodes) {
+                if (v == r) continue
+                val present = state.boolValues[nodePresent[v]]
+                if (!fwd[v] && present != false) {
+                    if (!state.pinBool(nodePresent[v], false, ant)) return false
+                }
+            }
+            // An edge can only exist between reachable endpoints.
+            for (e in from.indices) {
+                if (edgeState(state, e) == -1) continue
+                val u = from[e] - nodeOffset
+                val w = to[e] - nodeOffset
+                if (!(fwd[u] && fwd[w])) {
+                    if (!state.pinBool(edgePresent[e], false, ant)) return false
+                }
             }
         }
         return true
