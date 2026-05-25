@@ -882,10 +882,19 @@ class PropagationState(
 
     /** Collect every decision level touched by [boolVars] / [intVars] — the factor's view of
      *  who's responsible. Used when a factor returns `false` without explicitly setting
-     *  [conflictLevels]. */
+     *  [conflictLevels].
+     *
+     *  Atom-lit dispatch: [boolVars] may legitimately contain virtual atom-var ids when the
+     *  failing factor is a learned Clause whose literals reference atom-lits (encoded as
+     *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those map into [atomLevel],
+     *  not [boolLevel] — mirrors the [maxLevelForVars] dispatch a few lines above. */
     fun collectLevelsForVars(boolVars: IntArray, intVars: IntArray): Set<Int> {
         val out = HashSet<Int>()
-        for (v in boolVars) { val l = boolLevel[v]; if (l > 0) out.add(l) }
+        val numBool = problem.numBoolVars
+        for (v in boolVars) {
+            val l = if (v < numBool) boolLevel[v] else atomLevel[v - numBool]
+            if (l > 0) out.add(l)
+        }
         for (v in intVars) { val l = intLevel[v]; if (l > 0) out.add(l) }
         return out
     }
