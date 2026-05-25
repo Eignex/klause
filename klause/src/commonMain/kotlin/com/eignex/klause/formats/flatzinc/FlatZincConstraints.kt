@@ -2,6 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.AllDifferentExcept
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Member
@@ -113,9 +114,11 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // Global
     "all_different_int" -> emitAllDifferent(c)
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
+    "alldifferent_except", "fzn_alldifferent_except" -> emitAllDifferentExcept(c)
     "all_equal_int", "fzn_all_equal_int" -> emitAllEqual(c)
     "member_int", "fzn_member_int" -> emitMember(c)
     "sort", "fzn_sort" -> emitSort(c)
+    "arg_sort_int", "fzn_arg_sort_int", "arg_sort" -> emitArgSort(c)
     "symmetric_all_different", "fzn_symmetric_all_different" -> emitSymmetricAllDifferent(c)
     "inverse", "fzn_inverse" -> emitInverse(c, withOffsets = false)
     "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
@@ -758,6 +761,19 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     factors.add(AllDifferentExceptZero(vars))
 }
 
+/** `alldifferent_except(xs, S)` where S is a constant set of int (the sentinel values). */
+internal fun FlatZincCompiler.emitAllDifferentExcept(c: FznConstraint) {
+    require(c.args.size == 2)
+    val vars = evalIntVarArray(c.args[0])
+    val setArg = c.args[1]
+    val except: IntArray = when (setArg) {
+        is FznExpr.IntSetLit -> IntArray(setArg.values.size) { setArg.values[it].toInt() }
+        is FznExpr.IntRangeLit -> IntArray((setArg.hi - setArg.lo + 1).toInt()) { (setArg.lo + it).toInt() }
+        else -> failHere("alldifferent_except: expected set literal for S, got ${setArg::class.simpleName}")
+    }
+    factors.add(AllDifferentExcept(vars, except))
+}
+
 internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
@@ -771,6 +787,16 @@ internal fun FlatZincCompiler.emitMember(c: FznConstraint) {
     val xs = evalIntVarArray(c.args[0])
     val y = resolveIntVar(c.args[1])
     factors.add(Member(xs, y))
+}
+
+/** `arg_sort_int(values, perm)` — perm is a permutation of `1..n` (or `0..n-1` if domains
+ *  start at 0) such that `values[perm[i]]` is non-decreasing. */
+internal fun FlatZincCompiler.emitArgSort(c: FznConstraint) {
+    require(c.args.size == 2)
+    val values = evalIntVarArray(c.args[0])
+    val perm = evalIntVarArray(c.args[1])
+    val offset = if (perm.isNotEmpty()) intDomains[perm[0]].min else 0
+    factors.add(com.eignex.klause.solver.factor.ArgSort(values, perm, permOffset = offset))
 }
 
 /** `sort(xs, ys)` — ys is the non-decreasing sorted permutation of xs. */

@@ -13,6 +13,8 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
+import com.eignex.klause.solver.factor.AllDifferentExcept
+import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.ast.PbOp
 
 /**
@@ -62,6 +64,8 @@ object BitBlaster {
                 is ReifiedPseudoBoolean -> emitReifiedPseudoBoolean(b, factor, boolMap)
                 is Xor -> emitXor(b, factor, boolMap)
                 is AllDifferentFactor -> emitAllDifferent(b, factor, intBits, intMin, boolMap)
+                is AllDifferentExceptZero -> emitAllDifferentExcept(b, factor.xs, intArrayOf(0), intBits, intMin)
+                is AllDifferentExcept -> emitAllDifferentExcept(b, factor.xs, factor.except, intBits, intMin)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -170,6 +174,62 @@ object BitBlaster {
                 val cnfPj = Lit.make(boolMap[Lit.variable(pj)], Lit.isPositive(pj))
                 b.addClause(intArrayOf(Lit.negate(cnfPi), Lit.negate(cnfPj), notEq))
             }
+        }
+    }
+
+    /** Pairwise NE with an "in-except" escape per var. Builds a single aux bool per var
+     *  encoding `x_i ∈ except`, then for every pair emits `inExc_i ∨ inExc_j ∨ x_i ≠ x_j`. */
+    private fun emitAllDifferentExcept(
+        b: CnfBuilder,
+        xs: IntArray,
+        except: IntArray,
+        intBits: Array<IntArray>,
+        intMin: IntArray,
+    ) {
+        if (xs.size < 2) return
+        // Per-var aux bool: inExc_i ↔ (x_i ∈ except).
+        val inExc = IntArray(xs.size)
+        for (i in xs.indices) {
+            val v = xs[i]
+            val vLits = bitsToLits(intBits[v])
+            val vMin = intMin[v]
+            // Collect literals "x_i == e" for each e in except (those reachable given domain).
+            val eqLits = mutableListOf<Int>()
+            for (e in except) {
+                val rel = e - vMin
+                if (rel < 0) continue
+                if (rel.toLong() >= (1L shl vLits.size)) continue
+                eqLits += b.unsignedEq(vLits, constantLits(b, rel.toLong()))
+            }
+            if (eqLits.isEmpty()) {
+                // Empty disjunction → false constant. Encode as a fresh false lit.
+                val falseLit = Lit.make(b.newVar(), positive = true)
+                b.addClause(intArrayOf(Lit.negate(falseLit)))
+                inExc[i] = falseLit
+            } else if (eqLits.size == 1) {
+                inExc[i] = eqLits[0]
+            } else {
+                // Tseitin OR: aux ↔ OR(eqLits).
+                val aux = Lit.make(b.newVar(), positive = true)
+                for (e in eqLits) b.addClause(intArrayOf(Lit.negate(e), aux))
+                val big = IntArray(eqLits.size + 1)
+                big[0] = Lit.negate(aux)
+                for (k in eqLits.indices) big[k + 1] = eqLits[k]
+                b.addClause(big)
+                inExc[i] = aux
+            }
+        }
+        // Pairwise NE gated by inExc_i ∨ inExc_j.
+        for (i in xs.indices) for (j in i + 1 until xs.size) {
+            val a = xs[i]; val c = xs[j]
+            val aMin = intMin[a]; val cMin = intMin[c]
+            val aLits = bitsToLits(intBits[a])
+            val cLits = bitsToLits(intBits[c])
+            val base = minOf(aMin, cMin)
+            val aShifted = if (aMin == base) aLits else b.rippleAdd(aLits, constantLits(b, (aMin - base).toLong()))
+            val cShifted = if (cMin == base) cLits else b.rippleAdd(cLits, constantLits(b, (cMin - base).toLong()))
+            val notEq = Lit.negate(b.unsignedEq(aShifted, cShifted))
+            b.addClause(intArrayOf(inExc[i], inExc[j], notEq))
         }
     }
 

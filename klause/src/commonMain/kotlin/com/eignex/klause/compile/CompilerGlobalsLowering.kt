@@ -45,6 +45,24 @@ import com.eignex.klause.solver.IntDomain
 //  alldifferent_except
 // ----------------------------------------------------------------------------
 
+/** Top-level entry: emit the native [com.eignex.klause.solver.factor.AllDifferentExcept]
+ *  factor when every operand lifts to a bare [IntRef]. Otherwise fall back to the
+ *  BoolExpr decomposition routed through [assertExpr]. */
+internal fun Compiler.Build.assertAllDifferentExcept(expr: AllDifferentExceptExpr) {
+    val lifted = expr.terms.map { lift(it) }
+    if (lifted.all { it is IntRef } && expr.except.isNotEmpty()) {
+        val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+        if (ids.toSet().size == ids.size) {
+            factors += com.eignex.klause.solver.factor.AllDifferentExcept(
+                xs = ids,
+                except = expr.except.toIntArray(),
+            )
+            return
+        }
+    }
+    assertExpr(decomposeAllDifferentExcept(expr))
+}
+
 internal fun Compiler.Build.decomposeAllDifferentExcept(expr: AllDifferentExceptExpr): BoolExpr {
     val xs = expr.terms
     val except = expr.except
@@ -68,6 +86,26 @@ internal fun Compiler.Build.decomposeAllDifferentExcept(expr: AllDifferentExcept
 // ----------------------------------------------------------------------------
 //  arg_sort
 // ----------------------------------------------------------------------------
+
+/** Top-level entry: emit the [com.eignex.klause.solver.factor.ArgSort] factor when both
+ *  arrays lift to bare [IntRef]s. */
+internal fun Compiler.Build.assertArgSort(expr: ArgSortExpr) {
+    val liftedValues = expr.values.map { lift(it) }
+    val liftedPerm = expr.perm.map { lift(it) }
+    if (liftedValues.all { it is IntRef } && liftedPerm.all { it is IntRef }) {
+        val valueIds = IntArray(liftedValues.size) { intVarOf((liftedValues[it] as IntRef).name) }
+        val permIds = IntArray(liftedPerm.size) { intVarOf((liftedPerm[it] as IntRef).name) }
+        if (valueIds.toSet().size == valueIds.size && permIds.toSet().size == permIds.size) {
+            factors += com.eignex.klause.solver.factor.ArgSort(
+                values = valueIds,
+                perm = permIds,
+                permOffset = expr.permOffset,
+            )
+            return
+        }
+    }
+    assertExpr(decomposeArgSort(expr))
+}
 
 internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
     val n = expr.values.size

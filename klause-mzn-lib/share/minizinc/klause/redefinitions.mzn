@@ -104,6 +104,7 @@ predicate float_div(var float: a, var float: b, var float: c);
 predicate all_different_int(array[int] of var int: x);
 predicate all_equal_int(array[int] of var int: x);
 predicate alldifferent_except_0(array[int] of var int: x);
+predicate alldifferent_except(array[int] of var int: x, set of int: S);
 predicate symmetric_all_different(array[int] of var int: x);
 predicate member_int(array[int] of var int: x, var int: y);
 predicate sort(array[int] of var int: x, array[int] of var int: y);
