@@ -71,18 +71,31 @@ object MznParityCorpus {
         val problemDirs = benchRoot.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
             ?.sortedBy { it.name } ?: return emptyList()
         for (pd in problemDirs) {
-            val mzns = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.sortedBy { it.name }
+            // Find the model: prefer a .mzn directly under the problem dir, else recurse
+            // up to two levels (some problems put models under a subdir like `mzn/`).
+            val primaryMzn = pd.listFiles { f -> f.isFile && f.extension == "mzn" }
+                ?.sortedBy { it.name }?.firstOrNull()
+                ?: pd.walkTopDown().maxDepth(3)
+                    .firstOrNull { it.isFile && it.extension == "mzn" }
                 ?: continue
-            if (mzns.isEmpty()) continue
-            val primaryMzn = mzns.first()
-            val dataDir = File(pd, "data").takeIf { it.isDirectory } ?: pd
-            val dzns = dataDir.listFiles { f -> f.isFile && f.extension == "dzn" }?.sortedBy { it.name }
-            if (dzns.isNullOrEmpty()) {
+            // Find every .dzn under the problem dir (recursive). Real-world layouts vary:
+            //   - `<problem>/instance.dzn` (alpha, queens, …)
+            //   - `<problem>/data/*.dzn` (some benchmarks)
+            //   - `<problem>/class_1/*.dzn` (2DBinPacking, bin-packing classes)
+            //   - `<problem>/<year>/*.dzn` (amaze, …)
+            val dzns = pd.walkTopDown().maxDepth(3)
+                .filter { it.isFile && it.extension == "dzn" }
+                .sortedBy { it.relativeTo(pd).path }
+                .toList()
+            if (dzns.isEmpty()) {
                 // No data file: the .mzn must be self-contained.
                 out += Instance(pd.name, primaryMzn)
             } else {
                 for (dzn in dzns) {
-                    out += Instance("${pd.name}/${dzn.nameWithoutExtension}", primaryMzn, dzn)
+                    // Compose a name that retains the sub-layout so two instances under
+                    // different class dirs don't collide.
+                    val relPath = dzn.relativeTo(pd).path.removeSuffix(".dzn")
+                    out += Instance("${pd.name}/$relPath", primaryMzn, dzn)
                 }
             }
         }

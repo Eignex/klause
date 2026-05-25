@@ -295,17 +295,58 @@ object MznParity {
         return counts
     }
 
-    /** Parse `predicate <name>(...)` from klause's `redefinitions.mzn`. Each declaration
-     *  names a predicate the klause-fzn-cli backend handles natively. */
+    /** Union of klause's natively-handled FlatZinc predicates: every constraint name
+     *  klause-fzn-cli's parser dispatches on ([FlatZincConstraints.kt]) plus everything
+     *  declared in `redefinitions.mzn`. The redefinitions list is MZN's "stop decomposing
+     *  here" hint and overlaps with the parser names; the parser list also includes
+     *  elementary FlatZinc primitives MZN emits without consulting redefinitions
+     *  (`bool2int`, `int_eq_reif`, `int_le_reif`, …) — those are equally native at the
+     *  klause runtime level, and a parity report that omitted them would over-report
+     *  "decomposed" by a wide margin. */
     private fun loadNativePredicateSet(mznLibDir: File): Set<String> {
         val redefFile = File(mznLibDir, "redefinitions.mzn")
-        if (!redefFile.isFile) return emptySet()
         val predicateDecl = Regex("""^\s*predicate\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(""")
-        return buildSet {
-            redefFile.useLines { lines ->
+        val redefsPreds = buildSet {
+            if (redefFile.isFile) redefFile.useLines { lines ->
                 for (line in lines) {
                     val m = predicateDecl.find(line) ?: continue
                     add(m.groupValues[1])
+                }
+            }
+        }
+        return redefsPreds + loadParserSupportedNames(mznLibDir)
+    }
+
+    /** Extract the constraint names the klause-fzn-cli parser dispatches on. Reads the
+     *  source file `FlatZincConstraints.kt` directly and collects every string literal
+     *  that appears as a `when` arm in `processConstraint`. Captures both forms used in
+     *  the source (`"set_in"` and the `"fzn_set_in"` aliases). When the source file
+     *  isn't on the workspace's expected path (e.g. running from a published jar),
+     *  returns empty and falls back to the redefinitions list alone. */
+    private fun loadParserSupportedNames(mznLibDir: File): Set<String> {
+        // mznLibDir is .../klause-mzn-lib/share/minizinc/klause; the workspace root is its
+        // great-great-grandparent — `share/minizinc/klause` is three levels under
+        // `klause-mzn-lib`, plus the workspace root above that.
+        var cur: File? = mznLibDir
+        repeat(4) { cur = cur?.parentFile }
+        val workspaceRoot = cur ?: return emptySet()
+        val constraintsFile = File(
+            workspaceRoot,
+            "klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincConstraints.kt",
+        )
+        if (!constraintsFile.isFile) return emptySet()
+        // Match the `"name", "fzn_name" -> emit...` arms — strict literal pattern.
+        val nameLit = Regex("""\"([A-Za-z_][A-Za-z0-9_]*)\"""")
+        return buildSet {
+            constraintsFile.useLines { lines ->
+                for (line in lines) {
+                    if ("->" !in line) continue
+                    for (m in nameLit.findAll(line)) {
+                        val name = m.groupValues[1]
+                        // Skip Kotlin keywords and obvious type-bookkeeping false positives.
+                        if (name.length <= 2) continue
+                        add(name)
+                    }
                 }
             }
         }

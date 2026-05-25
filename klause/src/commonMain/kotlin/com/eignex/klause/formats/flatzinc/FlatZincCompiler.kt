@@ -194,7 +194,15 @@ internal class FlatZincCompiler(
         }
         when (val t = d.type) {
             FznType.Bool -> allocBool(d.name)
-            FznType.IntAny -> failHere("variable `${d.name}`: unbounded `int` not supported; need a domain")
+            FznType.IntAny -> {
+                // MiniZinc occasionally emits `var int` for auxiliary intermediates without
+                // a declared range; the surrounding linear / element constraints normally
+                // bound them via propagation. Allocate over a wide default domain — wide
+                // enough to absorb typical CP arithmetic without risk of int overflow in
+                // factor coefficient × value products. Matches the convention used by
+                // mainstream FZN solvers (gecode, chuffed) when faced with unbounded ints.
+                allocInt(d.name, UNBOUNDED_INT_DEFAULT_LO, UNBOUNDED_INT_DEFAULT_HI)
+            }
             is FznType.IntRange -> allocInt(d.name, t.lo.toInt(), t.hi.toInt())
             is FznType.IntSet -> {
                 val lo = t.values.min().toInt()
@@ -684,6 +692,15 @@ internal class FlatZincCompiler(
     }
 
     internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, 0, 0)
+
+    private companion object {
+        /** Default domain for `var int` declarations that arrive without an explicit
+         *  range. Wide enough to absorb typical CP arithmetic without int overflow
+         *  during factor coefficient × value products; matches the convention used by
+         *  Gecode / Chuffed when faced with unbounded ints. */
+        private const val UNBOUNDED_INT_DEFAULT_LO: Int = -10_000_000
+        private const val UNBOUNDED_INT_DEFAULT_HI: Int = 10_000_000
+    }
 }
 
 /** Top-level entry point: parse + compile. */
