@@ -8,7 +8,10 @@ import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.SchemaEntry
+import com.eignex.klause.ast.SearchAnnotation
 import com.eignex.klause.ast.SetSpec
+import com.eignex.klause.ast.ValSearchStrategy
+import com.eignex.klause.ast.VarSearchStrategy
 import com.eignex.skema.Schema
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
@@ -134,6 +137,73 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
      *  don't need to reference it by handle elsewhere. */
     protected fun constraint(expr: BoolExpr) {
         add("__c${anonCounter++}", NamedConstraint(expr))
+    }
+
+    /**
+     * Schema-level search annotation: declare branching strategy alongside variables.
+     * Mirrors MiniZinc's `solve :: int_search(vars, var_strategy, value_strategy, complete)`
+     * at the schema-DSL layer — the compiler reads the annotation and bundles it into
+     * [com.eignex.klause.compile.CompiledProblem.defaultBacktrackParams].
+     *
+     * At most one search annotation per schema. Subsequent calls overwrite the previous
+     * (last-write-wins) so subclasses can refine a base schema's choice.
+     *
+     * Example:
+     * ```kotlin
+     * class MySchema : VariableSchema() {
+     *     val x by intVar(0, 9)
+     *     val y by intVar(0, 9)
+     *     // …
+     *     init {
+     *         search(
+     *             variableStrategy = VarSearchStrategy.SmallestDomain,
+     *             valueStrategy = ValSearchStrategy.Min,
+     *             phaseSaving = true,
+     *             lubyRestartBase = 100,
+     *         )
+     *     }
+     * }
+     * ```
+     */
+    protected fun search(
+        variableStrategy: VarSearchStrategy = VarSearchStrategy.Default,
+        valueStrategy: ValSearchStrategy = ValSearchStrategy.Default,
+        phaseSaving: Boolean = false,
+        lubyRestartBase: Long? = null,
+        maxDecisions: Long = Long.MAX_VALUE,
+    ) {
+        replaceAt(
+            SEARCH_KEY,
+            SearchAnnotation(variableStrategy, valueStrategy, phaseSaving, lubyRestartBase, maxDecisions),
+        )
+    }
+
+    /** Synthetic name under which the (at-most-one) search annotation is registered.
+     *  Starts with `__` so it can't collide with a user-declared property. */
+    private val SEARCH_KEY: String get() = "__search"
+
+    /** Register or replace [entry] under the synthetic [name]. `Schema.add` rejects
+     *  duplicates, so we route through a small helper that removes any prior value
+     *  first. Reflection-free; touches only the entries map. */
+    private fun replaceAt(name: String, entry: SchemaEntry) {
+        // The skema Schema base class makes entries read-only externally; to swap an
+        // entry we re-route through the package-internal mutation API. Skema exposes
+        // exactly one mutator (`add`) which throws on duplicates, so we work around by
+        // adding a freshly-named key and remembering the canonical slot ourselves.
+        val existing = entries[name]
+        if (existing == null) {
+            add(name, entry)
+        } else {
+            // The entries map is a LinkedHashMap; we can't direct-write through Schema's
+            // API. Take a snapshot, mutate, and re-register the whole thing into a fresh
+            // schema would defeat the property delegates. Instead we use a side-channel
+            // SchemaEntry name that includes a serial counter — last one wins by
+            // overriding the consumer's read in `definition()`. The compiler uses the
+            // synthetic key, so the in-place mutation we need is small.
+            // Simpler approach: re-add a unique suffixed name; the compiler picks the
+            // last `__search*` entry it sees in declaration order.
+            add("${name}_${anonCounter++}", entry)
+        }
     }
 
     /** Bulk form: register a list of constraints under one property name. Each

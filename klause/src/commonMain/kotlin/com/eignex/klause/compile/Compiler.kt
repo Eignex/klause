@@ -151,6 +151,7 @@ class Compiler {
                         floatMetaBuckets += entry.buckets
                     }
                     is NamedConstraint -> {} // handled in a second pass once all vars are registered
+                    is com.eignex.klause.ast.SearchAnnotation -> {} // picked up at the end of compile()
                 }
             }
 
@@ -167,6 +168,11 @@ class Compiler {
                     constraints = floatMetaConstraints.toList(),
                 )
 
+            // Pick up the last `__search*` annotation in declaration order — schemas may
+            // re-declare to refine an inherited choice.
+            val searchAnnotation = def.entries.entries
+                .filter { it.value is com.eignex.klause.ast.SearchAnnotation }
+                .lastOrNull()?.value as? com.eignex.klause.ast.SearchAnnotation
             return CompiledProblem(
                 problem = Problem(
                     numBoolVars = numBoolVars,
@@ -181,6 +187,7 @@ class Compiler {
                 floatDecoders = floatDecoders.toMap(),
                 setLayouts = setLayouts.toMap(),
                 setNominalLabels = setLabelOrder.toMap(),
+                defaultBacktrackParams = searchAnnotation?.let { searchAnnotationToParams(it) },
             )
         }
 

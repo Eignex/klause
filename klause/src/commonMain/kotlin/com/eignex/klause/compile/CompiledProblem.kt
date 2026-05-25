@@ -32,6 +32,11 @@ class CompiledProblem(
     val intVarIdByName: Map<String, Int>,
     val nominalIndicators: Map<String, Map<String, Int>>,
     val floatDecoders: Map<String, FloatSpec>,
+    /** Default branching params derived from the schema's `search { … }` annotation, if
+     *  any. `null` when the schema didn't declare one — callers should fall back to
+     *  `BacktrackParams()` in that case. The convenience [backtrackParams] handles that
+     *  fallback. */
+    val defaultBacktrackParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
     /** Per-set-var indicator layout: parallel `(universe[i], indicatorBoolId[i])`. Used by
      *  the set decoders to read indicator bools back into a [Set]. Nominal-set vars stash
      *  their label order in [setNominalLabels] alongside this. */
@@ -40,6 +45,12 @@ class CompiledProblem(
      *  int-universe set vars. */
     val setNominalLabels: Map<String, List<String>> = emptyMap(),
 ) {
+    /** Return the schema's declared `BacktrackParams` if any, else a fresh default
+     *  [com.eignex.klause.solver.backtrack.BacktrackParams]. Convenience for the common
+     *  pattern `BacktrackSolver(p.problem).solve(p.backtrackParams())`. */
+    fun backtrackParams(): com.eignex.klause.solver.backtrack.BacktrackParams =
+        defaultBacktrackParams ?: com.eignex.klause.solver.backtrack.BacktrackParams()
+
     fun decode(handle: BoolHandle, sample: Sample): Boolean {
         val id = boolVarIdByName[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
