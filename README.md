@@ -210,21 +210,14 @@ Use cases:
 
 Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
 
-- [CP] Network flow DSL: networkFlow(arcs, balance, flow) and networkFlowCost(arcs, balance, weight, flow, cost) builders with decomposition lowering to per-node sum and weighted-sum.
-- [CP] Network flow propagator: dedicated min-cost-flow factor (SSP / cost-scaling) with reduced-cost arc pruning and infeasibility detection beyond the linear decomposition.
-- [CP] Network flow FlatZinc mapping: wire network_flow and network_flow_cost in klause-mzn-lib to the new builders, with redefinition fallback for backends without the propagator.
-- [CP] geost global: DSL builder, N-dimensional non-overlapping placement propagator (sweep-based, generalization of Diffn), and FlatZinc mapping for fzn_geost.
-- [CP] MDD global: DSL builder, propagator over multi-valued decision diagrams (incremental support counts on edges), and FlatZinc mapping for fzn_mdd.
-- [CP] cost_regular global: DSL builder, weighted-DFA propagator accumulating edge costs into a cost variable, and FlatZinc mapping for fzn_cost_regular.
-- [CP] cost_mdd global: DSL builder, weighted-MDD propagator, and FlatZinc mapping for fzn_cost_mdd.
-- [CP] path global: DSL builder, directed-path propagator over node/edge variables with reachability filtering, and FlatZinc mapping for fzn_path.
-- [CP] tree global: DSL builder, directed spanning-tree propagator with connectedness and acyclicity filtering, and FlatZinc mapping for fzn_tree.
-- [CP] arg_sort global: DSL builder, dedicated propagator over (values, permutation) stronger than Sort + Inverse decomposition, and FlatZinc mapping for fzn_arg_sort_int.
-- [CP] Generalized alldifferent_except: DSL builder taking an arbitrary excluded-value set, native propagator preserving free-value reasoning that remap-to-0 discards, and FlatZinc mapping for fzn_alldifferent_except.
+- [CP] Network-flow propagator: dedicated min-cost-flow factor (SSP / cost-scaling) with reduced-cost arc pruning and infeasibility detection beyond the linear decomposition (DSL builder and lowering are in place).
+- [CP] geost propagator: sweep-based N-dimensional non-overlap stronger than the current pairwise-axis-disjunction decomposition.
+- [CP] MDD / cost_mdd / cost_regular propagators: incremental support counts on layered edges, stronger than the per-layer Table decomposition.
+- [CP] path / tree propagators: reachability-aware filtering (dedicated factor) on top of the existing flow-based / rank-based decomposition.
+- [CP] arg_sort propagator: dedicated (values, permutation) factor stronger than the Sort + Inverse + tiebreak decomposition.
+- [CP] alldifferent_except propagator: native factor preserving free-value reasoning (the current decomposition is pairwise-NE gated by membership disjunctions, quadratic).
 - [CP] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD/cost_mdd/cost_regular support sets) to bitset domain operations.
-- [CP] Schema DSL set declarators: multiple(labels) and setVar(over = range), decoders, indicator-bool lowering.
-- [CP] Schema DSL set expressions: inSet, subsetOf, disjointFrom, union, intersect, card.
-- [CP] Native bitset set-propagators for set algebra over large universes.
+- [CP] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
 - [CP] Core-guided optimization: upgrade Unsat.conflictFactors to extract multi-factor cores from the propagation trail.
 - [CP] Core-guided optimization: assumption-based satisfy API (incremental unsat under hypotheses).
 - [CP] Core-guided optimization: OLL outer loop (unweighted MaxSAT, relax cores with cardinality constraints).

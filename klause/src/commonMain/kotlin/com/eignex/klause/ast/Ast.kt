@@ -219,6 +219,238 @@ data class AllDifferent(val terms: List<IntExpr>) : BoolExpr {
 }
 
 /**
+ * Generalized alldifferent_except: every pair of distinct positions must take different
+ * values, unless one of them takes a value in [except]. [except] is the set of "ignored"
+ * sentinel values (e.g., {0} for the classic alldifferent_except_0).
+ */
+@Serializable
+@SerialName("alldiff_except")
+data class AllDifferentExceptExpr(
+    val terms: List<IntExpr>,
+    val except: List<Int>,
+) : BoolExpr {
+    init {
+        require(terms.size >= 2) { "AllDifferentExcept needs at least two terms" }
+    }
+}
+
+/**
+ * `arg_sort(values, perm)` — `perm` is a permutation of `0..n-1` such that
+ * `values[perm[0]] ≤ values[perm[1]] ≤ … ≤ values[perm[n-1]]`. Ties are broken by index.
+ * [permOffset] is the integer that represents index 0 in `perm` (0 for klause native,
+ * 1 for FlatZinc-style 1-indexed inputs).
+ */
+@Serializable
+@SerialName("arg_sort")
+data class ArgSortExpr(
+    val values: List<IntExpr>,
+    val perm: List<IntExpr>,
+    val permOffset: Int = 0,
+) : BoolExpr {
+    init {
+        require(values.size == perm.size) { "arg_sort: values and perm must have the same length" }
+        require(values.isNotEmpty()) { "arg_sort: values must be non-empty" }
+    }
+}
+
+/**
+ * `path(N, from, to, source, sink, edge_present, node_present)` — every selected node
+ * lies on a simple directed path from [source] to [sink] using selected edges.
+ * - `from[i]` / `to[i]` are tail/head of edge i (constants in [permOffset, permOffset+N-1]).
+ * - `source` / `sink` are int variables (node indices, in `[permOffset, permOffset+N-1]`).
+ * - `nodePresent[i]` is true iff node i is on the path.
+ * - `edgePresent[j]` is true iff edge j is used.
+ */
+@Serializable
+@SerialName("path_global")
+data class PathExpr(
+    val numNodes: Int,
+    val from: List<Int>,
+    val to: List<Int>,
+    val source: IntExpr,
+    val sink: IntExpr,
+    val nodePresent: List<BoolExpr>,
+    val edgePresent: List<BoolExpr>,
+    val nodeOffset: Int = 0,
+) : BoolExpr {
+    init {
+        require(from.size == to.size) { "path: from/to length mismatch" }
+        require(from.size == edgePresent.size) { "path: edgePresent length mismatch" }
+        require(nodePresent.size == numNodes) { "path: nodePresent length mismatch" }
+    }
+}
+
+/**
+ * `tree(N, from, to, root, edge_present, node_present)` — selected nodes form a
+ * directed in-tree rooted at [root]. Each selected non-root node has exactly one
+ * incoming selected edge; the root has none. No cycles.
+ */
+@Serializable
+@SerialName("tree_global")
+data class TreeExpr(
+    val numNodes: Int,
+    val from: List<Int>,
+    val to: List<Int>,
+    val root: IntExpr,
+    val nodePresent: List<BoolExpr>,
+    val edgePresent: List<BoolExpr>,
+    val nodeOffset: Int = 0,
+) : BoolExpr {
+    init {
+        require(from.size == to.size) { "tree: from/to length mismatch" }
+        require(from.size == edgePresent.size) { "tree: edgePresent length mismatch" }
+        require(nodePresent.size == numNodes) { "tree: nodePresent length mismatch" }
+    }
+}
+
+/**
+ * Network flow: for each node `n`, the sum of incoming arc flows minus the sum of outgoing
+ * arc flows equals `balance[n]`. Arcs are described by parallel [arcFrom] / [arcTo] arrays
+ * (constants) and [flow] variables (one per arc).
+ *
+ * `[balance]` is per-node supply/demand: positive = source, negative = sink, 0 = transit.
+ */
+@Serializable
+@SerialName("network_flow")
+data class NetworkFlowExpr(
+    val numNodes: Int,
+    val arcFrom: List<Int>,
+    val arcTo: List<Int>,
+    val balance: List<Int>,
+    val flow: List<IntExpr>,
+    val nodeOffset: Int = 0,
+) : BoolExpr {
+    init {
+        require(arcFrom.size == arcTo.size && arcFrom.size == flow.size) {
+            "network_flow: arcFrom/arcTo/flow length mismatch"
+        }
+        require(balance.size == numNodes) { "network_flow: balance length mismatch" }
+    }
+}
+
+/**
+ * Network flow with cost: like [NetworkFlowExpr] plus a total-cost variable [cost] that
+ * equals `Σ weight[a] · flow[a]`.
+ */
+@Serializable
+@SerialName("network_flow_cost")
+data class NetworkFlowCostExpr(
+    val numNodes: Int,
+    val arcFrom: List<Int>,
+    val arcTo: List<Int>,
+    val balance: List<Int>,
+    val weight: List<Int>,
+    val flow: List<IntExpr>,
+    val cost: IntExpr,
+    val nodeOffset: Int = 0,
+) : BoolExpr {
+    init {
+        require(arcFrom.size == arcTo.size && arcFrom.size == flow.size && arcFrom.size == weight.size) {
+            "network_flow_cost: arcFrom/arcTo/flow/weight length mismatch"
+        }
+        require(balance.size == numNodes) { "network_flow_cost: balance length mismatch" }
+    }
+}
+
+/**
+ * geost — N-dimensional non-overlapping placement of axis-aligned boxes.
+ * For each pair of objects (i, j) and at least one dimension `d`,
+ * `origin[i][d] + length[i][d] ≤ origin[j][d]` or vice versa.
+ *
+ * [origin] is a flat row-major `[numObjects × numDims]` list of integer variables;
+ * [length] is the matching constant size table.
+ */
+@Serializable
+@SerialName("geost")
+data class GeostExpr(
+    val numDims: Int,
+    val numObjects: Int,
+    val origin: List<IntExpr>,
+    val length: List<Int>,
+) : BoolExpr {
+    init {
+        require(numDims >= 1) { "geost: numDims must be ≥ 1" }
+        require(origin.size == numObjects * numDims) { "geost: origin shape mismatch" }
+        require(length.size == numObjects * numDims) { "geost: length shape mismatch" }
+    }
+}
+
+/**
+ * MDD — sequence acceptance by a layered multi-valued decision diagram. Layer `i` of
+ * the MDD restricts `seq[i]`. [transitions] is a row-major list of triples
+ * `(srcState, value, dstState)` per layer; [layerStarts] is the prefix-sum index into
+ * [transitions] (layer `i` uses `transitions[layerStarts[i] until layerStarts[i+1]]`).
+ * [initial] is the start state; [accepting] is the set of accepting states at the final
+ * layer.
+ */
+@Serializable
+@SerialName("mdd")
+data class MddExpr(
+    val seq: List<IntExpr>,
+    val numStatesPerLayer: List<Int>,
+    val layerStarts: List<Int>,
+    val transitions: List<Int>, // flat: src0,val0,dst0, src1,val1,dst1, ...
+    val initial: Int,
+    val accepting: List<Int>,
+) : BoolExpr {
+    init {
+        require(seq.isNotEmpty()) { "mdd: seq must be non-empty" }
+        require(layerStarts.size == seq.size + 1) { "mdd: layerStarts must have length seq.size+1" }
+        require(transitions.size % 3 == 0) { "mdd: transitions length must be a multiple of 3" }
+        require(numStatesPerLayer.size == seq.size + 1) {
+            "mdd: numStatesPerLayer must have length seq.size+1"
+        }
+    }
+}
+
+/**
+ * Cost-regular: regular-DFA acceptance with edge weights accumulating into [cost].
+ * Compatible with klause's existing Regular factor on (seq, Q, S, transitions, q0, accepting)
+ * plus a parallel weights array indexed by (state, symbol).
+ */
+@Serializable
+@SerialName("cost_regular")
+data class CostRegularExpr(
+    val seq: List<IntExpr>,
+    val numStates: Int,
+    val numSymbols: Int,
+    val transitions: List<Int>, // Q × S row-major; 0 means no transition
+    val weights: List<Int>,     // Q × S row-major edge weights
+    val initial: Int,
+    val accepting: List<Int>,
+    val cost: IntExpr,
+    val symbolOffset: Int = 1,
+) : BoolExpr {
+    init {
+        require(transitions.size == numStates * numSymbols) {
+            "cost_regular: transitions must be Q×S"
+        }
+        require(weights.size == numStates * numSymbols) {
+            "cost_regular: weights must be Q×S"
+        }
+    }
+}
+
+/** Cost-MDD: like [MddExpr] but transition rows are (src, val, dst, weight). */
+@Serializable
+@SerialName("cost_mdd")
+data class CostMddExpr(
+    val seq: List<IntExpr>,
+    val numStatesPerLayer: List<Int>,
+    val layerStarts: List<Int>,
+    val transitions: List<Int>, // flat: src,val,dst,weight ×N
+    val initial: Int,
+    val accepting: List<Int>,
+    val cost: IntExpr,
+) : BoolExpr {
+    init {
+        require(seq.isNotEmpty()) { "cost_mdd: seq must be non-empty" }
+        require(layerStarts.size == seq.size + 1) { "cost_mdd: layerStarts must have length seq.size+1" }
+        require(transitions.size % 4 == 0) { "cost_mdd: transitions length must be a multiple of 4" }
+    }
+}
+
+/**
  * Hamiltonian-cycle constraint over a successor array. `succ[i]` is the index of node `i`'s
  * successor; the assignment must form a single cycle visiting every node. [valueOffset] is
  * the integer that represents node 0 — `0` for klause's native 0-indexed form, `1` for

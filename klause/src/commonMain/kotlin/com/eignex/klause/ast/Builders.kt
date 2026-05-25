@@ -344,6 +344,200 @@ fun gccOpt(
     )
 }
 
+// -----------------------------------------------------------------------------------
+//  Newer globals — decomposed in the compiler to existing primitives (Linear / Clause /
+//  ReifiedLinear). All bitblastable through the standard path.
+// -----------------------------------------------------------------------------------
+
+/**
+ * Generalised `alldifferent_except`: pairs of distinct positions must take different values
+ * unless one of them takes a value in [except]. `except.isEmpty()` collapses to [allDifferent].
+ */
+fun allDifferentExcept(xs: List<IntTerm>, except: Set<Int>): BoolExpr {
+    require(xs.size >= 2) { "allDifferentExcept: need at least two terms" }
+    if (except.isEmpty()) return allDifferent(*xs.toTypedArray())
+    return AllDifferentExceptExpr(xs.map { it.toIntExpr() }, except.sorted())
+}
+
+/**
+ * `arg_sort(values, perm)` — perm is a permutation of `[permOffset, permOffset + n − 1]`
+ * such that `values[perm[i] − permOffset]` is non-decreasing. Ties broken by index.
+ */
+fun argSort(values: List<IntTerm>, perm: List<IntTerm>, permOffset: Int = 0): BoolExpr {
+    require(values.size == perm.size) { "argSort: values and perm length mismatch" }
+    require(values.isNotEmpty()) { "argSort: values must be non-empty" }
+    return ArgSortExpr(
+        values = values.map { it.toIntExpr() },
+        perm = perm.map { it.toIntExpr() },
+        permOffset = permOffset,
+    )
+}
+
+/**
+ * `path` over a static graph described by parallel `from` / `to` arc arrays. Selected
+ * nodes/edges must form a simple directed path from [source] to [sink].
+ */
+fun path(
+    numNodes: Int,
+    from: List<Int>,
+    to: List<Int>,
+    source: IntTerm,
+    sink: IntTerm,
+    nodePresent: List<BoolTerm>,
+    edgePresent: List<BoolTerm>,
+    nodeOffset: Int = 0,
+): BoolExpr = PathExpr(
+    numNodes = numNodes,
+    from = from,
+    to = to,
+    source = source.toIntExpr(),
+    sink = sink.toIntExpr(),
+    nodePresent = nodePresent.map { it.toExpr() },
+    edgePresent = edgePresent.map { it.toExpr() },
+    nodeOffset = nodeOffset,
+)
+
+/** `tree`: selected nodes/edges form a directed in-tree rooted at [root]. */
+fun tree(
+    numNodes: Int,
+    from: List<Int>,
+    to: List<Int>,
+    root: IntTerm,
+    nodePresent: List<BoolTerm>,
+    edgePresent: List<BoolTerm>,
+    nodeOffset: Int = 0,
+): BoolExpr = TreeExpr(
+    numNodes = numNodes,
+    from = from,
+    to = to,
+    root = root.toIntExpr(),
+    nodePresent = nodePresent.map { it.toExpr() },
+    edgePresent = edgePresent.map { it.toExpr() },
+    nodeOffset = nodeOffset,
+)
+
+/** Network flow: per-node `inflow − outflow = balance[n]`. */
+fun networkFlow(
+    numNodes: Int,
+    arcFrom: List<Int>,
+    arcTo: List<Int>,
+    balance: List<Int>,
+    flow: List<IntTerm>,
+    nodeOffset: Int = 0,
+): BoolExpr = NetworkFlowExpr(
+    numNodes = numNodes,
+    arcFrom = arcFrom,
+    arcTo = arcTo,
+    balance = balance,
+    flow = flow.map { it.toIntExpr() },
+    nodeOffset = nodeOffset,
+)
+
+/** Network flow with cost = Σ weight[a] · flow[a]. */
+fun networkFlowCost(
+    numNodes: Int,
+    arcFrom: List<Int>,
+    arcTo: List<Int>,
+    balance: List<Int>,
+    weight: List<Int>,
+    flow: List<IntTerm>,
+    cost: IntTerm,
+    nodeOffset: Int = 0,
+): BoolExpr = NetworkFlowCostExpr(
+    numNodes = numNodes,
+    arcFrom = arcFrom,
+    arcTo = arcTo,
+    balance = balance,
+    weight = weight,
+    flow = flow.map { it.toIntExpr() },
+    cost = cost.toIntExpr(),
+    nodeOffset = nodeOffset,
+)
+
+/**
+ * `geost(numDims, origins, sizes)` — N-dimensional non-overlapping axis-aligned boxes.
+ * `origins` is row-major `[numObjects × numDims]`; `sizes` matches.
+ */
+fun geost(
+    numDims: Int,
+    origins: List<IntTerm>,
+    sizes: List<Int>,
+): BoolExpr {
+    require(numDims >= 1) { "geost: numDims must be ≥ 1" }
+    require(origins.size == sizes.size) { "geost: origins and sizes length mismatch" }
+    require(origins.size % numDims == 0) { "geost: origins length must be a multiple of numDims" }
+    val nObj = origins.size / numDims
+    return GeostExpr(
+        numDims = numDims,
+        numObjects = nObj,
+        origin = origins.map { it.toIntExpr() },
+        length = sizes,
+    )
+}
+
+/**
+ * `mdd(seq, layers)` — sequence-acceptance through a layered multi-valued decision diagram.
+ * The `transitions` list is a flat row-major sequence of `(src, value, dst)` triples per
+ * layer; [layerStarts] holds the start index per layer (with sentinel for the end).
+ */
+fun mdd(
+    seq: List<IntTerm>,
+    numStatesPerLayer: List<Int>,
+    layerStarts: List<Int>,
+    transitions: List<Int>,
+    initial: Int,
+    accepting: List<Int>,
+): BoolExpr = MddExpr(
+    seq = seq.map { it.toIntExpr() },
+    numStatesPerLayer = numStatesPerLayer,
+    layerStarts = layerStarts,
+    transitions = transitions,
+    initial = initial,
+    accepting = accepting,
+)
+
+/** `cost_regular(seq, Q, S, transitions, weights, q0, F, cost)`. */
+fun costRegular(
+    seq: List<IntTerm>,
+    numStates: Int,
+    numSymbols: Int,
+    transitions: List<Int>,
+    weights: List<Int>,
+    initial: Int,
+    accepting: List<Int>,
+    cost: IntTerm,
+    symbolOffset: Int = 1,
+): BoolExpr = CostRegularExpr(
+    seq = seq.map { it.toIntExpr() },
+    numStates = numStates,
+    numSymbols = numSymbols,
+    transitions = transitions,
+    weights = weights,
+    initial = initial,
+    accepting = accepting,
+    cost = cost.toIntExpr(),
+    symbolOffset = symbolOffset,
+)
+
+/** `cost_mdd(seq, ..., cost)` — like [mdd] with `(src, val, dst, weight)` rows. */
+fun costMdd(
+    seq: List<IntTerm>,
+    numStatesPerLayer: List<Int>,
+    layerStarts: List<Int>,
+    transitions: List<Int>,
+    initial: Int,
+    accepting: List<Int>,
+    cost: IntTerm,
+): BoolExpr = CostMddExpr(
+    seq = seq.map { it.toIntExpr() },
+    numStatesPerLayer = numStatesPerLayer,
+    layerStarts = layerStarts,
+    transitions = transitions,
+    initial = initial,
+    accepting = accepting,
+    cost = cost.toIntExpr(),
+)
+
 /**
  * Channel an integer variable to a list of Boolean indicators: `bools[i] iff (intVar = offset+i)`
  * for every index `i`. Useful for switching between an integer and a one-hot Boolean encoding.
