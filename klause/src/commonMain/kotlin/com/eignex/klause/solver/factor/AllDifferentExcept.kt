@@ -156,15 +156,13 @@ class AllDifferentExcept(
         val n = xs.size
         val ant = state.composeIntVarAtomAntecedents(xs)
 
-        // Collect non-except values present across domains.
+        // Collect non-except values present across domains (hole-aware).
         val valueSet = HashSet<Int>()
         var domHi = Int.MIN_VALUE
         var domLo = Int.MAX_VALUE
         for (v in xs) {
             val d = state.intDomains[v]
-            for (vv in d.min..d.max) {
-                if (vv !in exceptSet) valueSet += vv
-            }
+            d.forEach { vv -> if (vv !in exceptSet) valueSet += vv }
             if (d.min < domLo) domLo = d.min
             if (d.max > domHi) domHi = d.max
         }
@@ -178,10 +176,7 @@ class AllDifferentExcept(
         val varAdj = Array(n) { i ->
             val d = state.intDomains[xs[i]]
             val out = ArrayList<Int>()
-            for (vv in d.min..d.max) {
-                if (vv in exceptSet) continue
-                out += valueIndex[vv]!!
-            }
+            d.forEach { vv -> if (vv !in exceptSet) out += valueIndex[vv]!! }
             out.toIntArray()
         }
         val mayEscape = BooleanArray(n) { i ->
