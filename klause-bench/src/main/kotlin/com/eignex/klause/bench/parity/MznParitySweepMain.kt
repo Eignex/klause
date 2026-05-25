@@ -102,7 +102,8 @@ object MznParitySweepMain {
                         detail = "harness threw: ${ex.message}",
                     )
                 }
-                println("[parity]   verdict=${r.verdict} nativeCov=${"%.2f".format(r.nativeCoverage * 100)}% klauseMs=${r.klauseMs} refMs=${r.referenceMs}")
+                val inProc = if (r.klauseInProcMs >= 0) "${r.klauseInProcMs}ms" else "n/a"
+                println("[parity]   verdict=${r.verdict} nativeCov=${"%.2f".format(r.nativeCoverage * 100)}% klause-pipe=${r.klauseMs}ms klause-inproc=$inProc gecode=${r.referenceMs}ms")
                 for (p in r.decomposedUsed) decomposedHits.merge(p, r.predicateUsage.getValue(p)) { a, b -> a + b }
                 results += r
             }

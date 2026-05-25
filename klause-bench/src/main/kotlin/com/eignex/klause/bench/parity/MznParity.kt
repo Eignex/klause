@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.parity
 
+import com.eignex.klause.solver.maximizeInt
+import com.eignex.klause.solver.minimizeInt
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.serialization.Serializable
@@ -30,9 +32,17 @@ object MznParity {
     data class Result(
         val name: String,
         val verdict: Verdict,
-        /** Wall-clock for klause's solve (including JVM-side parse). */
+        /** Wall-clock for klause's solve via the full pipeline (`minizinc --solver klause`
+         *  → klause-fzn-cli subprocess). Includes JVM cold-start cost — most of the
+         *  difference vs [klauseInProcMs] is fixed JVM-launch overhead. */
         val klauseMs: Long,
-        /** Wall-clock for the reference solver. */
+        /** Wall-clock for klause's solve in-process — `BacktrackSolver` against a freshly
+         *  parsed `FlatZincProgram`, no subprocess. Excludes JVM startup, MiniZinc CLI
+         *  invocation, and stdout marshalling. The right number to compare to the
+         *  reference solver when reasoning about pure solver speed. `-1` when in-process
+         *  solve was skipped (eg compile failure). */
+        val klauseInProcMs: Long = -1L,
+        /** Wall-clock for the reference solver (full minizinc CLI pipeline). */
         val referenceMs: Long,
         /** Multiset of FlatZinc predicate names appearing as constraint heads. */
         val predicateUsage: Map<String, Int>,
@@ -108,12 +118,18 @@ object MznParity {
 
         val klauseRun = solveWithMinizinc(cfg, useKlause = true)
         val refRun = solveWithMinizinc(cfg, useKlause = false)
+        // In-process klause: parse the freshly-compiled .fzn and solve via BacktrackSolver
+        // without leaving the JVM. The CLI-roundtrip number lives in [klauseRun.elapsedMs];
+        // this one excludes process / JVM-launch / minizinc-CLI overhead so pure solver
+        // speed can be compared cleanly to the reference's elapsed.
+        val klauseInProcMs = solveInProcess(fznFile, cfg.timeoutSec)
 
         val verdict = decideVerdict(klauseRun, refRun)
         return Result(
             name = cfg.name,
             verdict = verdict,
             klauseMs = klauseRun.elapsedMs,
+            klauseInProcMs = klauseInProcMs,
             referenceMs = refRun.elapsedMs,
             predicateUsage = usage,
             nativeUsed = nativeUsed,
@@ -121,6 +137,46 @@ object MznParity {
             nativeCoverage = coverage,
             detail = buildDetail(klauseRun, refRun, verdict),
         )
+    }
+
+    /** Solve the FlatZinc directly inside this JVM — no subprocess. Returns wall-clock
+     *  milliseconds for the BacktrackSolver run, or `-1` when the in-process path didn't
+     *  produce a definitive verdict within the time budget. Uses a deadline-based
+     *  [com.eignex.klause.solver.Cancellation] so the timeout is honoured mid-solve, not
+     *  only at termination. The verdict isn't checked here — the CLI pipeline's verdict
+     *  already gates parity correctness in [decideVerdict]. */
+    private fun solveInProcess(fznFile: File, timeoutSec: Int): Long {
+        val source = runCatching { fznFile.readText() }.getOrNull() ?: return -1L
+        val program = runCatching {
+            com.eignex.klause.formats.flatzinc.parseFlatZinc(source)
+        }.getOrElse { return -1L }
+        val started = System.currentTimeMillis()
+        val deadline = started + timeoutSec * 1000L
+        val cancel = com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
+        val baseParams = (program.defaultBacktrackParams
+            ?: com.eignex.klause.solver.backtrack.BacktrackParams())
+            .copy(cancellation = cancel)
+        val params = baseParams.copy(randomSeed = baseParams.randomSeed ?: 1L)
+        val solver = com.eignex.klause.solver.backtrack.BacktrackSolver(program.problem)
+        try {
+            when (val solve = program.solve) {
+                is com.eignex.klause.formats.flatzinc.SolveDirective.Satisfy -> {
+                    solver.samples(params).firstOrNull()
+                }
+                is com.eignex.klause.formats.flatzinc.SolveDirective.Minimize -> {
+                    val objVarId = program.intVarsByName[solve.objVar] ?: return -1L
+                    solver.minimize(program.problem.minimizeInt(objVarId), params)
+                }
+                is com.eignex.klause.formats.flatzinc.SolveDirective.Maximize -> {
+                    val objVarId = program.intVarsByName[solve.objVar] ?: return -1L
+                    solver.minimize(program.problem.maximizeInt(objVarId), params)
+                }
+            }
+        } catch (_: Throwable) {
+            return -1L
+        }
+        val elapsed = System.currentTimeMillis() - started
+        return if (System.currentTimeMillis() > deadline) -1L else elapsed
     }
 
     /** Compile the model to FlatZinc using klause's solver definition. Returns `null` on

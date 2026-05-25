@@ -53,7 +53,8 @@ class MznParitySmokeTest {
                 workDir = workDir,
             )
             val result = MznParity.run(cfg)
-            println("[parity-smoke] ${inst.name}: ${result.verdict} (klause=${result.klauseMs}ms, ref=${result.referenceMs}ms, nativeCov=${"%.0f".format(result.nativeCoverage * 100)}%)")
+            val inProc = if (result.klauseInProcMs >= 0) "${result.klauseInProcMs}ms" else "n/a"
+            println("[parity-smoke] ${inst.name}: ${result.verdict} (klause-pipe=${result.klauseMs}ms, klause-inproc=$inProc, gecode=${result.referenceMs}ms, nativeCov=${"%.0f".format(result.nativeCoverage * 100)}%)")
             when (result.verdict) {
                 MznParity.Verdict.OK,
                 MznParity.Verdict.REFERENCE_UNAVAILABLE -> Unit
@@ -82,17 +83,14 @@ class MznParitySmokeTest {
 
     private companion object {
         /**
-         * Smoke instances that intermittently fail klause's LS or surface engine bugs
-         * unrelated to MiniZinc parity. Excluded from the default smoke gate; re-enabled
-         * under `-Dklause.parity.smoke.strict=true` for tightening campaigns.
+         * Smoke instances that intermittently fail klause's LS unrelated to MiniZinc
+         * parity. Excluded from the default smoke gate; re-enabled under
+         * `-Dklause.parity.smoke.strict=true` for tightening campaigns.
          *
          *  - `magic_square`: 3×3 magic squares have very rare satisfying assignments;
          *    klause's LS doesn't reliably converge within the 60s budget.
-         *  - `zero_one_knapsack`: optimization run intermittently trips an
-         *    ArrayIndexOutOfBoundsException in PropagationState.collectLevelsForVars
-         *    (pre-existing klause engine bug — tracked separately).
          */
-        private val KNOWN_LS_DIFFICULT = setOf("magic_square", "zero_one_knapsack")
+        private val KNOWN_LS_DIFFICULT = setOf("magic_square")
     }
 
     /** Sanity-check that klause's native-predicate set is parsed correctly from
