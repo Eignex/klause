@@ -89,7 +89,8 @@ internal fun Compiler.Build.decomposeAllDifferentExcept(expr: AllDifferentExcept
 // ----------------------------------------------------------------------------
 
 /** Top-level entry: emit the [com.eignex.klause.solver.factor.ArgSort] factor when both
- *  arrays lift to bare [IntRef]s. */
+ *  arrays lift to bare [IntRef]s. Also emit the AST decomposition so the bit-blast path
+ *  (which skips propagation-only factors) still enforces the constraint. */
 internal fun Compiler.Build.assertArgSort(expr: ArgSortExpr) {
     val liftedValues = expr.values.map { lift(it) }
     val liftedPerm = expr.perm.map { lift(it) }
@@ -102,6 +103,7 @@ internal fun Compiler.Build.assertArgSort(expr: ArgSortExpr) {
                 perm = permIds,
                 permOffset = expr.permOffset,
             )
+            assertExpr(decomposeArgSort(expr))
             return
         }
     }
@@ -529,7 +531,10 @@ internal fun Compiler.Build.assertMddNative(seqExpr: List<IntExpr>, numStatesPer
 }
 
 internal fun Compiler.Build.assertMdd(expr: MddExpr) {
-    if (assertMddNative(expr.seq, expr.numStatesPerLayer, expr.layerStarts, expr.transitions, expr.initial, expr.accepting, recordStride = 3)) return
+    if (assertMddNative(expr.seq, expr.numStatesPerLayer, expr.layerStarts, expr.transitions, expr.initial, expr.accepting, recordStride = 3)) {
+        assertMddDecomposed(expr)
+        return
+    }
     assertMddDecomposed(expr)
 }
 
@@ -574,7 +579,10 @@ internal fun Compiler.Build.assertCostMdd(expr: CostMddExpr) {
     if (liftedCost is IntRef && assertMddNative(
             expr.seq, expr.numStatesPerLayer, expr.layerStarts, expr.transitions,
             expr.initial, expr.accepting, recordStride = 4, costRef = liftedCost,
-        )) return
+        )) {
+        assertCostMddDecomposed(expr)
+        return
+    }
     assertCostMddDecomposed(expr)
 }
 
@@ -659,13 +667,15 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
                 flatTrans.addAll(baseRows)
             }
             starts[n] = flatTrans.size
-            if (assertMddNative(
-                    expr.seq, List(n + 1) { Q }, starts.toList(), flatTrans,
-                    expr.initial, expr.accepting, recordStride = 4, costRef = liftedCost,
-                )) return
+            assertMddNative(
+                expr.seq, List(n + 1) { Q }, starts.toList(), flatTrans,
+                expr.initial, expr.accepting, recordStride = 4, costRef = liftedCost,
+            )
         }
     }
 
+    // Decomposition path: always emitted so the bit-blast pipeline (which skips the
+    // propagation-only Mdd factor) still sees the constraint as primitive Table + Linear.
     val stateRefs = Array(n + 1) { IntRef(newAuxIntVar(IntDomain(0, Q - 1))) }
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
     if (expr.accepting.isEmpty()) {

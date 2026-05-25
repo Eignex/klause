@@ -65,10 +65,11 @@ class NewGlobalsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        // Native ArgSort factor — bitblast lowering for it is a follow-up; the CP solver
-        // alone validates the propagator.
         val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 5_000_000L)).firstOrNull()
         assertTrue(sample != null, "arg_sort: solver found no sample")
+        // BitBlast lowering goes through the decomposition primitives (ArgSort factor
+        // itself is skipped in bit-blast).
+        BitBlaster.compile(compiled.problem)
     }
 
     private fun assertSolves(compiled: CompiledProblem, label: String) {
@@ -164,9 +165,9 @@ class NewGlobalsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        // Native Path factor — bitblast lowering is a follow-up; CP solve validates.
         val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "path: solver found no sample")
+        BitBlaster.compile(compiled.problem)
     }
 
     @Test
@@ -193,6 +194,7 @@ class NewGlobalsDslTest {
         val compiled = schema.compile()
         val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "tree: solver found no sample")
+        BitBlaster.compile(compiled.problem)
     }
 
     @Test

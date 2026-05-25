@@ -70,6 +70,16 @@ object BitBlaster {
                 is AllDifferentExcept -> emitAllDifferentExcept(b, factor.xs, factor.except, intBits, intMin)
                 is MinCostFlow -> emitMinCostFlow(b, factor, intBits, intMin, problem)
                 is Geost -> emitGeost(b, factor, intBits, intMin, problem)
+                is com.eignex.klause.solver.factor.ArgSort,
+                is com.eignex.klause.solver.factor.Path,
+                is com.eignex.klause.solver.factor.Tree,
+                is com.eignex.klause.solver.factor.Mdd -> {
+                    // Propagation-only native factors. The compile lowering pairs them with
+                    // primitive constraints (Linear / Clause / Table / AllDifferent / Iff)
+                    // that BitBlaster handles directly, so it's safe to skip the factor
+                    // itself. See CompilerGlobalsLowering — each `assertX` emits the
+                    // decomposition factors alongside the native one.
+                }
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
