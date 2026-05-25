@@ -42,7 +42,21 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     val opts = parseArgs(args)
     val source = File(opts.fznPath).readText()
-    val program = parseFlatZinc(source)
+    // Unbounded `var int` declarations get a default domain. Resolution order:
+    //   CLI flag → env var → built-in default.
+    // The env-var names mirror the CLI flag names so a `KLAUSE_FZN_UNBOUNDED_INT_LO`
+    // export reaches in-process callers too. Built-in defaults match Gecode/Chuffed.
+    val unboundedLo = opts.unboundedIntLo
+        ?: System.getenv("KLAUSE_FZN_UNBOUNDED_INT_LO")?.toIntOrNull()
+        ?: com.eignex.klause.formats.flatzinc.DEFAULT_UNBOUNDED_INT_LO
+    val unboundedHi = opts.unboundedIntHi
+        ?: System.getenv("KLAUSE_FZN_UNBOUNDED_INT_HI")?.toIntOrNull()
+        ?: com.eignex.klause.formats.flatzinc.DEFAULT_UNBOUNDED_INT_HI
+    val program = parseFlatZinc(
+        source = source,
+        unboundedIntLo = unboundedLo,
+        unboundedIntHi = unboundedHi,
+    )
     val engine = opts.engine ?: System.getProperty("klause.fzn.engine") ?: "backtrack"
     dispatch(engine.lowercase(), program, opts)
 }
@@ -239,6 +253,12 @@ private data class Options(
     /** Optional `.ozn` file rendered by klause's native applier in place of MiniZinc's
      *  `solns2out`. When `null`, the FZN-format `name = value;` output is emitted. */
     val oznPath: String?,
+    /** Lower bound for unbounded `var int` declarations (FlatZinc auxiliaries without an
+     *  explicit range). `null` falls back to the `KLAUSE_FZN_UNBOUNDED_INT_LO` env var
+     *  and then the built-in default. CLI flag: `--unbounded-int-lo N`. */
+    val unboundedIntLo: Int?,
+    /** Upper bound counterpart to [unboundedIntLo]. Flag: `--unbounded-int-hi N`. */
+    val unboundedIntHi: Int?,
 )
 
 /**
@@ -256,6 +276,8 @@ private fun parseArgs(args: Array<String>): Options {
     var statistics = false
     var fznPath: String? = null
     var oznPath: String? = null
+    var unboundedIntLo: Int? = null
+    var unboundedIntHi: Int? = null
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
@@ -267,6 +289,8 @@ private fun parseArgs(args: Array<String>): Options {
             "-r" -> { randomSeed = args[++i].toLong(); i++ }
             "-e", "--engine" -> { engine = args[++i]; i++ }
             "--ozn" -> { oznPath = args[++i]; i++ }
+            "--unbounded-int-lo" -> { unboundedIntLo = args[++i].toInt(); i++ }
+            "--unbounded-int-hi" -> { unboundedIntHi = args[++i].toInt(); i++ }
             else -> {
                 if (a.startsWith("-")) {
                     System.err.println("klause-fzn: ignoring unknown flag $a")
@@ -283,5 +307,5 @@ private fun parseArgs(args: Array<String>): Options {
         System.err.println("usage: klause-fzn [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath)
+    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi)
 }

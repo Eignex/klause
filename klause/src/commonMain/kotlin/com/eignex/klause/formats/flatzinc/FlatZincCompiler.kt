@@ -42,6 +42,15 @@ internal class FlatZincCompiler(
      * default enforces them as `bool == true`.
      */
     internal val forLocalSearch: Boolean = false,
+    /**
+     * Default domain `[lo, hi]` for `var int` declarations that arrive without an explicit
+     * range. MiniZinc emits these for auxiliary intermediates; the surrounding linear /
+     * element constraints normally pin them via propagation. Wide enough by default to
+     * absorb typical CP arithmetic without int overflow during factor coefficient × value
+     * products; tune at the CLI boundary (env / flag) when a model needs different limits.
+     */
+    internal val unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
+    internal val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
 ) {
     // State is `internal` (not `private`) so the extension functions in
     // `FlatZincExprEval.kt` / `FlatZincConstraints.kt` / `FlatZincSolveOutput.kt` can
@@ -194,15 +203,7 @@ internal class FlatZincCompiler(
         }
         when (val t = d.type) {
             FznType.Bool -> allocBool(d.name)
-            FznType.IntAny -> {
-                // MiniZinc occasionally emits `var int` for auxiliary intermediates without
-                // a declared range; the surrounding linear / element constraints normally
-                // bound them via propagation. Allocate over a wide default domain — wide
-                // enough to absorb typical CP arithmetic without risk of int overflow in
-                // factor coefficient × value products. Matches the convention used by
-                // mainstream FZN solvers (gecode, chuffed) when faced with unbounded ints.
-                allocInt(d.name, UNBOUNDED_INT_DEFAULT_LO, UNBOUNDED_INT_DEFAULT_HI)
-            }
+            FznType.IntAny -> allocInt(d.name, unboundedIntLo, unboundedIntHi)
             is FznType.IntRange -> allocInt(d.name, t.lo.toInt(), t.hi.toInt())
             is FznType.IntSet -> {
                 val lo = t.values.min().toInt()
@@ -692,16 +693,17 @@ internal class FlatZincCompiler(
     }
 
     internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, 0, 0)
-
-    private companion object {
-        /** Default domain for `var int` declarations that arrive without an explicit
-         *  range. Wide enough to absorb typical CP arithmetic without int overflow
-         *  during factor coefficient × value products; matches the convention used by
-         *  Gecode / Chuffed when faced with unbounded ints. */
-        private const val UNBOUNDED_INT_DEFAULT_LO: Int = -10_000_000
-        private const val UNBOUNDED_INT_DEFAULT_HI: Int = 10_000_000
-    }
 }
+
+/** Default lower bound for unbounded `var int` declarations. Wide enough to absorb
+ *  typical CP arithmetic without overflow in factor coefficient × value products; matches
+ *  the convention used by Gecode / Chuffed. Override at the CLI boundary via the
+ *  `unboundedIntLo` parameter of [parseFlatZinc] — `klause-fzn-cli` wires the
+ *  `KLAUSE_FZN_UNBOUNDED_INT_LO` env var / `--unbounded-int-lo` flag through. */
+const val DEFAULT_UNBOUNDED_INT_LO: Int = -10_000_000
+
+/** Default upper bound for unbounded `var int`; counterpart to [DEFAULT_UNBOUNDED_INT_LO]. */
+const val DEFAULT_UNBOUNDED_INT_HI: Int = 10_000_000
 
 /** Top-level entry point: parse + compile. */
 fun parseFlatZinc(
@@ -709,8 +711,17 @@ fun parseFlatZinc(
     floatBuckets: Int = 1024,
     floatScale: Long = 1_000_000L,
     forLocalSearch: Boolean = false,
+    unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
+    unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
 ): FlatZincProgram {
     val tokens = FlatZincLexer(source).tokenize()
     val model = FlatZincParser(tokens).parse()
-    return FlatZincCompiler(model, floatBuckets, floatScale, forLocalSearch).compile()
+    return FlatZincCompiler(
+        model,
+        floatBuckets = floatBuckets,
+        floatScale = floatScale,
+        forLocalSearch = forLocalSearch,
+        unboundedIntLo = unboundedIntLo,
+        unboundedIntHi = unboundedIntHi,
+    ).compile()
 }
