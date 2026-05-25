@@ -64,9 +64,21 @@ class LocalSearchSolver(
     override fun session(): LocalSearchSession = LocalSearchSession(this)
 
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
-        val eff = effectiveAssumptions(params.assumptions) ?: return SolveResult.Unsat()
-        return sampleInternal(params, eff, warm)?.let(SolveResult::Sat)
-            ?: SolveResult.Unknown(TerminationReason.BudgetExhausted)
+        val sink = com.eignex.klause.solver.SolveStatsSink(backend = "ls")
+        sink.start()
+        val eff = effectiveAssumptions(params.assumptions)
+        if (eff == null) {
+            sink.stop()
+            return SolveResult.Unsat(stats = sink.snapshot())
+        }
+        val sample = sampleInternal(params, eff, warm)
+        sink.stop()
+        return if (sample != null) {
+            SolveResult.Sat(sample, sink.snapshot())
+        } else {
+            sink.timedOut = true
+            SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
+        }
     }
 
     internal fun samplesInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {

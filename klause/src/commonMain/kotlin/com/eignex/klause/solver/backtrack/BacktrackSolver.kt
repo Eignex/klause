@@ -36,14 +36,22 @@ import kotlin.random.Random
 class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, Optimizer<BacktrackParams> {
 
     override fun solve(params: BacktrackParams): SolveResult {
-        for (outcome in driveSearch(params)) {
+        val sink = com.eignex.klause.solver.SolveStatsSink(backend = "backtrack")
+        sink.start()
+        for (outcome in driveSearch(params, sink = sink)) {
+            sink.stop()
+            val stats = sink.snapshot()
             return when (outcome) {
-                is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
-                is SearchOutcome.Exhausted -> SolveResult.Unsat(outcome.core)
-                SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
+                is SearchOutcome.Found -> SolveResult.Sat(outcome.sample, stats)
+                is SearchOutcome.Exhausted -> SolveResult.Unsat(outcome.core, stats)
+                SearchOutcome.BudgetCapped -> {
+                    sink.timedOut = true
+                    SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
+                }
             }
         }
-        return SolveResult.Unsat()
+        sink.stop()
+        return SolveResult.Unsat(stats = sink.snapshot())
     }
 
     /**
@@ -321,6 +329,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     private fun driveSearch(
         params: BacktrackParams,
         pruneIf: ((PropagationSession) -> Boolean)? = null,
+        sink: com.eignex.klause.solver.SolveStatsSink? = null,
     ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted(coreOf(problem.baked))); return@sequence
@@ -382,6 +391,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     // kept up to the cap.
                     forgetIfOverCap(session, params)
                     lubyIdx++
+                    sink?.observeRestart()
                     continue@outer
                 }
                 if (descend) {
@@ -406,6 +416,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         AdvanceOutcome.Success -> {
                             capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                             trail.add(node)
+                            sink?.observeNode(trail.size)
                         }
                         AdvanceOutcome.Exhausted -> {
                             descend = false
@@ -415,6 +426,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             yield(SearchOutcome.BudgetCapped); return@sequence
                         }
                         is AdvanceOutcome.Backjump -> {
+                            sink?.observeFail()
+                            sink?.observeLearn()
                             // Trail size == session.decisionLevel here (the failed pin was
                             // self-reverted by the session); execute the backjump + learn
                             // sequence. On cascading conflict during assertion, recurse.
