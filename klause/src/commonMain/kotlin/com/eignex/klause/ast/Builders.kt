@@ -212,6 +212,138 @@ fun disjunctive(starts: List<IntTerm>, durations: List<Int>): BoolExpr {
     return DisjunctiveExpr(starts.map { it.toIntExpr() }, durations)
 }
 
+// -----------------------------------------------------------------------------------
+//  Optional-variable global builders
+// -----------------------------------------------------------------------------------
+// Each opt-* builder mirrors its non-opt sibling but takes a parallel [presents] list
+// of Boolean expressions describing whether each position participates. Internally each
+// lowers to its *Opt AST node; the compiler threads presence through to the factor's
+// native `presents: IntArray`.
+
+/** AllDifferent over presence-gated positions: only present positions must be pairwise
+ *  distinct. Each `OptIntHandle.present` is the typical source for the presence list. */
+fun allDifferentOpt(terms: List<IntTerm>, presents: List<BoolTerm>): BoolExpr {
+    require(terms.size >= 2) { "allDifferentOpt: need at least two terms" }
+    require(terms.size == presents.size) {
+        "allDifferentOpt: presents must match terms arity"
+    }
+    return AllDifferentOpt(
+        terms = terms.map { it.toIntExpr() },
+        presents = presents.map { it.toExpr() },
+    )
+}
+
+/** Cumulative with presence-gated tasks. Absent tasks contribute zero energy and don't
+ *  appear in the mandatory profile or edge-finding's Θ-tree. */
+fun cumulativeOpt(
+    starts: List<IntTerm>,
+    durations: List<Int>,
+    resources: List<Int>,
+    capacity: Int,
+    presents: List<BoolTerm>,
+): BoolExpr {
+    require(starts.size == durations.size && starts.size == resources.size && starts.size == presents.size) {
+        "cumulativeOpt: starts/durations/resources/presents must have the same length"
+    }
+    return CumulativeExprOpt(
+        starts = starts.map { it.toIntExpr() },
+        durations = durations,
+        resources = resources,
+        capacity = capacity,
+        presents = presents.map { it.toExpr() },
+    )
+}
+
+/** Disjunctive with presence-gated tasks. Absent tasks impose no no-overlap obligation. */
+fun disjunctiveOpt(
+    starts: List<IntTerm>,
+    durations: List<Int>,
+    presents: List<BoolTerm>,
+): BoolExpr {
+    require(starts.size == durations.size && starts.size == presents.size) {
+        "disjunctiveOpt: starts/durations/presents must have the same length"
+    }
+    return DisjunctiveExprOpt(
+        starts = starts.map { it.toIntExpr() },
+        durations = durations,
+        presents = presents.map { it.toExpr() },
+    )
+}
+
+/** Count over a presence-gated subset: `n = #{i : xs[i] ⟨op⟩ v ∧ present[i]}`. */
+fun countEqOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
+    countOptCommon(xs, v, n, presents, CountOp.EQ)
+
+fun countNeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
+    countOptCommon(xs, v, n, presents, CountOp.NE)
+
+fun countLeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
+    countOptCommon(xs, v, n, presents, CountOp.LE)
+
+private fun countOptCommon(
+    xs: List<IntTerm>,
+    v: Int,
+    n: IntTerm,
+    presents: List<BoolTerm>,
+    op: CountOp,
+): BoolExpr {
+    require(xs.isNotEmpty()) { "countOpt: xs must be non-empty" }
+    require(presents.size == xs.size) { "countOpt: presents must match xs arity" }
+    return CountExprOpt(
+        xs = xs.map { it.toIntExpr() },
+        v = v,
+        op = op,
+        n = n.toIntExpr(),
+        presents = presents.map { it.toExpr() },
+    )
+}
+
+/** Number of distinct values among the presence-gated subset of xs. */
+fun nValueOpt(
+    n: IntTerm,
+    xs: List<IntTerm>,
+    presents: List<BoolTerm>,
+    mode: NValueMode = NValueMode.EQ,
+): BoolExpr {
+    require(xs.isNotEmpty()) { "nValueOpt: xs must be non-empty" }
+    require(presents.size == xs.size) { "nValueOpt: presents must match xs arity" }
+    return NValueExprOpt(
+        n = n.toIntExpr(),
+        xs = xs.map { it.toIntExpr() },
+        mode = mode,
+        presents = presents.map { it.toExpr() },
+    )
+}
+
+/** Global Cardinality with presence-gated counting: for each (value, range), the count
+ *  of *present* xs entries taking that value must lie in the range. */
+fun gccOpt(
+    xs: List<IntTerm>,
+    valueCounts: Map<Int, IntRange>,
+    presents: List<BoolTerm>,
+    closed: Boolean = false,
+): BoolExpr {
+    require(xs.isNotEmpty()) { "gccOpt: xs must be non-empty" }
+    require(valueCounts.isNotEmpty()) { "gccOpt: valueCounts must be non-empty" }
+    require(presents.size == xs.size) { "gccOpt: presents must match xs arity" }
+    val cover = valueCounts.keys.toList()
+    val low = cover.map { valueCounts.getValue(it).first }
+    val high = cover.map { valueCounts.getValue(it).last }
+    for (i in cover.indices) {
+        require(low[i] >= 0 && low[i] <= high[i] && high[i] <= xs.size) {
+            "gccOpt: bad range ${low[i]}..${high[i]} for value ${cover[i]} (xs.size=${xs.size})"
+        }
+    }
+    return GccExprOpt(
+        xs = xs.map { it.toIntExpr() },
+        cover = cover,
+        low = low,
+        high = high,
+        closed = closed,
+        presents = presents.map { it.toExpr() },
+    )
+}
+
 /**
  * Channel an integer variable to a list of Boolean indicators: `bools[i] iff (intVar = offset+i)`
  * for every index `i`. Useful for switching between an integer and a one-hot Boolean encoding.

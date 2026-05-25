@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -21,20 +22,32 @@ class AllDifferent(
     val vars: IntArray,
     val domainMin: Int,
     val domainSize: Int,
+    /** Per-position presence literals; empty for the non-opt fast path. When non-empty,
+     *  only present positions are required pairwise-different, and Régin filtering treats
+     *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
+     *  slot nor block other positions from claiming their value. */
+    val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
     init {
         require(vars.size >= 2) { "AllDifferent needs at least two variables" }
         require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
+        require(presents.isEmpty() || presents.size == vars.size) {
+            "AllDifferent: presents must be empty or match vars arity"
+        }
     }
 
-    // Propagation strength: full GAC via Régin's matching + SCC algorithm. IntDomain
-    // supports interior holes, so non-matching value pruning lands at the variable
-    // domain level. Subsumes singleton conflict, singleton-value removal, Hall-interval
-    // detection, and global pigeonhole.
+    // Propagation strength: full GAC via Régin's matching + SCC algorithm over the
+    // definitely-present positions. IntDomain supports interior holes, so non-matching
+    // value pruning lands at the variable domain level. Opt-aware: definitely-absent
+    // positions are skipped entirely; unpinned-presence positions are skipped too, so any
+    // filtering remains sound under "this position might still go absent".
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars
+
+    private fun present(state: LocalSearchState, idx: Int): Boolean =
+        OptPresence.isPresentInAssignment(presents, idx, state)
 
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
@@ -62,8 +75,9 @@ class AllDifferent(
         }
         val counts = IntArray(domainSize)
         var dups = 0
-        for (v in vars) {
-            val idx = state.assignment.intValue(v) - domainMin
+        for (i in vars.indices) {
+            if (!present(state, i)) continue
+            val idx = state.assignment.intValue(vars[i]) - domainMin
             val prev = counts[idx]
             counts[idx] = prev + 1
             if (prev == 1) dups++   // count goes 1 -> 2: new duplicate value.
@@ -80,7 +94,7 @@ class AllDifferent(
         val s = state.refPayload[factorId] as State
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return 0
-        val (oldDup, newDup) = simulate(s, occurrences(intVar), old, newValue)
+        val (oldDup, newDup) = simulate(s, presentOccurrences(state, intVar), old, newValue)
         val wasViolated = s.duplicateCount > 0
         val willViolate = (s.duplicateCount + newDup - oldDup) > 0
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
@@ -91,7 +105,8 @@ class AllDifferent(
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
         val wasViolated = s.duplicateCount > 0
-        val n = occurrences(intVar)
+        val n = presentOccurrences(state, intVar)
+        if (n == 0) return 0  // every occurrence of [intVar] is currently absent.
         // Decrement count for oldValue.
         val oldIdx = oldValue - domainMin
         val oldCount = s.counts[oldIdx]
@@ -121,6 +136,68 @@ class AllDifferent(
 
     private fun occurrences(intVar: Int): Int = occurrencesByVar[intVar]
 
+    /** Count of indices where `vars[i] == intVar` AND position `i` is currently present.
+     *  Falls back to [occurrences] in the non-opt case for the precomputed O(1) lookup. */
+    private fun presentOccurrences(state: LocalSearchState, intVar: Int): Int {
+        if (presents.isEmpty()) return occurrencesByVar[intVar]
+        var c = 0
+        for (i in vars.indices) if (vars[i] == intVar && present(state, i)) c++
+        return c
+    }
+
+    /** Delta on [duplicateCount] from adjusting a value's count by [delta] (±1). */
+    private fun adjustDuplicates(counts: IntArray, valueIdx: Int, delta: Int): Int {
+        val before = counts[valueIdx]
+        val after = before + delta
+        counts[valueIdx] = after
+        return when {
+            before <= 1 && after >= 2 -> +1
+            before >= 2 && after <= 1 -> -1
+            else -> 0
+        }
+    }
+
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = s.duplicateCount > 0
+        // Simulate on a counts snapshot — touch only indices the flip would toggle.
+        val touched = mutableListOf<IntArray>()  // each: [valueIdx, delta]
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val wasP = present(state, i)
+            val delta = if (wasP) -1 else +1
+            val valueIdx = state.assignment.intValue(vars[i]) - domainMin
+            touched += intArrayOf(valueIdx, delta)
+        }
+        // Apply, score, unapply.
+        var dupDelta = 0
+        val snapshot = s.counts
+        for (t in touched) dupDelta += adjustDuplicates(snapshot, t[0], t[1])
+        // Revert.
+        for (k in touched.indices.reversed()) {
+            val t = touched[k]
+            adjustDuplicates(snapshot, t[0], -t[1])
+        }
+        val willViolate = (s.duplicateCount + dupDelta) > 0
+        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = s.duplicateCount > 0
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val nowP = present(state, i)
+            val delta = if (nowP) +1 else -1
+            val valueIdx = state.assignment.intValue(vars[i]) - domainMin
+            s.duplicateCount += adjustDuplicates(s.counts, valueIdx, delta)
+        }
+        val nowViolated = s.duplicateCount > 0
+        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
     /** Hall-style conflict reason: cites bound atoms plus `[v ≠ value]` literals for every
      *  domain hole each var has accumulated post-bake. Tighter than bound-only because two
      *  bounds can describe many interior configurations, but the matching/SCC pruning only
@@ -129,14 +206,27 @@ class AllDifferent(
         collectHoleAndBoundAntecedents(state, vars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val n = vars.size
+        // Only the definitely-present positions participate in Régin filtering. Build a
+        // local index map: filteredIdx → original position. Unpinned-presence positions
+        // are dropped — they may still go absent and would otherwise force unsound prunes.
+        val filtered: IntArray = if (presents.isEmpty()) IntArray(vars.size) { it }
+        else {
+            val acc = IntArrayList()
+            for (i in vars.indices) {
+                if (OptPresence.isDefinitelyPresent(presents, i, state)) acc.add(i)
+            }
+            IntArray(acc.size) { acc[it] }
+        }
+        val n = filtered.size
+        if (n < 2) return true  // nothing to filter on a single (or zero) present position.
+        val filteredVars = IntArray(n) { vars[filtered[it]] }
 
         // Build compact value-id mapping and per-var sorted value-id lists from current
         // domains. Cost: O(Σ |dom(xᵢ)|).
         val valueId = HashMap<Int, Int>()
         val idToValue = IntArrayList()
         val valuesPerVar = Array(n) { i ->
-            val d = state.intDomains[vars[i]]
+            val d = state.intDomains[filteredVars[i]]
             val list = IntArray(d.size)
             var k = 0
             d.forEach { v ->
@@ -279,7 +369,7 @@ class AllDifferent(
                 val valNode = n + vid
                 if (sccId[i] == sccId[valNode]) continue
                 if (reachedFromFree[valNode]) continue
-                if (!state.excludeIntValue(vars[i], idToValue[vid], antecedents)) return false
+                if (!state.excludeIntValue(filteredVars[i], idToValue[vid], antecedents)) return false
             }
         }
         return true
@@ -290,6 +380,10 @@ class AllDifferent(
      *  analysis). Returns `null` when no var's bounds are tighter than its initial domain. */
     private fun composeAllDifferentAntecedents(state: PropagationState): IntArray? =
         state.composeIntVarAtomAntecedents(vars)
+
+    /** Conservative repair: only act on present occupants when [presents] is set. We
+     *  intentionally avoid forcing presence as a repair — the LS engine flips bools via
+     *  its own move pool. */
 
     /** Hopcroft-Karp-style augmenting-path search for max bipartite matching. Returns
      *  true iff variable [i] can be matched (possibly re-routing earlier matches). */
@@ -326,11 +420,13 @@ class AllDifferent(
         }
         if (pickedIdx == -1) return
         val value = pickedIdx + domainMin
-        // Reservoir-sample one of its occupants.
+        // Reservoir-sample one of its occupants (skip absent positions in opt mode).
         var occupant = -1
         var seenOccupants = 0
-        for (v in vars) {
+        for (i in vars.indices) {
+            val v = vars[i]
             if (state.assignment.intValue(v) != value) continue
+            if (!present(state, i)) continue
             seenOccupants++
             if (state.rng.nextInt(seenOccupants) == 0) occupant = v
         }

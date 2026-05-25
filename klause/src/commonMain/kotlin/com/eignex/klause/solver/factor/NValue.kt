@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
@@ -20,16 +21,24 @@ class NValue(
     val n: Int,
     val xs: IntArray,
     val mode: Mode = Mode.Eq,
+    /** Per-index presence literals; empty for the non-opt fast path. */
+    val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
     enum class Mode { Eq, AtLeast, AtMost }
 
     init {
         require(xs.isNotEmpty()) { "nvalue: empty xs" }
+        require(presents.isEmpty() || presents.size == xs.size) {
+            "nvalue: presents must be empty or match xs arity"
+        }
     }
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = xs + intArrayOf(n)
+
+    private fun present(state: LocalSearchState, idx: Int): Boolean =
+        OptPresence.isPresentInAssignment(presents, idx, state)
 
     /** Maintains a per-value count over the assignment. `distinctCount` = number of values
      *  whose count is > 0. */
@@ -38,8 +47,9 @@ class NValue(
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val counts = HashMap<Int, Int>()
         var distinct = 0
-        for (v in xs) {
-            val value = state.assignment.intValue(v)
+        for (i in xs.indices) {
+            if (!present(state, i)) continue
+            val value = state.assignment.intValue(xs[i])
             val prev = counts[value] ?: 0
             counts[value] = prev + 1
             if (prev == 0) distinct++
@@ -79,10 +89,10 @@ class NValue(
     }
 
     private fun simulateDistinct(state: LocalSearchState, s: State, intVar: Int, newValue: Int): Int {
-        // intVar's previous value affects xs only if it's one of the operands. If it's n
-        // (not an xs operand), distinct count unchanged.
+        // intVar's previous value affects xs only if it's one of the operands AND that
+        // operand is present. If it's n (not an xs operand), distinct count unchanged.
         var occurrences = 0
-        for (v in xs) if (v == intVar) occurrences++
+        for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrences++
         if (occurrences == 0) return s.distinctCount
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return s.distinctCount
@@ -102,7 +112,7 @@ class NValue(
         val nVal = state.assignment.intValue(n)
         val wasViolated = isViolatedInternal(s, nVal)
         var occurrences = 0
-        for (v in xs) if (v == intVar) occurrences++
+        for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrences++
         if (occurrences > 0) {
             val oldCount = s.counts[oldValue] ?: 0
             val after = oldCount - occurrences
@@ -111,6 +121,53 @@ class NValue(
             val newCount = s.counts[cur] ?: 0
             if (newCount == 0) s.distinctCount++
             s.counts[cur] = newCount + occurrences
+        }
+        val nowViolated = isViolatedInternal(s, state.assignment.intValue(n))
+        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = isViolatedInternal(s, state.assignment.intValue(n))
+        // Simulate the flip's net effect on distinct.
+        var distinct = s.distinctCount
+        val touched = HashMap<Int, Int>()  // value → delta to counts[value]
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val wasP = present(state, i)
+            val value = state.assignment.intValue(xs[i])
+            touched[value] = (touched[value] ?: 0) + if (wasP) -1 else 1
+        }
+        for ((value, delta) in touched) {
+            val before = s.counts[value] ?: 0
+            val after = before + delta
+            if (before == 0 && after > 0) distinct++
+            if (before > 0 && after == 0) distinct--
+        }
+        val willViolate = isViolatedInternal(distinct, state.assignment.intValue(n))
+        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = isViolatedInternal(s, state.assignment.intValue(n))
+        // The flip has already landed in [state.assignment]; recompute affected counts.
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val nowP = present(state, i)
+            val value = state.assignment.intValue(xs[i])
+            if (nowP) {
+                val before = s.counts[value] ?: 0
+                if (before == 0) s.distinctCount++
+                s.counts[value] = before + 1
+            } else {
+                val before = s.counts[value] ?: error("nvalue: absent flip without prior count")
+                val after = before - 1
+                if (after == 0) { s.counts.remove(value); s.distinctCount-- }
+                else s.counts[value] = after
+            }
         }
         val nowViolated = isViolatedInternal(s, state.assignment.intValue(n))
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
@@ -129,14 +186,18 @@ class NValue(
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Upper bound: |∪ dom(xs[i])| — domain enumeration via forEach.
+        // Upper bound: |∪ dom(xs[i])| for indices that aren't definitely absent.
         val unionValues = HashSet<Int>()
-        for (v in xs) state.intDomains[v].forEach { unionValues.add(it) }
+        for (i in xs.indices) {
+            if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
+            state.intDomains[xs[i]].forEach { unionValues.add(it) }
+        }
         val maxDistinct = unionValues.size
-        // Lower bound: count of distinct singletons.
+        // Lower bound: count of distinct singleton values among definitely-present entries.
         val singletons = HashSet<Int>()
-        for (v in xs) {
-            val d = state.intDomains[v]
+        for (i in xs.indices) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            val d = state.intDomains[xs[i]]
             if (d.min == d.max) singletons.add(d.min)
         }
         val minDistinct = singletons.size

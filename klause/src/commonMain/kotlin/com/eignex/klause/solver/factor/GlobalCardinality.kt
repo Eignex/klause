@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
@@ -33,6 +34,9 @@ class GlobalCardinality(
     val countLow: IntArray? = null,
     val countHigh: IntArray? = null,
     val closed: Boolean = false,
+    /** Per-xs presence literals; empty for the non-opt fast path. Absent positions
+     *  contribute nothing to any cover-value count and don't trip the closed check. */
+    val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
     init {
@@ -45,9 +49,15 @@ class GlobalCardinality(
             require(countLow != null && countHigh != null) { "gcc: missing countLow/countHigh" }
             require(countLow.size == cover.size && countHigh.size == cover.size) { "gcc: lo/hi size mismatch" }
         }
+        require(presents.isEmpty() || presents.size == xs.size) {
+            "gcc: presents must be empty or match xs arity"
+        }
     }
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
+
+    private fun present(state: LocalSearchState, idx: Int): Boolean =
+        OptPresence.isPresentInAssignment(presents, idx, state)
     override val intVars: IntArray = run {
         val cv = countVars
         if (cv != null) xs + cv else xs
@@ -64,8 +74,9 @@ class GlobalCardinality(
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val counts = IntArray(cover.size)
-        for (x in xs) {
-            val value = state.assignment.intValue(x)
+        for (i in xs.indices) {
+            if (!present(state, i)) continue
+            val value = state.assignment.intValue(xs[i])
             val idx = coverIndexByValue[value] ?: continue  // out-of-cover; counts unaffected
             counts[idx]++
         }
@@ -83,9 +94,12 @@ class GlobalCardinality(
                 if (cnt < countLow!![k] || cnt > countHigh!![k]) return true
             }
         }
-        // Closed variant: every xs[i] must be in cover.
+        // Closed variant: every present xs[i] must be in cover.
         if (closed) {
-            for (x in xs) if (state.assignment.intValue(x) !in coverIndexByValue) return true
+            for (i in xs.indices) {
+                if (!present(state, i)) continue
+                if (state.assignment.intValue(xs[i]) !in coverIndexByValue) return true
+            }
         }
         return false
     }
@@ -96,7 +110,7 @@ class GlobalCardinality(
         // Simulate the change by adjusting a counts copy.
         val sim = s.counts.copyOf()
         var occurrencesInXs = 0
-        for (x in xs) if (x == intVar) occurrencesInXs++
+        for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
             val old = state.assignment.intValue(intVar)
             val oldIdx = coverIndexByValue[old]
@@ -121,7 +135,9 @@ class GlobalCardinality(
             }
         }
         if (closed) {
-            for (x in xs) {
+            for (i in xs.indices) {
+                if (!present(state, i)) continue
+                val x = xs[i]
                 val v = if (x == intVar) newValue else state.assignment.intValue(x)
                 if (v !in coverIndexByValue) return true
             }
@@ -149,7 +165,7 @@ class GlobalCardinality(
             simulatedViolation(state, intVar, oldValue, sim)
         }
         var occurrencesInXs = 0
-        for (x in xs) if (x == intVar) occurrencesInXs++
+        for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
             val oldIdx = coverIndexByValue[oldValue]
             val newIdx = coverIndexByValue[cur]
@@ -160,21 +176,79 @@ class GlobalCardinality(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = isViolated(state, factorId)
+        val sim = s.counts.copyOf()
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val wasP = present(state, i)
+            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
+            sim[coverIdx] += if (wasP) -1 else +1
+        }
+        val willViolate = simulatedViolationOnly(state, sim)
+        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = isViolated(state, factorId)
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val nowP = present(state, i)
+            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
+            s.counts[coverIdx] += if (nowP) +1 else -1
+        }
+        val nowViolated = isViolated(state, factorId)
+        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    /** Check counts-only violation given a simulated counts vector. Skips the closed-set
+     *  check (which is unaffected by presence flips on already-in-cover values). */
+    private fun simulatedViolationOnly(state: LocalSearchState, simCounts: IntArray): Boolean {
+        for (k in cover.indices) {
+            if (countVars != null) {
+                if (state.assignment.intValue(countVars[k]) != simCounts[k]) return true
+            } else {
+                if (simCounts[k] < countLow!![k] || simCounts[k] > countHigh!![k]) return true
+            }
+        }
+        if (closed) {
+            for (i in xs.indices) {
+                if (!OptPresence.isPresentInAssignment(presents, i, state)) continue
+                if (state.assignment.intValue(xs[i]) !in coverIndexByValue) return true
+            }
+        }
+        return false
+    }
+
     /** Hole-aware conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // ---- 1. Count tightening + closure --------------------------------------------
-        val n = xs.size
+        // Opt-aware: filter to definitely-present xs for the flow analysis. Definitely-
+        // absent xs contribute nothing; unpinned-presence xs may still go absent, so we
+        // can't require them to take a cover value — skip them too for soundness.
+        val origIdx: IntArray = if (presents.isEmpty()) IntArray(xs.size) { it }
+        else {
+            val acc = IntArrayList()
+            for (i in xs.indices) if (OptPresence.isDefinitelyPresent(presents, i, state)) acc.add(i)
+            IntArray(acc.size) { acc[it] }
+        }
+        val effectiveXs: IntArray = if (presents.isEmpty()) xs
+            else IntArray(origIdx.size) { xs[origIdx[it]] }
+        val n = effectiveXs.size
         val m = cover.size
         val coverSet = coverIndexByValue.keys
-        // LCG antecedents: the union of every xs var's int trail. Same coarse approach
-        // as AllDifferent — every prune/tighten in GCC reasoning involves all xs vars'
-        // domains, so attributing to all of them is sound (analyzer minimization shrinks).
-        val gccAntecedents = composeGccAntecedents(state)
+        // LCG antecedents: the union of every effectiveXs var's int trail. Same coarse
+        // approach as AllDifferent — analyzer minimization shrinks redundant pieces.
+        val gccAntecedents = state.composeIntVarAtomAntecedents(effectiveXs)
         if (closed) {
-            for (x in xs) {
+            for (x in effectiveXs) {
                 val d = state.intDomains[x]
                 val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
@@ -185,7 +259,7 @@ class GlobalCardinality(
         val possible = IntArray(m)
         for (k in cover.indices) {
             val target = cover[k]
-            for (x in xs) {
+            for (x in effectiveXs) {
                 val d = state.intDomains[x]
                 if (d.min == d.max && d.min == target) definite[k]++
                 if (target in d) possible[k]++
@@ -218,7 +292,7 @@ class GlobalCardinality(
         var anyOther = !closed && run {
             var any = false
             for (i in 0 until n) {
-                val d = state.intDomains[xs[i]]
+                val d = state.intDomains[effectiveXs[i]]
                 var found = false
                 d.forEach { if (!found && it !in coverSet) found = true }
                 hasOtherVar[i] = found
@@ -260,7 +334,7 @@ class GlobalCardinality(
         }
 
         for (i in 0 until n) {
-            val d = state.intDomains[xs[i]]
+            val d = state.intDomains[effectiveXs[i]]
             for (k in 0 until m) {
                 if (cover[k] in d) {
                     val eIdx = flow.addEdge(varNode[i], covNode[k], 1)  // [0, 1]
@@ -316,16 +390,16 @@ class GlobalCardinality(
                 if (eIdx < 0) continue
                 if (flow.flowOf(eIdx) > 0) continue  // active in current flow; alive.
                 if (sccId[varNode[i]] == sccId[covNode[k]]) continue  // may carry flow elsewhere.
-                if (!state.excludeIntValue(xs[i], cover[k], gccAntecedents)) return false
+                if (!state.excludeIntValue(effectiveXs[i], cover[k], gccAntecedents)) return false
             }
             // If the var→other arc exists but cannot carry flow in any feasible flow,
             // every non-cover value in dom(xᵢ) is dead — prune them all.
             val oIdx = xToOtherEdgeIdx[i]
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[varNode[i]] != sccId[otherNode]) {
-                val d = state.intDomains[xs[i]]
+                val d = state.intDomains[effectiveXs[i]]
                 val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (k in 0 until toRemove.size) if (!state.excludeIntValue(xs[i], toRemove[k], gccAntecedents)) return false
+                for (k in 0 until toRemove.size) if (!state.excludeIntValue(effectiveXs[i], toRemove[k], gccAntecedents)) return false
             }
         }
         return true

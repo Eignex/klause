@@ -326,6 +326,130 @@ data class PseudoBooleanExpr(
     }
 }
 
+// -----------------------------------------------------------------------------------
+//  Optional-variable globals
+// -----------------------------------------------------------------------------------
+// Each *Opt node mirrors its non-opt sibling but carries a parallel [presents] list of
+// Boolean expressions. The compiler reads each [BoolExpr] as a presence literal, threads
+// it into the corresponding factor's `presents: IntArray`, and the factor handles the
+// rest natively (see [com.eignex.klause.solver.factor.OptPresence]).
+//
+// AllDifferentOpt over zero or one present element is trivially true and emits no factor;
+// the constructor still requires `terms.size >= 2` because the compiler uses the same
+// pair-by-pair pigeonhole guard as the non-opt form for non-empty cases.
+
+@Serializable
+@SerialName("alldiffopt")
+data class AllDifferentOpt(
+    val terms: List<IntExpr>,
+    val presents: List<BoolExpr>,
+) : BoolExpr {
+    init {
+        require(terms.size >= 2) { "AllDifferentOpt needs at least two terms" }
+        require(presents.size == terms.size) {
+            "AllDifferentOpt: presents must match terms arity"
+        }
+    }
+}
+
+@Serializable
+@SerialName("cumulativeopt")
+data class CumulativeExprOpt(
+    val starts: List<IntExpr>,
+    val durations: List<Int>,
+    val resources: List<Int>,
+    val capacity: Int,
+    val presents: List<BoolExpr>,
+) : BoolExpr {
+    init {
+        require(starts.size == durations.size && starts.size == resources.size && starts.size == presents.size) {
+            "CumulativeExprOpt: starts/durations/resources/presents must have the same length"
+        }
+        require(capacity >= 0) { "CumulativeExprOpt capacity must be ≥ 0, got $capacity" }
+        for (i in durations.indices) {
+            require(durations[i] >= 0) { "CumulativeExprOpt durations[$i] must be ≥ 0" }
+            require(resources[i] >= 0) { "CumulativeExprOpt resources[$i] must be ≥ 0" }
+        }
+    }
+}
+
+@Serializable
+@SerialName("disjunctiveopt")
+data class DisjunctiveExprOpt(
+    val starts: List<IntExpr>,
+    val durations: List<Int>,
+    val presents: List<BoolExpr>,
+) : BoolExpr {
+    init {
+        require(starts.size == durations.size && starts.size == presents.size) {
+            "DisjunctiveExprOpt: starts/durations/presents must have the same length"
+        }
+        for (i in durations.indices) {
+            require(durations[i] >= 0) { "DisjunctiveExprOpt durations[$i] must be ≥ 0" }
+        }
+    }
+}
+
+/** count_⟨op⟩(xs, v, n) over a presence-gated subset of xs. */
+@Serializable
+@SerialName("countopt")
+data class CountExprOpt(
+    val xs: List<IntExpr>,
+    val v: Int,
+    val op: CountOp,
+    val n: IntExpr,
+    val presents: List<BoolExpr>,
+) : BoolExpr {
+    init {
+        require(xs.isNotEmpty()) { "CountExprOpt: xs must be non-empty" }
+        require(presents.size == xs.size) { "CountExprOpt: presents must match xs arity" }
+    }
+}
+
+@Serializable
+enum class CountOp { EQ, NE, LE, LT, GE, GT }
+
+/** nvalue over a presence-gated subset of xs. */
+@Serializable
+@SerialName("nvalueopt")
+data class NValueExprOpt(
+    val n: IntExpr,
+    val xs: List<IntExpr>,
+    val mode: NValueMode = NValueMode.EQ,
+    val presents: List<BoolExpr>,
+) : BoolExpr {
+    init {
+        require(xs.isNotEmpty()) { "NValueExprOpt: xs must be non-empty" }
+        require(presents.size == xs.size) { "NValueExprOpt: presents must match xs arity" }
+    }
+}
+
+@Serializable
+enum class NValueMode { EQ, AT_LEAST, AT_MOST }
+
+/** Global Cardinality Constraint over a presence-gated subset of xs. */
+@Serializable
+@SerialName("gccopt")
+data class GccExprOpt(
+    val xs: List<IntExpr>,
+    val cover: List<Int>,
+    /** Per-cover-value low bound. */
+    val low: List<Int>,
+    /** Per-cover-value high bound. */
+    val high: List<Int>,
+    val closed: Boolean,
+    val presents: List<BoolExpr>,
+) : BoolExpr {
+    init {
+        require(xs.isNotEmpty()) { "GccExprOpt: xs must be non-empty" }
+        require(cover.isNotEmpty()) { "GccExprOpt: cover must be non-empty" }
+        require(low.size == cover.size && high.size == cover.size) {
+            "GccExprOpt: low/high must match cover arity"
+        }
+        require(presents.size == xs.size) { "GccExprOpt: presents must match xs arity" }
+    }
+}
+
 @Serializable
 @SerialName("constraint")
 data class NamedConstraint(val expr: BoolExpr) : SchemaEntry

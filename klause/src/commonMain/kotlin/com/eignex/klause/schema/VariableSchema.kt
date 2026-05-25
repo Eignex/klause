@@ -11,6 +11,12 @@ import com.eignex.skema.Schema
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
 
+/** Suffix used to name the synthetic presence Boolean backing every opt variable. */
+internal const val PRESENCE_SUFFIX: String = "__present"
+
+/** Builds the canonical presence-variable name for an opt var named [varName]. */
+internal fun presenceName(varName: String): String = "$varName$PRESENCE_SUFFIX"
+
 /** Default bucket count for [VariableSchema.floatVar] when the caller doesn't specify one.
  *  10-bit precision is enough for typical config-style fractions; bump it explicitly when
  *  the constraint set needs finer granularity. */
@@ -37,6 +43,61 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
 
     protected fun floatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
         register(FloatSpec(min, max, buckets)) { FloatHandle(it, min, max, buckets) }
+
+    /**
+     * Optional integer variable: declares a presence Boolean named `<prop>__present` alongside
+     * the value variable. Compare via [OptIntHandle]'s opt-aware operators to get MiniZinc's
+     * "undefined → false" semantics, or coerce to a regular [com.eignex.klause.ast.IntExpr]
+     * with [OptIntHandle.valueOr].
+     */
+    protected fun optIntVar(min: Int, max: Int) =
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptIntHandle>> { thisRef, prop ->
+            val pName = presenceName(prop.name)
+            thisRef.add(pName, BoolSpec)
+            thisRef.add(prop.name, IntSpec(min, max))
+            val handle = OptIntHandle(
+                name = prop.name,
+                present = BoolHandle(pName),
+                value = IntHandle(prop.name, min, max),
+            )
+            ReadOnlyProperty { _, _ -> handle }
+        }
+
+    /**
+     * Optional Boolean variable: declares a presence bool plus the value bool. In a Boolean
+     * context the handle coerces to `present ∧ value`; access [OptBoolHandle.present] /
+     * [OptBoolHandle.value] for direct manipulation.
+     */
+    protected fun optBoolVar() =
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptBoolHandle>> { thisRef, prop ->
+            val pName = presenceName(prop.name)
+            thisRef.add(pName, BoolSpec)
+            thisRef.add(prop.name, BoolSpec)
+            val handle = OptBoolHandle(
+                name = prop.name,
+                present = BoolHandle(pName),
+                value = BoolHandle(prop.name),
+            )
+            ReadOnlyProperty { _, _ -> handle }
+        }
+
+    /**
+     * Optional nominal variable: declares a presence bool plus the underlying one-hot nominal.
+     * Comparisons via [OptNominalHandle.eq] / [OptNominalHandle.ne] fold the presence guard in.
+     */
+    protected fun optNominal(vararg labels: String) = labels.toList().let { ls ->
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptNominalHandle>> { thisRef, prop ->
+            val pName = presenceName(prop.name)
+            thisRef.add(pName, BoolSpec)
+            thisRef.add(prop.name, NominalSpec(ls))
+            val handle = OptNominalHandle(
+                name = prop.name,
+                present = BoolHandle(pName),
+                value = NominalHandle(prop.name, ls),
+            )
+            ReadOnlyProperty { _, _ -> handle }
+        }
+    }
 
     protected fun constraint(build: () -> BoolExpr) =
         PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, NamedConstraint>> { thisRef, prop ->

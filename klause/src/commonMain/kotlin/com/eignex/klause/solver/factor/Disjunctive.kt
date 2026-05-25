@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -46,6 +47,10 @@ import kotlin.math.min
 class Disjunctive(
     val starts: IntArray,
     val durations: IntArray,
+    /** Per-task presence literals; empty for the non-opt fast path. Absent tasks impose
+     *  no no-overlap obligation. The cost / propagation passes route through the
+     *  Cumulative LS-cost delegate and reuse its opt machinery. */
+    val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
     init {
@@ -55,20 +60,26 @@ class Disjunctive(
         for (i in durations.indices) {
             require(durations[i] >= 0) { "Disjunctive durations[$i] must be ≥ 0, got ${durations[i]}" }
         }
+        require(presents.isEmpty() || presents.size == starts.size) {
+            "Disjunctive: presents must be empty or match starts arity"
+        }
     }
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = starts
 
     private val n: Int = starts.size
 
     /** LS delegate: cumulative with all-1 resources and capacity 1. Identical cost
-     *  surface as disjunctive, so we reuse rather than copy the timeline machinery. */
+     *  surface as disjunctive, so we reuse rather than copy the timeline machinery. The
+     *  opt presents flow straight through — Cumulative's opt-aware hooks do the right
+     *  thing for the unit-resource case too. */
     private val cumulativeBacking: Cumulative = Cumulative(
         starts = starts,
         durations = durations,
         resources = IntArray(n) { 1 },
         capacity = 1,
+        presents = presents,
     )
 
     override fun initialize(state: LocalSearchState, factorId: Int) =
@@ -82,6 +93,12 @@ class Disjunctive(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int =
         cumulativeBacking.applyIntSet(state, factorId, intVar, oldValue)
+
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        cumulativeBacking.deltaIfBoolFlipped(state, factorId, boolVar)
+
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        cumulativeBacking.applyBoolFlip(state, factorId, boolVar)
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
         cumulativeBacking.proposeRepairMoves(state, factorId, sink)
@@ -103,6 +120,7 @@ class Disjunctive(
     private fun timeTable(state: PropagationState): Boolean {
         val events = ArrayList<IntArray>(n * 2)
         for (i in 0 until n) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = durations[i]
             if (d == 0) continue
             val dom = state.intDomains[starts[i]]
@@ -131,8 +149,10 @@ class Disjunctive(
                 if (level > 1) return false
             }
         }
-        // Shave non-fixed tasks against the mandatory profile.
+        // Shave non-fixed tasks against the mandatory profile. Only definitely-present
+        // tasks get tightened — unpinned-presence tasks might still vanish.
         for (i in 0 until n) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = durations[i]
             if (d == 0) continue
             val v = starts[i]
@@ -189,12 +209,14 @@ class Disjunctive(
     private fun detectablePrecedences(state: PropagationState): Boolean {
         for (i in 0 until n) {
             if (durations[i] == 0) continue
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var newMinI = di.min
             for (j in 0 until n) {
                 if (j == i) continue
                 if (durations[j] == 0) continue
+                if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
                 val dj = state.intDomains[starts[j]]
                 // i cannot precede j iff est_i + dur_i > lst_j.
                 if (di.min + durations[i] > dj.max) {
@@ -225,14 +247,20 @@ class Disjunctive(
      */
     private fun edgeFinding(state: PropagationState): Boolean {
         if (n < 2) return true
-        // Forward pass: tighten start_i.min.
+        // Forward pass: tighten start_i.min. Only definitely-present tasks anchor or
+        // contribute to Ω; unpinned-presence tasks can still vanish.
         val others = IntArray(n)
         for (i in 0 until n) {
             if (durations[i] == 0) continue
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var k = 0
-            for (j in 0 until n) if (j != i && durations[j] > 0) { others[k++] = j }
+            for (j in 0 until n) {
+                if (j != i && durations[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
+                    others[k++] = j
+                }
+            }
             // Sort others by lct = dom.max + dur ascending.
             sortByLct(others, k, state)
             // Sweep prefixes.
@@ -260,10 +288,15 @@ class Disjunctive(
         // Backward pass: tighten start_i.max via the symmetric overflow.
         for (i in 0 until n) {
             if (durations[i] == 0) continue
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var k = 0
-            for (j in 0 until n) if (j != i && durations[j] > 0) { others[k++] = j }
+            for (j in 0 until n) {
+                if (j != i && durations[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
+                    others[k++] = j
+                }
+            }
             sortByEstDesc(others, k, state)
             var sumDur = 0
             var maxLctOmega = Int.MIN_VALUE

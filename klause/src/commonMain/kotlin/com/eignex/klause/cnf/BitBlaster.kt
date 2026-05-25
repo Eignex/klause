@@ -61,7 +61,7 @@ object BitBlaster {
                 is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
                 is ReifiedPseudoBoolean -> emitReifiedPseudoBoolean(b, factor, boolMap)
                 is Xor -> emitXor(b, factor, boolMap)
-                is AllDifferentFactor -> emitAllDifferent(b, factor, intBits, intMin)
+                is AllDifferentFactor -> emitAllDifferent(b, factor, intBits, intMin, boolMap)
                 else -> throw UnsupportedOperationException(
                     "BitBlaster cannot lower factor type ${factor::class.simpleName}"
                 )
@@ -140,23 +140,36 @@ object BitBlaster {
         f: AllDifferentFactor,
         intBits: Array<IntArray>,
         intMin: IntArray,
+        boolMap: IntArray,
     ) {
         // Pairwise NE via offset-shifted bit-vector equality. For two vars i, j with possibly
         // different domains, compare their actual values: i_actual = iMin + decode(iBits) and
         // similarly for j. NE on actuals ⟺ NE on (iBits + (iMin - jMin)) and jBits when both
         // shifted to a common reference. Simpler: rebuild both as canonical bit-vectors of equal
         // width via a small offset add, then assert unsignedEq is false.
+        //
+        // Opt-aware: when [presents] is non-empty, gate each pairwise NE on the conjunction
+        // of both presence bits — `(present_i ∧ present_j) → (i ≠ j)`. Encoded as
+        //   `¬present_i ∨ ¬present_j ∨ ¬eq(i, j)`.
+        // The non-opt case (empty presents) still emits the bare unit clause.
+        val hasPresents = f.presents.isNotEmpty()
         for (i in f.vars.indices) for (j in i + 1 until f.vars.size) {
             val a = f.vars[i]; val c = f.vars[j]
             val aMin = intMin[a]; val cMin = intMin[c]
             val aLits = bitsToLits(intBits[a])
             val cLits = bitsToLits(intBits[c])
-            // Shift the smaller-min side up so both reference the same zero. Both shifts produce
-            // non-negative values since aMin / cMin can be any integer; pick the lower as base.
             val base = minOf(aMin, cMin)
             val aShifted = if (aMin == base) aLits else b.rippleAdd(aLits, constantLits(b, (aMin - base).toLong()))
             val cShifted = if (cMin == base) cLits else b.rippleAdd(cLits, constantLits(b, (cMin - base).toLong()))
-            b.addClause(intArrayOf(Lit.negate(b.unsignedEq(aShifted, cShifted))))
+            val notEq = Lit.negate(b.unsignedEq(aShifted, cShifted))
+            if (!hasPresents) {
+                b.addClause(intArrayOf(notEq))
+            } else {
+                val pi = f.presents[i]; val pj = f.presents[j]
+                val cnfPi = Lit.make(boolMap[Lit.variable(pi)], Lit.isPositive(pi))
+                val cnfPj = Lit.make(boolMap[Lit.variable(pj)], Lit.isPositive(pj))
+                b.addClause(intArrayOf(Lit.negate(cnfPi), Lit.negate(cnfPj), notEq))
+            }
         }
     }
 

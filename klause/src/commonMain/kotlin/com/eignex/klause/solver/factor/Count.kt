@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
@@ -25,16 +26,24 @@ class Count(
     val v: Int,
     val op: Op,
     val n: Int,
+    /** Per-index presence literals; empty for the non-opt fast path. See [OptPresence]. */
+    val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
     enum class Op { Eq, Ne, Le, Lt, Ge, Gt }
 
     init {
         require(xs.isNotEmpty()) { "count: empty xs" }
+        require(presents.isEmpty() || presents.size == xs.size) {
+            "count: presents must be empty or match xs arity (got ${presents.size} vs ${xs.size})"
+        }
     }
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = xs + intArrayOf(n)
+
+    private fun present(state: LocalSearchState, idx: Int): Boolean =
+        OptPresence.isPresentInAssignment(presents, idx, state)
 
     /** Cached count of xs[i] satisfying the predicate under the current assignment. */
     private class State(var count: Int)
@@ -50,7 +59,7 @@ class Count(
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var c = 0
-        for (x in xs) if (matches(state.assignment.intValue(x))) c++
+        for (i in xs.indices) if (present(state, i) && matches(state.assignment.intValue(xs[i]))) c++
         state.refPayload[factorId] = State(c)
     }
 
@@ -63,8 +72,9 @@ class Count(
         val s = state.refPayload[factorId] as State
         val wasViolated = state.assignment.intValue(n) != s.count
         var deltaCount = 0
-        for (x in xs) {
-            if (x != intVar) continue
+        for (i in xs.indices) {
+            if (xs[i] != intVar) continue
+            if (!present(state, i)) continue
             val old = state.assignment.intValue(intVar)
             val wasMatch = matches(old)
             val willMatch = matches(newValue)
@@ -82,12 +92,49 @@ class Count(
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
         val wasViolated = state.assignment.intValue(n) != s.count
-        for (x in xs) {
-            if (x != intVar) continue
+        for (i in xs.indices) {
+            if (xs[i] != intVar) continue
+            if (!present(state, i)) continue
             val wasMatch = matches(oldValue)
             val nowMatch = matches(cur)
             if (wasMatch && !nowMatch) s.count--
             if (!wasMatch && nowMatch) s.count++
+        }
+        val nowViolated = state.assignment.intValue(n) != s.count
+        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = state.assignment.intValue(n) != s.count
+        var deltaCount = 0
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val wasPresent = present(state, i)
+            val willBePresent = !wasPresent  // flipping the bool inverts the literal's truth
+            val matchesValue = matches(state.assignment.intValue(xs[i]))
+            if (!matchesValue) continue
+            if (wasPresent && !willBePresent) deltaCount--
+            if (!wasPresent && willBePresent) deltaCount++
+        }
+        val newCount = s.count + deltaCount
+        val willViolate = state.assignment.intValue(n) != newCount
+        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val s = state.refPayload[factorId] as State
+        val wasViolated = state.assignment.intValue(n) != s.count
+        // The flip has already been applied to `state.assignment`; recompute contributions
+        // for every entry whose presence literal references [boolVar].
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val nowPresent = present(state, i)
+            val matchesValue = matches(state.assignment.intValue(xs[i]))
+            if (!matchesValue) continue
+            if (nowPresent) s.count++ else s.count--
         }
         val nowViolated = state.assignment.intValue(n) != s.count
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
@@ -105,11 +152,15 @@ class Count(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         var definite = 0
         var possible = 0
-        for (x in xs) {
-            val d = state.intDomains[x]
+        for (i in xs.indices) {
+            // A definitely-absent entry contributes nothing to either bound.
+            if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
+            val d = state.intDomains[xs[i]]
             val all = domainAllMatches(d)
             val any = domainAnyMatches(d)
-            if (all) definite++
+            // Definite (lower bound) requires the entry to be present too — unpinned-presence
+            // entries can still go absent and stop matching.
+            if (all && OptPresence.isDefinitelyPresent(presents, i, state)) definite++
             if (any) possible++
         }
         val ant = state.composeIntVarAtomAntecedents(xs)

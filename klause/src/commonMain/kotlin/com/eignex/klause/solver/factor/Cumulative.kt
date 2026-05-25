@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -55,6 +56,11 @@ class Cumulative(
     val durations: IntArray,
     val resources: IntArray,
     val capacity: Int,
+    /** Per-task presence literals; empty for the non-opt fast path. Absent tasks contribute
+     *  zero energy / zero compulsory part. Theta-tree leaves stay inactive for
+     *  definitely-absent tasks; unpinned-presence tasks are excluded from edge-finding too
+     *  (they may yet go absent, so they can't sharpen Ω-energy deductions). */
+    val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
     init {
@@ -66,10 +72,16 @@ class Cumulative(
             require(durations[i] >= 0) { "Cumulative durations[$i] must be ≥ 0, got ${durations[i]}" }
             require(resources[i] >= 0) { "Cumulative resources[$i] must be ≥ 0, got ${resources[i]}" }
         }
+        require(presents.isEmpty() || presents.size == starts.size) {
+            "Cumulative: presents must be empty or match starts arity"
+        }
     }
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = starts
+
+    private fun present(state: LocalSearchState, idx: Int): Boolean =
+        OptPresence.isPresentInAssignment(presents, idx, state)
 
     private val n: Int = starts.size
     private val positionOfVar: Map<Int, Int> = starts.withIndex().associate { (i, v) -> v to i }
@@ -87,6 +99,7 @@ class Cumulative(
         val size = max(0, tHigh - tLow)
         val usage = IntArray(size)
         for (i in 0 until n) {
+            if (!present(state, i)) continue
             val s = state.assignment.intValue(starts[i])
             val d = durations[i]
             val r = resources[i]
@@ -110,6 +123,7 @@ class Cumulative(
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val pos = positionOfVar[intVar] ?: return 0
+        if (!present(state, pos)) return 0
         val ls = state.refPayload[factorId] as LsState
         val oldStart = state.assignment.intValue(intVar)
         if (oldStart == newValue) return 0
@@ -124,6 +138,7 @@ class Cumulative(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val pos = positionOfVar[intVar] ?: return 0
+        if (!present(state, pos)) return 0
         val ls = state.refPayload[factorId] as LsState
         val newValue = state.assignment.intValue(intVar)
         val d = durations[pos]
@@ -131,6 +146,60 @@ class Cumulative(
         val oldViolated = ls.overage > 0
         if (oldValue == newValue || d == 0 || r == 0) return 0
         applyOverageDelta(ls, oldValue, newValue, d, r)
+        state.intPayload[factorId] = ls.overage
+        val newViolated = ls.overage > 0
+        return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
+    }
+
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val ls = state.refPayload[factorId] as LsState
+        val oldViolated = ls.overage > 0
+        // Simulate the flip's effect on the dense profile.
+        var deltaOv = 0
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val d = durations[i]
+            val r = resources[i]
+            if (d == 0 || r == 0) continue
+            val wasP = present(state, i)
+            val sign = if (wasP) -1 else +1  // flipping removes/adds this task's contribution
+            val s = state.assignment.intValue(starts[i])
+            val from = max(0, s - ls.tLow)
+            val to = min(ls.usage.size, s + d - ls.tLow)
+            for (t in from until to) {
+                val u = ls.usage[t]
+                val nu = u + sign * r
+                deltaOv += max(0, nu - capacity) - max(0, u - capacity)
+            }
+        }
+        val newViolated = (ls.overage + deltaOv) > 0
+        return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
+    }
+
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (presents.isEmpty()) return 0
+        val ls = state.refPayload[factorId] as LsState
+        val oldViolated = ls.overage > 0
+        var deltaOv = 0
+        for (i in presents.indices) {
+            if (Lit.variable(presents[i]) != boolVar) continue
+            val d = durations[i]
+            val r = resources[i]
+            if (d == 0 || r == 0) continue
+            val nowP = present(state, i)
+            val sign = if (nowP) +1 else -1
+            val s = state.assignment.intValue(starts[i])
+            val from = max(0, s - ls.tLow)
+            val to = min(ls.usage.size, s + d - ls.tLow)
+            for (t in from until to) {
+                val u = ls.usage[t]
+                val nu = u + sign * r
+                ls.usage[t] = nu
+                deltaOv += max(0, nu - capacity) - max(0, u - capacity)
+            }
+        }
+        ls.overage += deltaOv
         state.intPayload[factorId] = ls.overage
         val newViolated = ls.overage > 0
         return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
@@ -232,8 +301,12 @@ class Cumulative(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
-        // Per-task resource feasibility.
+        // Per-task resource feasibility — only definitely-present tasks must fit.
         for (i in 0 until n) {
+            if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
+            // Unpinned-presence tasks may still be skipped; check feasibility only when
+            // definitely present, otherwise the task could legally vanish.
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             if (durations[i] > 0 && resources[i] > capacity) return false
         }
         // Overload check (Vilím 2002 / Schutt-Feydy-Stuckey 2009 simplified). For each
@@ -256,6 +329,9 @@ class Cumulative(
             var minEst = Int.MAX_VALUE
             for (k in 0 until n) {
                 val j = sorted[k]
+                // Skip tasks that aren't definitely-present — they may yet vanish and so
+                // cannot anchor an overload conclusion.
+                if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
                 val e = durations[j].toLong() * resources[j].toLong()
                 if (e == 0L) continue
                 totalEnergy += e
@@ -271,6 +347,8 @@ class Cumulative(
         //    and one (ect, -r) when lst < ect; otherwise no compulsory part.
         val events = ArrayList<IntArray>(n * 2)
         for (i in 0 until n) {
+            // Compulsory part only from definitely-present tasks.
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = durations[i]
             val r = resources[i]
             if (d == 0 || r == 0) continue
@@ -307,6 +385,9 @@ class Cumulative(
         //    over capacity at any covered segment (after subtracting i's own mandatory
         //    contribution, so a task doesn't conflict with itself).
         for (i in 0 until n) {
+            // Don't shave start domains of tasks that may yet vanish — if i goes absent
+            // it imposes no constraint at all, so tightening its start would be unsound.
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = durations[i]
             val r = resources[i]
             if (d == 0 || r == 0) continue
@@ -387,6 +468,10 @@ class Cumulative(
         if (n < 2 || capacity == 0) return true
         val active = IntArrayList()
         for (i in 0 until n) {
+            // Theta-tree leaves stay inactive for definitely-absent or unpinned-presence
+            // tasks — the README's stated opt semantics. Only definitely-present positive-
+            // energy tasks anchor edge-finding deductions.
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             if (durations[i] > 0 && resources[i] > 0) active.add(i)
         }
         val m = active.size

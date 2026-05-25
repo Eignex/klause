@@ -1,8 +1,14 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.AllDifferent
+import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
 import com.eignex.klause.ast.CircuitExpr
+import com.eignex.klause.ast.CountExprOpt
+import com.eignex.klause.ast.CumulativeExprOpt
+import com.eignex.klause.ast.DisjunctiveExprOpt
+import com.eignex.klause.ast.GccExprOpt
+import com.eignex.klause.ast.NValueExprOpt
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.DisjunctiveExpr
 import com.eignex.klause.ast.SubcircuitExpr
@@ -193,17 +199,17 @@ class Compiler {
             is AtMost -> reifyCardinality(expr.children, 0, expr.k)
             is AtLeast -> reifyCardinality(expr.children, expr.k, expr.children.size)
             is CardinalityExpr -> reifyCardinality(expr.children, expr.min, expr.max)
-            is AllDifferent -> {
-                val lifted = expr.terms.map { lift(it) }
-                val pairs = mutableListOf<BoolExpr>()
-                for (i in lifted.indices) for (j in i + 1 until lifted.size) {
-                    pairs += IntCompare(lifted[i], IntCmpOp.NE, lifted[j])
-                }
-                tseitinAnd(pairs)
-            }
-            is CircuitExpr, is SubcircuitExpr, is CumulativeExpr, is DisjunctiveExpr ->
-                error("${expr::class.simpleName} at non-top-level position is not yet supported; " +
-                    "circuit / cumulative / disjunctive can only appear as top-level constraints today.")
+            is AllDifferent -> reifyAllDifferent(expr.terms.map { lift(it) })
+            is CircuitExpr -> reifyCircuit(expr)
+            is SubcircuitExpr -> reifySubcircuit(expr)
+            is CumulativeExpr -> reifyCumulative(expr)
+            is DisjunctiveExpr -> reifyDisjunctive(expr)
+            is AllDifferentOpt -> reifyAllDifferentOpt(expr)
+            is CumulativeExprOpt -> reifyCumulativeOpt(expr)
+            is DisjunctiveExprOpt -> reifyDisjunctiveOpt(expr)
+            is CountExprOpt -> reifyCountOpt(expr)
+            is NValueExprOpt -> reifyNValueOpt(expr)
+            is GccExprOpt -> reifyGccOpt(expr)
             is TableConstraint -> lowerToLit(expandTable(expr))
             is PseudoBooleanExpr -> {
                 val lits = lowerAllBool(expr.lits)

@@ -5,6 +5,9 @@ import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.IntHandle
 import com.eignex.klause.schema.NominalHandle
+import com.eignex.klause.schema.OptBoolHandle
+import com.eignex.klause.schema.OptIntHandle
+import com.eignex.klause.schema.OptNominalHandle
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -45,6 +48,26 @@ class CompiledProblem(
         val id = intVarIdByName[handle.name]
             ?: error("No integer variable named '${handle.name}'")
         return sample.ints[id]
+    }
+
+    /** Decodes an optional integer: `null` when the presence bit is false, the value otherwise. */
+    fun decode(handle: OptIntHandle, sample: Sample): Int? {
+        if (!decode(handle.present, sample)) return null
+        return decode(handle.value, sample)
+    }
+
+    /** Decodes an optional Boolean: `null` when absent. */
+    fun decode(handle: OptBoolHandle, sample: Sample): Boolean? {
+        if (!decode(handle.present, sample)) return null
+        return decode(handle.value, sample)
+    }
+
+    /** Decodes an optional nominal: `null` when absent. The underlying one-hot indicators may
+     *  be unconstrained when the variable is absent, so we don't insist on exactly-one in
+     *  that case — but a present nominal still has its standard exactly-one invariant. */
+    fun decode(handle: OptNominalHandle, sample: Sample): String? {
+        if (!decode(handle.present, sample)) return null
+        return decode(handle.value, sample)
     }
 
     fun decode(handle: FloatHandle, sample: Sample): Double {

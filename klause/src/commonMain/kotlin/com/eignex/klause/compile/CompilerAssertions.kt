@@ -34,6 +34,17 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.ast.AllDifferentOpt
+import com.eignex.klause.ast.CountExprOpt
+import com.eignex.klause.ast.CountOp
+import com.eignex.klause.ast.CumulativeExprOpt
+import com.eignex.klause.ast.DisjunctiveExprOpt
+import com.eignex.klause.ast.GccExprOpt
+import com.eignex.klause.ast.NValueExprOpt
+import com.eignex.klause.ast.NValueMode
+import com.eignex.klause.solver.factor.Count as CountFactor
+import com.eignex.klause.solver.factor.GlobalCardinality as GccFactor
+import com.eignex.klause.solver.factor.NValue as NValueFactor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.Circuit as CircuitFactor
 import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
@@ -83,6 +94,12 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
         is SubcircuitExpr -> assertCircuit(expr.succ, expr.valueOffset, sub = true)
         is CumulativeExpr -> assertCumulative(expr)
         is DisjunctiveExpr -> assertDisjunctive(expr)
+        is AllDifferentOpt -> assertAllDifferentOpt(expr)
+        is CumulativeExprOpt -> assertCumulativeOpt(expr)
+        is DisjunctiveExprOpt -> assertDisjunctiveOpt(expr)
+        is CountExprOpt -> assertCountOpt(expr)
+        is NValueExprOpt -> assertNValueOpt(expr)
+        is GccExprOpt -> assertGccOpt(expr)
         is TableConstraint -> assertExpr(expandTable(expr))
         is PseudoBooleanExpr -> {
             val lits = lowerAllBool(expr.lits)
@@ -233,6 +250,147 @@ internal fun Compiler.Build.assertCumulative(expr: CumulativeExpr) {
         durations = expr.durations.toIntArray(),
         resources = expr.resources.toIntArray(),
         capacity = expr.capacity,
+    )
+}
+
+/**
+ * Lower each presence [BoolExpr] in [presents] to a solver literal. Used by every opt-aware
+ * global to thread presence into its factor's `presents: IntArray`.
+ */
+private fun Compiler.Build.lowerPresences(presents: List<BoolExpr>): IntArray {
+    val out = IntArray(presents.size)
+    for (i in presents.indices) out[i] = lowerToLit(presents[i])
+    return out
+}
+
+/** AllDifferent over an opt-presence-gated subset. Bare-IntRef operands map directly to the
+ *  global factor; non-bare operands fall back to presence-guarded pairwise NE. */
+internal fun Compiler.Build.assertAllDifferentOpt(expr: AllDifferentOpt) {
+    val lifted = expr.terms.map { lift(it) }
+    val presentLits = lowerPresences(expr.presents)
+    if (lifted.all { it is IntRef }) {
+        val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+        if (ids.toSet().size == ids.size) {
+            var dMin = intDomains[ids[0]].min
+            var dMax = intDomains[ids[0]].max
+            for (id in ids) {
+                val d = intDomains[id]
+                if (d.min < dMin) dMin = d.min
+                if (d.max > dMax) dMax = d.max
+            }
+            factors += AllDifferentFactor(ids, dMin, dMax - dMin + 1, presents = presentLits)
+            return
+        }
+    }
+    // Pairwise fallback: `(present_i ∧ present_j) → (x_i ≠ x_j)`.
+    for (i in lifted.indices) for (j in i + 1 until lifted.size) {
+        val ne = IntCompare(lifted[i], IntCmpOp.NE, lifted[j])
+        val guarded = Implies(
+            And(listOf(boolFromLit(presentLits[i]), boolFromLit(presentLits[j]))),
+            ne,
+        )
+        assertExpr(guarded)
+    }
+}
+
+/** Reconstruct a [BoolExpr] from a solver literal — used to thread already-lowered
+ *  presence literals back through the AST-level guards in the pairwise fallback path. */
+private fun Compiler.Build.boolFromLit(lit: Int): BoolExpr {
+    val v = Lit.variable(lit)
+    val name = boolVarIdByName.entries.firstOrNull { it.value == v }?.key
+        ?: error("opt: unknown bool var id $v in presence lowering")
+    return BoolRef(name, negated = !Lit.isPositive(lit))
+}
+
+internal fun Compiler.Build.assertCumulativeOpt(expr: CumulativeExprOpt) {
+    val lifted = expr.starts.map { lift(it) }
+    require(lifted.all { it is IntRef }) {
+        "cumulativeOpt: every start term must be a bare variable reference (no arithmetic)."
+    }
+    val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    factors += CumulativeFactor(
+        starts = ids,
+        durations = expr.durations.toIntArray(),
+        resources = expr.resources.toIntArray(),
+        capacity = expr.capacity,
+        presents = lowerPresences(expr.presents),
+    )
+}
+
+internal fun Compiler.Build.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
+    val lifted = expr.starts.map { lift(it) }
+    require(lifted.all { it is IntRef }) {
+        "disjunctiveOpt: every start term must be a bare variable reference (no arithmetic)."
+    }
+    val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    factors += DisjunctiveFactor(
+        starts = ids,
+        durations = expr.durations.toIntArray(),
+        presents = lowerPresences(expr.presents),
+    )
+}
+
+internal fun Compiler.Build.assertCountOpt(expr: CountExprOpt) {
+    val xsLifted = expr.xs.map { lift(it) }
+    require(xsLifted.all { it is IntRef }) {
+        "countOpt: every xs term must be a bare variable reference (no arithmetic)."
+    }
+    val xsIds = IntArray(xsLifted.size) { intVarOf((xsLifted[it] as IntRef).name) }
+    val nLifted = lift(expr.n)
+    require(nLifted is IntRef) { "countOpt: count target n must be a bare variable reference." }
+    val nId = intVarOf(nLifted.name)
+    val factorOp = when (expr.op) {
+        CountOp.EQ -> CountFactor.Op.Eq
+        CountOp.NE -> CountFactor.Op.Ne
+        CountOp.LE -> CountFactor.Op.Le
+        CountOp.LT -> CountFactor.Op.Lt
+        CountOp.GE -> CountFactor.Op.Ge
+        CountOp.GT -> CountFactor.Op.Gt
+    }
+    factors += CountFactor(
+        xs = xsIds,
+        v = expr.v,
+        op = factorOp,
+        n = nId,
+        presents = lowerPresences(expr.presents),
+    )
+}
+
+internal fun Compiler.Build.assertNValueOpt(expr: NValueExprOpt) {
+    val xsLifted = expr.xs.map { lift(it) }
+    require(xsLifted.all { it is IntRef }) {
+        "nvalueOpt: every xs term must be a bare variable reference (no arithmetic)."
+    }
+    val xsIds = IntArray(xsLifted.size) { intVarOf((xsLifted[it] as IntRef).name) }
+    val nLifted = lift(expr.n)
+    require(nLifted is IntRef) { "nvalueOpt: n must be a bare variable reference." }
+    val nId = intVarOf(nLifted.name)
+    val factorMode = when (expr.mode) {
+        NValueMode.EQ -> NValueFactor.Mode.Eq
+        NValueMode.AT_LEAST -> NValueFactor.Mode.AtLeast
+        NValueMode.AT_MOST -> NValueFactor.Mode.AtMost
+    }
+    factors += NValueFactor(
+        n = nId,
+        xs = xsIds,
+        mode = factorMode,
+        presents = lowerPresences(expr.presents),
+    )
+}
+
+internal fun Compiler.Build.assertGccOpt(expr: GccExprOpt) {
+    val xsLifted = expr.xs.map { lift(it) }
+    require(xsLifted.all { it is IntRef }) {
+        "gccOpt: every xs term must be a bare variable reference (no arithmetic)."
+    }
+    val xsIds = IntArray(xsLifted.size) { intVarOf((xsLifted[it] as IntRef).name) }
+    factors += GccFactor(
+        xs = xsIds,
+        cover = expr.cover.toIntArray(),
+        countLow = expr.low.toIntArray(),
+        countHigh = expr.high.toIntArray(),
+        closed = expr.closed,
+        presents = lowerPresences(expr.presents),
     )
 }
 
