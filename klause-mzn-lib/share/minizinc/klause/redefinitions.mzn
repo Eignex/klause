@@ -115,6 +115,23 @@ predicate count_le(array[int] of var int: x, var int: y, var int: c);
 predicate count_lt(array[int] of var int: x, var int: y, var int: c);
 predicate count_ge(array[int] of var int: x, var int: y, var int: c);
 predicate count_gt(array[int] of var int: x, var int: y, var int: c);
+
+% Reified count_*: b ↔ |{i : x[i] ⟨op⟩ y}| = c. Decompose through klause's non-reified
+% count_* (above) plus an elementary reified int equality on the count var. Without these
+% MiniZinc's flattener fails with "count_X is used in a reified context but no reified
+% version is available" whenever a model wraps a count in an implication / iff / etc.
+predicate count_eq_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
+  let { var 0..length(x): cnt; } in count_eq(x, y, cnt) /\ int_eq_reif(cnt, c, b);
+predicate count_neq_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
+  let { var 0..length(x): cnt; } in count_neq(x, y, cnt) /\ int_eq_reif(cnt, c, b);
+predicate count_le_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
+  let { var 0..length(x): cnt; } in count_le(x, y, cnt) /\ int_eq_reif(cnt, c, b);
+predicate count_lt_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
+  let { var 0..length(x): cnt; } in count_lt(x, y, cnt) /\ int_eq_reif(cnt, c, b);
+predicate count_ge_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
+  let { var 0..length(x): cnt; } in count_ge(x, y, cnt) /\ int_eq_reif(cnt, c, b);
+predicate count_gt_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
+  let { var 0..length(x): cnt; } in count_gt(x, y, cnt) /\ int_eq_reif(cnt, c, b);
 predicate among(var int: n, array[int] of var int: x, set of int: v);
 
 % Cardinality.

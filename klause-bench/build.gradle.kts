@@ -161,15 +161,22 @@ tasks.register("downloadMznHakank") {
 tasks.register<JavaExec>("runMznParity") {
     group = "verification"
     description = "MiniZinc parity sweep: compiles models against klause, compares to Gecode."
+    notCompatibleWithConfigurationCache(
+        "doFirst { ... } reads gradle.startParameter.systemPropertiesArgs at execution time " +
+            "to forward -Dklause.parity.* knobs through to the JavaExec child, which the " +
+            "configuration cache rejects",
+    )
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.eignex.klause.bench.parity.MznParitySweepMain")
-    // Reuse the bench-prop forwarding to pick up -Dklause.parity.* knobs.
+    // Reuse the bench-prop forwarding to pick up -Dklause.parity.* knobs. Capture the
+    // workspace root at configuration time so doFirst doesn't reach back into Project.
+    val workspaceRoot = rootDir.absolutePath
     doFirst {
         for ((k, v) in System.getProperties()) {
             val key = k.toString()
             if (key.startsWith("klause.parity.")) systemProperty(key, v.toString())
         }
-        systemProperty("klause.workspace.root", rootDir.absolutePath)
+        systemProperty("klause.workspace.root", workspaceRoot)
     }
     dependsOn(":klause-fzn-cli:installDist")
 }
