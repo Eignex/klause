@@ -206,11 +206,6 @@ Use cases:
 
 Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
 
-- [CP] Optional variables in the schema DSL: optIntVar(range) and optBoolVar() declarators returning (present, value) pairs; decoders surface present=false as absent in the result type.
-- [CP] Optional-variable lowering for comparisons and logical operators: reify each opt expression on the conjunction of involved presence bools so existing factors stay opt-ignorant.
-- [CP] Algebraic opt rewriting in Linear / Cardinality / PseudoBoolean / sum builders: accept presence-multiplied terms (present_i * value_i) so aggregating-by-sum constraints get native propagation without per-factor opt awareness.
-- [CP] Opt-aware Cumulative and Disjunctive variants: presents: BoolArray gating each task's energy and compulsory-part contribution; Theta-tree leaves stay inactive for absent tasks.
-- [CP] Opt-aware AllDifferent / GCC / nValue / Count: variants taking presents: BoolArray that restrict counting and matching to the present subset; FlatZinc mappings for the opt versions of these globals.
 - [CP] Network flow DSL: networkFlow(arcs, balance, flow) and networkFlowCost(arcs, balance, weight, flow, cost) builders with decomposition lowering to per-node sum and weighted-sum.
 - [CP] Network flow propagator: dedicated min-cost-flow factor (SSP / cost-scaling) with reduced-cost arc pruning and infeasibility detection beyond the linear decomposition.
 - [CP] Network flow FlatZinc mapping: wire network_flow and network_flow_cost in klause-mzn-lib to the new builders, with redefinition fallback for backends without the propagator.
