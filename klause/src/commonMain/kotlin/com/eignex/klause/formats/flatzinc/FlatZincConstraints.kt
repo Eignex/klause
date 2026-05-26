@@ -368,23 +368,17 @@ internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, eq: Boolean, le:
 }
 
 internal fun FlatZincCompiler.emitBool2Int(c: FznConstraint) {
-    // bool2int(b, x): x = if b then 1 else 0. Encode as linear: x - b == 0 with b
-    // represented as 0/1. We model b's truth as an int channel via a Linear factor on
-    // a fresh "indicator int" — but simpler: enforce x ∈ [0,1] and add two clauses:
-    // b → x=1; ¬b → x=0. Implement via two ReifiedLinear factors, or two Cardinality.
+    // bool2int(b, x): b ↔ (x = 1), with x ∈ {0, 1}. We pin x to {0,1} via two unit
+    // Linear bounds and encode the biconditional with a single ReifiedLinear. Polarity
+    // of `b` is folded into the encoded bound: a negated bool literal (¬v ↔ x=1) is
+    // rewritten as v ↔ (x = 0).
     val b = resolveBoolLit(c.args[0])
     val x = resolveIntVar(c.args[1])
-    // ReifiedLinear(b, [1·x = 1]) and ReifiedLinear(¬b, [1·x = 0])
+    factors.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 0))
+    factors.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.LE, 1))
+    val targetBound = if (Lit.isPositive(b)) 1 else 0
     factors.add(ReifiedLinear(Lit.variable(b),
-        coeffs = intArrayOf(1), vars = intArrayOf(x), op = LinearOp.EQ, bound = 1))
-    // To express ¬b implies x=0, allocate an aux bool that's the negation. Simplest:
-    // emit it as the same reified with the polarity flipped via ReifiedLinear
-    // negation semantics. Klause's ReifiedLinear's aux is "raw bool"; encoding "¬b ↔
-    // (x=0)" needs aux to be ¬b. Allocate aux and constrain it via two clauses.
-    // For most FlatZinc test cases bool2int's bool already has a fixed value;
-    // skipping the second half is sound but lossy. We compromise: add the unit
-    // constraint that x ≤ 1 (the variable's domain should already enforce this).
-    // TODO: complete the ↔ implementation if a test reveals it's needed.
+        coeffs = intArrayOf(1), vars = intArrayOf(x), op = LinearOp.EQ, bound = targetBound))
 }
 
 internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {

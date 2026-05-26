@@ -205,12 +205,7 @@ internal class FlatZincCompiler(
             FznType.Bool -> allocBool(d.name)
             FznType.IntAny -> allocInt(d.name, unboundedIntLo, unboundedIntHi)
             is FznType.IntRange -> allocInt(d.name, t.lo.toInt(), t.hi.toInt())
-            is FznType.IntSet -> {
-                val lo = t.values.min().toInt()
-                val hi = t.values.max().toInt()
-                allocInt(d.name, lo, hi)
-                // TODO: enforce the set-of-int restriction. Bounds are sound but loose.
-            }
+            is FznType.IntSet -> allocIntSet(d.name, t)
             FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
             is FznType.SetOfInt -> allocSetVar(d.name, t, d.value)
@@ -293,7 +288,7 @@ internal class FlatZincCompiler(
             when (val t = type.element) {
                 FznType.Bool -> varIds[i] = allocBool(elemName)
                 is FznType.IntRange -> varIds[i] = allocInt(elemName, t.lo.toInt(), t.hi.toInt())
-                is FznType.IntSet -> varIds[i] = allocInt(elemName, t.values.min().toInt(), t.values.max().toInt())
+                is FznType.IntSet -> varIds[i] = allocIntSet(elemName, t)
                 is FznType.FloatRange -> {
                     val v = allocFloat(elemName, t.lo, t.hi)
                     varIds[i] = v
@@ -325,6 +320,22 @@ internal class FlatZincCompiler(
         val id = intDomains.size
         intDomains.add(IntDomain(lo, hi))
         intVars[name] = id
+        return id
+    }
+
+    /** Allocate an int var whose initial domain is exactly the values of [t] — interior
+     *  values not in the set are excised from the contiguous `[min..max]` envelope. */
+    internal fun allocIntSet(name: String, t: FznType.IntSet): Int {
+        val sorted = t.values.distinct().sorted().map { it.toInt() }
+        require(sorted.isNotEmpty()) { "IntSet domain for `$name` is empty" }
+        val id = allocInt(name, sorted.first(), sorted.last())
+        var dom = intDomains[id]
+        var prev = sorted.first()
+        for (v in sorted) {
+            for (gap in prev + 1 until v) dom = dom.excludeValue(gap)
+            prev = v
+        }
+        intDomains[id] = dom
         return id
     }
     /**
