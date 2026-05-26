@@ -61,6 +61,45 @@ class Regular(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Repair by replaying the DFA up to the first dead position; at that position propose
+     *  every in-domain symbol that yields a valid transition from the live state, plus
+     *  symbols that reach the accepting set when the run completed without accepting. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        var q = q0
+        for (i in seq.indices) {
+            val s = state.assignment.intValue(seq[i])
+            val next = delta(q, s)
+            if (next == 0) {
+                // First dead position: propose every alphabet symbol in domain that keeps q alive.
+                val d = state.problem.intDomains[seq[i]]
+                d.forEach { sym ->
+                    if (sym != s && delta(q, sym) != 0) sink.addIntSet(seq[i], sym)
+                }
+                return
+            }
+            q = next
+        }
+        // Run completed but final state not accepting. Try last-position symbol changes that
+        // would land in an accepting state.
+        if (q !in acceptingSet && seq.isNotEmpty()) {
+            val last = seq.size - 1
+            // Recompute state at last-1.
+            var qPrev = q0
+            for (i in 0 until last) qPrev = delta(qPrev, state.assignment.intValue(seq[i]))
+            val curLast = state.assignment.intValue(seq[last])
+            val d = state.problem.intDomains[seq[last]]
+            d.forEach { sym ->
+                val target = delta(qPrev, sym)
+                if (sym != curLast && target in acceptingSet) sink.addIntSet(seq[last], sym)
+            }
+        }
+    }
+
     private fun accepts(state: LocalSearchState): Boolean = run(false, state, 0, 0)
     private fun acceptsWithOverride(state: LocalSearchState, intVar: Int, value: Int): Boolean =
         run(true, state, intVar, value)

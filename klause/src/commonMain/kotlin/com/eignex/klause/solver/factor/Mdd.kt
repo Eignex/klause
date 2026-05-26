@@ -48,9 +48,110 @@ class Mdd(
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
 
     override fun initialize(state: LocalSearchState, factorId: Int) {}
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
+
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !pathExists(state, -1, 0)
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val wasViolated = !pathExists(state, -1, 0)
+        val willViolate = !pathExists(state, intVar, newValue)
+        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+
+    /** Walk the layered DAG along the current assignment (with one optional override of
+     *  [intVar] → [override]). Returns true iff the path lands in an accepting state. */
+    private fun pathExists(state: LocalSearchState, intVar: Int, override: Int): Boolean {
+        var current = initial
+        for (i in 0 until seq.size) {
+            val symbol = if (seq[i] == intVar) override else state.assignment.intValue(seq[i])
+            val start = layerStarts[i]
+            val end = layerStarts[i + 1]
+            var next = -1
+            var p = start
+            while (p < end) {
+                if (transitions[p] == current && transitions[p + 1] == symbol) {
+                    next = transitions[p + 2]
+                    break
+                }
+                p += recordStride
+            }
+            if (next < 0) return false
+            current = next
+        }
+        for (s in accepting) if (s == current) return true
+        return false
+    }
+
+    /** Repair by finding the first dead position in the assignment-path through the layered
+     *  DAG; at that position, propose every in-domain symbol that has a valid transition
+     *  from the live state (regardless of forward feasibility to an accepting state — the
+     *  cheap heuristic; the engine will eventually find paths that lead to acceptance). */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        var current = initial
+        for (i in 0 until seq.size) {
+            val symbol = state.assignment.intValue(seq[i])
+            val start = layerStarts[i]; val end = layerStarts[i + 1]
+            var matchedDst = -1
+            var p = start
+            while (p < end) {
+                if (transitions[p] == current && transitions[p + 1] == symbol) {
+                    matchedDst = transitions[p + 2]; break
+                }
+                p += recordStride
+            }
+            if (matchedDst < 0) {
+                // Dead end at layer i. Propose any symbol with a transition from `current`.
+                val d = state.problem.intDomains[seq[i]]
+                var q = start
+                while (q < end) {
+                    if (transitions[q] == current) {
+                        val altSym = transitions[q + 1]
+                        if (altSym != symbol && altSym in d) sink.addIntSet(seq[i], altSym)
+                    }
+                    q += recordStride
+                }
+                return
+            }
+            current = matchedDst
+        }
+        // Path completed without accepting. Try last-position changes that reach accepting.
+        if (seq.isNotEmpty()) {
+            val last = seq.size - 1
+            // Recompute state up to last - 1.
+            var qPrev = initial
+            for (i in 0 until last) {
+                val symbol = state.assignment.intValue(seq[i])
+                val start = layerStarts[i]; val end = layerStarts[i + 1]
+                var p = start
+                while (p < end) {
+                    if (transitions[p] == qPrev && transitions[p + 1] == symbol) {
+                        qPrev = transitions[p + 2]; break
+                    }
+                    p += recordStride
+                }
+            }
+            val curLast = state.assignment.intValue(seq[last])
+            val d = state.problem.intDomains[seq[last]]
+            val start = layerStarts[last]; val end = layerStarts[last + 1]
+            var p = start
+            while (p < end) {
+                if (transitions[p] == qPrev) {
+                    val sym = transitions[p + 1]
+                    val dst = transitions[p + 2]
+                    if (sym != curLast && sym in d && accepting.any { it == dst }) {
+                        sink.addIntSet(seq[last], sym)
+                    }
+                }
+                p += recordStride
+            }
+        }
+    }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.composeIntVarAtomAntecedents(intVars)

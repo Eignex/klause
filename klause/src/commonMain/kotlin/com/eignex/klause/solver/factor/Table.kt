@@ -77,6 +77,40 @@ class Table(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Repair via per-tuple-support: find the tuple closest (by Hamming distance) to the
+     *  current assignment, then propose IntSet moves that bring `xs` toward each matching
+     *  column in that tuple. Caps proposals at the top-2 closest tuples to keep the
+     *  candidate set focused while still giving strategies multiple repair directions. */
+    override fun proposeRepairMoves(
+        state: com.eignex.klause.solver.localsearch.LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        // Score each tuple by Hamming distance to the current assignment.
+        data class Scored(val row: Int, val distance: Int)
+        val scored = ArrayList<Scored>(numTuples)
+        for (row in 0 until numTuples) {
+            var dist = 0
+            for (col in 0 until arity) {
+                if (state.assignment.intValue(xs[col]) != tuples[row * arity + col]) dist++
+            }
+            scored.add(Scored(row, dist))
+        }
+        scored.sortBy { it.distance }
+        val topK = minOf(2, scored.size)
+        for (k in 0 until topK) {
+            val row = scored[k].row
+            for (col in 0 until arity) {
+                val target = tuples[row * arity + col]
+                val cur = state.assignment.intValue(xs[col])
+                if (target != cur && target in state.problem.intDomains[xs[col]]) {
+                    sink.addIntSet(xs[col], target)
+                }
+            }
+        }
+    }
+
     /** Hole-aware conflict reason — cites every post-bake domain hole and bound shift
      *  across [xs], matching the per-prune antecedent set used in [propagate]. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
