@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -180,6 +181,55 @@ class NValue(
      *
      * Stronger inference (Hall-style under [Mode.AtMost]) lands in the next propagation pass.
      */
+    /** Distinct-count repair: snap `n` to current `distinctCount`, plus per-mode moves
+     *  that nudge the distinct count in the right direction. To increase distinctCount,
+     *  pick an xs[i] in a high-occurrence value class and shift it to a value currently
+     *  uncovered (in its domain). To decrease, shift it to an already-covered value. */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as State
+        val nv = state.assignment.intValue(n)
+        // Snap n to the current distinct count when the mode would be satisfied by it.
+        val nDom = state.problem.intDomains[n]
+        if (s.distinctCount in nDom) sink.addIntSet(n, s.distinctCount)
+        val needIncrease = when (mode) {
+            Mode.Eq -> nv > s.distinctCount
+            Mode.AtLeast -> true   // nv > distinct → must raise distinct
+            Mode.AtMost -> false
+        }
+        val needDecrease = when (mode) {
+            Mode.Eq -> nv < s.distinctCount
+            Mode.AtLeast -> false
+            Mode.AtMost -> true
+        }
+        if (!needIncrease && !needDecrease) return
+        if (needIncrease) {
+            // Pick xs[i] in a duplicate value class (count > 1) and move it to an uncovered
+            // value in its domain.
+            for (i in xs.indices) {
+                if (!present(state, i)) continue
+                val cur = state.assignment.intValue(xs[i])
+                if ((s.counts[cur] ?: 0) <= 1) continue
+                val d = state.problem.intDomains[xs[i]]
+                var pick: Int? = null
+                d.forEach { if (pick == null && it != cur && (s.counts[it] ?: 0) == 0) pick = it }
+                if (pick != null) sink.addIntSet(xs[i], pick!!)
+            }
+        }
+        if (needDecrease) {
+            // Pick xs[i] whose value is currently unique, move it to a covered value.
+            for (i in xs.indices) {
+                if (!present(state, i)) continue
+                val cur = state.assignment.intValue(xs[i])
+                if ((s.counts[cur] ?: 0) > 1) continue
+                val d = state.problem.intDomains[xs[i]]
+                var pick: Int? = null
+                d.forEach { if (pick == null && it != cur && (s.counts[it] ?: 0) > 0) pick = it }
+                if (pick != null) sink.addIntSet(xs[i], pick!!)
+            }
+        }
+    }
+
     /** Reason on conflict: bound atoms of every participating var. NValue tightens
      *  only the count var `n`; conflicts are implied by the current bound facts. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =

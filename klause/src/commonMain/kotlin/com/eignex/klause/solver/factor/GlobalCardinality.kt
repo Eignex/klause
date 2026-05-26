@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
@@ -537,6 +538,73 @@ class GlobalCardinality(
                             if (lowlink[v] < lowlink[parent]) lowlink[parent] = lowlink[v]
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /** Repair moves: for each cover index `k` whose count violates the constraint, push it
+     *  toward the target band. With [countVars], also snap each countVars[k] to the current
+     *  count. For [closed]=true, drag any out-of-cover xs[i] into the cover. */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as State
+        // 1. Snap countVars to current count when they disagree.
+        if (countVars != null) {
+            for (k in cover.indices) {
+                val cv = countVars[k]
+                val cur = state.assignment.intValue(cv)
+                if (cur != s.counts[k] && s.counts[k] in state.problem.intDomains[cv]) {
+                    sink.addIntSet(cv, s.counts[k])
+                }
+            }
+        }
+        // 2. For each violating cover index, propose moves to push count toward target.
+        for (k in cover.indices) {
+            val coverVal = cover[k]
+            val cnt = s.counts[k]
+            val target: Int
+            val needIncrease: Boolean
+            if (countVars != null) {
+                target = state.assignment.intValue(countVars[k])
+                if (cnt == target) continue
+                needIncrease = cnt < target
+            } else {
+                if (cnt in countLow!![k]..countHigh!![k]) continue
+                needIncrease = cnt < countLow[k]
+                target = if (needIncrease) countLow[k] else countHigh[k]
+            }
+            if (needIncrease) {
+                // Pick xs[i] currently NOT at coverVal whose domain contains it; switch.
+                for (i in xs.indices) {
+                    if (!present(state, i)) continue
+                    val cur = state.assignment.intValue(xs[i])
+                    if (cur != coverVal && coverVal in state.problem.intDomains[xs[i]]) {
+                        sink.addIntSet(xs[i], coverVal)
+                    }
+                }
+            } else {
+                // Pick xs[i] currently AT coverVal; move it to a non-coverVal in its domain.
+                for (i in xs.indices) {
+                    if (!present(state, i)) continue
+                    val cur = state.assignment.intValue(xs[i])
+                    if (cur != coverVal) continue
+                    val d = state.problem.intDomains[xs[i]]
+                    var pick: Int? = null
+                    d.forEach { if (pick == null && it != coverVal) pick = it }
+                    if (pick != null) sink.addIntSet(xs[i], pick!!)
+                }
+            }
+        }
+        // 3. Closed mode: drag out-of-cover xs[i] into the cover.
+        if (closed) {
+            for (i in xs.indices) {
+                if (!present(state, i)) continue
+                val cur = state.assignment.intValue(xs[i])
+                if (cur in coverIndexByValue) continue
+                val d = state.problem.intDomains[xs[i]]
+                for (cv in cover) {
+                    if (cv in d && cv != cur) { sink.addIntSet(xs[i], cv); break }
                 }
             }
         }

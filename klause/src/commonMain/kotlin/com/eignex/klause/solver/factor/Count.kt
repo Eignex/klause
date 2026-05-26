@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -176,6 +177,58 @@ class Count(
         Op.Lt -> d.max < v
         Op.Ge -> d.min >= v
         Op.Gt -> d.min > v
+    }
+
+    /** Three concurrent repair directions for a violated count:
+     *  (a) snap `n` to the current count (the cheapest direction when `n` is unconstrained),
+     *  (b) flip matching xs[i] off the predicate (when count > n),
+     *  (c) flip non-matching xs[i] onto the predicate (when count < n).
+     *  For (b)/(c) we propose the closest-in-domain value that flips the match outcome. */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as State
+        val cur = s.count
+        val nv = state.assignment.intValue(n)
+        // (a) Snap n to the current count.
+        if (cur in state.problem.intDomains[n]) sink.addIntSet(n, cur)
+        if (nv == cur) return  // already satisfied (shouldn't happen given violation)
+        val needIncrease = cur < nv   // need more matches
+        val needDecrease = cur > nv
+        for (i in xs.indices) {
+            if (!present(state, i)) continue
+            val xi = xs[i]
+            val d = state.problem.intDomains[xi]
+            val curX = state.assignment.intValue(xi)
+            val isMatch = matches(curX)
+            if (isMatch && needDecrease) {
+                // Find any in-domain value that doesn't match (op-specific).
+                val target = pickNonMatching(d, curX) ?: continue
+                if (target != curX) sink.addIntSet(xi, target)
+            } else if (!isMatch && needIncrease) {
+                val target = pickMatching(d, curX) ?: continue
+                if (target != curX) sink.addIntSet(xi, target)
+            }
+        }
+    }
+
+    /** Pick an in-domain value that matches the predicate; returns null if impossible. */
+    private fun pickMatching(d: com.eignex.klause.solver.IntDomain, avoid: Int): Int? = when (op) {
+        Op.Eq -> if (v in d && v != avoid) v else null
+        Op.Ne -> { var pick: Int? = null; d.forEach { if (it != v && it != avoid && pick == null) pick = it }; pick }
+        Op.Le -> if (d.min <= v) d.min.takeIf { it != avoid } ?: d.min else null
+        Op.Lt -> if (d.min < v) d.min.takeIf { it != avoid } ?: d.min else null
+        Op.Ge -> if (d.max >= v) d.max.takeIf { it != avoid } ?: d.max else null
+        Op.Gt -> if (d.max > v) d.max.takeIf { it != avoid } ?: d.max else null
+    }
+
+    /** Pick an in-domain value that does NOT match the predicate; returns null if impossible. */
+    private fun pickNonMatching(d: com.eignex.klause.solver.IntDomain, avoid: Int): Int? = when (op) {
+        Op.Eq -> { var pick: Int? = null; d.forEach { if (it != v && it != avoid && pick == null) pick = it }; pick }
+        Op.Ne -> if (v in d && v != avoid) v else null
+        Op.Le -> if (d.max > v) d.max.takeIf { it != avoid } ?: d.max else null
+        Op.Lt -> if (d.max >= v) d.max.takeIf { it != avoid } ?: d.max else null
+        Op.Ge -> if (d.min < v) d.min.takeIf { it != avoid } ?: d.min else null
+        Op.Gt -> if (d.min <= v) d.min.takeIf { it != avoid } ?: d.min else null
     }
 
     private fun domainAnyMatches(d: com.eignex.klause.solver.IntDomain): Boolean = when (op) {

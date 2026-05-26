@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -41,6 +42,29 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+
+    /** Pick the most common current value across [xs] (mode) as the consensus target;
+     *  for every dissenting var whose domain contains the target, propose snapping to it.
+     *  Falls back to the secondary mode if the primary target is out of some domains. */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!isViolated(state, factorId)) return
+        val counts = HashMap<Int, Int>(xs.size)
+        for (v in xs) {
+            val cur = state.assignment.intValue(v)
+            counts[cur] = (counts[cur] ?: 0) + 1
+        }
+        // Try the top-2 most-frequent values; if first is rejected by some domain, the
+        // second often succeeds. Keeps the proposal-set small.
+        val ranked = counts.entries.sortedByDescending { it.value }
+        for ((target, _) in ranked.take(2)) {
+            for (v in xs) {
+                val cur = state.assignment.intValue(v)
+                if (cur != target && target in state.problem.intDomains[v]) {
+                    sink.addIntSet(v, target)
+                }
+            }
+        }
+    }
 
     /** Bound-only conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =

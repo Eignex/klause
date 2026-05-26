@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -150,5 +151,34 @@ class Sequence(
             if (possible < low) return false
         }
         return true
+    }
+
+    /** For each violated window, propose flips of in-window xs[j] that move the window
+     *  count toward `[low, high]`. Below-low windows want a non-match → match flip;
+     *  above-high windows want a match → non-match flip. */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val s = state.refPayload[factorId] as State
+        for (w in 0 until windowCount) {
+            val c = s.windowCounts[w]
+            if (c in low..high) continue
+            val needIncrease = c < low
+            for (j in 0 until k) {
+                val xi = xs[w + j]
+                val d = state.problem.intDomains[xi]
+                val cur = state.assignment.intValue(xi)
+                val isMatch = matches(cur)
+                if (isMatch && !needIncrease) {
+                    // Pick any in-domain non-matching value.
+                    var pick: Int? = null
+                    d.forEach { if (pick == null && it != cur && !matches(it)) pick = it }
+                    if (pick != null) sink.addIntSet(xi, pick!!)
+                } else if (!isMatch && needIncrease) {
+                    // Pick a matching value from the set.
+                    var pick: Int? = null
+                    for (vv in values) if (vv in d && vv != cur) { pick = vv; break }
+                    if (pick != null) sink.addIntSet(xi, pick!!)
+                }
+            }
+        }
     }
 }

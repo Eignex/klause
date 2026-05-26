@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
@@ -47,6 +48,30 @@ class Member(
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+
+    /** Propose either snapping `y` to one of the `xs[i]` values (if the domain allows),
+     *  or snapping an `xs[i]` to `y`'s current value. Both directions resolve the
+     *  violation, and the strategy can pick the cheaper one. */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!isViolated(state, factorId)) return
+        val yv = state.assignment.intValue(y)
+        val dy = state.problem.intDomains[y]
+        // Direction 1: snap y to an existing xs[i] value.
+        val seen = HashSet<Int>()
+        for (x in xs) {
+            val xv = state.assignment.intValue(x)
+            if (seen.add(xv) && xv != yv && xv in dy) {
+                sink.addIntSet(y, xv)
+            }
+        }
+        // Direction 2: snap some xs[i] to yv if its domain allows.
+        for (x in xs) {
+            val xv = state.assignment.intValue(x)
+            if (xv != yv && yv in state.problem.intDomains[x]) {
+                sink.addIntSet(x, yv)
+            }
+        }
+    }
 
     /** Hole-aware conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =

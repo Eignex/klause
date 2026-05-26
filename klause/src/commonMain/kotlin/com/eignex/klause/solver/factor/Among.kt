@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -89,6 +90,35 @@ class Among(
         }
         val nowViolated = state.assignment.intValue(n) != s.count
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    /** Snap `n` to the running count, and propose flips of dissenting xs[i] toward / away
+     *  from the value set [values]. When count differs from `n` by more than 1, multiple
+     *  xs[i] candidates ride alongside the n-snap so a strategy can chain them. */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as State
+        val cur = s.count
+        val nv = state.assignment.intValue(n)
+        if (cur in state.problem.intDomains[n]) sink.addIntSet(n, cur)
+        if (nv == cur) return
+        val needIncrease = cur < nv
+        for (x in xs) {
+            val d = state.problem.intDomains[x]
+            val curX = state.assignment.intValue(x)
+            val isMatch = matches(curX)
+            if (isMatch && !needIncrease) {
+                // Pick any in-domain non-matching value.
+                var pick: Int? = null
+                d.forEach { if (pick == null && it != curX && !matches(it)) pick = it }
+                if (pick != null) sink.addIntSet(x, pick!!)
+            } else if (!isMatch && needIncrease) {
+                // Pick the closest in-domain matching value.
+                var pick: Int? = null
+                for (vv in values) if (vv in d && vv != curX) { pick = vv; break }
+                if (pick != null) sink.addIntSet(x, pick!!)
+            }
+        }
     }
 
     /** Bound-only conflict reason: cite bound atoms of every participating var. */
