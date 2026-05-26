@@ -223,4 +223,31 @@ class ReifiedLinear(
             state.boolBreakCount[auxBoolVar]++
         }
     }
+
+    override val maintainsIntBreakMakeIncrementallyForIntSet: Boolean get() = true
+
+    /** Aux's break/make contribution depends only on `holds(sum)` and `aux`. An int set
+     *  may flip `holds`, in which case the aux's contribution swaps; otherwise no change. */
+    override fun updateIntBreakMakeForIntSet(
+        state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int,
+    ) {
+        val newSum = state.intPayload[factorId]
+        val coeff = coeffOf(intVar)
+        val newValue = state.assignment.intValue(intVar)
+        val oldSum = newSum - coeff * (newValue - oldValue)
+        val oldHolds = holds(oldSum)
+        val newHolds = holds(newSum)
+        if (oldHolds == newHolds) return  // aux contribution unchanged
+        val aux = state.assignment.boolValue(auxBoolVar)
+        val oldViolated = aux != oldHolds
+        val newViolated = aux != newHolds
+        // oldViolated != newViolated, so the aux's contribution swaps break↔make.
+        if (newViolated) {
+            state.boolBreakCount[auxBoolVar]--
+            state.boolMakeCount[auxBoolVar]++
+        } else {
+            state.boolMakeCount[auxBoolVar]--
+            state.boolBreakCount[auxBoolVar]++
+        }
+    }
 }

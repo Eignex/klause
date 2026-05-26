@@ -210,10 +210,6 @@ Use cases:
 
 Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [LS] updateIntBreakMakeForIntSet hook framework mirroring the bool path.
-- [LS] Convert Linear, BinPacking, Knapsack to incremental updateIntBreakMakeForIntSet.
-- [LS] Convert GlobalCardinality, AllDifferent family, AllEqual to incremental updateIntBreakMakeForIntSet.
-- [LS] Convert Among, Count, NValue, Member, Inverse, Monotone, Sequence to incremental updateIntBreakMakeForIntSet.
 - [LS] Problem-aware moves for cumulative (resource-feasibility-preserving swaps and shifts).
 - [LS] Problem-aware moves for lexLeq / lexLt (lex-preserving swap neighbourhood).
 - [LS] Problem-aware moves for reified factors (toggle-driven sub-region exploration).

@@ -335,9 +335,11 @@ class LocalSearchState(
         if (old == newValue) return
         val touchedFactors = problem.intOccurrences[intVar]
         // Phase 1: subtract bool break/make contributions for every bool var in every
-        // touched factor — the int change shifts their per-var deltas.
+        // touched factor — the int change shifts their per-var deltas. Incremental
+        // factors skip this and apply a single diff in phase 3.
         for (factorId in touchedFactors) {
             val f = factors[factorId]
+            if (f.maintainsIntBreakMakeIncrementallyForIntSet) continue
             for (w in f.boolVars) {
                 val d = f.deltaIfBoolFlipped(this, factorId, w)
                 if (d > 0) boolBreakCount[w]--
@@ -351,10 +353,14 @@ class LocalSearchState(
         }
         for (factorId in touchedFactors) {
             val f = factors[factorId]
-            for (w in f.boolVars) {
-                val d = f.deltaIfBoolFlipped(this, factorId, w)
-                if (d > 0) boolBreakCount[w]++
-                else if (d < 0) boolMakeCount[w]++
+            if (f.maintainsIntBreakMakeIncrementallyForIntSet) {
+                f.updateIntBreakMakeForIntSet(this, factorId, intVar, old)
+            } else {
+                for (w in f.boolVars) {
+                    val d = f.deltaIfBoolFlipped(this, factorId, w)
+                    if (d > 0) boolBreakCount[w]++
+                    else if (d < 0) boolMakeCount[w]++
+                }
             }
         }
         markNeighborConfChange(touchedFactors)

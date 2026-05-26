@@ -196,6 +196,41 @@ class IncrementalBreakMakeTest {
     }
 
     @Test
+    fun `reified linear LE stays consistent across int sets`() {
+        val factor = ReifiedLinear(
+            auxBoolVar = 0,
+            coeffs = intArrayOf(2, 3, 1),
+            vars = intArrayOf(0, 1, 2),
+            op = LinearOp.LE, bound = 10,
+        )
+        val intDomains = Array(3) { com.eignex.klause.solver.IntDomain(0, 5) }
+        val problem = Problem(1, 3, intDomains, listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (i in 0 until 3) state.assignment.setInt(i, i + 1)
+        state.recompute()
+        // Sweep each int var across its domain via the engine and verify break/make
+        // tracks the brute-force result after every step.
+        for (round in 0 until 10) {
+            val v = round % 3
+            val cur = state.assignment.intValue(v)
+            val target = (cur + 1) % 6
+            if (cur == target) continue
+            state.apply(com.eignex.klause.solver.Move.IntSet(v, target))
+            val incBreak = state.boolBreakCountSnapshot()
+            val incMake = state.boolMakeCountSnapshot()
+            state.recompute()
+            assertEquals(
+                incBreak.toList(), state.boolBreakCountSnapshot().toList(),
+                "boolBreakCount mismatch after IntSet(v=$v, target=$target)",
+            )
+            assertEquals(
+                incMake.toList(), state.boolMakeCountSnapshot().toList(),
+                "boolMakeCount mismatch after IntSet(v=$v, target=$target)",
+            )
+        }
+    }
+
+    @Test
     fun `reified linear LE stays consistent across aux flips`() {
         // boolVars = [aux]; int vars are 0..2 with domains [0, 5].
         val factor = ReifiedLinear(

@@ -68,4 +68,22 @@ interface LocalSearchFactor : Factor {
      *  Only invoked when [maintainsBreakMakeIncrementally] is true. Net adjustment must
      *  equal the brute-force "subtract pre-flip per-var deltas, add post-flip" pattern. */
     fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {}
+
+    /** Mirror of [maintainsBreakMakeIncrementally] for the int-set path. When `true`, the
+     *  LS engine skips its brute-force [boolVars] walk after an [intVar] is set and calls
+     *  [updateIntBreakMakeForIntSet] instead. Factors whose [deltaIfBoolFlipped] doesn't
+     *  depend on int values (e.g. pure Boolean constraints with no [intVars]) get no
+     *  benefit from setting this flag — the engine already short-circuits when [intVars]
+     *  is empty via [Problem.intOccurrences]. */
+    val maintainsIntBreakMakeIncrementallyForIntSet: Boolean get() = false
+
+    /** Adjust [LocalSearchState.boolBreakCount] / [LocalSearchState.boolMakeCount] after
+     *  [intVar] has been set from [oldValue] to its new value (read via
+     *  `state.assignment.intValue(intVar)`). Called *after* the assignment is updated and
+     *  after this factor's own [applyIntSet] has run. Only invoked when
+     *  [maintainsIntBreakMakeIncrementallyForIntSet] is true. Net adjustment must equal
+     *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
+    fun updateIntBreakMakeForIntSet(
+        state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int,
+    ) {}
 }
