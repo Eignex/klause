@@ -210,7 +210,6 @@ Use cases:
 
 Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [LS] Richer VNS: per-level neighbourhood operators and skewed-VNS acceptance.
 - [LS] ILS: basin-hopping perturbation kick.
 - [LS] ILS: linkage-aware crossover.
 - [LS] ALNS: cumulative time-window destroy operators.

@@ -21,22 +21,37 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * at the current level. The two have orthogonal stagnation-avoidance strategies and are
  * typically composed in classical VNS frameworks (shake + VND).
  */
+/** Per-level neighbourhood operator. Returns a candidate move list for level [k]
+ *  (1-indexed). Used by [Vnd] to override the default size-k Compound generation with
+ *  a problem-specific operator (e.g. swap-pair at level 2, hot-spot at level 3). */
+typealias VndLevelOperator = (state: LocalSearchState, k: Int, candidatesPerLevel: Int) -> List<Move>
+
 class Vnd(
     val maxNeighborhood: Int = 3,
     val candidatesPerLevel: Int = 4,
     val noise: Double = 0.05,
     val tabu: TabuFilter = TabuFilter(tenure = 10),
+    /** Skewed-VNS acceptance parameter (Hansen et al. 2010). When non-zero, the
+     *  acceptance test becomes `netDelta + skewAlpha * distance < 0` where `distance`
+     *  is the size of the move (1 for primitives, parts.size for Compound). Lets the
+     *  descent accept slightly-worsening moves whose locality penalty is small —
+     *  classical mechanism for escaping plateau lakes. Set to 0 for strict descent. */
+    val skewAlpha: Double = 0.0,
+    /** Optional per-level operator overrides. Index `i` overrides the candidate
+     *  generator for level `i + 1`. Entries past the list size fall back to the
+     *  default size-k Compound generator. */
+    val levelOperators: List<VndLevelOperator> = emptyList(),
 ) : Strategy {
 
     init {
         require(maxNeighborhood >= 1) { "maxNeighborhood must be ≥ 1" }
         require(candidatesPerLevel > 0) { "candidatesPerLevel must be > 0" }
         require(noise in 0.0..1.0) { "noise must be in [0, 1]" }
+        require(skewAlpha >= 0.0) { "skewAlpha must be ≥ 0" }
     }
 
     override fun pickMove(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
-        // Try levels 1..maxNeighborhood in order; return the first improving move found.
         for (k in 1..maxNeighborhood) {
             val candidates = generateCandidates(state, k)
             if (candidates.isEmpty()) continue
@@ -45,21 +60,37 @@ class Vnd(
             var bestImp: Move? = null
             var bestImpScore = Double.POSITIVE_INFINITY
             for (m in filtered) {
-                if (state.netDelta(m) < 0) {
+                if (skewedImproves(state, m)) {
                     val s = state.shapedBreakScore(m)
                     if (s < bestImpScore) { bestImpScore = s; bestImp = m }
                 }
             }
             if (bestImp != null) return bestImp
         }
-        // No improving move at any level. Plateau-escape: pick at level 1.
         val plateau = tabu.filter(state, generateCandidates(state, 1))
         if (plateau.isEmpty()) return null
         if (state.rng.nextDouble() < noise) return plateau[state.rng.nextInt(plateau.size)]
         return state.greedyPickByShapedBreak(plateau)
     }
 
+    /** Strict descent when [skewAlpha] is 0; otherwise skewed acceptance treats moves
+     *  with small spatial reach as effectively improving. */
+    private fun skewedImproves(state: LocalSearchState, m: Move): Boolean {
+        val delta = state.netDelta(m)
+        if (skewAlpha == 0.0) return delta < 0
+        val size = when (m) {
+            is Move.BoolFlip, is Move.IntSet -> 1
+            is Move.Compound -> m.parts.size
+        }
+        return delta + skewAlpha * size < 0
+    }
+
     private fun generateCandidates(state: LocalSearchState, k: Int): List<Move> {
+        // Per-level operator override.
+        val opIdx = k - 1
+        if (opIdx < levelOperators.size) {
+            return levelOperators[opIdx](state, k, candidatesPerLevel)
+        }
         if (k == 1) {
             val factorId = state.violated.random(state.rng)
             state.moveSink.clear()
