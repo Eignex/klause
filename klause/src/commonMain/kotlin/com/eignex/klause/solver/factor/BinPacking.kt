@@ -168,4 +168,63 @@ class BinPacking(
         }
         return true
     }
+
+    /** Repair: for each overloaded bin, propose moving its heaviest item to the bin with
+     *  the most slack. Under [Mode.LoadVars] also snap loadVars to current loads. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as State
+        if (mode == Mode.LoadVars) {
+            for (k in 0 until numBins) {
+                val lv = loadVars!![k]
+                val cur = state.assignment.intValue(lv)
+                if (cur != s.loads[k] && s.loads[k] in state.problem.intDomains[lv]) {
+                    sink.addIntSet(lv, s.loads[k])
+                }
+            }
+        }
+        // Identify overloaded and underloaded bins.
+        for (b in 0 until numBins) {
+            val cap = when (mode) {
+                Mode.UniformCapacity -> uniformCapacity
+                Mode.PerBinCapacity -> capacities!![b]
+                Mode.LoadVars -> Int.MAX_VALUE  // load-var mode doesn't enforce capacity here
+            }
+            if (s.loads[b] <= cap) continue
+            // Find the heaviest item in this bin.
+            var heaviestI = -1
+            var heaviestW = -1
+            for (i in bins.indices) {
+                val itemBin = state.assignment.intValue(bins[i]) - binOffset
+                if (itemBin != b) continue
+                if (weights[i] > heaviestW) { heaviestW = weights[i]; heaviestI = i }
+            }
+            if (heaviestI < 0) continue
+            // Pick the bin with most slack as the relocation target.
+            var bestBin = -1
+            var bestSlack = Int.MIN_VALUE
+            for (k in 0 until numBins) {
+                if (k == b) continue
+                val capK = when (mode) {
+                    Mode.UniformCapacity -> uniformCapacity
+                    Mode.PerBinCapacity -> capacities!![k]
+                    Mode.LoadVars -> Int.MAX_VALUE
+                }
+                val slack = capK - s.loads[k]
+                if (slack >= weights[heaviestI] && slack > bestSlack) {
+                    bestSlack = slack; bestBin = k
+                }
+            }
+            if (bestBin >= 0) {
+                val target = bestBin + binOffset
+                if (target in state.problem.intDomains[bins[heaviestI]]) {
+                    sink.addIntSet(bins[heaviestI], target)
+                }
+            }
+        }
+    }
 }

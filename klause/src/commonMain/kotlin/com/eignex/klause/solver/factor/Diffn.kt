@@ -192,4 +192,36 @@ class Diffn(
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
+    /** Repair: for each overlapping pair, propose shifting one rectangle so they no
+     *  longer overlap on x or y. Picks the move with the smallest shift among the four
+     *  candidate axes/directions. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        val n = xs.size
+        for (i in 0 until n) {
+            val xi = state.assignment.intValue(xs[i])
+            val yi = state.assignment.intValue(ys[i])
+            for (j in i + 1 until n) {
+                val xj = state.assignment.intValue(xs[j])
+                val yj = state.assignment.intValue(ys[j])
+                if (!overlaps(xi, yi, widths[i], heights[i], xj, yj, widths[j], heights[j])) continue
+                // Four directions: shift i left, i right, i down, i up — to escape overlap with j.
+                val dxs = state.problem.intDomains[xs[i]]
+                val dys = state.problem.intDomains[ys[i]]
+                val leftI = xj - widths[i]  // xs[i] + w_i <= xj  →  xs[i] <= xj - w_i
+                val rightI = xj + widths[j]  // xs[i] >= xj + w_j
+                val downI = yj - heights[i]
+                val upI = yj + heights[j]
+                if (leftI in dxs && leftI != xi) sink.addIntSet(xs[i], leftI)
+                if (rightI in dxs && rightI != xi) sink.addIntSet(xs[i], rightI)
+                if (downI in dys && downI != yi) sink.addIntSet(ys[i], downI)
+                if (upI in dys && upI != yi) sink.addIntSet(ys[i], upI)
+            }
+        }
+    }
 }

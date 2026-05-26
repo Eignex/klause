@@ -70,6 +70,36 @@ class Knapsack(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
+    /** Repair: snap `w` / `p` to the current totals; if w/p are pinned and the totals
+     *  diverge, propose flipping a high-leverage xs[i] in the direction that closes the gap. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as State
+        val wDom = state.problem.intDomains[w]
+        if (s.currentWeight in wDom) sink.addIntSet(w, s.currentWeight)
+        val pDom = state.problem.intDomains[p]
+        if (s.currentProfit in pDom) sink.addIntSet(p, s.currentProfit)
+        // For each xs[i], if w-var requires lower weight, propose decreasing xs[i] when
+        // weights[i] > 0; symmetric for profit.
+        val wTarget = state.assignment.intValue(w)
+        val wGap = wTarget - s.currentWeight  // positive: need more weight
+        if (wGap != 0) {
+            for (i in xs.indices) {
+                if (weights[i] == 0) continue
+                val xi = xs[i]
+                val cur = state.assignment.intValue(xi)
+                val d = state.problem.intDomains[xi]
+                val wantIncrease = (weights[i] > 0) == (wGap > 0)
+                val candidate = if (wantIncrease) cur + 1 else cur - 1
+                if (candidate in d) sink.addIntSet(xi, candidate)
+            }
+        }
+    }
+
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
