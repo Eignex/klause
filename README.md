@@ -215,10 +215,8 @@ Grouped by workstream. CP covers the complete-search engine and propagators; LS 
 - [CP] MDD upgrade: trail-based incremental forward/backward support-count maintenance. The Mdd factor today does a full reachability sweep on every fire — strong filtering but O(layers·transitions) per propagator call.
 - [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
 - [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
-- [CP] Core-guided optimization: upgrade Unsat.conflictFactors to extract multi-factor cores from the propagation trail.
-- [CP] Core-guided optimization: assumption-based satisfy API (incremental unsat under hypotheses).
-- [CP] Core-guided optimization: OLL outer loop (unweighted MaxSAT, relax cores with cardinality constraints).
-- [CP] Core-guided optimization: RC2 weight handling for weighted MaxSAT and stratified weights.
+- [CP] Core-guided optimization: totalizer-based OLL with incremental threshold bumping (the current `CoreGuidedOptimizer` is Fu-Malik / RC2-style with per-core ExactlyOne cardinalities; totalizer encoding would compress per-core blocker state into a single shared counter, cutting bake cost across cores).
+- [CP] Assumption-resolution for cores under deep DFS: when a conflict surfaces after seed succeeded (vs. at seed time), surface a strict-subset assumption core via 1UIP analysis over the learned-clause antecedents rather than returning the full input set conservatively.
 - [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.
 - [LS] Incremental updateBoolBreakMakeForFlip for Cardinality, PseudoBoolean, Xor.
 - [LS] Extend incremental updateBoolBreakMakeForFlip to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.
