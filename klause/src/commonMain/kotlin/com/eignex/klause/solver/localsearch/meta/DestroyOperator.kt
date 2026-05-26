@@ -165,6 +165,51 @@ fun interface DestroyOperator {
          *  a [LocalSearchSession] that accumulates recency). */
         val Defaults: List<DestroyOperator> = listOf(Random, WorstObjective, AdjacencyRelated)
 
+        /** Free every int var whose current value lies in a randomly-chosen contiguous
+         *  window `[t, t + windowSize)`. Targets scheduling-style problems (Cumulative,
+         *  Disjunctive, Sequence): tasks sharing a temporal slice get re-optimised
+         *  together, exposing peak-overlap repairs that uniform random destroy misses.
+         *  The window is sampled across the union of all int-var value ranges; vars
+         *  outside the window stay pinned. Bool vars in the incumbent are always pinned. */
+        fun timeWindow(windowSize: Int): DestroyOperator = DestroyOperator { rng, problem, incumbent, _, fraction ->
+            require(windowSize > 0) { "windowSize must be > 0, got $windowSize" }
+            val n = problem.numIntVars
+            if (n == 0) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            // Pick the window start uniformly across the smallest..largest int var domain.
+            var globalLo = Int.MAX_VALUE
+            var globalHi = Int.MIN_VALUE
+            for (i in 0 until n) {
+                val d = problem.intDomains[i]
+                if (d.min < globalLo) globalLo = d.min
+                if (d.max > globalHi) globalHi = d.max
+            }
+            if (globalLo > globalHi) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            val span = globalHi - globalLo + 1
+            val start = if (span <= windowSize) globalLo
+                        else globalLo + rng.nextInt(span - windowSize + 1)
+            val end = start + windowSize  // exclusive
+            // Collect int vars whose current value lies in [start, end).
+            val inWindow = com.eignex.klause.util.IntArrayList()
+            for (i in 0 until n) {
+                val v = incumbent.ints[i]
+                if (v in start until end) inWindow.add(i)
+            }
+            // If the window picked an empty slice, fall back to a uniform random pick over
+            // int vars only (the time-window operator targets int-typed schedule positions).
+            if (inWindow.size == 0) {
+                val cap = ((problem.numBoolVars + n) * fraction).toInt().coerceIn(1, n)
+                val all = IntArray(n) { it }.also { it.shuffle(rng) }
+                val ints = IntArray(cap) { all[it] }
+                return@DestroyOperator FreedVars(IntArray(0), ints)
+            }
+            // Honour `fraction` as a cap on how many of the in-window vars to free.
+            val cap = ((problem.numBoolVars + n) * fraction).toInt().coerceAtLeast(1)
+            val take = minOf(cap, inWindow.size)
+            val idxs = IntArray(inWindow.size) { it }.also { it.shuffle(rng) }
+            val ints = IntArray(take) { inWindow[idxs[it]] }
+            FreedVars(IntArray(0), ints)
+        }
+
         private fun split(ids: List<Int>, numBoolVars: Int): FreedVars {
             val bools = mutableListOf<Int>()
             val ints = mutableListOf<Int>()

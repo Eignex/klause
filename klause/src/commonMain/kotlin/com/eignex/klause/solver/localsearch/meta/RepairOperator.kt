@@ -142,3 +142,123 @@ class GreedyConstructionRepair(
 
     override fun toString(): String = "GreedyConstructionRepair(cap=$intDomainSampleCap)"
 }
+
+/**
+ * Regret-based repair (Potvin & Rousseau 1993, adapted to CP/LS). For each freed integer
+ * variable, compute the *regret* — the gap between the cost of its best feasible value and
+ * its second-best. Assign variables in descending regret order: vars with large regret
+ * are critical (the wrong choice costs a lot) and should be locked in first; small-regret
+ * vars are flexible and slot in later. Booleans assign by best-flip score in arbitrary
+ * order — regret is a continuous-domain heuristic.
+ *
+ * Compared to [GreedyConstructionRepair] (which orders freed vars by shuffle), regret
+ * uses problem-aware ordering. On scheduling / packing problems where each var's value
+ * has dramatically different costs, regret typically reaches a feasible incumbent in fewer
+ * inner LS rounds.
+ */
+class RegretRepair(
+    val intDomainSampleCap: Int = 20,
+) : RepairOperator {
+    override fun repair(context: RepairContext): Sample? {
+        val problem = context.inner.problem
+        val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.bools[b])
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.ints[i])
+        state.recompute()
+        val shaping = context.params.costShaping
+        fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
+        // Booleans: greedy single pass (regret on a 2-value domain reduces to best-flip).
+        for (b in context.freed.bools) {
+            val baseline = currentScore()
+            state.apply(Move.BoolFlip(b))
+            if (currentScore() >= baseline) state.apply(Move.BoolFlip(b))
+        }
+        // Integers: compute regret per var, sort desc, assign best value in that order.
+        data class Slot(val v: Int, val best: Int, val bestScore: Double, val regret: Double)
+        val slots = ArrayList<Slot>(context.freed.ints.size)
+        for (i in context.freed.ints) {
+            val d = problem.intDomains[i]
+            val cur = state.assignment.intValue(i)
+            val cand: IntArray = if (d.size <= intDomainSampleCap) IntArray(d.size) { d.valueAt(it) }
+                                  else IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+            var best = cur
+            var bestScore = currentScore()
+            var second = Double.POSITIVE_INFINITY
+            for (v in cand) {
+                if (v == cur) continue
+                state.apply(Move.IntSet(i, v))
+                val s = currentScore()
+                if (s < bestScore) { second = bestScore; bestScore = s; best = v }
+                else if (s < second) second = s
+                state.apply(Move.IntSet(i, cur))
+            }
+            val regret = if (second == Double.POSITIVE_INFINITY) 0.0 else second - bestScore
+            slots.add(Slot(i, best, bestScore, regret))
+        }
+        slots.sortByDescending { it.regret }
+        for (slot in slots) {
+            val cur = state.assignment.intValue(slot.v)
+            if (cur != slot.best) state.apply(Move.IntSet(slot.v, slot.best))
+        }
+        return state.assignment.snapshot()
+    }
+
+    override fun toString(): String = "RegretRepair(cap=$intDomainSampleCap)"
+}
+
+/**
+ * Best-improving (hill-climbing) repair. Repeatedly scans every freed variable and every
+ * candidate value (sampled to [intDomainSampleCap] for large int domains) and applies the
+ * single move that *most* reduces the shaped score. Terminates when no improving move
+ * exists — i.e. a strict local optimum over the freed neighbourhood under shaped scoring.
+ *
+ * Distinguished from [InnerLsRepair] by being purely deterministic-best-improvement
+ * (no tabu, noise, or restart). Good when the freed neighbourhood is small and the
+ * objective surface near the incumbent is smooth — the bandit learns when best-improving
+ * outperforms stochastic LS.
+ */
+class BestImprovingRepair(
+    val intDomainSampleCap: Int = 20,
+    val maxIterations: Int = 100,
+) : RepairOperator {
+    override fun repair(context: RepairContext): Sample? {
+        val problem = context.inner.problem
+        val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.bools[b])
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.ints[i])
+        state.recompute()
+        val shaping = context.params.costShaping
+        fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
+        var iter = 0
+        while (iter < maxIterations) {
+            val baseline = currentScore()
+            var bestScore = baseline
+            var bestMove: Move? = null
+            for (b in context.freed.bools) {
+                state.apply(Move.BoolFlip(b))
+                val s = currentScore()
+                if (s < bestScore) { bestScore = s; bestMove = Move.BoolFlip(b) }
+                state.apply(Move.BoolFlip(b))
+            }
+            for (i in context.freed.ints) {
+                val d = problem.intDomains[i]
+                val cur = state.assignment.intValue(i)
+                val cand: IntArray = if (d.size <= intDomainSampleCap) IntArray(d.size) { d.valueAt(it) }
+                                      else IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                for (v in cand) {
+                    if (v == cur) continue
+                    state.apply(Move.IntSet(i, v))
+                    val s = currentScore()
+                    if (s < bestScore) { bestScore = s; bestMove = Move.IntSet(i, v) }
+                    state.apply(Move.IntSet(i, cur))
+                }
+            }
+            if (bestMove == null || bestScore >= baseline) break
+            state.apply(bestMove!!)
+            iter++
+        }
+        return state.assignment.snapshot()
+    }
+
+    override fun toString(): String = "BestImprovingRepair(cap=$intDomainSampleCap, iters=$maxIterations)"
+}
