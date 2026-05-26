@@ -208,29 +208,56 @@ Use cases:
 
 ## TODO
 
-Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
+Grouped by workstream. Each bullet is sized to a single focused session.
 
-- [CP] Min-cost-flow upgrade: SSP / cost-scaling with reduced-cost arc pruning. The MinCostFlow factor today does per-node interval-arithmetic bound propagation + per-component balance conservation; the LP-relaxation cost bound and sensitivity-based arc pruning are the next tier.
-- [CP] geost upgrade: full sweep-line propagation across all dimensions with mandatory-part kernel union. The Geost factor today handles forced-single-dim cases only.
-- [CP] MDD upgrade: trail-based incremental forward/backward support-count maintenance. The Mdd factor today does a full reachability sweep on every fire — strong filtering but O(layers·transitions) per propagator call.
-- [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
-- [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
-- [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.
-- [LS] Incremental updateBoolBreakMakeForFlip for Cardinality, PseudoBoolean, Xor.
-- [LS] Extend incremental updateBoolBreakMakeForFlip to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.
-- [LS] updateIntBreakMakeForIntSet hook framework mirroring the bool path.
-- [LS] Convert Linear, BinPacking, Knapsack to incremental updateIntBreakMakeForIntSet.
-- [LS] Convert GlobalCardinality, AllDifferent family, AllEqual to incremental updateIntBreakMakeForIntSet.
-- [LS] Convert Among, Count, NValue, Member, Inverse, Monotone, Sequence to incremental updateIntBreakMakeForIntSet.
-- [LS] Problem-aware moves for cumulative (resource-feasibility-preserving swaps and shifts).
-- [LS] Problem-aware moves for lexLeq / lexLt (lex-preserving swap neighbourhood).
-- [LS] Problem-aware moves for reified factors (toggle-driven sub-region exploration).
-- [LS] Richer VNS: VND (variable neighbourhood descent) over the existing neighbourhood ladder.
-- [LS] Richer VNS: per-level neighbourhood operators and skewed-VNS acceptance.
-- [LS] ILS: basin-hopping perturbation kick.
-- [LS] ILS: linkage-aware crossover.
-- [LS] ALNS: cumulative time-window destroy operators.
-- [LS] ALNS: regret-based and best-improving repair operators.
-- [LS] Multi-core LS portfolio: worker-config factory and per-worker strategy selection.
-- [LS] Multi-core LS portfolio: best-feasible sharing across workers.
-- [LS] Multi-core LS portfolio: shared kumulant stats for a restart-level bandit.
+### CP — propagator strength
+
+- Min-cost-flow: SSP / cost-scaling with reduced-cost arc pruning. The MinCostFlow factor today does per-node interval-arithmetic bound propagation + per-component balance conservation; LP-relaxation cost bound and sensitivity-based arc pruning are the next tier.
+- geost: full sweep-line propagation across all dimensions with mandatory-part kernel union. The Geost factor today only handles forced-single-dim cases.
+- MDD: trail-based incremental forward/backward support-count maintenance. The Mdd factor today does a full reachability sweep on every fire — strong filtering but `O(layers · transitions)` per propagator call.
+
+### Backend — FactorDecomposer follow-ups
+
+The `FactorDecomposer` covers all 45 factor types end-to-end for the Z3/SMT backend; a handful of variants currently bail (return null) and require either a backend-specific path or a richer encoding:
+
+- BinPacking `LoadVars` mode: per-bin load is itself a variable, so the per-bin PB needs a variable bound. Decompose via per-load-value reified cardinality, or extend `PseudoBoolean` to accept an int-var bound.
+- Cost-MDD (`Mdd.recordStride == 4`): plain acceptance is covered; the cost-weighted variant needs Linear EQ summing transition weights along the firing path.
+- Cumulative beyond horizon = 1024: time-indexed bool encoding bails on long horizons. Replacement: pairwise-overlap encoding (precedence-aware) for medium horizons; full PB-over-tasks for tight ones.
+- Opt-aware variants of Count / NValue / Disjunctive / GlobalCardinality: `presents` non-empty falls back. Decomposition needs an "presence-gated reified eq" step.
+- Path / Tree connectivity: degree decomposition is sound but not cycle-eliminating. Full encoding needs flow or level-based sub-tour elimination.
+
+### Perf
+
+- Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
+- Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain).
+
+### LS — engine internals
+
+- Move-pool inlining: pack `BoolFlip` / `IntSet` into a Long-backed `MoveSink` lane.
+- Incremental `updateBoolBreakMakeForFlip` for Cardinality, PseudoBoolean, Xor.
+- Extend incremental `updateBoolBreakMakeForFlip` to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.
+- `updateIntBreakMakeForIntSet` hook framework mirroring the bool path.
+- Convert Linear, BinPacking, Knapsack to incremental `updateIntBreakMakeForIntSet`.
+- Convert GlobalCardinality, AllDifferent family, AllEqual to incremental `updateIntBreakMakeForIntSet`.
+- Convert Among, Count, NValue, Member, Inverse, Monotone, Sequence to incremental `updateIntBreakMakeForIntSet`.
+
+### LS — problem-aware moves
+
+- Cumulative: resource-feasibility-preserving swaps and shifts.
+- lexLeq / lexLt: lex-preserving swap neighbourhood.
+- Reified factors: toggle-driven sub-region exploration.
+
+### LS — meta-heuristics
+
+- VNS: VND (variable neighbourhood descent) over the existing neighbourhood ladder.
+- VNS: per-level neighbourhood operators and skewed-VNS acceptance.
+- ILS: basin-hopping perturbation kick.
+- ILS: linkage-aware crossover.
+- ALNS: cumulative time-window destroy operators.
+- ALNS: regret-based and best-improving repair operators.
+
+### LS — multi-core portfolio
+
+- Worker-config factory and per-worker strategy selection.
+- Best-feasible sharing across workers.
+- Shared kumulant stats for a restart-level bandit.
