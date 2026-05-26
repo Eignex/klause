@@ -224,8 +224,16 @@ class Mdd(
                 }
             }
             if (bestLo == INF) return false
-            if (!state.tightenIntMin(cost, bestLo.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), ant)) return false
-            if (!state.tightenIntMax(cost, bestHi.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt(), ant)) return false
+            // Cost var is Int-typed: if the min path cost exceeds Int.MAX_VALUE (or the max
+            // path cost is below Int.MIN_VALUE), the constraint is unsatisfiable. Clamping
+            // bestLo down to Int.MAX_VALUE would otherwise leave Int.MAX_VALUE in the domain
+            // as a spurious feasible value.
+            if (bestLo > Int.MAX_VALUE.toLong()) return false
+            if (bestHi < Int.MIN_VALUE.toLong()) return false
+            val loBound = if (bestLo < Int.MIN_VALUE.toLong()) Int.MIN_VALUE else bestLo.toInt()
+            val hiBound = if (bestHi > Int.MAX_VALUE.toLong()) Int.MAX_VALUE else bestHi.toInt()
+            if (!state.tightenIntMin(cost, loBound, ant)) return false
+            if (!state.tightenIntMax(cost, hiBound, ant)) return false
         }
         // Record the post-propagation domain refs so the next fire can skip a redundant
         // sweep. Any pruning above will have produced fresh IntDomain refs in state.intDomains;
