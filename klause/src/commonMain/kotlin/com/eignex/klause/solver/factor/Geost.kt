@@ -10,16 +10,17 @@ import com.eignex.klause.solver.propagation.PropagationState
  * row-major `[numObjects × numDims]` integer-variable array; [length] is the matching
  * constant size table.
  *
- * Propagation in this first cut:
- *  - For each pair (i, j): check if in EVERY dimension the boxes must overlap (`origin[i,d] +
- *    size[i,d] > origin[j,d].max` AND `origin[j,d] + size[j,d] > origin[i,d].max`, both sides).
- *    If so, fail.
- *  - If in exactly one dimension a non-overlap is still feasible, propagate that dimension's
- *    inequality (one of the two LE constraints) to bound consistency.
+ * Propagation runs a full sweep-line per (target object i, target dimension d). For each
+ * other object j we test whether, on EVERY dimension d' ≠ d, the pair (i, j) must overlap
+ * regardless of their assigned origins in d' — that is, origin_i.d' is currently confined
+ * to the *mandatory-overlap interval* `[j.max + 1 − s_i.d', j.min + s_j.d' − 1]`. If yes
+ * for all d' ≠ d, then placing origin_i.d in `[j.max + 1 − s_i.d, j.min + s_j.d − 1]` would
+ * force an overlap on d too — a global conflict. We collect those forbidden intervals,
+ * union them, and tighten origin_i.d to avoid the union (advance min past leading intervals,
+ * retract max past trailing intervals; report failure if min > max).
  *
- * This beats the AST-level pairwise Or-of-LE decomposition by recognising the "forced single
- * dimension" case in a single pass rather than relying on the OR-clause structure for
- * cross-dim reasoning.
+ * The earlier "forced single-dim" pairwise scan is subsumed by the case where all but one
+ * dim's M-intervals are already exhausted.
  */
 class Geost(
     val numDims: Int,
@@ -45,68 +46,86 @@ class Geost(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.composeIntVarAtomAntecedents(intVars)
 
-    /** Returns one of {Forced.LeftLow, Forced.RightLow, Free.MaybeEither, Forced.Conflict}. */
-    private enum class PairDim { LEFT_LOW_FORCED, RIGHT_LOW_FORCED, MAYBE_EITHER, OVERLAP_FORCED }
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val ant = state.composeIntVarAtomAntecedents(intVars)
+        // First sweep: detect "must overlap in every dim" → infeasibility.
+        for (i in 0 until numObjects) for (j in i + 1 until numObjects) {
+            if (mustOverlapEveryDim(state, i, j, exceptDim = -1)) return false
+        }
+        // Per (i, d) sweep.
+        for (i in 0 until numObjects) {
+            for (d in 0 until numDims) {
+                val oi = origin[i * numDims + d]
+                val si = length[i * numDims + d]
+                // Collect forbidden intervals for origin_i.d.
+                val intervals = collectForbidden(state, i, d, si)
+                if (intervals.isEmpty()) continue
+                // Sweep min upward.
+                var lo = state.intDomains[oi].min
+                var hi = state.intDomains[oi].max
+                var changed = true
+                while (changed) {
+                    changed = false
+                    for (k in intervals.indices step 2) {
+                        val fLo = intervals[k]; val fHi = intervals[k + 1]
+                        if (lo in fLo..fHi) { lo = fHi + 1; changed = true }
+                        if (hi in fLo..fHi) { hi = fLo - 1; changed = true }
+                    }
+                }
+                if (lo > hi) return false
+                if (!state.tightenIntMin(oi, lo, ant)) return false
+                if (!state.tightenIntMax(oi, hi, ant)) return false
+            }
+        }
+        return true
+    }
 
-    private fun pairDimRel(state: PropagationState, i: Int, j: Int, d: Int): PairDim {
+    /**
+     * Return the union of forbidden intervals for origin_i.d, as a flat list of
+     * [lo0, hi0, lo1, hi1, …] (inclusive bounds). An interval comes from some j ≠ i
+     * for which on every dim d' ≠ d the pair already must overlap.
+     */
+    private fun collectForbidden(state: PropagationState, i: Int, d: Int, si: Int): IntArray {
+        val acc = IntArray(numObjects * 2)
+        var n = 0
+        for (j in 0 until numObjects) {
+            if (j == i) continue
+            if (!mustOverlapAllOtherDims(state, i, j, d)) continue
+            val oj = origin[j * numDims + d]
+            val sj = length[j * numDims + d]
+            val dj = state.intDomains[oj]
+            val flo = dj.max + 1 - si
+            val fhi = dj.min + sj - 1
+            if (flo <= fhi) {
+                acc[n] = flo; acc[n + 1] = fhi; n += 2
+            }
+        }
+        return acc.copyOf(n)
+    }
+
+    /** True iff for every dim d' ≠ [exceptDim] (or every dim if -1), the pair (i, j) must
+     *  overlap regardless of origin_i.d' and origin_j.d' values within current bounds. */
+    private fun mustOverlapAllOtherDims(state: PropagationState, i: Int, j: Int, exceptDim: Int): Boolean {
+        for (dp in 0 until numDims) {
+            if (dp == exceptDim) continue
+            if (!mustOverlapDim(state, i, j, dp)) return false
+        }
+        return true
+    }
+
+    private fun mustOverlapEveryDim(state: PropagationState, i: Int, j: Int, exceptDim: Int): Boolean =
+        mustOverlapAllOtherDims(state, i, j, exceptDim)
+
+    /** True iff origin_i.d ⊆ [origin_j.d.max + 1 − s_i.d, origin_j.d.min + s_j.d − 1]. */
+    private fun mustOverlapDim(state: PropagationState, i: Int, j: Int, d: Int): Boolean {
         val oi = origin[i * numDims + d]
         val oj = origin[j * numDims + d]
         val si = length[i * numDims + d]
         val sj = length[j * numDims + d]
         val di = state.intDomains[oi]
         val dj = state.intDomains[oj]
-        // i fully left of j  ⟺  origin_i + si ≤ origin_j  ⟺  origin_i ≤ origin_j − si.
-        val leftPossible = di.min + si <= dj.max // there exists assignment with i + si ≤ j
-        val rightPossible = dj.min + sj <= di.max
-        return when {
-            !leftPossible && !rightPossible -> PairDim.OVERLAP_FORCED
-            leftPossible && !rightPossible -> PairDim.LEFT_LOW_FORCED
-            !leftPossible && rightPossible -> PairDim.RIGHT_LOW_FORCED
-            else -> PairDim.MAYBE_EITHER
-        }
-    }
-
-    override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val ant = state.composeIntVarAtomAntecedents(intVars)
-        for (i in 0 until numObjects) for (j in i + 1 until numObjects) {
-            // Determine feasibility in each dimension.
-            var freeDims = 0
-            var forcedDim = -1
-            var forcedSide = 0  // 1 = i left, -1 = j left
-            var allOverlap = true
-            for (d in 0 until numDims) {
-                val rel = pairDimRel(state, i, j, d)
-                if (rel == PairDim.OVERLAP_FORCED) {
-                    // this axis cannot separate; allOverlap remains true
-                } else {
-                    allOverlap = false
-                    if (rel == PairDim.LEFT_LOW_FORCED) { forcedDim = d; forcedSide = 1 }
-                    else if (rel == PairDim.RIGHT_LOW_FORCED) { forcedDim = d; forcedSide = -1 }
-                    else freeDims++
-                }
-            }
-            if (allOverlap) return false
-            // If exactly one dim is feasible for separation and it's forced one-way,
-            // tighten that axis. If multiple free dims, defer to OR-clause propagation.
-            if (freeDims == 0 && forcedDim >= 0) {
-                val oi = origin[i * numDims + forcedDim]
-                val oj = origin[j * numDims + forcedDim]
-                val si = length[i * numDims + forcedDim]
-                val sj = length[j * numDims + forcedDim]
-                if (forcedSide == 1) {
-                    // origin_i + si ≤ origin_j.
-                    val newMax = state.intDomains[oj].max - si
-                    if (!state.tightenIntMax(oi, newMax, ant)) return false
-                    val newMin = state.intDomains[oi].min + si
-                    if (!state.tightenIntMin(oj, newMin, ant)) return false
-                } else {
-                    val newMax = state.intDomains[oi].max - sj
-                    if (!state.tightenIntMax(oj, newMax, ant)) return false
-                    val newMin = state.intDomains[oj].min + sj
-                    if (!state.tightenIntMin(oi, newMin, ant)) return false
-                }
-            }
-        }
-        return true
+        val mLo = dj.max + 1 - si
+        val mHi = dj.min + sj - 1
+        return mLo <= mHi && di.min >= mLo && di.max <= mHi
     }
 }
