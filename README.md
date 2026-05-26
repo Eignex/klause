@@ -208,7 +208,7 @@ Use cases:
 
 ## TODO
 
-Grouped by workstream. CP covers the complete-search engine and propagators; Backend covers the FactorDecomposer's residual gaps for arithmetic adapters; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
+Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
 - [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
 - [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
