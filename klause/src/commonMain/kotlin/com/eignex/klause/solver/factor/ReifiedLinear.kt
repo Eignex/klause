@@ -138,16 +138,30 @@ class ReifiedLinear(
         val sum = state.intPayload[factorId]
         if (aux == holds(sum)) return
         sink.addBoolFlip(auxBoolVar)
+        val auxFlipMove = com.eignex.klause.solver.Move.BoolFlip(auxBoolVar)
         for (i in vars.indices) {
             val v = vars[i]
             val c = coeffs[i]
             if (c == 0) continue
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c * cur
-            val target = snapTarget(c, sumWithout, aux) ?: continue
-            val clamped = state.problem.intDomains[v].clamp(target)
-            if (clamped != cur && (aux == holds(sumWithout + c * clamped))) {
-                sink.addIntSet(v, clamped)
+            // Same-aux snap: shift body so the predicate matches the current aux.
+            val targetSame = snapTarget(c, sumWithout, aux)
+            if (targetSame != null) {
+                val clamped = state.problem.intDomains[v].clamp(targetSame)
+                if (clamped != cur && aux == holds(sumWithout + c * clamped)) {
+                    sink.addIntSet(v, clamped)
+                }
+            }
+            // Toggle-driven sub-region exploration: flip aux *and* shift body so the
+            // predicate matches the flipped aux. Strategies that get stuck on the current
+            // reification side benefit from atomic transitions to the other side.
+            val targetOpp = snapTarget(c, sumWithout, !aux)
+            if (targetOpp != null) {
+                val clamped = state.problem.intDomains[v].clamp(targetOpp)
+                if (clamped != cur && !aux == holds(sumWithout + c * clamped)) {
+                    sink.addCompound(listOf(auxFlipMove, com.eignex.klause.solver.Move.IntSet(v, clamped)))
+                }
             }
         }
     }

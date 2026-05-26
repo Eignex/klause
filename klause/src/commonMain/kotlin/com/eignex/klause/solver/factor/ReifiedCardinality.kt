@@ -219,14 +219,21 @@ class ReifiedCardinality(
         val n = state.intPayload[factorId]
         if (aux == inRange(n)) return
         sink.addBoolFlip(auxBoolVar)
-        // For each literal, flipping it shifts count by ±1; only propose flips that move
-        // count toward the desired direction.
+        val auxFlip = com.eignex.klause.solver.Move.BoolFlip(auxBoolVar)
         val wantInRange = aux
         for (lit in literals) {
             val v = Lit.variable(lit)
+            if (v == auxBoolVar) continue
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val newN = n + if (isTrue) -1 else 1
+            // Same-aux body flip: drives count toward the predicate matching current aux.
             if (wantInRange == inRange(newN)) sink.addBoolFlip(v)
+            // Toggle-driven sub-region exploration: pair aux flip with a body flip that
+            // drives count toward the *opposite* predicate, so strategies can atomically
+            // transition to the other reification side.
+            if (wantInRange != inRange(newN)) {
+                sink.addCompound(listOf(auxFlip, com.eignex.klause.solver.Move.BoolFlip(v)))
+            }
         }
     }
 

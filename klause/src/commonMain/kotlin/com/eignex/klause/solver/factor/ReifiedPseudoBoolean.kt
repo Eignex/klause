@@ -205,19 +205,25 @@ class ReifiedPseudoBoolean(
         val sum = state.intPayload[factorId]
         if (aux == predHolds(sum)) return
         sink.addBoolFlip(auxBoolVar)
+        val auxFlip = com.eignex.klause.solver.Move.BoolFlip(auxBoolVar)
         val wantHolds = aux
         val curDist = distanceToInRange(sum)
         for (i in literals.indices) {
             val lit = literals[i]
             val v = Lit.variable(lit)
+            if (v == auxBoolVar) continue
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val change = if (isTrue) -weights[i] else weights[i]
             val newDist = distanceToInRange(sum + change)
-            // wantHolds=true: drive sum toward the satisfying region (newDist ≤ curDist).
-            // wantHolds=false: drive sum away from it (newDist ≥ curDist).
-            // Allow neutral flips so tight constraints don't stall; tabu / probSAT scoring break cycles.
-            val improves = if (wantHolds) newDist <= curDist else newDist >= curDist
-            if (improves) sink.addBoolFlip(v)
+            val improvesSame = if (wantHolds) newDist <= curDist else newDist >= curDist
+            if (improvesSame) sink.addBoolFlip(v)
+            // Toggle-driven sub-region exploration: pair aux flip with a body flip whose
+            // shift drives sum toward the *opposite* satisfying region. Lets strategies
+            // escape the current reification side atomically.
+            val improvesOpp = if (wantHolds) newDist >= curDist else newDist <= curDist
+            if (improvesOpp && !improvesSame) {
+                sink.addCompound(listOf(auxFlip, com.eignex.klause.solver.Move.BoolFlip(v)))
+            }
         }
     }
 

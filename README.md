@@ -210,7 +210,6 @@ Use cases:
 
 Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [LS] Problem-aware moves for reified factors (toggle-driven sub-region exploration).
 - [LS] Problem-aware moves for counting/aggregation: AllEqual, Among, Count, GlobalCardinality, NValue, Member, Sequence.
 - [LS] Problem-aware moves for tabular factors: Table, Regular, Mdd (per-tuple-support repair candidates).
 - [LS] Problem-aware moves for ordering/permutation: ArgMin/ArgMax, ArgSort, ArrayMinMax, Sort, ValuePrecede, SymmetricAllDifferent.
