@@ -215,8 +215,8 @@ Grouped by workstream. CP covers the complete-search engine and propagators; LS 
 - [CP] MDD upgrade: trail-based incremental forward/backward support-count maintenance. The Mdd factor today does a full reachability sweep on every fire — strong filtering but O(layers·transitions) per propagator call.
 - [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
 - [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
-- [CP] Core-guided optimization: totalizer-based OLL with incremental threshold bumping (the current `CoreGuidedOptimizer` is Fu-Malik / RC2-style with per-core ExactlyOne cardinalities; totalizer encoding would compress per-core blocker state into a single shared counter, cutting bake cost across cores).
-- [CP] Assumption-resolution for cores under deep DFS: when a conflict surfaces after seed succeeded (vs. at seed time), surface a strict-subset assumption core via 1UIP analysis over the learned-clause antecedents rather than returning the full input set conservatively.
+- [CP] Weighted totalizer-OLL: the `TotalizerOptimizer` is unweighted-only — extend with pseudo-Boolean threshold encoding so RC2-style weighted MaxSAT can ride the same shared-counter machinery instead of falling back to `CoreGuidedOptimizer`'s per-core cardinalities.
+- [CP] Engine-level assumption-core extraction for post-seed UNSAT: `satisfyUnderAssumptions(minimizeCore = true)` currently uses deletion-based MUS (O(|assumptions|) extra solves); a 1UIP-resolution pass over the engine's learned clauses would extract the same core in one extra walk over the trail.
 - [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.
 - [LS] Incremental updateBoolBreakMakeForFlip for Cardinality, PseudoBoolean, Xor.
 - [LS] Extend incremental updateBoolBreakMakeForFlip to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.

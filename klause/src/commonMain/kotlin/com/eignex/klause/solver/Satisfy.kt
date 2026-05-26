@@ -41,9 +41,10 @@ sealed interface SatisfyResult {
 fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     assumptions: Assumptions,
     params: P,
+    minimizeCore: Boolean = false,
 ): SatisfyResult {
     if (this is BacktrackSolver && params is com.eignex.klause.solver.backtrack.BacktrackParams) {
-        return satisfyUnderAssumptionsBacktrack(this, assumptions, params)
+        return satisfyUnderAssumptionsBacktrack(this, assumptions, params, minimizeCore)
     }
     val merged = params.withAssumptions(assumptions)
     @Suppress("UNCHECKED_CAST")
@@ -51,7 +52,11 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
         is SolveResult.Unsat ->
             if (assumptions.isEmpty) SatisfyResult.GloballyUnsat(r.core)
-            else SatisfyResult.UnsatUnderAssumptions(assumptions)
+            else {
+                val core = if (minimizeCore) deletionMinimize(this, assumptions, params)
+                else assumptions
+                SatisfyResult.UnsatUnderAssumptions(core)
+            }
         is SolveResult.Unknown -> SatisfyResult.Unknown(r.reason)
     }
 }
@@ -67,6 +72,7 @@ private fun satisfyUnderAssumptionsBacktrack(
     solver: BacktrackSolver,
     assumptions: Assumptions,
     params: com.eignex.klause.solver.backtrack.BacktrackParams,
+    minimizeCore: Boolean,
 ): SatisfyResult {
     if (assumptions.isEmpty) {
         return when (val r = solver.solve(params)) {
@@ -92,9 +98,86 @@ private fun satisfyUnderAssumptionsBacktrack(
     val merged = params.withAssumptions(assumptions)
     return when (val r = solver.solve(merged)) {
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
-        is SolveResult.Unsat -> SatisfyResult.UnsatUnderAssumptions(assumptions)
+        is SolveResult.Unsat -> {
+            val core = if (minimizeCore) deletionMinimize(solver, assumptions, params)
+            else assumptions
+            SatisfyResult.UnsatUnderAssumptions(core)
+        }
         is SolveResult.Unknown -> SatisfyResult.Unknown(r.reason)
     }
+}
+
+/**
+ * Deletion-based MUS minimisation: starting from [assumptions] (known unsat), try
+ * dropping one literal at a time and re-solving. Literals whose removal still leaves
+ * the problem unsat are not load-bearing — drop them; literals whose removal makes the
+ * problem sat are kept. Result is a minimal unsat subset (any further deletion would
+ * make it sat).
+ *
+ * O(|assumptions| × solve_cost) — opt-in via the `minimizeCore` flag on
+ * [satisfyUnderAssumptions]. Recommended only when callers can tolerate the extra
+ * solve calls in exchange for tighter cores (typically off-line MUS extraction; OLL/RC2
+ * loops should leave it off and rely on the seed-time projection alone).
+ */
+private fun <P : SolverParams> deletionMinimize(
+    solver: Solver<P>,
+    assumptions: Assumptions,
+    params: P,
+): Assumptions {
+    // Walk both bool and int pins. We iterate over snapshots of the key arrays so the
+    // working `current` can shrink as we discover removable pins.
+    var current = assumptions
+    val candidateBools = assumptions.boolKeys.copyOf()
+    val candidateInts = assumptions.intKeys.copyOf()
+
+    for (id in candidateBools) {
+        if (current.boolValueOrNull(id) == null) continue  // already dropped
+        val trial = current.dropBool(id)
+        if (trial.isEmpty) continue  // dropping it leaves nothing — last necessary pin
+        val merged = params.withAssumptions(trial)
+        @Suppress("UNCHECKED_CAST")
+        val r = solver.solve(merged as P)
+        if (r is SolveResult.Unsat) {
+            // Without this pin we're still unsat → it isn't load-bearing, drop it.
+            current = trial
+        }
+    }
+    for (id in candidateInts) {
+        if (current.intValueOrNull(id) == null) continue
+        val trial = current.dropInt(id)
+        if (trial.isEmpty) continue
+        val merged = params.withAssumptions(trial)
+        @Suppress("UNCHECKED_CAST")
+        val r = solver.solve(merged as P)
+        if (r is SolveResult.Unsat) current = trial
+    }
+    return current
+}
+
+/** Sorted-array deletion helper for [Assumptions.boolKeys]. */
+private fun Assumptions.dropBool(id: Int): Assumptions {
+    val idx = boolKeys.toList().indexOf(id)
+    if (idx < 0) return this
+    val nk = IntArray(boolKeys.size - 1)
+    val nv = BooleanArray(boolKeys.size - 1)
+    boolKeys.copyInto(nk, 0, 0, idx)
+    boolValues.copyInto(nv, 0, 0, idx)
+    boolKeys.copyInto(nk, idx, idx + 1)
+    boolValues.copyInto(nv, idx, idx + 1)
+    return Assumptions(nk, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
+}
+
+/** Sorted-array deletion helper for [Assumptions.intKeys]. */
+private fun Assumptions.dropInt(id: Int): Assumptions {
+    val idx = intKeys.toList().indexOf(id)
+    if (idx < 0) return this
+    val nk = IntArray(intKeys.size - 1)
+    val nv = IntArray(intKeys.size - 1)
+    intKeys.copyInto(nk, 0, 0, idx)
+    intValues.copyInto(nv, 0, 0, idx)
+    intKeys.copyInto(nk, idx, idx + 1)
+    intValues.copyInto(nv, idx, idx + 1)
+    return Assumptions(boolKeys, boolValues, nk, nv, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
 }
 
 /**

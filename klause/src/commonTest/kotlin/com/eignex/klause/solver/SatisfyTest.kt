@@ -65,6 +65,38 @@ class SatisfyTest {
     }
 
     @Test
+    fun `minimizeCore strips irrelevant pins`() {
+        // Hard: ¬b0 ∨ ¬b1. Assume b0=true, b1=true, b2=true (b2 irrelevant).
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
+        )
+        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+            Assumptions(bools = mapOf(0 to true, 1 to true, 2 to true)),
+            BacktrackParams(),
+            minimizeCore = true,
+        )
+        val unsat = assertIs<SatisfyResult.UnsatUnderAssumptions>(r)
+        // Core must contain the load-bearing b0, b1 and exclude irrelevant b2.
+        assertEquals(true, unsat.core.boolValueOrNull(0))
+        assertEquals(true, unsat.core.boolValueOrNull(1))
+        assertTrue(2 !in unsat.core.boolKeys.toList())
+    }
+
+    @Test
+    fun `minimizeCore on satisfiable input still returns Sat`() {
+        val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
+        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+            Assumptions(bools = mapOf(0 to true)),
+            BacktrackParams(),
+            minimizeCore = true,
+        )
+        assertIs<SatisfyResult.Sat>(r)
+    }
+
+    @Test
     fun `satisfy returns UnsatUnderAssumptions for pairwise-conflicting bool pins`() {
         // x XOR y forces them to differ. Pinning both true must fail.
         val problem = Problem(
