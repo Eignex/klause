@@ -80,6 +80,31 @@ class ArrayMinMax(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
+    /** Repair: snap `result` to the current best xs value (the most reliable single move),
+     *  and additionally propose moves that bring an xs element to `result`'s current value
+     *  (so the constraint holds via the value-side rather than the result-side). */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as State
+        val best = s.bestValue
+        val rDom = state.problem.intDomains[result]
+        if (best in rDom) sink.addIntSet(result, best)
+        val rv = state.assignment.intValue(result)
+        // Push an xs element toward rv so the best across xs becomes rv (when rv is more
+        // extreme than current best). Pick any xs[i] in whose domain rv lies.
+        if ((max && rv > best) || (!max && rv < best)) {
+            for (v in xs) {
+                if (rv in state.problem.intDomains[v] && rv != state.assignment.intValue(v)) {
+                    sink.addIntSet(v, rv); break
+                }
+            }
+        }
+    }
+
     /** Bound-only conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)

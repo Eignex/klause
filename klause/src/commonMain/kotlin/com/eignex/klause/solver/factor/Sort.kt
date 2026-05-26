@@ -54,6 +54,23 @@ class Sort(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Repair by snapping `ys` to `sorted(xs)` at every position where they disagree. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        val sortedXs = IntArray(xs.size) { state.assignment.intValue(xs[it]) }.also { it.sort() }
+        for (i in ys.indices) {
+            val cur = state.assignment.intValue(ys[i])
+            val target = sortedXs[i]
+            if (target != cur && target in state.problem.intDomains[ys[i]]) {
+                sink.addIntSet(ys[i], target)
+            }
+        }
+    }
+
     /** Bound-only conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)

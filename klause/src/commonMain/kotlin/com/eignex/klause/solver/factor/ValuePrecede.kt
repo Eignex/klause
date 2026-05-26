@@ -47,6 +47,35 @@ class ValuePrecede(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Repair: at the first xs[i] holding `t` before any `s` appeared, propose moves to
+     *  either drop xs[i] off `t` (replace with anything else in its domain) or to set
+     *  some xs[j] (j < i) to `s` so the precedence holds. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (satisfied(state)) return
+        var firstTAt = -1
+        for (i in xs.indices) {
+            val v = state.assignment.intValue(xs[i])
+            if (v == s) return  // satisfied — shouldn't reach here given !satisfied above
+            if (v == t) { firstTAt = i; break }
+        }
+        if (firstTAt < 0) return
+        // 1. Replace xs[firstTAt] with anything that's not t.
+        val xi = xs[firstTAt]
+        val d = state.problem.intDomains[xi]
+        val cur = state.assignment.intValue(xi)
+        d.forEach { vv -> if (vv != t && vv != cur) sink.addIntSet(xi, vv) }
+        // 2. Set some xs[j] with j < firstTAt to s.
+        for (j in 0 until firstTAt) {
+            val xj = xs[j]
+            val curJ = state.assignment.intValue(xj)
+            if (curJ != s && s in state.problem.intDomains[xj]) sink.addIntSet(xj, s)
+        }
+    }
+
     private fun satisfied(state: LocalSearchState): Boolean = walk { state.assignment.intValue(it) }
 
     private fun satisfiedWithOverride(

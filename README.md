@@ -210,7 +210,6 @@ Use cases:
 
 Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [LS] Problem-aware moves for ordering/permutation: ArgMin/ArgMax, ArgSort, ArrayMinMax, Sort, ValuePrecede, SymmetricAllDifferent.
 - [LS] Problem-aware moves for packing/geometric: BinPacking, Knapsack, Diffn, Geost (overlap-resolving relocations).
 - [LS] Problem-aware moves for routing: PathTree, MinCostFlow (degree-preserving rewires).
 - [LS] Richer VNS: VND (variable neighbourhood descent) over the existing neighbourhood ladder.

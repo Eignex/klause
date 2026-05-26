@@ -72,6 +72,32 @@ class ArgMinMax(
         return 0
     }
 
+    /** Repair: either snap `idx` to the current arg-extreme, or shift `xs[idx]` to the
+     *  current arg-extreme value so the named position becomes extreme. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        val bestIdx = argExtreme(state)
+        val bestValue = state.assignment.intValue(xs[bestIdx])
+        val expected = bestIdx + indexOffset
+        val curIdx = state.assignment.intValue(idx)
+        if (expected != curIdx && expected in state.problem.intDomains[idx]) {
+            sink.addIntSet(idx, expected)
+        }
+        // Push xs[curIdx] toward the current extreme value so the named index becomes extreme.
+        val pos = curIdx - indexOffset
+        if (pos in xs.indices) {
+            val v = xs[pos]
+            val d = state.problem.intDomains[v]
+            val target = if (max) bestValue + 1 else bestValue - 1
+            val clamped = d.clamp(target)
+            if (clamped != state.assignment.intValue(v)) sink.addIntSet(v, clamped)
+        }
+    }
+
     /** Bound-only conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)

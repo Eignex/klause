@@ -86,6 +86,33 @@ class ArgSort(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Repair: snap `perm` to the true argsort of `values`. Computing the correct
+     *  permutation gives strategies a one-shot fix for an entire violated argsort. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        val n = perm.size
+        val indices = IntArray(n) { it }
+        val valuesNow = IntArray(n) { state.assignment.intValue(values[it]) }
+        // Stable sort indices by valuesNow with tie-break by index (matches the constraint).
+        val sortedIdx = indices.toTypedArray().also {
+            it.sortWith(Comparator { a, b ->
+                val c = valuesNow[a].compareTo(valuesNow[b])
+                if (c != 0) c else a.compareTo(b)
+            })
+        }
+        for (i in 0 until n) {
+            val target = sortedIdx[i] + permOffset
+            val cur = state.assignment.intValue(perm[i])
+            if (target != cur && target in state.problem.intDomains[perm[i]]) {
+                sink.addIntSet(perm[i], target)
+            }
+        }
+    }
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 

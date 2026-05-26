@@ -61,6 +61,43 @@ class SymmetricAllDifferent(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
+    /** Repair: at each broken self-inverse pair (i, xs[i]), propose Compound swaps that
+     *  fix the involution and the mirroring constraint simultaneously. */
+    override fun proposeRepairMoves(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+    ) {
+        if (!isViolated(state, factorId)) return
+        for (i in xs.indices) {
+            val v = state.assignment.intValue(xs[i])
+            val target = v - indexOffset
+            if (target !in xs.indices) {
+                // Out-of-range: snap xs[i] into the legal range.
+                val di = state.problem.intDomains[xs[i]]
+                val pick = (i + indexOffset).takeIf { it in di } ?: continue
+                if (pick != v) sink.addIntSet(xs[i], pick)
+                continue
+            }
+            val backVal = state.assignment.intValue(xs[target])
+            val want = i + indexOffset
+            if (backVal != want) {
+                // Self-inverse broken at (i, target). Propose snapping xs[target] to want.
+                if (want in state.problem.intDomains[xs[target]] && want != backVal) {
+                    sink.addIntSet(xs[target], want)
+                }
+                // Or snap xs[i] so it points to its own current mirror.
+                val xiDom = state.problem.intDomains[xs[i]]
+                val backTarget = backVal - indexOffset
+                if (backTarget in xs.indices) {
+                    // Pick a value where the mirror is consistent.
+                    val candidate = backTarget + indexOffset  // points at j with xs[j]=v...; trial
+                    if (candidate in xiDom && candidate != v) sink.addIntSet(xs[i], candidate)
+                }
+            }
+        }
+    }
+
     /** Bound-only conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
