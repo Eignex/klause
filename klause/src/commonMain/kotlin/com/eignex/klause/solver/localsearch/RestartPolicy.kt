@@ -46,29 +46,68 @@ class FixedCadenceRestart(val maxFlipsBeforeRestart: Int = 10_000) : RestartPoli
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
 }
 
+/** Perturbation strategy used by [IteratedLocalSearchRestart] when kicking out of a
+ *  local optimum. [Uniform] is the original behaviour (random vars across the whole
+ *  problem). [BasinHopping] focuses the kick on a randomly-picked factor's neighbourhood
+ *  — every variable touched by that factor is randomised — producing a coordinated
+ *  multi-variable jump more likely to land in a different basin than scattered single
+ *  flips would. */
+enum class PerturbationKind { Uniform, BasinHopping }
+
 /**
- * Copy [anchor] into [state]'s assignment, apply [perturbationStrength] uniform-random
- * single-variable mutations (bool flip or int re-set within its domain), then recompute
- * the cost. Shared between [AdaptivePerturbationRestart] and [IteratedLocalSearchRestart].
+ * Copy [anchor] into [state]'s assignment, apply [perturbationStrength] mutations
+ * according to [kind], then recompute the cost. Shared between [AdaptivePerturbationRestart]
+ * and [IteratedLocalSearchRestart].
  */
-internal fun anchorAndPerturb(state: LocalSearchState, anchor: Sample, perturbationStrength: Int) {
+internal fun anchorAndPerturb(
+    state: LocalSearchState,
+    anchor: Sample,
+    perturbationStrength: Int,
+    kind: PerturbationKind = PerturbationKind.Uniform,
+) {
     val problem = state.problem
     for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, anchor.bools[b])
     for (i in 0 until problem.numIntVars) state.assignment.setInt(i, anchor.ints[i])
     val totalVars = problem.numBoolVars + problem.numIntVars
     if (totalVars > 0) {
-        repeat(perturbationStrength) {
-            val pick = state.rng.nextInt(totalVars)
-            if (pick < problem.numBoolVars) {
-                state.assignment.flipBool(pick)
-            } else {
-                val v = pick - problem.numBoolVars
-                val d = problem.intDomains[v]
-                state.assignment.setInt(v, d.valueAt(state.rng.nextInt(d.size)))
+        when (kind) {
+            PerturbationKind.Uniform -> repeat(perturbationStrength) {
+                kickRandomVar(state, problem)
+            }
+            PerturbationKind.BasinHopping -> {
+                // Pick `perturbationStrength` factors at random; for each, randomise every
+                // variable in that factor's scope. The localisation produces a coordinated
+                // kick that traverses a single decision-graph subregion in one shot.
+                val numFactors = problem.numFactors
+                if (numFactors == 0) {
+                    repeat(perturbationStrength) { kickRandomVar(state, problem) }
+                } else {
+                    repeat(perturbationStrength) {
+                        val fid = state.rng.nextInt(numFactors)
+                        val f = state.factors[fid]
+                        for (b in f.boolVars) state.assignment.flipBool(b)
+                        for (i in f.intVars) {
+                            val d = problem.intDomains[i]
+                            state.assignment.setInt(i, d.valueAt(state.rng.nextInt(d.size)))
+                        }
+                    }
+                }
             }
         }
     }
     state.recompute()
+}
+
+private fun kickRandomVar(state: LocalSearchState, problem: Problem) {
+    val totalVars = problem.numBoolVars + problem.numIntVars
+    val pick = state.rng.nextInt(totalVars)
+    if (pick < problem.numBoolVars) {
+        state.assignment.flipBool(pick)
+    } else {
+        val v = pick - problem.numBoolVars
+        val d = problem.intDomains[v]
+        state.assignment.setInt(v, d.valueAt(state.rng.nextInt(d.size)))
+    }
 }
 
 /**

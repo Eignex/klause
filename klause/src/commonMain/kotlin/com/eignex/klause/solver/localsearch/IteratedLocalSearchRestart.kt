@@ -46,6 +46,11 @@ class IteratedLocalSearchRestart(
      *  parent with the lower objective. Only consulted when [crossoverRate] > 0 and a
      *  crossover restart fires. */
     val crossoverBias: CrossoverBias = CrossoverBias.Uniform,
+    /** Perturbation kind for the kick out of a local optimum. [PerturbationKind.Uniform]
+     *  scatters single-variable mutations across the problem; [PerturbationKind.BasinHopping]
+     *  randomises every variable of a small set of randomly-picked factors, producing a
+     *  coordinated jump biased toward escaping the current basin. */
+    val perturbationKind: PerturbationKind = PerturbationKind.Uniform,
 ) : RestartPolicy {
 
     init {
@@ -100,7 +105,8 @@ class IteratedLocalSearchRestart(
             return
         }
         val anchor = pickAnchor(state) ?: bestSoFar
-        if (anchor == null) state.restart() else anchorAndPerturb(state, anchor, perturbationStrength)
+        if (anchor == null) state.restart()
+        else anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
     }
 
     private fun pickAnchor(state: LocalSearchState): Sample? {
