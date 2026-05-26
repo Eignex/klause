@@ -36,10 +36,7 @@ import kotlin.math.min
  *     suffixes tightens `start_i.max ≤ lct(Ω) − sum_dur(Ω) − dur_i`.
  *
  * Together (1)+(2)+(3) match Choco's `disjunctive(default)` strength on classical JSP
- * benchmarks. The remaining gap to MiniZinc's strongest cumulative-via-disjunctive
- * propagators is Vilím's Θ-tree O(n log n) edge-finding plus the not-first / not-last
- * complement; both are natural follow-ups but contribute only constant-factor wins on
- * the n ≤ 50 size class where klause-LS lives.
+ * benchmarks.
  *
  * Variable durations aren't supported yet (matches [Cumulative]). All complexity figures
  * are per propagator call; the deductive engine iterates to fixpoint via the worklist.

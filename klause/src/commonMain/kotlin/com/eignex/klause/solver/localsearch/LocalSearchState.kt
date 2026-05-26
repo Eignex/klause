@@ -90,8 +90,8 @@ class LocalSearchState(
         internal set
 
     /** Lambda coefficient extracted from `params.costShaping` for pre-feasibility shaping.
-     *  Set by the engine in [com.eignex.klause.solver.localsearch.LocalSearchSolver.minimizeImpl];
-     *  defaults to 0.0 (no shaping) outside a `minimize` call or under
+     *  Set by the engine when entering a `minimize` call; defaults to 0.0 (no shaping)
+     *  outside a `minimize` call or under
      *  [com.eignex.klause.solver.localsearch.CostShaping.FeasibilityFirst]. */
     var shapingLambda: Double = 0.0
         internal set

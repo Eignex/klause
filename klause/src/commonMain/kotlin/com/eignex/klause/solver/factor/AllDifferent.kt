@@ -107,12 +107,10 @@ class AllDifferent(
         val wasViolated = s.duplicateCount > 0
         val n = presentOccurrences(state, intVar)
         if (n == 0) return 0  // every occurrence of [intVar] is currently absent.
-        // Decrement count for oldValue.
         val oldIdx = oldValue - domainMin
         val oldCount = s.counts[oldIdx]
         if (oldCount == 2) s.duplicateCount--
         s.counts[oldIdx] = oldCount - n
-        // Increment count for newValue.
         val newIdx = cur - domainMin
         val newCount = s.counts[newIdx]
         val newPlus = newCount + n
@@ -170,11 +168,9 @@ class AllDifferent(
             val valueIdx = state.assignment.intValue(vars[i]) - domainMin
             touched += intArrayOf(valueIdx, delta)
         }
-        // Apply, score, unapply.
         var dupDelta = 0
         val snapshot = s.counts
         for (t in touched) dupDelta += adjustDuplicates(snapshot, t[0], t[1])
-        // Revert.
         for (k in touched.indices.reversed()) {
             val t = touched[k]
             adjustDuplicates(snapshot, t[0], -t[1])

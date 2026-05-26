@@ -410,11 +410,8 @@ internal fun Compiler.Build.liftSetCard(expr: SetCard): IntRef {
     val n = layout.size
     val aux = newAuxIntVar(IntDomain(0, n))
     val auxId = intVarOf(aux)
-    // n = Σ indicators. Use a Linear factor: coeffs = [1×n indicators, -1×count],
-    // vars = [indicator_int_aux..., count]. Each bool indicator is channelled to a 0/1
-    // int via ReifiedLinear, then the sum is asserted equal to the count.
-    // Simpler: emit a PB factor `Σ indicators - count = 0` — but PB factor takes bool
-    // literals only and the count is an int var. We materialise indicator ints first.
+    // Channel each indicator bool to a 0/1 int via ReifiedLinear (PB factor takes bool
+    // literals only, but the count here is an int var), then assert Σ ints − count = 0.
     val indicatorIntVars = IntArray(n) { i ->
         val intName = newAuxIntVar(IntDomain(0, 1))
         val id = intVarOf(intName)

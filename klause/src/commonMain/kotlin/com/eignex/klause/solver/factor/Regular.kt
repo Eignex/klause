@@ -13,10 +13,8 @@ import com.eignex.klause.util.IntArrayList
  * and accepting set [accepting]. A transition value of `0` denotes rejection (the
  * "dead state").
  *
- * Decomposed propagation in this first cut: when every `seq[i]` is singleton, simulate
- * the run and verify acceptance. The classic Pesant layered-DAG propagator (forward
- * + backward arc-consistency) lands when full propagator strength is in scope (next
- * step).
+ * Decomposed propagation: when every `seq[i]` is singleton, simulate the run and verify
+ * acceptance.
  */
 class Regular(
     val seq: IntArray,

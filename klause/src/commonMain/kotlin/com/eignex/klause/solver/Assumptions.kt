@@ -250,10 +250,6 @@ class Assumptions internal constructor(
      *  ensuring [value] is in the var's current effective domain — the engine will
      *  raise on attempts to exclude a singleton's sole value, mirroring tighten-on-pin. */
     fun withIntHole(id: Int, value: Int): Assumptions {
-        // Find insertion point via linear walk over the (id, value) sorted rows.
-        // Hole sets are small in practice (each SAC iteration adds at most one), so
-        // sticking to O(n) keeps code readable; binary search by lex pair is the
-        // next step if profiling shows it.
         var lo = 0
         var hi = intHoleVarIds.size
         while (lo < hi) {

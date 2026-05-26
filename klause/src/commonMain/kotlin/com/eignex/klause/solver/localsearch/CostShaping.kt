@@ -5,8 +5,8 @@ import kotlin.math.sqrt
 
 /**
  * Combines hard-constraint violation count with the soft objective into a single scalar the
- * minimize engine uses for greedy descent. The default [FeasibilityFirst] preserves the
- * historical two-phase behaviour: only consider the objective once `violationCount == 0`.
+ * minimize engine uses for greedy descent. The default [FeasibilityFirst] is two-phase:
+ * only consider the objective once `violationCount == 0`.
  *
  * For tight problems where the feasible region is narrow or disconnected, [linear] mixes
  * the objective in from the start so the descent can step *through* slightly-infeasible
@@ -23,10 +23,10 @@ sealed interface CostShaping {
     fun shape(violationCount: Int, objective: Double): Double
 
     /** True iff descent should reject moves with `violationCount > 0`. Used to short-circuit
-     *  the existing greedy-objective code path for [FeasibilityFirst]. */
+     *  to the greedy-objective code path for [FeasibilityFirst]. */
     val feasibilityGated: Boolean
 
-    /** Historical behaviour: only optimise the objective once feasibility is reached. */
+    /** Two-phase: only optimise the objective once feasibility is reached. */
     data object FeasibilityFirst : CostShaping {
         override fun shape(violationCount: Int, objective: Double): Double =
             if (violationCount == 0) objective else Double.POSITIVE_INFINITY

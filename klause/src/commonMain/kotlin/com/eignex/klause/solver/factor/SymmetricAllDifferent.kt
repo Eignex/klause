@@ -13,9 +13,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * [indexOffset] is the value `xs[0]` would take to mean position 0 — typically `1` for
  * the MZN 1-based default.
  *
- * Propagation in this first cut: all-different singleton-conflict detection inherited
- * from `AllDifferent`, plus a self-inverse check on singletons. Régin-style flow + sym
- * propagator lands when full strength is in scope.
+ * Propagation: all-different singleton-conflict detection inherited from `AllDifferent`,
+ * plus a self-inverse check on singletons.
  */
 class SymmetricAllDifferent(
     val xs: IntArray,

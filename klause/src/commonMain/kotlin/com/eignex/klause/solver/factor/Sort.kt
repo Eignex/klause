@@ -10,9 +10,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * of values). Two constraints together: pairwise `ys[i] ≤ ys[i+1]` AND the multisets of
  * `xs` and `ys` are equal.
  *
- * Propagation in this first cut: chain bound-tightening on `ys` (non-decreasing) and
- * matching bounds between `ys[0]` ↔ `min(xs)` / `ys[n-1]` ↔ `max(xs)`. Full Régin-style
- * matching across the multisets lands when full propagation strength is in scope.
+ * Propagation: chain bound-tightening on `ys` (non-decreasing) and matching bounds
+ * between `ys[0]` ↔ `min(xs)` / `ys[n-1]` ↔ `max(xs)`.
  */
 class Sort(
     val xs: IntArray,

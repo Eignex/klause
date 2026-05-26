@@ -13,10 +13,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * matching its 1-based default; the offsets are encoded into the factor so the dispatch
  * doesn't have to allocate channel vars.
  *
- * Propagation in this first cut: pin-forcing channels — whenever `f[i]` becomes singleton
- * with value `j`, force `g[j']` to `i'` where the indices apply the offset; vice versa.
- * Full GAC (across non-singleton coupled domains) lands when full propagator strength is
- * in scope (next step).
+ * Propagation: pin-forcing channels — whenever `f[i]` becomes singleton with value `j`,
+ * force `g[j']` to `i'` where the indices apply the offset; vice versa.
  */
 class Inverse(
     val f: IntArray,

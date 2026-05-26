@@ -11,10 +11,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * two values is `0`. Common in sparse-permutation modelling: zero stands in for "absent",
  * and non-zero values must be unique.
  *
- * Decomposed propagation in this first cut: detect singleton conflicts on non-zero values
- * (two vars pinned to the same non-zero value → fail). LS counts pairs of equal non-zero
- * values. Strong (Régin-style) propagation lands when full propagator strength is in
- * scope (next step).
+ * Decomposed propagation: detect singleton conflicts on non-zero values (two vars pinned
+ * to the same non-zero value → fail). LS counts pairs of equal non-zero values.
  */
 class AllDifferentExceptZero(
     val xs: IntArray,

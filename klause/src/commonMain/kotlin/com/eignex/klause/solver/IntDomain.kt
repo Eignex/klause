@@ -292,8 +292,8 @@ class IntDomain private constructor(
 
     override fun hashCode(): Int {
         var h = min * 31 + max
-        // Hash from set membership to stay consistent across reps. O(size) but
-        // matched to how the previous implementation worked over holes.size.
+        // Hash from set membership to stay consistent across the contiguous /
+        // holes / bitset representations.
         forEach { v -> h = h * 31 + v }
         return h
     }

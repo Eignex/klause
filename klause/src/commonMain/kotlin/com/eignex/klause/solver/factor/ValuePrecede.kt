@@ -14,10 +14,9 @@ import com.eignex.klause.solver.propagation.PropagationState
  * values[i+1], xs)` factors at the FZN-dispatch level — one factor per consecutive pair
  * — so chain semantics fall out for free.
  *
- * Propagation in this first cut is a singleton-violation check at all-pinned time.
- * Per-prefix value-locking (e.g. "if `xs[0] = t`, then UNSAT") lands with full strength
- * later — the current bound-only propagation lets BacktrackSolver find correct models
- * because the singleton check fires at every leaf attempt.
+ * Propagation is a singleton-violation check at all-pinned time. The bound-only
+ * propagation lets BacktrackSolver find correct models because the singleton check
+ * fires at every leaf attempt.
  */
 class ValuePrecede(
     val s: Int,

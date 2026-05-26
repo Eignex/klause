@@ -30,12 +30,11 @@ class ConflictAnalyzerTest {
         val problem = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),  // ¬a ∨ b
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))), // ¬a ∨ ¬b
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             ),
         )
         val session = PropagationSession(problem)
-        // Push a = true to trigger the conflict.
         val result = session.pinBool(0, true)
         val unsat = assertIs<PropagationResult.Unsat>(result)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
@@ -95,11 +94,9 @@ class ConflictAnalyzerTest {
                 com.eignex.klause.solver.factor.Linear(
                     intArrayOf(1), intArrayOf(0),
                     com.eignex.klause.solver.factor.LinearOp.EQ, 5,
-                ),  // impossible: 1·x = 5 with x in [0,3]
+                ),
             ),
         )
-        // The conflict fires at bake time → no learning at level 0. Verify the
-        // BacktrackSolver still reports Unsat (chronological-backtrack fallback).
         val r = BacktrackSolver(problem).solve(BacktrackParams(variableHeuristic = InputOrder))
         assertIs<SolveResult.Unsat>(r)
     }
@@ -135,14 +132,10 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
             ),
         )
-        // Run the solver — it will hit the conflict, learn, and proceed to SAT (a=false
-        // ∨ b=false satisfies the learned clause; one of them remains free to satisfy
-        // the originals too).
         val r = BacktrackSolver(problem).solve(BacktrackParams(
             variableHeuristic = InputOrder, randomSeed = 0L,
         ))
         val sat = assertIs<SolveResult.Sat>(r)
-        // The found model must satisfy: not both a and b true.
         val a = sat.assignment.bools[0]
         val b = sat.assignment.bools[1]
         assertTrue(!(a && b),
@@ -159,18 +152,16 @@ class ConflictAnalyzerTest {
         val problem = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),    // a ∨ b
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),    // ¬a ∨ c
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),   // ¬b ∨ ¬c
-                Clause(intArrayOf(Lit.make(2, true),  Lit.make(3, false))),   // c ∨ ¬d
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),    // ¬c ∨ d
+                Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(2, true),  Lit.make(3, false))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 42L))
-        // Verify a satisfying assignment.
         val sat = assertIs<SolveResult.Sat>(r)
         val s = sat.assignment.bools
-        // Manually evaluate every clause to confirm correctness.
         val clauses = listOf(
             listOf(Lit.make(0, true), Lit.make(1, true)),
             listOf(Lit.make(0, false), Lit.make(2, true)),
@@ -256,29 +247,23 @@ class ConflictAnalyzerTest {
         val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true)))
         val c2 = Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true)))
         val fid0 = state.addLearnedClause(c0, lbd = 1)
-        val fid1 = state.addLearnedClause(c1, lbd = 5)  // will be dropped
+        val fid1 = state.addLearnedClause(c1, lbd = 5)
         val fid2 = state.addLearnedClause(c2, lbd = 1)
         assertEquals(baseFid, fid0)
         assertEquals(baseFid + 1, fid1)
         assertEquals(baseFid + 2, fid2)
         assertEquals(3, state.learnedClauses.size)
-        // Confirm watcher index has c1 listed at some lit before forget.
         assertTrue(state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
             "c1 should be in ¬b watcher list before forget")
 
-        // Forget anything with LBD > 1.
         state.forgetLearnedClauses { _, lbd -> lbd <= 1 }
         assertEquals(2, state.learnedClauses.size,
             "expected 2 clauses kept after dropping the high-LBD one")
-        // Remaining clauses should be c0 and c2 — order preserved, renumbered.
         assertEquals(c0, state.learnedClauses[0])
         assertEquals(c2, state.learnedClauses[1])
-        // The watcher index must no longer reference the dropped fid (¬b watcher list
-        // should not contain fid1 = baseFid+1 anymore).
         assertTrue(!state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
             "watcher entry for the dropped clause should be removed")
-        // The surviving clauses should be present at their new ids.
-        val newFid2 = baseFid + 1  // c2 moved up one slot
+        val newFid2 = baseFid + 1
         assertTrue(state.boolWatchersByLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
             "c2 should be findable at its new fid (${newFid2}) via its watch literal")
     }
@@ -368,16 +353,15 @@ class ConflictAnalyzerTest {
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),  // ¬a ∨ b
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
                 Clause(intArrayOf(Lit.make(3, false), Lit.make(4, true))),
-                Clause(intArrayOf(Lit.make(0, true))),  // a
+                Clause(intArrayOf(Lit.make(0, true))),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        // All five vars should end up true.
         for (v in 0 until 5) {
             assertTrue(sat.assignment.bools[v], "v$v should be true; got ${sat.assignment.bools.toList()}")
         }

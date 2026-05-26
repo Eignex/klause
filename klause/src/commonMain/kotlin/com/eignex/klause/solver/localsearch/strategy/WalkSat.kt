@@ -9,7 +9,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * pick the suggestion with the smallest break count (ties broken uniformly at random).
  *
  * Short-term tabu filtering, aspiration, and dynamic tenure are delegated to [tabu]; see
- * [TabuFilter] for the available knobs. Default: tenure 10 with the historical
+ * [TabuFilter] for the available knobs. Default: tenure 10 with the
  * "drop the filter when every candidate is tabu" aspiration.
  */
 open class WalkSat(

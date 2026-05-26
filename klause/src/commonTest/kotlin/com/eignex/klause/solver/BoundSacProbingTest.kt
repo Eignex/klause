@@ -29,26 +29,13 @@ class BoundSacProbingTest {
 
     @Test
     fun `bound SAC tightens an int min when its lowest value is locally infeasible`() {
-        // x ∈ [0..5], y ∈ [3..3], x + y ≤ 5 → x ≤ 2. Direct linear propagation already
-        // handles this case at bake (no SAC needed). Build a case where local propagation
-        // misses the bound: x ∈ [0..3], y ∈ [0..3], x + y ≥ 2, plus a non-linear-style
-        // constraint that pins implicit pairs.
-        //
-        // Simpler: x ∈ [0..3]; constraint Σ = x ≥ 3 forces x ≥ 3 trivially. Bound-SAC
-        // would just confirm. So pick a case where probing min fires the linear:
-        // x ∈ [0..3], y ∈ [0..3]: x = y, x + y ≥ 2. Pure linear bound prop on x+y≥2
-        // alone gives x ≥ -1 / y ≥ -1 (no change). x = y is a Linear equality. Together
-        // they imply x ≥ 1, y ≥ 1 — but only via reasoning at the same time.
-        //
-        // probeIntBounds tries x = 0: x + y = 0 + 0 = 0 < 2 → Unsat (with x = y, both
-        // singleton 0). So x ≥ 1 is forced. Likewise y ≥ 1.
+        // x = y, x + y ≥ 2 over [0..3]^2. Pure linear bound prop alone can't combine
+        // the two; bound-SAC probing x=0 finds x+y=0 < 2 infeasible → x.min ≥ 1.
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(
-                // x - y = 0 (x = y).
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
-                // x + y ≥ 2.
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2),
             ),
             probeIntBounds = true,
@@ -60,7 +47,6 @@ class BoundSacProbingTest {
 
     @Test
     fun `bound SAC narrows to singleton when only one value remains feasible`() {
-        // x ∈ [0..2], y ∈ [0..2], x + y = 2, x = y → both must be 1.
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
@@ -77,17 +63,8 @@ class BoundSacProbingTest {
 
     @Test
     fun `interior-hole SAC excludes an unreachable middle value`() {
-        // x ∈ [0..2], y ∈ [0..2], x = y, x + y must be even (encoded as x + y ∈ {0,2,4} via
-        // a Table). With Table over y and x: actually simplest is Linear: x = y AND
-        // x + y != 2 (encoded by `1*x + 1*y != 2` — but we don't have NE Linear. Use Table.)
-        //
-        // Simpler test: 3 vars, x = y, x + y = 2 OR x + y = 4. That is two solutions:
-        // (1,1) and (2,2). So x = y, x ∈ {1, 2}. Interior value x = 0 should be excluded.
-        // Without bound-SAC alone, x.min lifts to 1 trivially (x + y ≥ 2). So bound-SAC
-        // already captures this. We need a case with interior hole.
-        //
-        // x ∈ [0..3], y ∈ [0..3], x = y, x + y ∈ {0, 6} (two Linear OR'd... no OR primitive).
-        // Use Table: tuples = [(0,0), (3,3)]. With x = y reified-implicit via Table.
+        // Allowed tuples (0,0) and (3,3); interior values 1, 2 should be excluded by
+        // interior-hole SAC.
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
@@ -101,7 +78,6 @@ class BoundSacProbingTest {
             probeIntHoles = true,
         )
         val baked = assertIs<PropagationResult.Implied>(p.baked)
-        // x's allowed values are {0, 3}. So interior 1, 2 are holes.
         val xHoles = mutableSetOf<Int>()
         baked.forEachIntHole { id, v -> if (id == 0) xHoles.add(v) }
         assertEquals(setOf(1, 2), xHoles, "interior-hole SAC should mark x ≠ 1 and x ≠ 2")

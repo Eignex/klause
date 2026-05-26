@@ -239,13 +239,6 @@ class LocalSearchSolver(
     }
 
     /**
-     * Two-phase search per restart attempt: WalkSat-style fight to feasibility, then a
-     * greedy descent on the objective restricted to feasibility-preserving moves. When the
-     * descent reaches a local minimum (no neighbour both keeps `cost == 0` and lowers
-     * the objective), restart and try again. Best-feasible-objective state lives across
-     * restarts so we monotonically improve.
-     */
-    /**
      * Streaming body of the LS minimize loop. Yields a [MinimizeResult.BestFound] on
      * every strict improvement; yields exactly one terminal verdict
      * ([MinimizeResult.BestFound] with reason, or [MinimizeResult.Unknown]) on exit.

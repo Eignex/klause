@@ -417,13 +417,6 @@ class Compiler {
         fun intVarOf(name: String): Int =
             intVarIdByName[name] ?: error("Unknown int/float variable '$name'")
 
-        /**
-         * Rewrite [expr] so that the residual is affine: every non-affine subexpression is
-         * replaced by a fresh aux [IntRef], with auxiliary constraints emitted that pin the
-         * aux to the correct value. The affine fragment ([IntRef], [IntLit], [IntScale],
-         * [IntSum]) passes through unchanged.
-         */
-
         internal fun trueLit(): Int {
             val v = newBoolVar()
             factors += Clause(intArrayOf(Lit.make(v, positive = true)))

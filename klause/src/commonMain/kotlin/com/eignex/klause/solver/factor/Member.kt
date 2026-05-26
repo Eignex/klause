@@ -11,9 +11,8 @@ import com.eignex.klause.util.IntArrayList
  * `member_int(xs, y)` — `y` equals at least one of the `xs[i]`. The dual of
  * disjunction-of-equalities: `(y = xs[0]) ∨ (y = xs[1]) ∨ … ∨ (y = xs[n-1])`.
  *
- * Propagation in this first cut: when every `xs[i]`'s domain is disjoint from `y`'s
- * domain, fail; when `xs` has length 1, force `y = xs[0]`. Per-value support tightening
- * lands when full strength propagators are in scope.
+ * Propagation: when every `xs[i]`'s domain is disjoint from `y`'s domain, fail; when
+ * `xs` has length 1, force `y = xs[0]`.
  */
 class Member(
     val xs: IntArray,

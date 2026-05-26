@@ -735,15 +735,8 @@ internal fun Compiler.Build.materializeIntFromSumOfBools(name: String, bools: Li
         // Force to 0.
         assertExpr(IntCompare(IntRef(varName), IntCmpOp.EQ, IntLit(0)))
     } else {
-        // var = Σ bool_i  ↔  for each subset count... simpler: introduce equivalence:
-        // (var = c) ⟺ exactly c of the bools are true. Express via channelling clauses:
-        //   var ≥ 1 ⟺ at least one bool is true; etc.
-        // We use the IfThenElse-based casting: ∀i, b_i ↔ (var includes i in the count).
-        // Concretely, post the equality "var − Σ b_i = 0" by treating each b_i as 0/1.
-        // Use the Iff form via the existing reified pipeline: lower each b_i to a lit,
-        // then assert one Linear factor over (var, b_i...) with op EQ and bound 0.
-        // Build IntExpr Σ b_i: but we don't have a direct "BoolExpr → IntExpr" cast.
-        // Workaround: introduce one aux int per bool that channels b_i ↔ aux_i ∈ {0,1}.
+        // No direct BoolExpr → IntExpr cast: channel each b_i through an aux int in {0,1}
+        // (b_i ↔ aux_i = 1), then post `var − Σ aux_i = 0` as a Linear factor.
         val terms = mutableListOf<IntExpr>(IntRef(varName))
         for (b in bools) {
             val aname = "__b2i_${auxIntCounter++}"

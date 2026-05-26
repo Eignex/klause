@@ -42,9 +42,7 @@ import kotlin.math.min
  * Time-tabling is the baseline, paired here with an O(n²) Vilím Θ-tree edge-finder
  * (Vilím 2009 / Schutt-Feydy-Stuckey 2009) running off [CumulativeThetaTree]. The
  * edge-finder catches energy-overflow deductions on subsets that have no compulsory
- * profile, which time-tabling cannot see. The Θ-Λ tree variant lowering this to
- * O(kn log n), and energetic reasoning (Baptiste-Le Pape-Nuijten), are deferred until
- * profiling justifies them.
+ * profile, which time-tabling cannot see.
  *
  * Cost model is dense: the LS payload allocates an `IntArray` of size
  * `horizon = max_i(starts[i].max + durations[i]) − min_i(starts[i].min)`. For Challenge
@@ -460,9 +458,7 @@ class Cumulative(
      * forces i's earliest start up by however much room c_i leaves outside Ω's anchor.
      *
      * Cost is O(m²) where m = active task count (tasks with positive duration and
-     * resource): one inner sweep over outside tasks per distinct LCT value. The Θ-Λ
-     * variant (Vilím 2009 §4) reduces this to O(km log m) and is the natural follow-up
-     * if cumulative propagation shows up in profiling on RCPSP-scale instances.
+     * resource): one inner sweep over outside tasks per distinct LCT value.
      */
     private fun edgeFindingPass(state: PropagationState): Boolean {
         if (n < 2 || capacity == 0) return true

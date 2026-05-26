@@ -14,9 +14,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * (the `diffn_nonstrict` variant). With [nonStrict] = false (the default), even zero-
  * dimensional rectangles must satisfy the non-overlap criterion.
  *
- * Widths and heights are constants; positions are variables. Propagation in this first cut
- * checks the all-singleton case for pairwise overlap. Cumulative-style sweep over each
- * axis lands when full propagator strength is in scope (next step).
+ * Widths and heights are constants; positions are variables.
  */
 class Diffn(
     val xs: IntArray,
@@ -70,8 +68,7 @@ class Diffn(
     }
 
     /** Brute-force delta: simulate the move, recount overlaps. O(n²). For typical diffn
-     *  problem sizes (n ≤ ~50) this is acceptable; an incremental per-rect Δ is a clear
-     *  follow-up once profiling indicates it. */
+     *  problem sizes (n ≤ ~50) this is acceptable. */
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val wasViolated = s.overlappingPairs > 0
@@ -131,10 +128,10 @@ class Diffn(
      *     reachable under current bounds, tighten the corresponding `y.max` / `y.min`.
      *   - Symmetric for must-overlap on y.
      *
-     * Iterated to fixed point implicitly via the engine's propagator loop. This is the
-     * "compulsory parts" precursor to the full sweep-line cumulative-style propagator —
-     * subsumes singleton conflict and prunes non-singleton rectangles whose forced
-     * positions force a non-overlap direction on the orthogonal axis.
+     * Iterated to fixed point implicitly via the engine's propagator loop. The
+     * "compulsory parts" propagator subsumes singleton conflict and prunes non-singleton
+     * rectangles whose forced positions force a non-overlap direction on the orthogonal
+     * axis.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = xs.size

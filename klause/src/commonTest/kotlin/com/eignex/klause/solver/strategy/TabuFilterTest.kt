@@ -26,7 +26,7 @@ class TabuFilterTest {
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
-        // Touch var 0 by applying a flip — so isTaboo(BoolFlip(0), >=1) becomes true.
+        // Touch var 0 so isTaboo(BoolFlip(0), >=1) becomes true.
         state.apply(Move.BoolFlip(0))
         return state
     }
@@ -41,7 +41,6 @@ class TabuFilterTest {
     @Test
     fun `filter returns input list when no move is tabu`() {
         val state = smallState()
-        // Tenure 0 means nothing is tabu.
         val filter = TabuFilter(tenure = 0)
         val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
         assertSame(moves, filter.filter(state, moves))
@@ -49,7 +48,7 @@ class TabuFilterTest {
 
     @Test
     fun `filter strips tabu candidates when alternatives exist`() {
-        val state = smallState() // step=1, BoolFlip(0) is tabu under tenure 10
+        val state = smallState()
         val filter = TabuFilter(tenure = 10)
         val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
         val out = filter.filter(state, moves)
@@ -58,7 +57,7 @@ class TabuFilterTest {
 
     @Test
     fun `filter falls back to full set when every move is tabu`() {
-        val state = smallState() // BoolFlip(0) tabu
+        val state = smallState()
         val filter = TabuFilter(tenure = 10)
         // The only candidate is tabu; aspiration fallback must drop the filter, not return empty.
         val moves = listOf<Move>(Move.BoolFlip(0))
@@ -68,33 +67,23 @@ class TabuFilterTest {
 
     @Test
     fun `aspiration admits tabu move that strictly improves cost`() {
-        // Build a state where flipping var 0 is tabu but flipping it strictly improves cost.
-        // Concrete setup: AtLeastOne(a,b) — start with a=false,b=false (violated), apply a flip on
-        // var 0 making a=true (cost=0). The undo flip on var 0 is tabu (recent touch) and would
-        // worsen cost, so aspiration should NOT admit it. Conversely if we set up the other way…
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
-        // Start with both false → factor violated. Touch var 1 (worsens nothing, but marks tabu).
-        // Then flipping var 0 strictly improves cost (1 → 0). var 0 is NOT tabu, so first ensure
-        // OrImproving admits it via "no tabu" path. Now touch var 0 too and verify OrImproving
-        // would still admit it if it were the sole improving move.
-        state.apply(Move.BoolFlip(0)) // a=true, cost=0
-        state.apply(Move.BoolFlip(0)) // a=false again, cost=1; var 0 is tabu now (touched twice)
+        // Touch var 0 twice so it is tabu, but flipping it now strictly improves cost.
+        state.apply(Move.BoolFlip(0))
+        state.apply(Move.BoolFlip(0))
 
         val filter = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
         val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
         val out = filter.filter(state, moves)
-        // Both moves strictly improve cost (1 → 0). var 1 is non-tabu and admitted; var 0 is
-        // tabu but OrImproving admits it. So both pass.
         assertEquals(2, out.size, "OrImproving should admit the strictly-improving tabu move; got $out")
     }
 
     @Test
     fun `dynamic tenure overrides the static value`() {
         val state = smallState()
-        // Static tenure 10 (would flag var 0 tabu), but dynamic forces 0 → nothing is tabu.
         val filter = TabuFilter(tenure = 10, dynamicTenure = { 0 })
         val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
         assertSame(moves, filter.filter(state, moves))
@@ -102,49 +91,33 @@ class TabuFilterTest {
 
     @Test
     fun `OrImprovesBestEver admits a tabu move that would beat the historical minimum`() {
-        val state = smallState() // BoolFlip(0) tabu under tenure 10
-        // smallState applies BoolFlip(0) once before returning. That flip changes cost;
-        // bestCostSeen now reflects the post-flip cost. The cost is currently the
-        // same. A move reaching strictly below bestCostSeen is admitted.
+        val state = smallState()
         val initialBest = state.bestCostSeen
-        // Apply some flips to drive cost down (and bestCostSeen down).
-        state.apply(Move.BoolFlip(1)) // var 1 now true alongside var 0
-        // The minimum cost observed so far is captured.
+        state.apply(Move.BoolFlip(1))
         val current = state.bestCostSeen
         assertTrue(current <= initialBest, "best-cost should monotone-decrease, got $initialBest -> $current")
 
-        // Build a filter with the best-ever aspiration; verify it admits a tabu move
-        // predicted to beat the historical low.
         val filter = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImprovesBestEver)
         val moves = listOf<Move>(Move.BoolFlip(0))
         val out = filter.filter(state, moves)
-        // Whether the move is admitted depends on netDelta; we just verify the filter
-        // doesn't crash and returns a sensible list (either the move itself if admitted,
-        // or the fallback all-tabu list since there's only one candidate).
         assertTrue(out.isNotEmpty())
     }
 
     @Test
     fun `Cooling aspiration admits liberally at high T and converges to never at low T`() {
-        val state = smallState() // BoolFlip(0) tabu
+        val state = smallState()
         val cooling = AspirationCriterion.Cooling(initialTemperature = 100.0, coolingRate = 0.5, minTemperature = 1e-9)
         val moves = listOf<Move>(Move.BoolFlip(0))
-        // At high T (~100), exp(-1/100) ≈ 0.99 — admit rate is very high.
         val highTfilter = TabuFilter(tenure = 10, aspiration = cooling)
         var earlyAdmits = 0
         repeat(50) {
             cooling.reset()
             if (highTfilter.filter(state, moves) == moves) earlyAdmits++
         }
-        // Most calls should admit at high T.
         assertTrue(earlyAdmits >= 40, "high-T admission rate too low: $earlyAdmits/50")
 
-        // Now cool aggressively to near-zero and verify near-rejection.
         cooling.reset()
-        // Drive T down — each admitsTabu call cools by coolingRate=0.5 multiplicatively.
-        // After ~50 calls, T is far below 1e-9 (clamped at min).
         repeat(100) { cooling.admitsTabu(state, Move.BoolFlip(0)) }
-        // At min T, exp(-1/1e-9) is effectively 0.
         var lateAdmits = 0
         repeat(50) { if (cooling.admitsTabu(state, Move.BoolFlip(0))) lateAdmits++ }
         assertTrue(lateAdmits == 0, "low-T should never admit, got $lateAdmits/50")
@@ -152,18 +125,14 @@ class TabuFilterTest {
 
     @Test
     fun `Probabilistic aspiration admits tabu moves at the configured rate`() {
-        // smallState applies BoolFlip(0) once, so var 0 is tabu under tenure 10.
         val state = smallState()
         val filter = TabuFilter(tenure = 10, aspiration = AspirationCriterion.Probabilistic(rate = 1.0))
         val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
-        // rate=1.0 always admits → both moves pass.
         val out = filter.filter(state, moves)
         assertEquals(2, out.size, "rate=1.0 should admit every tabu move; got $out")
 
-        // rate=0.0 falls back to the all-tabu fallback (one move available).
         val zero = TabuFilter(tenure = 10, aspiration = AspirationCriterion.Probabilistic(rate = 0.0))
         val outZero = zero.filter(state, listOf<Move>(Move.BoolFlip(0)))
-        // Only candidate is tabu and rate=0 rejects; fallback drops the filter.
         assertEquals(listOf<Move>(Move.BoolFlip(0)), outZero)
     }
 
@@ -199,8 +168,6 @@ class TabuFilterTest {
 
     @Test
     fun `walk sat with custom tabu filter still solves`() {
-        // Smoke test: passing a TabuFilter through the constructor changes nothing observable
-        // for callers that previously passed tabuTenure.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val solver = LocalSearchSolver(

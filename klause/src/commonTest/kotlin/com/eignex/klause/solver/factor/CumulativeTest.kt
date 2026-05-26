@@ -110,17 +110,14 @@ class CumulativeTest {
     fun `incremental apply matches a recompute`() {
         val problem = threeTasksUnary()
         val state = LocalSearchState(problem, Random(0))
-        // Initial: all at 0 → all three overlap, big overage.
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)
         state.recompute()
         val before = state.intPayload[0]
-        // Apply moves: spread them out to 0, 2, 4. Each move is committed individually.
         state.apply(com.eignex.klause.solver.Move.IntSet(1, 2))
         state.apply(com.eignex.klause.solver.Move.IntSet(2, 4))
         val afterIncr = state.intPayload[0]
-        // Now do a fresh recompute and confirm intPayload matches.
         val fresh = LocalSearchState(problem, Random(0))
         fresh.assignment.setInt(0, 0); fresh.assignment.setInt(1, 2); fresh.assignment.setInt(2, 4)
         fresh.recompute()
@@ -171,7 +168,6 @@ class CumulativeTest {
 
     @Test
     fun `propagator rejects a pin that would force overlap with a mandatory part`() {
-        // Same scenario but pin task 1 to start at 2: overlaps task 0's mandatory part.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(4, 2),
@@ -193,7 +189,6 @@ class CumulativeTest {
         val solver = BacktrackSolver(problem)
         val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample, "BacktrackSolver should find a feasible schedule")
-        // Verify the assignment is in fact non-overlapping.
         val starts = sample.ints
         val occ = IntArray(8)
         for (i in 0 until 3) {
@@ -254,8 +249,6 @@ class CumulativeTest {
 
     @Test
     fun `edge-finding is silent when no deduction applies`() {
-        // Three identical tasks comfortably fitting their windows. The edge-finder
-        // should not produce any spurious bound tightenings.
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
             durations = intArrayOf(1, 1, 1),

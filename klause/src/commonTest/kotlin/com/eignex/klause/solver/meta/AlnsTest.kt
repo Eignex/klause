@@ -33,7 +33,6 @@ class AlnsTest {
         val obj = LinearObjective(boolWeights = DoubleArray(10) { 1.0 })
         val freed = DestroyOperator.Random.destroy(Random(0), problem, incumbent, obj, fraction = 0.3)
         assertEquals(3, freed.bools.size, "expected 3 freed bools (fraction 0.3 of 10)")
-        // All distinct
         assertEquals(freed.bools.toSet().size, freed.bools.size, "freed bools should be distinct")
     }
 
@@ -50,7 +49,6 @@ class AlnsTest {
         val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(fA, fB))
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
-        // Free 2 of 8 = fraction 0.25. Starts from one component and stays inside it.
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
         assertEquals(2, freed.bools.size)
         val componentA = freed.bools.all { it in 0..3 }
@@ -76,8 +74,6 @@ class AlnsTest {
 
     @Test
     fun `worst objective destroy picks high contribution vars`() {
-        // 4 bool vars, only var 3 is set true and has the largest weight; destroy fraction 0.25 → 1 var.
-        // WorstObjective should pick var 3.
         val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val incumbent = Sample(booleanArrayOf(false, false, false, true), IntArray(0))
         val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 2.0, 3.0, 100.0))
@@ -125,9 +121,6 @@ class AlnsTest {
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
-        // Both repair operators should have been picked at least once over 30 iterations
-        // with default roulette weights. (Probability of one being skipped entirely is
-        // essentially zero with equal initial weights and 30 picks.)
         val repairIdxs = alns.iterationLog.map { it.repairIdx }.toSet()
         assertTrue(repairIdxs.isNotEmpty(), "ALNS should have logged at least one iteration")
     }
@@ -144,9 +137,6 @@ class AlnsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
-        // Pick a deterministic seed/order so the test is reproducible. The incumbent here
-        // is infeasible; greedy walks freed vars and accepts any flip that strictly lowers
-        // the shaped score, including transitions out of infeasibility.
         val incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0))
         val context = com.eignex.klause.solver.localsearch.meta.RepairContext(
             inner = inner,
@@ -159,9 +149,6 @@ class AlnsTest {
         )
         val sample = GreedyConstructionRepair().repair(context)
         assertNotNull(sample)
-        // Greedy reaches feasibility by flipping exactly one bool; under deterministic
-        // walk order the picked bool varies, but all feasible single-flip outcomes are
-        // among {10, 5, 8, 3}. We require feasibility (cost=0) and any of the four values.
         val trueCount = (0..3).count { sample.bools[it] }
         assertEquals(1, trueCount, "expected exactly one true after greedy repair")
     }
@@ -211,7 +198,6 @@ class AlnsTest {
         )
         val s = repair.repair(context)
         assertNotNull(s)
-        // Verify the repair picks the right answer (boolean 0 true, boolean 1 false).
         assertEquals(1.0, objective.evaluate(s))
     }
 
@@ -240,7 +226,6 @@ class AlnsTest {
             flipsPerIteration = 200L,
         )
         alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
-        // After ALNS runs, activity touch counts should be populated (size = numBoolVars).
         val touches = session.warmStateView.activityTouches()
         assertEquals(4, touches.size)
         assertTrue(touches.any { it > 0 }, "expected at least one touched variable")
@@ -276,7 +261,6 @@ class AlnsTest {
 
     @Test
     fun `freed vars empty triggers reward and continue`() {
-        // Edge case: destroy op returns empty set. ALNS should reward (rejectedReward) and not crash.
         val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true)))))
         val objective = LinearObjective(boolWeights = doubleArrayOf(1.0))

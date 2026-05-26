@@ -182,28 +182,13 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
      *  Starts with `__` so it can't collide with a user-declared property. */
     private val SEARCH_KEY: String get() = "__search"
 
-    /** Register or replace [entry] under the synthetic [name]. `Schema.add` rejects
-     *  duplicates, so we route through a small helper that removes any prior value
-     *  first. Reflection-free; touches only the entries map. */
+    /** Register [entry] under [name], or under a uniquely-suffixed variant when [name]
+     *  is already taken. `Schema.add` rejects duplicates and exposes no in-place mutator,
+     *  so callers that need last-write-wins semantics (e.g. [search]) rely on the
+     *  compiler picking the last matching entry in declaration order. */
     private fun replaceAt(name: String, entry: SchemaEntry) {
-        // The skema Schema base class makes entries read-only externally; to swap an
-        // entry we re-route through the package-internal mutation API. Skema exposes
-        // exactly one mutator (`add`) which throws on duplicates, so we work around by
-        // adding a freshly-named key and remembering the canonical slot ourselves.
-        val existing = entries[name]
-        if (existing == null) {
-            add(name, entry)
-        } else {
-            // The entries map is a LinkedHashMap; we can't direct-write through Schema's
-            // API. Take a snapshot, mutate, and re-register the whole thing into a fresh
-            // schema would defeat the property delegates. Instead we use a side-channel
-            // SchemaEntry name that includes a serial counter — last one wins by
-            // overriding the consumer's read in `definition()`. The compiler uses the
-            // synthetic key, so the in-place mutation we need is small.
-            // Simpler approach: re-add a unique suffixed name; the compiler picks the
-            // last `__search*` entry it sees in declaration order.
-            add("${name}_${anonCounter++}", entry)
-        }
+        if (entries[name] == null) add(name, entry)
+        else add("${name}_${anonCounter++}", entry)
     }
 
     /** Bulk form: register a list of constraints under one property name. Each

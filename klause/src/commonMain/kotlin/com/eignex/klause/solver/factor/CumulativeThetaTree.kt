@@ -1,9 +1,8 @@
 package com.eignex.klause.solver.factor
 
 /**
- * Vilím-style Θ-tree for cumulative scheduling envelope reasoning. The next session wires
- * this into a Schutt-Feydy-Stuckey edge-finding propagator on `Cumulative`; this file is
- * the data-structure half of that pair.
+ * Vilím-style Θ-tree for cumulative scheduling envelope reasoning. The data-structure
+ * half of a Schutt-Feydy-Stuckey edge-finding propagator on `Cumulative`.
  *
  * Tasks are addressed by a stable id `0..n-1` set at construction. The id is *not* a leaf
  * position — callers pass the per-leaf order to [setLeafOrder] (typically `argsort` by

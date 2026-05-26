@@ -13,8 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * over arbitrary excluded-value sets remains O(N · |except|) per call.
  *
  * Propagation is the same singleton-take filter as the zero-only variant: any var pinned to
- * a non-excluded value `v` removes `v` from every other var's domain. Régin-style stronger
- * propagation is tracked as a follow-up.
+ * a non-excluded value `v` removes `v` from every other var's domain.
  */
 class AllDifferentExcept(
     val xs: IntArray,
@@ -150,7 +149,7 @@ class AllDifferentExcept(
      *      - x and v are in different SCCs.
      *
      * Complexity O((|V|+|E|) · √|V|) for Hopcroft-Karp; here we use simple O(VE) augmenting
-     * paths for clarity. Hopcroft-Karp is a follow-up.
+     * paths for clarity.
      */
     private fun reginPropagate(state: PropagationState): Boolean {
         val n = xs.size

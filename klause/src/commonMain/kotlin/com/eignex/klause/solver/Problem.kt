@@ -260,12 +260,6 @@ class Problem(
         )
     }
 
-    /**
-     * Bound-SAC fixed-point loop. Probes the min and max of each multi-value int var
-     * under the current [base]; an Unsat result lets us tighten that bound by one
-     * and re-probe. Returns the strengthened [PropagationResult.Implied], or [Unsat]
-     * if the problem turns out to be infeasible.
-     */
     /** Probe-order heuristic: wdeg / dom — sort descending by `Σ factorWeights[f] / dom(v)`
      *  so the budget is spent first on vars that are heavily-constrained relative to their
      *  remaining domain. Each Unsat probe bumps the weights of the factors in its conflict
@@ -307,6 +301,12 @@ class Problem(
         }
     }
 
+    /**
+     * Bound-SAC fixed-point loop. Probes the min and max of each multi-value int var
+     * under the current [base]; an Unsat result lets us tighten that bound by one
+     * and re-probe. Returns the strengthened [PropagationResult.Implied], or [Unsat]
+     * if the problem turns out to be infeasible.
+     */
     private fun probeBoundSac(
         base: PropagationResult.Implied,
         factorWeights: DoubleArray,

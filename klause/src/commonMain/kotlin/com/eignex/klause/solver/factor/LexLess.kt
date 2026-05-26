@@ -18,8 +18,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * If `xs.size != ys.size` the shorter array is treated as a prefix: a proper prefix
  * compares strictly less than the longer one (MiniZinc semantics).
  *
- * Propagation in this first cut is the default no-op — chained prefix tightening lands
- * with full propagator strength later. LS recomputes the relation on each query.
+ * LS recomputes the relation on each query.
  */
 class LexLess(
     val xs: IntArray,

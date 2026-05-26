@@ -40,11 +40,6 @@ class FactorConflictReasonTest {
 
     @Test
     fun `Cardinality conflict analyzer learns clause containing decision`() {
-        // Cardinality(literals=[a, b, c, d], min=2) with helper Clauses forcing
-        // a, b, c all false when decision x=true. Cardinality then can't satisfy
-        // min=2 with only d remaining — and during unit-prop it also finds c
-        // already pinned false. propagate returns false; analyzer learns a clause
-        // containing ¬x (the UIP).
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
@@ -61,7 +56,7 @@ class FactorConflictReasonTest {
             ),
         )
         val session = PropagationSession(problem)
-        val r = session.pinBool(4, true)  // decision x=true triggers cascade
+        val r = session.pinBool(4, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(Lit.make(4, false) in learned.literals.toSet(),
@@ -75,8 +70,8 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),  // ¬x ∨ a
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),  // ¬x ∨ b
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
                 Cardinality(
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     min = 0, max = 1,
@@ -97,8 +92,8 @@ class FactorConflictReasonTest {
         val problem = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),  // ¬x ∨ a
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),  // ¬x ∨ b
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
                 PseudoBoolean(
                     weights = intArrayOf(3, 4),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
@@ -132,7 +127,7 @@ class FactorConflictReasonTest {
             ),
         )
         val session = PropagationSession(problem)
-        assertIs<PropagationResult.Implied>(session.pinBool(2, true))  // r=true
+        assertIs<PropagationResult.Implied>(session.pinBool(2, true))
         val r = session.pinBool(3, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
@@ -160,7 +155,7 @@ class FactorConflictReasonTest {
             ),
         )
         val session = PropagationSession(problem)
-        assertIs<PropagationResult.Implied>(session.pinBool(3, true))  // r=true
+        assertIs<PropagationResult.Implied>(session.pinBool(3, true))
         val r = session.pinBool(4, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
@@ -299,26 +294,20 @@ class FactorConflictReasonTest {
             ),
         )
         val session = PropagationSession(problem)
-        // Use PropagationState directly for low-level assertions.
         val r = session.pinBool(0, true)
         assertIs<PropagationResult.Implied>(r)
-        // Reach into PropagationState — the session's snapshot has the post-pin facts.
         val ant = problem.factors.let {
-            // Build a fresh state and replay the pin to inspect antecedents.
             val s = com.eignex.klause.solver.propagation.PropagationState(
                 problem, com.eignex.klause.solver.Assumptions.None,
             )
             s.pinBoolAsDecision(0, true)
-            // Run propagation to fixpoint.
             val confl = s.runToFixpoint(allFactors = false)
             assertTrue(confl == null, "unexpected conflict at level 1")
             s
         }
-        // v0 should be pinned to 5 with antecedents that include ¬x (the extraLit
-        // wired through propagateLinearBounds).
         assertTrue(ant.intMinAntecedents[0] != null,
             "v0.min antecedents should be set by ReifiedLinear A's body propagation")
-        val xLit = Lit.make(0, false)  // ¬x = the false-form of the pinned x=true.
+        val xLit = Lit.make(0, false)
         assertTrue(xLit in ant.intMinAntecedents[0]!!.toSet(),
             "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}")
         // z (bool var 1) implied true; its boolAntecedents now contain the *atom-lit*

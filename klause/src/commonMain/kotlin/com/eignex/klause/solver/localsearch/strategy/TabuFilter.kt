@@ -10,9 +10,10 @@ import kotlin.random.Random
  * that every LS strategy used to carry, with two extensions over the original inline form:
  *
  *   - [aspiration] decides whether a tabu move can still be admitted. The default
- *     ("when *every* candidate is tabu, drop the filter") matches the historical behaviour.
- *     [AspirationCriterion.OrImproving] additionally admits individual tabu moves that
- *     strictly improve the current cost — the standard literature aspiration.
+ *     ("when *every* candidate is tabu, drop the filter") preserves liveness when the
+ *     tabu would otherwise starve the strategy. [AspirationCriterion.OrImproving]
+ *     additionally admits individual tabu moves that strictly improve the current cost —
+ *     the standard literature aspiration.
  *
  *   - [dynamicTenure] lets the effective tenure scale with the search state. Default is
  *     constant; pass a function of `state.step` to vary the tenure over time (e.g. randomly

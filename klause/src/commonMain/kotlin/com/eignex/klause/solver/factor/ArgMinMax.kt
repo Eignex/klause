@@ -13,8 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * [indexOffset] is the value `idx` takes for position 0 in [xs] — typically `1` for the
  * MiniZinc 1-based default, `0` for the canonical klause 0-based form.
  *
- * Propagation in this first cut: tighten [idx] to its legal index range. Per-element
- * inferences (e.g. forcing `xs[idx].max ≥ max(xs.min)`) land in the next strength pass.
+ * Propagation: tighten [idx] to its legal index range.
  */
 class ArgMinMax(
     val idx: Int,

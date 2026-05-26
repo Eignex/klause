@@ -15,9 +15,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  *  - `strictly_decreasing_int(xs)` — strict descending: `xs[i] > xs[i+1]`
  *
  * Single class with [direction] and [strict] flags so MiniZinc's four predicate variants
- * all route to one factor. Propagation in this first cut is the default no-op — chained
- * bound-tightening lands when full propagator strength is in scope (next step). LS side
- * counts pairwise violations and proposes nudge moves on the offending vars.
+ * all route to one factor. LS side counts pairwise violations and proposes nudge moves
+ * on the offending vars.
  */
 class Monotone(
     val xs: IntArray,

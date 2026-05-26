@@ -41,7 +41,6 @@ class PropagationTest {
 
     @Test
     fun `unit clause with one undetermined literal pins it`() {
-        // (x0) — x0 must be true
         val p = boolProblem(1, intArrayOf(lit(0, true)))
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to true), r.bools)
@@ -50,7 +49,6 @@ class PropagationTest {
 
     @Test
     fun `forced chain across three unit clauses cascades`() {
-        // x0, !x0 v x1, !x1 v x2  →  x0=x1=x2=true
         val p = boolProblem(
             3,
             intArrayOf(lit(0, true)),
@@ -63,7 +61,6 @@ class PropagationTest {
 
     @Test
     fun `conflicting assumption set returns Unsat`() {
-        // (!x0 v x1) plus assumption x0=true, x1=false → unit-prop forces x1=true, contradiction
         val p = boolProblem(2, intArrayOf(lit(0, false), lit(1, true)))
         val r = p.propagate(Assumptions(bools = mapOf(0 to true, 1 to false)))
         assertIs<PropagationResult.Unsat>(r)
@@ -71,7 +68,6 @@ class PropagationTest {
 
     @Test
     fun `two contradicting clauses with empty assumptions return Unsat at init`() {
-        // (x0) and (!x0) jointly Unsat — caught by the empty-assumption pass
         val p = boolProblem(
             1,
             intArrayOf(lit(0, true)),
@@ -82,7 +78,6 @@ class PropagationTest {
 
     @Test
     fun `Implied result is disjoint from input assumptions`() {
-        // (!x0 v x1) with assumption x0=true → implies x1=true; x0 should NOT reappear in Implied
         val p = boolProblem(2, intArrayOf(lit(0, false), lit(1, true)))
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
         assertEquals(mapOf(1 to true), r.bools)
@@ -102,7 +97,6 @@ class PropagationTest {
 
     @Test
     fun `unsatisfiable clause under assumptions returns Unsat`() {
-        // (x0 v x1) with x0=false, x1=false → empty clause, Unsat
         val p = boolProblem(2, intArrayOf(lit(0, true), lit(1, true)))
         val r = p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false)))
         assertIs<PropagationResult.Unsat>(r)
@@ -110,7 +104,6 @@ class PropagationTest {
 
     @Test
     fun `non-unit clause does not force anything`() {
-        // (x0 v x1 v x2) with no assumptions — nothing pinned
         val p = boolProblem(3, intArrayOf(lit(0, true), lit(1, true), lit(2, true)))
         val r = implied(p.propagate())
         assertTrue(r.isEmpty)
@@ -158,7 +151,6 @@ class PropagationTest {
 
     @Test
     fun `Cardinality at upper bound forces remaining literals false`() {
-        // atMostOne(x0, x1, x2); pin x0=true → x1=x2 must be false.
         val p = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -174,7 +166,6 @@ class PropagationTest {
 
     @Test
     fun `Cardinality at lower bound forces remaining literals true`() {
-        // atLeastOne(x0, x1); pin x0=false → x1 must be true.
         val p = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -190,7 +181,6 @@ class PropagationTest {
 
     @Test
     fun `Cardinality with too many true literals is Unsat`() {
-        // atMostOne(x0, x1, x2) with x0=x1=true → Unsat
         val p = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -220,7 +210,6 @@ class PropagationTest {
 
     @Test
     fun `single-var reified linear derives aux when domain forces it`() {
-        // x in [0..3], aux ↔ (x ≤ 5) → aux must be true.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
             factors = arrayOf<Factor>(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)),
@@ -231,7 +220,6 @@ class PropagationTest {
 
     @Test
     fun `single-var reified linear conflicting aux is Unsat`() {
-        // x in [0..3], aux ↔ (x ≥ 10), pin aux=true → never holds → Unsat.
         val p = Problem(
             numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
             factors = arrayOf<Factor>(reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.GE, 10)),
@@ -241,7 +229,6 @@ class PropagationTest {
 
     @Test
     fun `ReifiedCardinality body forced derives aux`() {
-        // aux ↔ (#true in {x1, x2} ≤ 1). x1=x2=true means body=false → aux=false.
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(ReifiedCardinality(
@@ -269,7 +256,6 @@ class PropagationTest {
 
     @Test
     fun `Linear EQ derives both variable bounds`() {
-        // x + y = 5, x in [2..2] → y must be 3.
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(2, 2), IntDomain(0, 10)),
@@ -281,7 +267,6 @@ class PropagationTest {
 
     @Test
     fun `Linear infeasible bounds returns Unsat`() {
-        // 2x + 3y ≥ 100, x,y in [0..1] → max sum = 5, can never reach 100 → Unsat.
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
@@ -370,7 +355,6 @@ class PropagationTest {
 
     @Test
     fun `Xor with all pinned wrong parity is Unsat`() {
-        // XOR(x0, x1) = 1; pin both true → parity 0 ≠ 1 → Unsat
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(Xor(intArrayOf(lit(0, true), lit(1, true)), targetParity = 1)),
@@ -463,7 +447,6 @@ class PropagationTest {
 
     @Test
     fun `AllDifferent detects singleton-value conflict`() {
-        // x0, x1 both pinned to 5 → Unsat.
         val p = Problem(
             numBoolVars = 0, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
@@ -474,7 +457,6 @@ class PropagationTest {
 
     @Test
     fun `AllDifferent pigeonhole detects Unsat across non-pinned vars`() {
-        // 3 vars, each domain {0..1} (size 2), but 3 vars need 3 distinct values → Unsat
         val p = Problem(
             numBoolVars = 0, numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),

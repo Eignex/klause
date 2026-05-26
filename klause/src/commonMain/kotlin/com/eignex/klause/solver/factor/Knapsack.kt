@@ -11,9 +11,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * convention is enforced by [w]'s declared domain upper bound, and "maximise profit" by
  * the solve directive consuming [p].
  *
- * Decomposed propagation in this first cut: bound-tighten [w] and [p] from the per-element
- * `weights[i] · domain(xs[i])` and `profits[i] · domain(xs[i])` ranges. LP-relaxation-driven
- * pruning lands when full propagation strength is in scope (next step).
+ * Decomposed propagation: bound-tighten [w] and [p] from the per-element
+ * `weights[i] · domain(xs[i])` and `profits[i] · domain(xs[i])` ranges.
  */
 class Knapsack(
     val weights: IntArray,

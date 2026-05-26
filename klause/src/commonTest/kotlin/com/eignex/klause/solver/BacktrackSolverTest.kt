@@ -24,7 +24,6 @@ class BacktrackSolverTest {
 
     @Test
     fun `solve returns SAT with valid witness on simple clause`() {
-        // (x0 ∨ x1)
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
@@ -74,10 +73,10 @@ class BacktrackSolverTest {
         val p = Problem(
             numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),                                  // x0
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),              // ¬x0 ∨ x1
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),              // ¬x1 ∨ x2
-                Clause(intArrayOf(Lit.make(2, false))),                                 // ¬x2
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(2, false))),
             ),
         )
         val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
@@ -97,16 +96,12 @@ class BacktrackSolverTest {
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(clause))
         val state = com.eignex.klause.solver.propagation.PropagationState(problem, Assumptions.None)
-        // Initially watching the literals at indices 0 and 1 — the positive forms of v0 and v1.
         assertEquals(1, state.boolWatchersByLit[Lit.make(0, true)].size,
             "clause should be in watcher list for +v0")
         assertEquals(1, state.boolWatchersByLit[Lit.make(1, true)].size,
             "clause should be in watcher list for +v1")
-        // Should NOT be on the negative polarities (those becoming false means the
-        // positive literal is true → clause satisfied → no wakeup needed).
         assertEquals(0, state.boolWatchersByLit[Lit.make(0, false)].size,
             "clause should not be woken when -v0 becomes false (i.e., v0 = true)")
-        // Should NOT be on v2 at all yet — not a watched literal.
         assertEquals(0, state.boolWatchersByLit[Lit.make(2, true)].size,
             "v2 is not yet a watched literal")
     }
@@ -125,7 +120,7 @@ class BacktrackSolverTest {
             )),
         )
         val pins = mutableMapOf<Int, Boolean>()
-        for (v in 0 until 6) pins[v] = false  // 6 of 8 false → exactly 2 non-false left
+        for (v in 0 until 6) pins[v] = false
         val result = BacktrackSolver(problem).solve(BacktrackParams(
             assumptions = Assumptions(bools = pins),
         ))
@@ -237,7 +232,6 @@ class BacktrackSolverTest {
 
     @Test
     fun `solve respects assumptions`() {
-        // (x0 ∨ x1) with x0=false pinned → x1 must be true in the SAT witness.
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
@@ -250,7 +244,6 @@ class BacktrackSolverTest {
 
     @Test
     fun `enumerate yields every distinct SAT model on exactly-one`() {
-        // exactly-one over 4 vars → 4 models.
         val p = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(
@@ -260,7 +253,6 @@ class BacktrackSolverTest {
         val models = BacktrackSolver(p).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
         assertEquals(4, models.size)
         assertEquals(4, models.toSet().size, "models must be distinct")
-        // Each model has exactly one true bool.
         for (m in models) {
             assertEquals(1, m.bools.count { it })
         }
@@ -268,7 +260,6 @@ class BacktrackSolverTest {
 
     @Test
     fun `enumerate over int domain`() {
-        // x in [0..2] with x ≥ 1 → values {1, 2}.
         val p = Problem(
             numBoolVars = 0, numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 2)),
@@ -280,24 +271,20 @@ class BacktrackSolverTest {
 
     @Test
     fun `solve returns Unknown when budget exhausts before finding SAT`() {
-        // Hard-to-find problem with tiny budget.
         val p = Problem(
             numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                // Force exactly one of 10 vars to be true; budget=1 won't find it.
                 Cardinality.exactlyOne((0..9).map { Lit.make(it, true) }.toIntArray()),
             ),
         )
         val r = BacktrackSolver(p).solve(BacktrackParams(maxDecisions = 1))
         // Could legitimately be Unknown or Sat depending on whether the first branch hits.
-        // The strong assertion: it must not be Unsat (the problem is feasible).
         assertTrue(r is SolveResult.Sat || r is SolveResult.Unknown,
             "should not report Unsat on feasible problem: $r")
     }
 
     @Test
     fun `minimize finds the optimal feasible assignment`() {
-        // exactly-one over 4 vars with weights — minimum at the cheapest.
         val p = Problem(
             numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(
@@ -325,7 +312,6 @@ class BacktrackSolverTest {
         val models = BacktrackSolver(p).enumerate(
             BacktrackParams(minHammingDistance = 2, recentWindow = 16)
         ).toList()
-        // Every adjacent pair must differ by at least 2 bools.
         for (i in 0 until models.size - 1) {
             var d = 0
             for (j in models[i].bools.indices) if (models[i].bools[j] != models[i + 1].bools[j]) d++
@@ -356,7 +342,6 @@ class BacktrackSolverTest {
             variableHeuristic = Vsids(), randomSeed = 0L,
         ))
         val sat = assertIs<SolveResult.Sat>(r)
-        // Verify the witness actually satisfies the constraints.
         assertEquals(1, sat.assignment.bools.take(3).count { it },
             "exactly one of v0..v2 should be true")
         assertEquals(1, sat.assignment.bools.drop(3).count { it },
@@ -388,16 +373,11 @@ class BacktrackSolverTest {
             factors = emptyArray(),
         )
         val vsids = Vsids()
-        // Bump v3 directly via the rich onConflict signature. Use varRef = v3 and an
-        // empty Unsat record so only v3 (the failing decision) gets the bump.
+        // Bump v3 directly via the rich onConflict signature with an empty Unsat record
+        // so only v3 (the failing decision) gets the bump.
         val emptyUnsat = com.eignex.klause.solver.propagation.PropagationResult.Unsat()
         repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
-        // Solve with this VSIDS; the first decision should be on v3.
         val pinned = mutableMapOf<Int, Boolean>()
-        // We can't easily inspect "which var was picked first" without engine hooks, so
-        // verify the indirect effect: with a tightly-constrained problem requiring v3 to
-        // be a specific value, the solver should still reach SAT — confirms VSIDS isn't
-        // breaking the engine when used.
         val r = BacktrackSolver(problem).solve(BacktrackParams(variableHeuristic = vsids))
         assertIs<SolveResult.Sat>(r)
     }
@@ -458,14 +438,11 @@ class BacktrackSolverTest {
         // call onConflict(v3) directly, then ask `pick` on a fresh session.
         val problem = Problem(
             numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),  // unit on v0
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
         val base = RandomVariable
         val lc = LastConflict(base)
-        // Simulate a conflict on v3.
         lc.onConflict(VarRef.Bool(3))
-        // Now pick. Build a session with no pins; v3 should be the choice regardless
-        // of the base heuristic's random pick.
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val picked = lc.pick(session, kotlin.random.Random(0L))
         assertEquals(VarRef.Bool(3), picked,
@@ -480,18 +457,15 @@ class BacktrackSolverTest {
         )
         val lc = LastConflict(SmallestDomain)
         lc.onConflict(VarRef.Bool(2))
-        // Commit v2 → the prioritisation should drop.
         lc.onCommit(VarRef.Bool(2))
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val picked = lc.pick(session, kotlin.random.Random(0L))
-        // After commit, falls through to base — which is SmallestDomain, so first bool var.
         assertEquals(VarRef.Bool(0), picked,
             "last-conflict should defer to base after the prioritised var commits")
     }
 
     @Test
     fun `last-conflict composes with vsids end-to-end`() {
-        // Functional check: LastConflict(Vsids()) finds SAT on a conflict-heavy instance.
         val problem = Problem(
             numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
@@ -514,7 +488,7 @@ class BacktrackSolverTest {
     fun `samples yields models without dedup window`() {
         val p = Problem(
             numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyArray(),  // 4 models total
+            factors = emptyArray(),
         )
         val models = BacktrackSolver(p).samples(BacktrackParams(randomSeed = 0L)).take(80).toList()
         assertEquals(80, models.size, "samples is infinite for feasible problems; take(80) drains exactly 80")

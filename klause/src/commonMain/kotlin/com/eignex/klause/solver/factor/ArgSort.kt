@@ -10,15 +10,11 @@ import com.eignex.klause.solver.propagation.PropagationState
  * `[permOffset, permOffset+n-1]` such that the sequence `values[perm[i] − permOffset]`
  * is non-decreasing, with ties broken by smaller index.
  *
- * First-cut propagation:
+ * Propagation:
  *  - Bound-check that [perm] entries lie in `[permOffset, permOffset+n-1]`.
  *  - Pairwise NE on [perm] (all-different).
  *  - When all [perm] entries are pinned, verify sorted-ness directly and propagate
  *    bound-tightenings from [values] back to the ordering implied by perm.
- *
- * Stronger Régin-style propagation (matching-based) is left as a follow-up; the basic
- * factor here already beats the per-pair-Element decomposition on conflict-attribution
- * locality.
  */
 class ArgSort(
     val values: IntArray,

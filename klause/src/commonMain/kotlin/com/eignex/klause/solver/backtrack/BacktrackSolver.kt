@@ -611,21 +611,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     }
 
     /**
-     * Drive [node] through its remaining values until one succeeds or it exhausts. On Unsat
-     * the session self-reverts; the engine notifies the heuristics so activity-/conflict-
-     * driven strategies (VSIDS, dom/wdeg, last-conflict) can accumulate state. When
-     * [pruneIf] is non-null, a successful pin is *additionally* checked against the
-     * predicate: if the predicate says "no descendant of this partial assignment can
-     * improve the incumbent," the pin is reverted and the next value tried — B&B soft
-     * pruning, not fired as a heuristic conflict (the partial assignment is still
-     * propagation-consistent). Returns `false` when the node runs out of values or the
-     * decision budget is exhausted.
-     */
-    /**
-     * What [advance] reports back to the search loop. The previous `Boolean` was
-     * `true = success / false = exhausted-or-budget`; LCG-style non-chronological
-     * backjump adds a third path that needs the target level threaded back to the
-     * outer loop, hence the sealed type.
+     * What [advance] reports back to the search loop. LCG-style non-chronological
+     * backjump needs the target level threaded back to the outer loop, hence the
+     * sealed type rather than a plain Boolean success / failure.
      */
     private sealed interface AdvanceOutcome {
         /** A value pinned cleanly; commit the node to the trail. */

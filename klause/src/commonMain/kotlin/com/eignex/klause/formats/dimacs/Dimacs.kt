@@ -113,7 +113,6 @@ object Dimacs {
                 continue
             }
             // New MaxSAT 2022+ format may omit the `p` header; derive numVars from observed lits.
-            // Tokens:
             val tokens = line.split(Regex("\\s+")).filter { it.isNotEmpty() }
             if (tokens.isEmpty()) continue
             val isHard: Boolean

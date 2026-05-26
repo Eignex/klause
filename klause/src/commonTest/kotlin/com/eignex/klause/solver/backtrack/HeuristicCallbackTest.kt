@@ -26,7 +26,6 @@ class HeuristicCallbackTest {
         val committedVars: MutableList<Int> = ArrayList()
         val conflictVars: MutableList<Int> = ArrayList()
 
-        // Delegate the actual decisions to the canonical defaults; we're only counting.
         override fun pick(session: PropagationSession, rng: Random): VarRef? =
             InputOrder.pick(session, rng)
 
@@ -40,24 +39,14 @@ class HeuristicCallbackTest {
             conflictCount++; conflictVars.add(varRef.varId)
         }
         override fun onRestart() { restartCount++ }
-        // ValueHeuristic also has onCommit / onConflict — the same instance receives both
-        // (since it implements both interfaces). The overload resolution picks the
-        // VariableHeuristic variants (no `value` parameter) for the var-level callbacks,
-        // and these stubs for the value-level ones.
-        override fun onCommit(varRef: VarRef, value: Int) { /* counted via var-level */ }
-        override fun onConflict(varRef: VarRef, value: Int) { /* counted via var-level */ }
-        // Both VariableHeuristic and ValueHeuristic carry onSolution; pick a single
-        // override that satisfies both (they share the same signature).
+        override fun onCommit(varRef: VarRef, value: Int) {}
+        override fun onConflict(varRef: VarRef, value: Int) {}
         override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
     }
 
     @Test
     fun `onCommit fires once per successful pin`() {
-        // 3 bools, no constraints → 8 leaves. enumerate visits all of them; each leaf
-        // requires 3 successful pins, so commits ≥ 8 * 3 + intermediate-only commits = ?
-        // Actually with DFS: total `onCommit` calls equal the total number of decision
-        // pushes across the tree. For a 3-bool unconstrained problem with binary
-        // branching, the tree has 2 + 4 + 8 = 14 successful pins.
+        // 3 bools, no constraints: complete binary tree of depth 3 has 2+4+8 = 14 pins.
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
             factors = emptyArray())
         val h = CountingHeuristics()
@@ -65,22 +54,14 @@ class HeuristicCallbackTest {
             randomSeed = 0L, variableHeuristic = h, valueHeuristic = h,
         )).toList()
         assertEquals(8, samples.size)
-        // Each leaf required descending through 3 nodes; the engine pops and re-advances
-        // on the way back up. The expected number is the count of *distinct value pins*
-        // across the whole search — exactly 14 for a complete binary tree of depth 3.
         assertEquals(14, h.commitCount, "expected 14 successful pins; got ${h.commitCount}")
-        // No constraints → no conflicts.
         assertEquals(0, h.conflictCount)
     }
 
     @Test
     fun `onConflict fires on propagation Unsat`() {
-        // Two bools a, b with clauses (a ∨ b), (a ∨ ¬b), (¬a ∨ b), (¬a ∨ ¬b). These four
-        // clauses together resolve to ⊥, but klause's default baking only does unit-
-        // propagation (no failed-literal probing without opt-in), so the contradiction
-        // surfaces only at DFS depth 1: pinning a=false unit-propagates b=true via
-        // (a ∨ b), then (a ∨ ¬b) forces b=false → conflict. Same on a=true. Guaranteed
-        // DFS-level Unsat regardless of value ordering.
+        // Four clauses over (a, b) are UNSAT but bake-time unit-prop alone can't see
+        // it; the contradiction surfaces only after a DFS pin.
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
@@ -101,14 +82,11 @@ class HeuristicCallbackTest {
 
     @Test
     fun `onRestart fires once per Luby restart`() {
-        // With a tiny Luby base, the search restarts many times before completing.
-        // Each restart pops the trail and invokes onRestart.
         val factor = Cardinality.exactlyOne(intArrayOf(
             Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
         ))
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val h = CountingHeuristics()
-        // maxDecisions caps total work so the restart loop doesn't run forever.
         BacktrackSolver(problem).solve(BacktrackParams(
             randomSeed = 0L,
             variableHeuristic = h, valueHeuristic = h,
@@ -120,9 +98,6 @@ class HeuristicCallbackTest {
 
     @Test
     fun `default heuristics ignore callbacks without compile errors`() {
-        // The defaults (RandomVariable / IndomainRandom) don't override the callbacks.
-        // This test just verifies the search runs cleanly with them — no NPE, no
-        // exception. The actual semantic test is "no callback override breaks the build."
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
             factors = emptyArray())
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).toList()

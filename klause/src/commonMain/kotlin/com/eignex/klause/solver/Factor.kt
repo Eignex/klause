@@ -2,6 +2,12 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.propagation.PropagationState
 
+/** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
+ *  the two var spaces (purely-Boolean ones leave [Factor.intVars] empty; purely-integer
+ *  ones leave [Factor.boolVars] empty) wire this in instead of allocating their own
+ *  per-class empty array. */
+internal val EmptyIntArray: IntArray = IntArray(0)
+
 /**
  * Constraint metadata for [Problem]. Variables touched by a factor split into two id
  * spaces: Boolean vars in [boolVars] and integer vars in [intVars]. Pure-Boolean factors
@@ -18,12 +24,6 @@ import com.eignex.klause.solver.propagation.PropagationState
  * propagates (no LS support) is possible but unusual; documenting the split makes
  * propagation-only constraint kinds (e.g. expensive global constraints) safe to add.
  */
-/** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
- *  the two var spaces (purely-Boolean ones leave [Factor.intVars] empty; purely-integer
- *  ones leave [Factor.boolVars] empty) wire this in instead of allocating their own
- *  per-class empty array. */
-internal val EmptyIntArray: IntArray = IntArray(0)
-
 interface Factor {
     val boolVars: IntArray
     val intVars: IntArray
