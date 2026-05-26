@@ -209,10 +209,10 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
         solver: Z3LibSolver,
         rng: kotlin.random.Random,
     ) {
-        val pinBools = minOf(encoding.boolExprs.size, RANDOM_PIN_COUNT_CAP / 2)
-        val pinInts = minOf(encoding.intExprs.size, RANDOM_PIN_COUNT_CAP - pinBools)
+        val pinBools = minOf(encoding.numOriginalBoolVars, RANDOM_PIN_COUNT_CAP / 2)
+        val pinInts = minOf(encoding.numOriginalIntVars, RANDOM_PIN_COUNT_CAP - pinBools)
         if (pinBools > 0) {
-            val boolIds = (0 until encoding.boolExprs.size).toMutableList().apply { shuffle(rng) }
+            val boolIds = (0 until encoding.numOriginalBoolVars).toMutableList().apply { shuffle(rng) }
             for (i in 0 until pinBools) {
                 val v = boolIds[i]
                 val polarity = rng.nextBoolean()
@@ -220,7 +220,7 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
             }
         }
         if (pinInts > 0) {
-            val intIds = (0 until encoding.intExprs.size).toMutableList().apply { shuffle(rng) }
+            val intIds = (0 until encoding.numOriginalIntVars).toMutableList().apply { shuffle(rng) }
             for (i in 0 until pinInts) {
                 val v = intIds[i]
                 val d = problem.intDomains[v]
@@ -294,11 +294,14 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
 
     private fun decode(model: Model, encoding: Z3Encoding): Sample {
         val ctx = encoding.ctx
-        val bools = BooleanArray(encoding.boolExprs.size) { i ->
+        // Decode only the user-facing prefix of bool/int vars — aux allocated by the
+        // [FactorDecomposer] lives past `numOriginalBoolVars` / `numOriginalIntVars`
+        // and is encoding-internal.
+        val bools = BooleanArray(encoding.numOriginalBoolVars) { i ->
             val v = model.eval(encoding.boolExprs[i], true)
             v.equals(ctx.mkTrue())
         }
-        val ints = IntArray(encoding.intExprs.size) { i ->
+        val ints = IntArray(encoding.numOriginalIntVars) { i ->
             val v = model.eval(encoding.intExprs[i], true)
             (v as? IntNum)?.int ?: 0  // float-backed int vars are populated below from reals
         }
@@ -327,12 +330,17 @@ class Z3Solver(override val problem: Problem) : Solver<Z3Params>, Optimizer<Z3Pa
     private fun blockingClause(model: Model, encoding: Z3Encoding, ctx: Context): BoolExpr {
         // Forbid the exact assignment by OR-ing each variable with the negation of its
         // current model value.
-        val terms = ArrayList<BoolExpr>(encoding.boolExprs.size + encoding.intExprs.size)
-        for (b in encoding.boolExprs) {
+        // Block by the user-facing assignment only — letting aux vary across iterations
+        // doesn't grow the model count (each user assignment is one model regardless of
+        // how aux are chosen).
+        val terms = ArrayList<BoolExpr>(encoding.numOriginalBoolVars + encoding.numOriginalIntVars)
+        for (vid in 0 until encoding.numOriginalBoolVars) {
+            val b = encoding.boolExprs[vid]
             val current = model.eval(b, true)
             if (current.equals(ctx.mkTrue())) terms.add(ctx.mkNot(b)) else terms.add(b)
         }
-        for (i in encoding.intExprs) {
+        for (vid in 0 until encoding.numOriginalIntVars) {
+            val i = encoding.intExprs[vid]
             val current = model.eval(i, true) as IntNum
             terms.add(ctx.mkNot(ctx.mkEq(i, ctx.mkInt(current.int))))
         }

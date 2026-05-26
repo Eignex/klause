@@ -15,6 +15,9 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.decompose.DecompositionContext
+import com.eignex.klause.solver.decompose.FactorDecomposer
+import com.eignex.klause.solver.IntDomain
 import com.microsoft.z3.ArithExpr
 import com.microsoft.z3.BoolExpr
 import com.microsoft.z3.BoolSort
@@ -31,8 +34,17 @@ import com.microsoft.z3.RealSort
  */
 internal class Z3Encoding(
     val ctx: Context,
+    /** Bool consts indexed by var id. Entries `[0, numOriginalBoolVars)` correspond to
+     *  the original problem's bool variables; entries beyond are aux vars allocated by
+     *  the [FactorDecomposer] (one per fresh bool requested during decomposition). The
+     *  sample-decoding path uses [numOriginalBoolVars] to slice off just the user-facing
+     *  prefix. */
     val boolExprs: Array<BoolExpr>,
     val intExprs: Array<IntExpr>,
+    /** Number of bool consts that correspond to the original problem's variables;
+     *  `boolExprs.size - numOriginalBoolVars` are decomposition aux. */
+    val numOriginalBoolVars: Int,
+    val numOriginalIntVars: Int,
     /** Real-sorted Z3 expressions for each float var in [com.eignex.klause.solver.Problem.floatMetadata].
      *  Empty when the problem has no float metadata. Z3 reasons over LRA directly here —
      *  much faster than the bucketed-int path. */
@@ -64,11 +76,35 @@ internal class Z3Translation(
 internal object Z3Translator {
 
     fun translate(problem: Problem, ctx: Context): Z3Translation {
-        val boolExprs: Array<BoolExpr> = Array(problem.numBoolVars) { i ->
-            ctx.mkBoolConst("b$i") as BoolExpr
+        // First pass: decompose any factor type not in the native translator set into
+        // mid-IR factors. The decomposer's [DecompositionContext] hands out fresh
+        // aux var ids; we track how many were allocated so the Z3 const arrays can be
+        // sized to fit both the original problem and the new aux.
+        val decomposedFactors = ArrayList<Factor>(problem.factors.size)
+        val factorSpans = ArrayList<IntRange>(problem.factors.size)
+        val decomposeCtx = Z3DecomposeContext(
+            startBool = problem.numBoolVars,
+            startInt = problem.numIntVars,
+        )
+        for (factor in problem.factors) {
+            val start = decomposedFactors.size
+            if (isNativeZ3(factor)) {
+                decomposedFactors.add(factor)
+            } else {
+                val pieces = FactorDecomposer.decompose(factor, decomposeCtx)
+                    ?: error("Z3Translator: unsupported factor type ${factor::class.simpleName} and no decomposition registered")
+                decomposedFactors.addAll(pieces)
+            }
+            factorSpans.add(start until decomposedFactors.size)
         }
-        val intExprs: Array<IntExpr> = Array(problem.numIntVars) { i ->
-            ctx.mkIntConst("i$i") as IntExpr
+        val totalBoolVars = decomposeCtx.nextBool
+        val totalIntVars = decomposeCtx.nextInt
+
+        val boolExprs: Array<BoolExpr> = Array(totalBoolVars) { i ->
+            ctx.mkBoolConst(if (i < problem.numBoolVars) "b$i" else "aux_b$i") as BoolExpr
+        }
+        val intExprs: Array<IntExpr> = Array(totalIntVars) { i ->
+            ctx.mkIntConst(if (i < problem.numIntVars) "i$i" else "aux_i$i") as IntExpr
         }
         // Native-real handling for problems with float metadata. Each float var becomes
         // a Z3 Real const; the original real-valued constraints are emitted as LRA
@@ -82,7 +118,14 @@ internal object Z3Translator {
                 ctx.mkRealConst("r$i") as RealExpr
             }
 
-        val encoding = Z3Encoding(ctx, boolExprs, intExprs, realExprs)
+        val encoding = Z3Encoding(
+            ctx = ctx,
+            boolExprs = boolExprs,
+            intExprs = intExprs,
+            numOriginalBoolVars = problem.numBoolVars,
+            numOriginalIntVars = problem.numIntVars,
+            realExprs = realExprs,
+        )
 
         val auxiliary = ArrayList<BoolExpr>()
         // Int-domain constraints — we always add these, even for float-backing int vars,
@@ -92,6 +135,13 @@ internal object Z3Translator {
             auxiliary.add(ctx.mkAnd(
                 ctx.mkGe(intExprs[i], ctx.mkInt(d.min)),
                 ctx.mkLe(intExprs[i], ctx.mkInt(d.max)),
+            ))
+        }
+        // Domain constraints for decomposer-allocated aux int vars.
+        for ((id, dom) in decomposeCtx.auxIntDomains) {
+            auxiliary.add(ctx.mkAnd(
+                ctx.mkGe(intExprs[id], ctx.mkInt(dom.min)),
+                ctx.mkLe(intExprs[id], ctx.mkInt(dom.max)),
             ))
         }
         // Native-real domain constraints and the link `real = lo + bucket * step` so
@@ -130,11 +180,48 @@ internal object Z3Translator {
         // real values that decode to wrong-side buckets when the grid is coarse.) The
         // perf hit is small because the int Linear factors are short and Z3's mixed
         // int-real Simplex handles them efficiently.
+        // Translate the post-decomposition factor list. One Z3 BoolExpr per *original*
+        // factor: when a factor decomposed to multiple pieces, AND them so the cores
+        // / minimize loop still sees a 1-to-1 mapping with `problem.factors`.
+        val piecewise = ArrayList<BoolExpr>(decomposedFactors.size)
+        for (factor in decomposedFactors) {
+            piecewise.add(translateFactor(factor, encoding, ctx))
+        }
         val factorExprs = ArrayList<BoolExpr>(problem.factors.size)
-        for (factor in problem.factors) {
-            factorExprs.add(translateFactor(factor, encoding, ctx))
+        for (span in factorSpans) {
+            factorExprs.add(when (span.last - span.first + 1) {
+                0 -> ctx.mkTrue()
+                1 -> piecewise[span.first]
+                else -> ctx.mkAnd(*piecewise.subList(span.first, span.last + 1).toTypedArray())
+            })
         }
         return Z3Translation(encoding, auxiliary, factorExprs)
+    }
+
+    /** True for factor types this translator handles natively (no decomposition). */
+    private fun isNativeZ3(f: Factor): Boolean = when (f) {
+        is Clause, is Cardinality, is Linear, is PseudoBoolean, is Xor,
+        is AllDifferent, is Product,
+        is ReifiedLinear, is ReifiedPseudoBoolean, is ReifiedCardinality,
+        -> true
+        else -> false
+    }
+
+    /** [DecompositionContext] that hands out fresh klause var ids for aux variables;
+     *  the Z3 translator allocates Z3 const decls for them in a second pass. */
+    private class Z3DecomposeContext(
+        startBool: Int,
+        startInt: Int,
+    ) : DecompositionContext {
+        var nextBool: Int = startBool
+        var nextInt: Int = startInt
+        val auxIntDomains = ArrayList<Pair<Int, IntDomain>>()
+        override fun freshBool(): Int = nextBool++
+        override fun freshInt(domain: IntDomain): Int {
+            val id = nextInt++
+            auxIntDomains.add(id to domain)
+            return id
+        }
     }
 
     /** Translate a [com.eignex.klause.solver.RealLinearConstraint] into native Z3 real arithmetic. */
@@ -206,7 +293,7 @@ internal object Z3Translator {
             )
             ctx.mkIff(e.boolExprs[factor.auxBoolVar], pred)
         }
-        else -> error("Z3Translator: unsupported factor type ${factor::class.simpleName}")
+        else -> error("Z3Translator: factor type ${factor::class.simpleName} reached translator without decomposition (bug in isNativeZ3 / FactorDecomposer)")
     }
 
     /** Boolean expression for a klause literal — `boolExprs[v]` or its negation. */
