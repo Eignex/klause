@@ -210,11 +210,6 @@ Use cases:
 
 Grouped by workstream. CP covers the complete-search engine and propagators; Backend covers the FactorDecomposer's residual gaps for arithmetic adapters; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [Backend] BinPacking `LoadVars` decomposition: the per-bin load is a variable, so PB needs a variable bound. Decompose via per-load-value reified cardinality, or extend PseudoBoolean to accept an int-var bound.
-- [Backend] Cost-MDD (`Mdd.recordStride == 4`): plain acceptance is decomposed; the cost-weighted variant needs Linear EQ summing transition weights along the firing path.
-- [Backend] Cumulative for horizon > 1024: time-indexed bool encoding bails on long horizons. Replacement: pairwise-overlap encoding (precedence-aware) for medium horizons; full PB-over-tasks for tight ones.
-- [Backend] Opt-aware variants of Count / NValue / Disjunctive / GlobalCardinality: `presents` non-empty falls back. Decomposition needs a presence-gated reified-eq step.
-- [Backend] Path / Tree connectivity: the degree decomposition is sound but not cycle-eliminating. Full encoding needs flow or level-based sub-tour elimination.
 - [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
 - [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
 - [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.

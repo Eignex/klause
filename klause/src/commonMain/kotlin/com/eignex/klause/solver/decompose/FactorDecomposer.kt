@@ -40,8 +40,10 @@ import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedCardinality
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.ast.PbOp
 
 /**
  * Allocator hook for fresh aux variables used by [FactorDecomposer]. Backends that
@@ -303,15 +305,22 @@ object FactorDecomposer {
         return out
     }
 
-    /** `count(xs, v, op, n)` — number of `xs[i] = v` ⟨op⟩ `n`. The `presents`-empty
-     *  fast path; non-empty `presents` returns null (caller must handle natively). */
+    /** `count(xs, v, op, n)` — number of `xs[i] = v` ⟨op⟩ `n`. With `presents` non-empty,
+     *  the contributing lits are gated by presence: `inCount_i ↔ present_i ∧ (xs[i] = v)`. */
     private fun decomposeCount(f: Count, ctx: DecompositionContext): List<Factor>? {
-        if (f.presents.isNotEmpty()) return null
         val out = ArrayList<Factor>()
-        val eqLits = IntArray(f.xs.size) {
-            val aux = ctx.freshBool()
-            out.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(f.xs[it]), LinearOp.EQ, f.v))
-            Lit.make(aux, true)
+        val eqLits = IntArray(f.xs.size) { i ->
+            val eq = ctx.freshBool()
+            out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, f.v))
+            if (f.presents.isEmpty()) Lit.make(eq, true)
+            else {
+                val pres = f.presents[i]
+                val gated = ctx.freshBool()
+                out.add(Clause(intArrayOf(Lit.make(gated, false), Lit.make(eq, true))))
+                out.add(Clause(intArrayOf(Lit.make(gated, false), pres)))
+                out.add(Clause(intArrayOf(Lit.make(gated, true), Lit.make(eq, false), Lit.negate(pres))))
+                Lit.make(gated, true)
+            }
         }
         val xn = f.xs.size
         val (lo, hi) = when (f.op) {
@@ -357,7 +366,6 @@ object FactorDecomposer {
      *  over the union of `xs` domains, allocates a "used_v" aux per candidate, and
      *  constrains the sum via Cardinality with mode-driven bounds. */
     private fun decomposeNValue(f: NValue, ctx: DecompositionContext): List<Factor>? {
-        if (f.presents.isNotEmpty()) return null
         // Union of domain extremes.
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
@@ -370,11 +378,19 @@ object FactorDecomposer {
         val out = ArrayList<Factor>()
         val usedLits = ArrayList<Int>()
         for (v in lo..hi) {
-            // For each xs[i], reified eq_iv ↔ (xs[i] = v).
+            // For each xs[i], reified eq_iv ↔ (xs[i] = v); gate by presence when opt-aware.
             val eqLits = IntArray(f.xs.size) { i ->
-                val aux = ctx.freshBool()
-                out.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, v))
-                Lit.make(aux, true)
+                val eq = ctx.freshBool()
+                out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, v))
+                if (f.presents.isEmpty()) Lit.make(eq, true)
+                else {
+                    val pres = f.presents[i]
+                    val gated = ctx.freshBool()
+                    out.add(Clause(intArrayOf(Lit.make(gated, false), Lit.make(eq, true))))
+                    out.add(Clause(intArrayOf(Lit.make(gated, false), pres)))
+                    out.add(Clause(intArrayOf(Lit.make(gated, true), Lit.make(eq, false), Lit.negate(pres))))
+                    Lit.make(gated, true)
+                }
             }
             // used_v ↔ (sum eq_iv ≥ 1).
             val usedV = ctx.freshBool()
@@ -498,13 +514,12 @@ object FactorDecomposer {
         return out
     }
 
-    /** `bin_packing(bins, weights, mode, ...)`. We decompose UniformCapacity and
-     *  PerBinCapacity into per-bin PB sums against constant capacities; LoadVars (where
-     *  the per-bin total is itself a variable) returns null. */
+    /** `bin_packing(bins, weights, mode, ...)`. All three modes decompose to
+     *  per-(item, bin) reified equalities plus per-bin sum constraints. UniformCapacity
+     *  and PerBinCapacity become a `≤ cap` PB; LoadVars equates the per-bin PB sum to the
+     *  load var by enumerating its domain and tying `(Σ = k) ↔ (load = k)` per value. */
     private fun decomposeBinPacking(f: BinPacking, ctx: DecompositionContext): List<Factor>? {
-        if (f.mode == BinPacking.Mode.LoadVars) return null
         val out = ArrayList<Factor>()
-        // For each (item, bin) pair, reified inBin_ik ↔ (bins[i] = k + binOffset).
         val inBin = Array(f.numBins) { IntArray(f.bins.size) }
         for (i in f.bins.indices) {
             for (k in 0 until f.numBins) {
@@ -512,20 +527,29 @@ object FactorDecomposer {
                 out.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(f.bins[i]), LinearOp.EQ, k + f.binOffset))
                 inBin[k][i] = aux
             }
-            // Exactly one bin per item — implicit from the domain constraint, but adding
-            // it explicitly lets the backend exploit the AMO directly.
             val perItem = IntArray(f.numBins) { Lit.make(inBin[it][i], true) }
             out.add(Cardinality(perItem, min = 1, max = 1))
         }
-        // Per-bin capacity: Σᵢ inBin_ik · weights[i] ≤ cap_k.
         for (k in 0 until f.numBins) {
-            val cap = when (f.mode) {
-                BinPacking.Mode.UniformCapacity -> f.uniformCapacity
-                BinPacking.Mode.PerBinCapacity -> f.capacities!![k]
-                BinPacking.Mode.LoadVars -> error("unreachable")
-            }
             val lits = IntArray(f.bins.size) { Lit.make(inBin[k][it], true) }
-            out.add(PseudoBoolean(f.weights.copyOf(), lits, com.eignex.klause.ast.PbOp.LE, cap))
+            when (f.mode) {
+                BinPacking.Mode.UniformCapacity ->
+                    out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, f.uniformCapacity))
+                BinPacking.Mode.PerBinCapacity ->
+                    out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, f.capacities!![k]))
+                BinPacking.Mode.LoadVars -> {
+                    val loadVar = f.loadVars!![k]
+                    val dom = ctx.intDomainOf(loadVar)
+                    for (v in dom.min..dom.max) {
+                        val sumEqV = ctx.freshBool()
+                        out.add(ReifiedPseudoBoolean(sumEqV, f.weights.copyOf(), lits, PbOp.EQ, v))
+                        val loadEqV = ctx.freshBool()
+                        out.add(ReifiedLinear(loadEqV, intArrayOf(1), intArrayOf(loadVar), LinearOp.EQ, v))
+                        out.add(Clause(intArrayOf(Lit.make(sumEqV, false), Lit.make(loadEqV, true))))
+                        out.add(Clause(intArrayOf(Lit.make(sumEqV, true), Lit.make(loadEqV, false))))
+                    }
+                }
+            }
         }
         return out
     }
@@ -754,9 +778,6 @@ object FactorDecomposer {
      *  bounds each layer's rows. Per layer, an aux per transition fires when (state_i =
      *  src ∧ seq[i] = value ∧ state_{i+1} = dst); exactly one transition fires per layer. */
     private fun decomposeMdd(f: Mdd, ctx: DecompositionContext): List<Factor>? {
-        // Cost MDD (recordStride == 4) and weight-tracking left as a follow-up; the
-        // plain acceptance case (stride 3) is what most workloads exercise.
-        if (f.recordStride != 3) return null
         val out = ArrayList<Factor>()
         val n = f.seq.size
         // Per-layer state aux: state[i] ∈ [0, numStatesPerLayer[i] - 1].
@@ -764,6 +785,8 @@ object FactorDecomposer {
             ctx.freshInt(com.eignex.klause.solver.IntDomain(0, f.numStatesPerLayer[i] - 1))
         }
         out.add(Linear(intArrayOf(1), intArrayOf(state[0]), LinearOp.EQ, f.initial))
+        val allFires = ArrayList<Int>()
+        val allWeights = ArrayList<Int>()
         for (i in 0 until n) {
             val from = f.layerStarts[i]
             val to = f.layerStarts[i + 1]
@@ -780,14 +803,16 @@ object FactorDecomposer {
                 out.add(ReifiedLinear(a2, intArrayOf(1), intArrayOf(f.seq[i]), LinearOp.EQ, value))
                 out.add(ReifiedLinear(a3, intArrayOf(1), intArrayOf(state[i + 1]), LinearOp.EQ, dst))
                 val fires = ctx.freshBool()
-                // fires ↔ a1 ∧ a2 ∧ a3
                 out.add(Clause(intArrayOf(Lit.make(fires, false), Lit.make(a1, true))))
                 out.add(Clause(intArrayOf(Lit.make(fires, false), Lit.make(a2, true))))
                 out.add(Clause(intArrayOf(Lit.make(fires, false), Lit.make(a3, true))))
                 out.add(Clause(intArrayOf(Lit.make(fires, true), Lit.make(a1, false), Lit.make(a2, false), Lit.make(a3, false))))
+                if (f.recordStride == 4) {
+                    allFires.add(Lit.make(fires, true))
+                    allWeights.add(f.transitions[base + 3])
+                }
                 fires
             }
-            // Exactly one transition fires per layer.
             val lits = IntArray(numTx) { Lit.make(txAux[it], true) }
             out.add(Cardinality(lits, min = 1, max = 1))
         }
@@ -798,35 +823,44 @@ object FactorDecomposer {
             Lit.make(aux, true)
         }
         out.add(Cardinality(acceptLits, min = 1, max = f.accepting.size))
+        // Cost-MDD: cost = Σ weight · fires. Exactly one fires bool per layer, so this
+        // sums one weight per layer. Enumerate cost domain and tie `(Σ = k) ↔ (cost = k)`.
+        if (f.recordStride == 4) {
+            val firesArr = allFires.toIntArray()
+            val weightsArr = allWeights.toIntArray()
+            val cdom = ctx.intDomainOf(f.cost)
+            for (k in cdom.min..cdom.max) {
+                val sumEqK = ctx.freshBool()
+                out.add(ReifiedPseudoBoolean(sumEqK, weightsArr, firesArr, PbOp.EQ, k))
+                val cEqK = ctx.freshBool()
+                out.add(ReifiedLinear(cEqK, intArrayOf(1), intArrayOf(f.cost), LinearOp.EQ, k))
+                out.add(Clause(intArrayOf(Lit.make(sumEqK, false), Lit.make(cEqK, true))))
+                out.add(Clause(intArrayOf(Lit.make(sumEqK, true), Lit.make(cEqK, false))))
+            }
+        }
         return out
     }
 
     /** `disjunctive(starts, durations)` — pairwise non-overlap. For each task pair (i,j):
      *  `(start_i + dur_i ≤ start_j) ∨ (start_j + dur_j ≤ start_i)`. */
     private fun decomposeDisjunctive(f: Disjunctive, ctx: DecompositionContext): List<Factor>? {
-        if (f.presents.isNotEmpty()) return null
         val out = ArrayList<Factor>()
         for (i in 0 until f.starts.size - 1) {
             for (j in i + 1 until f.starts.size) {
-                // a_ij ↔ (start_i + dur_i ≤ start_j)  iff  start_i − start_j ≤ −dur_i.
                 val aij = ctx.freshBool()
-                out.add(ReifiedLinear(
-                    aij,
-                    intArrayOf(1, -1),
-                    intArrayOf(f.starts[i], f.starts[j]),
-                    LinearOp.LE,
-                    -f.durations[i],
-                ))
-                // a_ji ↔ (start_j + dur_j ≤ start_i)
+                out.add(ReifiedLinear(aij, intArrayOf(1, -1), intArrayOf(f.starts[i], f.starts[j]), LinearOp.LE, -f.durations[i]))
                 val aji = ctx.freshBool()
-                out.add(ReifiedLinear(
-                    aji,
-                    intArrayOf(1, -1),
-                    intArrayOf(f.starts[j], f.starts[i]),
-                    LinearOp.LE,
-                    -f.durations[j],
-                ))
-                out.add(Clause(intArrayOf(Lit.make(aij, true), Lit.make(aji, true))))
+                out.add(ReifiedLinear(aji, intArrayOf(1, -1), intArrayOf(f.starts[j], f.starts[i]), LinearOp.LE, -f.durations[j]))
+                // Non-opt: at least one separation holds. Opt-aware: if either is absent
+                // the pair is vacuous, so add ¬present_i ∨ ¬present_j to the disjunction.
+                if (f.presents.isEmpty()) {
+                    out.add(Clause(intArrayOf(Lit.make(aij, true), Lit.make(aji, true))))
+                } else {
+                    out.add(Clause(intArrayOf(
+                        Lit.make(aij, true), Lit.make(aji, true),
+                        Lit.negate(f.presents[i]), Lit.negate(f.presents[j]),
+                    )))
+                }
             }
         }
         return out
@@ -911,8 +945,10 @@ object FactorDecomposer {
             val end = d.max + f.durations[i]
             if (end > horizon) horizon = end
         }
-        // Cap horizon to a reasonable value to avoid exploding aux bool counts.
-        if (horizon > 1024) return null
+        // Long horizons: fall back to the pairwise-overlap "task-as-time" encoding.
+        // Resource peaks can only occur at task start times, so capacity feasibility at
+        // every start time is necessary and sufficient.
+        if (horizon > 1024) return decomposeCumulativePairwise(f, ctx)
         val out = ArrayList<Factor>()
         val nTasks = f.starts.size
         // active_i_t ↔ (starts[i] ≤ t ∧ starts[i] + durations[i] > t)
@@ -934,7 +970,45 @@ object FactorDecomposer {
         // For each time t: Σ resources[i] · active_i_t ≤ capacity.
         for (t in 0 until horizon) {
             val lits = IntArray(nTasks) { Lit.make(active[it][t], true) }
-            out.add(PseudoBoolean(f.resources.copyOf(), lits, com.eignex.klause.ast.PbOp.LE, f.capacity))
+            out.add(PseudoBoolean(f.resources.copyOf(), lits, PbOp.LE, f.capacity))
+        }
+        return out
+    }
+
+    /** Pairwise-overlap "task-as-time" encoding for cumulative. Bool `contains_ij ↔
+     *  (start_j ≤ start_i ≤ start_j + dur_j − 1)` — task j is active at task i's start.
+     *  For each i: `Σⱼ≠ᵢ resources[j] · contains_ij ≤ capacity − resources[i]`.
+     *  Sound and complete: resource peaks can only occur at start events, so checking
+     *  every start time covers the schedule's maximum load. */
+    private fun decomposeCumulativePairwise(f: Cumulative, ctx: DecompositionContext): List<Factor> {
+        val out = ArrayList<Factor>()
+        val n = f.starts.size
+        val contains = Array(n) { IntArray(n) }
+        for (i in 0 until n) {
+            for (j in 0 until n) {
+                if (i == j) continue
+                // start_i − start_j ≥ 0
+                val ge = ctx.freshBool()
+                out.add(ReifiedLinear(ge, intArrayOf(1, -1), intArrayOf(f.starts[i], f.starts[j]), LinearOp.GE, 0))
+                // start_i − start_j ≤ dur_j − 1
+                val le = ctx.freshBool()
+                out.add(ReifiedLinear(le, intArrayOf(1, -1), intArrayOf(f.starts[i], f.starts[j]), LinearOp.LE, f.durations[j] - 1))
+                val both = ctx.freshBool()
+                out.add(Clause(intArrayOf(Lit.make(both, false), Lit.make(ge, true))))
+                out.add(Clause(intArrayOf(Lit.make(both, false), Lit.make(le, true))))
+                out.add(Clause(intArrayOf(Lit.make(both, true), Lit.make(ge, false), Lit.make(le, false))))
+                contains[i][j] = both
+            }
+        }
+        for (i in 0 until n) {
+            val lits = ArrayList<Int>()
+            val ws = ArrayList<Int>()
+            for (j in 0 until n) {
+                if (i == j) continue
+                lits.add(Lit.make(contains[i][j], true))
+                ws.add(f.resources[j])
+            }
+            out.add(PseudoBoolean(ws.toIntArray(), lits.toIntArray(), PbOp.LE, f.capacity - f.resources[i]))
         }
         return out
     }
@@ -1228,14 +1302,33 @@ object FactorDecomposer {
             out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(fp, true))))
             out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(tp, true))))
         }
+        // Cycle elimination via per-node level (MTZ-style): `level[v] ∈ [0, n-1]`,
+        // `level[source] = 0`, and `edgePresent[e] = (u→v) ⇒ level[v] = level[u] + 1`.
+        // Around any cycle this would require level[u]+k = level[u], so all simple cycles
+        // are excluded; the only feasible subgraph is a source-to-sink path.
+        val level = IntArray(n) { ctx.freshInt(com.eignex.klause.solver.IntDomain(0, n - 1)) }
+        for (v in 0 until n) {
+            val isSourceL = ctx.freshBool()
+            out.add(ReifiedLinear(isSourceL, intArrayOf(1), intArrayOf(f.source), LinearOp.EQ, v + off))
+            val lvlEq0 = ctx.freshBool()
+            out.add(ReifiedLinear(lvlEq0, intArrayOf(1), intArrayOf(level[v]), LinearOp.EQ, 0))
+            out.add(Clause(intArrayOf(Lit.make(isSourceL, false), Lit.make(lvlEq0, true))))
+        }
+        for (e in 0 until m) {
+            val u = f.from[e] - off
+            val v = f.to[e] - off
+            val step = ctx.freshBool()
+            out.add(ReifiedLinear(step, intArrayOf(1, -1), intArrayOf(level[v], level[u]), LinearOp.EQ, 1))
+            out.add(Clause(intArrayOf(Lit.make(f.edgePresent[e], false), Lit.make(step, true))))
+        }
         return out
     }
 
     /** `tree(numNodes, from, to, root, nodePresent, edgePresent)` — in-tree rooted at
      *  `root`. Decomposition: root has in-degree 0, every other present node has
-     *  in-degree 1. Out-degree is unconstrained beyond "≥ 1 implies present". Like
-     *  [decomposePath], this is the degree-based necessary condition; full connectivity
-     *  (cycle-free) is left to the propagator. */
+     *  in-degree 1; plus level-based cycle elimination so a present edge `u→v`
+     *  enforces `level[v] = level[u] + 1`. Around any cycle this is infeasible, ruling
+     *  out disconnected components that the degree constraints alone permit. */
     private fun decomposeTree(f: Tree, ctx: DecompositionContext): List<Factor> {
         val out = ArrayList<Factor>()
         val n = f.numNodes
@@ -1284,6 +1377,25 @@ object FactorDecomposer {
             out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(fp, true))))
             out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(tp, true))))
         }
+        // Cycle elimination: `level[v] ∈ [0, n-1]`, `level[root] = 0`, and per edge
+        // `(u→v)`: `edgePresent[e] ⇒ level[v] = level[u] + 1`. This eliminates cycles
+        // (level monotonically increases along present edges) and any non-root present
+        // node is forced to descend from the root.
+        val level = IntArray(n) { ctx.freshInt(com.eignex.klause.solver.IntDomain(0, n - 1)) }
+        for (v in 0 until n) {
+            val isRootL = ctx.freshBool()
+            out.add(ReifiedLinear(isRootL, intArrayOf(1), intArrayOf(f.root), LinearOp.EQ, v + off))
+            val lvlEq0 = ctx.freshBool()
+            out.add(ReifiedLinear(lvlEq0, intArrayOf(1), intArrayOf(level[v]), LinearOp.EQ, 0))
+            out.add(Clause(intArrayOf(Lit.make(isRootL, false), Lit.make(lvlEq0, true))))
+        }
+        for (e in 0 until m) {
+            val u = f.from[e] - off
+            val v = f.to[e] - off
+            val step = ctx.freshBool()
+            out.add(ReifiedLinear(step, intArrayOf(1, -1), intArrayOf(level[v], level[u]), LinearOp.EQ, 1))
+            out.add(Clause(intArrayOf(Lit.make(f.edgePresent[e], false), Lit.make(step, true))))
+        }
         return out
     }
 
@@ -1292,15 +1404,27 @@ object FactorDecomposer {
      *  presence; we cover the count-var (open) and count-low/high (open) cases. The
      *  closed-mode and per-xs-presence variants return null. */
     private fun decomposeGlobalCardinality(f: GlobalCardinality, ctx: DecompositionContext): List<Factor>? {
-        if (f.presents.isNotEmpty() || f.closed) return null
         val out = ArrayList<Factor>()
+        // Per xs[i], collect a "membership_iv ↔ present_i ∧ (xs[i] = v)" lit per cover
+        // value. Closed mode additionally requires every present xs[i] to be ∈ cover —
+        // we materialize a per-i ∈-cover indicator and force it true (or true-when-present).
+        val coverIndicator = if (f.closed) IntArray(f.xs.size) else IntArray(0)
+        val coverLitsPerIndex = if (f.closed) Array(f.xs.size) { ArrayList<Int>() } else emptyArray()
         for (ci in f.cover.indices) {
             val v = f.cover[ci]
-            // Per xs[i], reified eq_iv ↔ (xs[i] = v).
             val eqLits = IntArray(f.xs.size) { i ->
-                val aux = ctx.freshBool()
-                out.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, v))
-                Lit.make(aux, true)
+                val eq = ctx.freshBool()
+                out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, v))
+                if (f.closed) coverLitsPerIndex[i].add(Lit.make(eq, true))
+                if (f.presents.isEmpty()) Lit.make(eq, true)
+                else {
+                    val pres = f.presents[i]
+                    val gated = ctx.freshBool()
+                    out.add(Clause(intArrayOf(Lit.make(gated, false), Lit.make(eq, true))))
+                    out.add(Clause(intArrayOf(Lit.make(gated, false), pres)))
+                    out.add(Clause(intArrayOf(Lit.make(gated, true), Lit.make(eq, false), Lit.negate(pres))))
+                    Lit.make(gated, true)
+                }
             }
             when {
                 f.countVars != null -> {
@@ -1336,6 +1460,22 @@ object FactorDecomposer {
                 }
                 else -> {
                     // No count constraint expressed for this cover value — skip.
+                }
+            }
+        }
+        if (f.closed) {
+            // Each present xs[i] must equal some cover value.
+            for (i in f.xs.indices) {
+                val inCover = ctx.freshBool()
+                coverIndicator[i] = inCover
+                // inCover ↔ OR(coverLitsPerIndex[i]).
+                val lits = coverLitsPerIndex[i].toIntArray()
+                out.add(ReifiedCardinality(inCover, lits, min = 1, max = lits.size))
+                if (f.presents.isEmpty()) {
+                    out.add(Clause(intArrayOf(Lit.make(inCover, true))))
+                } else {
+                    // present_i → inCover
+                    out.add(Clause(intArrayOf(Lit.negate(f.presents[i]), Lit.make(inCover, true))))
                 }
             }
         }
