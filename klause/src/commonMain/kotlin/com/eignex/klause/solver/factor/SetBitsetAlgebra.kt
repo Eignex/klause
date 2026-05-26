@@ -2,9 +2,13 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+
+private const val SET_BITSET_MAX_PROPOSALS = 8
 
 /**
  * Native bulk set-algebra propagators over indicator-bool arrays. A set var is represented
@@ -77,6 +81,25 @@ class SetBitsetSubset(
             if (!rv) { nowV = true; break }
         }
         return (if (nowV) 1 else 0) - (if (wasV) 1 else 0)
+    }
+
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        // For each violating position (left=true, right=false-or-absent) propose:
+        // (a) flip left to false, (b) flip right to true (if right exists), (c) compound both.
+        var emitted = 0
+        for (i in leftBools.indices) {
+            if (emitted >= SET_BITSET_MAX_PROPOSALS) break
+            val lb = leftBools[i]
+            if (lb < 0 || !state.assignment.boolValue(lb)) continue
+            val rb = rightBools[i]
+            if (rb >= 0 && state.assignment.boolValue(rb)) continue
+            sink.addBoolFlip(lb)
+            if (rb >= 0) {
+                sink.addBoolFlip(rb)
+                sink.addCompound(listOf(Move.BoolFlip(lb), Move.BoolFlip(rb)))
+            }
+            emitted++
+        }
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
@@ -176,6 +199,23 @@ class SetBitsetDisjoint(
         return (if (nowV) 1 else 0) - (if (wasV) 1 else 0)
     }
 
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        // For each colliding position (both sides true) propose flipping either side
+        // (or a compound flipping both — useful when the violation is shared with another
+        // factor on the same indicator).
+        var emitted = 0
+        for (i in leftBools.indices) {
+            if (emitted >= SET_BITSET_MAX_PROPOSALS) break
+            val lb = leftBools[i]; val rb = rightBools[i]
+            if (lb < 0 || rb < 0) continue
+            if (!state.assignment.boolValue(lb) || !state.assignment.boolValue(rb)) continue
+            sink.addBoolFlip(lb)
+            sink.addBoolFlip(rb)
+            sink.addCompound(listOf(Move.BoolFlip(lb), Move.BoolFlip(rb)))
+            emitted++
+        }
+    }
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         for (i in leftBools.indices) {
             val lb = leftBools[i]; val rb = rightBools[i]
@@ -254,6 +294,23 @@ class SetBitsetEq(
             if (lv != rv) { nowV = true; break }
         }
         return (if (nowV) 1 else 0) - (if (wasV) 1 else 0)
+    }
+
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        // For each mismatched position, flipping either side resolves the local mismatch.
+        // (A compound that flips both would just swap which side is true — still mismatched —
+        //  so we don't propose one for Eq.)
+        var emitted = 0
+        for (i in leftBools.indices) {
+            if (emitted >= SET_BITSET_MAX_PROPOSALS) break
+            val lb = leftBools[i]; val rb = rightBools[i]
+            val lv = lb >= 0 && state.assignment.boolValue(lb)
+            val rv = rb >= 0 && state.assignment.boolValue(rb)
+            if (lv == rv) continue
+            if (lb >= 0) sink.addBoolFlip(lb)
+            if (rb >= 0) sink.addBoolFlip(rb)
+            emitted++
+        }
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
