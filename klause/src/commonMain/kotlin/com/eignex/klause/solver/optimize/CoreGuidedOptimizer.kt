@@ -88,10 +88,21 @@ class CoreGuidedOptimizer(val baseProblem: Problem) {
         var spent: Boolean = false,
     ) {
         fun relaxerClause(): Clause {
-            val arr = IntArray(2 + extraBlockers.size)
+            // Pre-first-core: `(origLit ∨ r_i)` with `¬r_i` assumed acts as the
+            // "soft must hold" constraint. Once spent, drop r_i: the per-core blockers
+            // are now the only relaxation channel, gated by the ExactlyOne constraints
+            // that accumulate across cores. Keeping r_i in the clause after the soft
+            // is spent would leave it as a free relaxation switch (it has no other
+            // constraint), letting the SAT solver satisfy the relaxer without honouring
+            // any soft — the cost lower bound stays correct but the recovered sample
+            // doesn't reflect the optimum (cost-bound test relied on this, sample test
+            // didn't).
+            val size = (if (spent) 1 else 2) + extraBlockers.size
+            val arr = IntArray(size)
             arr[0] = origLit
-            arr[1] = Lit.make(initialSelector, positive = true)
-            for (i in 0 until extraBlockers.size) arr[2 + i] = Lit.make(extraBlockers[i], positive = true)
+            var i = 1
+            if (!spent) { arr[i++] = Lit.make(initialSelector, positive = true) }
+            for (j in 0 until extraBlockers.size) arr[i++] = Lit.make(extraBlockers[j], positive = true)
             return Clause(arr)
         }
     }
