@@ -34,6 +34,23 @@ class PseudoBoolean(
     }
     override val intVars: IntArray = EmptyIntArray
 
+    /** Sum of `weight[i] * sign(literals[i])` per Boolean variable. Flipping `v` shifts
+     *  the running sum by `(if v_was_true then -signed[v] else +signed[v])`, computed in
+     *  O(1) instead of scanning every literal in the factor. */
+    private val signedWeightByVar: com.eignex.klause.util.IntIntMap = run {
+        val signs = HashMap<Int, Int>()
+        for (i in literals.indices) {
+            val v = Lit.variable(literals[i])
+            val s = if (Lit.isPositive(literals[i])) weights[i] else -weights[i]
+            signs[v] = (signs[v] ?: 0) + s
+        }
+        com.eignex.klause.util.IntIntMap.build(
+            keys = signs.keys.toIntArray(),
+            values = signs.values.toIntArray(),
+            absent = 0,
+        )
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0
         for (i in literals.indices) {
@@ -101,15 +118,55 @@ class PseudoBoolean(
     }
 
     private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
+        val signed = signedWeightByVar[boolVar]
+        if (signed == 0) return 0
+        // If we want the delta against the *current* value of `boolVar`: flipping from
+        // true → false contributes `-signed`; false → true contributes `+signed`. If we
+        // want the delta from the *pre*-flip value (i.e. the engine has already committed
+        // the flip), the polarity inverts.
         val pre = if (current) state.assignment.boolValue(boolVar)
         else !state.assignment.boolValue(boolVar)
-        var delta = 0
-        for (i in literals.indices) {
-            if (Lit.variable(literals[i]) != boolVar) continue
-            delta += if (Lit.evaluate(literals[i], pre)) -weights[i] else weights[i]
+        return if (pre) -signed else signed
+    }
+
+    override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    /** O(arity) — replaces the engine's two `deltaIfBoolFlipped`-driven passes (each itself
+     *  O(arity)) with a single per-var diff. Computes pre- vs post-flip break/make
+     *  contributions from [signedWeightByVar] and applies only the changes. */
+    override fun updateBoolBreakMakeForFlip(
+        state: LocalSearchState, factorId: Int, flippedVar: Int,
+    ) {
+        val signedFlipped = signedWeightByVar[flippedVar]
+        if (signedFlipped == 0) return
+        val newSum = state.intPayload[factorId]
+        val flippedPost = state.assignment.boolValue(flippedVar)
+        val changeV = if (flippedPost) signedFlipped else -signedFlipped
+        val oldSum = newSum - changeV
+        val oldViolated = violates(oldSum)
+        val newViolated = violates(newSum)
+        for (u in boolVars) {
+            val signedU = signedWeightByVar[u]
+            if (signedU == 0) continue
+            val uPost = state.assignment.boolValue(u)
+            val uPre = if (u == flippedVar) !uPost else uPost
+            val oldChangeU = if (uPre) -signedU else signedU
+            val newChangeU = if (uPost) -signedU else signedU
+            val preViolatedIfU = violates(oldSum + oldChangeU)
+            val postViolatedIfU = violates(newSum + newChangeU)
+            val preBreak = !oldViolated && preViolatedIfU
+            val preMake = oldViolated && !preViolatedIfU
+            val postBreak = !newViolated && postViolatedIfU
+            val postMake = newViolated && !postViolatedIfU
+            if (preBreak != postBreak) {
+                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
+            }
+            if (preMake != postMake) {
+                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
+            }
         }
-        return delta
-    }}
+    }
+}
 
 /**
  * Range `[sumLo, sumHi]` reachable by `Σ weights[i] * lit_i` given current pins.

@@ -416,6 +416,68 @@ class Cardinality(
         }
     }
 
+    /** Cached max |signedOccurrencesByVar[v]| across `boolVars`. Bounds the change `n` can
+     *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out: when both
+     *  the pre- and post-flip `n` are far enough from the [min] / [max] boundaries that no
+     *  single subsequent flip could cross either side, no break/make state needs to change. */
+    private val maxAbsSigned: Int = run {
+        var m = 0
+        for (v in boolVars) {
+            val s = signedOccurrencesByVar[v]
+            val a = if (s < 0) -s else s
+            if (a > m) m = a
+        }
+        m
+    }
+
+    override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    /** Adjust break/make counts after [flippedVar] has been flipped. Fast-path early-out
+     *  when both pre- and post-flip counts sit strictly inside the `[min + maxAbsSigned,
+     *  max - maxAbsSigned]` interior — in that region no further flip can move `n` outside
+     *  `[min, max]`, so every var's contribution is 0 in both pre and post states. */
+    override fun updateBoolBreakMakeForFlip(
+        state: LocalSearchState, factorId: Int, flippedVar: Int,
+    ) {
+        val signedFlipped = signedOccurrencesByVar[flippedVar]
+        if (signedFlipped == 0) return
+        val newN = state.intPayload[factorId]
+        val flippedPost = state.assignment.boolValue(flippedVar)
+        val changeV = if (flippedPost) signedFlipped else -signedFlipped
+        val oldN = newN - changeV
+        val oldViolated = oldN < min || oldN > max
+        val newViolated = newN < min || newN > max
+        // Interior fast-path: both n values are deep enough inside [min, max] that no
+        // flip could move them out. Every var's break/make contribution is 0 in both.
+        if (!oldViolated && !newViolated &&
+            oldN - maxAbsSigned >= min && oldN + maxAbsSigned <= max &&
+            newN - maxAbsSigned >= min && newN + maxAbsSigned <= max) {
+            return
+        }
+        for (u in boolVars) {
+            val signedU = signedOccurrencesByVar[u]
+            if (signedU == 0) continue
+            val uPost = state.assignment.boolValue(u)
+            val uPre = if (u == flippedVar) !uPost else uPost
+            val oldChangeU = if (uPre) -signedU else signedU
+            val newChangeU = if (uPost) -signedU else signedU
+            val preTotal = oldN + oldChangeU
+            val postTotal = newN + newChangeU
+            val preViolatedIfU = preTotal < min || preTotal > max
+            val postViolatedIfU = postTotal < min || postTotal > max
+            val preBreak = !oldViolated && preViolatedIfU
+            val preMake = oldViolated && !preViolatedIfU
+            val postBreak = !newViolated && postViolatedIfU
+            val postMake = newViolated && !postViolatedIfU
+            if (preBreak != postBreak) {
+                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
+            }
+            if (preMake != postMake) {
+                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
+            }
+        }
+    }
+
     companion object {
         fun atMostOne(literals: IntArray): Cardinality =
             Cardinality(literals, min = 0, max = 1)

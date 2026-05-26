@@ -156,4 +156,34 @@ class Xor(
         for (v in boolVars) {
             if (parityByVar.coeffOf(v) == 1) sink.addBoolFlip(v)
         }
-    }}
+    }
+
+    override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    /** O(arity) — but typically the loop body is one branch. The parity model collapses
+     *  to: if the flipped var's parity contribution is 0, nothing changed; otherwise
+     *  violation flips and every parity-contributing var swaps break↔make. */
+    override fun updateBoolBreakMakeForFlip(
+        state: LocalSearchState, factorId: Int, flippedVar: Int,
+    ) {
+        if (parityByVar.coeffOf(flippedVar) == 0) return
+        val newParity = state.intPayload[factorId]
+        val nowViolated = newParity != targetParity
+        // Each odd-parity var was contributing to make (was violated) or break (was sat).
+        // After the flip, violation is inverted, so its contribution swaps.
+        if (nowViolated) {
+            // Pre was satisfied: each parity-contributing var contributed break=1.
+            for (v in boolVars) {
+                if (parityByVar.coeffOf(v) == 0) continue
+                state.boolBreakCount[v]--
+                state.boolMakeCount[v]++
+            }
+        } else {
+            for (v in boolVars) {
+                if (parityByVar.coeffOf(v) == 0) continue
+                state.boolMakeCount[v]--
+                state.boolBreakCount[v]++
+            }
+        }
+    }
+}
