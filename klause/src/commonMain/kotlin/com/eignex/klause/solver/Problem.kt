@@ -211,17 +211,17 @@ class Problem(
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
                 val accAsAssumptions = acc.toAssumptions()
+                // Build a per-var hole-set once so the `alreadyHole` lookup in the k-loop
+                // is O(1) instead of a linear scan of acc.intHoleVarIds for every probed k.
+                val existingHoles = HashSet<Int>()
+                for (i in 0 until acc.intHoleVarIds.size) {
+                    if (acc.intHoleVarIds[i] == v) existingHoles.add(acc.intHoleValues[i])
+                }
                 for (k in (curMin + 1) until curMax) {
                     if (perVarCalls[v] >= probeBudgetPerVar) break
                     if (totalCalls >= probeTotalBudget) return acc
                     if (k !in orig) continue
-                    var alreadyHole = false
-                    for (i in 0 until acc.intHoleVarIds.size) {
-                        if (acc.intHoleVarIds[i] == v && acc.intHoleValues[i] == k) {
-                            alreadyHole = true; break
-                        }
-                    }
-                    if (alreadyHole) continue
+                    if (k in existingHoles) continue
                     perVarCalls[v]++; totalCalls++
                     val pin = propagate(accAsAssumptions.withInt(v, k))
                     if (pin is PropagationResult.Unsat) {

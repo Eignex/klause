@@ -4,7 +4,6 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.util.IntArrayList
 
 /**
  * `table_int(xs, tuples)` — the vector of `xs[i]` values must equal one of the rows of
@@ -99,7 +98,20 @@ class Table(
             state.refPayload[factorId] = fresh
             fresh
         }
-        val supports = Array(arity) { HashSet<Int>() }
+        // Per-column support bitsets: bit (value - lo[col]) is set iff some currently-feasible
+        // tuple has that value at the column. Spans are bounded by the column's current
+        // domain [min..max] (values outside this band cannot appear because infeasible
+        // tuples were already filtered out).
+        val lo = IntArray(arity)
+        val hi = IntArray(arity)
+        val supportBits = arrayOfNulls<LongArray>(arity)
+        for (col in 0 until arity) {
+            val d = state.intDomains[xs[col]]
+            lo[col] = d.min
+            hi[col] = d.max
+            val span = hi[col] - lo[col] + 1
+            supportBits[col] = LongArray((span + 63) ushr 6)
+        }
         var i = 0
         while (i < s.numValid) {
             val row = s.validTuples[i]
@@ -117,21 +129,55 @@ class Table(
                 s.numValid = last
                 // Don't advance i — the swapped-in tuple at i hasn't been checked.
             } else {
-                for (col in 0 until arity) supports[col].add(tuples[row * arity + col])
+                for (col in 0 until arity) {
+                    val v = tuples[row * arity + col]
+                    val off = v - lo[col]
+                    val bits = supportBits[col]!!
+                    bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
+                }
                 i++
             }
         }
         if (s.numValid == 0) return false
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
-            val sup = supports[col]
-            val minSup = sup.min(); val maxSup = sup.max()
+            val bits = supportBits[col]!!
+            // First / last set bit ⇒ tightened bounds.
+            var firstSet = -1
+            for (w in bits.indices) {
+                if (bits[w] != 0L) { firstSet = (w shl 6) + bits[w].countTrailingZeroBits(); break }
+            }
+            if (firstSet < 0) return false  // No supports — fail.
+            var lastSet = -1
+            for (w in bits.indices.reversed()) {
+                if (bits[w] != 0L) { lastSet = (w shl 6) + (63 - bits[w].countLeadingZeroBits()); break }
+            }
+            val minSup = lo[col] + firstSet
+            val maxSup = lo[col] + lastSet
             if (!state.tightenIntMin(xs[col], minSup, ant)) return false
             if (!state.tightenIntMax(xs[col], maxSup, ant)) return false
             val d = state.intDomains[xs[col]]
-            val toRemove = IntArrayList()
-            d.forEach { value -> if (value !in sup) toRemove.add(value) }
-            for (k in 0 until toRemove.size) if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
+            // Iterate the current domain; exclude values whose bit is not set.
+            // Re-resolve bits / lo from snapshot — the domain ref may have shifted bounds
+            // but the column's tuple-source values are still indexed off the original lo[col].
+            val colLo = lo[col]
+            val colHi = hi[col]
+            // Collect first, then exclude — excludeIntValue invalidates the domain ref.
+            var toRemoveCount = 0
+            val toRemove = IntArray(d.size)
+            d.forEach { value ->
+                if (value in colLo..colHi) {
+                    val off = value - colLo
+                    if (((bits[off ushr 6] ushr (off and 63)) and 1L) == 0L) {
+                        toRemove[toRemoveCount++] = value
+                    }
+                } else {
+                    toRemove[toRemoveCount++] = value
+                }
+            }
+            for (k in 0 until toRemoveCount) {
+                if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
+            }
         }
         return true
     }

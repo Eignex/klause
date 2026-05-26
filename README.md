@@ -210,7 +210,6 @@ Use cases:
 
 Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
 - [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
 - [LS] Move-pool inlining: pack BoolFlip / IntSet into a Long-backed MoveSink lane.
 - [LS] Incremental updateBoolBreakMakeForFlip for Cardinality, PseudoBoolean, Xor.

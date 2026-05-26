@@ -47,8 +47,6 @@ class Mdd(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
 
-    private val acceptingSet: HashSet<Int> = accepting.toHashSet()
-
     override fun initialize(state: LocalSearchState, factorId: Int) {}
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
@@ -82,12 +80,16 @@ class Mdd(
         if (!changed && cost >= 0 && payload.cachedCost !== state.intDomains[cost]) changed = true
         if (!changed && payload.cachedSeq[0] != null) return true
         val ant = state.composeIntVarAtomAntecedents(intVars)
-        // Forward reachability: fwd[i] = set of reachable states at layer i.
-        val fwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
+        // Forward reachability: fwd[i] is a packed bitset over [0, numStatesPerLayer[i]).
+        // Each layer stores `(numStates + 63) / 64` longs; bit s tests layer-s reachability.
+        val fwd = Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
         if (initial < 0 || initial >= numStatesPerLayer[0]) return false
-        fwd[0][initial] = true
+        fwd[0][initial ushr 6] = fwd[0][initial ushr 6] or (1L shl (initial and 63))
         for (i in 0 until n) {
             val sDom = state.intDomains[seq[i]]
+            val numNext = numStatesPerLayer[i + 1]
+            val fwdI = fwd[i]
+            val fwdN = fwd[i + 1]
             val k = layerStarts[i]
             val end = layerStarts[i + 1]
             var p = k
@@ -95,22 +97,40 @@ class Mdd(
                 val src = transitions[p]
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2]
-                if (src in fwd[i].indices && fwd[i][src] && sym in sDom.min..sDom.max && dst in fwd[i + 1].indices) {
-                    fwd[i + 1][dst] = true
+                if (src >= 0 && src < numStatesPerLayer[i]
+                    && ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L
+                    && sym in sDom.min..sDom.max
+                    && dst in 0 until numNext) {
+                    fwdN[dst ushr 6] = fwdN[dst ushr 6] or (1L shl (dst and 63))
                 }
                 p += recordStride
             }
         }
-        // Check acceptance.
+        // Check acceptance: any accepting state with its fwd-bit set.
         var anyAccepting = false
-        for (s in fwd[n].indices) if (fwd[n][s] && s in acceptingSet) { anyAccepting = true; break }
+        for (s in accepting) {
+            if (s in 0 until numStatesPerLayer[n]
+                && ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L) {
+                anyAccepting = true; break
+            }
+        }
         if (!anyAccepting) return false
 
         // Backward reachability.
-        val bwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
-        for (s in bwd[n].indices) if (s in acceptingSet && fwd[n][s]) bwd[n][s] = true
+        val bwd = Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
+        for (s in accepting) {
+            if (s in 0 until numStatesPerLayer[n]
+                && ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L) {
+                bwd[n][s ushr 6] = bwd[n][s ushr 6] or (1L shl (s and 63))
+            }
+        }
         for (i in n - 1 downTo 0) {
             val sDom = state.intDomains[seq[i]]
+            val numI = numStatesPerLayer[i]
+            val numN = numStatesPerLayer[i + 1]
+            val bwdI = bwd[i]
+            val bwdN = bwd[i + 1]
+            val fwdI = fwd[i]
             val k = layerStarts[i]
             val end = layerStarts[i + 1]
             var p = k
@@ -118,9 +138,11 @@ class Mdd(
                 val src = transitions[p]
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2]
-                if (src in bwd[i].indices && dst in bwd[i + 1].indices &&
-                    bwd[i + 1][dst] && fwd[i][src] && sym in sDom.min..sDom.max) {
-                    bwd[i][src] = true
+                if (src in 0 until numI && dst in 0 until numN
+                    && ((bwdN[dst ushr 6] ushr (dst and 63)) and 1L) != 0L
+                    && ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L
+                    && sym in sDom.min..sDom.max) {
+                    bwdI[src ushr 6] = bwdI[src ushr 6] or (1L shl (src and 63))
                 }
                 p += recordStride
             }
@@ -128,9 +150,12 @@ class Mdd(
         // Prune seq[i] values that have no fwd∩bwd transition.
         for (i in 0 until n) {
             val sDom = state.intDomains[seq[i]]
-            // For each value in domain, check if any transition (src,val,dst) has
-            // fwd[i][src] ∧ bwd[i+1][dst].
-            val survives = BooleanArray(sDom.max - sDom.min + 1)
+            val span = sDom.max - sDom.min + 1
+            val survives = LongArray((span + 63) ushr 6)
+            val numI = numStatesPerLayer[i]
+            val numN = numStatesPerLayer[i + 1]
+            val fwdI = fwd[i]
+            val bwdN = bwd[i + 1]
             val k = layerStarts[i]
             val end = layerStarts[i + 1]
             var p = k
@@ -139,14 +164,18 @@ class Mdd(
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2]
                 if (sym in sDom.min..sDom.max
-                    && src in fwd[i].indices && fwd[i][src]
-                    && dst in bwd[i + 1].indices && bwd[i + 1][dst]) {
-                    survives[sym - sDom.min] = true
+                    && src in 0 until numI
+                    && ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L
+                    && dst in 0 until numN
+                    && ((bwdN[dst ushr 6] ushr (dst and 63)) and 1L) != 0L) {
+                    val off = sym - sDom.min
+                    survives[off ushr 6] = survives[off ushr 6] or (1L shl (off and 63))
                 }
                 p += recordStride
             }
             for (s in sDom.min..sDom.max) {
-                if (!survives[s - sDom.min]) {
+                val off = s - sDom.min
+                if (((survives[off ushr 6] ushr (off and 63)) and 1L) == 0L) {
                     if (!state.excludeIntValue(seq[i], s, ant)) return false
                 }
             }
@@ -161,6 +190,10 @@ class Mdd(
             maxCost[0][initial] = 0L
             for (i in 0 until n) {
                 val sDom = state.intDomains[seq[i]]
+                val numI = numStatesPerLayer[i]
+                val numN = numStatesPerLayer[i + 1]
+                val fwdI = fwd[i]
+                val fwdN = fwd[i + 1]
                 var p = layerStarts[i]
                 val end = layerStarts[i + 1]
                 while (p < end) {
@@ -169,8 +202,10 @@ class Mdd(
                     val dst = transitions[p + 2]
                     val w = transitions[p + 3].toLong()
                     if (sym in sDom.min..sDom.max
-                        && src in fwd[i].indices && fwd[i][src]
-                        && dst in fwd[i + 1].indices && fwd[i + 1][dst]) {
+                        && src in 0 until numI
+                        && ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L
+                        && dst in 0 until numN
+                        && ((fwdN[dst ushr 6] ushr (dst and 63)) and 1L) != 0L) {
                         val nm = minCost[i][src] + w
                         if (nm < minCost[i + 1][dst]) minCost[i + 1][dst] = nm
                         val nM = maxCost[i][src] + w
@@ -181,8 +216,9 @@ class Mdd(
             }
             var bestLo = INF
             var bestHi = -INF
-            for (s in fwd[n].indices) {
-                if (s in acceptingSet && fwd[n][s]) {
+            for (s in accepting) {
+                if (s in 0 until numStatesPerLayer[n]
+                    && ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L) {
                     if (minCost[n][s] < bestLo) bestLo = minCost[n][s]
                     if (maxCost[n][s] > bestHi) bestHi = maxCost[n][s]
                 }
