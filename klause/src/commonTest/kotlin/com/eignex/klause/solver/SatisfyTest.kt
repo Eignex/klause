@@ -86,6 +86,31 @@ class SatisfyTest {
     }
 
     @Test
+    fun `engine populates Unsat assumptionCore from 1UIP decision levels`() {
+        // Hard: ¬b0 ∨ ¬b1. Assume b0=true, b1=true, b2=true (b2 irrelevant). The seed
+        // phase catches this so the conflictLevels include b0 and b1 but not b2 —
+        // SolveResult.Unsat.assumptionCore should expose the same subset without any
+        // deletion-MUS work (minimizeCore = false).
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
+        )
+        val r = BacktrackSolver(problem).solve(
+            com.eignex.klause.solver.backtrack.BacktrackParams(
+                assumptions = Assumptions(bools = mapOf(0 to true, 1 to true, 2 to true)),
+            ),
+        )
+        val unsat = assertIs<SolveResult.Unsat>(r)
+        val ac = unsat.assumptionCore
+        assertTrue(ac != null && !ac.isEmpty, "engine should populate assumptionCore")
+        assertEquals(true, ac.boolValueOrNull(0))
+        assertEquals(true, ac.boolValueOrNull(1))
+        assertTrue(2 !in ac.boolKeys.toList())
+    }
+
+    @Test
     fun `minimizeCore on satisfiable input still returns Sat`() {
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val r = BacktrackSolver(problem).satisfyUnderAssumptions(

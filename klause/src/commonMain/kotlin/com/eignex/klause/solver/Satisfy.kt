@@ -95,12 +95,20 @@ private fun satisfyUnderAssumptionsBacktrack(
         )
     }
     // Seed cleanly applied — defer to the engine's normal solve path for the DFS phase.
+    // The engine populates `r.assumptionCore` with the subset of seed assumptions whose
+    // decision levels appeared in any conflict's 1UIP-derived level set during search.
+    // That's typically a strict subset of the input and tighter than the destructive-MUS
+    // fallback below.
     val merged = params.withAssumptions(assumptions)
     return when (val r = solver.solve(merged)) {
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
         is SolveResult.Unsat -> {
-            val core = if (minimizeCore) deletionMinimize(solver, assumptions, params)
-            else assumptions
+            val engineCore = r.assumptionCore
+            val core = when {
+                engineCore != null && !engineCore.isEmpty -> engineCore
+                minimizeCore -> deletionMinimize(solver, assumptions, params)
+                else -> assumptions
+            }
             SatisfyResult.UnsatUnderAssumptions(core)
         }
         is SolveResult.Unknown -> SatisfyResult.Unknown(r.reason)

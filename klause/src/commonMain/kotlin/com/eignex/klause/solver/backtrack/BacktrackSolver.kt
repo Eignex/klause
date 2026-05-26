@@ -43,7 +43,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             val stats = sink.snapshot()
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample, stats)
-                is SearchOutcome.Exhausted -> SolveResult.Unsat(outcome.core, stats)
+                is SearchOutcome.Exhausted -> SolveResult.Unsat(
+                    core = outcome.core,
+                    stats = stats,
+                    assumptionCore = projectTouchedToAssumptions(params.assumptions, outcome.touchedAssumptionLevels),
+                )
                 SearchOutcome.BudgetCapped -> {
                     sink.timedOut = true
                     SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
@@ -262,6 +266,25 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     // Engine.
     // ---------------------------------------------------------------------------------------
 
+    /** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
+     *  levels. Returns `null` when the input was empty (no assumption layer to
+     *  project) or no level was touched (no information). */
+    private fun projectTouchedToAssumptions(input: com.eignex.klause.solver.Assumptions, levels: IntArray): com.eignex.klause.solver.Assumptions? {
+        if (input.isEmpty || levels.isEmpty()) return null
+        val touched = HashSet<Int>(levels.size)
+        for (l in levels) touched.add(l)
+        return com.eignex.klause.solver.projectSeedConflictToAssumptions(input, touched)
+    }
+
+    /** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty
+     *  when there were no touches (or no seed in the first place). */
+    private fun touchedToArray(touched: HashSet<Int>?): IntArray {
+        if (touched == null || touched.isEmpty()) return IntArray(0)
+        val out = touched.toIntArray()
+        out.sort()
+        return out
+    }
+
     /** Lift a [PropagationResult.Unsat]'s factor-level conflict info to a klause [UnsatCore].
      *  Empty `conflictFactors` (seed-only contradiction, no factor invocation involved)
      *  collapses to `null` — the API contract is "core absent" rather than "core empty",
@@ -274,8 +297,16 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         data class Found(val sample: Sample) : SearchOutcome
         /** DFS exhausted without finding a model. [core] is non-null when the exhaustion
          *  was forced by root-level propagation (bake or seed); after a full DFS-tree
-         *  walk, no single-factor core explains the result and [core] stays null. */
-        data class Exhausted(val core: UnsatCore? = null) : SearchOutcome
+         *  walk, no single-factor core explains the result and [core] stays null.
+         *  [touchedAssumptionLevels] is the union of seed-level decision levels that
+         *  appeared in any conflict's learned-clause decision-level set during the
+         *  search — feeds the assumption-core projection in
+         *  [com.eignex.klause.solver.satisfyUnderAssumptions]. Empty when no seed was
+         *  in play or no conflict referenced a seed level. */
+        data class Exhausted(
+            val core: UnsatCore? = null,
+            val touchedAssumptionLevels: IntArray = IntArray(0),
+        ) : SearchOutcome
         data object BudgetCapped : SearchOutcome
     }
 
@@ -335,9 +366,18 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             yield(SearchOutcome.Exhausted(coreOf(problem.baked))); return@sequence
         }
         val session = PropagationSession(problem)
+        // Number of decision levels seed pushes uses — bool pins first then int pins.
+        // Decision levels 1..numSeed correspond to assumptions; levels > numSeed are
+        // post-seed DFS decisions.
+        val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
+        val touchedSeedLevels = if (numSeed > 0) HashSet<Int>() else null
         val seedResult = session.seed(params.assumptions)
         if (seedResult is PropagationResult.Unsat) {
-            yield(SearchOutcome.Exhausted(coreOf(seedResult))); return@sequence
+            if (touchedSeedLevels != null) {
+                for (l in seedResult.conflictLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+            }
+            yield(SearchOutcome.Exhausted(coreOf(seedResult), touchedToArray(touchedSeedLevels)))
+            return@sequence
         }
         // Phase-saving: cache the last value committed for each var (across backtracks
         // and restarts). Allocated only when enabled. The `boolPhaseSet` parallel array
@@ -428,6 +468,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         is AdvanceOutcome.Backjump -> {
                             sink?.observeFail()
                             sink?.observeLearn()
+                            if (touchedSeedLevels != null) {
+                                for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                            }
                             // Trail size == session.decisionLevel here (the failed pin was
                             // self-reverted by the session); execute the backjump + learn
                             // sequence. On cascading conflict during assertion, recurse.
@@ -436,14 +479,20 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             when (term) {
                                 BackjumpTerm.Resume -> { descend = true; continue@inner }
                                 BackjumpTerm.Exhausted -> {
-                                    yield(SearchOutcome.Exhausted()); return@sequence
+                                    yield(SearchOutcome.Exhausted(
+                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                                    )); return@sequence
                                 }
                                 BackjumpTerm.Stuck -> { descend = false; continue@inner }
                             }
                         }
                     }
                 } else {
-                    if (trail.isEmpty()) { yield(SearchOutcome.Exhausted()); return@sequence }
+                    if (trail.isEmpty()) {
+                        yield(SearchOutcome.Exhausted(
+                            touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                        )); return@sequence
+                    }
                     val top = trail.last()
                     session.popLast()
                     val decsBefore = decisionsLeft
@@ -461,6 +510,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             yield(SearchOutcome.BudgetCapped); return@sequence
                         }
                         is AdvanceOutcome.Backjump -> {
+                            if (touchedSeedLevels != null) {
+                                for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                            }
                             // Else-path: session has been popped below trail.last; align
                             // first (trail.removeAt) then proceed to backjump + learn.
                             val term = backjumpAndLearn(out.learned, trail, session, params,
@@ -468,7 +520,9 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             when (term) {
                                 BackjumpTerm.Resume -> { descend = true; continue@inner }
                                 BackjumpTerm.Exhausted -> {
-                                    yield(SearchOutcome.Exhausted()); return@sequence
+                                    yield(SearchOutcome.Exhausted(
+                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                                    )); return@sequence
                                 }
                                 BackjumpTerm.Stuck -> { descend = false; continue@inner }
                             }

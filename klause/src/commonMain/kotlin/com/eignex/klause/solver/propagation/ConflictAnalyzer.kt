@@ -48,16 +48,23 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             val literals: IntArray,
             val backjumpLevel: Int,
             val lbd: Int,
+            /** Distinct decision levels appearing in [literals]. Sorted ascending. Used
+             *  by the engine to project a conflict back to the subset of assumption-
+             *  level pins (decision levels 1..|seed|) that participated — feeds the
+             *  assumption-core extraction path in [com.eignex.klause.solver.satisfyUnderAssumptions]. */
+            val decisionLevels: IntArray,
         ) : AnalysisResult {
             override fun equals(other: Any?): Boolean =
                 other is Learned
                     && literals.contentEquals(other.literals)
                     && backjumpLevel == other.backjumpLevel
                     && lbd == other.lbd
+                    && decisionLevels.contentEquals(other.decisionLevels)
             override fun hashCode(): Int =
-                31 * (31 * literals.contentHashCode() + backjumpLevel) + lbd
+                31 * (31 * (31 * literals.contentHashCode() + backjumpLevel) + lbd) +
+                    decisionLevels.contentHashCode()
             override fun toString(): String =
-                "Learned(literals=${literals.toList()}, backjumpLevel=$backjumpLevel, lbd=$lbd)"
+                "Learned(literals=${literals.toList()}, backjumpLevel=$backjumpLevel, lbd=$lbd, levels=${decisionLevels.toList()})"
         }
 
         /** Analysis couldn't produce a clause (no conflict reason, or non-Clause failure). */
@@ -186,11 +193,25 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      */
     private fun finalizeClause(learned: IntArrayList, currentLevel: Int): AnalysisResult.Learned {
         val minimized = minimize(learned, currentLevel)
+        val levels = distinctLevelsOf(minimized)
         return AnalysisResult.Learned(
             minimized.toIntArray(),
             backjumpLevelOf(minimized, currentLevel),
-            lbdOf(minimized),
+            levels.size,
+            levels,
         )
+    }
+
+    /** Sorted-ascending array of distinct decision levels touched by [learned]. Shares
+     *  its scan with [lbdOf] (whose count is just `levels.size`); finalize computes both
+     *  in one pass via this helper. */
+    private fun distinctLevelsOf(learned: IntArrayList): IntArray {
+        if (learned.size == 0) return IntArray(0)
+        val seen = HashSet<Int>(learned.size)
+        for (i in 0 until learned.size) seen.add(levelOf(Lit.variable(learned[i])))
+        val out = seen.toIntArray()
+        out.sort()
+        return out
     }
 
     /**

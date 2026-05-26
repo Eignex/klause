@@ -81,6 +81,53 @@ class TotalizerOptimizerTest {
     }
 
     @Test
+    fun `weighted - heavier soft kept over lighter under mutex`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
+        )
+        val r = TotalizerOptimizer(problem).minimizeWeighted(
+            listOf(
+                TotalizerOptimizer.WeightedSoft(Lit.make(0, true), weight = 5L),
+                TotalizerOptimizer.WeightedSoft(Lit.make(1, true), weight = 3L),
+            ),
+            BacktrackParams(),
+        )
+        val opt = assertIs<TotalizerOptimizer.Result.Optimal>(r)
+        assertEquals(3L, opt.lowerBound)
+        assertEquals(true, opt.sample.bools[0])
+        assertEquals(false, opt.sample.bools[1])
+    }
+
+    @Test
+    fun `weighted - three-way pairwise mutex with distinct weights`() {
+        // K3 mutex graph; weights 10/4/1. Optimum: keep the weight-10 soft, pay 5.
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+        val r = TotalizerOptimizer(problem).minimizeWeighted(
+            listOf(
+                TotalizerOptimizer.WeightedSoft(Lit.make(0, true), weight = 10L),
+                TotalizerOptimizer.WeightedSoft(Lit.make(1, true), weight = 4L),
+                TotalizerOptimizer.WeightedSoft(Lit.make(2, true), weight = 1L),
+            ),
+            BacktrackParams(),
+        )
+        val opt = assertIs<TotalizerOptimizer.Result.Optimal>(r)
+        assertEquals(5L, opt.lowerBound)
+        assertEquals(true, opt.sample.bools[0])
+    }
+
+    @Test
     fun `globally unsat returns Infeasible`() {
         val problem = Problem(
             numBoolVars = 1,
