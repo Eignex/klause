@@ -85,6 +85,7 @@ internal object Z3Translator {
         val decomposeCtx = Z3DecomposeContext(
             startBool = problem.numBoolVars,
             startInt = problem.numIntVars,
+            originalIntDomains = problem.intDomains,
         )
         for (factor in problem.factors) {
             val start = decomposedFactors.size
@@ -212,16 +213,23 @@ internal object Z3Translator {
     private class Z3DecomposeContext(
         startBool: Int,
         startInt: Int,
+        private val originalIntDomains: Array<IntDomain>,
     ) : DecompositionContext {
         var nextBool: Int = startBool
         var nextInt: Int = startInt
         val auxIntDomains = ArrayList<Pair<Int, IntDomain>>()
+        private val auxDomainLookup = HashMap<Int, IntDomain>()
         override fun freshBool(): Int = nextBool++
         override fun freshInt(domain: IntDomain): Int {
             val id = nextInt++
             auxIntDomains.add(id to domain)
+            auxDomainLookup[id] = domain
             return id
         }
+        override fun intDomainOf(id: Int): IntDomain =
+            if (id < originalIntDomains.size) originalIntDomains[id]
+            else auxDomainLookup[id]
+                ?: error("Z3DecomposeContext: unknown int var id $id")
     }
 
     /** Translate a [com.eignex.klause.solver.RealLinearConstraint] into native Z3 real arithmetic. */
