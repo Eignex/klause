@@ -210,9 +210,9 @@ Use cases:
 
 Grouped by workstream. CP covers the complete-search engine and propagators; LS covers the local-search engine and strategies. Within each group, items are listed in suggested execution order and sized so each bullet fits in a single focused session.
 
-- [CP] Min-cost-flow upgrade: SSP / cost-scaling with reduced-cost arc pruning. The current MinCostFlow factor does per-node interval-arithmetic bound propagation + per-component balance conservation.
-- [CP] geost upgrade: full sweep-line propagation across all dimensions with mandatory-part kernel propagation. The current Geost factor handles forced-single-dim cases only.
-- [CP] MDD upgrade: trail-based incremental forward/backward support-count maintenance (the current Mdd factor does a full reachability sweep on every fire).
+- [CP] Min-cost-flow upgrade: SSP / cost-scaling with reduced-cost arc pruning. The MinCostFlow factor today does per-node interval-arithmetic bound propagation + per-component balance conservation; the LP-relaxation cost bound and sensitivity-based arc pruning are the next tier.
+- [CP] geost upgrade: full sweep-line propagation across all dimensions with mandatory-part kernel union. The Geost factor today handles forced-single-dim cases only.
+- [CP] MDD upgrade: trail-based incremental forward/backward support-count maintenance. The Mdd factor today does a full reachability sweep on every fire — strong filtering but O(layers·transitions) per propagator call.
 - [Perf] Migrate hot-path propagators (table, notIn, interior-SAC hole emission, MDD support sets) to bitset domain operations.
 - [Perf] Native bitset set-propagators for set algebra over large universes (indicator-bool lowering is in place; this would replace it with a dedicated bitset domain on large universes).
 - [CP] Core-guided optimization: upgrade Unsat.conflictFactors to extract multi-factor cores from the propagation trail.
