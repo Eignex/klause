@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
@@ -56,8 +57,30 @@ class Mdd(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.composeIntVarAtomAntecedents(intVars)
 
+    /** Cached snapshot of seq domain refs at last successful propagate. When every seq
+     *  variable's IntDomain reference is unchanged, the previous fixpoint still holds and
+     *  the full sweep is skipped. Backtrack-safe via [PropagationState.SnapshottablePayload]:
+     *  on push the engine clones the array, on pop the prior level's refs are restored. */
+    private class MddState(
+        val cachedSeq: Array<IntDomain?>,
+        var cachedCost: IntDomain?,
+    ) : PropagationState.SnapshottablePayload {
+        override fun snapshotCopy(): MddState = MddState(cachedSeq.copyOf(), cachedCost)
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = seq.size
+        // Incremental fast path: if nothing relevant has changed since the last fire, the
+        // previous propagator pass already reached fixpoint and we can return immediately.
+        val payload = (state.refPayload[factorId] as? MddState) ?: run {
+            val fresh = MddState(arrayOfNulls(n), null)
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        var changed = false
+        for (i in 0 until n) if (payload.cachedSeq[i] !== state.intDomains[seq[i]]) { changed = true; break }
+        if (!changed && cost >= 0 && payload.cachedCost !== state.intDomains[cost]) changed = true
+        if (!changed && payload.cachedSeq[0] != null) return true
         val ant = state.composeIntVarAtomAntecedents(intVars)
         // Forward reachability: fwd[i] = set of reachable states at layer i.
         val fwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
@@ -168,6 +191,11 @@ class Mdd(
             if (!state.tightenIntMin(cost, bestLo.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), ant)) return false
             if (!state.tightenIntMax(cost, bestHi.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt(), ant)) return false
         }
+        // Record the post-propagation domain refs so the next fire can skip a redundant
+        // sweep. Any pruning above will have produced fresh IntDomain refs in state.intDomains;
+        // capture them after all tightening so the fast path only fires on a real no-op.
+        for (i in 0 until n) payload.cachedSeq[i] = state.intDomains[seq[i]]
+        if (cost >= 0) payload.cachedCost = state.intDomains[cost]
         return true
     }
 }

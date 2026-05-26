@@ -210,9 +210,6 @@ Use cases:
 
 Grouped by workstream. CP covers the complete-search engine and propagators; Backend covers the FactorDecomposer's residual gaps for arithmetic adapters; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [CP] Min-cost-flow upgrade: SSP / cost-scaling with reduced-cost arc pruning. The MinCostFlow factor today does per-node interval-arithmetic bound propagation + per-component balance conservation; the LP-relaxation cost bound and sensitivity-based arc pruning are the next tier.
-- [CP] geost upgrade: full sweep-line propagation across all dimensions with mandatory-part kernel union. The Geost factor today handles forced-single-dim cases only.
-- [CP] MDD upgrade: trail-based incremental forward/backward support-count maintenance. The Mdd factor today does a full reachability sweep on every fire — strong filtering but O(layers·transitions) per propagator call.
 - [Backend] BinPacking `LoadVars` decomposition: the per-bin load is a variable, so PB needs a variable bound. Decompose via per-load-value reified cardinality, or extend PseudoBoolean to accept an int-var bound.
 - [Backend] Cost-MDD (`Mdd.recordStride == 4`): plain acceptance is decomposed; the cost-weighted variant needs Linear EQ summing transition weights along the firing path.
 - [Backend] Cumulative for horizon > 1024: time-indexed bool encoding bails on long horizons. Replacement: pairwise-overlap encoding (precedence-aware) for medium horizons; full PB-over-tasks for tight ones.
