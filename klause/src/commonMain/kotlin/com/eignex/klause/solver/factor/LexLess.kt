@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -43,6 +45,69 @@ class LexLess(
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         // Stateless factor — delta queries are already correct against the current assignment.
         return 0
+    }
+
+    /**
+     * Problem-aware repair: locate the first position `k` where the lex relation is decided
+     * (xs[k] != ys[k]) — if violated there, propose targeted moves that restore `xs[k] ≤ ys[k]`
+     * (strict: `<`). When the comparable prefix is fully equal, the violation is structural
+     * (strict + equal-length, or xs has an extra suffix); propose prefix-breaking moves at
+     * the earliest position with domain slack. A Compound swap of `xs[k] ↔ ys[k]` is added
+     * when both target values fit the opposite domain — the lex-preserving "swap neighbourhood".
+     */
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (satisfied(state)) return
+        val len = minOf(xs.size, ys.size)
+        var k = -1
+        for (i in 0 until len) {
+            val a = state.assignment.intValue(xs[i])
+            val b = state.assignment.intValue(ys[i])
+            if (a != b) { k = i; break }
+        }
+        if (k < 0) {
+            // Comparable prefix fully equal — break it at the earliest slot with room.
+            proposePrefixBreak(state, sink, 0)
+            return
+        }
+        val a = state.assignment.intValue(xs[k])
+        val b = state.assignment.intValue(ys[k])
+        if (a < b) return  // unreachable: satisfied() would have returned true
+        val xV = xs[k]; val yV = ys[k]
+        val dx = state.problem.intDomains[xV]
+        val dy = state.problem.intDomains[yV]
+        val needXLE = if (strict) b - 1 else b  // xs[k] must reach ≤ this for the relation to hold
+        val needYGE = if (strict) a + 1 else a  // ys[k] must reach ≥ this
+        // Lower xs[k] toward `needXLE` (preferred), or as close as the domain allows.
+        if (needXLE in dx) sink.addIntSet(xV, needXLE)
+        else if (dx.min <= needXLE) sink.addIntSet(xV, dx.min)
+        // Raise ys[k] toward `needYGE` (preferred), or as close as the domain allows.
+        if (needYGE in dy) sink.addIntSet(yV, needYGE)
+        else if (dy.max >= needYGE) sink.addIntSet(yV, dy.max)
+        // Lex-preserving swap: if each side's current value sits in the other's domain,
+        // swapping resolves the violation (xs[k]=b, ys[k]=a → satisfies xs[k] < ys[k]).
+        if (xV != yV && b in dx && a in dy) {
+            sink.addCompound(listOf(Move.IntSet(xV, b), Move.IntSet(yV, a)))
+        }
+        // ±1 nudges at the violation point as cheap fallbacks for tight domains.
+        if (a > dx.min) sink.addIntSet(xV, a - 1)
+        if (b < dy.max) sink.addIntSet(yV, b + 1)
+    }
+
+    /** Add the first-available prefix-breaking move (lower xs[i] or raise ys[i]) at the
+     *  earliest paired index starting at [startK] with domain slack. Used when the
+     *  comparable prefix is fully singleton-equal and the violation is structural. */
+    private fun proposePrefixBreak(state: LocalSearchState, sink: MoveSink, startK: Int) {
+        val len = minOf(xs.size, ys.size)
+        for (i in startK until len) {
+            val a = state.assignment.intValue(xs[i])
+            val b = state.assignment.intValue(ys[i])
+            val dx = state.problem.intDomains[xs[i]]
+            val dy = state.problem.intDomains[ys[i]]
+            var added = false
+            if (a > dx.min) { sink.addIntSet(xs[i], a - 1); added = true }
+            if (b < dy.max) { sink.addIntSet(ys[i], b + 1); added = true }
+            if (added) return
+        }
     }
 
     /** Compute `xs lex≤(or <) ys` against current assignment. */
