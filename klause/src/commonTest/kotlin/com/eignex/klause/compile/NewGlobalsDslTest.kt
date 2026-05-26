@@ -65,7 +65,12 @@ class NewGlobalsDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 5_000_000L)).firstOrNull()
+        // Pin a deterministic seed — the default-Random path makes search-budget timeouts
+        // flaky depending on prior tests' RNG consumption. With a fixed seed the heuristic
+        // choice sequence is reproducible and the budget margin holds.
+        val sample = BacktrackSolver(compiled.problem)
+            .enumerate(BacktrackParams(maxDecisions = 5_000_000L, randomSeed = 1L))
+            .firstOrNull()
         assertTrue(sample != null, "arg_sort: solver found no sample")
         // BitBlast lowering goes through the decomposition primitives (ArgSort factor
         // itself is skipped in bit-blast).
