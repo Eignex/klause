@@ -36,6 +36,22 @@ class ReifiedPseudoBoolean(
     }
     override val intVars: IntArray = EmptyIntArray
 
+    /** Per-var signed weight (excluding [auxBoolVar]); aux flips don't shift the body sum. */
+    private val signedWeightByVar: com.eignex.klause.util.IntIntMap = run {
+        val signs = HashMap<Int, Int>()
+        for (i in literals.indices) {
+            val v = Lit.variable(literals[i])
+            if (v == auxBoolVar) continue
+            val s = if (Lit.isPositive(literals[i])) weights[i] else -weights[i]
+            signs[v] = (signs[v] ?: 0) + s
+        }
+        com.eignex.klause.util.IntIntMap.build(
+            keys = signs.keys.toIntArray(),
+            values = signs.values.toIntArray(),
+            absent = 0,
+        )
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0
         for (i in literals.indices) {
@@ -218,12 +234,65 @@ class ReifiedPseudoBoolean(
     }
 
     private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
+        val signed = signedWeightByVar[boolVar]
+        if (signed == 0) return 0
         val pre = if (current) state.assignment.boolValue(boolVar)
         else !state.assignment.boolValue(boolVar)
-        var delta = 0
-        for (i in literals.indices) {
-            if (Lit.variable(literals[i]) != boolVar) continue
-            delta += if (Lit.evaluate(literals[i], pre)) -weights[i] else weights[i]
+        return if (pre) -signed else signed
+    }
+
+    override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    override fun updateBoolBreakMakeForFlip(
+        state: LocalSearchState, factorId: Int, flippedVar: Int,
+    ) {
+        val newSum = state.intPayload[factorId]
+        val newAux = state.assignment.boolValue(auxBoolVar)
+        val oldAux: Boolean
+        val oldSum: Int
+        if (flippedVar == auxBoolVar) {
+            oldAux = !newAux
+            oldSum = newSum
+        } else {
+            oldAux = newAux
+            val signedFlipped = signedWeightByVar[flippedVar]
+            if (signedFlipped == 0) return
+            val flippedPost = state.assignment.boolValue(flippedVar)
+            val changeV = if (flippedPost) signedFlipped else -signedFlipped
+            oldSum = newSum - changeV
         }
-        return delta
-    }}
+        val oldViolated = oldAux != predHolds(oldSum)
+        val newViolated = newAux != predHolds(newSum)
+        for (u in boolVars) {
+            val preViolatedIfU: Boolean
+            val postViolatedIfU: Boolean
+            if (u == auxBoolVar) {
+                preViolatedIfU = !oldAux != predHolds(oldSum)
+                postViolatedIfU = !newAux != predHolds(newSum)
+            } else {
+                val signedU = signedWeightByVar[u]
+                if (signedU == 0) {
+                    preViolatedIfU = oldViolated
+                    postViolatedIfU = newViolated
+                } else {
+                    val uPost = state.assignment.boolValue(u)
+                    val uPre = if (u == flippedVar) !uPost else uPost
+                    val preChangeU = if (uPre) -signedU else signedU
+                    val postChangeU = if (uPost) -signedU else signedU
+                    preViolatedIfU = oldAux != predHolds(oldSum + preChangeU)
+                    postViolatedIfU = newAux != predHolds(newSum + postChangeU)
+                }
+            }
+            val preBreak = !oldViolated && preViolatedIfU
+            val preMake = oldViolated && !preViolatedIfU
+            val postBreak = !newViolated && postViolatedIfU
+            val postMake = newViolated && !postViolatedIfU
+            if (preBreak != postBreak) {
+                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
+            }
+            if (preMake != postMake) {
+                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
+            }
+        }
+    }
+}

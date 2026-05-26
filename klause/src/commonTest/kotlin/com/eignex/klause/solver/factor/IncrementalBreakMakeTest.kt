@@ -138,6 +138,89 @@ class IncrementalBreakMakeTest {
     }
 
     @Test
+    fun `reified cardinality body satisfied stays consistent`() {
+        // aux is var 5; literals over vars 0..4.
+        val factor = ReifiedCardinality(
+            auxBoolVar = 5,
+            literals = IntArray(5) { Lit.make(it, positive = true) },
+            min = 2, max = 3,
+        )
+        assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
+    }
+
+    @Test
+    fun `reified cardinality with mixed polarity stays consistent`() {
+        val factor = ReifiedCardinality(
+            auxBoolVar = 4,
+            literals = intArrayOf(
+                Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false),
+            ),
+            min = 1, max = 2,
+        )
+        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
+    }
+
+    @Test
+    fun `reified pseudo boolean LE stays consistent`() {
+        val factor = ReifiedPseudoBoolean(
+            auxBoolVar = 5,
+            weights = intArrayOf(2, 3, 1, 4, 2),
+            literals = IntArray(5) { Lit.make(it, positive = true) },
+            op = PbOp.LE, bound = 6,
+        )
+        assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
+    }
+
+    @Test
+    fun `reified pseudo boolean GE with negative literals stays consistent`() {
+        val factor = ReifiedPseudoBoolean(
+            auxBoolVar = 4,
+            weights = intArrayOf(3, 2, 4, 1),
+            literals = intArrayOf(
+                Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false),
+            ),
+            op = PbOp.GE, bound = 5,
+        )
+        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
+    }
+
+    @Test
+    fun `reified pseudo boolean EQ stays consistent`() {
+        val factor = ReifiedPseudoBoolean(
+            auxBoolVar = 4,
+            weights = intArrayOf(1, 1, 1, 1),
+            literals = IntArray(4) { Lit.make(it, positive = true) },
+            op = PbOp.EQ, bound = 2,
+        )
+        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
+    }
+
+    @Test
+    fun `reified linear LE stays consistent across aux flips`() {
+        // boolVars = [aux]; int vars are 0..2 with domains [0, 5].
+        val factor = ReifiedLinear(
+            auxBoolVar = 0,
+            coeffs = intArrayOf(2, 3, 1),
+            vars = intArrayOf(0, 1, 2),
+            op = LinearOp.LE, bound = 10,
+        )
+        val intDomains = Array(3) { com.eignex.klause.solver.IntDomain(0, 5) }
+        val problem = Problem(1, 3, intDomains, listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (i in 0 until 3) state.assignment.setInt(i, i + 1)
+        state.recompute()
+        // Repeatedly flip the aux through the engine and verify against a fresh recompute().
+        for (round in 0 until 4) {
+            state.apply(com.eignex.klause.solver.Move.BoolFlip(0))
+            val incBreak = state.boolBreakCountSnapshot()
+            val incMake = state.boolMakeCountSnapshot()
+            state.recompute()
+            assertEquals(incBreak.toList(), state.boolBreakCountSnapshot().toList())
+            assertEquals(incMake.toList(), state.boolMakeCountSnapshot().toList())
+        }
+    }
+
+    @Test
     fun `multiple factors of different kinds compose correctly`() {
         // Combined problem with all three factor kinds touching overlapping variables.
         val card = Cardinality(

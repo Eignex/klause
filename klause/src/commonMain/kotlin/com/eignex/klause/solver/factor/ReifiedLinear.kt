@@ -205,4 +205,22 @@ class ReifiedLinear(
         val r = a % b
         return if (r != 0 && (r xor b) >= 0) q + 1 else q
     }
+
+    override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    /** [boolVars] contains only [auxBoolVar], so a bool flip is always an aux flip. Flipping
+     *  aux always toggles violation (sum unchanged), so the aux's own contribution simply
+     *  swaps between break and make. */
+    override fun updateBoolBreakMakeForFlip(
+        state: LocalSearchState, factorId: Int, flippedVar: Int,
+    ) {
+        val nowViolated = state.assignment.boolValue(auxBoolVar) != holds(state.intPayload[factorId])
+        if (nowViolated) {
+            state.boolBreakCount[auxBoolVar]--
+            state.boolMakeCount[auxBoolVar]++
+        } else {
+            state.boolMakeCount[auxBoolVar]--
+            state.boolBreakCount[auxBoolVar]++
+        }
+    }
 }

@@ -210,7 +210,6 @@ Use cases:
 
 Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [LS] Extend incremental updateBoolBreakMakeForFlip to Reified{Cardinality,PseudoBoolean,Linear} and IntCmpReified.
 - [LS] updateIntBreakMakeForIntSet hook framework mirroring the bool path.
 - [LS] Convert Linear, BinPacking, Knapsack to incremental updateIntBreakMakeForIntSet.
 - [LS] Convert GlobalCardinality, AllDifferent family, AllEqual to incremental updateIntBreakMakeForIntSet.

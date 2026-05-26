@@ -36,6 +36,25 @@ class ReifiedCardinality(
     }
     override val intVars: IntArray = EmptyIntArray
 
+    /** Net polarity-signed occurrence count per Boolean variable in [literals] (excluding
+     *  [auxBoolVar] — aux flips don't affect the body count). `+1` per positive
+     *  occurrence, `-1` per negative; vars whose occurrences cancel exactly have entry 0
+     *  and don't shift the count when flipped. */
+    private val signedOccurrencesByVar: com.eignex.klause.util.IntIntMap = run {
+        val signs = HashMap<Int, Int>()
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            if (v == auxBoolVar) continue
+            val sign = if (Lit.isPositive(lit)) 1 else -1
+            signs[v] = (signs[v] ?: 0) + sign
+        }
+        com.eignex.klause.util.IntIntMap.build(
+            keys = signs.keys.toIntArray(),
+            values = signs.values.toIntArray(),
+            absent = 0,
+        )
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var count = 0
         for (lit in literals) {
@@ -83,18 +102,14 @@ class ReifiedCardinality(
     /**
      * Δ to payload count from flipping `boolVar`. With `current = true` the assignment still
      * holds the pre-flip value (used by [deltaIfBoolFlipped]); with `current = false` the
-     * assignment has been updated (used by [applyBoolFlip]).
+     * assignment has been updated (used by [applyBoolFlip]). O(1) via [signedOccurrencesByVar].
      */
     private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
+        val signed = signedOccurrencesByVar[boolVar]
+        if (signed == 0) return 0
         val pre = if (current) state.assignment.boolValue(boolVar)
         else !state.assignment.boolValue(boolVar)
-        var delta = 0
-        for (lit in literals) {
-            if (Lit.variable(lit) != boolVar) continue
-            // Pre-flip evaluation uses pre; the flip inverts that.
-            delta += if (Lit.evaluate(lit, pre)) -1 else 1
-        }
-        return delta
+        return if (pre) -signed else signed
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -223,5 +238,62 @@ class ReifiedCardinality(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0
         return pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxLit)
+    }
+
+    override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    /** Recover the pre-flip count and aux value from the now-committed state, then walk
+     *  each touched variable once applying the change in its break/make contribution. */
+    override fun updateBoolBreakMakeForFlip(
+        state: LocalSearchState, factorId: Int, flippedVar: Int,
+    ) {
+        val newN = state.intPayload[factorId]
+        val newAux = state.assignment.boolValue(auxBoolVar)
+        val oldAux: Boolean
+        val oldN: Int
+        if (flippedVar == auxBoolVar) {
+            oldAux = !newAux
+            oldN = newN
+        } else {
+            oldAux = newAux
+            val signedFlipped = signedOccurrencesByVar[flippedVar]
+            if (signedFlipped == 0) return  // body lit whose occurrences cancel — nothing changed
+            val flippedPost = state.assignment.boolValue(flippedVar)
+            val changeV = if (flippedPost) signedFlipped else -signedFlipped
+            oldN = newN - changeV
+        }
+        val oldViolated = oldAux != inRange(oldN)
+        val newViolated = newAux != inRange(newN)
+        for (u in boolVars) {
+            val preViolatedIfU: Boolean
+            val postViolatedIfU: Boolean
+            if (u == auxBoolVar) {
+                preViolatedIfU = !oldAux != inRange(oldN)
+                postViolatedIfU = !newAux != inRange(newN)
+            } else {
+                val signedU = signedOccurrencesByVar[u]
+                if (signedU == 0) {
+                    preViolatedIfU = oldViolated
+                    postViolatedIfU = newViolated
+                } else {
+                    val uPost = state.assignment.boolValue(u)
+                    val uPre = if (u == flippedVar) !uPost else uPost
+                    val preChangeU = if (uPre) -signedU else signedU
+                    val postChangeU = if (uPost) -signedU else signedU
+                    preViolatedIfU = oldAux != inRange(oldN + preChangeU)
+                    postViolatedIfU = newAux != inRange(newN + postChangeU)
+                }
+            }
+            val preBreak = !oldViolated && preViolatedIfU
+            val preMake = oldViolated && !preViolatedIfU
+            val postBreak = !newViolated && postViolatedIfU
+            val postMake = newViolated && !postViolatedIfU
+            if (preBreak != postBreak) {
+                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
+            }
+            if (preMake != postMake) {
+                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
+            }
+        }
     }
 }
