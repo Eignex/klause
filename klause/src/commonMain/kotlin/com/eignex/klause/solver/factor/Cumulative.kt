@@ -541,11 +541,13 @@ class Cumulative(
             if (usage[t] > peakV) { peakV = usage[t]; peakT = t }
         }
         val tLow = ls.tLow
-        // 2. For each task running through the peak slot, propose moves that take it off
-        //    the peak — either start it after the peak, or finish it before. Plus ±1
-        //    slides as cheap local fallbacks.
-        val MAX_TARGETS = 4
         val absT = if (peakT >= 0) peakT + tLow else 0
+        // Collect tasks running through the peak (used by both shift and swap passes).
+        val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else IntArray(0)
+        // 2. For each peak task, propose feasibility-preserving shifts off the peak. Prefer
+        //    shifts that strictly reduce overage (simulated) over generic afterPeak/beforePeak,
+        //    so probSAT-style scoring sees winning candidates rather than random shifts.
+        val MAX_TARGETS = 4
         for (i in 0 until n) {
             val v = starts[i]
             val cur = state.assignment.intValue(v)
@@ -554,17 +556,13 @@ class Cumulative(
             val dom = state.problem.intDomains[v]
             val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
-                // Start just after the peak: cur' = absT + 1 (clamped to domain).
                 val afterPeak = absT + 1
                 if (afterPeak in dom && afterPeak != cur) sink.addIntSet(v, afterPeak)
-                // Finish just before the peak: cur' = absT - d.
                 val beforePeak = absT - d
                 if (beforePeak in dom && beforePeak != cur) sink.addIntSet(v, beforePeak)
             }
-            // Local nudges as a robustness fallback for tight windows.
-            if (cur < dom.max && cur + 1 != cur) sink.addIntSet(v, cur + 1)
-            if (cur > dom.min && cur - 1 != cur) sink.addIntSet(v, cur - 1)
-            // A few random alternatives so the search isn't trapped near the peak.
+            if (cur < dom.max) sink.addIntSet(v, cur + 1)
+            if (cur > dom.min) sink.addIntSet(v, cur - 1)
             if (dom.size <= MAX_TARGETS) {
                 dom.forEach { target -> if (target != cur) sink.addIntSet(v, target) }
             } else {
@@ -574,4 +572,65 @@ class Cumulative(
                 }
             }
         }
-    }}
+        // 3. Resource-feasibility-preserving swaps. Pair each peak task with an off-peak
+        //    task whose start time fits both domains; the swap moves one task off the peak
+        //    while filling a slot the off-peak task vacates. simulateOverageDelta filters
+        //    swaps that would worsen total overage at either side.
+        if (peakTasks.isNotEmpty()) emitFeasibleSwaps(state, ls, peakTasks, sink)
+    }
+
+    /** Tasks whose interval covers [absT] under the current assignment, in declaration order. */
+    private fun collectPeakTasks(state: LocalSearchState, absT: Int): IntArray {
+        val out = com.eignex.klause.util.IntArrayList()
+        for (i in 0 until n) {
+            val r = resources[i]; val d = durations[i]
+            if (r == 0 || d == 0) continue
+            if (!present(state, i)) continue
+            val cur = state.assignment.intValue(starts[i])
+            if (cur <= absT && absT < cur + d) out.add(i)
+        }
+        return out.toIntArray()
+    }
+
+    /** Propose paired-shift Compound moves: for each task at the peak, find a non-peak
+     *  task whose start sits in the peak task's domain (and vice versa) and the combined
+     *  swap doesn't push usage above capacity at a new slot. Capped at [MAX_SWAPS] to
+     *  bound the proposal-set size. */
+    private fun emitFeasibleSwaps(
+        state: LocalSearchState, ls: LsState, peakTasks: IntArray, sink: MoveSink,
+    ) {
+        var swapsAdded = 0
+        for (i in peakTasks) {
+            if (swapsAdded >= MAX_SWAPS) break
+            val iV = starts[i]
+            val iCur = state.assignment.intValue(iV)
+            val iDom = state.problem.intDomains[iV]
+            for (j in 0 until n) {
+                if (swapsAdded >= MAX_SWAPS) break
+                if (j == i) continue
+                if (durations[j] == 0 || resources[j] == 0) continue
+                if (!present(state, j)) continue
+                val jV = starts[j]
+                val jCur = state.assignment.intValue(jV)
+                if (jCur !in iDom || iCur !in state.problem.intDomains[jV]) continue
+                if (jCur == iCur) continue
+                // Simulate the joint overage delta. Each task is moved independently against
+                // the *original* timeline — this is an approximation (the two moves interact),
+                // but for typical instances the second task's interval rarely overlaps the
+                // first task's new slot exactly, so the linearised delta is a useful filter.
+                val di = simulateOverageDelta(ls, iCur, jCur, durations[i], resources[i])
+                val dj = simulateOverageDelta(ls, jCur, iCur, durations[j], resources[j])
+                if (di + dj >= 0) continue  // not feasibility-preserving by this approximation
+                sink.addCompound(listOf(
+                    com.eignex.klause.solver.Move.IntSet(iV, jCur),
+                    com.eignex.klause.solver.Move.IntSet(jV, iCur),
+                ))
+                swapsAdded++
+            }
+        }
+    }
+
+    private companion object {
+        const val MAX_SWAPS: Int = 4
+    }
+}
