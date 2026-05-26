@@ -210,7 +210,6 @@ Use cases:
 
 Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
 
-- [LS] ILS: linkage-aware crossover.
 - [LS] ALNS: cumulative time-window destroy operators.
 - [LS] ALNS: regret-based and best-improving repair operators.
 - [LS] Multi-core LS portfolio: worker-config factory and per-worker strategy selection.

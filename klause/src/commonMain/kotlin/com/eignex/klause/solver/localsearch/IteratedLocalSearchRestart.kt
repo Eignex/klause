@@ -51,7 +51,13 @@ class IteratedLocalSearchRestart(
      *  randomises every variable of a small set of randomly-picked factors, producing a
      *  coordinated jump biased toward escaping the current basin. */
     val perturbationKind: PerturbationKind = PerturbationKind.Uniform,
+    /** When true, crossover transfers entire factor scopes at once instead of mixing
+     *  per-variable, preserving co-adapted assignments that uniform recombination would
+     *  shred. Off by default (uniform crossover) to keep behaviour stable for callers
+     *  that don't opt in. */
+    val linkageAware: Boolean = false,
 ) : RestartPolicy {
+
 
     init {
         require(populationSize >= 1) { "populationSize must be ≥ 1, got $populationSize" }
@@ -100,7 +106,7 @@ class IteratedLocalSearchRestart(
         if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
             val (parentA, parentB) = pickTwoDistinct(state.rng)
             val probA = crossoverBias.probParentA(parentA.objective, parentB.objective)
-            val child = biasedCrossover(parentA.sample, parentB.sample, probA, state.rng)
+            val child = biasedCrossover(state, parentA.sample, parentB.sample, probA, state.rng)
             applyChild(state, child)
             return
         }
@@ -121,9 +127,44 @@ class IteratedLocalSearchRestart(
         return population[i] to population[j]
     }
 
-    private fun biasedCrossover(a: Sample, b: Sample, probA: Double, rng: kotlin.random.Random): Sample {
+    private fun biasedCrossover(
+        state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: kotlin.random.Random,
+    ): Sample {
+        if (linkageAware) return linkageAwareCrossover(state, a, b, probA, rng)
         val bools = BooleanArray(a.bools.size) { if (rng.nextDouble() < probA) a.bools[it] else b.bools[it] }
         val ints = IntArray(a.ints.size) { if (rng.nextDouble() < probA) a.ints[it] else b.ints[it] }
+        return Sample(bools, ints)
+    }
+
+    /** Linkage-aware crossover: copy entire factor scopes from one parent at a time.
+     *  Each factor's bool+int scope is the linkage group; we pick a parent for the group
+     *  and copy all its variables together, preserving co-adapted assignments that uniform
+     *  crossover would shred. Variables touched by multiple factors get assigned by the
+     *  *last* factor processed (later factors override). Vars touched by no factor fall
+     *  back to a per-variable coin flip. */
+    private fun linkageAwareCrossover(
+        state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: kotlin.random.Random,
+    ): Sample {
+        val bools = BooleanArray(a.bools.size)
+        val ints = IntArray(a.ints.size)
+        val boolSet = BooleanArray(a.bools.size)
+        val intSet = BooleanArray(a.ints.size)
+        for (f in state.factors) {
+            val pickA = rng.nextDouble() < probA
+            val source = if (pickA) a else b
+            for (v in f.boolVars) {
+                if (v in source.bools.indices) { bools[v] = source.bools[v]; boolSet[v] = true }
+            }
+            for (v in f.intVars) {
+                if (v in source.ints.indices) { ints[v] = source.ints[v]; intSet[v] = true }
+            }
+        }
+        for (i in bools.indices) if (!boolSet[i]) {
+            bools[i] = if (rng.nextDouble() < probA) a.bools[i] else b.bools[i]
+        }
+        for (i in ints.indices) if (!intSet[i]) {
+            ints[i] = if (rng.nextDouble() < probA) a.ints[i] else b.ints[i]
+        }
         return Sample(bools, ints)
     }
 
