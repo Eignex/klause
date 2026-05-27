@@ -30,8 +30,8 @@ Two native engines, both implementing Solver and Optimizer:
   finish in budget.
 
 Optional adapter modules send the same problem to external solvers when
-useful: klause-logicng for bit-blasted SAT, klause-z3 for SMT. Side doors,
-not the core.
+useful: klause-logicng for bit-blasted SAT, klause-smt for SMT-LIB-based
+backends. Side doors, not the core.
 
 Sampling is first-class. Drawing samples with replacement and enumerating
 without replacement are core operations. Most CP libraries solve once and

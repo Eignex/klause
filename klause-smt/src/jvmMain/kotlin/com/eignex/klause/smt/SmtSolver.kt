@@ -33,10 +33,6 @@ import org.sosy_lab.java_smt.api.SolverContext.ProverOptions
  * CVC5, MathSAT5, Bitwuzla, Yices2), you need the corresponding JavaSMT solver
  * artifact on the classpath.
  *
- * This module deliberately sits alongside `klause-z3` rather than replacing it —
- * users who want lean, single-backend Z3 access still pick that module; users who
- * want cross-backend experimentation or pure-Java SMT pick this one.
- *
  * Scaffold scope: `solve()` directly; `samples()` / `enumerate()` go through [session]
  * (a one-shot session is opened and immediately closed). Native `minimize()` comes in a
  * follow-up.

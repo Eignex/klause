@@ -7,4 +7,4 @@ pluginManagement {
     }
 }
 
-include(":klause", ":klause-logicng", ":klause-z3", ":klause-smt", ":klause-bench", ":klause-fzn-cli")
+include(":klause", ":klause-logicng", ":klause-smt", ":klause-bench", ":klause-fzn-cli")

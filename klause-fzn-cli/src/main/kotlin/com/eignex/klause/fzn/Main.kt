@@ -20,8 +20,6 @@ import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.z3.Z3Params
-import com.eignex.klause.z3.Z3Solver
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -36,7 +34,7 @@ import kotlin.system.exitProcess
  *
  * Backend is chosen with `--engine NAME` (or `-e NAME`), or via the `klause.fzn.engine`
  * system property. Recognised names: `backtrack` (default), `ls` / `localsearch`,
- * `logicng`, `z3`, `brute`. Each backend honors `-t` (time limit) and `-r` (seed); the
+ * `logicng`, `brute`. Each backend honors `-t` (time limit) and `-r` (seed); the
  * `-a` / `-n` flags apply to the satisfy path.
  */
 fun main(args: Array<String>) {
@@ -77,11 +75,10 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
         "backtrack", "bt" -> runWithBacktrack(program, opts)
         "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
         "logicng" -> runWithLogicNG(program, opts)
-        "z3" -> runWithZ3(program, opts)
         "brute", "bruteforce", "brute-force" -> runWithBrute(program, opts)
         else -> {
             System.err.println("klause-fzn: unknown engine `$engine`; expected one of " +
-                "backtrack, ls, logicng, z3, brute")
+                "backtrack, ls, logicng, brute")
             exitProcess(2)
         }
     }
@@ -104,14 +101,6 @@ private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {
         timeoutMillis = opts.timeLimitMs,
     )
     runGeneric(LogicNGSolver(program.problem), params, program, opts)
-}
-
-private fun runWithZ3(program: FlatZincProgram, opts: Options) {
-    val params = Z3Params(
-        randomSeed = opts.randomSeed,
-        timeoutMillis = opts.timeLimitMs,
-    )
-    runGeneric(Z3Solver(program.problem), params, program, opts)
 }
 
 private fun runWithBrute(program: FlatZincProgram, opts: Options) {

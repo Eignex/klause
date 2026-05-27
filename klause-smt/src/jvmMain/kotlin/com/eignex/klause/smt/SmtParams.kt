@@ -5,9 +5,9 @@ import com.eignex.klause.solver.SolverParams
 import org.sosy_lab.java_smt.SolverContextFactory
 
 /**
- * Per-call params for [SmtSolver]. Mirrors [com.eignex.klause.logicng.LogicNGParams] and
- * the discontinued klause-z3 params in shape so the cross-backend harness can hand each
- * backend its own typed params and stay symmetric.
+ * Per-call params for [SmtSolver]. Mirrors [com.eignex.klause.logicng.LogicNGParams] in
+ * shape so the cross-backend harness can hand each backend its own typed params and stay
+ * symmetric.
  *
  *  - [solver] — which JavaSMT backend to use. SMTInterpol is pure-Java and always
  *    available. Z3 / CVC5 / MathSAT5 / Bitwuzla / Yices2 require their respective native
@@ -35,9 +35,7 @@ data class SmtParams(
      * backends' [com.eignex.klause.solver.SolverParams]. **Currently ignored** by this
      * backend: JavaSMT does not expose Z3's `rlimit` or any equivalent uniformly across
      * its supported solvers, so there's no per-solver knob we can pass through here.
-     * Use [timeoutMillis] until JavaSMT (or specific backends below it) gain such a knob;
-     * the direct [com.eignex.klause.z3.Z3Solver] in klause-z3 honours `maxInstructions`
-     * via Z3's native rlimit if you need wall-clock-independent budgets today.
+     * Use [timeoutMillis] until JavaSMT (or specific backends below it) gain such a knob.
      */
     val maxInstructions: Long? = null,
 ) : SolverParams {

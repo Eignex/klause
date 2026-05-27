@@ -33,9 +33,9 @@ internal class SmtEncoding(
 )
 
 /**
- * Translation result mirroring [com.eignex.klause.z3.Z3Translation]: variable encoding
- * plus the formulas to assert, split into [auxiliary] (var domains, real-link
- * bookkeeping — never appear in unsat cores) and [factorFormulas] (parallel to
+ * Translation result: variable encoding plus the formulas to assert, split into
+ * [auxiliary] (var domains, real-link bookkeeping — never appear in unsat cores) and
+ * [factorFormulas] (parallel to
  * [com.eignex.klause.solver.Problem.factors] in id order). The split lets `solve`
  * track only factor-derived assertions when an unsat core is requested.
  */
@@ -48,10 +48,10 @@ internal class SmtTranslation(
 }
 
 /**
- * Direct (non-bit-blasted) SMT translation of a klause [Problem] to JavaSMT formulas.
- * Same factor-by-factor mapping as the discontinued `klause-z3` path, but expressed
- * against JavaSMT's solver-agnostic API so any compatible backend (SMTInterpol default,
- * Z3 / CVC5 / MathSAT5 / Bitwuzla / Yices2 if their natives are present) can consume it.
+ * Direct (non-bit-blasted) SMT translation of a klause [Problem] to JavaSMT formulas,
+ * expressed against JavaSMT's solver-agnostic API so any compatible backend
+ * (SMTInterpol default, Z3 / CVC5 / MathSAT5 / Bitwuzla / Yices2 if their natives are
+ * present) can consume it.
  */
 internal object SmtTranslator {
 

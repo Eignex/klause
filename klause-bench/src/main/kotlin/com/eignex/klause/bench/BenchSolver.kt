@@ -11,8 +11,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.z3.Z3Params
-import com.eignex.klause.z3.Z3Solver
 
 /** Type-erased sampler wrapper for the harness. Each impl pre-binds its params. */
 interface BenchSolver {
@@ -54,19 +52,6 @@ class LogicNGBench(
     override fun samplesSequence() = s.samples(params)
 }
 
-class Z3Bench(
-    override val problem: Problem,
-    private val params: Z3Params = Z3Params(),
-) : BenchSolver {
-    private val s = Z3Solver(problem)
-    override val name = "z3"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
-    override fun enumerateSequence() = s.enumerate(params)
-    override fun samplesSequence() = s.samples(params)
-}
-
 class BacktrackBench(
     override val problem: Problem,
     private val params: BacktrackParams = BacktrackParams(maxDecisions = 100_000L, randomSeed = 0L),
@@ -98,6 +83,5 @@ fun defaultSolvers(problem: Problem): List<BenchSolver> = buildList {
     add(LocalSearchBench(problem))
     add(BacktrackBench(problem))
     add(LogicNGBench(problem))
-    add(Z3Bench(problem))
     if (BruteForceSolver.fits(problem)) add(BruteForceBench(problem))
 }

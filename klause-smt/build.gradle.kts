@@ -19,8 +19,7 @@ kotlin {
             // re-add via `implementation("io.github.uuverifiers:princess_2.13:...")` if
             // you want it. Native backends (Z3, CVC5, MathSAT5, Bitwuzla, Yices2) are
             // optional and added by depending on their JavaSMT solver artifacts; they
-            // bring platform-specific natives. The lean klause-z3 module is preserved
-            // alongside for users who want direct-Z3 access without JavaSMT's abstraction.
+            // bring platform-specific natives.
             implementation("org.sosy-lab:java-smt:5.0.0") {
                 exclude(group = "io.github.uuverifiers")
                 exclude(group = "org.scala-lang")
@@ -32,6 +31,18 @@ kotlin {
         jvmTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":klause"))
+        }
+    }
+}
+
+dokka {
+    dokkaSourceSets.configureEach {
+        sourceLink {
+            localDirectory.set(projectDir.resolve("src"))
+            val sub = projectDir.relativeTo(rootDir).invariantSeparatorsPath
+            val prefix = if (sub.isEmpty()) "src" else "$sub/src"
+            remoteUrl("https://github.com/Eignex/${rootProject.name}/blob/main/$prefix")
+            remoteLineSuffix.set("#L")
         }
     }
 }

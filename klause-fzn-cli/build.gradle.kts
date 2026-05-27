@@ -10,7 +10,6 @@ repositories {
 dependencies {
     implementation(project(":klause"))
     implementation(project(":klause-logicng"))
-    implementation(project(":klause-z3"))
 }
 
 application {
