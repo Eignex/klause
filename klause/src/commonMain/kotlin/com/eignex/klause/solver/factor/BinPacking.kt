@@ -169,8 +169,17 @@ class BinPacking(
         return true
     }
 
-    /** Repair: for each overloaded bin, propose moving its heaviest item to the bin with
-     *  the most slack. Under [Mode.LoadVars] also snap loadVars to current loads. */
+    /**
+     * Repair: for each overloaded bin, propose a rich candidate set rather than a single
+     * "heaviest to most-slack" move. The LS scorer picks among them. Specifically:
+     *  1. Move each of the top-K heaviest items in the overloaded bin to its best-fit
+     *     receiver — gives multiple alternatives when the absolute-heaviest doesn't fit.
+     *  2. For each item in the overloaded bin, propose every receiver bin whose slack
+     *     would accept it (capped per item).
+     *  3. Pair swaps: for items currently in the overloaded bin, find an item in a less
+     *     loaded bin whose weight roughly compensates and propose the atomic swap.
+     *  Under [Mode.LoadVars] also snap loadVars to current loads.
+     */
     override fun proposeRepairMoves(
         state: LocalSearchState,
         factorId: Int,
@@ -187,44 +196,89 @@ class BinPacking(
                 }
             }
         }
-        // Identify overloaded and underloaded bins.
+        // Per-bin capacities (called repeatedly below).
+        fun capOf(k: Int): Int = when (mode) {
+            Mode.UniformCapacity -> uniformCapacity
+            Mode.PerBinCapacity -> capacities!![k]
+            Mode.LoadVars -> Int.MAX_VALUE
+        }
         for (b in 0 until numBins) {
-            val cap = when (mode) {
-                Mode.UniformCapacity -> uniformCapacity
-                Mode.PerBinCapacity -> capacities!![b]
-                Mode.LoadVars -> Int.MAX_VALUE  // load-var mode doesn't enforce capacity here
-            }
+            val cap = capOf(b)
             if (s.loads[b] <= cap) continue
-            // Find the heaviest item in this bin.
-            var heaviestI = -1
-            var heaviestW = -1
+            // Collect every item currently assigned to overloaded bin b, sorted by
+            // weight descending — the top of the list is the highest-leverage candidate
+            // but lighter items may fit when the heaviest doesn't.
+            val itemsHere = ArrayList<Int>()
             for (i in bins.indices) {
                 val itemBin = state.assignment.intValue(bins[i]) - binOffset
-                if (itemBin != b) continue
-                if (weights[i] > heaviestW) { heaviestW = weights[i]; heaviestI = i }
+                if (itemBin == b) itemsHere.add(i)
             }
-            if (heaviestI < 0) continue
-            // Pick the bin with most slack as the relocation target.
-            var bestBin = -1
-            var bestSlack = Int.MIN_VALUE
-            for (k in 0 until numBins) {
-                if (k == b) continue
-                val capK = when (mode) {
-                    Mode.UniformCapacity -> uniformCapacity
-                    Mode.PerBinCapacity -> capacities!![k]
-                    Mode.LoadVars -> Int.MAX_VALUE
-                }
-                val slack = capK - s.loads[k]
-                if (slack >= weights[heaviestI] && slack > bestSlack) {
-                    bestSlack = slack; bestBin = k
+            if (itemsHere.isEmpty()) continue
+            itemsHere.sortByDescending { weights[it] }
+
+            // (1) + (2): for each of the top-K heaviest items propose moves to receivers.
+            val topK = minOf(MAX_ITEMS_PER_BIN, itemsHere.size)
+            for (idxInList in 0 until topK) {
+                val itemI = itemsHere[idxInList]
+                val itemBinVar = bins[itemI]
+                val itemDom = state.problem.intDomains[itemBinVar]
+                var receiversAdded = 0
+                for (k in 0 until numBins) {
+                    if (k == b) continue
+                    val slack = capOf(k) - s.loads[k]
+                    if (slack < weights[itemI]) continue
+                    val target = k + binOffset
+                    if (target !in itemDom) continue
+                    sink.addChannelingIntSet(state, itemBinVar, target)
+                    if (++receiversAdded >= MAX_RECEIVERS_PER_ITEM) break
                 }
             }
-            if (bestBin >= 0) {
-                val target = bestBin + binOffset
-                if (target in state.problem.intDomains[bins[heaviestI]]) {
-                    sink.addChannelingIntSet(state, bins[heaviestI], target)
+
+            // (3): swap pairs. For each top-K heaviest item in b, look for an item in
+            // another bin whose weight is close enough that the swap (a) frees enough
+            // slack in b and (b) doesn't overload the receiver. Bounded by item count.
+            for (idxInList in 0 until topK) {
+                val itemI = itemsHere[idxInList]
+                val wI = weights[itemI]
+                val binVarI = bins[itemI]
+                val domI = state.problem.intDomains[binVarI]
+                var swapsAdded = 0
+                for (j in bins.indices) {
+                    if (j == itemI) continue
+                    val jBin = state.assignment.intValue(bins[j]) - binOffset
+                    if (jBin == b) continue  // both in overloaded bin — skip
+                    if (jBin < 0 || jBin >= numBins) continue
+                    val wJ = weights[j]
+                    // Net effect on b: -wI + wJ. Want ≤ 0 (i.e. wJ ≤ wI) so we reduce
+                    // load. Net on jBin: -wJ + wI. Want ≤ capOf(jBin) − (s.loads[jBin]).
+                    if (wJ > wI) continue
+                    val jSlack = capOf(jBin) - s.loads[jBin]
+                    if (wI - wJ > jSlack) continue
+                    val targetForI = jBin + binOffset
+                    val targetForJ = b + binOffset
+                    if (targetForI !in domI) continue
+                    if (targetForJ !in state.problem.intDomains[bins[j]]) continue
+                    sink.addCompound(listOf(
+                        com.eignex.klause.solver.Move.IntSet(binVarI, targetForI),
+                        com.eignex.klause.solver.Move.IntSet(bins[j], targetForJ),
+                    ))
+                    if (++swapsAdded >= MAX_SWAPS_PER_ITEM) break
                 }
             }
         }
+    }
+
+    private companion object {
+        /** Top-K heaviest items in each overloaded bin to consider as movers / swap
+         *  pivots. Bounds per-step proposal count at O(numOverloadedBins · K). */
+        const val MAX_ITEMS_PER_BIN: Int = 4
+
+        /** Cap on receiver bins proposed per item — diversifies the candidate set without
+         *  blowing it up on problems with many bins. */
+        const val MAX_RECEIVERS_PER_ITEM: Int = 3
+
+        /** Cap on swap partners proposed per moving item — bounds the inner-loop cost on
+         *  problems with many items. */
+        const val MAX_SWAPS_PER_ITEM: Int = 2
     }
 }

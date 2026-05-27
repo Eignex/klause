@@ -190,9 +190,15 @@ class Diffn(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
-    /** Repair: for each overlapping pair, propose shifting one rectangle so they no
-     *  longer overlap on x or y. Picks the move with the smallest shift among the four
-     *  candidate axes/directions. */
+    /** Repair: for each overlapping pair, propose moves that escape the overlap.
+     *  Per-pair candidate set:
+     *   - 4 single-axis shifts for rectangle i (existing).
+     *   - 4 symmetric single-axis shifts for rectangle j.
+     *   - 4 diagonal Compound shifts on i (left+down, left+up, right+down, right+up) —
+     *     useful when single-axis shifts collide with adjacent rectangles.
+     *   - 1 swap Compound that exchanges (xs[i], ys[i]) with (xs[j], ys[j]) — escapes
+     *     deadlocks where i and j mutually block each other on both axes.
+     */
     override fun proposeRepairMoves(
         state: LocalSearchState,
         factorId: Int,
@@ -207,17 +213,56 @@ class Diffn(
                 val xj = state.assignment.intValue(xs[j])
                 val yj = state.assignment.intValue(ys[j])
                 if (!overlaps(xi, yi, widths[i], heights[i], xj, yj, widths[j], heights[j])) continue
-                // Four directions: shift i left, i right, i down, i up — to escape overlap with j.
-                val dxs = state.problem.intDomains[xs[i]]
-                val dys = state.problem.intDomains[ys[i]]
-                val leftI = xj - widths[i]  // xs[i] + w_i <= xj  →  xs[i] <= xj - w_i
-                val rightI = xj + widths[j]  // xs[i] >= xj + w_j
+                val dxsI = state.problem.intDomains[xs[i]]
+                val dysI = state.problem.intDomains[ys[i]]
+                val dxsJ = state.problem.intDomains[xs[j]]
+                val dysJ = state.problem.intDomains[ys[j]]
+                // i-side single-axis shifts.
+                val leftI = xj - widths[i]
+                val rightI = xj + widths[j]
                 val downI = yj - heights[i]
                 val upI = yj + heights[j]
-                if (leftI in dxs && leftI != xi) sink.addChannelingIntSet(state, xs[i], leftI)
-                if (rightI in dxs && rightI != xi) sink.addChannelingIntSet(state, xs[i], rightI)
-                if (downI in dys && downI != yi) sink.addChannelingIntSet(state, ys[i], downI)
-                if (upI in dys && upI != yi) sink.addChannelingIntSet(state, ys[i], upI)
+                if (leftI in dxsI && leftI != xi) sink.addChannelingIntSet(state, xs[i], leftI)
+                if (rightI in dxsI && rightI != xi) sink.addChannelingIntSet(state, xs[i], rightI)
+                if (downI in dysI && downI != yi) sink.addChannelingIntSet(state, ys[i], downI)
+                if (upI in dysI && upI != yi) sink.addChannelingIntSet(state, ys[i], upI)
+                // j-side symmetric shifts.
+                val leftJ = xi - widths[j]
+                val rightJ = xi + widths[i]
+                val downJ = yi - heights[j]
+                val upJ = yi + heights[i]
+                if (leftJ in dxsJ && leftJ != xj) sink.addChannelingIntSet(state, xs[j], leftJ)
+                if (rightJ in dxsJ && rightJ != xj) sink.addChannelingIntSet(state, xs[j], rightJ)
+                if (downJ in dysJ && downJ != yj) sink.addChannelingIntSet(state, ys[j], downJ)
+                if (upJ in dysJ && upJ != yj) sink.addChannelingIntSet(state, ys[j], upJ)
+                // Diagonal 2-axis shifts on i. Useful when single-axis moves would collide
+                // with a third rectangle but the diagonal corner is free.
+                fun proposeDiagonal(nx: Int, ny: Int) {
+                    if (nx == xi && ny == yi) return
+                    if (nx !in dxsI || ny !in dysI) return
+                    sink.addCompound(listOf(
+                        com.eignex.klause.solver.Move.IntSet(xs[i], nx),
+                        com.eignex.klause.solver.Move.IntSet(ys[i], ny),
+                    ))
+                }
+                proposeDiagonal(leftI, downI)
+                proposeDiagonal(leftI, upI)
+                proposeDiagonal(rightI, downI)
+                proposeDiagonal(rightI, upI)
+                // Swap rectangles i and j (4-flip compound). Only when domains allow the
+                // exchange and at least one axis actually shifts on each side — degenerate
+                // axes (equal current values) would emit no-op IntSets that the engine
+                // would reject anyway.
+                if (xi != xj && yi != yj) {
+                    if (xj in dxsI && yj in dysI && xi in dxsJ && yi in dysJ) {
+                        sink.addCompound(listOf(
+                            com.eignex.klause.solver.Move.IntSet(xs[i], xj),
+                            com.eignex.klause.solver.Move.IntSet(ys[i], yj),
+                            com.eignex.klause.solver.Move.IntSet(xs[j], xi),
+                            com.eignex.klause.solver.Move.IntSet(ys[j], yi),
+                        ))
+                    }
+                }
             }
         }
     }

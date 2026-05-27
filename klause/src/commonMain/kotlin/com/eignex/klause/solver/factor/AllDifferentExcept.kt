@@ -325,24 +325,66 @@ class AllDifferentExcept(
         return false
     }
 
+    /** Reservoir-sample a duplicated value uniformly across all duplicates, then reservoir-
+     *  sample one of its occupants, then propose multiple candidate targets: the excluded
+     *  sentinels (which never break the constraint) plus reservoir-sampled in-domain
+     *  unused values. Mirrors the structure of [AllDifferent.proposeRepairMoves] so the
+     *  except variant has the same search diversity as the base. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val s = state.refPayload[factorId] as State
         if (s.violatedPairs == 0) return
-        var target: Int = Int.MIN_VALUE
+        // Reservoir-sample a duplicated value.
+        var pickedValue = Int.MIN_VALUE
+        var seenDups = 0
         for ((value, count) in s.counts) {
-            if (count >= 2) { target = value; break }
+            if (count < 2) continue
+            seenDups++
+            if (state.rng.nextInt(seenDups) == 0) pickedValue = value
         }
-        if (target == Int.MIN_VALUE) return
+        if (pickedValue == Int.MIN_VALUE) return
+        // Reservoir-sample one occupant of that value.
+        var occupant = -1
+        var seenOccupants = 0
         for (v in xs) {
-            if (state.assignment.intValue(v) != target) continue
-            val d = state.problem.intDomains[v]
-            // Try setting to any excluded sentinel that's in the domain.
-            for (e in except) {
-                if (e in d) { sink.addChannelingIntSet(state, v, e); break }
-            }
-            if (target > d.min && (target - 1) in d) sink.addChannelingIntSet(state, v, target - 1)
-            if (target < d.max && (target + 1) in d) sink.addChannelingIntSet(state, v, target + 1)
-            return
+            if (state.assignment.intValue(v) != pickedValue) continue
+            seenOccupants++
+            if (state.rng.nextInt(seenOccupants) == 0) occupant = v
         }
+        if (occupant == -1) return
+        val d = state.problem.intDomains[occupant]
+        // Excluded sentinels first — they're always safe targets.
+        var emitted = 0
+        for (e in except) {
+            if (e in d && e != pickedValue) {
+                sink.addChannelingIntSet(state, occupant, e)
+                if (++emitted >= MAX_REPAIR_TARGETS) return
+            }
+        }
+        // Reservoir-sample unused (count == 0) targets from the occupant's domain. Cap at
+        // MAX_REPAIR_TARGETS combined with the sentinel emissions above so the proposal
+        // set stays bounded.
+        val budget = MAX_REPAIR_TARGETS - emitted
+        if (budget <= 0) return
+        val targets = IntArray(budget) { Int.MIN_VALUE }
+        var filled = 0
+        var seenTargets = 0
+        d.forEach { target ->
+            if (target == pickedValue) return@forEach
+            if (target in exceptSet) return@forEach  // already proposed above
+            val count = s.counts[target] ?: 0
+            if (count != 0) return@forEach
+            seenTargets++
+            if (filled < budget) targets[filled++] = target
+            else {
+                val r = state.rng.nextInt(seenTargets)
+                if (r < budget) targets[r] = target
+            }
+        }
+        for (i in 0 until filled) sink.addChannelingIntSet(state, occupant, targets[i])
+    }
+
+    private companion object {
+        /** Cap on total target candidates proposed per call. Matches AllDifferent.MAX_REPAIR_TARGETS. */
+        const val MAX_REPAIR_TARGETS: Int = 4
     }
 }
