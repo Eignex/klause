@@ -111,8 +111,16 @@ class Cbls(
         return bestMove
     }
 
-    private fun score(state: LocalSearchState, move: Move): Double =
-        state.weightedNetDelta(move) + state.shapedObjectiveDelta(move)
+    /** Score a candidate move. **Feasibility-first**: the objective component is gated
+     *  behind `state.cost == 0`. At infeasibility we ignore the objective entirely so the
+     *  search isn't pulled away from constraint satisfaction by a competing gradient —
+     *  pure weighted-violation delta wins. At feasibility the objective is the only
+     *  signal that distinguishes the equally-cost-0 candidates, so it fully drives. */
+    private fun score(state: LocalSearchState, move: Move): Double {
+        val violationDelta = state.weightedNetDelta(move)
+        val objDelta = if (state.cost == 0) state.shapedObjectiveDelta(move) else 0.0
+        return violationDelta + objDelta
+    }
 
     /** Bump weights on every currently-violated factor by [increment]. SAPS-style scale
      *  rather than DDFW-style transfer — we don't redistribute from satisfied neighbors,
@@ -134,6 +142,11 @@ class Cbls(
 
     private fun sampleFromSatisfied(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
         if (satisfiedSampleCount == 0) return
+        // At infeasibility the structured-move source contributes nothing useful — its
+        // moves only matter when the engine is already at cost==0 and looking for
+        // objective-improving steps. Sampling here just dilutes the candidate pool while
+        // the search should be focused on closing violations.
+        if (state.cost > 0) return
         val total = state.problem.numFactors
         if (total == 0) return
         // Random sampling rather than enumerate-then-filter; the satisfied-vs-violated
@@ -149,8 +162,12 @@ class Cbls(
 
     /** Seed single-variable moves directly on the objective's nonzero-weight vars. Without
      *  this, a fully-satisfied state with no factor proposing structured moves has zero
-     *  candidates and pickMove returns null — engine restarts spuriously. */
+     *  candidates and pickMove returns null — engine restarts spuriously. Skipped at
+     *  infeasibility for the same reason as [sampleFromSatisfied]: the objective gradient
+     *  doesn't matter when we're still chasing violations, and the engine has
+     *  proposeRepairMoves to cover that phase. */
     private fun seedObjectiveMoves(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
+        if (state.cost > 0) return
         val obj = state.objective ?: return
         when (obj) {
             is com.eignex.klause.solver.LinearObjective -> {

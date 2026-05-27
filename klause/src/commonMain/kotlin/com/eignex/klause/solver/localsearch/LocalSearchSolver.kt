@@ -306,15 +306,14 @@ class LocalSearchSolver(
         // degenerate objective (e.g. all-zero) on a constraint-free problem would
         // produce an infinite loop: cost stays at 0, greedy descent never improves,
         // and the restart path otherwise wouldn't bump [totalFlips].
-        // Phase split: [strategy] (satisfy-mode, default AdaptiveProbSat) drives the
-        // feasibility fight when `state.cost > 0`. [optimizeStrategy] — typically a CBLS
-        // variant — contributes objective-improving moves at feasibility alongside the
-        // greedy / structured / pair-swap descent options. Earlier-tried "unified CBLS
-        // throughout" regressed feasibility-finding on hard SAT-shape constraints: CBLS's
-        // objective-aware scoring weakens the violation gradient pressure that ProbSat
-        // exerts on the feasibility fight. Keeping ProbSat for satisfy + CBLS for descent
-        // gives each phase its native strength.
+        // Phase strategy: when [optimizeStrategy] is feasibility-aware (gates objective
+        // behind cost==0) it drives both phases — CBLS's pure-netDelta scoring at
+        // infeasibility beats ProbSat at multi-flip-cascade problems, and its
+        // weight-bumping helps escape SAT-shape local minima too. Fall back to phase
+        // split (strategy for satisfy, optimizeStrategy for descent) for non-unified
+        // strategies that bail at feasibility (DDFW/ProbSat).
         val descentStrategy = optimizeStrategy
+        val unified = descentStrategy is com.eignex.klause.solver.localsearch.strategy.Cbls
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
@@ -394,8 +393,11 @@ class LocalSearchSolver(
                 totalFlips++
                 continue
             }
-            // Pre-feasibility: satisfy-mode strategy drives the violation fight.
-            val move = strategy.pickMove(state)
+            // Pre-feasibility: drive through the unified strategy when one is configured,
+            // else use the satisfy-mode strategy. CBLS (when unified) scores by
+            // weightedNetDelta only at cost>0, which gives it equivalent feasibility-fight
+            // behavior to ProbSat plus better multi-flip handling.
+            val move = if (unified) descentStrategy!!.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
                 restartPolicy.restart(state, bestSample)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
