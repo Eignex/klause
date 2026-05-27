@@ -180,6 +180,28 @@ tasks.register<JavaExec>("runMznParity") {
     dependsOn(":klause-fzn-cli:installDist")
 }
 
+/** LS-vs-baseline anytime bench. Drives klause-LS and Yuck through `minizinc --solver`
+ *  on the same instances, captures time-to-first/best and final objective for each. See
+ *  [com.eignex.klause.bench.parity.LsBenchMain] for properties. */
+tasks.register<JavaExec>("runLsBench") {
+    group = "verification"
+    description = "LS bench: klause-LS vs Yuck on the same MiniZinc instances."
+    notCompatibleWithConfigurationCache(
+        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
+    )
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.LsBenchMain")
+    val workspaceRoot = rootDir.absolutePath
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.lsbench.")) systemProperty(key, v.toString())
+        }
+        systemProperty("klause.workspace.root", workspaceRoot)
+    }
+    dependsOn(":klause-fzn-cli:installDist")
+}
+
 /** Opt-in: download SATLIB benchmark tarballs to `build/satlib/<set>/`. The bench
  *  harness picks them up automatically on the next `:klause-bench:run`. Tarballs are
  *  small (~300 KB each, 1000 instances of 20-50 vars). */

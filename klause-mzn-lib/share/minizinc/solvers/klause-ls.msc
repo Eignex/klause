@@ -1,0 +1,16 @@
+{
+  "id": "com.eignex.klause.ls",
+  "name": "Klause LS",
+  "description": "Klause local-search backend (LocalSearchSolver)",
+  "version": "0.1.0",
+  "mznlib": "../klause",
+  "executable": "../../../bin/klause-fzn-ls",
+  "tags": ["cbls", "int", "finite-domain", "localsearch"],
+  "stdFlags": ["-a", "-n", "-s", "-v", "-t", "-r"],
+  "supportsMzn": false,
+  "supportsFzn": true,
+  "needsSolns2Out": true,
+  "needsMznExecutable": false,
+  "needsStdlibDir": false,
+  "isGUIApplication": false
+}
