@@ -100,7 +100,12 @@ object LsBench {
         BufferedReader(InputStreamReader(proc.inputStream)).useLines { lines ->
             for (line in lines) {
                 if (!inSolution && line.isNotBlank()) inSolution = true
-                val objMatch = Regex("""_objective\s*=\s*(-?\d+(?:\.\d+)?)""").find(line)
+                // MiniZinc emits either `_objective = N` (with --output-objective on a
+                // model that didn't define an output stanza for it) or `Objective = N`
+                // (when the model itself includes `output ["Objective = ", show(obj)]`,
+                // as the MiniZinc Challenge benchmarks do).
+                val objMatch = Regex("""(?:_objective|Objective)\s*=\s*(-?\d+(?:\.\d+)?)""")
+                    .find(line)
                 if (objMatch != null) curObj = objMatch.groupValues[1].toDoubleOrNull()
                 if (line.trimEnd() == "----------") {
                     val now = System.currentTimeMillis() - started
