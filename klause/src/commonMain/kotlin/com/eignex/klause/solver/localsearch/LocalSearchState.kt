@@ -282,6 +282,47 @@ class LocalSearchState(
      * is improving enough to override the tabu. Walks the affected var's occurrence list
      * once; same O(arity) cost as [breakScore].
      */
+    /**
+     * Synthesize a value-driven move that sets [intVar] to [newValue] and coordinately
+     * flips all indicator bools of sibling **reified single-var equality** factors on the
+     * same int var. The classic channeling pattern: a course-period model encodes
+     * `course[i] = p` via N parallel `int_eq_reif(course[i], p, b_ip)` factors, one per
+     * possible period. A naive `IntSet(course[i], 7)` cascades into N indicator-violations
+     * that the engine has to chase one bool-flip at a time; this helper rolls the
+     * coordinated update into one atomic Compound.
+     *
+     * Returns the plain [Move.IntSet] when no sibling indicators need updating (no
+     * channeling, or all indicators already consistent). Returns a [Move.Compound] when
+     * at least one indicator flip is needed. Sibling factors of other shapes
+     * (multi-var reified linear, LE/GE reified, etc.) are intentionally skipped — only
+     * the single-var EQ channeling pattern has a deterministic "which indicator flips"
+     * answer.
+     */
+    fun synthesizeChannelingMove(intVar: Int, newValue: Int): Move {
+        val cur = assignment.intValue(intVar)
+        if (cur == newValue) return Move.IntSet(intVar, newValue)  // caller handles no-op
+        val parts = ArrayList<Move>(4)
+        parts += Move.IntSet(intVar, newValue)
+        // Walk every factor mentioning this int var. For each single-var EQ reified-linear
+        // factor, check whether its aux needs to flip given the new int value.
+        for (fid in problem.intOccurrences[intVar]) {
+            val f = factors[fid]
+            if (f !is com.eignex.klause.solver.factor.ReifiedLinear) continue
+            if (f.vars.size != 1 || f.op != com.eignex.klause.solver.factor.LinearOp.EQ) continue
+            // Single-coeff EQ: f holds iff coeff·newValue == bound.
+            val coeff = f.coeffs[0]
+            val auxVar = f.auxBoolVar
+            if (assumptions.isFrozenBool(auxVar)) continue
+            val newSum = coeff * newValue
+            val shouldHold = newSum == f.bound
+            val auxCurrent = assignment.boolValue(auxVar)
+            if (auxCurrent != shouldHold) {
+                parts += Move.BoolFlip(auxVar)
+            }
+        }
+        return if (parts.size == 1) parts[0] else Move.Compound(parts)
+    }
+
     fun netDelta(move: Move): Int = when (move) {
         is Move.BoolFlip -> {
             var sum = 0

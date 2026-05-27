@@ -145,12 +145,16 @@ class ReifiedLinear(
             if (c == 0) continue
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c * cur
-            // Same-aux snap: shift body so the predicate matches the current aux.
+            // Same-aux snap: shift body so the predicate matches the current aux. Routed
+            // through the channeling-aware sink helper so any sibling reified-eq factors
+            // on this var get their indicators flipped atomically — without this, LS sets
+            // the int and then chases the now-inconsistent indicator bools one at a time,
+            // which is the cascade that stalls course-period style decompositions.
             val targetSame = snapTarget(c, sumWithout, aux)
             if (targetSame != null) {
                 val clamped = state.problem.intDomains[v].clamp(targetSame)
                 if (clamped != cur && aux == holds(sumWithout + c * clamped)) {
-                    sink.addIntSet(v, clamped)
+                    sink.addChannelingIntSet(state, v, clamped)
                 }
             }
             // Toggle-driven sub-region exploration: flip aux *and* shift body so the

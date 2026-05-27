@@ -163,8 +163,9 @@ class Cbls(
                     val cur = state.assignment.intValue(v)
                     val d = state.problem.intDomains[v]
                     // Step in the direction the coefficient says reduces the objective.
-                    if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addIntSet(v, cur - 1)
-                    if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addIntSet(v, cur + 1)
+                    // Channeling-aware so int-move + indicator updates stay atomic.
+                    if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
+                    if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
                 }
             }
             else -> { /* no per-var direction without inspecting the objective shape */ }

@@ -83,8 +83,8 @@ class Linear(
                 if (c == 0) continue
                 val cur = state.assignment.intValue(v)
                 val d = state.problem.intDomains[v]
-                if (cur > d.min) sink.addIntSet(v, cur - 1)
-                if (cur < d.max) sink.addIntSet(v, cur + 1)
+                if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
+                if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
             }
             return
         }
@@ -96,7 +96,7 @@ class Linear(
             val sumWithout = sum - c * cur
             val target = snapTarget(c, sumWithout) ?: continue
             val clamped = state.problem.intDomains[v].clamp(target)
-            if (clamped != cur) sink.addIntSet(v, clamped)
+            if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
     }
 
