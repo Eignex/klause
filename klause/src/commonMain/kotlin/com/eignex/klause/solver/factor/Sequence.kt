@@ -171,12 +171,12 @@ class Sequence(
                     // Pick any in-domain non-matching value.
                     var pick: Int? = null
                     d.forEach { if (pick == null && it != cur && !matches(it)) pick = it }
-                    if (pick != null) sink.addIntSet(xi, pick!!)
+                    if (pick != null) sink.addChannelingIntSet(state, xi, pick!!)
                 } else if (!isMatch && needIncrease) {
                     // Pick a matching value from the set.
                     var pick: Int? = null
                     for (vv in values) if (vv in d && vv != cur) { pick = vv; break }
-                    if (pick != null) sink.addIntSet(xi, pick!!)
+                    if (pick != null) sink.addChannelingIntSet(state, xi, pick!!)
                 }
             }
         }

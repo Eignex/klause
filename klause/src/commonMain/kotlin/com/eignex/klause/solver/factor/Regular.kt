@@ -76,7 +76,7 @@ class Regular(
                 // First dead position: propose every alphabet symbol in domain that keeps q alive.
                 val d = state.problem.intDomains[seq[i]]
                 d.forEach { sym ->
-                    if (sym != s && delta(q, sym) != 0) sink.addIntSet(seq[i], sym)
+                    if (sym != s && delta(q, sym) != 0) sink.addChannelingIntSet(state, seq[i], sym)
                 }
                 return
             }
@@ -93,7 +93,7 @@ class Regular(
             val d = state.problem.intDomains[seq[last]]
             d.forEach { sym ->
                 val target = delta(qPrev, sym)
-                if (sym != curLast && target in acceptingSet) sink.addIntSet(seq[last], sym)
+                if (sym != curLast && target in acceptingSet) sink.addChannelingIntSet(state, seq[last], sym)
             }
         }
     }

@@ -60,7 +60,7 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
             for (v in xs) {
                 val cur = state.assignment.intValue(v)
                 if (cur != target && target in state.problem.intDomains[v]) {
-                    sink.addIntSet(v, target)
+                    sink.addChannelingIntSet(state, v, target)
                 }
             }
         }

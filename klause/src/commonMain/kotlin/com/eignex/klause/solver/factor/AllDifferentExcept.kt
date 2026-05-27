@@ -338,10 +338,10 @@ class AllDifferentExcept(
             val d = state.problem.intDomains[v]
             // Try setting to any excluded sentinel that's in the domain.
             for (e in except) {
-                if (e in d) { sink.addIntSet(v, e); break }
+                if (e in d) { sink.addChannelingIntSet(state, v, e); break }
             }
-            if (target > d.min && (target - 1) in d) sink.addIntSet(v, target - 1)
-            if (target < d.max && (target + 1) in d) sink.addIntSet(v, target + 1)
+            if (target > d.min && (target - 1) in d) sink.addChannelingIntSet(state, v, target - 1)
+            if (target < d.max && (target + 1) in d) sink.addChannelingIntSet(state, v, target + 1)
             return
         }
     }

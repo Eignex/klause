@@ -80,11 +80,11 @@ class Knapsack(
         val s = state.refPayload[factorId] as State
         val wDom = state.problem.intDomains[w]
         if (s.currentWeight in wDom && s.currentWeight != state.assignment.intValue(w)) {
-            sink.addIntSet(w, s.currentWeight)
+            sink.addChannelingIntSet(state, w, s.currentWeight)
         }
         val pDom = state.problem.intDomains[p]
         if (s.currentProfit in pDom && s.currentProfit != state.assignment.intValue(p)) {
-            sink.addIntSet(p, s.currentProfit)
+            sink.addChannelingIntSet(state, p, s.currentProfit)
         }
         // For each xs[i], if w-var requires lower weight, propose decreasing xs[i] when
         // weights[i] > 0; symmetric for profit.
@@ -98,7 +98,7 @@ class Knapsack(
                 val d = state.problem.intDomains[xi]
                 val wantIncrease = (weights[i] > 0) == (wGap > 0)
                 val candidate = if (wantIncrease) cur + 1 else cur - 1
-                if (candidate in d) sink.addIntSet(xi, candidate)
+                if (candidate in d) sink.addChannelingIntSet(state, xi, candidate)
             }
         }
     }

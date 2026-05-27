@@ -77,19 +77,19 @@ class LexLess(
         val needXLE = if (strict) b - 1 else b  // xs[k] must reach ≤ this for the relation to hold
         val needYGE = if (strict) a + 1 else a  // ys[k] must reach ≥ this
         // Lower xs[k] toward `needXLE` (preferred), or as close as the domain allows.
-        if (needXLE in dx) sink.addIntSet(xV, needXLE)
-        else if (dx.min <= needXLE) sink.addIntSet(xV, dx.min)
+        if (needXLE in dx) sink.addChannelingIntSet(state, xV, needXLE)
+        else if (dx.min <= needXLE) sink.addChannelingIntSet(state, xV, dx.min)
         // Raise ys[k] toward `needYGE` (preferred), or as close as the domain allows.
-        if (needYGE in dy) sink.addIntSet(yV, needYGE)
-        else if (dy.max >= needYGE) sink.addIntSet(yV, dy.max)
+        if (needYGE in dy) sink.addChannelingIntSet(state, yV, needYGE)
+        else if (dy.max >= needYGE) sink.addChannelingIntSet(state, yV, dy.max)
         // Lex-preserving swap: if each side's current value sits in the other's domain,
         // swapping resolves the violation (xs[k]=b, ys[k]=a → satisfies xs[k] < ys[k]).
         if (xV != yV && b in dx && a in dy) {
             sink.addCompound(listOf(Move.IntSet(xV, b), Move.IntSet(yV, a)))
         }
         // ±1 nudges at the violation point as cheap fallbacks for tight domains.
-        if (a > dx.min) sink.addIntSet(xV, a - 1)
-        if (b < dy.max) sink.addIntSet(yV, b + 1)
+        if (a > dx.min) sink.addChannelingIntSet(state, xV, a - 1)
+        if (b < dy.max) sink.addChannelingIntSet(state, yV, b + 1)
     }
 
     /** Add the first-available prefix-breaking move (lower xs[i] or raise ys[i]) at the
@@ -103,8 +103,8 @@ class LexLess(
             val dx = state.problem.intDomains[xs[i]]
             val dy = state.problem.intDomains[ys[i]]
             var added = false
-            if (a > dx.min) { sink.addIntSet(xs[i], a - 1); added = true }
-            if (b < dy.max) { sink.addIntSet(ys[i], b + 1); added = true }
+            if (a > dx.min) { sink.addChannelingIntSet(state, xs[i], a - 1); added = true }
+            if (b < dy.max) { sink.addChannelingIntSet(state, ys[i], b + 1); added = true }
             if (added) return
         }
     }

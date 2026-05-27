@@ -452,7 +452,7 @@ class AllDifferent(
             }
         }
         if (filled > 0) {
-            for (i in 0 until filled) sink.addIntSet(occupant, targets[i])
+            for (i in 0 until filled) sink.addChannelingIntSet(state, occupant, targets[i])
             return
         }
         // No unused targets — every domain value is already taken. A single-var nudge
@@ -482,8 +482,8 @@ class AllDifferent(
         if (swapsAdded > 0) return
         // Last-resort fallback: nudge occupant by ±1 within domain.
         val cur = state.assignment.intValue(occupant)
-        if (cur < d.max) sink.addIntSet(occupant, cur + 1)
-        if (cur > d.min) sink.addIntSet(occupant, cur - 1)
+        if (cur < d.max) sink.addChannelingIntSet(state, occupant, cur + 1)
+        if (cur > d.min) sink.addChannelingIntSet(state, occupant, cur - 1)
     }
 
     private companion object {

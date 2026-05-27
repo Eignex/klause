@@ -75,7 +75,7 @@ class SymmetricAllDifferent(
                 // Out-of-range: snap xs[i] into the legal range.
                 val di = state.problem.intDomains[xs[i]]
                 val pick = (i + indexOffset).takeIf { it in di } ?: continue
-                if (pick != v) sink.addIntSet(xs[i], pick)
+                if (pick != v) sink.addChannelingIntSet(state, xs[i], pick)
                 continue
             }
             val backVal = state.assignment.intValue(xs[target])
@@ -83,7 +83,7 @@ class SymmetricAllDifferent(
             if (backVal != want) {
                 // Self-inverse broken at (i, target). Propose snapping xs[target] to want.
                 if (want in state.problem.intDomains[xs[target]] && want != backVal) {
-                    sink.addIntSet(xs[target], want)
+                    sink.addChannelingIntSet(state, xs[target], want)
                 }
                 // Or snap xs[i] so it points to its own current mirror.
                 val xiDom = state.problem.intDomains[xs[i]]
@@ -91,12 +91,12 @@ class SymmetricAllDifferent(
                 if (backTarget in xs.indices) {
                     // Pick a value where the mirror is consistent.
                     val candidate = backTarget + indexOffset  // points at j with xs[j]=v...; trial
-                    if (candidate in xiDom && candidate != v) sink.addIntSet(xs[i], candidate)
+                    if (candidate in xiDom && candidate != v) sink.addChannelingIntSet(state, xs[i], candidate)
                 }
                 // Self-pair fallback: xs[i] = i (self-map) trivially satisfies the involution
                 // at position i and frees `target` from the collision.
                 val selfPair = i + indexOffset
-                if (selfPair in xiDom && selfPair != v) sink.addIntSet(xs[i], selfPair)
+                if (selfPair in xiDom && selfPair != v) sink.addChannelingIntSet(state, xs[i], selfPair)
             }
         }
     }

@@ -70,7 +70,7 @@ class Sort(
         for (i in ys.indices) {
             val target = sortedXs[i]
             if (target != ysVals[i] && target in state.problem.intDomains[ys[i]]) {
-                sink.addIntSet(ys[i], target)
+                sink.addChannelingIntSet(state, ys[i], target)
             }
         }
         val xsCount = HashMap<Int, Int>().also { for (v in xsVals) it.merge(v, 1, Int::plus) }
@@ -82,7 +82,7 @@ class Sort(
         for (v in over) for (vPrime in under) {
             for (k in xs.indices) {
                 if (xsVals[k] == v && vPrime in state.problem.intDomains[xs[k]]) {
-                    sink.addIntSet(xs[k], vPrime)
+                    sink.addChannelingIntSet(state, xs[k], vPrime)
                     break
                 }
             }

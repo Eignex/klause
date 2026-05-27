@@ -60,14 +60,14 @@ class Member(
         for (x in xs) {
             val xv = state.assignment.intValue(x)
             if (seen.add(xv) && xv != yv && xv in dy) {
-                sink.addIntSet(y, xv)
+                sink.addChannelingIntSet(state, y, xv)
             }
         }
         // Direction 2: snap some xs[i] to yv if its domain allows.
         for (x in xs) {
             val xv = state.assignment.intValue(x)
             if (xv != yv && yv in state.problem.intDomains[x]) {
-                sink.addIntSet(x, yv)
+                sink.addChannelingIntSet(state, x, yv)
             }
         }
     }

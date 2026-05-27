@@ -66,12 +66,12 @@ class ValuePrecede(
         val xi = xs[firstTAt]
         val d = state.problem.intDomains[xi]
         val cur = state.assignment.intValue(xi)
-        d.forEach { vv -> if (vv != t && vv != cur) sink.addIntSet(xi, vv) }
+        d.forEach { vv -> if (vv != t && vv != cur) sink.addChannelingIntSet(state, xi, vv) }
         // 2. Set some xs[j] with j < firstTAt to s.
         for (j in 0 until firstTAt) {
             val xj = xs[j]
             val curJ = state.assignment.intValue(xj)
-            if (curJ != s && s in state.problem.intDomains[xj]) sink.addIntSet(xj, s)
+            if (curJ != s && s in state.problem.intDomains[xj]) sink.addChannelingIntSet(state, xj, s)
         }
     }
 

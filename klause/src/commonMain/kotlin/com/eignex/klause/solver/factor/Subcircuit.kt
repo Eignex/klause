@@ -177,18 +177,18 @@ class Subcircuit(val succ: IntArray) : LocalSearchFactor {
             val cur = state.assignment.intValue(v)
             val d = state.problem.intDomains[v]
             // Self-loop as an option when not currently self-looping.
-            if (i != cur && i in d) sink.addIntSet(v, i)
+            if (i != cur && i in d) sink.addChannelingIntSet(state, v, i)
             val span = d.size
             if (span <= MAX_TARGETS) {
                 d.forEach { target ->
-                    if (target != cur) sink.addIntSet(v, target)
+                    if (target != cur) sink.addChannelingIntSet(state, v, target)
                 }
             } else {
-                if (cur < d.max) sink.addIntSet(v, cur + 1)
-                if (cur > d.min) sink.addIntSet(v, cur - 1)
+                if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
+                if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
                 repeat(MAX_TARGETS) {
                     val target = d.valueAt(state.rng.nextInt(span))
-                    if (target != cur) sink.addIntSet(v, target)
+                    if (target != cur) sink.addChannelingIntSet(state, v, target)
                 }
             }
         }

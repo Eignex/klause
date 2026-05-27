@@ -555,7 +555,7 @@ class GlobalCardinality(
                 val cv = countVars[k]
                 val cur = state.assignment.intValue(cv)
                 if (cur != s.counts[k] && s.counts[k] in state.problem.intDomains[cv]) {
-                    sink.addIntSet(cv, s.counts[k])
+                    sink.addChannelingIntSet(state, cv, s.counts[k])
                 }
             }
         }
@@ -580,7 +580,7 @@ class GlobalCardinality(
                     if (!present(state, i)) continue
                     val cur = state.assignment.intValue(xs[i])
                     if (cur != coverVal && coverVal in state.problem.intDomains[xs[i]]) {
-                        sink.addIntSet(xs[i], coverVal)
+                        sink.addChannelingIntSet(state, xs[i], coverVal)
                     }
                 }
             } else {
@@ -592,7 +592,7 @@ class GlobalCardinality(
                     val d = state.problem.intDomains[xs[i]]
                     var pick: Int? = null
                     d.forEach { if (pick == null && it != coverVal) pick = it }
-                    if (pick != null) sink.addIntSet(xs[i], pick!!)
+                    if (pick != null) sink.addChannelingIntSet(state, xs[i], pick!!)
                 }
             }
         }
@@ -604,7 +604,7 @@ class GlobalCardinality(
                 if (cur in coverIndexByValue) continue
                 val d = state.problem.intDomains[xs[i]]
                 for (cv in cover) {
-                    if (cv in d && cv != cur) { sink.addIntSet(xs[i], cv); break }
+                    if (cv in d && cv != cur) { sink.addChannelingIntSet(state, xs[i], cv); break }
                 }
             }
         }

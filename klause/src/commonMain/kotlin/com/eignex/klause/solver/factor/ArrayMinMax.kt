@@ -92,14 +92,14 @@ class ArrayMinMax(
         val s = state.refPayload[factorId] as State
         val best = s.bestValue
         val rDom = state.problem.intDomains[result]
-        if (best in rDom) sink.addIntSet(result, best)
+        if (best in rDom) sink.addChannelingIntSet(state, result, best)
         val rv = state.assignment.intValue(result)
         // Push an xs element toward rv so the best across xs becomes rv (when rv is more
         // extreme than current best). Pick any xs[i] in whose domain rv lies.
         if ((max && rv > best) || (!max && rv < best)) {
             for (v in xs) {
                 if (rv in state.problem.intDomains[v] && rv != state.assignment.intValue(v)) {
-                    sink.addIntSet(v, rv); break
+                    sink.addChannelingIntSet(state, v, rv); break
                 }
             }
         }

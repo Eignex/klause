@@ -175,15 +175,15 @@ class Monotone(
             when (direction) {
                 Direction.Increasing -> {
                     val targetLeft = if (strict) b - 1 else b
-                    if (targetLeft in da) sink.addIntSet(xs[i], targetLeft)
+                    if (targetLeft in da) sink.addChannelingIntSet(state, xs[i], targetLeft)
                     val targetRight = if (strict) a + 1 else a
-                    if (targetRight in db) sink.addIntSet(xs[i + 1], targetRight)
+                    if (targetRight in db) sink.addChannelingIntSet(state, xs[i + 1], targetRight)
                 }
                 Direction.Decreasing -> {
                     val targetLeft = if (strict) b + 1 else b
-                    if (targetLeft in da) sink.addIntSet(xs[i], targetLeft)
+                    if (targetLeft in da) sink.addChannelingIntSet(state, xs[i], targetLeft)
                     val targetRight = if (strict) a - 1 else a
-                    if (targetRight in db) sink.addIntSet(xs[i + 1], targetRight)
+                    if (targetRight in db) sink.addChannelingIntSet(state, xs[i + 1], targetRight)
                 }
             }
             return

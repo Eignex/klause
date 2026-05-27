@@ -553,18 +553,18 @@ class Cumulative(
             val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
                 val afterPeak = absT + 1
-                if (afterPeak in dom && afterPeak != cur) sink.addIntSet(v, afterPeak)
+                if (afterPeak in dom && afterPeak != cur) sink.addChannelingIntSet(state, v, afterPeak)
                 val beforePeak = absT - d
-                if (beforePeak in dom && beforePeak != cur) sink.addIntSet(v, beforePeak)
+                if (beforePeak in dom && beforePeak != cur) sink.addChannelingIntSet(state, v, beforePeak)
             }
-            if (cur < dom.max) sink.addIntSet(v, cur + 1)
-            if (cur > dom.min) sink.addIntSet(v, cur - 1)
+            if (cur < dom.max) sink.addChannelingIntSet(state, v, cur + 1)
+            if (cur > dom.min) sink.addChannelingIntSet(state, v, cur - 1)
             if (dom.size <= MAX_TARGETS) {
-                dom.forEach { target -> if (target != cur) sink.addIntSet(v, target) }
+                dom.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }
             } else {
                 repeat(MAX_TARGETS) {
                     val pick = dom.valueAt(state.rng.nextInt(dom.size))
-                    if (pick != cur) sink.addIntSet(v, pick)
+                    if (pick != cur) sink.addChannelingIntSet(state, v, pick)
                 }
             }
         }

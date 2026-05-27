@@ -264,14 +264,14 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
             val span = d.size
             if (span <= MAX_TARGETS) {
                 d.forEach { target ->
-                    if (target != cur && target != i) sink.addIntSet(v, target)
+                    if (target != cur && target != i) sink.addChannelingIntSet(state, v, target)
                 }
             } else {
-                if (cur < d.max) sink.addIntSet(v, cur + 1)
-                if (cur > d.min) sink.addIntSet(v, cur - 1)
+                if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
+                if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
                 repeat(MAX_TARGETS) {
                     val target = d.valueAt(state.rng.nextInt(span))
-                    if (target != cur && target != i) sink.addIntSet(v, target)
+                    if (target != cur && target != i) sink.addChannelingIntSet(state, v, target)
                 }
             }
         }

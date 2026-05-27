@@ -100,7 +100,7 @@ class Among(
         val s = state.refPayload[factorId] as State
         val cur = s.count
         val nv = state.assignment.intValue(n)
-        if (cur in state.problem.intDomains[n]) sink.addIntSet(n, cur)
+        if (cur in state.problem.intDomains[n]) sink.addChannelingIntSet(state, n, cur)
         if (nv == cur) return
         val needIncrease = cur < nv
         for (x in xs) {
@@ -111,12 +111,12 @@ class Among(
                 // Pick any in-domain non-matching value.
                 var pick: Int? = null
                 d.forEach { if (pick == null && it != curX && !matches(it)) pick = it }
-                if (pick != null) sink.addIntSet(x, pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, x, pick!!)
             } else if (!isMatch && needIncrease) {
                 // Pick the closest in-domain matching value.
                 var pick: Int? = null
                 for (vv in values) if (vv in d && vv != curX) { pick = vv; break }
-                if (pick != null) sink.addIntSet(x, pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, x, pick!!)
             }
         }
     }

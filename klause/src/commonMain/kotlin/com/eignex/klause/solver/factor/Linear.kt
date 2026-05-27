@@ -198,7 +198,7 @@ class Linear(
             }
             val target = cur + direction * maxStep
             val clamped = dom.clamp(target)
-            if (clamped != cur) sink.addIntSet(v, clamped)
+            if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
     }
 

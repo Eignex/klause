@@ -46,8 +46,8 @@ interface LocalSearchFactor : Factor {
         for (i in intVars) {
             val cur = state.assignment.intValue(i)
             val d = state.problem.intDomains[i]
-            if (cur < d.max) sink.addIntSet(i, cur + 1)
-            if (cur > d.min) sink.addIntSet(i, cur - 1)
+            if (cur < d.max) sink.addChannelingIntSet(state, i, cur + 1)
+            if (cur > d.min) sink.addChannelingIntSet(state, i, cur - 1)
         }
     }
 

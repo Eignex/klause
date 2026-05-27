@@ -104,7 +104,7 @@ class ArgSort(
             val target = sortedIdx[i] + permOffset
             val cur = state.assignment.intValue(perm[i])
             if (target != cur && target in state.problem.intDomains[perm[i]]) {
-                sink.addIntSet(perm[i], target)
+                sink.addChannelingIntSet(state, perm[i], target)
             }
         }
         // Symmetric: at each ordering inversion (a, b) with values[a] > values[b] but a
@@ -121,16 +121,16 @@ class ArgSort(
                 val bDom = state.problem.intDomains[values[b]]
                 // Match: collapse to either current value (handles simple inversions).
                 if (valuesNow[b] in aDom && valuesNow[b] != valuesNow[a]) {
-                    sink.addIntSet(values[a], valuesNow[b])
+                    sink.addChannelingIntSet(state, values[a], valuesNow[b])
                 }
                 if (valuesNow[a] in bDom && valuesNow[a] != valuesNow[b]) {
-                    sink.addIntSet(values[b], valuesNow[a])
+                    sink.addChannelingIntSet(state, values[b], valuesNow[a])
                 }
                 // Bound spread: when the inversion sits on a tie-broken edge of the constraint
                 // (sorted but indices-out-of-order at equal values), neither "match" move
                 // suffices — pulling one side to its domain extremum breaks the tie.
-                if (aDom.min != valuesNow[a]) sink.addIntSet(values[a], aDom.min)
-                if (bDom.max != valuesNow[b]) sink.addIntSet(values[b], bDom.max)
+                if (aDom.min != valuesNow[a]) sink.addChannelingIntSet(state, values[a], aDom.min)
+                if (bDom.max != valuesNow[b]) sink.addChannelingIntSet(state, values[b], bDom.max)
             }
         }
     }

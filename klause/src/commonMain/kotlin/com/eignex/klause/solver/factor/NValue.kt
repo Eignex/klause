@@ -191,7 +191,7 @@ class NValue(
         val nv = state.assignment.intValue(n)
         // Snap n to the current distinct count when the mode would be satisfied by it.
         val nDom = state.problem.intDomains[n]
-        if (s.distinctCount in nDom) sink.addIntSet(n, s.distinctCount)
+        if (s.distinctCount in nDom) sink.addChannelingIntSet(state, n, s.distinctCount)
         val needIncrease = when (mode) {
             Mode.Eq -> nv > s.distinctCount
             Mode.AtLeast -> true   // nv > distinct → must raise distinct
@@ -213,7 +213,7 @@ class NValue(
                 val d = state.problem.intDomains[xs[i]]
                 var pick: Int? = null
                 d.forEach { if (pick == null && it != cur && (s.counts[it] ?: 0) == 0) pick = it }
-                if (pick != null) sink.addIntSet(xs[i], pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick!!)
             }
         }
         if (needDecrease) {
@@ -225,7 +225,7 @@ class NValue(
                 val d = state.problem.intDomains[xs[i]]
                 var pick: Int? = null
                 d.forEach { if (pick == null && it != cur && (s.counts[it] ?: 0) > 0) pick = it }
-                if (pick != null) sink.addIntSet(xs[i], pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick!!)
             }
         }
     }

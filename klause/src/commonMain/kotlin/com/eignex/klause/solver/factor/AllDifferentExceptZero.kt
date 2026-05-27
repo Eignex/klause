@@ -141,10 +141,10 @@ class AllDifferentExceptZero(
             if (state.assignment.intValue(v) != target) continue
             val d = state.problem.intDomains[v]
             // Try setting to 0 if 0 ∈ d.
-            if (0 in d) sink.addIntSet(v, 0)
+            if (0 in d) sink.addChannelingIntSet(state, v, 0)
             // ±1 nudges.
-            if (target > d.min && (target - 1) in d) sink.addIntSet(v, target - 1)
-            if (target < d.max && (target + 1) in d) sink.addIntSet(v, target + 1)
+            if (target > d.min && (target - 1) in d) sink.addChannelingIntSet(state, v, target - 1)
+            if (target < d.max && (target + 1) in d) sink.addChannelingIntSet(state, v, target + 1)
             return
         }
     }

@@ -190,7 +190,7 @@ class Count(
         val cur = s.count
         val nv = state.assignment.intValue(n)
         // (a) Snap n to the current count.
-        if (cur in state.problem.intDomains[n]) sink.addIntSet(n, cur)
+        if (cur in state.problem.intDomains[n]) sink.addChannelingIntSet(state, n, cur)
         if (nv == cur) return  // already satisfied (shouldn't happen given violation)
         val needIncrease = cur < nv   // need more matches
         val needDecrease = cur > nv
@@ -203,10 +203,10 @@ class Count(
             if (isMatch && needDecrease) {
                 // Find any in-domain value that doesn't match (op-specific).
                 val target = pickNonMatching(d, curX) ?: continue
-                if (target != curX) sink.addIntSet(xi, target)
+                if (target != curX) sink.addChannelingIntSet(state, xi, target)
             } else if (!isMatch && needIncrease) {
                 val target = pickMatching(d, curX) ?: continue
-                if (target != curX) sink.addIntSet(xi, target)
+                if (target != curX) sink.addChannelingIntSet(state, xi, target)
             }
         }
     }

@@ -183,7 +183,7 @@ class BinPacking(
                 val lv = loadVars!![k]
                 val cur = state.assignment.intValue(lv)
                 if (cur != s.loads[k] && s.loads[k] in state.problem.intDomains[lv]) {
-                    sink.addIntSet(lv, s.loads[k])
+                    sink.addChannelingIntSet(state, lv, s.loads[k])
                 }
             }
         }
@@ -222,7 +222,7 @@ class BinPacking(
             if (bestBin >= 0) {
                 val target = bestBin + binOffset
                 if (target in state.problem.intDomains[bins[heaviestI]]) {
-                    sink.addIntSet(bins[heaviestI], target)
+                    sink.addChannelingIntSet(state, bins[heaviestI], target)
                 }
             }
         }

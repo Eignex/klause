@@ -214,10 +214,10 @@ class Diffn(
                 val rightI = xj + widths[j]  // xs[i] >= xj + w_j
                 val downI = yj - heights[i]
                 val upI = yj + heights[j]
-                if (leftI in dxs && leftI != xi) sink.addIntSet(xs[i], leftI)
-                if (rightI in dxs && rightI != xi) sink.addIntSet(xs[i], rightI)
-                if (downI in dys && downI != yi) sink.addIntSet(ys[i], downI)
-                if (upI in dys && upI != yi) sink.addIntSet(ys[i], upI)
+                if (leftI in dxs && leftI != xi) sink.addChannelingIntSet(state, xs[i], leftI)
+                if (rightI in dxs && rightI != xi) sink.addChannelingIntSet(state, xs[i], rightI)
+                if (downI in dys && downI != yi) sink.addChannelingIntSet(state, ys[i], downI)
+                if (upI in dys && upI != yi) sink.addChannelingIntSet(state, ys[i], upI)
             }
         }
     }

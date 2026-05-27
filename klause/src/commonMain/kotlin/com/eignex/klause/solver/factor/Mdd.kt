@@ -112,7 +112,7 @@ class Mdd(
                 while (q < end) {
                     if (transitions[q] == current) {
                         val altSym = transitions[q + 1]
-                        if (altSym != symbol && altSym in d) sink.addIntSet(seq[i], altSym)
+                        if (altSym != symbol && altSym in d) sink.addChannelingIntSet(state, seq[i], altSym)
                     }
                     q += recordStride
                 }
@@ -145,7 +145,7 @@ class Mdd(
                     val sym = transitions[p + 1]
                     val dst = transitions[p + 2]
                     if (sym != curLast && sym in d && accepting.any { it == dst }) {
-                        sink.addIntSet(seq[last], sym)
+                        sink.addChannelingIntSet(state, seq[last], sym)
                     }
                 }
                 p += recordStride

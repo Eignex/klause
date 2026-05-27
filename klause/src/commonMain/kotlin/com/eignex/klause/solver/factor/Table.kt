@@ -104,7 +104,7 @@ class Table(
                 val target = tuples[row * arity + col]
                 val cur = state.assignment.intValue(xs[col])
                 if (target != cur && target in state.problem.intDomains[xs[col]]) {
-                    sink.addIntSet(xs[col], target)
+                    sink.addChannelingIntSet(state, xs[col], target)
                 }
             }
         }

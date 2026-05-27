@@ -84,7 +84,7 @@ class ArgMinMax(
         val expected = bestIdx + indexOffset
         val curIdx = state.assignment.intValue(idx)
         if (expected != curIdx && expected in state.problem.intDomains[idx]) {
-            sink.addIntSet(idx, expected)
+            sink.addChannelingIntSet(state, idx, expected)
         }
         // Push xs[curIdx] toward the current extreme value so the named index becomes extreme.
         val pos = curIdx - indexOffset
@@ -93,7 +93,7 @@ class ArgMinMax(
             val d = state.problem.intDomains[v]
             val target = if (max) bestValue + 1 else bestValue - 1
             val clamped = d.clamp(target)
-            if (clamped != state.assignment.intValue(v)) sink.addIntSet(v, clamped)
+            if (clamped != state.assignment.intValue(v)) sink.addChannelingIntSet(state, v, clamped)
         }
     }
 
