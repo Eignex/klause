@@ -515,6 +515,25 @@ internal class FlatZincCompiler(
         else -> failHere("expected int array, got ${e::class.simpleName}")
     }
 
+    /** Non-throwing variant of [evalIntConstArray]: returns `null` if [e] isn't a known
+     *  int-const array (because it's an int-var array, a non-array expression, or a
+     *  different param kind). Used at call sites that accept either constant or var
+     *  arrays and need to dispatch on the actual form (e.g. GCC's `counts` argument). */
+    internal fun tryEvalIntConstArray(e: FznExpr): IntArray? = when (e) {
+        is FznExpr.ArrayLit -> {
+            val out = IntArray(e.elements.size)
+            var ok = true
+            for (i in e.elements.indices) {
+                val v = evalIntConstOrNull(e.elements[i]) ?: run { ok = false; 0L }
+                out[i] = v.toInt()
+                if (!ok) break
+            }
+            if (ok) out else null
+        }
+        is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.IntParam)?.values
+        else -> null
+    }
+
     /** Resolve a constraint argument that's expected to be a list of float constants. */
     internal fun evalFloatConstArray(e: FznExpr): DoubleArray = when (e) {
         is FznExpr.ArrayLit -> DoubleArray(e.elements.size) { evalFloatConst(e.elements[it]) }

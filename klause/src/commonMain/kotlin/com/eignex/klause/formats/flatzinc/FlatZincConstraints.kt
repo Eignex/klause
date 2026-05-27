@@ -24,6 +24,7 @@ import com.eignex.klause.solver.factor.Sequence as SequenceFactor
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative
@@ -1484,6 +1485,18 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: 
             xs = xs, cover = cover, countLow = lo, countHigh = up, closed = closed,
         ))
     } else {
+        // MZN allows the `counts` argument to be either an int-var array (the standard
+        // form) or a constant int array (count must equal that fixed value). Detect the
+        // constant form first and route to the low_up path with lo[i] = up[i] = counts[i];
+        // the var form falls through to the GlobalCardinality(countVars) constructor.
+        val countsAsConst = tryEvalIntConstArray(c.args[2])
+        if (countsAsConst != null) {
+            factors.add(GlobalCardinality(
+                xs = xs, cover = cover,
+                countLow = countsAsConst, countHigh = countsAsConst, closed = closed,
+            ))
+            return
+        }
         val countVars = evalIntVarArray(c.args[2])
         factors.add(GlobalCardinality(
             xs = xs, cover = cover, countVars = countVars, closed = closed,
@@ -1621,15 +1634,93 @@ internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
     require(c.args.size == if (reified) 3 else 2)
     val elem = c.args[0]
     val sExpr = c.args[1]
+    val rExpr = if (reified) c.args[2] else null
+    // Set-literal RHS: `set_in(x, {v1..vn})` or `set_in(x, lo..hi)`. The MZN compiler
+    // produces this directly for `x in S` where S is a parameter set; the set-var
+    // indicator layout from `resolveSetVar` is the wrong abstraction here, so handle
+    // it inline against the literal values.
+    if (sExpr is FznExpr.IntSetLit || sExpr is FznExpr.IntRangeLit) {
+        val values = resolveSetLiteral(sExpr)
+        emitSetInLiteral(elem, values, rExpr)
+        return
+    }
     val layout = resolveSetVar(sExpr)
     if (elem is FznExpr.IntLit) {
-        emitSetInConst(elem.value.toInt(), layout, if (reified) c.args[2] else null)
+        emitSetInConst(elem.value.toInt(), layout, rExpr)
         return
     }
     // Var-int element path.
     val xVar = resolveIntVar(elem)
     val dom = intDomains[xVar]
-    emitSetInVarInt(xVar, dom.min, dom.max, layout, if (reified) c.args[2] else null)
+    emitSetInVarInt(xVar, dom.min, dom.max, layout, rExpr)
+}
+
+/** `set_in(x, S)` where S is a constant set literal. Two cases by `x`:
+ *   - Constant int: trivial — non-reified passes/fails immediately; reified pins `r` to the
+ *     membership truth value.
+ *   - Var int: decompose to `r ↔ ⋁ (x = vᵢ)` for vᵢ ∈ S via a fresh chan bool per element
+ *     + ReifiedCardinality.atLeastOne. Non-reified path forces the disjunction with a plain
+ *     Cardinality. Values outside `x`'s current domain contribute no chan (always false). */
+private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, rExpr: FznExpr?) {
+    if (elem is FznExpr.IntLit) {
+        val v = elem.value.toInt()
+        val isMember = values.binarySearch(v) >= 0
+        if (rExpr != null) {
+            val r = resolveBoolLit(rExpr)
+            factors.add(Clause(intArrayOf(if (isMember) r else Lit.negate(r))))
+        } else {
+            if (!isMember) failHere("set_in: element $v outside literal set $values")
+        }
+        return
+    }
+    val xVar = resolveIntVar(elem)
+    val dom = intDomains[xVar]
+    val membershipLits = ArrayList<Int>()
+    for (v in values) {
+        if (v < dom.min || v > dom.max) continue
+        val chan = allocBool("__set_in_lit_chan_${xVar}_$v")
+        factors.add(ReifiedLinear(
+            auxBoolVar = chan,
+            coeffs = intArrayOf(1), vars = intArrayOf(xVar),
+            op = LinearOp.EQ, bound = v,
+        ))
+        membershipLits += Lit.make(chan, true)
+    }
+    if (rExpr == null) {
+        // Non-reified: at least one chan must be true (i.e. x ∈ S). If S is empty given
+        // the domain, this is trivially unsatisfiable — emit an empty disjunction (false).
+        if (membershipLits.isEmpty()) {
+            factors.add(Clause(IntArray(0)))
+            return
+        }
+        factors.add(Cardinality.atLeastOne(membershipLits.toIntArray()))
+        return
+    }
+    val r = resolveBoolLit(rExpr)
+    if (membershipLits.isEmpty()) {
+        // r ↔ false → r must be false.
+        factors.add(Clause(intArrayOf(Lit.negate(r))))
+        return
+    }
+    factors.add(ReifiedCardinality(
+        auxBoolVar = Lit.variable(r),
+        literals = membershipLits.toIntArray(),
+        min = 1, max = membershipLits.size,
+    ))
+    // Lit.variable strips polarity; if r is negated, flip the reification by swapping
+    // the cardinality bound (atLeastOne ↔ exactlyZero on a negated reification).
+    if (!Lit.isPositive(r)) {
+        // Replace the just-added factor with the negated form: ¬r ↔ ⋁ → r ↔ ¬⋁.
+        // Encoded as: ¬r ⇒ all chan false, and r ⇒ some chan true. The simplest
+        // equivalent is ReifiedCardinality with min=0,max=0 on the negated aux —
+        // but we already emitted the positive form. Add the complement clause set.
+        factors.removeAt(factors.size - 1)
+        factors.add(ReifiedCardinality(
+            auxBoolVar = Lit.variable(r),
+            literals = membershipLits.toIntArray(),
+            min = 0, max = 0,
+        ))
+    }
 }
 
 private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, rExpr: FznExpr?) {
