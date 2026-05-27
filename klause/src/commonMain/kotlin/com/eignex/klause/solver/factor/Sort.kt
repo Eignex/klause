@@ -53,19 +53,38 @@ class Sort(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
-    /** Repair by snapping `ys` to `sorted(xs)` at every position where they disagree. */
+    /** Repair by snapping `ys` to `sorted(xs)` at every position where they disagree, plus
+     *  the symmetric xs-side: for each value v over-represented in `xs` relative to `ys`,
+     *  propose retargeting some `xs[k] = v` to a value `v'` that `ys` has more of. Without
+     *  the xs-side proposal, the LS engine can't reach feasibility when the *multiset* of
+     *  `xs` needs to change to match `ys` — only its order. */
     override fun proposeRepairMoves(
         state: LocalSearchState,
         factorId: Int,
         sink: com.eignex.klause.solver.localsearch.MoveSink,
     ) {
         if (!isViolated(state, factorId)) return
-        val sortedXs = IntArray(xs.size) { state.assignment.intValue(xs[it]) }.also { it.sort() }
+        val xsVals = IntArray(xs.size) { state.assignment.intValue(xs[it]) }
+        val ysVals = IntArray(ys.size) { state.assignment.intValue(ys[it]) }
+        val sortedXs = xsVals.copyOf().also { it.sort() }
         for (i in ys.indices) {
-            val cur = state.assignment.intValue(ys[i])
             val target = sortedXs[i]
-            if (target != cur && target in state.problem.intDomains[ys[i]]) {
+            if (target != ysVals[i] && target in state.problem.intDomains[ys[i]]) {
                 sink.addIntSet(ys[i], target)
+            }
+        }
+        val xsCount = HashMap<Int, Int>().also { for (v in xsVals) it.merge(v, 1, Int::plus) }
+        val ysCount = HashMap<Int, Int>().also { for (v in ysVals) it.merge(v, 1, Int::plus) }
+        val over = ArrayList<Int>()
+        val under = ArrayList<Int>()
+        for ((v, c) in xsCount) if (c > (ysCount[v] ?: 0)) over.add(v)
+        for ((v, c) in ysCount) if (c > (xsCount[v] ?: 0)) under.add(v)
+        for (v in over) for (vPrime in under) {
+            for (k in xs.indices) {
+                if (xsVals[k] == v && vPrime in state.problem.intDomains[xs[k]]) {
+                    sink.addIntSet(xs[k], vPrime)
+                    break
+                }
             }
         }
     }

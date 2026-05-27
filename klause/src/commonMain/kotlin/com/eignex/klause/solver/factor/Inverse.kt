@@ -203,7 +203,7 @@ class Inverse(
                 // f[i]'s value out of range: nudge into range.
                 val d = state.problem.intDomains[f[i]]
                 val mid = ((d.min + d.max) / 2)
-                if (mid in d) sink.addIntSet(f[i], mid)
+                if (mid in d && mid != j) sink.addIntSet(f[i], mid)
                 return
             }
             val gVal = state.assignment.intValue(g[gIdx])
@@ -211,13 +211,26 @@ class Inverse(
                 // Two repair candidates: align g side or change f's value.
                 val gd = state.problem.intDomains[g[gIdx]]
                 val target = i + fOffset
-                if (target in gd) sink.addIntSet(g[gIdx], target)
+                if (target in gd && target != gVal) sink.addIntSet(g[gIdx], target)
                 // Or change f[i] to point where g[gIdx] currently points back.
                 val gFwd = gVal - fOffset
                 if (gFwd in 0 until g.size) {
                     val targetFwd = gFwd + gOffset
                     val fd = state.problem.intDomains[f[i]]
-                    if (targetFwd in fd) sink.addIntSet(f[i], targetFwd)
+                    if (targetFwd in fd && targetFwd != j) sink.addIntSet(f[i], targetFwd)
+                }
+                // Symmetric: scan for some jPrime where g[jPrime] already equals (i+fOffset),
+                // and propose f[i] = jPrime + gOffset. Repairs i's constraint without touching
+                // any g[*]. Necessary when the desired value already lives elsewhere on g.
+                val fd = state.problem.intDomains[f[i]]
+                for (jPrime in g.indices) {
+                    if (state.assignment.intValue(g[jPrime]) == i + fOffset) {
+                        val tgt = jPrime + gOffset
+                        if (tgt in fd && tgt != j) {
+                            sink.addIntSet(f[i], tgt)
+                            break
+                        }
+                    }
                 }
                 return
             }

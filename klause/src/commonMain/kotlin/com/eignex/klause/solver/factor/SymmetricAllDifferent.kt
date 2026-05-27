@@ -93,6 +93,10 @@ class SymmetricAllDifferent(
                     val candidate = backTarget + indexOffset  // points at j with xs[j]=v...; trial
                     if (candidate in xiDom && candidate != v) sink.addIntSet(xs[i], candidate)
                 }
+                // Self-pair fallback: xs[i] = i (self-map) trivially satisfies the involution
+                // at position i and frees `target` from the collision.
+                val selfPair = i + indexOffset
+                if (selfPair in xiDom && selfPair != v) sink.addIntSet(xs[i], selfPair)
             }
         }
     }

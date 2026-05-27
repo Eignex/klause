@@ -79,9 +79,13 @@ class Knapsack(
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State
         val wDom = state.problem.intDomains[w]
-        if (s.currentWeight in wDom) sink.addIntSet(w, s.currentWeight)
+        if (s.currentWeight in wDom && s.currentWeight != state.assignment.intValue(w)) {
+            sink.addIntSet(w, s.currentWeight)
+        }
         val pDom = state.problem.intDomains[p]
-        if (s.currentProfit in pDom) sink.addIntSet(p, s.currentProfit)
+        if (s.currentProfit in pDom && s.currentProfit != state.assignment.intValue(p)) {
+            sink.addIntSet(p, s.currentProfit)
+        }
         // For each xs[i], if w-var requires lower weight, propose decreasing xs[i] when
         // weights[i] > 0; symmetric for profit.
         val wTarget = state.assignment.intValue(w)

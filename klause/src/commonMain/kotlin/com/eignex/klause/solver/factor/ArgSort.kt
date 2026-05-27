@@ -107,6 +107,32 @@ class ArgSort(
                 sink.addIntSet(perm[i], target)
             }
         }
+        // Symmetric: at each ordering inversion (a, b) with values[a] > values[b] but a
+        // comes before b in perm, propose flattening one side to the other so the inversion
+        // disappears without changing the permutation. Required for LS to escape states
+        // where the right repair is in the values, not the perm.
+        val permVals = IntArray(n) { state.assignment.intValue(perm[it]) - permOffset }
+        for (i in 0 until n - 1) {
+            val a = permVals[i]
+            val b = permVals[i + 1]
+            if (a !in 0 until n || b !in 0 until n) continue
+            if (valuesNow[a] > valuesNow[b]) {
+                val aDom = state.problem.intDomains[values[a]]
+                val bDom = state.problem.intDomains[values[b]]
+                // Match: collapse to either current value (handles simple inversions).
+                if (valuesNow[b] in aDom && valuesNow[b] != valuesNow[a]) {
+                    sink.addIntSet(values[a], valuesNow[b])
+                }
+                if (valuesNow[a] in bDom && valuesNow[a] != valuesNow[b]) {
+                    sink.addIntSet(values[b], valuesNow[a])
+                }
+                // Bound spread: when the inversion sits on a tie-broken edge of the constraint
+                // (sorted but indices-out-of-order at equal values), neither "match" move
+                // suffices — pulling one side to its domain extremum breaks the tie.
+                if (aDom.min != valuesNow[a]) sink.addIntSet(values[a], aDom.min)
+                if (bDom.max != valuesNow[b]) sink.addIntSet(values[b], bDom.max)
+            }
+        }
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
