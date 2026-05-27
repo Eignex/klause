@@ -302,25 +302,92 @@ class LocalSearchState(
         val cur = assignment.intValue(intVar)
         if (cur == newValue) return Move.IntSet(intVar, newValue)  // caller handles no-op
         val parts = ArrayList<Move>(4)
+        // Pinned-target set: vars whose update we've already committed to so a sibling
+        // factor doesn't try to override the choice. Without this two Linear EQs sharing
+        // the same compensation target would both add IntSet for it and the second one
+        // would clobber the first.
+        val pinned = HashSet<Int>()
+        pinned += intVar
         parts += Move.IntSet(intVar, newValue)
-        // Walk every factor mentioning this int var. For each single-var EQ reified-linear
-        // factor, check whether its aux needs to flip given the new int value.
         for (fid in problem.intOccurrences[intVar]) {
             val f = factors[fid]
-            if (f !is com.eignex.klause.solver.factor.ReifiedLinear) continue
-            if (f.vars.size != 1 || f.op != com.eignex.klause.solver.factor.LinearOp.EQ) continue
-            // Single-coeff EQ: f holds iff coeff·newValue == bound.
-            val coeff = f.coeffs[0]
-            val auxVar = f.auxBoolVar
-            if (assumptions.isFrozenBool(auxVar)) continue
-            val newSum = coeff * newValue
-            val shouldHold = newSum == f.bound
-            val auxCurrent = assignment.boolValue(auxVar)
-            if (auxCurrent != shouldHold) {
-                parts += Move.BoolFlip(auxVar)
+            // Indicator channeling: single-var EQ reified-linear (the bool2int /
+            // int_eq_reif pattern). Flip the aux bool iff the new value changes the truth
+            // of `coeff·v == bound`.
+            if (f is com.eignex.klause.solver.factor.ReifiedLinear) {
+                if (f.vars.size == 1 && f.op == com.eignex.klause.solver.factor.LinearOp.EQ) {
+                    val coeff = f.coeffs[0]
+                    val auxVar = f.auxBoolVar
+                    if (assumptions.isFrozenBool(auxVar)) continue
+                    val shouldHold = coeff * newValue == f.bound
+                    val auxCurrent = assignment.boolValue(auxVar)
+                    if (auxCurrent != shouldHold) parts += Move.BoolFlip(auxVar)
+                }
+                continue
+            }
+            // Sum channeling: Linear EQ `Σ c[i]·x[i] = bound`. When v's value changes by
+            // delta, the sum drifts by `c_v · delta` — pick another participant u in the
+            // factor and shift u by the inverse amount to keep the equality balanced. The
+            // classic case is `load[p] = Σ course_load[c] · x[p,c]` encoded as
+            // `Σ c · x - load = 0`, so the var with coeff -1 (the "result") absorbs every
+            // partial-sum change cleanly. We prefer compensation targets whose coefficient
+            // divides the drift evenly so the new value lands on an integer.
+            //
+            // Only apply to *currently-satisfied* Linear EQs: a violated one is the very
+            // constraint the caller is trying to repair via the IntSet — adding a
+            // counter-shift would undo the repair. Side-effect preservation only.
+            if (f is com.eignex.klause.solver.factor.Linear &&
+                f.op == com.eignex.klause.solver.factor.LinearOp.EQ &&
+                !violated.contains(fid)) {
+                propagateLinearEqShift(f, intVar, cur, newValue, parts, pinned)
             }
         }
         return if (parts.size == 1) parts[0] else Move.Compound(parts)
+    }
+
+    /** Helper for [synthesizeChannelingMove]: find a compensation target in a Linear EQ
+     *  factor and append an IntSet that restores the sum invariant after [intVar] shifts
+     *  from [oldV] to [newV]. Skips when no clean integer compensation exists, when the
+     *  candidate target is frozen / pinned / would exit its domain. */
+    private fun propagateLinearEqShift(
+        f: com.eignex.klause.solver.factor.Linear,
+        intVar: Int,
+        oldV: Int,
+        newV: Int,
+        parts: ArrayList<Move>,
+        pinned: HashSet<Int>,
+    ) {
+        var coeffV = 0
+        for (i in f.vars.indices) if (f.vars[i] == intVar) { coeffV = f.coeffs[i]; break }
+        if (coeffV == 0) return
+        val drift = coeffV.toLong() * (newV - oldV)
+        // Pick the lowest-|coeff| participant other than intVar to absorb the drift —
+        // tied breaks toward coeff = ±1 since those guarantee integer landing.
+        var bestIdx = -1
+        var bestAbs = Int.MAX_VALUE
+        for (i in f.vars.indices) {
+            val u = f.vars[i]
+            if (u == intVar || u in pinned) continue
+            val cu = f.coeffs[i]
+            if (cu == 0) continue
+            val absC = if (cu < 0) -cu else cu
+            if (absC < bestAbs && drift % cu == 0L) {
+                bestAbs = absC
+                bestIdx = i
+            }
+        }
+        if (bestIdx < 0) return
+        val u = f.vars[bestIdx]
+        if (assumptions.isFrozenInt(u)) return
+        val cu = f.coeffs[bestIdx]
+        val uShift = -drift / cu  // (uShift * cu) cancels the drift
+        val curU = assignment.intValue(u)
+        val newU = curU + uShift.toInt()
+        if (newU == curU) return
+        val dom = problem.intDomains[u]
+        if (newU < dom.min || newU > dom.max) return
+        parts += Move.IntSet(u, newU)
+        pinned += u
     }
 
     fun netDelta(move: Move): Int = when (move) {
