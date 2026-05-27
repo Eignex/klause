@@ -416,6 +416,55 @@ class Cardinality(
         }
     }
 
+    /** Self-preserving moves during objective descent. Cardinality's count `n ∈ [min, max]`
+     *  is invariant under any "swap one currently-true lit with one currently-false lit"
+     *  — both edges sit in distinct vars (when each var appears once), so flipping both
+     *  yields net 0 change to `n`. We push a Compound for each (true-lit, false-lit) pair,
+     *  capped at [PAIR_PROPOSAL_CAP] to bound the per-step cost.
+     *
+     *  For min == max (the exactly-K case, e.g. `Cardinality.exactlyOne`) this is the
+     *  *only* feasibility-preserving 2-flip available and is the dominant structured move
+     *  on decomposed CP problems where MiniZinc lowers `exactly_one` to Cardinality. For
+     *  min < max we still propose swaps; the engine scores by objective delta. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (boolVars.size < 2 || literals.size < 2) return
+        // Repeated-var literal sets break the "flip one true, flip one false → Δn = 0"
+        // invariant because the same var can satisfy multiple lits; fall back to no
+        // proposals there (rare; main models use one-var-per-lit form).
+        if (boolVars.size != literals.size) return
+        val trueLits = IntArray(literals.size)
+        val falseLits = IntArray(literals.size)
+        var nT = 0; var nF = 0
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            if (Lit.evaluate(lit, state.assignment.boolValue(v))) trueLits[nT++] = v
+            else falseLits[nF++] = v
+        }
+        if (nT == 0 || nF == 0) return
+        // Cap pairings: pick min(nT, nF) × pair-stride samples, biased toward fresh
+        // combinations. Exhaustive enumeration is Θ(nT·nF) which can be O(n²) on wide
+        // cardinality constraints; clip to a budget.
+        val total = nT * nF
+        if (total <= PAIR_PROPOSAL_CAP) {
+            for (i in 0 until nT) for (j in 0 until nF) {
+                sink.addCompound(listOf(
+                    com.eignex.klause.solver.Move.BoolFlip(trueLits[i]),
+                    com.eignex.klause.solver.Move.BoolFlip(falseLits[j]),
+                ))
+            }
+        } else {
+            val rng = state.rng
+            repeat(PAIR_PROPOSAL_CAP) {
+                val a = trueLits[rng.nextInt(nT)]
+                val b = falseLits[rng.nextInt(nF)]
+                sink.addCompound(listOf(
+                    com.eignex.klause.solver.Move.BoolFlip(a),
+                    com.eignex.klause.solver.Move.BoolFlip(b),
+                ))
+            }
+        }
+    }
+
     /** Cached max |signedOccurrencesByVar[v]| across `boolVars`. Bounds the change `n` can
      *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out: when both
      *  the pre- and post-flip `n` are far enough from the [min] / [max] boundaries that no
@@ -488,5 +537,9 @@ class Cardinality(
         fun exactlyOne(literals: IntArray): Cardinality =
             Cardinality(literals, min = 1, max = 1)
 
+        /** Cap on (true-lit, false-lit) swap-pair proposals in [proposeStructuredMoves].
+         *  Bounds per-step cost; structured moves are scored by objective delta in the
+         *  engine which costs a state.apply + revert per candidate. */
+        private const val PAIR_PROPOSAL_CAP: Int = 32
     }
 }

@@ -336,11 +336,20 @@ class LocalSearchSolver(
                     totalFlips++
                     continue
                 }
-                // Single-flip greedy descent stalled. Try a bounded pair-swap pass: for
-                // binary-decision optimization, often *no* single move keeps feasibility,
-                // but a coordinated 2-flip (swap take-status of two items, swap values of
-                // two int vars) does and improves. Without this the descent reaches its
-                // 1-opt local minimum and restarts.
+                // Single-flip greedy descent stalled. First try factor-aware structured
+                // moves: each factor proposes 2-flips / pair-shifts it knows preserve its
+                // own satisfaction. The engine scores each by objective delta and applies
+                // the best feasibility-preserving improver. This is the right neighbourhood
+                // for decomposed CP optimization where random pair-swap rarely lands a
+                // useful pair in O(n²) space.
+                if (structuredMoveStep(state, objective)) {
+                    flipsSinceRestart++
+                    totalFlips++
+                    continue
+                }
+                // Last-resort random pair-swap. Less informed than structured moves but
+                // catches cases no factor proposed a useful pair (e.g. swaps that span
+                // multiple constraints' shared structure).
                 if (pairSwapBudget > 0 && largeEnoughForGreedy &&
                     pairSwapStep(state, objective, pairSwapBudget)) {
                     flipsSinceRestart++
@@ -552,6 +561,70 @@ class LocalSearchSolver(
         // Reset tabu / activity tracking so the main loop doesn't start with every var
         // freshly blocked by the repair pass's apply-then-revert churn.
         state.resetStepCounters()
+    }
+
+    /**
+     * Factor-aware structured descent step. Collects [LocalSearchFactor.proposeStructuredMoves]
+     * from every factor — each factor pushes moves it knows preserve its own satisfaction
+     * (e.g. `Linear EQ` pair-shifts that keep the sum, `Cardinality.exactlyOne` swaps that
+     * keep the count). The engine scores each by objective delta on a temporary apply,
+     * applies the best feasibility-preserving improver, and commits.
+     *
+     * Returns `true` and commits if an improving structured move exists. Returns `false`
+     * if no factor proposed an improving feasibility-preserving move within the collected
+     * set; the caller falls back to random pair-swap.
+     *
+     * Cost: one [proposeStructuredMoves] call per factor (each factor caps its own
+     * proposal count) plus a scoring apply+revert per proposed move. Bounded by the sum
+     * of per-factor caps.
+     */
+    private fun structuredMoveStep(state: LocalSearchState, objective: Objective): Boolean {
+        val baselineSnap = state.assignment.snapshot()
+        val baselineObj = objective.evaluate(baselineSnap)
+        val sink = state.moveSink
+        sink.clear()
+        for (fid in 0 until problem.numFactors) {
+            val f = state.factors[fid]
+            // Only consult factors that are currently satisfied. A violated factor would
+            // propose repair moves (which run before objective descent) so we skip here.
+            if (!f.isViolated(state, fid)) f.proposeStructuredMoves(state, fid, sink)
+        }
+        val proposed = sink.list
+        if (proposed.isEmpty()) return false
+        var bestDelta = 0.0
+        var bestMove: Move? = null
+        for (move in proposed) {
+            state.apply(move)
+            if (state.cost == 0) {
+                val obj = objective.evaluate(state.assignment.snapshot())
+                val delta = obj - baselineObj
+                if (delta < bestDelta) { bestDelta = delta; bestMove = move }
+            }
+            // Revert by re-applying the move's inverse. BoolFlip self-inverts; IntSet
+            // needs the original value; Compound reverts each part in reverse order.
+            revertMove(state, move, baselineSnap)
+        }
+        sink.clear()
+        if (bestMove == null) return false
+        state.apply(bestMove)
+        return true
+    }
+
+    /** Undo [move] on [state] so it matches [baselineSnap] again. BoolFlip self-inverts;
+     *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
+    private fun revertMove(state: LocalSearchState, move: Move, baselineSnap: Sample) {
+        when (move) {
+            is Move.BoolFlip -> state.apply(move)  // self-inverse
+            is Move.IntSet -> {
+                val old = baselineSnap.ints[move.varId]
+                if (old != state.assignment.intValue(move.varId)) state.apply(Move.IntSet(move.varId, old))
+            }
+            is Move.Compound -> {
+                // Revert in reverse order so each part sees the post-apply state of the
+                // ones after it (mirror of the forward `apply` order).
+                for (part in move.parts.reversed()) revertMove(state, part, baselineSnap)
+            }
+        }
     }
 
     /**

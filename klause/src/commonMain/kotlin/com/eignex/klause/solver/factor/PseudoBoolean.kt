@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `Σ weights[i] * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -105,6 +106,69 @@ class PseudoBoolean(
         }
     }
 
+    /** Self-preserving moves during objective descent. For PB the natural structured move
+     *  is a "swap two literals with equal effective weights": flip a true literal i and a
+     *  false literal j with `effectiveWeight(i) == effectiveWeight(j)`, where the
+     *  effective weight is `weights[i]` for positive lits and `-weights[i]` for negative.
+     *  The sum stays unchanged so any feasible op (LE/GE/EQ) remains feasible. The
+     *  engine scores each by objective delta and applies the best improving one.
+     *
+     *  For LE with slack, also propose unilateral flips that consume some slack: any
+     *  true positive-lit can be flipped to false (sum decreases), any false negative-lit
+     *  can be flipped to true (sum also decreases) — both safe under LE. Symmetric under
+     *  GE. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (literals.size < 2) return
+        val sum = state.intPayload[factorId]
+        // Group literals by their (effective weight, current truth value). Effective
+        // weight: positive lit → +weights[i]; negative lit → -weights[i].
+        // Sum-preserving swap: true-effwt-W + false-effwt-W. Equivalently match on
+        // signed weight magnitude AND opposing truth states.
+        val trueByWeight = HashMap<Int, IntArrayList>()
+        val falseByWeight = HashMap<Int, IntArrayList>()
+        for (i in literals.indices) {
+            val lit = literals[i]
+            val v = Lit.variable(lit)
+            val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
+            val effW = if (Lit.isPositive(lit)) weights[i] else -weights[i]
+            val bucket = if (isTrue) trueByWeight else falseByWeight
+            bucket.getOrPut(effW) { IntArrayList() }.add(v)
+        }
+        var proposed = 0
+        outer@ for ((w, trueVars) in trueByWeight) {
+            val falseVars = falseByWeight[w] ?: continue
+            for (i in 0 until trueVars.size) {
+                for (j in 0 until falseVars.size) {
+                    if (trueVars[i] == falseVars[j]) continue  // same var — degenerate
+                    sink.addCompound(listOf(
+                        com.eignex.klause.solver.Move.BoolFlip(trueVars[i]),
+                        com.eignex.klause.solver.Move.BoolFlip(falseVars[j]),
+                    ))
+                    proposed++
+                    if (proposed >= PAIR_PROPOSAL_CAP) break@outer
+                }
+            }
+        }
+        // Slack-consuming unilateral flips. Only when the inequality has positive slack.
+        val slack = when (op) {
+            PbOp.LE -> bound - sum
+            PbOp.GE -> sum - bound
+            PbOp.EQ -> 0
+        }
+        if (slack > 0) {
+            for (i in literals.indices) {
+                val lit = literals[i]
+                val v = Lit.variable(lit)
+                val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
+                val change = if (isTrue) -weights[i] else weights[i]
+                val effChange = if (Lit.isPositive(lit)) change else -change
+                val newSum = sum + effChange
+                if (op == PbOp.LE && newSum <= bound) sink.addBoolFlip(v)
+                else if (op == PbOp.GE && newSum >= bound) sink.addBoolFlip(v)
+            }
+        }
+    }
+
     private fun violates(sum: Int): Boolean = when (op) {
         PbOp.LE -> sum > bound
         PbOp.GE -> sum < bound
@@ -165,6 +229,10 @@ class PseudoBoolean(
                 if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
             }
         }
+    }
+
+    private companion object {
+        const val PAIR_PROPOSAL_CAP: Int = 32
     }
 }
 

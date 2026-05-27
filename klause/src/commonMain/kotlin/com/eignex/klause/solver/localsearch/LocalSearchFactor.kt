@@ -51,6 +51,25 @@ interface LocalSearchFactor : Factor {
         }
     }
 
+    /**
+     * Suggest moves that the factor *currently* knows would preserve its own satisfaction
+     * (`isViolated → false` after the move). Called by the minimize engine during the
+     * objective-descent phase to collect candidate moves that don't break the constraint
+     * but might improve the LS objective. Pre-condition: `!isViolated(state, factorId)`
+     * — engines only consult this on already-feasible states.
+     *
+     * Default: no proposals. Factors with structural insight (e.g. `Linear EQ`'s "shift
+     * between two summed vars" or `Cardinality.exactlyOne`'s "swap a true literal with a
+     * false one") override to push self-preserving moves. The engine combines proposals
+     * from all factors and scores each against the objective; the constraint-aware
+     * "structured" set typically dwarfs random pair-swap in hit rate on decomposed CP
+     * models.
+     */
+    fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        // Default no-op. See class doc; factors that participate in objective descent
+        // override.
+    }
+
     /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]
      *  and [LocalSearchState.boolMakeCount] incrementally via [updateBoolBreakMakeForFlip],
      *  skipping the engine's brute-force O(arity²) per-flip subtract-add cycle.
