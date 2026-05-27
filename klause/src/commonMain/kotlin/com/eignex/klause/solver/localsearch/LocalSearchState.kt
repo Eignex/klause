@@ -296,6 +296,41 @@ class LocalSearchState(
         is Move.Compound -> evaluateCompound(move).netDelta
     }
 
+    /**
+     * Weighted net change in violated-factor count for [move]: `Σ factorWeights[f] · Δviolated[f]`.
+     * Companion to [netDelta] for CBLS strategies that score against the per-factor weight
+     * vector instead of a flat violation count. Positive = more weighted violation after
+     * the move; negative = less.
+     *
+     * Reads from [factorWeights], lazily-allocating if untouched — callers that want to
+     * avoid forcing the allocation on every probe should check [factorWeightsAllocated]
+     * first and fall back to [netDelta].
+     */
+    fun weightedNetDelta(move: Move): Double {
+        val w = factorWeights
+        return when (move) {
+            is Move.BoolFlip -> {
+                var sum = 0.0
+                forEachBoolFactorDelta(move.varId) { fid, d ->
+                    if (d != 0) sum += w[fid] * d
+                }
+                sum
+            }
+            is Move.IntSet -> {
+                var sum = 0.0
+                forEachIntFactorDelta(move.varId, move.newValue) { fid, d ->
+                    if (d != 0) sum += w[fid] * d
+                }
+                sum
+            }
+            // Compound: approximate by summing per-part contributions against the current
+            // state. Same caveat as Ddfw.weightedBreakScore — biased when later parts
+            // re-satisfy factors broken by earlier parts. The exact path is
+            // apply-evaluate-revert, which defeats the purpose of a probe-cost metric.
+            is Move.Compound -> move.parts.sumOf { weightedNetDelta(it) }
+        }
+    }
+
     private fun applyBoolFlip(boolVar: Int) {
         val touchedFactors = problem.boolOccurrences[boolVar]
         // Phase 1: brute-force factors — subtract pre-flip break/make contributions.

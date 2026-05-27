@@ -67,9 +67,13 @@ object MznParityCorpus {
     private fun discoverMznBench(root: File): List<Instance> {
         val benchRoot = File(root, "klause-bench/build/mzn/minizinc-benchmarks")
         if (!benchRoot.isDirectory) return emptyList()
-        val out = mutableListOf<Instance>()
         val problemDirs = benchRoot.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
             ?.sortedBy { it.name } ?: return emptyList()
+        // Per-family instance lists. Built first, then interleaved across families so the
+        // global ordering is "1 from family A, 1 from family B, ..., 2nd from A, ...".
+        // The interleave makes `.take(N)` naturally yield a spread across families instead
+        // of consuming all of the first family's instances before reaching the second.
+        val perFamily = mutableListOf<List<Instance>>()
         for (pd in problemDirs) {
             // Find the model: prefer a .mzn directly under the problem dir, else recurse
             // up to two levels (some problems put models under a subdir like `mzn/`).
@@ -87,17 +91,29 @@ object MznParityCorpus {
                 .filter { it.isFile && it.extension == "dzn" }
                 .sortedBy { it.relativeTo(pd).path }
                 .toList()
-            if (dzns.isEmpty()) {
+            val familyInstances = if (dzns.isEmpty()) {
                 // No data file: the .mzn must be self-contained.
-                out += Instance(pd.name, primaryMzn)
+                listOf(Instance(pd.name, primaryMzn))
             } else {
-                for (dzn in dzns) {
-                    // Compose a name that retains the sub-layout so two instances under
-                    // different class dirs don't collide.
+                dzns.map { dzn ->
                     val relPath = dzn.relativeTo(pd).path.removeSuffix(".dzn")
-                    out += Instance("${pd.name}/$relPath", primaryMzn, dzn)
+                    Instance("${pd.name}/$relPath", primaryMzn, dzn)
                 }
             }
+            if (familyInstances.isNotEmpty()) perFamily += familyInstances
+        }
+        return interleave(perFamily)
+    }
+
+    /** Round-robin merge of [lists]. Iteration `k` takes element `k` from each list that
+     *  still has one; stops when all lists are exhausted. Stable: relative order within a
+     *  list is preserved, and ties (same depth) follow the order of `lists`. */
+    private fun <T> interleave(lists: List<List<T>>): List<T> {
+        if (lists.isEmpty()) return emptyList()
+        val maxLen = lists.maxOf { it.size }
+        val out = ArrayList<T>(lists.sumOf { it.size })
+        for (k in 0 until maxLen) {
+            for (l in lists) if (k < l.size) out += l[k]
         }
         return out
     }

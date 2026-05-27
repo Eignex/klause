@@ -100,7 +100,7 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
     // a one-shot per invocation so it picks the SOTA-for-CP default.
     val solver = com.eignex.klause.solver.localsearch.LocalSearchSolver(
         program.problem,
-        optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.AdaptiveDdfw(
+        optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.Cbls(
             tabu = com.eignex.klause.solver.localsearch.strategy.TabuFilter(
                 tenure = 10,
                 aspiration = com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImproving,
@@ -108,7 +108,12 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
         ),
         pairSwapBudget = 1024,
     )
-    runGeneric(solver, params, program, opts)
+    // CBLS scores moves by `Σ weight·Δviolated + λ·Δobjective`. Without a non-zero λ at
+    // the params level the objective contribution is zero and the strategy never feels
+    // pressure to descend. Linear shaping with λ=1.0 lets the constraint and objective
+    // gradients meet at comparable magnitudes; tune in problem-specific harness if needed.
+    val cblsParams = params.copy(costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = 1.0))
+    runGeneric(solver, cblsParams, program, opts)
 }
 
 private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {

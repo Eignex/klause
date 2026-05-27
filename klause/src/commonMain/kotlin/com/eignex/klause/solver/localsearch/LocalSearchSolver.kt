@@ -306,6 +306,13 @@ class LocalSearchSolver(
         // degenerate objective (e.g. all-zero) on a constraint-free problem would
         // produce an infinite loop: cost stays at 0, greedy descent never improves,
         // and the restart path otherwise wouldn't bump [totalFlips].
+        // CBLS strategies score moves against a global weighted-violation gradient + λ·obj
+        // and work regardless of feasibility — so the engine drops the satisfy-then-descend
+        // phase split and drives the entire loop through strategy.pickMove. The SAT-style
+        // strategies bail at feasibility (return null) so they still need the descent path.
+        val activeOptimize = optimizeStrategy ?: strategy
+        val unifiedCbls = activeOptimize is com.eignex.klause.solver.localsearch.strategy.Cbls
+
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
@@ -322,48 +329,43 @@ class LocalSearchSolver(
                     // Yield each strict improvement as the inner loop discovers it.
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }
-                // Try to descend via a single move. Under [CostShaping.FeasibilityFirst]
-                // this stays inside the feasible region; under a linear shaping it may
-                // temporarily step into infeasibility if the shaped score improves —
-                // the strategy loop below then drives back to feasibility.
-                val descended = if (shaping.feasibilityGated) {
-                    greedyObjectiveStep(state, objective)
-                } else {
-                    shapedDescentStep(state, objective, shaping)
-                }
-                if (descended) {
-                    flipsSinceRestart++
+                if (!unifiedCbls) {
+                    // Phase-split path for SAT-style strategies. Try greedy / structured /
+                    // pair-swap descent before restarting; the strategy itself doesn't
+                    // produce moves at feasibility (DDFW/probSAT both bail when no
+                    // violations exist).
+                    val descended = if (shaping.feasibilityGated) {
+                        greedyObjectiveStep(state, objective)
+                    } else {
+                        shapedDescentStep(state, objective, shaping)
+                    }
+                    if (descended) {
+                        flipsSinceRestart++
+                        totalFlips++
+                        continue
+                    }
+                    if (structuredMoveStep(state, objective)) {
+                        flipsSinceRestart++
+                        totalFlips++
+                        continue
+                    }
+                    if (pairSwapBudget > 0 && largeEnoughForGreedy &&
+                        pairSwapStep(state, objective, pairSwapBudget)) {
+                        flipsSinceRestart++
+                        totalFlips++
+                        continue
+                    }
+                    restartPolicy.onLocalOptimum(state, snap, obj)
+                    restartPolicy.restart(state, bestSample)
+                    if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                    flipsSinceRestart = 0
                     totalFlips++
                     continue
                 }
-                // Single-flip greedy descent stalled. First try factor-aware structured
-                // moves: each factor proposes 2-flips / pair-shifts it knows preserve its
-                // own satisfaction. The engine scores each by objective delta and applies
-                // the best feasibility-preserving improver. This is the right neighbourhood
-                // for decomposed CP optimization where random pair-swap rarely lands a
-                // useful pair in O(n²) space.
-                if (structuredMoveStep(state, objective)) {
-                    flipsSinceRestart++
-                    totalFlips++
-                    continue
-                }
-                // Last-resort random pair-swap. Less informed than structured moves but
-                // catches cases no factor proposed a useful pair (e.g. swaps that span
-                // multiple constraints' shared structure).
-                if (pairSwapBudget > 0 && largeEnoughForGreedy &&
-                    pairSwapStep(state, objective, pairSwapBudget)) {
-                    flipsSinceRestart++
-                    totalFlips++
-                    continue
-                }
-                // Local minimum on the (shaped) objective — give ILS-style policies a
-                // chance to update their incumbent before we restart.
-                restartPolicy.onLocalOptimum(state, snap, obj)
-                restartPolicy.restart(state, bestSample)
-                if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
-                flipsSinceRestart = 0
-                totalFlips++
-                continue
+                // Unified CBLS: fall through to strategy.pickMove below. The CBLS strategy
+                // generates objective-direction moves at feasibility (`seedObjectiveMoves`)
+                // and scores them against `weightedNetDelta + λ·objectiveDelta`, so a
+                // valid descent step exists even with no violated factors.
             }
             if (restartPolicy.shouldRestart(flipsSinceRestart)) {
                 restartPolicy.restart(state, bestSample)
@@ -372,7 +374,7 @@ class LocalSearchSolver(
                 totalFlips++
                 continue
             }
-            val move = (optimizeStrategy ?: strategy).pickMove(state)
+            val move = activeOptimize.pickMove(state)
             if (move == null) {
                 restartPolicy.restart(state, bestSample)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
