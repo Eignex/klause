@@ -129,7 +129,7 @@ class LocalSearchPortfolio(
 
     /** Per-config [LocalSearchSession] for direct portfolio composition. */
     val workers: List<LocalSearchSession> = configs.map { cfg ->
-        LocalSearchSolver(problem, cfg.strategy, cfg.restartPolicy).session()
+        LocalSearchSolver(problem, strategy = cfg.strategy, restartPolicy = cfg.restartPolicy).session()
     }
 
     /** Try to update [sharedBest] with [sample]; returns true if accepted as the new

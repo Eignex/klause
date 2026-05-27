@@ -138,11 +138,18 @@ class LocalSearchState(
             if (assignment.boolValue(id) != value) assignment.flipBool(id)
         }
         assumptions.forEachInt { id, value -> assignment.setInt(id, value) }
+        resetStepCounters()
+        recompute()
+    }
+
+    /** Clear tabu / CCA bookkeeping without touching the assignment. Used by
+     *  optimization-side warm-up passes (e.g. greedy-repair) that mutate the assignment
+     *  via [apply] but should leave the LS engine a fresh tabu epoch afterwards. */
+    fun resetStepCounters() {
         for (i in lastTouched.indices) lastTouched[i] = 0L
         for (i in boolConfChange.indices) boolConfChange[i] = true
         for (i in intConfChange.indices) intConfChange[i] = true
         step = 0L
-        recompute()
     }
 
     fun recompute() {
