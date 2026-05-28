@@ -1637,17 +1637,45 @@ internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
 // every set constraint reduces to clauses, cardinality, or pseudo-Boolean sums we already
 // have factors for.
 
-/** Resolve a set var reference to its layout. Set literals as parameters (e.g. `set of int: u = {1,3}`)
- *  are not handled here — they belong on the constraint side as constant universes. Accepts
- *  both plain idents (`s`) and array accesses (`a[2]`) into a set-var array. */
+/** Resolve a set var reference to its layout. Accepts plain idents (`s`), array accesses
+ *  (`a[2]`) into a set-var array, and set literals (`1..3`, `{1,3}`, or a set-param ident)
+ *  — literals are materialised as anonymous pinned SetVarLayouts so downstream set algebra
+ *  treats them uniformly. */
 internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout = when (e) {
-    is FznExpr.Ident -> setVarsByName[e.name] ?: failHere("`${e.name}` is not a set var")
+    is FznExpr.Ident -> setVarsByName[e.name] ?: run {
+        // Could be a set parameter (e.g. `set of int: u = {1,3}`) flowing into a set
+        // constraint. Lower it to a pinned layout on the fly.
+        val members = resolveSetLiteral(e)
+        materialisePinnedSetLayout("__set_param_${e.name}", members)
+    }
     is FznExpr.ArrayAccess -> {
         val arr = arrays[e.name] as? FlatZincArray.SetVars
             ?: failHere("`${e.name}` is not a set var array")
         arr.layouts[e.index - 1]
     }
+    is FznExpr.IntSetLit, is FznExpr.IntRangeLit -> {
+        val members = resolveSetLiteral(e)
+        materialisePinnedSetLayout("__set_lit_${setVarsByName.size}", members)
+    }
     else -> failHere("expected a set var reference, got ${e::class.simpleName}")
+}
+
+/** Allocate a fresh SetVarLayout whose universe is exactly [members] (sorted), with every
+ *  indicator pinned via a unit clause. Used to lift set literals into the indicator-bool
+ *  representation set constraints expect. The empty case still allocates one dummy
+ *  indicator (pinned false) so universes never have size 0. */
+private fun FlatZincCompiler.materialisePinnedSetLayout(name: String, members: IntArray): SetVarLayout {
+    val universe = if (members.isEmpty()) intArrayOf(0) else members
+    val indicatorIds = IntArray(universe.size) { i ->
+        allocBool("${name}_${universe[i]}")
+    }
+    val layout = SetVarLayout(name, universe, indicatorIds)
+    setVarsByName[name] = layout
+    for (i in universe.indices) {
+        val inSet = if (members.isEmpty()) false else members.binarySearch(universe[i]) >= 0
+        factors.add(Clause(intArrayOf(Lit.make(indicatorIds[i], inSet))))
+    }
+    return layout
 }
 
 /** Resolve a set-literal expression to its element list (sorted ascending). */

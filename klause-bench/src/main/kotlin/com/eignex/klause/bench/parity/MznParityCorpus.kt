@@ -75,13 +75,18 @@ object MznParityCorpus {
         // of consuming all of the first family's instances before reaching the second.
         val perFamily = mutableListOf<List<Instance>>()
         for (pd in problemDirs) {
-            // Find the model: prefer a .mzn directly under the problem dir, else recurse
-            // up to two levels (some problems put models under a subdir like `mzn/`).
-            val primaryMzn = pd.listFiles { f -> f.isFile && f.extension == "mzn" }
-                ?.sortedBy { it.name }?.firstOrNull()
-                ?: pd.walkTopDown().maxDepth(3)
-                    .firstOrNull { it.isFile && it.extension == "mzn" }
-                ?: continue
+            // Find the model. Many families ship multiple `.mzn` files (alternate
+            // formulations, deprecated forerunners, year-prefixed competition variants).
+            // Prefer one whose basename matches the family name closely — `<family>.mzn`
+            // or `<family>_model.mzn` — before falling back to alphabetical. This avoids
+            // landing on stale variants like `mznc2009_roster_model.mzn` (uses obsolete
+            // `:: is_output`) or `zephyrus-FH-2-15.mzn` (different parameter set than the
+            // shipped .dzns).
+            val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }
+                ?.toList()
+                ?: pd.walkTopDown().maxDepth(3).filter { it.isFile && it.extension == "mzn" }.toList()
+            if (candidates.isEmpty()) continue
+            val primaryMzn = pickPrimaryMzn(pd.name, candidates)
             // Find every .dzn under the problem dir (recursive). Real-world layouts vary:
             //   - `<problem>/instance.dzn` (alpha, queens, …)
             //   - `<problem>/data/*.dzn` (some benchmarks)
@@ -103,6 +108,24 @@ object MznParityCorpus {
             if (familyInstances.isNotEmpty()) perFamily += familyInstances
         }
         return interleave(perFamily)
+    }
+
+    /** Pick the canonical .mzn for [familyName] from [candidates]. Tries an exact
+     *  basename match first, then a `<family>_model.mzn` / `<family>_alt.mzn` / `model.mzn`
+     *  / `main.mzn` fallback, finally a name containing the family as a prefix without a
+     *  competition-year prefix. Falls back to sorted-first when none of these apply. */
+    internal fun pickPrimaryMzn(familyName: String, candidates: List<File>): File {
+        val lower = familyName.lowercase()
+        val priorities = listOf<(File) -> Boolean>(
+            { it.nameWithoutExtension.equals(familyName, ignoreCase = true) },
+            { it.nameWithoutExtension.equals("${familyName}_model", ignoreCase = true) },
+            { it.nameWithoutExtension.equals("model", ignoreCase = true) },
+            { it.nameWithoutExtension.equals("main", ignoreCase = true) },
+            { it.nameWithoutExtension.lowercase().startsWith(lower) &&
+                !it.nameWithoutExtension.lowercase().startsWith("mznc") },
+        )
+        for (pred in priorities) candidates.firstOrNull(pred)?.let { return it }
+        return candidates.sortedBy { it.name }.first()
     }
 
     /** Round-robin merge of [lists]. Iteration `k` takes element `k` from each list that

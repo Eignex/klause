@@ -63,6 +63,14 @@ object LsCompileAuditMain {
         "sort", "fzn_sort",
         "table_int", "fzn_table_int", "klause_table_int",
         "value_precede_int", "value_precede_chain_int",
+        // Set ops: klause decomposes var sets into per-element bool indicators at the
+        // compiler level, then handles the set algebra directly in the constraint
+        // emitters (emitSetUnion / emitSetIntersect / emitSetCard / emitArraySetElement /
+        // emitSetIn). They are *not* MiniZinc-side decompositions.
+        "set_union", "set_intersect", "set_diff", "set_symdiff",
+        "set_card", "set_eq", "set_ne", "set_le", "set_lt",
+        "set_subset", "set_superset", "set_in", "set_in_reif",
+        "array_set_element", "array_var_set_element",
     )
 
     /** Whitelist of low-level FZN primitives we don't count as "decomposition" — these
