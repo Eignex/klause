@@ -248,13 +248,59 @@ internal class FlatZincCompiler(
             return
         }
         // Array-of-set-of-int: materialise each element as its own SetVarLayout under name
-        // `<arr>[<i>]`, and register the array as FlatZincArray.SetVars.
+        // `<arr>[<i>]`. The FZN flattener routinely emits `array of var set of int: x = [...]`
+        // where elements are a mix of set-var name references (`X_INTRODUCED_*`) and set
+        // literals (`1..0` for empty, `{1,3}`, `1..3`). For Ident refs, alias the existing
+        // layout; for literals, allocate a fresh pinned layout sized to the literal's
+        // elements (unioned with sibling Ident universes so downstream uses see a uniform
+        // universe across the array).
         if (type.element is FznType.SetOfInt) {
             val layouts = ArrayList<SetVarLayout>(type.length)
-            for (i in 0 until type.length) {
-                val elemName = "$name[${i + 1}]"
-                allocSetVar(elemName, type.element)
-                layouts.add(setVarsByName.getValue(elemName))
+            if (value is FznExpr.ArrayLit) {
+                require(value.elements.size == type.length) {
+                    "array `$name`: initializer length ${value.elements.size} ≠ declared ${type.length}"
+                }
+                val sharedUniverse: IntArray? = run {
+                    val acc = HashSet<Int>()
+                    for (e in value.elements) {
+                        if (e is FznExpr.Ident) {
+                            val l = setVarsByName[e.name] ?: continue
+                            for (u in l.elements) acc.add(u)
+                        }
+                    }
+                    if (acc.isEmpty()) null else acc.toIntArray().also { it.sort() }
+                }
+                for ((i, e) in value.elements.withIndex()) {
+                    if (e is FznExpr.Ident) {
+                        val layout = setVarsByName[e.name]
+                            ?: failHere("array `$name`: set-var `${e.name}` referenced before its declaration")
+                        layouts.add(layout)
+                    } else {
+                        val elemName = "$name[${i + 1}]"
+                        val members = resolveSetLiteral(e)
+                        val universeSet = HashSet<Int>()
+                        for (m in members) universeSet += m
+                        if (sharedUniverse != null) for (u in sharedUniverse) universeSet += u
+                        val universe = if (universeSet.isEmpty()) intArrayOf(0)
+                                       else universeSet.toIntArray().also { it.sort() }
+                        val indicatorIds = IntArray(universe.size) { k ->
+                            allocBool("__set_${elemName}_${universe[k]}")
+                        }
+                        val layout = SetVarLayout(elemName, universe, indicatorIds)
+                        setVarsByName[elemName] = layout
+                        for (k in universe.indices) {
+                            val inSet = members.binarySearch(universe[k]) >= 0
+                            factors.add(Clause(intArrayOf(Lit.make(indicatorIds[k], inSet))))
+                        }
+                        layouts.add(layout)
+                    }
+                }
+            } else {
+                for (i in 0 until type.length) {
+                    val elemName = "$name[${i + 1}]"
+                    allocSetVar(elemName, type.element)
+                    layouts.add(setVarsByName.getValue(elemName))
+                }
             }
             arrays[name] = FlatZincArray.SetVars(name, layouts)
             return

@@ -1479,15 +1479,31 @@ internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) {
  *  in practice) we fall back to the existing reified-decomposition path. */
 internal fun FlatZincCompiler.emitCountOp(c: FznConstraint, op: Count.Op) {
     require(c.args.size == 3)
-    val xs = evalIntVarArray(c.args[0])
+    // FZN occasionally emits count over a const-folded xs array (e.g. groupsplitter's
+    // `count_eq([1,1,1,...], 1, n)` after the flattener inferred xs's values). Handle
+    // it at compile time: collapse to `n op cnt` where cnt is the static count.
+    val xsConst = tryEvalIntConstArray(c.args[0])
     val vConst = evalIntConstOrNull(c.args[1])?.toInt()
     val n = resolveIntVar(c.args[2])
+    if (xsConst != null && vConst != null) {
+        val cnt = xsConst.count { it == vConst }
+        // Map count's op into LE/EQ/GE/NE on n (Linear factor's vocabulary).
+        val (linOp, rhs) = when (op) {
+            Count.Op.Eq -> LinearOp.EQ to cnt
+            Count.Op.Ne -> LinearOp.NE to cnt
+            Count.Op.Le -> LinearOp.LE to cnt
+            Count.Op.Lt -> LinearOp.LE to (cnt - 1)
+            Count.Op.Ge -> LinearOp.GE to cnt
+            Count.Op.Gt -> LinearOp.GE to (cnt + 1)
+        }
+        factors.add(Linear(intArrayOf(1), intArrayOf(n), linOp, rhs))
+        return
+    }
+    val xs = evalIntVarArray(c.args[0])
     if (vConst != null) {
         factors.add(Count(xs, vConst, op, n))
     } else {
         if (op != Count.Op.Eq) failHere("count_$op with variable v not supported; only count_eq")
-        // Delegate to the older reified-decomposition path that channels b_i ↔ xs[i]=v
-        // through ReifiedLinear + an integer-sum link.
         emitCountEq(c)
     }
 }
