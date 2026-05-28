@@ -13,7 +13,9 @@ import kotlinx.serialization.json.Json
  *
  *  - `klause.lsbench.source` — comma-separated source ids (default `smoke`).
  *  - `klause.lsbench.timeoutSec` — per-solver wall-clock budget. Default 10.
- *  - `klause.lsbench.maxInstances` — cap instances per source.
+ *  - `klause.lsbench.perFamily` — cap samples per problem family. Default unset = no cap
+ *    (the legacy interleave-then-take behaviour).
+ *  - `klause.lsbench.maxInstances` — overall cap (applied after perFamily).
  *  - `klause.lsbench.report` — output JSON path. Default `klause-bench/build/lsbench-report.json`.
  *  - `klause.lsbench.baseline` — baseline solver id. Default `yuck`.
  *  - `klause.lsbench.freeSearch` — pass `-f` (ignore search annotations). Default false.
@@ -58,6 +60,7 @@ object LsBenchMain {
     fun main(args: Array<String>) {
         val sourceIds = System.getProperty("klause.lsbench.source", "smoke").split(",").map { it.trim() }
         val timeoutSec = System.getProperty("klause.lsbench.timeoutSec", "10").toInt()
+        val perFamily = System.getProperty("klause.lsbench.perFamily")?.toIntOrNull()
         val maxInstances = System.getProperty("klause.lsbench.maxInstances")?.toIntOrNull()
         val root = MznParityCorpus.workspaceRoot()
         val reportPath = System.getProperty("klause.lsbench.report")?.let { File(it) }
@@ -87,8 +90,9 @@ object LsBenchMain {
 
         val pairs = mutableListOf<Pair>()
         for (src in sources) {
-            val instances = MznParityCorpus.discover(src, root)
-                .let { if (maxInstances != null) it.take(maxInstances) else it }
+            val instances = LsCompileAuditMain.selectInstances(
+                MznParityCorpus.discover(src, root), perFamily ?: Int.MAX_VALUE, maxInstances,
+            )
             println("[lsbench] source=$src instances=${instances.size}")
             for (inst in instances) {
                 val cfg = LsBench.Config(

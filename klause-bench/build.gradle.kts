@@ -202,6 +202,29 @@ tasks.register<JavaExec>("runLsBench") {
     dependsOn(":klause-fzn-cli:installDist")
 }
 
+/** Compile-only audit across the corpus. Per instance: MiniZinc → FZN, parse constraint
+ *  kinds, optional klause-fzn-cli ingest smoke. Useful for spotting MiniZinc-side
+ *  decomposition and per-family compile breakage without running any solve. See
+ *  [com.eignex.klause.bench.parity.LsCompileAuditMain]. */
+tasks.register<JavaExec>("runLsCompileAudit") {
+    group = "verification"
+    description = "Compile-only audit: classify FZN constraint kinds across the corpus."
+    notCompatibleWithConfigurationCache(
+        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
+    )
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.LsCompileAuditMain")
+    val workspaceRoot = rootDir.absolutePath
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.lscompile.")) systemProperty(key, v.toString())
+        }
+        systemProperty("klause.workspace.root", workspaceRoot)
+    }
+    dependsOn(":klause-fzn-cli:installDist")
+}
+
 /** Opt-in: download SATLIB benchmark tarballs to `build/satlib/<set>/`. The bench
  *  harness picks them up automatically on the next `:klause-bench:run`. Tarballs are
  *  small (~300 KB each, 1000 instances of 20-50 vars). */
