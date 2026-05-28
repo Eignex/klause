@@ -1,7 +1,9 @@
 package com.eignex.klause.bench.parity
 
 import java.io.File
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -25,6 +27,7 @@ import kotlinx.serialization.json.Json
  *  - `klause.lscompile.compileTimeoutSec` — MiniZinc compile timeout. Default 30.
  *  - `klause.lscompile.ingestTimeoutSec` — klause ingest smoke timeout. Default 1.
  *  - `klause.lscompile.skipIngest` — if `true`, skip the klause-fzn-cli smoke.
+ *  - `klause.lscompile.parallelism` — concurrent workers. Default = `nproc`.
  *  - `klause.lscompile.report` — output JSON path.
  */
 object LsCompileAuditMain {
@@ -118,6 +121,8 @@ object LsCompileAuditMain {
         val compileTimeoutSec = System.getProperty("klause.lscompile.compileTimeoutSec", "30").toInt()
         val ingestTimeoutSec = System.getProperty("klause.lscompile.ingestTimeoutSec", "1").toInt()
         val skipIngest = System.getProperty("klause.lscompile.skipIngest", "false").toBoolean()
+        val parallelism = System.getProperty("klause.lscompile.parallelism")?.toIntOrNull()
+            ?: Runtime.getRuntime().availableProcessors()
         val root = MznParityCorpus.workspaceRoot()
         val reportPath = System.getProperty("klause.lscompile.report")?.let { File(it) }
             ?: File(root, "klause-bench/build/lscompile-audit.json")
@@ -141,19 +146,29 @@ object LsCompileAuditMain {
 
         val instances = selectInstances(MznParityCorpus.discover(source, root), perFamily, maxInstances)
         println("[lscompile] source=$source perFamily=$perFamily maxInstances=${maxInstances ?: "∞"} " +
-            "selected=${instances.size}")
+            "parallelism=$parallelism selected=${instances.size}")
 
         val tmpDir = File(System.getProperty("java.io.tmpdir"), "klause-lscompile").apply { mkdirs() }
-        val reports = mutableListOf<InstanceReport>()
-        for ((idx, inst) in instances.withIndex()) {
-            val fznOut = File(tmpDir, "audit_${idx}.fzn")
-            fznOut.delete()
-            val r = auditOne(inst, klauseLsMsc, klauseLib, klauseFznCli, fznOut,
-                compileTimeoutSec, ingestTimeoutSec, skipIngest)
-            reports += r
-            println("[lscompile]   ${r.name}: compile=${r.compileStatus} ingest=${r.ingestStatus} " +
-                "globals=${r.nativeGlobalCounts.values.sum()} decomp=${r.decomposedCounts.values.sum()}")
-            fznOut.delete()
+        val pool = Executors.newFixedThreadPool(parallelism)
+        val done = AtomicInteger()
+        val reports: List<InstanceReport> = try {
+            instances.mapIndexed { idx, inst ->
+                pool.submit<InstanceReport> {
+                    val fznOut = File(tmpDir, "audit_${idx}.fzn")
+                    fznOut.delete()
+                    val r = auditOne(inst, klauseLsMsc, klauseLib, klauseFznCli, fznOut,
+                        compileTimeoutSec, ingestTimeoutSec, skipIngest)
+                    fznOut.delete()
+                    val n = done.incrementAndGet()
+                    println("[lscompile] [${n}/${instances.size}] ${r.name}: " +
+                        "compile=${r.compileStatus} ingest=${r.ingestStatus} " +
+                        "globals=${r.nativeGlobalCounts.values.sum()} decomp=${r.decomposedCounts.values.sum()}")
+                    r
+                }
+            }.map { it.get() }
+        } finally {
+            pool.shutdown()
+            pool.awaitTermination(10, TimeUnit.MINUTES)
         }
 
         val families = aggregateByFamily(reports)
