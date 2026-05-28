@@ -97,6 +97,9 @@ internal class FlatZincCompiler(
                 intVarByFloatVar = floatIntVarIds.toIntArray(),
                 constraints = realConstraints.toList(),
             )
+        // compileSolve may pin a synthetic int/bool var (for `solve minimize <par-int>`),
+        // so resolve it before snapshotting var counts into Problem.
+        val solveDirective = compileSolve()
         val problem = Problem(
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
@@ -106,7 +109,7 @@ internal class FlatZincCompiler(
         )
         return FlatZincProgram(
             problem = problem,
-            solve = compileSolve(),
+            solve = solveDirective,
             boolVarsByName = boolVars,
             intVarsByName = intVars,
             floatVarsByName = floatVars,
@@ -710,8 +713,44 @@ internal class FlatZincCompiler(
     }
 
     internal fun resolveObjVar(e: FznExpr): Pair<String, SolveDirective.ObjKind> {
+        // Inline int/float/bool literals: MiniZinc occasionally emits `solve minimize 4;`
+        // when the objective folds to a constant. Treat as a satisfy-equivalent by pinning
+        // a synthetic var to the literal value.
+        when (e) {
+            is FznExpr.IntLit -> {
+                val name = "__obj_const_${e.value}"
+                val v = e.value.toInt()
+                if (name !in intVars) { allocInt(name, v, v) }
+                return name to SolveDirective.ObjKind.Int
+            }
+            is FznExpr.BoolLit -> {
+                val name = "__obj_const_${e.value}"
+                if (name !in boolVars) { allocBool(name) /* pin via Clause below */
+                    factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[name]!!, e.value))))
+                }
+                return name to SolveDirective.ObjKind.Bool
+            }
+            else -> {}
+        }
         val name = (e as? FznExpr.Ident)?.name
             ?: failHere("solve objective must be a variable name")
+        // Par int / bool objective (e.g. `solve minimize X_INTRODUCED_27_` where the ident
+        // is a par constant produced by MiniZinc's flattener). Pin a synthetic var to the
+        // constant value so downstream search has something to track.
+        (params[name] as? ParamValue.Int)?.let { p ->
+            val pinName = "__obj_const_${name}"
+            val v = p.value.toInt()
+            if (pinName !in intVars) { allocInt(pinName, v, v) }
+            return pinName to SolveDirective.ObjKind.Int
+        }
+        (params[name] as? ParamValue.Bool)?.let { p ->
+            val pinName = "__obj_const_${name}"
+            if (pinName !in boolVars) {
+                allocBool(pinName)
+                factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[pinName]!!, p.value))))
+            }
+            return pinName to SolveDirective.ObjKind.Bool
+        }
         return when {
             name in boolVars -> name to SolveDirective.ObjKind.Bool
             name in floatVars -> name to SolveDirective.ObjKind.Float

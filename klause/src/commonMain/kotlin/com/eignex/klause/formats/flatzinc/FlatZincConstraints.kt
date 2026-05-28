@@ -1499,6 +1499,30 @@ internal fun FlatZincCompiler.emitCountOp(c: FznConstraint, op: Count.Op) {
         factors.add(Linear(intArrayOf(1), intArrayOf(n), linOp, rhs))
         return
     }
+    if (xsConst != null) {
+        // xs is a par int array, v is a var: reify `v = xsConst[i]` per position, channel
+        // each bool to a 0/1 int, then constrain sum(channels) op n.
+        val vVar = resolveIntVar(c.args[1])
+        val channels = IntArray(xsConst.size) { i ->
+            val aux = allocBool("__count_const_b_$i")
+            factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(vVar), LinearOp.EQ, xsConst[i]))
+            val ch = allocInt("__count_const_ch_$i", 0, 1)
+            factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
+            ch
+        }
+        val (linOp, rhs) = when (op) {
+            Count.Op.Eq -> LinearOp.EQ to 0
+            Count.Op.Ne -> LinearOp.NE to 0
+            Count.Op.Le -> LinearOp.LE to 0
+            Count.Op.Lt -> LinearOp.LE to -1
+            Count.Op.Ge -> LinearOp.GE to 0
+            Count.Op.Gt -> LinearOp.GE to 1
+        }
+        val coefs = IntArray(channels.size + 1) { if (it < channels.size) 1 else -1 }
+        val vars = IntArray(channels.size + 1) { if (it < channels.size) channels[it] else n }
+        factors.add(Linear(coefs, vars, linOp, rhs))
+        return
+    }
     val xs = evalIntVarArray(c.args[0])
     if (vConst != null) {
         factors.add(Count(xs, vConst, op, n))
