@@ -206,7 +206,3 @@ Use cases:
 - Independent infeasibility checks. External solvers emit DRAT proofs of UNSAT
   that can be verified separately.
 
-## TODO
-
-Grouped by workstream. Perf covers propagator-data-structure migrations; LS covers the local-search engine and strategies. Each bullet is sized to a single focused session.
-

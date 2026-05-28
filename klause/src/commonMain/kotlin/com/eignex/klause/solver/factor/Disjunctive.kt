@@ -48,6 +48,8 @@ class Disjunctive(
      *  no no-overlap obligation. The cost / propagation passes route through the
      *  Cumulative LS-cost delegate and reuse its opt machinery. */
     val presents: IntArray = EmptyIntArray,
+    /** Per-task duration variables; empty = use [durations] as constants. */
+    val durationVars: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
     init {
@@ -60,23 +62,23 @@ class Disjunctive(
         require(presents.isEmpty() || presents.size == starts.size) {
             "Disjunctive: presents must be empty or match starts arity"
         }
+        require(durationVars.isEmpty() || durationVars.size == starts.size) {
+            "Disjunctive: durationVars must be empty or match starts arity"
+        }
     }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
-    override val intVars: IntArray = starts
+    override val intVars: IntArray = if (durationVars.isEmpty()) starts else starts + durationVars
 
     private val n: Int = starts.size
 
-    /** LS delegate: cumulative with all-1 resources and capacity 1. Identical cost
-     *  surface as disjunctive, so we reuse rather than copy the timeline machinery. The
-     *  opt presents flow straight through — Cumulative's opt-aware hooks do the right
-     *  thing for the unit-resource case too. */
     private val cumulativeBacking: Cumulative = Cumulative(
         starts = starts,
         durations = durations,
         resources = IntArray(n) { 1 },
         capacity = 1,
         presents = presents,
+        durationVars = durationVars,
     )
 
     override fun initialize(state: LocalSearchState, factorId: Int) =
@@ -100,25 +102,36 @@ class Disjunctive(
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
         cumulativeBacking.proposeRepairMoves(state, factorId, sink)
 
+    /** Snapshot effective per-task durations. Returns null if any duration var is not
+     *  fixed at this fixpoint pass — propagation defers in that case (sound). */
+    private fun effDurOrNull(state: PropagationState): IntArray? {
+        if (durationVars.isEmpty()) return durations
+        val out = IntArray(n)
+        for (i in 0 until n) {
+            val d = state.intDomains[durationVars[i]]
+            if (d.min != d.max) return null
+            out[i] = d.min
+        }
+        return out
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
-        // 1. Time-tabling (cap = 1).
-        if (!timeTable(state)) return false
-        // 2. Pairwise detectable precedences.
-        if (!detectablePrecedences(state)) return false
-        // 3. Edge-finding (Carlier-Pinson lite).
-        if (!edgeFinding(state)) return false
+        val effDur = effDurOrNull(state) ?: return true
+        if (!timeTable(state, effDur)) return false
+        if (!detectablePrecedences(state, effDur)) return false
+        if (!edgeFinding(state, effDur)) return false
         return true
     }
 
     /** Build the mandatory profile from each task's `[lst, ect)` compulsory part; fail on
      *  level > 1; shave any non-fixed task's start endpoints if placement would create
      *  an additional unit-overlap with the mandatory profile. */
-    private fun timeTable(state: PropagationState): Boolean {
+    private fun timeTable(state: PropagationState, effDur: IntArray): Boolean {
         val events = ArrayList<IntArray>(n * 2)
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val d = durations[i]
+            val d = effDur[i]
             if (d == 0) continue
             val dom = state.intDomains[starts[i]]
             val lst = dom.max
@@ -150,7 +163,7 @@ class Disjunctive(
         // tasks get tightened — unpinned-presence tasks might still vanish.
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val d = durations[i]
+            val d = effDur[i]
             if (d == 0) continue
             val v = starts[i]
             val dom = state.intDomains[v]
@@ -203,24 +216,21 @@ class Disjunctive(
 
     /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
      *  i must come strictly after j. Tighten `start_i.min ≥ est_j + dur_j`. */
-    private fun detectablePrecedences(state: PropagationState): Boolean {
+    private fun detectablePrecedences(state: PropagationState, effDur: IntArray): Boolean {
         for (i in 0 until n) {
-            if (durations[i] == 0) continue
+            if (effDur[i] == 0) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var newMinI = di.min
             for (j in 0 until n) {
                 if (j == i) continue
-                if (durations[j] == 0) continue
+                if (effDur[j] == 0) continue
                 if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
                 val dj = state.intDomains[starts[j]]
-                // i cannot precede j iff est_i + dur_i > lst_j.
-                if (di.min + durations[i] > dj.max) {
-                    // Also check the symmetric direction — if both can't precede the
-                    // other, no consistent ordering exists.
-                    if (dj.min + durations[j] > di.max) return false
-                    newMinI = max(newMinI, dj.min + durations[j])
+                if (di.min + effDur[i] > dj.max) {
+                    if (dj.min + effDur[j] > di.max) return false
+                    newMinI = max(newMinI, dj.min + effDur[j])
                 }
             }
             if (newMinI != di.min) {
@@ -242,37 +252,32 @@ class Disjunctive(
      * the maximum-over-subsets adjustment), but sound and catches the JSP / RCPSP
      * disjunctive-only patterns the user-facing TODO calls out.
      */
-    private fun edgeFinding(state: PropagationState): Boolean {
+    private fun edgeFinding(state: PropagationState, effDur: IntArray): Boolean {
         if (n < 2) return true
-        // Forward pass: tighten start_i.min. Only definitely-present tasks anchor or
-        // contribute to Ω; unpinned-presence tasks can still vanish.
         val others = IntArray(n)
         for (i in 0 until n) {
-            if (durations[i] == 0) continue
+            if (effDur[i] == 0) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var k = 0
             for (j in 0 until n) {
-                if (j != i && durations[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
+                if (j != i && effDur[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
                     others[k++] = j
                 }
             }
-            // Sort others by lct = dom.max + dur ascending.
-            sortByLct(others, k, state)
-            // Sweep prefixes.
+            sortByLct(others, k, state, effDur)
             var sumDur = 0
             var minEstOmega = Int.MAX_VALUE
             var newMinI = di.min
             for (p in 0 until k) {
                 val j = others[p]
                 val dj = state.intDomains[starts[j]]
-                sumDur += durations[j]
+                sumDur += effDur[j]
                 minEstOmega = min(minEstOmega, dj.min)
-                val lctOmega = dj.max + durations[j] // since list is lct-sorted, last is max
+                val lctOmega = dj.max + effDur[j]
                 val estUnion = min(minEstOmega, di.min)
-                if (estUnion + durations[i] + sumDur > lctOmega) {
-                    // i can't fit before all of Ω.
+                if (estUnion + effDur[i] + sumDur > lctOmega) {
                     val push = minEstOmega + sumDur
                     if (push > newMinI) newMinI = push
                 }
@@ -282,15 +287,14 @@ class Disjunctive(
                 if (!state.tightenIntMin(vi, newMinI, state.composeIntVarAtomAntecedents(starts))) return false
             }
         }
-        // Backward pass: tighten start_i.max via the symmetric overflow.
         for (i in 0 until n) {
-            if (durations[i] == 0) continue
+            if (effDur[i] == 0) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var k = 0
             for (j in 0 until n) {
-                if (j != i && durations[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
+                if (j != i && effDur[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
                     others[k++] = j
                 }
             }
@@ -301,14 +305,13 @@ class Disjunctive(
             for (p in 0 until k) {
                 val j = others[p]
                 val dj = state.intDomains[starts[j]]
-                sumDur += durations[j]
-                val lctJ = dj.max + durations[j]
+                sumDur += effDur[j]
+                val lctJ = dj.max + effDur[j]
                 if (lctJ > maxLctOmega) maxLctOmega = lctJ
-                val estOmega = dj.min // est-sorted desc → last considered has the min est
-                val lctUnion = max(maxLctOmega, di.max + durations[i])
-                if (estOmega + durations[i] + sumDur > lctUnion) {
-                    // i can't fit after all of Ω → i must end before some of Ω → start_i.max ≤ maxLctOmega − sumDur − dur_i
-                    val push = maxLctOmega - sumDur - durations[i]
+                val estOmega = dj.min
+                val lctUnion = max(maxLctOmega, di.max + effDur[i])
+                if (estOmega + effDur[i] + sumDur > lctUnion) {
+                    val push = maxLctOmega - sumDur - effDur[i]
                     if (push < newMaxI) newMaxI = push
                 }
             }
@@ -320,14 +323,13 @@ class Disjunctive(
         return true
     }
 
-    private fun sortByLct(arr: IntArray, len: Int, state: PropagationState) {
-        // Insertion sort — len is typically small (≤ 50 on Challenge JSP).
+    private fun sortByLct(arr: IntArray, len: Int, state: PropagationState, effDur: IntArray) {
         for (i in 1 until len) {
             val cur = arr[i]
-            val curKey = state.intDomains[starts[cur]].max + durations[cur]
+            val curKey = state.intDomains[starts[cur]].max + effDur[cur]
             var j = i - 1
             while (j >= 0) {
-                val cmpKey = state.intDomains[starts[arr[j]]].max + durations[arr[j]]
+                val cmpKey = state.intDomains[starts[arr[j]]].max + effDur[arr[j]]
                 if (cmpKey <= curKey) break
                 arr[j + 1] = arr[j]; j--
             }

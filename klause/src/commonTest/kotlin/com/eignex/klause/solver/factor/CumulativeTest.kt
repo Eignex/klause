@@ -266,4 +266,80 @@ class CumulativeTest {
         assertEquals(null, result.intMinOrNullCompat(1))
         assertEquals(null, result.intMinOrNullCompat(2))
     }
+
+    @Test
+    fun `var resources flip overage as the resource var changes`() {
+        // 2 tasks duration 2; cap 1. Var resources r0 (0..1), r1 (0..1). Start at 0 and 1
+        // (overlap at t=1). Both r=1 → usage 2 over t=1 → overage 1. Set r1 = 0 → no
+        // overage. The factor must track these via the resource vars.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1),
+            durations = intArrayOf(2, 2),
+            resources = intArrayOf(1, 1),  // ubs
+            capacity = 1,
+            resourceVars = intArrayOf(2, 3),
+        )
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 1), IntDomain(0, 1)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val state = LocalSearchState(problem, Random(0))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 1); state.assignment.setInt(3, 1)
+        state.recompute()
+        assertTrue(state.cost > 0, "both resources at 1 should overload capacity 1")
+        // Drop r1 to 0 — overlap is now between a unit-demand and a zero-demand task.
+        state.assignment.setInt(3, 0); state.recompute()
+        assertEquals(0, state.cost, "zero resource on one task should remove the overage")
+    }
+
+    @Test
+    fun `var capacity flips overage as the capacity var changes`() {
+        // 2 tasks duration 2 unit resources overlapping at t=1. Cap=1 → overage; cap=2 → ok.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1),
+            durations = intArrayOf(2, 2),
+            resources = intArrayOf(1, 1),
+            capacity = 2,
+            capacityVar = 2,
+        )
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(1, 2)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val state = LocalSearchState(problem, Random(0))
+        state.assignment.setInt(0, 0); state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 1); state.recompute()
+        assertTrue(state.cost > 0, "cap=1 with unit overlap should overage")
+        state.assignment.setInt(2, 2); state.recompute()
+        assertEquals(0, state.cost, "raising cap to 2 should clear overage")
+    }
+
+    @Test
+    fun `var durations rescale task footprint`() {
+        // 2 tasks unit resource, cap 1, var durations. Starts 0 and 2. With d0=d1=2,
+        // no overlap. With d0=3, task 0 ends at 3 and overlaps task 1 at t=2.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1),
+            durations = intArrayOf(3, 3),  // ubs
+            resources = intArrayOf(1, 1),
+            capacity = 1,
+            durationVars = intArrayOf(2, 3),
+        )
+        val problem = Problem(
+            numBoolVars = 0, numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(1, 3), IntDomain(1, 3)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val state = LocalSearchState(problem, Random(0))
+        state.assignment.setInt(0, 0); state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 2); state.assignment.setInt(3, 2)
+        state.recompute()
+        assertEquals(0, state.cost, "duration 2 each at starts 0 and 2 shouldn't overlap")
+        state.assignment.setInt(2, 3); state.recompute()
+        assertTrue(state.cost > 0, "extending d0 to 3 overlaps task 1 at t=2")
+    }
 }

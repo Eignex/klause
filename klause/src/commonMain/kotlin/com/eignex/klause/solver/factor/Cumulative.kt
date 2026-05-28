@@ -51,14 +51,27 @@ import kotlin.math.min
  */
 class Cumulative(
     val starts: IntArray,
+    /** Per-task duration: constant fallback / upper bound (when [durationVars] is set this
+     *  holds the var's domain ub, used for horizon sizing). */
     val durations: IntArray,
+    /** Per-task resource demand: same dual role as [durations]. */
     val resources: IntArray,
+    /** Capacity: constant fallback / upper bound (when [capacityVar] ≥ 0 holds the var's ub). */
     val capacity: Int,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks contribute
      *  zero energy / zero compulsory part. Theta-tree leaves stay inactive for
      *  definitely-absent tasks; unpinned-presence tasks are excluded from edge-finding too
      *  (they may yet go absent, so they can't sharpen Ω-energy deductions). */
     val presents: IntArray = EmptyIntArray,
+    /** Per-task duration variables; empty = use [durations] as constants. When set, the
+     *  factor reads the current duration from `state.assignment.intValue(durationVars[i])`
+     *  and propagation pulls bounds from `state.intDomains[durationVars[i]]`. */
+    val durationVars: IntArray = EmptyIntArray,
+    /** Per-task resource variables; empty = use [resources] as constants. Same pattern as
+     *  [durationVars]. */
+    val resourceVars: IntArray = EmptyIntArray,
+    /** Capacity variable id; -1 = use [capacity] as a constant. */
+    val capacityVar: Int = -1,
 ) : LocalSearchFactor {
 
     init {
@@ -73,22 +86,56 @@ class Cumulative(
         require(presents.isEmpty() || presents.size == starts.size) {
             "Cumulative: presents must be empty or match starts arity"
         }
+        require(durationVars.isEmpty() || durationVars.size == starts.size) {
+            "Cumulative: durationVars must be empty or match starts arity"
+        }
+        require(resourceVars.isEmpty() || resourceVars.size == starts.size) {
+            "Cumulative: resourceVars must be empty or match starts arity"
+        }
     }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
-    override val intVars: IntArray = starts
+    override val intVars: IntArray = run {
+        val extra = (if (durationVars.isNotEmpty()) durationVars.size else 0) +
+            (if (resourceVars.isNotEmpty()) resourceVars.size else 0) +
+            (if (capacityVar >= 0) 1 else 0)
+        if (extra == 0) starts else {
+            val out = IntArray(starts.size + extra)
+            var k = 0
+            for (v in starts) out[k++] = v
+            if (durationVars.isNotEmpty()) for (v in durationVars) out[k++] = v
+            if (resourceVars.isNotEmpty()) for (v in resourceVars) out[k++] = v
+            if (capacityVar >= 0) out[k++] = capacityVar
+            out
+        }
+    }
 
     private fun present(state: LocalSearchState, idx: Int): Boolean =
         OptPresence.isPresentInAssignment(presents, idx, state)
 
     private val n: Int = starts.size
-    private val positionOfVar: Map<Int, Int> = starts.withIndex().associate { (i, v) -> v to i }
+    /** Variable role: which side of a task the changed int-var represents. */
+    private enum class VarRole { START, DURATION, RESOURCE, CAPACITY }
+    private val startPos: Map<Int, Int> = starts.withIndex().associate { (i, v) -> v to i }
+    private val durPos: Map<Int, Int> =
+        if (durationVars.isEmpty()) emptyMap() else durationVars.withIndex().associate { (i, v) -> v to i }
+    private val resPos: Map<Int, Int> =
+        if (resourceVars.isEmpty()) emptyMap() else resourceVars.withIndex().associate { (i, v) -> v to i }
 
-    /** LS-side payload. Owns the usage timeline and the running overage. */
+    private fun curDur(state: LocalSearchState, i: Int): Int =
+        if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
+    private fun curRes(state: LocalSearchState, i: Int): Int =
+        if (resourceVars.isEmpty()) resources[i] else state.assignment.intValue(resourceVars[i])
+    private fun curCap(state: LocalSearchState): Int =
+        if (capacityVar < 0) capacity else state.assignment.intValue(capacityVar)
+
+    /** LS-side payload. Owns the usage timeline, the running overage, and the cached
+     *  capacity (so capacity-var changes can recompute overage in one O(horizon) scan). */
     private class LsState(
         val tLow: Int,
         val usage: IntArray,
         var overage: Int,
+        var cap: Int,
     )
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
@@ -99,19 +146,20 @@ class Cumulative(
         for (i in 0 until n) {
             if (!present(state, i)) continue
             val s = state.assignment.intValue(starts[i])
-            val d = durations[i]
-            val r = resources[i]
-            if (d == 0 || r == 0) continue
+            val d = curDur(state, i)
+            val r = curRes(state, i)
+            if (d <= 0 || r <= 0) continue
             val from = max(0, s - tLow)
             val to = min(size, s + d - tLow)
             for (t in from until to) usage[t] += r
         }
+        val cap = curCap(state)
         var ov = 0
         for (t in usage.indices) {
             val u = usage[t]
-            if (u > capacity) ov += u - capacity
+            if (u > cap) ov += u - cap
         }
-        val ls = LsState(tLow, usage, ov)
+        val ls = LsState(tLow, usage, ov, cap)
         state.refPayload[factorId] = ls
         state.intPayload[factorId] = ov
     }
@@ -120,30 +168,82 @@ class Cumulative(
         state.intPayload[factorId] > 0
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val pos = positionOfVar[intVar] ?: return 0
-        if (!present(state, pos)) return 0
         val ls = state.refPayload[factorId] as LsState
-        val oldStart = state.assignment.intValue(intVar)
-        if (oldStart == newValue) return 0
-        val d = durations[pos]
-        val r = resources[pos]
         val oldViolated = ls.overage > 0
-        if (d == 0 || r == 0) return 0
-        val delta = simulateOverageDelta(ls, oldStart, newValue, d, r)
+        val oldVal = state.assignment.intValue(intVar)
+        if (oldVal == newValue) return 0
+        val delta = when {
+            intVar == capacityVar -> capacityDelta(ls, newValue)
+            else -> {
+                val sp = startPos[intVar]
+                if (sp != null) {
+                    if (!present(state, sp)) 0 else {
+                        val d = curDur(state, sp); val r = curRes(state, sp)
+                        if (d <= 0 || r <= 0) 0
+                        else simulateStartDelta(ls, oldVal, newValue, d, r)
+                    }
+                } else {
+                    val dp = durPos[intVar]
+                    if (dp != null) {
+                        if (!present(state, dp)) 0 else {
+                            val r = curRes(state, dp)
+                            if (r <= 0) 0 else {
+                                val s = state.assignment.intValue(starts[dp])
+                                simulateDurDelta(ls, s, oldVal, newValue, r)
+                            }
+                        }
+                    } else {
+                        val rp = resPos[intVar]
+                        if (rp != null) {
+                            if (!present(state, rp)) 0 else {
+                                val d = curDur(state, rp)
+                                if (d <= 0) 0 else {
+                                    val s = state.assignment.intValue(starts[rp])
+                                    simulateResDelta(ls, s, d, oldVal, newValue)
+                                }
+                            }
+                        } else 0
+                    }
+                }
+            }
+        }
         val newViolated = (ls.overage + delta) > 0
         return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        val pos = positionOfVar[intVar] ?: return 0
-        if (!present(state, pos)) return 0
         val ls = state.refPayload[factorId] as LsState
         val newValue = state.assignment.intValue(intVar)
-        val d = durations[pos]
-        val r = resources[pos]
         val oldViolated = ls.overage > 0
-        if (oldValue == newValue || d == 0 || r == 0) return 0
-        applyOverageDelta(ls, oldValue, newValue, d, r)
+        if (oldValue == newValue) return 0
+        when {
+            intVar == capacityVar -> applyCapacityDelta(ls, newValue)
+            else -> {
+                val sp = startPos[intVar]
+                if (sp != null) {
+                    if (!present(state, sp)) return 0
+                    val d = curDur(state, sp); val r = curRes(state, sp)
+                    if (d <= 0 || r <= 0) return 0
+                    applyStartDelta(ls, oldValue, newValue, d, r)
+                } else {
+                    val dp = durPos[intVar]
+                    if (dp != null) {
+                        if (!present(state, dp)) return 0
+                        val r = curRes(state, dp)
+                        if (r <= 0) return 0
+                        val s = state.assignment.intValue(starts[dp])
+                        applyDurDelta(ls, s, oldValue, newValue, r)
+                    } else {
+                        val rp = resPos[intVar] ?: return 0
+                        if (!present(state, rp)) return 0
+                        val d = curDur(state, rp)
+                        if (d <= 0) return 0
+                        val s = state.assignment.intValue(starts[rp])
+                        applyResDelta(ls, s, d, oldValue, newValue)
+                    }
+                }
+            }
+        }
         state.intPayload[factorId] = ls.overage
         val newViolated = ls.overage > 0
         return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
@@ -152,23 +252,23 @@ class Cumulative(
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val ls = state.refPayload[factorId] as LsState
+        val cap = ls.cap
         val oldViolated = ls.overage > 0
-        // Simulate the flip's effect on the dense profile.
         var deltaOv = 0
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val d = durations[i]
-            val r = resources[i]
-            if (d == 0 || r == 0) continue
+            val d = curDur(state, i)
+            val r = curRes(state, i)
+            if (d <= 0 || r <= 0) continue
             val wasP = present(state, i)
-            val sign = if (wasP) -1 else +1  // flipping removes/adds this task's contribution
+            val sign = if (wasP) -1 else +1
             val s = state.assignment.intValue(starts[i])
             val from = max(0, s - ls.tLow)
             val to = min(ls.usage.size, s + d - ls.tLow)
             for (t in from until to) {
                 val u = ls.usage[t]
                 val nu = u + sign * r
-                deltaOv += max(0, nu - capacity) - max(0, u - capacity)
+                deltaOv += max(0, nu - cap) - max(0, u - cap)
             }
         }
         val newViolated = (ls.overage + deltaOv) > 0
@@ -178,13 +278,14 @@ class Cumulative(
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val ls = state.refPayload[factorId] as LsState
+        val cap = ls.cap
         val oldViolated = ls.overage > 0
         var deltaOv = 0
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val d = durations[i]
-            val r = resources[i]
-            if (d == 0 || r == 0) continue
+            val d = curDur(state, i)
+            val r = curRes(state, i)
+            if (d <= 0 || r <= 0) continue
             val nowP = present(state, i)
             val sign = if (nowP) +1 else -1
             val s = state.assignment.intValue(starts[i])
@@ -194,7 +295,7 @@ class Cumulative(
                 val u = ls.usage[t]
                 val nu = u + sign * r
                 ls.usage[t] = nu
-                deltaOv += max(0, nu - capacity) - max(0, u - capacity)
+                deltaOv += max(0, nu - cap) - max(0, u - cap)
             }
         }
         ls.overage += deltaOv
@@ -203,63 +304,136 @@ class Cumulative(
         return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
     }
 
-    /**
-     * Compute the overage Δ of moving task `pos` from `oldStart` to `newStart` without
-     * mutating the timeline. Visits the symmetric difference of the two task intervals.
-     */
-    private fun simulateOverageDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int): Int {
-        val usage = ls.usage
-        val tLow = ls.tLow
-        val size = usage.size
+    /** Overage Δ of shifting task from [oldStart,+d) → [newStart,+d). Pure simulation. */
+    private fun simulateStartDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int): Int {
+        val cap = ls.cap
+        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
         var delta = 0
-        val oldFrom = oldStart - tLow
-        val oldTo = oldFrom + d
-        val newFrom = newStart - tLow
-        val newTo = newFrom + d
-        // Slots present in old but not new → usage drops by r.
+        val oldFrom = oldStart - tLow; val oldTo = oldFrom + d
+        val newFrom = newStart - tLow; val newTo = newFrom + d
         for (t in oldFrom until oldTo) {
             if (t in newFrom until newTo) continue
             if (t < 0 || t >= size) continue
             val u = usage[t]
-            delta += max(0, u - r - capacity) - max(0, u - capacity)
+            delta += max(0, u - r - cap) - max(0, u - cap)
         }
-        // Slots present in new but not old → usage rises by r.
         for (t in newFrom until newTo) {
             if (t in oldFrom until oldTo) continue
             if (t < 0 || t >= size) continue
             val u = usage[t]
-            delta += max(0, u + r - capacity) - max(0, u - capacity)
+            delta += max(0, u + r - cap) - max(0, u - cap)
         }
         return delta
     }
 
-    /** Same as [simulateOverageDelta] but mutates the timeline and the cached overage. */
-    private fun applyOverageDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int) {
-        val usage = ls.usage
-        val tLow = ls.tLow
-        val size = usage.size
+    private fun applyStartDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int) {
+        val cap = ls.cap
+        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
         var deltaOv = 0
-        val oldFrom = oldStart - tLow
-        val oldTo = oldFrom + d
-        val newFrom = newStart - tLow
-        val newTo = newFrom + d
+        val oldFrom = oldStart - tLow; val oldTo = oldFrom + d
+        val newFrom = newStart - tLow; val newTo = newFrom + d
         for (t in oldFrom until oldTo) {
             if (t in newFrom until newTo) continue
             if (t < 0 || t >= size) continue
-            val u = usage[t]
-            val nu = u - r
-            usage[t] = nu
-            deltaOv += max(0, nu - capacity) - max(0, u - capacity)
+            val u = usage[t]; val nu = u - r; usage[t] = nu
+            deltaOv += max(0, nu - cap) - max(0, u - cap)
         }
         for (t in newFrom until newTo) {
             if (t in oldFrom until oldTo) continue
             if (t < 0 || t >= size) continue
-            val u = usage[t]
-            val nu = u + r
-            usage[t] = nu
-            deltaOv += max(0, nu - capacity) - max(0, u - capacity)
+            val u = usage[t]; val nu = u + r; usage[t] = nu
+            deltaOv += max(0, nu - cap) - max(0, u - cap)
         }
         ls.overage += deltaOv
+    }
+
+    /** Overage Δ of duration change [s,s+oldD) → [s,s+newD) at constant r. */
+    private fun simulateDurDelta(ls: LsState, s: Int, oldD: Int, newD: Int, r: Int): Int {
+        if (r <= 0 || oldD == newD) return 0
+        val cap = ls.cap
+        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        var delta = 0
+        if (newD > oldD) {
+            val from = max(0, s + oldD - tLow); val to = min(size, s + newD - tLow)
+            for (t in from until to) {
+                val u = usage[t]
+                delta += max(0, u + r - cap) - max(0, u - cap)
+            }
+        } else {
+            val from = max(0, s + newD - tLow); val to = min(size, s + oldD - tLow)
+            for (t in from until to) {
+                val u = usage[t]
+                delta += max(0, u - r - cap) - max(0, u - cap)
+            }
+        }
+        return delta
+    }
+
+    private fun applyDurDelta(ls: LsState, s: Int, oldD: Int, newD: Int, r: Int) {
+        if (r <= 0 || oldD == newD) return
+        val cap = ls.cap
+        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        var deltaOv = 0
+        if (newD > oldD) {
+            val from = max(0, s + oldD - tLow); val to = min(size, s + newD - tLow)
+            for (t in from until to) {
+                val u = usage[t]; val nu = u + r; usage[t] = nu
+                deltaOv += max(0, nu - cap) - max(0, u - cap)
+            }
+        } else {
+            val from = max(0, s + newD - tLow); val to = min(size, s + oldD - tLow)
+            for (t in from until to) {
+                val u = usage[t]; val nu = u - r; usage[t] = nu
+                deltaOv += max(0, nu - cap) - max(0, u - cap)
+            }
+        }
+        ls.overage += deltaOv
+    }
+
+    /** Overage Δ of resource change r → r' over fixed interval [s, s+d). */
+    private fun simulateResDelta(ls: LsState, s: Int, d: Int, oldR: Int, newR: Int): Int {
+        if (d <= 0 || oldR == newR) return 0
+        val cap = ls.cap
+        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val diff = newR - oldR
+        val from = max(0, s - tLow); val to = min(size, s + d - tLow)
+        var delta = 0
+        for (t in from until to) {
+            val u = usage[t]
+            delta += max(0, u + diff - cap) - max(0, u - cap)
+        }
+        return delta
+    }
+
+    private fun applyResDelta(ls: LsState, s: Int, d: Int, oldR: Int, newR: Int) {
+        if (d <= 0 || oldR == newR) return
+        val cap = ls.cap
+        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val diff = newR - oldR
+        val from = max(0, s - tLow); val to = min(size, s + d - tLow)
+        var deltaOv = 0
+        for (t in from until to) {
+            val u = usage[t]; val nu = u + diff; usage[t] = nu
+            deltaOv += max(0, nu - cap) - max(0, u - cap)
+        }
+        ls.overage += deltaOv
+    }
+
+    /** Overage Δ when capacity changes; full O(horizon) rescan. */
+    private fun capacityDelta(ls: LsState, newCap: Int): Int {
+        val usage = ls.usage; val oldCap = ls.cap
+        if (newCap == oldCap) return 0
+        var newOv = 0
+        for (u in usage) if (u > newCap) newOv += u - newCap
+        return newOv - ls.overage
+    }
+
+    private fun applyCapacityDelta(ls: LsState, newCap: Int) {
+        if (newCap == ls.cap) return
+        var newOv = 0
+        for (u in ls.usage) if (u > newCap) newOv += u - newCap
+        ls.cap = newCap
+        ls.overage = newOv
     }
 
     private fun computeTLow(state: LocalSearchState): Int {
@@ -273,8 +447,11 @@ class Cumulative(
     private fun computeTHigh(state: LocalSearchState): Int {
         var hi = Int.MIN_VALUE
         for (i in 0 until n) {
-            val d = durations[i]
-            val cand = max(state.problem.intDomains[starts[i]].max, state.assignment.intValue(starts[i])) + d
+            // durations[i] is the constant or the var's ub (set by the compiler) — both
+            // are sound upper bounds for horizon sizing.
+            val dUb = if (durationVars.isEmpty()) durations[i]
+                      else max(durations[i], state.problem.intDomains[durationVars[i]].max)
+            val cand = max(state.problem.intDomains[starts[i]].max, state.assignment.intValue(starts[i])) + dUb
             hi = max(hi, cand)
         }
         return if (hi == Int.MIN_VALUE) 0 else hi
@@ -299,56 +476,65 @@ class Cumulative(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
+        // Snapshot effective durations / resources / capacity. If any var-arg isn't
+        // fixed at this fixpoint pass, skip propagation (sound: better deductions defer
+        // to later when bounds tighten). Const-only path is unchanged.
+        val effDur = IntArray(n)
+        val effRes = IntArray(n)
+        for (i in 0 until n) {
+            if (durationVars.isEmpty()) effDur[i] = durations[i] else {
+                val d = state.intDomains[durationVars[i]]
+                if (d.min != d.max) return true
+                effDur[i] = d.min
+            }
+            if (resourceVars.isEmpty()) effRes[i] = resources[i] else {
+                val d = state.intDomains[resourceVars[i]]
+                if (d.min != d.max) return true
+                effRes[i] = d.min
+            }
+        }
+        val effCap = if (capacityVar < 0) capacity else {
+            val d = state.intDomains[capacityVar]
+            if (d.min != d.max) return true
+            d.min
+        }
         // Per-task resource feasibility — only definitely-present tasks must fit.
         for (i in 0 until n) {
             if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
-            // Unpinned-presence tasks may still be skipped; check feasibility only when
-            // definitely present, otherwise the task could legally vanish.
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            if (durations[i] > 0 && resources[i] > capacity) return false
+            if (effDur[i] > 0 && effRes[i] > effCap) return false
         }
         // Overload check (Vilím 2002 / Schutt-Feydy-Stuckey 2009 simplified). For each
         // anchor LCT τ, let Ω(τ) = { j : LCT(j) ≤ τ }; if Σ_{j∈Ω} dur(j)·res(j) exceeds
-        // capacity · (τ − EST(Ω)), the instance is infeasible. Catches conflicts that
-        // time-tabling misses (no compulsory parts but combined energy overflows).
-        // O(n log n): sort tasks by LCT, accumulate Energy and min-EST in scan order.
+        // capacity · (τ − EST(Ω)), the instance is infeasible.
         run {
             val idx = IntArray(n) { it }
-            // Stable sort by (lct, est) so multiple tasks with the same LCT all anchor
-            // through one another in the same iteration.
             val lcts = IntArray(n) { i ->
                 val d = state.intDomains[starts[i]]
-                d.max + durations[i]
+                d.max + effDur[i]
             }
             val ests = IntArray(n) { i -> state.intDomains[starts[i]].min }
-            // Sort indices by lcts[idx[i]] ascending.
             val sorted = idx.sortedBy { lcts[it] }.toIntArray()
             var totalEnergy = 0L
             var minEst = Int.MAX_VALUE
             for (k in 0 until n) {
                 val j = sorted[k]
-                // Skip tasks that aren't definitely-present — they may yet vanish and so
-                // cannot anchor an overload conclusion.
                 if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
-                val e = durations[j].toLong() * resources[j].toLong()
+                val e = effDur[j].toLong() * effRes[j].toLong()
                 if (e == 0L) continue
                 totalEnergy += e
                 if (ests[j] < minEst) minEst = ests[j]
                 val tau = lcts[j]
-                val slack = (tau.toLong() - minEst.toLong()) * capacity.toLong()
+                val slack = (tau.toLong() - minEst.toLong()) * effCap.toLong()
                 if (totalEnergy > slack) return false
             }
         }
-        // Edge-finding pass (Vilím 2009 via Θ-tree envelope).
-        if (!edgeFindingPass(state)) return false
-        // 1. Build mandatory profile as an event list. Each task contributes one (lst, +r)
-        //    and one (ect, -r) when lst < ect; otherwise no compulsory part.
+        if (!edgeFindingPass(state, effDur, effRes, effCap)) return false
         val events = ArrayList<IntArray>(n * 2)
         for (i in 0 until n) {
-            // Compulsory part only from definitely-present tasks.
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val d = durations[i]
-            val r = resources[i]
+            val d = effDur[i]
+            val r = effRes[i]
             if (d == 0 || r == 0) continue
             val dom = state.intDomains[starts[i]]
             val lst = dom.max
@@ -358,8 +544,7 @@ class Cumulative(
                 events.add(intArrayOf(ect, -r))
             }
         }
-        events.sortWith(compareBy({ it[0] }, { -it[1] })) // process +deltas before -deltas at same time
-        // 2. Sweep; record the per-segment profile level; fail on any segment > capacity.
+        events.sortWith(compareBy({ it[0] }, { -it[1] }))
         val segFrom = IntArray(events.size)
         val segTo = IntArray(events.size)
         val segLevel = IntArray(events.size)
@@ -375,19 +560,13 @@ class Cumulative(
             level += ev[1]
             cursor = t
             if (idx == events.size - 1 || events[idx + 1][0] != t) {
-                if (level > capacity) return false
+                if (level > effCap) return false
             }
         }
-        // 3. Per-task shaving. For each task i with a free start domain, check whether
-        //    placing it at the current low / high endpoint would push the mandatory profile
-        //    over capacity at any covered segment (after subtracting i's own mandatory
-        //    contribution, so a task doesn't conflict with itself).
         for (i in 0 until n) {
-            // Don't shave start domains of tasks that may yet vanish — if i goes absent
-            // it imposes no constraint at all, so tightening its start would be unsound.
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val d = durations[i]
-            val r = resources[i]
+            val d = effDur[i]
+            val r = effRes[i]
             if (d == 0 || r == 0) continue
             val v = starts[i]
             val dom = state.intDomains[v]
@@ -395,23 +574,20 @@ class Cumulative(
             val lstI = dom.max
             val ectI = dom.min + d
             val ownsMandatory = lstI < ectI
-            // Tighten dom.min upward.
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
                 if (overloadsAt(segFrom, segTo, segLevel, segCount,
-                        newMin, newMin + d, r, ownsMandatory, lstI, ectI)) {
+                        newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI)) {
                     newMin++
                 } else break
             }
             if (newMin > state.intDomains[v].max) return false
-            // LCG antecedents: every start var's bounds contribute to the resource profile.
             val ant = state.composeIntVarAtomAntecedents(starts)
             if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
-            // Tighten dom.max downward.
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
                 if (overloadsAt(segFrom, segTo, segLevel, segCount,
-                        newMax, newMax + d, r, ownsMandatory, lstI, ectI)) {
+                        newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI)) {
                     newMax--
                 } else break
             }
@@ -428,7 +604,7 @@ class Cumulative(
      */
     private fun overloadsAt(
         segFrom: IntArray, segTo: IntArray, segLevel: IntArray, segCount: Int,
-        s: Int, sPlusD: Int, r: Int,
+        s: Int, sPlusD: Int, r: Int, cap: Int,
         ownsMandatory: Boolean, lstI: Int, ectI: Int,
     ): Boolean {
         for (k in 0 until segCount) {
@@ -439,7 +615,7 @@ class Cumulative(
                 val ovFrom = max(from, lstI); val ovTo = min(to, ectI)
                 if (ovFrom < ovTo) effective -= r
             }
-            if (effective + r > capacity) return true
+            if (effective + r > cap) return true
         }
         return false
     }
@@ -460,24 +636,21 @@ class Cumulative(
      * Cost is O(m²) where m = active task count (tasks with positive duration and
      * resource): one inner sweep over outside tasks per distinct LCT value.
      */
-    private fun edgeFindingPass(state: PropagationState): Boolean {
-        if (n < 2 || capacity == 0) return true
+    private fun edgeFindingPass(state: PropagationState, effDur: IntArray, effRes: IntArray, effCap: Int): Boolean {
+        if (n < 2 || effCap == 0) return true
         val active = IntArrayList()
         for (i in 0 until n) {
-            // Theta-tree leaves stay inactive for definitely-absent or unpinned-presence
-            // tasks — the README's stated opt semantics. Only definitely-present positive-
-            // energy tasks anchor edge-finding deductions.
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            if (durations[i] > 0 && resources[i] > 0) active.add(i)
+            if (effDur[i] > 0 && effRes[i] > 0) active.add(i)
         }
         val m = active.size
         if (m < 2) return true
 
         val taskIds = IntArray(m) { active[it] }
         val ests = IntArray(m) { state.intDomains[starts[taskIds[it]]].min }
-        val lcts = IntArray(m) { state.intDomains[starts[taskIds[it]]].max + durations[taskIds[it]] }
-        val energies = LongArray(m) { durations[taskIds[it]].toLong() * resources[taskIds[it]].toLong() }
-        val cs = IntArray(m) { resources[taskIds[it]] }
+        val lcts = IntArray(m) { state.intDomains[starts[taskIds[it]]].max + effDur[taskIds[it]] }
+        val energies = LongArray(m) { effDur[taskIds[it]].toLong() * effRes[taskIds[it]].toLong() }
+        val cs = IntArray(m) { effRes[taskIds[it]] }
 
         // EST-ascending leaf positions. Stable on ties — choice doesn't affect the
         // envelope recurrence since equal-EST leaves anchor at the same time.
@@ -488,16 +661,14 @@ class Cumulative(
         // LCT-ascending sweep order.
         val lctOrder = (0 until m).sortedWith(compareBy({ lcts[it] }, { it })).toIntArray()
 
-        val tree = CumulativeThetaTree(n = m, capacity = capacity)
+        val tree = CumulativeThetaTree(n = m, capacity = effCap)
         tree.setLeafOrder(leafPos)
-        val capL = capacity.toLong()
+        val capL = effCap.toLong()
         val ant = state.composeIntVarAtomAntecedents(starts)
 
         var k = 0
         while (k < m) {
             val tau = lcts[lctOrder[k]]
-            // Insert every task at this LCT before testing — tasks with equal LCT all
-            // belong to Θ at threshold τ.
             while (k < m && lcts[lctOrder[k]] == tau) {
                 val j = lctOrder[k]
                 tree.activate(j, ests[j], energies[j])
@@ -506,13 +677,12 @@ class Cumulative(
             if (k >= m) break
             val envTheta = tree.envOfTheta()
             val capTau = capL * tau.toLong()
-            // For every task still outside Θ (lct > τ), check the edge-finding rule.
             for (ki in k until m) {
                 val i = lctOrder[ki]
                 val eI = energies[i]
                 val cI = cs[i]
                 if (envTheta + eI <= capTau) continue
-                val numerator = envTheta - (capacity - cI).toLong() * tau.toLong()
+                val numerator = envTheta - (effCap - cI).toLong() * tau.toLong()
                 if (numerator <= 0L) continue
                 val newEstL = (numerator + cI - 1L) / cI.toLong()
                 if (newEstL > Int.MAX_VALUE.toLong()) continue
@@ -531,24 +701,20 @@ class Cumulative(
         val ls = state.refPayload[factorId] as LsState
         // 1. Find the peak time slot — it concentrates the most leverage for a single move.
         var peakT = -1
-        var peakV = capacity
+        var peakV = ls.cap
         val usage = ls.usage
         for (t in usage.indices) {
             if (usage[t] > peakV) { peakV = usage[t]; peakT = t }
         }
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0
-        // Collect tasks running through the peak (used by both shift and swap passes).
         val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else IntArray(0)
-        // 2. For each peak task, propose feasibility-preserving shifts off the peak. Prefer
-        //    shifts that strictly reduce overage (simulated) over generic afterPeak/beforePeak,
-        //    so probSAT-style scoring sees winning candidates rather than random shifts.
         val MAX_TARGETS = 4
         for (i in 0 until n) {
             val v = starts[i]
             val cur = state.assignment.intValue(v)
-            val d = durations[i]
-            val r = resources[i]
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             val dom = state.problem.intDomains[v]
             val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
@@ -579,8 +745,8 @@ class Cumulative(
     private fun collectPeakTasks(state: LocalSearchState, absT: Int): IntArray {
         val out = com.eignex.klause.util.IntArrayList()
         for (i in 0 until n) {
-            val r = resources[i]; val d = durations[i]
-            if (r == 0 || d == 0) continue
+            val r = curRes(state, i); val d = curDur(state, i)
+            if (r <= 0 || d <= 0) continue
             if (!present(state, i)) continue
             val cur = state.assignment.intValue(starts[i])
             if (cur <= absT && absT < cur + d) out.add(i)
@@ -604,18 +770,15 @@ class Cumulative(
             for (j in 0 until n) {
                 if (swapsAdded >= MAX_SWAPS) break
                 if (j == i) continue
-                if (durations[j] == 0 || resources[j] == 0) continue
+                val dj0 = curDur(state, j); val rj0 = curRes(state, j)
+                if (dj0 <= 0 || rj0 <= 0) continue
                 if (!present(state, j)) continue
                 val jV = starts[j]
                 val jCur = state.assignment.intValue(jV)
                 if (jCur !in iDom || iCur !in state.problem.intDomains[jV]) continue
                 if (jCur == iCur) continue
-                // Simulate the joint overage delta. Each task is moved independently against
-                // the *original* timeline — this is an approximation (the two moves interact),
-                // but for typical instances the second task's interval rarely overlaps the
-                // first task's new slot exactly, so the linearised delta is a useful filter.
-                val di = simulateOverageDelta(ls, iCur, jCur, durations[i], resources[i])
-                val dj = simulateOverageDelta(ls, jCur, iCur, durations[j], resources[j])
+                val di = simulateStartDelta(ls, iCur, jCur, curDur(state, i), curRes(state, i))
+                val dj = simulateStartDelta(ls, jCur, iCur, dj0, rj0)
                 if (di + dj >= 0) continue  // not feasibility-preserving by this approximation
                 sink.addCompound(listOf(
                     com.eignex.klause.solver.Move.IntSet(iV, jCur),

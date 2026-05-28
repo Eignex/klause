@@ -1047,30 +1047,55 @@ internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
 }
 
 /**
- * `cumulative(starts, durations, resources, capacity)`. The klause factor requires
- * constant durations / resources / capacity; if any of those is given as a variable,
- * we fail-loud so the model is surfaced rather than silently decomposed.
+ * `cumulative(starts, durations, resources, capacity)`. Durations, resources, and
+ * capacity may each be either constants or variables; the factor reads current values
+ * via the var arrays at solve time and falls back to the const fast path when all are
+ * fixed.
  */
 internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
     require(c.args.size == 4) { "cumulative expects 4 args, got ${c.args.size}" }
     val starts = evalIntVarArray(c.args[0])
-    val durations = evalIntConstArray(c.args[1])
-    val resources = evalIntConstArray(c.args[2])
-    val capacity = evalIntConst(c.args[3]).toInt()
+    val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
+    val (resources, resourceVars) = resolveIntArrayConstOrVars(c.args[2])
+    val (capacity, capacityVar) = resolveIntConstOrVar(c.args[3])
     factors.add(Cumulative(
         starts = starts,
         durations = durations,
         resources = resources,
         capacity = capacity,
+        durationVars = durationVars,
+        resourceVars = resourceVars,
+        capacityVar = capacityVar,
     ))
 }
 
-/** `disjunctive(starts, durations)` / `disjunctive_strict(...)`. Durations are constants. */
+/** `disjunctive(starts, durations)` / `disjunctive_strict(...)`. Durations may be var. */
 internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
     require(c.args.size == 2) { "disjunctive expects 2 args, got ${c.args.size}" }
     val starts = evalIntVarArray(c.args[0])
-    val durations = evalIntConstArray(c.args[1])
-    factors.add(Disjunctive(starts = starts, durations = durations))
+    val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
+    factors.add(Disjunctive(starts = starts, durations = durations, durationVars = durationVars))
+}
+
+/** Returns (values, vars). When [e] is all-constant, `vars` is empty and `values` holds
+ *  the constants. When [e] is a var array, `vars` holds the var ids and `values` holds
+ *  each var's current domain ub — the factor uses these as worst-case bounds for horizon
+ *  sizing and reads the live values via the var ids at solve time. */
+private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<IntArray, IntArray> {
+    val asConst = tryEvalIntConstArray(e)
+    if (asConst != null) return asConst to com.eignex.klause.solver.EmptyIntArray
+    val vars = evalIntVarArray(e)
+    val ubs = IntArray(vars.size) { intDomains[vars[it]].max }
+    return ubs to vars
+}
+
+/** Returns (constOrUb, varId). When [e] is an int literal/param, varId = -1 and the int
+ *  is the value. When [e] is a var, varId is set and the int is the var's domain ub. */
+private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
+    val asConst = evalIntConstOrNull(e)
+    if (asConst != null) return asConst.toInt() to -1
+    val varId = resolveIntVar(e)
+    return intDomains[varId].max to varId
 }
 
 internal fun FlatZincCompiler.emitIntTimes(c: FznConstraint) {
