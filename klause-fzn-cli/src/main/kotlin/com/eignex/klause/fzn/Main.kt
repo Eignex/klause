@@ -96,25 +96,17 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
         tenure = 10,
         aspiration = com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImproving,
     )
-    // CLI-side strategy selection by problem shape (the library default leaves these alone for
-    // backward-compat; the CLI is one-shot per invocation, so it picks the per-shape SOTA):
-    //
-    //  - satisfy, pure-Boolean (no integer vars) → adaptive probSAT: the SOTA pick for the
-    //    clausal/SAT shape it was designed for.
-    //  - satisfy, any integer structure (the MiniZinc-typical CP shape — int vars + global /
-    //    linear constraints) → CBLS. Measured: probSAT collapses on CP-shaped satisfaction
-    //    (e.g. quasigroup / all_different), where CBLS's constraint-violation gradient and
-    //    int-aware repair moves actually make progress.
-    //  - minimize / maximize → CBLS (unified): it drives both the feasibility fight and the
-    //    objective descent on the decomposed CP shape MiniZinc-Challenge instances produce.
-    val satisfyStrategy: com.eignex.klause.solver.localsearch.strategy.Strategy =
-        if (program.problem.numIntVars == 0)
-            com.eignex.klause.solver.localsearch.strategy.ProbSat.adaptive(tabu = tabu)
-        else
-            com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu)
+    // CBLS throughout — both the satisfy fight (`strategy`) and the objective descent
+    // (`optimizeStrategy`, unified). A bench sweep (FocusedLs/probSAT vs CBLS over planted
+    // random 3-SAT and CP-shaped satisfaction instances) found CBLS at least as good as
+    // probSAT on solve-rate everywhere, including pure clausal SAT — and far more robust at
+    // scale — so there is no problem shape where routing satisfy to probSAT helps. The
+    // library default leaves these alone for backward-compat; the CLI is one-shot per
+    // invocation, so it picks the across-the-board winner. (FocusedLs/probSAT/SA remain in
+    // the multi-core portfolio for trajectory diversity, just not as the single default.)
     val solver = com.eignex.klause.solver.localsearch.LocalSearchSolver(
         program.problem,
-        strategy = satisfyStrategy,
+        strategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
         optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
         pairSwapBudget = 1024,
     )
