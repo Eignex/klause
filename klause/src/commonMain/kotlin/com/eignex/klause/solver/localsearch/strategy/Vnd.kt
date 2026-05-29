@@ -4,9 +4,8 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
- * Variable Neighbourhood Descent — deterministic descent across the same k-level
- * neighbourhood ladder used by [Vns], but accepting only strictly-improving moves
- * (`netDelta < 0`). Algorithm:
+ * Variable Neighbourhood Descent — deterministic descent across a k-level neighbourhood
+ * ladder, accepting only strictly-improving moves (`netDelta < 0`). Algorithm:
  *
  *  1. Start at level `k = 1` (single-variable repair candidates from one violated factor).
  *  2. Sample [candidatesPerLevel] candidate moves at level `k`. Filter through [tabu].
@@ -16,10 +15,12 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  *  5. If no improving move at any level, return the best (or random under [noise])
  *     plateau-move from level 1 so search keeps exploring.
  *
- * Difference from [Vns]: VNS *shakes* upward on stagnation regardless of improvement;
- * VND *descends* deterministically and only escalates when no improvement is available
- * at the current level. The two have orthogonal stagnation-avoidance strategies and are
- * typically composed in classical VNS frameworks (shake + VND).
+ * This is the *descent* half of the classical "shake + VND" framework: VND escalates the
+ * neighbourhood only when no improvement is available at the current level, and never commits
+ * to a worsening move. The complementary *shake* (committed diversification on stagnation) is
+ * supplied here by the restart-policy layer — [com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart]
+ * (BasinHopping perturbation) and [com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart] —
+ * which the portfolio composes with this strategy (the `vnd/ils-linkage` worker).
  */
 /** Per-level neighbourhood operator. Returns a candidate move list for level [k]
  *  (1-indexed). Used by [Vnd] to override the default size-k Compound generation with
