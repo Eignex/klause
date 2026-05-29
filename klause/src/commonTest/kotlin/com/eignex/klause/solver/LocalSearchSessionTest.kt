@@ -6,7 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 
 import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.localsearch.strategy.Ddfw
+import com.eignex.klause.solver.localsearch.strategy.Cbls
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -15,24 +15,26 @@ import kotlin.test.assertTrue
 
 class LocalSearchSessionTest {
 
-    private fun ddfwProblem(): Problem {
-        // 5 cardinality factors over overlapping vars — DDFW shuffles weights between
-        // satisfied / unsatisfied neighbours, producing non-default weights quickly.
+    private fun weightLearningProblem(): Problem {
+        // 6 bool vars; an odd-cycle of three `exactlyOne` cardinality factors over vars 0–2
+        // ({0,1}, {1,2}, {0,2}). Since 2·(x0+x1+x2)=3 has no integer solution the problem is
+        // unsatisfiable, so a weight-learning strategy (CBLS) never reaches cost 0 — it keeps
+        // hitting local minima and scaling factor weights off their defaults. That divergence
+        // is exactly the learned state the session must capture/persist. Vars 3–5 are left
+        // unconstrained so the variable-activity assertions still see all 6 slots.
         return Problem(
             numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Cardinality.exactlyOne(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-                Cardinality.exactlyOne(intArrayOf(Lit.make(4, true), Lit.make(5, true))),
                 Cardinality.exactlyOne(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-                Cardinality.exactlyOne(intArrayOf(Lit.make(3, true), Lit.make(4, true))),
+                Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
             ),
         )
     }
 
     @Test
     fun `maxInstructions tightens flip budget vs maxFlips when smaller`() {
-        val problem = ddfwProblem()
+        val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem)
         val tight = solver.solve(LocalSearchParams(
             maxFlips = Long.MAX_VALUE, maxInstructions = 5L, randomSeed = 0L,
@@ -42,22 +44,22 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `session captures DDFW factor weights after a call`() {
-        val problem = ddfwProblem()
-        val solver = LocalSearchSolver(problem, strategy = Ddfw())
+    fun `session captures learned factor weights after a call`() {
+        val problem = weightLearningProblem()
+        val solver = LocalSearchSolver(problem, strategy = Cbls())
         val session = LocalSearchSession(solver)
         assertNull(session.warmState.factorWeights)
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
         val captured = session.warmState.factorWeights
         assertNotNull(captured, "session should capture factorWeights")
         assertEquals(problem.numFactors, captured.size)
-        assertTrue(captured.any { it != 1.0 }, "DDFW should learn non-default weights")
+        assertTrue(captured.any { it != 1.0 }, "CBLS should learn non-default weights")
     }
 
     @Test
     fun `reset clears warm state`() {
-        val problem = ddfwProblem()
-        val session = LocalSearchSession(LocalSearchSolver(problem, strategy = Ddfw()))
+        val problem = weightLearningProblem()
+        val session = LocalSearchSession(LocalSearchSolver(problem, strategy = Cbls()))
         session.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 2L)).assignment
         assertNotNull(session.warmState.factorWeights)
         session.reset()
@@ -66,8 +68,8 @@ class LocalSearchSessionTest {
 
     @Test
     fun `warm weights survive across two minimize calls`() {
-        val problem = ddfwProblem()
-        val session = LocalSearchSession(LocalSearchSolver(problem, strategy = Ddfw()))
+        val problem = weightLearningProblem()
+        val session = LocalSearchSession(LocalSearchSolver(problem, strategy = Cbls()))
         val obj = LinearObjective(boolWeights = DoubleArray(6) { 1.0 })
         session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 5L)).assignment
         val firstWeights = session.warmState.factorWeights!!.copyOf()
@@ -86,7 +88,7 @@ class LocalSearchSessionTest {
 
     @Test
     fun `session implements Session interface and is returned by solver session factory`() {
-        val solver = LocalSearchSolver(ddfwProblem())
+        val solver = LocalSearchSolver(weightLearningProblem())
         val session: LocalSearchSession = solver.session()
         assertEquals(0, session.depth)
         session.push(com.eignex.klause.solver.Assumptions(bools = mapOf(0 to true)))
@@ -97,7 +99,7 @@ class LocalSearchSessionTest {
 
     @Test
     fun `session captures variable activity counts after a call`() {
-        val problem = ddfwProblem()
+        val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L)).assignment
@@ -108,7 +110,7 @@ class LocalSearchSessionTest {
 
     @Test
     fun `bestCostSeen watermark survives session call boundaries`() {
-        val problem = ddfwProblem()
+        val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
@@ -124,7 +126,7 @@ class LocalSearchSessionTest {
 
     @Test
     fun `reset clears bestCostSeen alongside other warm fields`() {
-        val problem = ddfwProblem()
+        val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L)).assignment
@@ -135,9 +137,26 @@ class LocalSearchSessionTest {
     }
 
     @Test
+    fun `cbls smoothing bounds weight growth vs bump-only`() {
+        // On the UNSAT helper CBLS bumps violated weights every stall and never resets, so
+        // bump-only weights grow without bound. Smoothing pulls them back toward baseWeight,
+        // so after the same flip budget the smoothed run's peak weight must be strictly lower.
+        fun peakWeightAfterRun(strategy: Cbls): Double {
+            val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem(), strategy = strategy))
+            session.sample(LocalSearchParams(maxFlips = 3_000L, randomSeed = 4L)).assignment
+            return session.warmState.factorWeights!!.max()
+        }
+        val bumpOnlyPeak = peakWeightAfterRun(Cbls())
+        val smoothedPeak = peakWeightAfterRun(Cbls(smoothProb = 1.0, smoothFactor = 0.5))
+        assertTrue(bumpOnlyPeak > 1.0, "bump-only run should grow weights, got peak=$bumpOnlyPeak")
+        assertTrue(smoothedPeak < bumpOnlyPeak,
+            "smoothing should bound growth: smoothed=$smoothedPeak vs bump-only=$bumpOnlyPeak")
+    }
+
+    @Test
     fun `bare solver call does not touch the session warm state`() {
-        val problem = ddfwProblem()
-        val solver = LocalSearchSolver(problem, strategy = Ddfw())
+        val problem = weightLearningProblem()
+        val solver = LocalSearchSolver(problem, strategy = Cbls())
         val session = LocalSearchSession(solver)
         solver.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 9L)).assignment
         assertNull(session.warmState.factorWeights, "bare solver call must not write to session warm state")

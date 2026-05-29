@@ -6,7 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * Constraint-Based Local Search strategy. Unlike SAT-family strategies ([ProbSat],
- * [WalkSat], [Ddfw]) that route picks through a randomly-chosen violated factor, CBLS
+ * [WalkSat]) that route picks through a randomly-chosen violated factor, CBLS
  * scores moves against a *global* weighted-violation gradient:
  *
  *   `score(move) = Σ factorWeights[f] · Δviolated[f] + shapingLambda · Δobjective`
@@ -20,7 +20,12 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * Per step:
  *  1. If the previous step didn't strictly improve (no progress for [stallSteps]):
  *     bump weights on currently-violated factors by [stallIncrement] — SAPS-style scale,
- *     amplifying pressure on factors that resist being repaired.
+ *     amplifying pressure on factors that resist being repaired. Then, with probability
+ *     [smoothProb], apply SAPS-style probabilistic *smoothing*: pull every weight a fraction
+ *     [smoothFactor] of the way back toward [baseWeight]. Smoothing is a forgetting mechanism
+ *     that counteracts the otherwise-monotone weight growth, so factors that are no longer
+ *     hard decay back and the gradient doesn't ossify on long plateau-heavy runs. Disabled by
+ *     default ([smoothProb] = 0.0); the bump-only schedule is the baseline regime.
  *  2. Collect candidate moves:
  *     - From each violated factor (capped at [violatedSampleCount]): `proposeRepairMoves`.
  *     - From each currently-satisfied factor (capped at [satisfiedSampleCount]):
@@ -43,6 +48,15 @@ class Cbls(
     val stallSteps: Int = 1,
     /** Per-bump weight increment for violated factors. */
     val stallIncrement: Double = 1.0,
+    /** Probability of applying a smoothing pass after a stall bump. `0.0` (default) disables
+     *  smoothing entirely, leaving the monotone bump-only schedule. */
+    val smoothProb: Double = 0.0,
+    /** Smoothing pull strength: each smoothed weight moves this fraction of the way toward
+     *  [baseWeight] (`w ← (1 - smoothFactor)·w + smoothFactor·baseWeight`). Only consulted
+     *  when [smoothProb] > 0. */
+    val smoothFactor: Double = 0.8,
+    /** Weight that smoothing pulls toward — the lazily-allocated default of [factorWeights]. */
+    val baseWeight: Double = 1.0,
     /** Cap on violated factors sampled per [pickMove] call for candidate generation. */
     val violatedSampleCount: Int = 4,
     /** Cap on satisfied factors sampled per [pickMove] call (for `proposeStructuredMoves`). */
@@ -54,6 +68,9 @@ class Cbls(
         require(noiseProbability in 0.0..1.0) { "noiseProbability ∈ [0, 1], got $noiseProbability" }
         require(stallSteps >= 1) { "stallSteps ≥ 1, got $stallSteps" }
         require(stallIncrement > 0) { "stallIncrement > 0, got $stallIncrement" }
+        require(smoothProb in 0.0..1.0) { "smoothProb ∈ [0, 1], got $smoothProb" }
+        require(smoothFactor in 0.0..1.0) { "smoothFactor ∈ [0, 1], got $smoothFactor" }
+        require(baseWeight > 0) { "baseWeight > 0, got $baseWeight" }
         require(violatedSampleCount >= 1) { "violatedSampleCount ≥ 1, got $violatedSampleCount" }
         require(satisfiedSampleCount >= 0) { "satisfiedSampleCount ≥ 0, got $satisfiedSampleCount" }
     }
@@ -73,6 +90,7 @@ class Cbls(
                 lastCost = state.cost
             } else if (state.step - lastImprovingStep >= stallSteps) {
                 bumpViolatedWeights(state, stallIncrement)
+                if (smoothProb > 0.0 && state.rng.nextDouble() < smoothProb) smoothAllWeights(state)
                 lastImprovingStep = state.step  // reset stall window after the bump
             }
             lastSeenStep = state.step
@@ -130,6 +148,18 @@ class Cbls(
         val w = state.factorWeights
         val violatedSnapshot = state.violated.toIntArray()
         for (fid in violatedSnapshot) w[fid] += increment
+    }
+
+    /** SAPS-style probabilistic smoothing (forgetting): pull every factor weight a fraction
+     *  [smoothFactor] of the way back toward [baseWeight]. [bumpViolatedWeights] only ever
+     *  grows weights, so without a counter-pressure the gradient ossifies on long runs;
+     *  smoothing lets weight on factors that are no longer hard decay back. Called with
+     *  probability [smoothProb] right after a stall bump. */
+    private fun smoothAllWeights(state: LocalSearchState) {
+        val w = state.factorWeights
+        val keep = 1.0 - smoothFactor
+        val pull = smoothFactor * baseWeight
+        for (i in w.indices) w[i] = keep * w[i] + pull
     }
 
     private fun sampleFromViolated(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {

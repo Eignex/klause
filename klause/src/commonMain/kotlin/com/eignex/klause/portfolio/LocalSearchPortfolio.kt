@@ -5,7 +5,6 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
-import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.solver.localsearch.LocalSearchSession
@@ -15,7 +14,6 @@ import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AdaptiveProbSat
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
-import com.eignex.klause.solver.localsearch.strategy.Ddfw
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.Strategy
@@ -69,11 +67,6 @@ data class LocalSearchWorkerConfig(
                     "walksat/luby",
                     WalkSat(noise = 0.5, tabu = TabuFilter(tenure = 5)),
                     LubyRestart(unit = 200),
-                ),
-                LocalSearchWorkerConfig(
-                    "ddfw/adaptive-perturb",
-                    Ddfw(),
-                    AdaptivePerturbationRestart(),
                 ),
                 LocalSearchWorkerConfig(
                     "probsat/ils-basin",

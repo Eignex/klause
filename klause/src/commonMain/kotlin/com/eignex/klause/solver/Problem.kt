@@ -132,29 +132,6 @@ class Problem(
         }
     }
 
-    /**
-     * For each factor, the ids of every other factor sharing at least one variable.
-     * Used by clause-weighting strategies (DDFW) to find candidate weight donors.
-     */
-    val factorNeighbors: Array<IntArray> = run {
-        val n = factors.size
-        val mark = BooleanArray(n)
-        val touched = com.eignex.klause.util.IntArrayList()
-        Array(n) { fid ->
-            val f = factors[fid]
-            for (v in f.boolVars) for (o in boolOccurrences[v]) {
-                if (o != fid && !mark[o]) { mark[o] = true; touched.add(o) }
-            }
-            for (v in f.intVars) for (o in intOccurrences[v]) {
-                if (o != fid && !mark[o]) { mark[o] = true; touched.add(o) }
-            }
-            val out = touched.toIntArray()
-            for (i in 0 until touched.size) mark[touched[i]] = false
-            touched.clear()
-            out
-        }
-    }
-
     val numFactors: Int get() = factors.size
 
     /**

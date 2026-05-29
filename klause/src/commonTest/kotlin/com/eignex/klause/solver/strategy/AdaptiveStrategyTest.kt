@@ -2,9 +2,8 @@ package com.eignex.klause.solver.strategy
 
 import com.eignex.klause.solver.localsearch.strategy.AdaptiveWalkSat
 import com.eignex.klause.solver.localsearch.strategy.AdaptiveProbSat
-import com.eignex.klause.solver.localsearch.strategy.AdaptiveDdfw
 import com.eignex.klause.solver.localsearch.strategy.NoiseController
-import com.eignex.klause.solver.localsearch.strategy.Saps
+import com.eignex.klause.solver.localsearch.strategy.Cbls
 
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -136,33 +135,16 @@ class AdaptiveStrategyTest {
     }
 
     @Test
-    fun `saps finds feasible samples`() {
+    fun `cbls with smoothing finds feasible samples`() {
         val schema = CardinalityS()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            strategy = Saps(),
+            strategy = Cbls(smoothProb = 0.4, smoothFactor = 0.8),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 19)).take(5).toList()
-        assertTrue(samples.isNotEmpty(), "Saps produced no samples")
-        for (s in samples) {
-            val count = listOf(schema.a, schema.b, schema.c, schema.d, schema.e).count { compiled.decode(it, s) }
-            assertTrue(count in 2..3, "count=$count violates 2..3")
-        }
-    }
-
-    @Test
-    fun `adaptive ddfw finds feasible samples`() {
-        val schema = CardinalityS()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem,
-            strategy = AdaptiveDdfw(baselineIncrement = 1.0, theta = 20),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
-        )
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(5).toList()
-        assertTrue(samples.isNotEmpty(), "AdaptiveDdfw produced no samples")
+        assertTrue(samples.isNotEmpty(), "Cbls with smoothing produced no samples")
         for (s in samples) {
             val count = listOf(schema.a, schema.b, schema.c, schema.d, schema.e).count { compiled.decode(it, s) }
             assertTrue(count in 2..3, "count=$count violates 2..3")

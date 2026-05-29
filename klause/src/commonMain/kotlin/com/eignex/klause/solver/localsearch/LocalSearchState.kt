@@ -102,7 +102,7 @@ class LocalSearchState(
      *  this array between picks.
      *
      *  Lazily allocated on first access. WalkSat / ProbSat / SimulatedAnnealing / CcaWalkSat
-     *  never touch it and so pay no allocation cost; only DDFW (and any future weight-using
+     *  never touch it and so pay no allocation cost; only CBLS (and any future weight-using
      *  strategy) triggers the `DoubleArray(numFactors)` allocation. [WarmState.captureFrom]
      *  probes [factorWeightsAllocated] before reading to avoid forcing the allocation just
      *  to capture all-1.0 defaults from sessions that ran a weight-blind strategy. */
@@ -432,7 +432,7 @@ class LocalSearchState(
                 sum
             }
             // Compound: approximate by summing per-part contributions against the current
-            // state. Same caveat as Ddfw.weightedBreakScore — biased when later parts
+            // state. Same caveat as the weighted-break score proxies — biased when later parts
             // re-satisfy factors broken by earlier parts. The exact path is
             // apply-evaluate-revert, which defeats the purpose of a probe-cost metric.
             is Move.Compound -> move.parts.sumOf { weightedNetDelta(it) }

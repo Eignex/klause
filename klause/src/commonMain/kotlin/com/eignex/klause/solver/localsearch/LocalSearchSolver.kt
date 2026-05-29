@@ -19,9 +19,9 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.propagation.PropagationResult
 
-import com.eignex.klause.solver.localsearch.strategy.AdaptiveDdfw
 import com.eignex.klause.solver.localsearch.strategy.AdaptiveProbSat
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
+import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import kotlin.random.Random
@@ -54,8 +54,8 @@ class LocalSearchSolver(
      *  reuses [strategy], preserving backward-compat — users who override [strategy] for
      *  optimization workloads get that same strategy in minimize without re-passing it.
      *  Override explicitly to decouple the satisfy-mode and minimize-mode strategies; the
-     *  common case is satisfy-mode AdaptiveProbSat + minimize-mode [AdaptiveDdfw] for
-     *  decomposed CP problems where DDFW's weight transfer reaches feasibility on
+     *  common case is satisfy-mode AdaptiveProbSat + minimize-mode [Cbls] for decomposed CP
+     *  problems, where CBLS's global weighted-violation gradient descends the objective on
      *  instances where probSAT alone plateaus. */
     val optimizeStrategy: Strategy? = null,
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
