@@ -114,7 +114,19 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
     // the params level the objective contribution is zero and the strategy never feels
     // pressure to descend. Linear shaping with λ=1.0 lets the constraint and objective
     // gradients meet at comparable magnitudes; tune in problem-specific harness if needed.
-    val cblsParams = params.copy(costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = 1.0))
+    // Honor -t for the LS backend by installing a deadline cancellation into the params.
+    // The native optimize (streaming branch-and-bound) path doesn't poll the wall clock
+    // itself, so without this it would run unbounded on instances it can't close; the LS
+    // engine checks `cancellation` inside its flip loop, so this stops both the satisfy
+    // fight and the objective descent mid-search at the budget.
+    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val cancellation = if (deadline != null)
+        com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
+    else com.eignex.klause.solver.Cancellation.Never
+    val cblsParams = params.copy(
+        costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = 1.0),
+        cancellation = cancellation,
+    )
     runGeneric(solver, cblsParams, program, opts)
 }
 
@@ -219,8 +231,12 @@ private fun <P : SolverParams> runOptimize(
             }
         }
     }
-    // Sequence ended without a terminal verdict: best-found stands, no optimality proven.
-    if (produced == 0) println("=====UNKNOWN=====") else println("==========")
+    // Sequence ended without an Optimal verdict: optimality was NOT proven (the LS backend
+    // never proves it; branch-and-bound only falls through here on budget/cancellation). The
+    // best-found incumbents have already been streamed, each terminated by `----------`; we
+    // must not print `==========`, which would falsely claim the last incumbent is optimal.
+    // Only signal UNKNOWN when nothing feasible was found at all.
+    if (produced == 0) println("=====UNKNOWN=====")
 }
 
 private fun <P : SolverParams> runOptimizeViaEnumerate(
