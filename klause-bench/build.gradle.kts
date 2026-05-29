@@ -202,44 +202,23 @@ tasks.register<JavaExec>("runLsBench") {
     dependsOn(":klause-fzn-cli:installDist")
 }
 
-/** CBLS optimize-parameter sweep. Runs the minimize path in-process over pre-compiled
- *  optimization `.fzn` instances under a wall-clock budget, comparing CBLS param variants
- *  (noise / stall schedule / smoothing / tabu) to tune the shipped defaults. See
- *  [com.eignex.klause.bench.parity.CblsSweepMain] for properties. */
-tasks.register<JavaExec>("runCblsSweep") {
+/** Solver-agnostic in-process sweep over an `.fzn` corpus. Optimization instances get an
+ *  objective + avg-rank comparison of the configured solvers; satisfaction instances get a
+ *  solve-rate / time comparison plus feature-based routing-rule regret. Built-in configs cover
+ *  local search and complete backtracking; see [com.eignex.klause.bench.parity.SolverSweepMain]. */
+tasks.register<JavaExec>("runSolverSweep") {
     group = "verification"
-    description = "CBLS optimize-parameter sweep (objective + avg rank)."
+    description = "Solver-agnostic sweep: per-config objective/solve-rate + routing-rule regret."
     notCompatibleWithConfigurationCache(
         "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
     )
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.parity.CblsSweepMain")
+    mainClass.set("com.eignex.klause.bench.parity.SolverSweepMain")
     val workspaceRoot = rootDir.absolutePath
     doFirst {
         for ((k, v) in System.getProperties()) {
             val key = k.toString()
-            if (key.startsWith("klause.cblssweep.")) systemProperty(key, v.toString())
-        }
-        systemProperty("klause.workspace.root", workspaceRoot)
-    }
-}
-
-/** SAT-strategy sweep: runs FocusedLs vs CBLS on satisfaction `.fzn` instances across seeds,
- *  extracts cheap features, and scores candidate routing rules by regret — used to decide the
- *  MiniZinc CLI's satisfy default. See [com.eignex.klause.bench.parity.SatSweepMain]. */
-tasks.register<JavaExec>("runSatSweep") {
-    group = "verification"
-    description = "SAT-strategy sweep: FocusedLs vs CBLS + routing-rule regret."
-    notCompatibleWithConfigurationCache(
-        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
-    )
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.parity.SatSweepMain")
-    val workspaceRoot = rootDir.absolutePath
-    doFirst {
-        for ((k, v) in System.getProperties()) {
-            val key = k.toString()
-            if (key.startsWith("klause.satsweep.")) systemProperty(key, v.toString())
+            if (key.startsWith("klause.solversweep.")) systemProperty(key, v.toString())
         }
         systemProperty("klause.workspace.root", workspaceRoot)
     }
