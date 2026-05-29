@@ -13,6 +13,7 @@ import com.eignex.klause.solver.localsearch.LubyRestart
 import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
+import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.Strategy
@@ -47,41 +48,67 @@ data class LocalSearchWorkerConfig(
     val label: String,
     val strategy: Strategy,
     val restartPolicy: RestartPolicy,
+    /** Minimize-phase strategy. `null` reuses [strategy]. Set to a [Cbls] instance to engage
+     *  the unified minimize path (CBLS drives both feasibility fight and objective descent);
+     *  required for a CBLS worker to actually use CBLS for the objective rather than the
+     *  built-in greedy descent. */
+    val optimizeStrategy: Strategy? = null,
 ) {
     companion object {
-        /** A diverse default palette of [count] worker configs, cycling through
-         *  adaptive-probSAT / WalkSAT / DDFW / SA strategies and FixedCadence / Luby /
-         *  ILS / AdaptivePerturbation restart policies. Each (strategy, restart) pair is
-         *  chosen for orthogonal exploration behaviour — the portfolio benefits from
-         *  diverse trajectories on the same problem. */
+        /** A diverse default palette of [count] worker configs. CBLS leads (the strongest
+         *  general strategy — constraint-violation gradient with int-aware moves and weight
+         *  learning, best on the CP shape MiniZinc produces), followed by orthogonal members
+         *  for coverage: adaptive probSAT for clausal SAT, WalkSAT+configuration-checking for
+         *  structured SAT, simulated annealing for rugged escape, and VND+ILS for coordinated
+         *  multi-variable moves. The first [count] entries are taken, so small portfolios get
+         *  the highest-value workers first. */
         fun diverse(count: Int): List<LocalSearchWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
+            val cblsTabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
             val palette = listOf(
+                // The constraint-based workhorse: strongest on CP-shaped satisfaction and
+                // optimization. optimizeStrategy set so minimize runs CBLS's unified path.
                 LocalSearchWorkerConfig(
-                    "adaptive-probsat/fixed",
-                    ProbSat.adaptive(tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)),
-                    FixedCadenceRestart(),
+                    "cbls/fixed",
+                    strategy = Cbls(tabu = cblsTabu),
+                    restartPolicy = FixedCadenceRestart(),
+                    optimizeStrategy = Cbls(tabu = cblsTabu),
                 ),
+                // CBLS with probabilistic smoothing (weight forgetting) + basin-hopping
+                // perturbation — diversifies the long-run weight trajectory on plateau-heavy
+                // landscapes where the bump-only schedule ossifies.
                 LocalSearchWorkerConfig(
-                    "walksat/luby",
-                    WalkSat(noise = 0.5, tabu = TabuFilter(tenure = 5)),
-                    LubyRestart(unit = 200),
-                ),
-                LocalSearchWorkerConfig(
-                    "probsat/ils-basin",
-                    ProbSat(cb = 2.5, tabu = TabuFilter(tenure = 8)),
-                    IteratedLocalSearchRestart(
+                    "cbls-smooth/ils-basin",
+                    strategy = Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu),
+                    restartPolicy = IteratedLocalSearchRestart(
                         populationSize = 3,
                         crossoverRate = 0.25,
                         perturbationKind = PerturbationKind.BasinHopping,
                         acceptance = AcceptanceCriterion.Improving,
                     ),
+                    optimizeStrategy = Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu),
                 ),
+                // Adaptive probSAT: SOTA for the pure-Boolean / clausal SAT shape.
+                LocalSearchWorkerConfig(
+                    "adaptive-probsat/fixed",
+                    ProbSat.adaptive(tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)),
+                    FixedCadenceRestart(),
+                ),
+                // WalkSAT + configuration checking: cycle-breaking for tightly-coupled
+                // (structured) constraint networks, paired with Luby restarts.
+                LocalSearchWorkerConfig(
+                    "walksat-cc/luby",
+                    WalkSat(configurationChecking = true, tabu = TabuFilter(tenure = 5)),
+                    LubyRestart(unit = 200),
+                ),
+                // Simulated annealing: temperature-driven drift through worse regions.
                 LocalSearchWorkerConfig(
                     "sa/fixed",
                     SimulatedAnnealing(),
                     FixedCadenceRestart(maxFlipsBeforeRestart = 50_000),
                 ),
+                // VND + linkage-aware ILS: coordinated multi-variable (compound) moves with
+                // restart-layer shaking — the "shake + descent" framework.
                 LocalSearchWorkerConfig(
                     "vnd/ils-linkage",
                     Vnd(maxNeighborhood = 3, skewAlpha = 0.2),
@@ -121,7 +148,12 @@ class LocalSearchPortfolio(
 
     /** Per-config [LocalSearchSession] for direct portfolio composition. */
     val workers: List<LocalSearchSession> = configs.map { cfg ->
-        LocalSearchSolver(problem, strategy = cfg.strategy, restartPolicy = cfg.restartPolicy).session()
+        LocalSearchSolver(
+            problem,
+            strategy = cfg.strategy,
+            optimizeStrategy = cfg.optimizeStrategy,
+            restartPolicy = cfg.restartPolicy,
+        ).session()
     }
 
     /** Try to update [sharedBest] with [sample]; returns true if accepted as the new
