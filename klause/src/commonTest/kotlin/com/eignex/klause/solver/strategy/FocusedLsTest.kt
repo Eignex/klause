@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.strategy
 
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
+import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -79,4 +80,12 @@ class FocusedLsTest {
     @Test
     fun `adaptive walksat selection solves small 3 sat`() =
         assertSolvesSat3("WalkSat.adaptive", WalkSat.adaptive(baselineNoise = 0.1, theta = 20), seed = 42L)
+
+    @Test
+    fun `simulated annealing selection solves small 3 sat`() =
+        assertSolvesSat3("SimulatedAnnealing", SimulatedAnnealing(), seed = 7L)
+
+    @Test
+    fun `simulated annealing with fast cooling solves small 3 sat`() =
+        assertSolvesSat3("SimulatedAnnealing(fast)", SimulatedAnnealing(coolingRate = 0.99), seed = 1L)
 }

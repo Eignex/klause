@@ -101,8 +101,8 @@ class LocalSearchState(
      *  toward repairing persistently-violated factors (e.g. DDFW, SAPS) read and mutate
      *  this array between picks.
      *
-     *  Lazily allocated on first access. WalkSat / ProbSat / SimulatedAnnealing
-     *  never touch it and so pay no allocation cost; only CBLS (and any future weight-using
+     *  Lazily allocated on first access. The FocusedLs family (WalkSat / ProbSat / SA)
+     *  never touches it and so pays no allocation cost; only CBLS (and any future weight-using
      *  strategy) triggers the `DoubleArray(numFactors)` allocation. [WarmState.captureFrom]
      *  probes [factorWeightsAllocated] before reading to avoid forcing the allocation just
      *  to capture all-1.0 defaults from sessions that ran a weight-blind strategy. */

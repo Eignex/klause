@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import kotlin.math.exp
 import kotlin.math.pow
 
 /**
@@ -15,6 +16,8 @@ import kotlin.math.pow
  *    else the minimum-break candidate.
  *  - [ProbSatWeighted] — probSAT (Balint & Schöning 2012): roulette-sample candidates by
  *    `(eps + break)^(-cb)`, a smooth bias toward low-break moves.
+ *  - [Annealing] — simulated annealing: accept a sampled candidate by the Metropolis
+ *    criterion under a cooling temperature, drifting through worse regions early on.
  *
  * Two orthogonal refinements apply to either policy:
  *  - **Adaptive parameter** — wrap the policy's scalar (`noise` / `cb`) in a [NoiseController]
@@ -114,6 +117,43 @@ class ProbSatWeighted(
 }
 
 /**
+ * Simulated-annealing selection: repeatedly sample a candidate and accept the first one whose
+ * shaped break score `delta` passes the Metropolis criterion — `delta ≤ 0` (improving, always
+ * accepted) or `rng < exp(-delta / T)` (worsening, accepted with temperature-dependent
+ * probability). The temperature cools by [coolingRate] on each accepted move, floored at
+ * [minTemperature]; high T early favours exploration, low T later favours exploitation. If no
+ * candidate passes after one pass, a random candidate is taken. Temperature is per-instance and
+ * cools monotonically (not re-heated on restart), matching the original strategy's behaviour.
+ */
+class Annealing(
+    val initialTemperature: Double = 1.0,
+    val coolingRate: Double = 0.999,
+    val minTemperature: Double = 0.001,
+) : MoveSelection {
+    private var temperature: Double = initialTemperature
+
+    override fun pick(state: LocalSearchState, moves: List<Move>): Move {
+        repeat(moves.size) {
+            val move = moves[state.rng.nextInt(moves.size)]
+            // Shaped break: under no shaping this is breakScore; under Linear shaping the
+            // objective delta tilts the Metropolis criterion so objective-improving moves are
+            // accepted unconditionally and mildly-worsening ones get more acceptance mass.
+            val delta = state.shapedBreakScore(move)
+            if (delta <= 0.0 || state.rng.nextDouble() < exp(-delta / temperature)) {
+                anneal()
+                return move
+            }
+        }
+        anneal()
+        return moves[state.rng.nextInt(moves.size)]
+    }
+
+    private fun anneal() {
+        temperature = (temperature * coolingRate).coerceAtLeast(minTemperature)
+    }
+}
+
+/**
  * WalkSAT factory (Selman 1994). `WalkSat(...)` builds a fixed-noise [FocusedLs];
  * [adaptive] builds the Hoos-2002 adaptive-noise variant. Configuration checking is opt-in
  * on both.
@@ -184,6 +224,24 @@ object ProbSat {
             eps = eps,
             controller = NoiseController(initial = 0.0, theta = theta, phi = phi, ewmaAlpha = ewmaAlpha),
         ),
+        tabu, configurationChecking,
+    )
+}
+
+/**
+ * Simulated-annealing factory. `SimulatedAnnealing(...)` builds a [FocusedLs] with the
+ * [Annealing] selection policy — Metropolis acceptance under a cooling temperature.
+ * Configuration checking is opt-in.
+ */
+object SimulatedAnnealing {
+    operator fun invoke(
+        initialTemperature: Double = 1.0,
+        coolingRate: Double = 0.999,
+        minTemperature: Double = 0.001,
+        tabu: TabuFilter = TabuFilter(tenure = 10),
+        configurationChecking: Boolean = false,
+    ): FocusedLs = FocusedLs(
+        Annealing(initialTemperature, coolingRate, minTemperature),
         tabu, configurationChecking,
     )
 }
