@@ -92,20 +92,30 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
 
 private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
     val params = LocalSearchParams(randomSeed = opts.randomSeed)
-    // CLI-side defaults for the LS backend: keep adaptive probSAT for satisfy-mode (best on
-    // pure-SAT shape) but switch to CBLS for minimize-mode (better on the
-    // decomposed CP shape that MiniZinc-Challenge instances produce — many small linear
-    // constraints with uneven difficulty). The library default leaves optimizeStrategy
-    // null for backward-compat with sessions that share weights across calls; the CLI is
-    // a one-shot per invocation so it picks the SOTA-for-CP default.
+    val tabu = com.eignex.klause.solver.localsearch.strategy.TabuFilter(
+        tenure = 10,
+        aspiration = com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImproving,
+    )
+    // CLI-side strategy selection by problem shape (the library default leaves these alone for
+    // backward-compat; the CLI is one-shot per invocation, so it picks the per-shape SOTA):
+    //
+    //  - satisfy, pure-Boolean (no integer vars) → adaptive probSAT: the SOTA pick for the
+    //    clausal/SAT shape it was designed for.
+    //  - satisfy, any integer structure (the MiniZinc-typical CP shape — int vars + global /
+    //    linear constraints) → CBLS. Measured: probSAT collapses on CP-shaped satisfaction
+    //    (e.g. quasigroup / all_different), where CBLS's constraint-violation gradient and
+    //    int-aware repair moves actually make progress.
+    //  - minimize / maximize → CBLS (unified): it drives both the feasibility fight and the
+    //    objective descent on the decomposed CP shape MiniZinc-Challenge instances produce.
+    val satisfyStrategy: com.eignex.klause.solver.localsearch.strategy.Strategy =
+        if (program.problem.numIntVars == 0)
+            com.eignex.klause.solver.localsearch.strategy.ProbSat.adaptive(tabu = tabu)
+        else
+            com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu)
     val solver = com.eignex.klause.solver.localsearch.LocalSearchSolver(
         program.problem,
-        optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.Cbls(
-            tabu = com.eignex.klause.solver.localsearch.strategy.TabuFilter(
-                tenure = 10,
-                aspiration = com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImproving,
-            ),
-        ),
+        strategy = satisfyStrategy,
+        optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
         pairSwapBudget = 1024,
     )
     // CBLS scores moves by `Σ weight·Δviolated + λ·Δobjective`. Without a non-zero λ at
