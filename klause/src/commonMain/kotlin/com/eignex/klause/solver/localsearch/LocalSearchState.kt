@@ -101,7 +101,7 @@ class LocalSearchState(
      *  toward repairing persistently-violated factors (e.g. DDFW, SAPS) read and mutate
      *  this array between picks.
      *
-     *  Lazily allocated on first access. WalkSat / ProbSat / SimulatedAnnealing / CcaWalkSat
+     *  Lazily allocated on first access. WalkSat / ProbSat / SimulatedAnnealing
      *  never touch it and so pay no allocation cost; only CBLS (and any future weight-using
      *  strategy) triggers the `DoubleArray(numFactors)` allocation. [WarmState.captureFrom]
      *  probes [factorWeightsAllocated] before reading to avoid forcing the allocation just
@@ -563,7 +563,7 @@ class LocalSearchState(
     }
 
     /** Greedy reservoir-sampled pick: the move with the smallest [shapedBreakScore]
-     *  (ties broken uniformly at random). Used by WalkSat / CcaWalkSat after candidate
+     *  (ties broken uniformly at random). Used by WalkSat / ProbSat after candidate
      *  filtering. Returns `null` on an empty input. */
     fun greedyPickByShapedBreak(moves: List<Move>): Move? {
         if (moves.isEmpty()) return null

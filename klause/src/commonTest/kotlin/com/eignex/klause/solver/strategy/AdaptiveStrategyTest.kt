@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.strategy
 
-import com.eignex.klause.solver.localsearch.strategy.AdaptiveWalkSat
 import com.eignex.klause.solver.localsearch.strategy.AdaptiveProbSat
 import com.eignex.klause.solver.localsearch.strategy.NoiseController
 import com.eignex.klause.solver.localsearch.strategy.Cbls
@@ -98,23 +97,6 @@ class AdaptiveStrategyTest {
         // Result always in (0, 1].
         val alpha = NoiseController.autoEwmaAlpha(numVars = 1_000_000, flipBudget = 1)
         assertTrue(alpha in 0.02..0.5, "alpha out of clip range: $alpha")
-    }
-
-    @Test
-    fun `adaptive walk sat finds feasible samples`() {
-        val schema = CardinalityS()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem,
-            strategy = AdaptiveWalkSat(baselineNoise = 0.1, theta = 20),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
-        )
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 42)).take(5).toList()
-        assertTrue(samples.isNotEmpty(), "AdaptiveWalkSat produced no samples")
-        for (s in samples) {
-            val count = listOf(schema.a, schema.b, schema.c, schema.d, schema.e).count { compiled.decode(it, s) }
-            assertTrue(count in 2..3, "count=$count violates 2..3")
-        }
     }
 
     @Test

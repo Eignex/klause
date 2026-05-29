@@ -20,7 +20,7 @@ class AdaptiveProbSat(
     tabu: TabuFilter = TabuFilter(tenure = 10),
     theta: Int = 50,
     phi: Double = 0.2,
-    /** Opt-in EWMA-mode for the internal [NoiseController]; see [AdaptiveWalkSat]'s
+    /** Opt-in EWMA-mode for the internal [NoiseController]; see [WalkSat.adaptive]'s
      *  matching parameter. */
     ewmaAlpha: Double? = null,
 ) : ProbSat(cb = baselineCb, eps = eps, tabu = tabu) {
