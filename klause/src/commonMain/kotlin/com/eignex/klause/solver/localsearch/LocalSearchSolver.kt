@@ -19,7 +19,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.propagation.PropagationResult
 
-import com.eignex.klause.solver.localsearch.strategy.AdaptiveProbSat
+import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.Strategy
@@ -47,14 +47,14 @@ class LocalSearchSolver(
     // the cb-tuning burden by widening the distribution during stalls and re-sharpening on
     // progress (Hoos 2002, Balint-Schöning 2012). Tabu aspiration admits individually
     // improving moves that would otherwise be blocked by the tenure window.
-    val strategy: Strategy = AdaptiveProbSat(
+    val strategy: Strategy = ProbSat.adaptive(
         tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
     ),
     /** Strategy used during the feasibility-fight phase of [minimize]. `null` (default)
      *  reuses [strategy], preserving backward-compat — users who override [strategy] for
      *  optimization workloads get that same strategy in minimize without re-passing it.
      *  Override explicitly to decouple the satisfy-mode and minimize-mode strategies; the
-     *  common case is satisfy-mode AdaptiveProbSat + minimize-mode [Cbls] for decomposed CP
+     *  common case is satisfy-mode [ProbSat.adaptive] + minimize-mode [Cbls] for decomposed CP
      *  problems, where CBLS's global weighted-violation gradient descends the objective on
      *  instances where probSAT alone plateaus. */
     val optimizeStrategy: Strategy? = null,

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.strategy
 
+import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
 
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -17,11 +18,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Tests for the unified [WalkSat] strategy and its two opt-in knobs: adaptive noise
- * ([WalkSat.adaptive]) and configuration checking ([WalkSat.configurationChecking], backed by
- * [LocalSearchState.boolConfChange] / [LocalSearchState.intConfChange]).
+ * Tests for the unified [com.eignex.klause.solver.localsearch.strategy.FocusedLs] family —
+ * both selection policies ([WalkSat] noise-greedy, [ProbSat] break-weighted), their adaptive
+ * variants, and the configuration-checking knob (backed by [LocalSearchState.boolConfChange] /
+ * [LocalSearchState.intConfChange]). Plain fixed-noise WalkSat solving is also covered by
+ * TabuFilterTest.
  */
-class WalkSatTest {
+class FocusedLsTest {
 
     // ---- Configuration-checking state mechanism ----
 
@@ -42,8 +45,7 @@ class WalkSatTest {
         assertTrue(state.boolConfChange.all { it }, "restart resets conf-change to true")
     }
 
-    // ---- Strategy modes: configuration-checking, adaptive ----
-    // (Plain fixed-noise WalkSat solving is already covered by TabuFilterTest.)
+    // ---- Selection policies × {fixed, adaptive} + configuration checking ----
 
     private val sat3 = listOf(
         Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
@@ -51,11 +53,11 @@ class WalkSatTest {
         Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
     )
 
-    private fun assertSolvesSat3(strategy: Strategy, seed: Long) {
+    private fun assertSolvesSat3(label: String, strategy: Strategy, seed: Long) {
         val problem = Problem(3, 0, emptyArray(), sat3)
         val solver = LocalSearchSolver(problem, strategy = strategy)
         val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = seed)).assignment
-        assertNotNull(sample, "${strategy::class.simpleName} should find a satisfying assignment within budget")
+        assertNotNull(sample, "$label should find a satisfying assignment within budget")
         for (clause in sat3) {
             val sat = clause.literals.any { lit -> Lit.evaluate(lit, sample.bools[Lit.variable(lit)]) }
             assertEquals(true, sat)
@@ -63,10 +65,18 @@ class WalkSatTest {
     }
 
     @Test
-    fun `walk sat with configuration checking solves small 3 sat`() =
-        assertSolvesSat3(WalkSat(configurationChecking = true), seed = 7L)
+    fun `probsat selection solves small 3 sat`() =
+        assertSolvesSat3("ProbSat", ProbSat(), seed = 23L)
 
     @Test
-    fun `adaptive walk sat solves small 3 sat`() =
-        assertSolvesSat3(WalkSat.adaptive(baselineNoise = 0.1, theta = 20), seed = 42L)
+    fun `adaptive probsat selection solves small 3 sat`() =
+        assertSolvesSat3("ProbSat.adaptive", ProbSat.adaptive(baselineCb = 2.06, theta = 20), seed = 7L)
+
+    @Test
+    fun `walksat with configuration checking solves small 3 sat`() =
+        assertSolvesSat3("WalkSat(cc)", WalkSat(configurationChecking = true), seed = 7L)
+
+    @Test
+    fun `adaptive walksat selection solves small 3 sat`() =
+        assertSolvesSat3("WalkSat.adaptive", WalkSat.adaptive(baselineNoise = 0.1, theta = 20), seed = 42L)
 }

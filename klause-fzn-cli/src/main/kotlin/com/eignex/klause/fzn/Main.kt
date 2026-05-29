@@ -92,7 +92,7 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
 
 private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
     val params = LocalSearchParams(randomSeed = opts.randomSeed)
-    // CLI-side defaults for the LS backend: keep AdaptiveProbSat for satisfy-mode (best on
+    // CLI-side defaults for the LS backend: keep adaptive probSAT for satisfy-mode (best on
     // pure-SAT shape) but switch to CBLS for minimize-mode (better on the
     // decomposed CP shape that MiniZinc-Challenge instances produce — many small linear
     // constraints with uneven difficulty). The library default leaves optimizeStrategy

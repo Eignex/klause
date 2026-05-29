@@ -12,7 +12,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LubyRestart
 import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
-import com.eignex.klause.solver.localsearch.strategy.AdaptiveProbSat
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
@@ -60,7 +59,7 @@ data class LocalSearchWorkerConfig(
             val palette = listOf(
                 LocalSearchWorkerConfig(
                     "adaptive-probsat/fixed",
-                    AdaptiveProbSat(tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)),
+                    ProbSat.adaptive(tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)),
                     FixedCadenceRestart(),
                 ),
                 LocalSearchWorkerConfig(
