@@ -202,6 +202,49 @@ tasks.register<JavaExec>("runLsBench") {
     dependsOn(":klause-fzn-cli:installDist")
 }
 
+/** CBLS optimize-parameter sweep. Runs the minimize path in-process over pre-compiled
+ *  optimization `.fzn` instances under a wall-clock budget, comparing CBLS param variants
+ *  (noise / stall schedule / smoothing / tabu) to tune the shipped defaults. See
+ *  [com.eignex.klause.bench.parity.CblsSweepMain] for properties. */
+tasks.register<JavaExec>("runCblsSweep") {
+    group = "verification"
+    description = "CBLS optimize-parameter sweep (objective + avg rank)."
+    notCompatibleWithConfigurationCache(
+        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
+    )
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.CblsSweepMain")
+    val workspaceRoot = rootDir.absolutePath
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.cblssweep.")) systemProperty(key, v.toString())
+        }
+        systemProperty("klause.workspace.root", workspaceRoot)
+    }
+}
+
+/** SAT-strategy sweep: runs FocusedLs vs CBLS on satisfaction `.fzn` instances across seeds,
+ *  extracts cheap features, and scores candidate routing rules by regret — used to decide the
+ *  MiniZinc CLI's satisfy default. See [com.eignex.klause.bench.parity.SatSweepMain]. */
+tasks.register<JavaExec>("runSatSweep") {
+    group = "verification"
+    description = "SAT-strategy sweep: FocusedLs vs CBLS + routing-rule regret."
+    notCompatibleWithConfigurationCache(
+        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
+    )
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.SatSweepMain")
+    val workspaceRoot = rootDir.absolutePath
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.satsweep.")) systemProperty(key, v.toString())
+        }
+        systemProperty("klause.workspace.root", workspaceRoot)
+    }
+}
+
 /** Compile-only audit across the corpus. Per instance: MiniZinc → FZN, parse constraint
  *  kinds, optional klause-fzn-cli ingest smoke. Useful for spotting MiniZinc-side
  *  decomposition and per-family compile breakage without running any solve. See
