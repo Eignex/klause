@@ -19,8 +19,9 @@ import kotlin.math.sqrt
  */
 sealed interface CostShaping {
 
-    /** Shaped scalar; lower is better. */
-    fun shape(violationCount: Int, objective: Double): Double
+    /** Shaped scalar; lower is better. [violationCount] is the graded total violation
+     *  (`LocalSearchState.cost`, a sum of per-factor degrees). */
+    fun shape(violationCount: Long, objective: Double): Double
 
     /** True iff descent should reject moves with `violationCount > 0`. Used to short-circuit
      *  to the greedy-objective code path for [FeasibilityFirst]. */
@@ -28,8 +29,8 @@ sealed interface CostShaping {
 
     /** Two-phase: only optimise the objective once feasibility is reached. */
     data object FeasibilityFirst : CostShaping {
-        override fun shape(violationCount: Int, objective: Double): Double =
-            if (violationCount == 0) objective else Double.POSITIVE_INFINITY
+        override fun shape(violationCount: Long, objective: Double): Double =
+            if (violationCount == 0L) objective else Double.POSITIVE_INFINITY
         override val feasibilityGated: Boolean = true
     }
 
@@ -39,7 +40,7 @@ sealed interface CostShaping {
         val violationPenalty: ViolationPenalty = ViolationPenalty.Identity,
     ) : CostShaping {
         init { require(lambda >= 0) { "lambda must be non-negative, got $lambda" } }
-        override fun shape(violationCount: Int, objective: Double): Double =
+        override fun shape(violationCount: Long, objective: Double): Double =
             violationPenalty.of(violationCount) + lambda * objective
         override val feasibilityGated: Boolean = false
     }
@@ -61,18 +62,18 @@ sealed interface CostShaping {
 }
 
 sealed interface ViolationPenalty {
-    fun of(violationCount: Int): Double
+    fun of(violationCount: Long): Double
 
     data object Identity : ViolationPenalty {
-        override fun of(violationCount: Int): Double = violationCount.toDouble()
+        override fun of(violationCount: Long): Double = violationCount.toDouble()
     }
 
     data class Saturating(val cap: Double) : ViolationPenalty {
         init { require(cap >= 0) { "cap must be non-negative, got $cap" } }
-        override fun of(violationCount: Int): Double = min(violationCount.toDouble(), cap)
+        override fun of(violationCount: Long): Double = min(violationCount.toDouble(), cap)
     }
 
     data object SquareRoot : ViolationPenalty {
-        override fun of(violationCount: Int): Double = sqrt(violationCount.toDouble())
+        override fun of(violationCount: Long): Double = sqrt(violationCount.toDouble())
     }
 }

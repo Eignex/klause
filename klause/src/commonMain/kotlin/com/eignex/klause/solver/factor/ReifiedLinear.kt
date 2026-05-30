@@ -41,11 +41,37 @@ class ReifiedLinear(
         return aux != holds
     }
 
+    /** Graded violation. When the indicator demands the linear hold (`aux = true`) but it
+     *  doesn't, the degree is the *linear residual* — how far the sum is from satisfying the
+     *  comparison — giving CBLS a gradient on the sum's variables (this is what makes the
+     *  element decomposition's `idxMatch → bodyHolds` channels navigable). When `aux = false`
+     *  but the linear holds, the natural one-step repair is to flip the indicator, so the
+     *  degree is 1 (pushing the sum out of the satisfied region is rarely the right move). */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        degreeFor(state.intPayload[factorId], state.assignment.boolValue(auxBoolVar))
+
+    private fun degreeFor(sum: Int, aux: Boolean): Int {
+        val h = holds(sum)
+        return when {
+            aux == h -> 0
+            aux -> residual(sum)  // indicator wants it to hold; grade by how far off
+            else -> 1             // indicator wants it false but it holds; flip the aux
+        }
+    }
+
+    /** Distance the sum must move to satisfy the comparison, given it currently does not —
+     *  run through [compressViolation] so far-off reified linears don't dominate the cost. */
+    private fun residual(sum: Int): Int = when (op) {
+        LinearOp.LE -> compressViolation(sum.toLong() - bound)       // sum > bound
+        LinearOp.GE -> compressViolation(bound.toLong() - sum)       // sum < bound
+        LinearOp.EQ -> { val d = sum.toLong() - bound; compressViolation(if (d < 0) -d else d) }
+        LinearOp.NE -> 1                                             // sum == bound; one step off
+    }
+
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        val sum = state.intPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
-        val holds = holds(state.intPayload[factorId])
-        val wasViolated = aux != holds
-        return if (wasViolated) -1 else +1
+        return degreeFor(sum, !aux) - degreeFor(sum, aux)
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
@@ -53,16 +79,14 @@ class ReifiedLinear(
         val sum = state.intPayload[factorId]
         val coeff = coeffOf(intVar)
         val newSum = sum + coeff * (newValue - state.assignment.intValue(intVar))
-        val wasViolated = aux != holds(sum)
-        val willViolate = aux != holds(newSum)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return degreeFor(newSum, aux) - degreeFor(sum, aux)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        // aux already flipped in the assignment; report Δdegree (cost is reconciled by the engine).
+        val sum = state.intPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
-        val holds = holds(state.intPayload[factorId])
-        val nowViolated = aux != holds
-        return if (nowViolated) +1 else -1
+        return degreeFor(sum, aux) - degreeFor(sum, !aux)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -71,9 +95,7 @@ class ReifiedLinear(
         val oldSum = state.intPayload[factorId]
         val newSum = oldSum + coeff * (state.assignment.intValue(intVar) - oldValue)
         state.intPayload[factorId] = newSum
-        val wasViolated = aux != holds(oldSum)
-        val nowViolated = aux != holds(newSum)
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        return degreeFor(newSum, aux) - degreeFor(oldSum, aux)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {

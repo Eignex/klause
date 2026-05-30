@@ -224,7 +224,7 @@ class LocalSearchSolver(
                     if (params.cancellation()) return@sequence
                     cancelCountdown = CANCEL_CHECK_INTERVAL
                 }
-                if (state.cost == 0) {
+                if (state.cost == 0L) {
                     val snap = state.assignment.snapshot()
                     // Sync warm state on every yield so streaming consumers (which
                     // typically take just one or a few samples and never drain the
@@ -320,7 +320,7 @@ class LocalSearchSolver(
                 if (params.cancellation()) { cancelled = true; break }
                 cancelCountdown = CANCEL_CHECK_INTERVAL
             }
-            if (state.cost == 0) {
+            if (state.cost == 0L) {
                 // Score the current feasible assignment, record if best.
                 val snap = state.assignment.snapshot()
                 val obj = objective.evaluate(snap)
@@ -360,7 +360,7 @@ class LocalSearchSolver(
                         val savedSnap = state.assignment.snapshot()
                         val baseObj = objective.evaluate(savedSnap)
                         state.apply(m)
-                        if (state.cost == 0 && objective.evaluate(state.assignment.snapshot()) < baseObj) {
+                        if (state.cost == 0L && objective.evaluate(state.assignment.snapshot()) < baseObj) {
                             flipsSinceRestart++
                             totalFlips++
                             continue
@@ -436,7 +436,7 @@ class LocalSearchSolver(
         for (b in 0 until problem.numBoolVars) {
             if (state.assumptions.isFrozenBool(b)) continue
             state.apply(Move.BoolFlip(b))
-            if (state.cost == 0) {
+            if (state.cost == 0L) {
                 val obj = objective.evaluate(state.assignment.snapshot())
                 val delta = obj - baselineObj
                 if (delta < bestDelta) {
@@ -454,7 +454,7 @@ class LocalSearchSolver(
             for (target in intArrayOf(cur - 1, cur + 1)) {
                 if (target !in d) continue  // sparse-aware: rejects holes
                 state.apply(Move.IntSet(i, target))
-                if (state.cost == 0) {
+                if (state.cost == 0L) {
                     val obj = objective.evaluate(state.assignment.snapshot())
                     val delta = obj - baselineObj
                     if (delta < bestDelta) {
@@ -620,7 +620,7 @@ class LocalSearchSolver(
         var bestMove: Move? = null
         for (move in proposed) {
             state.apply(move)
-            if (state.cost == 0) {
+            if (state.cost == 0L) {
                 val obj = objective.evaluate(state.assignment.snapshot())
                 val delta = obj - baselineObj
                 if (delta < bestDelta) { bestDelta = delta; bestMove = move }
@@ -682,7 +682,7 @@ class LocalSearchSolver(
                 if (va == vb) continue
                 state.apply(Move.BoolFlip(a))
                 state.apply(Move.BoolFlip(b))
-                if (state.cost == 0) {
+                if (state.cost == 0L) {
                     val obj = objective.evaluate(state.assignment.snapshot())
                     if (obj < baselineObj) return true
                 }
@@ -708,7 +708,7 @@ class LocalSearchSolver(
                 if (vb !in problem.intDomains[a] || va !in problem.intDomains[b]) continue
                 state.apply(Move.IntSet(a, vb))
                 state.apply(Move.IntSet(b, va))
-                if (state.cost == 0) {
+                if (state.cost == 0L) {
                     val obj = objective.evaluate(state.assignment.snapshot())
                     if (obj < baselineObj) return true
                 }

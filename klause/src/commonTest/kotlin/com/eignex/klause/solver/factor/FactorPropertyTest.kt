@@ -321,11 +321,14 @@ class FactorPropertyTest {
                 is Move.IntSet -> factor.deltaIfIntSet(state, 0, move.varId, move.newValue)
                 is Move.Compound -> error("pickRandomMove never returns Compound")
             }
-            val violatedBefore = factor.isViolated(state, 0)
+            val degreeBefore = factor.violationDegree(state, 0)
             val costBefore = state.cost
             state.apply(move)
             val violatedAfter = factor.isViolated(state, 0)
-            val observedDelta = (if (violatedAfter) 1 else 0) - (if (violatedBefore) 1 else 0)
+            // Graded contract: deltaIf* predicts the change in violationDegree (which equals
+            // the binary isViolated change for binary factors and the magnitude change for
+            // graded ones like Linear).
+            val observedDelta = factor.violationDegree(state, 0) - degreeBefore
             assertEquals(predicted, observedDelta,
                 "${factor::class.simpleName}: predicted Δ != observed Δ on iter=$i move=$move")
             assertEquals(costBefore + predicted, state.cost,

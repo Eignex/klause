@@ -24,10 +24,10 @@ class OccurrenceDedupTest {
 
         val state = LocalSearchState(problem, Random(7))
         state.recompute()
-        val brute = if (factor.isViolated(state, 0)) 1 else 0
+        val brute = if (factor.isViolated(state, 0)) 1L else 0L
         assertEquals(brute, state.cost)
         state.apply(com.eignex.klause.solver.Move.BoolFlip(a))
-        val brute2 = if (factor.isViolated(state, 0)) 1 else 0
+        val brute2 = if (factor.isViolated(state, 0)) 1L else 0L
         assertEquals(brute2, state.cost, "cost drifted from brute-force after flipping a")
     }
 

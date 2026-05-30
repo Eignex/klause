@@ -66,7 +66,7 @@ class AllFactorsOracleTest {
             vars = intArrayOf(0, 1),
             op = LinearOp.LE, bound = 2,
         )
-        check(f, numBoolVars = 1, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)))
+        check(f, numBoolVars = 1, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
     }
 
     @Test fun reifiedPseudoBoolean() {
@@ -100,22 +100,22 @@ class AllFactorsOracleTest {
 
     @Test fun linearLe() {
         val f = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)))
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
     }
 
     @Test fun linearEq() {
         val f = Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 3)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
     }
 
     @Test fun linearGe() {
         val f = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)))
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
     }
 
     @Test fun linearNe() {
         val f = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, 2)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)))
+        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
     }
 
     @Test fun product() {
@@ -126,13 +126,17 @@ class AllFactorsOracleTest {
     // ---- Counting / occurrence ---------------------------------------------------
 
     @Test fun count() {
-        val f = Count(xs = intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = 2)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+        // n (the count var) is a *separate* var (3), not aliased with a counted xs element.
+        val f = Count(xs = intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = 3)
+        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
+              exactProbe = true)
     }
 
     @Test fun among() {
-        val f = Among(n = 1, xs = intArrayOf(0, 1, 2), values = intArrayOf(1, 2))
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+        // n (the count var) is a *separate* var (3), not aliased with a counted xs element.
+        val f = Among(n = 3, xs = intArrayOf(0, 1, 2), values = intArrayOf(1, 2))
+        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
+              exactProbe = true)
     }
 
     @Test fun nValue() {
@@ -369,11 +373,17 @@ class AllFactorsOracleTest {
 
     // ---- Helpers ----------------------------------------------------------------
 
+    /**
+     * @param exactProbe set true for factors migrated to graded violation — asserts their
+     *   `deltaIf*` probe exactly predicts the cost change (accurate CBLS gradient). Left false
+     *   for factors with approximate-by-design probes (cost-tracking is still verified).
+     */
     private fun check(
         factor: Factor,
         numBoolVars: Int = 0,
         intDomains: Array<IntDomain> = emptyArray(),
         label: String? = null,
+        exactProbe: Boolean = false,
     ) {
         val name = label ?: factor::class.simpleName ?: "factor"
         val problem = Problem(
@@ -384,5 +394,6 @@ class AllFactorsOracleTest {
         )
         FactorPropagationOracle.assertSound(problem, name)
         MoveSetOracle.assertRepairsCoverImproving(problem, name, iters = 40, requireImprovement = false)
+        DegreeConsistencyOracle.assertConsistent(problem, name, exactProbe = exactProbe)
     }
 }

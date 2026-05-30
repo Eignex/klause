@@ -107,8 +107,10 @@ class IntFactorTest {
         state.recompute()
         assertTrue(factor.isViolated(state, 0))
 
+        // Graded: GE residual drops from (5-2)=3 to 0, so the degree delta is -3 (not the
+        // old binary -1). This is the gradient CBLS descends on.
         val delta = factor.deltaIfIntSet(state, 0, 0, 5)
-        assertEquals(-1, delta)
+        assertEquals(-3, delta)
     }
 
     @Test

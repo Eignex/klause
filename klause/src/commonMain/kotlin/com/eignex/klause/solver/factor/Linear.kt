@@ -43,12 +43,20 @@ class Linear(
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         violates(state.intPayload[factorId])
 
+    /** Graded violation: the residual amount by which the sum misses [bound] — `|sum-bound|`
+     *  for EQ, `max(0, sum-bound)` for LE, `max(0, bound-sum)` for GE. NE has no natural
+     *  magnitude, so it stays binary (1 when `sum == bound`). This is the descent gradient
+     *  CBLS needs on tight arithmetic: a move shrinking the residual scores a real improvement
+     *  even when it doesn't flip the satisfied/violated status. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        degree(state.intPayload[factorId])
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val coeff = coeffOf(intVar)
         val old = state.assignment.intValue(intVar)
         val sum = state.intPayload[factorId]
         val newSum = sum + coeff * (newValue - old)
-        return (if (violates(newSum)) 1 else 0) - (if (violates(sum)) 1 else 0)
+        return degree(newSum) - degree(sum)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -57,7 +65,7 @@ class Linear(
         val oldSum = state.intPayload[factorId]
         val newSum = oldSum + coeff * (cur - oldValue)
         state.intPayload[factorId] = newSum
-        return (if (violates(newSum)) 1 else 0) - (if (violates(oldSum)) 1 else 0)
+        return degree(newSum) - degree(oldSum)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
@@ -207,6 +215,16 @@ class Linear(
         LinearOp.EQ -> sum != bound
         LinearOp.GE -> sum < bound
         LinearOp.NE -> sum == bound
+    }
+
+    /** Graded violation magnitude (0 when satisfied). The raw residual is run through
+     *  [compressViolation] so a large coeff·domain residual neither overflows nor dominates
+     *  the global cost — exact near feasibility, log-compressed far from it. */
+    private fun degree(sum: Int): Int = when (op) {
+        LinearOp.LE -> compressViolation(sum.toLong() - bound)
+        LinearOp.GE -> compressViolation(bound.toLong() - sum)
+        LinearOp.EQ -> { val d = sum.toLong() - bound; compressViolation(if (d < 0) -d else d) }
+        LinearOp.NE -> if (sum == bound) 1 else 0
     }
 
     private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)

@@ -50,7 +50,7 @@ class AdaptiveStrategyTest {
         // Improvement-only trajectory: feed strictly decreasing costs so every observation decays.
         // Subsequent equal-cost observations would re-stall; the bound check is on a single decay.
         val before = controller.level
-        for (cost in 99 downTo 80) controller.observe(cost)
+        for (cost in 99 downTo 80) controller.observe(cost.toLong())
         assertTrue(controller.level < before, "level did not decay on strict improvements: $before -> ${controller.level}")
         assertTrue(controller.level >= 0.5, "level escaped minLevel: ${controller.level}")
     }
@@ -62,7 +62,7 @@ class AdaptiveStrategyTest {
         // the level near baseline.
         val controller = NoiseController(initial = 0.2, theta = 5, phi = 0.2, ewmaAlpha = 0.2)
         // Start at cost=20 and walk down 1 per step.
-        for (cost in 20 downTo 5) controller.observe(cost)
+        for (cost in 20 downTo 5) controller.observe(cost.toLong())
         // After a clear downward trend the level should not have grown past the initial
         // value (cost stays below EWMA → "improving" most of the time).
         assertTrue(controller.level <= 0.3,

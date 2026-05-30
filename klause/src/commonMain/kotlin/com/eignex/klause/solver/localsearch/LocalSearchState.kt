@@ -24,6 +24,14 @@ class LocalSearchState(
         numIntVars = problem.numIntVars,
     )
     val violated: IntSwapSet = IntSwapSet(problem.numFactors)
+
+    /** Per-factor graded violation degree (0 = satisfied), the source of truth for both
+     *  [violated]-set membership (`degree > 0`) and [cost] (`Σ factorDegree`). Maintained
+     *  incrementally from each factor's `deltaIf*`/`apply*` return value (Δdegree) and
+     *  recomputed from [LocalSearchFactor.violationDegree] at [recompute]. Lets [cost] be a
+     *  graded sum-of-degrees rather than a flat count of violated factors, giving CBLS a
+     *  descent gradient on tight arithmetic/global constraints. */
+    val factorDegree: IntArray = IntArray(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
     val moveSink: MoveSink = MoveSink(assumptions)
@@ -72,7 +80,10 @@ class LocalSearchState(
     internal val boolBreakCount: IntArray = IntArray(problem.numBoolVars)
     internal val boolMakeCount: IntArray = IntArray(problem.numBoolVars)
 
-    var cost: Int = 0
+    /** Aggregated hard cost = `Σ factorDegree`, the graded total violation. `Long` because a
+     *  single tight arithmetic factor can carry a residual near [Int.MAX_VALUE] and the sum
+     *  across a large factor set would otherwise overflow. `cost == 0L` iff feasible. */
+    var cost: Long = 0L
         internal set
 
     /** Lowest [cost] observed since this state was constructed. Updated at the end of
@@ -80,7 +91,7 @@ class LocalSearchState(
      *  drives aspiration decisions even when individual restart epochs go uphill. Used
      *  by [com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImprovesBestEver]
      *  to admit tabu moves that would beat the historical low. */
-    var bestCostSeen: Int = Int.MAX_VALUE
+    var bestCostSeen: Long = Long.MAX_VALUE
         internal set
 
     /** Objective injected by the engine during a `minimize` call. `null` outside
@@ -96,8 +107,8 @@ class LocalSearchState(
     var shapingLambda: Double = 0.0
         internal set
 
-    /** Per-factor weight, default 1.0. Not read by the engine itself — every violation
-     *  contributes +1/-1 to [cost] regardless. Strategies that want to bias the search
+    /** Per-factor weight, default 1.0. Not read by the engine itself — every factor
+     *  contributes its [factorDegree] to [cost] regardless. Strategies that want to bias the search
      *  toward repairing persistently-violated factors (e.g. DDFW, SAPS) read and mutate
      *  this array between picks.
      *
@@ -154,13 +165,15 @@ class LocalSearchState(
 
     fun recompute() {
         for (i in 0 until problem.numFactors) violated.remove(i)
-        cost = 0
+        cost = 0L
         for (v in boolBreakCount.indices) { boolBreakCount[v] = 0; boolMakeCount[v] = 0 }
         factors.forEachIndexed { id, factor ->
             factor.initialize(this, id)
-            if (factor.isViolated(this, id)) {
+            val deg = factor.violationDegree(this, id)
+            factorDegree[id] = deg
+            if (deg > 0) {
                 violated.add(id)
-                cost++
+                cost += deg
             }
         }
         // Initialize break/make vectors from factor deltas. After initialize() each factor's
@@ -390,14 +403,14 @@ class LocalSearchState(
         pinned += u
     }
 
-    fun netDelta(move: Move): Int = when (move) {
+    fun netDelta(move: Move): Long = when (move) {
         is Move.BoolFlip -> {
-            var sum = 0
+            var sum = 0L
             forEachBoolFactorDelta(move.varId) { _, d -> sum += d }
             sum
         }
         is Move.IntSet -> {
-            var sum = 0
+            var sum = 0L
             forEachIntFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
             sum
         }
@@ -455,8 +468,11 @@ class LocalSearchState(
         // Phase 2: commit the flip and let each factor update its own payload.
         assignment.flipBool(boolVar)
         for (factorId in touchedFactors) {
-            val factor = factors[factorId]
-            updateViolation(factorId, factor.applyBoolFlip(this, factorId, boolVar))
+            // applyBoolFlip maintains the factor's payload; we re-read violationDegree from
+            // that payload for the exact cost delta rather than trusting the (sometimes
+            // approximate) returned status delta.
+            factors[factorId].applyBoolFlip(this, factorId, boolVar)
+            updateViolation(factorId)
         }
         // Phase 3: brute-force factors — add post-flip contributions.
         // Incremental factors apply their O(1) / O(arity) update.
@@ -498,8 +514,10 @@ class LocalSearchState(
         }
         assignment.setInt(intVar, newValue)
         for (factorId in touchedFactors) {
-            val factor = factors[factorId]
-            updateViolation(factorId, factor.applyIntSet(this, factorId, intVar, old))
+            // See applyBoolFlip: re-read violationDegree from the maintained payload for the
+            // exact graded cost delta instead of the returned status delta.
+            factors[factorId].applyIntSet(this, factorId, intVar, old)
+            updateViolation(factorId)
         }
         for (factorId in touchedFactors) {
             val f = factors[factorId]
@@ -626,7 +644,7 @@ class LocalSearchState(
         var breakCount = 0
         val newViolated = violated.toIntArray()
         for (fid in newViolated) if (fid !in oldViolatedIds) breakCount++
-        val netDelta = cost - oldCost
+        val netDelta: Long = cost - oldCost
 
         for (i in inverses.indices.reversed()) apply(inverses[i])
 
@@ -652,18 +670,19 @@ class LocalSearchState(
         is Move.Compound -> error("Compound parts are primitive by construction")
     }
 
-    private data class CompoundEval(val breakScore: Int, val netDelta: Int)
+    private data class CompoundEval(val breakScore: Int, val netDelta: Long)
 
-    private fun updateViolation(factorId: Int, deltaViolated: Int) {
-        when (deltaViolated) {
-            +1 -> {
-                violated.add(factorId)
-                cost++
-            }
-            -1 -> {
-                violated.remove(factorId)
-                cost--
-            }
-        }
+    /** Re-read the factor's [LocalSearchFactor.violationDegree] from its just-updated payload
+     *  and reconcile the maintained [factorDegree], [cost] (`Σ degree`), and [violated]-set
+     *  membership (`degree > 0`). Called after the factor's `apply*` has refreshed its payload.
+     *  Using the recomputed degree (rather than `apply*`'s returned delta) makes cost tracking
+     *  exact for every factor, including globals whose returned status delta is approximate. */
+    private fun updateViolation(factorId: Int) {
+        val newDegree = factors[factorId].violationDegree(this, factorId)
+        val delta = newDegree - factorDegree[factorId]
+        if (delta == 0) return
+        factorDegree[factorId] = newDegree
+        cost += delta
+        if (newDegree > 0) violated.add(factorId) else violated.remove(factorId)
     }
 }

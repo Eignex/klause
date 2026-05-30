@@ -149,7 +149,7 @@ class BruteForceSolver(override val problem: Problem) :
             return sequence {
                 if (!budget.consume()) return@sequence
                 state.recompute()
-                if (state.cost == 0) yield(state.assignment.snapshot())
+                if (state.cost == 0L) yield(state.assignment.snapshot())
             }
         }
         // Use a different sub-seed per chunk so two chunks with the same size don't walk
@@ -180,7 +180,7 @@ class BruteForceSolver(override val problem: Problem) :
         if (depth == perms.size) {
             if (!budget.consume()) return@sequence
             state.recompute()
-            if (state.cost == 0) yield(state.assignment.snapshot())
+            if (state.cost == 0L) yield(state.assignment.snapshot())
             return@sequence
         }
         for (idx in perms[depth]) {

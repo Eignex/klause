@@ -19,9 +19,34 @@ interface LocalSearchFactor : Factor {
     fun isViolated(state: LocalSearchState, factorId: Int): Boolean
 
     /**
-     * Δ in this factor's violation status if the given move were applied, computed without
-     * mutating state. +1 means a satisfied factor would become violated, -1 the opposite.
-     * Default returns 0; factors override the methods relevant to the move kinds they handle.
+     * **Graded violation degree**: `0` when satisfied, a positive magnitude that grows with
+     * "how far" the constraint is from being satisfied. The LS hard cost is
+     * `Σ violationDegree` over all factors — *not* a count of violated factors — so CBLS
+     * sees a descent gradient on tight arithmetic and global constraints (a move that shrinks
+     * an `int_lin_eq` residual from 1000 → 1 scores a real improvement instead of 0).
+     *
+     * The default delegates to the binary [isViolated] (degree `1` when violated, else `0`),
+     * which is the *correct* degree for inherently-binary factors — a violated clause, a
+     * single comparator, a table membership all genuinely have degree 1. Gradable factors
+     * (linear, count/cardinality, packing, scheduling, all-different, …) override this with
+     * a real magnitude.
+     *
+     * **Contract (must hold for cost/gradient consistency):** for every move kind,
+     * `deltaIf*` and `apply*` must return exactly `violationDegree(after) - violationDegree(before)`.
+     * The engine maintains `cost` and the per-factor degree incrementally from those deltas
+     * and only calls [violationDegree] at [LocalSearchState.recompute]; a delta that disagrees
+     * with this method silently desyncs the cost. Degrees should be clamped to a sane range
+     * to avoid `Int` overflow when summed across the factor set.
+     */
+    fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        if (isViolated(state, factorId)) 1 else 0
+
+    /**
+     * Δ in this factor's [violationDegree] if the given move were applied, computed without
+     * mutating state. For a binary factor this is `+1` (satisfied → violated), `-1` (the
+     * opposite), or `0`; for a graded factor it is the signed change in magnitude (any
+     * integer). Default returns 0; factors override the methods relevant to the move kinds
+     * they handle.
      */
     fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
     fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
@@ -29,8 +54,8 @@ interface LocalSearchFactor : Factor {
     /**
      * Apply a committed move to this factor's payload. The assignment has already been
      * updated, so factors compare current values against the saved [oldValue] (for int sets)
-     * or recover the pre-flip value by inversion. Returns the same delta the deltaIf* method
-     * would have returned before the move.
+     * or recover the pre-flip value by inversion. Returns the same Δ[violationDegree] the
+     * deltaIf* method would have returned before the move.
      */
     fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
     fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

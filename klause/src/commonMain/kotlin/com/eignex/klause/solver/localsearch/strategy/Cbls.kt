@@ -77,7 +77,7 @@ class Cbls(
 
     private var lastImprovingStep: Long = -1L
     private var lastSeenStep: Long = -1L
-    private var lastCost: Int = Int.MAX_VALUE
+    private var lastCost: Long = Long.MAX_VALUE
 
     override fun pickMove(state: LocalSearchState): Move? {
         // Stall detection: when [state.cost] hasn't strictly decreased for [stallSteps]
@@ -136,7 +136,7 @@ class Cbls(
      *  signal that distinguishes the equally-cost-0 candidates, so it fully drives. */
     private fun score(state: LocalSearchState, move: Move): Double {
         val violationDelta = state.weightedNetDelta(move)
-        val objDelta = if (state.cost == 0) state.shapedObjectiveDelta(move) else 0.0
+        val objDelta = if (state.cost == 0L) state.shapedObjectiveDelta(move) else 0.0
         return violationDelta + objDelta
     }
 

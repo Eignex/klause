@@ -69,9 +69,21 @@ class Count(
         return state.assignment.intValue(n) != s.count
     }
 
+    /** Graded violation: the constraint is `n == #matches`, so the degree is `|n − count|` —
+     *  how far the count variable is off-target. Gives CBLS a gradient rewarding moves that
+     *  nudge the match count toward `n` (or `n` toward the count). */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val s = state.refPayload[factorId] as State
+        return degree(state.assignment.intValue(n), s.count)
+    }
+
+    private fun degree(nValue: Int, count: Int): Int {
+        val d = nValue.toLong() - count
+        return compressViolation(if (d < 0) -d else d)
+    }
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val wasViolated = state.assignment.intValue(n) != s.count
         var deltaCount = 0
         for (i in xs.indices) {
             if (xs[i] != intVar) continue
@@ -84,15 +96,15 @@ class Count(
         }
         val newCount = s.count + deltaCount
         val newN = if (intVar == n) newValue else state.assignment.intValue(n)
-        val willViolate = newN != newCount
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return degree(newN, newCount) - degree(state.assignment.intValue(n), s.count)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
-        val wasViolated = state.assignment.intValue(n) != s.count
+        val oldN = if (intVar == n) oldValue else state.assignment.intValue(n)
+        val oldCount = s.count
         for (i in xs.indices) {
             if (xs[i] != intVar) continue
             if (!present(state, i)) continue
@@ -101,14 +113,12 @@ class Count(
             if (wasMatch && !nowMatch) s.count--
             if (!wasMatch && nowMatch) s.count++
         }
-        val nowViolated = state.assignment.intValue(n) != s.count
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        return degree(state.assignment.intValue(n), s.count) - degree(oldN, oldCount)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = state.assignment.intValue(n) != s.count
         var deltaCount = 0
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
@@ -120,14 +130,15 @@ class Count(
             if (!wasPresent && willBePresent) deltaCount++
         }
         val newCount = s.count + deltaCount
-        val willViolate = state.assignment.intValue(n) != newCount
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        val nv = state.assignment.intValue(n)
+        return degree(nv, newCount) - degree(nv, s.count)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = state.assignment.intValue(n) != s.count
+        val nv = state.assignment.intValue(n)
+        val oldCount = s.count
         // The flip has already been applied to `state.assignment`; recompute contributions
         // for every entry whose presence literal references [boolVar].
         for (i in presents.indices) {
@@ -137,8 +148,7 @@ class Count(
             if (!matchesValue) continue
             if (nowPresent) s.count++ else s.count--
         }
-        val nowViolated = state.assignment.intValue(n) != s.count
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        return degree(nv, s.count) - degree(nv, oldCount)
     }
 
     /**

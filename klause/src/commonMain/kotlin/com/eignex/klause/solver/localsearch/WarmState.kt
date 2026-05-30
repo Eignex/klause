@@ -38,22 +38,22 @@ class WarmState {
 
     /** Lowest [LocalSearchState.cost] observed across every call made through the session.
      *  Persisted so `AspirationCriterion.OrImprovesBestEver` sees the full-history low,
-     *  not just the current call's watermark. `Int.MAX_VALUE` until the first apply. */
-    internal var bestCostSeen: Int = Int.MAX_VALUE
+     *  not just the current call's watermark. `Long.MAX_VALUE` until the first apply. */
+    internal var bestCostSeen: Long = Long.MAX_VALUE
 
     /** Read-only view onto activity counts for tests / destroy operators. Returns an
      *  empty array when no data has been captured yet. */
     fun activityTouches(): IntArray = activityTouches ?: IntArray(0)
 
-    /** Read-only handle for tests / diagnostics. Returns `Int.MAX_VALUE` if no apply has
+    /** Read-only handle for tests / diagnostics. Returns `Long.MAX_VALUE` if no apply has
      *  happened yet through this session. */
-    fun bestCostSeen(): Int = bestCostSeen
+    fun bestCostSeen(): Long = bestCostSeen
 
     /** Discard all warm state. The next session call starts from defaults. */
     fun reset() {
         factorWeights = null
         activityTouches = null
-        bestCostSeen = Int.MAX_VALUE
+        bestCostSeen = Long.MAX_VALUE
     }
 
     /** Sync warm weights, activity counts, and the best-cost watermark into [state]

@@ -130,9 +130,9 @@ class LocalSearchSessionTest {
         val solver = LocalSearchSolver(problem)
         val session = LocalSearchSession(solver)
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L)).assignment
-        assertTrue(session.warmStateView.bestCostSeen() < Int.MAX_VALUE)
+        assertTrue(session.warmStateView.bestCostSeen() < Long.MAX_VALUE)
         session.reset()
-        assertEquals(Int.MAX_VALUE, session.warmStateView.bestCostSeen(),
+        assertEquals(Long.MAX_VALUE, session.warmStateView.bestCostSeen(),
             "reset should restore the bestCost watermark to its empty default")
     }
 

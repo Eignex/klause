@@ -50,11 +50,11 @@ class NoiseController(
         private set
 
     private val ewma: EwmaMeanStat? = ewmaAlpha?.let { EwmaMeanStat(alpha = it) }
-    private var bestCostSeen: Int = Int.MAX_VALUE
+    private var bestCostSeen: Long = Long.MAX_VALUE
     private var stallCount: Int = 0
 
     /** Observe the current cost; mutates [level] if the trajectory warrants. */
-    fun observe(cost: Int) {
+    fun observe(cost: Long) {
         val improving = if (ewma != null) {
             // EWMA-trend mode: update the smoother and check whether the latest cost
             // lies strictly below the smoothed average. Smoothing rejects single-step
@@ -82,7 +82,7 @@ class NoiseController(
 
     /** Reset trajectory tracking — call on restart. [level] is preserved. */
     fun reset() {
-        bestCostSeen = Int.MAX_VALUE
+        bestCostSeen = Long.MAX_VALUE
         stallCount = 0
         ewma?.reset()
     }

@@ -43,7 +43,7 @@ class RestartPolicyTest {
         AdaptivePerturbationRestart().restart(state, bestSoFar = null)
 
         val countTrue = (0..2).count { state.assignment.boolValue(it) }
-        val expectedHard = if (countTrue == 1) 0 else 1
+        val expectedHard = if (countTrue == 1) 0L else 1L
         assertEquals(expectedHard, state.cost)
     }
 
