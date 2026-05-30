@@ -384,7 +384,7 @@ class AllFactorsOracleTest {
             xs = intArrayOf(0, 1, 2),
             tuples = intArrayOf(0, 0, 0,  1, 1, 0,  1, 0, 1),
         )
-        check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)))
+        check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)), exactProbe = true)
     }
 
     // ---- Helpers ----------------------------------------------------------------

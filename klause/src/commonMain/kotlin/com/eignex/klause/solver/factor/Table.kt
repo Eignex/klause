@@ -58,21 +58,38 @@ class Table(
         return true
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val wasViolated = isViolated(state, factorId)
-        // Simulate by checking match against any row using the override.
-        var matchAny = false
+    /** Graded violation: the **minimum Hamming distance** from the current `xs` assignment to
+     *  any allowed tuple — i.e. the fewest columns that must change to satisfy the table. `0`
+     *  iff some tuple matches exactly. Gives CBLS a gradient that rewards moves bringing `xs`
+     *  closer to a tuple, instead of the flat all-or-nothing binary cost. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        minHamming(state, intVar = -1, newValue = 0)
+
+    /** Min Hamming distance from the assignment (with [intVar] hypothetically set to
+     *  [newValue], or no override when `intVar < 0`) to the nearest tuple. Early-exits a row
+     *  once it exceeds the running best, and returns immediately on an exact match. */
+    private fun minHamming(state: LocalSearchState, intVar: Int, newValue: Int): Int {
+        var best = arity + 1
         for (row in 0 until numTuples) {
-            var match = true
+            val base = row * arity
+            var dist = 0
             for (col in 0 until arity) {
                 val v = if (xs[col] == intVar) newValue else state.assignment.intValue(xs[col])
-                if (v != tuples[row * arity + col]) { match = false; break }
+                if (v != tuples[base + col]) {
+                    dist++
+                    if (dist >= best) break
+                }
             }
-            if (match) { matchAny = true; break }
+            if (dist < best) {
+                best = dist
+                if (best == 0) return 0
+            }
         }
-        val willViolate = !matchAny
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return best
     }
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int =
+        minHamming(state, intVar, newValue) - minHamming(state, -1, 0)
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
