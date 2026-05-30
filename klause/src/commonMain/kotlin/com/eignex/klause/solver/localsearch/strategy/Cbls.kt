@@ -61,6 +61,17 @@ class Cbls(
     val violatedSampleCount: Int = 4,
     /** Cap on satisfied factors sampled per [pickMove] call (for `proposeStructuredMoves`). */
     val satisfiedSampleCount: Int = 4,
+    /** Steps without a strict *cost drop* before the **plateau-escape** machinery engages. At
+     *  infeasibility the candidate pool is only violated factors' own repair moves; when that
+     *  pool traps the search in a local minimum, this kicks in [frontierMoveCap] frontier moves
+     *  (on variables of factors *neighbouring* the violated ones) and raises the effective noise
+     *  to [stallNoise] so the search can step uphill out of the basin. `0` disables escape. */
+    val frontierAfterStall: Int = 40,
+    /** Cap on frontier (neighbour-variable) moves injected per stalled [pickMove]. */
+    val frontierMoveCap: Int = 32,
+    /** Effective [noiseProbability] while stalled past [frontierAfterStall] — a random-walk
+     *  diversification over the broadened pool that lets strict local minima be escaped. */
+    val stallNoise: Double = 0.4,
     val tabu: TabuFilter = TabuFilter.Disabled,
 ) : Strategy {
 
@@ -73,21 +84,34 @@ class Cbls(
         require(baseWeight > 0) { "baseWeight > 0, got $baseWeight" }
         require(violatedSampleCount >= 1) { "violatedSampleCount ≥ 1, got $violatedSampleCount" }
         require(satisfiedSampleCount >= 0) { "satisfiedSampleCount ≥ 0, got $satisfiedSampleCount" }
+        require(frontierAfterStall >= 0) { "frontierAfterStall ≥ 0, got $frontierAfterStall" }
+        require(frontierMoveCap >= 1) { "frontierMoveCap ≥ 1, got $frontierMoveCap" }
+        require(stallNoise in 0.0..1.0) { "stallNoise ∈ [0, 1], got $stallNoise" }
     }
 
     private var lastImprovingStep: Long = -1L
     private var lastSeenStep: Long = -1L
     private var lastCost: Long = Long.MAX_VALUE
+    /** Step of the last strict cost decrease — unlike [lastImprovingStep] this is *not* reset
+     *  by a weight bump, so it measures a true "no progress" stall window for plateau escape. */
+    private var lastDropStep: Long = 0L
 
     override fun pickMove(state: LocalSearchState): Move? {
         // Stall detection: when [state.cost] hasn't strictly decreased for [stallSteps]
         // applied moves, bump weights. Reads the engine-maintained step counter so we
         // don't need our own apply-tracking — `state.step` advances on every committed
         // move regardless of strategy.
+        if (state.step < lastSeenStep) {
+            // step rewound → a restart happened; reset the stall trackers to this epoch.
+            lastImprovingStep = state.step
+            lastDropStep = state.step
+            lastCost = state.cost
+        }
         if (state.step != lastSeenStep) {
             if (state.cost < lastCost) {
                 lastImprovingStep = state.step
                 lastCost = state.cost
+                lastDropStep = state.step
             } else if (state.step - lastImprovingStep >= stallSteps) {
                 bumpViolatedWeights(state, stallIncrement)
                 if (smoothProb > 0.0 && state.rng.nextDouble() < smoothProb) smoothAllWeights(state)
@@ -96,12 +120,19 @@ class Cbls(
             lastSeenStep = state.step
         }
 
+        // Plateau escape: when no strict cost drop for [frontierAfterStall] steps, the search
+        // is trapped — the violated-only candidate pool is too small for noise/weight-bumping
+        // to escape. Broaden the pool with frontier (neighbour) moves and raise noise.
+        val stalled = frontierAfterStall > 0 &&
+            state.cost > 0 && state.step - lastDropStep >= frontierAfterStall
+
         // Candidate generation: violated factors' repairs + satisfied factors' structured
         // moves + objective-direction seed moves. Each source contributes a bounded number
         // of moves so the per-step cost is O(arity × cap), not O(numFactors × numVars).
         val sink = state.moveSink
         sink.clear()
         sampleFromViolated(state, sink)
+        if (stalled) sampleFrontier(state, sink)
         sampleFromSatisfied(state, sink)
         seedObjectiveMoves(state, sink)
 
@@ -110,7 +141,8 @@ class Cbls(
         val moves = tabu.filter(state, raw)
         if (moves.isEmpty()) return null
 
-        if (state.rng.nextDouble() < noiseProbability) {
+        val effectiveNoise = if (stalled) stallNoise else noiseProbability
+        if (state.rng.nextDouble() < effectiveNoise) {
             return moves[state.rng.nextInt(moves.size)]
         }
 
@@ -168,6 +200,60 @@ class Cbls(
             val fid = state.violated.random(state.rng)
             state.factors[fid].proposeRepairMoves(state, fid, sink)
         }
+    }
+
+    /** **Frontier moves** for plateau escape: when the search is trapped, the violated-only
+     *  repair pool can't get out — every repair of a violated factor breaks a *satisfied
+     *  neighbour*, and the moves that would first re-arrange those neighbours are never
+     *  generated (satisfied factors are sampled only at feasibility). This injects bounded
+     *  ±1 / bool-flip moves on the variables of factors that *neighbour* a violated factor
+     *  (share a variable), giving the search — together with the raised stall noise — moves
+     *  to step through the basin wall. Capped at [frontierMoveCap] per call. */
+    private fun sampleFrontier(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
+        if (state.violated.isEmpty()) return
+        val problem = state.problem
+        var budget = frontierMoveCap
+        repeat(minOf(violatedSampleCount, state.violated.size)) {
+            if (budget <= 0) return
+            val fid = state.violated.random(state.rng)
+            val f = state.factors[fid]
+            for (v in f.intVars) {
+                for (nf in problem.intOccurrences[v]) {
+                    if (nf == fid) continue
+                    budget = addNeighbourMoves(state, sink, nf, budget)
+                    if (budget <= 0) return
+                }
+            }
+            for (v in f.boolVars) {
+                for (nf in problem.boolOccurrences[v]) {
+                    if (nf == fid) continue
+                    budget = addNeighbourMoves(state, sink, nf, budget)
+                    if (budget <= 0) return
+                }
+            }
+        }
+    }
+
+    /** Emit ±1 int-steps and bool flips for every variable of factor [nf], spending from and
+     *  returning the remaining [budget]. */
+    private fun addNeighbourMoves(
+        state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink, nf: Int, budget: Int,
+    ): Int {
+        var b = budget
+        val nfac = state.factors[nf]
+        for (u in nfac.intVars) {
+            if (b <= 0) return b
+            val cur = state.assignment.intValue(u)
+            val d = state.problem.intDomains[u]
+            if (cur < d.max) { sink.addChannelingIntSet(state, u, cur + 1); b-- }
+            if (b <= 0) return b
+            if (cur > d.min) { sink.addChannelingIntSet(state, u, cur - 1); b-- }
+        }
+        for (u in nfac.boolVars) {
+            if (b <= 0) return b
+            sink.addBoolFlip(u); b--
+        }
+        return b
     }
 
     private fun sampleFromSatisfied(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
