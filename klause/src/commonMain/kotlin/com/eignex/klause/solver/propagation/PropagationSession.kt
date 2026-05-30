@@ -80,6 +80,10 @@ class PropagationSession(val problem: Problem) {
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
     val decisionLevel: Int get() = trail.size
 
+    /** Cumulative count of factor-forced assignments across this session — backs the
+     *  `propagations` solve stat. Monotonic; the engine reads deltas around each pin. */
+    val propagationCount: Long get() = state.propagations
+
     /** Current bool value: pinned by decision OR forced by propagation. `null` = free. */
     fun boolValue(v: Int): Boolean? = state.boolValues[v]
 

@@ -189,6 +189,12 @@ class PropagationState(
      *  (decisions, assumption seeding) — those pins/tightenings record `reason = -1`. */
     internal var currentFactor: Int = -1
 
+    /** Cumulative count of factor-forced assignments (bool pins + int tightens applied while
+     *  a factor's `propagate` is running, i.e. `currentFactor >= 0`). Decisions and seed
+     *  pins don't count. Read via [PropagationSession.propagationCount] for the
+     *  `propagations` stat; monotonic for the life of the state. */
+    internal var propagations: Long = 0L
+
     /**
      * Seed set of factors directly implicated in a contradiction. Populated by [runToFixpoint]
      * (the factor that returned `false`) and by the impl methods (both sides of a two-source
@@ -847,6 +853,7 @@ class PropagationState(
             return false
         }
         if (undoLogging) logBoolPin(v)
+        if (currentFactor >= 0) propagations++
         boolValues[v] = value
         boolLevel[v] = currentLevel
         boolReason[v] = currentFactor
@@ -869,6 +876,7 @@ class PropagationState(
             return false
         }
         if (undoLogging) logIntChange(v)
+        if (currentFactor >= 0) propagations++
         // Preserve interior holes via the sparse-aware constructor path. For contiguous
         // domains this is functionally identical to `IntDomain(lo, d.max)`.
         intDomains[v] = d.withMinAtLeast(lo)
@@ -890,6 +898,7 @@ class PropagationState(
             return false
         }
         if (undoLogging) logIntChange(v)
+        if (currentFactor >= 0) propagations++
         intDomains[v] = d.withMaxAtMost(hi)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMaxReason[v] = currentFactor
@@ -922,6 +931,7 @@ class PropagationState(
             return false
         }
         if (undoLogging) logIntChange(v)
+        if (currentFactor >= 0) propagations++
         val newDomain = d.excludeValue(value)
         intDomains[v] = newDomain
         intLevel[v] = maxOf(intLevel[v], currentLevel)
