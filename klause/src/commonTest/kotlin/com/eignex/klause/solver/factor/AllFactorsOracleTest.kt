@@ -236,6 +236,22 @@ class AllFactorsOracleTest {
         check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
     }
 
+    @Test fun elementConst() {
+        // result(0) = arr[idx(1)], arr = [5,7,9] constants, idx 1-based ∈ [1,3].
+        val f = Element(idx = 1, result = 0, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1)
+        check(f, intDomains = arrayOf(IntDomain(4, 10), IntDomain(0, 4)), exactProbe = true)
+    }
+
+    @Test fun elementVar() {
+        // result(0) = arr[idx(1)], arr = vars 2,3,4; idx 1-based ∈ [1,3].
+        val f = Element(idx = 1, result = 0, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
+        check(f, intDomains = arrayOf(
+            IntDomain(0, 3),                       // result
+            IntDomain(0, 4),                       // idx
+            IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3),  // arr vars
+        ), exactProbe = true)
+    }
+
     @Test fun sort() {
         val f = Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))
         check(f, intDomains = arrayOf(

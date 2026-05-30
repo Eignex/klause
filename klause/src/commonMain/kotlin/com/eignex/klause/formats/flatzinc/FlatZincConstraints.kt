@@ -5,6 +5,7 @@ import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExcept
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.AllEqual
+import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
@@ -1269,40 +1270,16 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
 
 /**
  * `array_int_element(idx, arr, result)` / `array_var_int_element(idx, arr, result)`:
- * `result = arr[idx]` with 1-based indexing. The decomposition reifies `idx = i` for
- * each `i ∈ [1, len]`, then implies `result = arr[i-1]` whenever the indicator holds.
+ * `result = arr[idx]` with 1-based indexing. Emits the native [Element] factor (graded
+ * violation + direct repair moves, no aux-bool blow-up) rather than the old per-index
+ * reified-linear + indicator-clause decomposition — see issue #37.
  */
 internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Boolean) {
     require(c.args.size == 3)
     val idx = resolveIntVar(c.args[0])
     val result = resolveIntVar(c.args[2])
-    val len: Int = if (varArray) {
-        val arr = evalIntVarArray(c.args[1])
-        for (i in 1..arr.size) wireElementCase(idx, i, "result_eq_arr[${i-1}]_var") { eqBool ->
-            factors.add(ReifiedLinear(eqBool, intArrayOf(1, -1), intArrayOf(result, arr[i-1]), LinearOp.EQ, 0))
-        }
-        arr.size
-    } else {
-        val arrConst = evalIntConstArray(c.args[1])
-        for (i in 1..arrConst.size) wireElementCase(idx, i, "result_eq_${arrConst[i-1]}_const") { eqBool ->
-            factors.add(ReifiedLinear(eqBool, intArrayOf(1), intArrayOf(result), LinearOp.EQ, arrConst[i-1]))
-        }
-        arrConst.size
-    }
-    // Enforce idx ∈ [1, len].
-    factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.GE, 1))
-    factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.LE, len))
-}
-
-/** Shared "if idx = i then <body>" wiring for element constraints. Allocates two
- *  aux bools (idx-match indicator and body indicator) and clauses them. */
-internal inline fun FlatZincCompiler.wireElementCase(idx: Int, i: Int, tag: String, registerBody: (Int) -> Unit) {
-    val idxMatch = allocBool("__elem_${idx}_${i}_idx")
-    factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
-    val bodyHolds = allocBool("__elem_${idx}_${i}_$tag")
-    registerBody(bodyHolds)
-    // idxMatch → bodyHolds  ≡  ¬idxMatch ∨ bodyHolds
-    factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(bodyHolds, true))))
+    val arr = if (varArray) evalIntVarArray(c.args[1]) else evalIntConstArray(c.args[1])
+    factors.add(Element(idx = idx, result = result, arr = arr, arrIsVars = varArray, indexOffset = 1))
 }
 
 internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: Boolean) {
