@@ -239,6 +239,12 @@ tasks.register<JavaExec>("runMeasureBacktrack") {
             val key = k.toString()
             if (key.startsWith("klause.measure.")) systemProperty(key, v.toString())
         }
+        // Opt-in CPU profiling: -Dklause.measure.profile=<out> -Dklause.measure.asyncProfiler=<libasyncProfiler.so>
+        val profOut = System.getProperty("klause.measure.profile")
+        val profSo = System.getProperty("klause.measure.asyncProfiler")
+        if (profOut != null && profSo != null) {
+            jvmArgs("-agentpath:$profSo=start,event=cpu,flat=45,file=$profOut")
+        }
     }
 }
 
