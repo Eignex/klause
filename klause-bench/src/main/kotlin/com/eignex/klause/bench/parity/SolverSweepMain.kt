@@ -10,6 +10,7 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
@@ -55,14 +56,19 @@ object SolverSweepMain {
 
     /** A CBLS config exercised in BOTH phases with the same params (rebuilt per run — CBLS is
      *  stateful): satisfy via `strategy`, optimize via `optimizeStrategy` (unified minimize). */
+    /** ILS perturbation restart: on stall, perturb the best-so-far (incl. best infeasible —
+     *  threaded by [LocalSearchSolver]) rather than full-randomise, so a long feasibility
+     *  fight / plateau escape accumulates progress across restart cadences. */
+    private fun ilsRestart() = AdaptivePerturbationRestart(maxFlipsBeforeRestart = 20_000, perturbationStrength = 6)
+
     private fun cbls(label: String, make: () -> Cbls) = SolverConfig(
         label,
         sat = { p, seed, cancel ->
-            LocalSearchSolver(p, strategy = make(), pairSwapBudget = 1024)
+            LocalSearchSolver(p, strategy = make(), restartPolicy = ilsRestart(), pairSwapBudget = 1024)
                 .samples(LocalSearchParams(randomSeed = seed, cancellation = cancel)).firstOrNull()
         },
         opt = { p, objVar, maximize, seed, cancel ->
-            val solver = LocalSearchSolver(p, optimizeStrategy = make(), pairSwapBudget = 1024)
+            val solver = LocalSearchSolver(p, optimizeStrategy = make(), restartPolicy = ilsRestart(), pairSwapBudget = 1024)
             val params = LocalSearchParams(randomSeed = seed, cancellation = cancel, costShaping = CostShaping.Linear(lambda = 1.0))
             val obj = if (maximize) p.maximizeInt(objVar) else p.minimizeInt(objVar)
             (solver.minimize(obj, params) as? MinimizeResult.WithSample)?.sample

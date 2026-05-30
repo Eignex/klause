@@ -213,6 +213,12 @@ class LocalSearchSolver(
             // random restart.
             restartPolicy.restart(state, bestSoFar = null)
             var flipsSinceRestart = 0
+            // Best-cost-so-far snapshot (even while infeasible): an [IteratedLocalSearchRestart]
+            // perturbs from this instead of full-randomising, so a long descent/plateau-escape
+            // accumulates progress across restarts rather than resetting each cadence window.
+            // [FixedCadenceRestart] ignores it (full random), so threading it is a no-op there.
+            var bestCost = state.cost
+            var bestSnap: Sample? = state.assignment.snapshot()
             // Bound per yield, not per session: when [maxFlips] elapses without producing a
             // fresh sample, we've effectively exhausted the search neighbourhood — end the
             // sequence.
@@ -233,21 +239,23 @@ class LocalSearchSolver(
                     yield(snap)
                     flipsSinceYield = 0
                     restartPolicy.restart(state, bestSoFar = null)
+                    bestCost = state.cost; bestSnap = state.assignment.snapshot()
                     flipsSinceRestart = 0
                     continue
                 }
                 if (restartPolicy.shouldRestart(flipsSinceRestart)) {
-                    restartPolicy.restart(state, bestSoFar = null)
+                    restartPolicy.restart(state, bestSoFar = bestSnap)
                     flipsSinceRestart = 0
                     continue
                 }
                 val move = strategy.pickMove(state)
                 if (move == null) {
-                    restartPolicy.restart(state, bestSoFar = null)
+                    restartPolicy.restart(state, bestSoFar = bestSnap)
                     flipsSinceRestart = 0
                     continue
                 }
                 state.apply(move)
+                if (state.cost < bestCost) { bestCost = state.cost; bestSnap = state.assignment.snapshot() }
                 flipsSinceRestart++
                 flipsSinceYield++
             } } finally {
@@ -296,6 +304,11 @@ class LocalSearchSolver(
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
+        // Best-cost (still-infeasible) snapshot for ILS perturbation *before* feasibility is
+        // reached: when [bestSample] is null an [IteratedLocalSearchRestart] perturbs from this
+        // instead of full-randomising, so a long feasibility fight accumulates progress.
+        var bestCostInfeasible: Long = Long.MAX_VALUE
+        var bestCostSnap: Sample? = null
         var flipsSinceRestart = 0
         var totalFlips = 0L
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
@@ -387,7 +400,7 @@ class LocalSearchSolver(
                 continue
             }
             if (restartPolicy.shouldRestart(flipsSinceRestart)) {
-                restartPolicy.restart(state, bestSample)
+                restartPolicy.restart(state, bestSample ?: bestCostSnap)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
                 flipsSinceRestart = 0
                 totalFlips++
@@ -399,13 +412,16 @@ class LocalSearchSolver(
             // behavior to ProbSat plus better multi-flip handling.
             val move = if (unified) descentStrategy!!.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restartPolicy.restart(state, bestSample)
+                restartPolicy.restart(state, bestSample ?: bestCostSnap)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
                 flipsSinceRestart = 0
                 totalFlips++
                 continue
             }
             state.apply(move)
+            if (state.cost in 1 until bestCostInfeasible) {
+                bestCostInfeasible = state.cost; bestCostSnap = state.assignment.snapshot()
+            }
             flipsSinceRestart++
             totalFlips++
         }
