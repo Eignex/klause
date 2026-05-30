@@ -32,8 +32,20 @@ fun main() {
         for (n in intArrayOf(50, 100, 150, 200)) add("rand3sat-$n" to generateRandom3Sat(n, ratio = 4.26, seed = seed))
     }
 
+    // Config knobs (so the restart cadence / heuristic can be swept):
+    //   -Dklause.measure.lubyBase=N   restart base in attempt-units; 0 disables restarts.
+    //   -Dklause.measure.phaseSaving=true|false
+    //   -Dklause.measure.vsids=true|false   (false ⇒ default RandomVariable)
+    val lubyBaseProp = System.getProperty("klause.measure.lubyBase")?.toLongOrNull() ?: 100L
+    val lubyBase: Long? = if (lubyBaseProp <= 0) null else lubyBaseProp
+    val phaseSaving = System.getProperty("klause.measure.phaseSaving")?.toBooleanStrictOrNull() ?: true
+    val useVsids = System.getProperty("klause.measure.vsids")?.toBooleanStrictOrNull() ?: true
+
     println()
-    println("=== BacktrackSolver measurement (CDCL config: VSIDS + Luby(100) + phase-saving + LBD forget; ${budgetMs}ms budget) ===")
+    println(
+        "=== BacktrackSolver measurement (heuristic=${if (useVsids) "VSIDS" else "Random"}, " +
+            "lubyBase=${lubyBase ?: "off"}, phaseSaving=$phaseSaving, LBD forget; ${budgetMs}ms budget) ==="
+    )
     println(
         "%-14s %-8s %12s %12s %10s %9s %14s %8s %12s".format(
             "instance", "verdict", "decisions", "conflicts", "learned", "restarts", "propagations", "depth", "dec/sec"
@@ -43,9 +55,9 @@ fun main() {
         val problem = Dimacs.parse(cnf)
         val params = BacktrackParams(
             randomSeed = seed,
-            variableHeuristic = Vsids(),
-            lubyRestartBase = 100L,
-            phaseSaving = true,
+            variableHeuristic = if (useVsids) Vsids() else com.eignex.klause.solver.backtrack.RandomVariable,
+            lubyRestartBase = lubyBase,
+            phaseSaving = phaseSaving,
             maxLearnedClauses = 20_000,
             cancellation = Cancellation.after(budgetMs.milliseconds),
         )
