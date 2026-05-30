@@ -73,8 +73,8 @@ class Sort(
                 sink.addChannelingIntSet(state, ys[i], target)
             }
         }
-        val xsCount = HashMap<Int, Int>().also { for (v in xsVals) it.merge(v, 1, Int::plus) }
-        val ysCount = HashMap<Int, Int>().also { for (v in ysVals) it.merge(v, 1, Int::plus) }
+        val xsCount = HashMap<Int, Int>().also { for (v in xsVals) it[v] = (it[v] ?: 0) + 1 }
+        val ysCount = HashMap<Int, Int>().also { for (v in ysVals) it[v] = (it[v] ?: 0) + 1 }
         val over = ArrayList<Int>()
         val under = ArrayList<Int>()
         for ((v, c) in xsCount) if (c > (ysCount[v] ?: 0)) over.add(v)

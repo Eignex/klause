@@ -21,7 +21,7 @@ class Among(
 ) : LocalSearchFactor {
 
     /** Sorted, deduplicated value set. */
-    val values: IntArray = values.toSortedSet().toIntArray()
+    val values: IntArray = values.distinct().sorted().toIntArray()
 
     init {
         require(xs.isNotEmpty()) { "among: empty xs" }

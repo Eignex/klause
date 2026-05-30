@@ -20,7 +20,7 @@ class AllDifferentExcept(
     except: IntArray,
 ) : LocalSearchFactor {
 
-    val except: IntArray = except.toSortedSet().toIntArray()
+    val except: IntArray = except.distinct().sorted().toIntArray()
     private val exceptSet: Set<Int> = this.except.toHashSet()
 
     init {

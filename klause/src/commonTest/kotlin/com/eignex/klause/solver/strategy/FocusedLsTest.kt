@@ -30,7 +30,7 @@ class FocusedLsTest {
     // ---- Configuration-checking state mechanism ----
 
     @Test
-    fun `conf change flips false on the flipped var, stays true for neighbors, and resets on restart`() {
+    fun `conf change flips false on flipped var stays true for neighbors and resets on restart`() {
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))

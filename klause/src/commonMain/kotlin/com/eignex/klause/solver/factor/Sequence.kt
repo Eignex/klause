@@ -23,7 +23,7 @@ class Sequence(
     values: IntArray,
 ) : LocalSearchFactor {
 
-    val values: IntArray = values.toSortedSet().toIntArray()
+    val values: IntArray = values.distinct().sorted().toIntArray()
 
     init {
         require(k >= 1) { "sequence: k must be ≥ 1" }

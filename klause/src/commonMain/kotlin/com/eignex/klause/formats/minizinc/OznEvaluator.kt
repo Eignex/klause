@@ -89,7 +89,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                     else -> throw OznEvalException("non-int element in set literal: $v")
                 }
             }
-            OznValue.SetV(vals.toSortedSet().toIntArray())
+            OznValue.SetV(vals.distinct().sorted().toIntArray())
         }
         is OznExpr.Comprehension -> evalComprehension(e, ctx)
         is OznExpr.Call -> evalCall(e, ctx)
@@ -172,7 +172,7 @@ internal class OznEvaluator(items: List<OznItem>) {
         }
         recurse(0)
         if (c.isSet) {
-            val ints = out.map { (it as OznValue.IntV).value.toInt() }.toSortedSet().toIntArray()
+            val ints = out.map { (it as OznValue.IntV).value.toInt() }.distinct().sorted().toIntArray()
             return OznValue.SetV(ints)
         }
         return OznValue.ArrayV(out)

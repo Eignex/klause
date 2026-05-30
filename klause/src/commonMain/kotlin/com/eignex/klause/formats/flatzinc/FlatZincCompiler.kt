@@ -1,4 +1,5 @@
 package com.eignex.klause.formats.flatzinc
+import com.eignex.klause.util.bsearch
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -292,7 +293,7 @@ internal class FlatZincCompiler(
                         val layout = SetVarLayout(elemName, universe, indicatorIds)
                         setVarsByName[elemName] = layout
                         for (k in universe.indices) {
-                            val inSet = members.binarySearch(universe[k]) >= 0
+                            val inSet = members.bsearch(universe[k]) >= 0
                             factors.add(Clause(intArrayOf(Lit.make(indicatorIds[k], inSet))))
                         }
                         layouts.add(layout)
@@ -403,11 +404,11 @@ internal class FlatZincCompiler(
         if (initializer != null) {
             val members = resolveSetLiteral(initializer)
             for (i in elements.indices) {
-                val inSet = members.binarySearch(elements[i]) >= 0
+                val inSet = members.bsearch(elements[i]) >= 0
                 factors.add(Clause(intArrayOf(Lit.make(indicatorIds[i], inSet))))
             }
             for (m in members) {
-                if (elements.binarySearch(m) < 0) {
+                if (elements.bsearch(m) < 0) {
                     failHere("set var `$name` initializer element $m outside declared universe")
                 }
             }

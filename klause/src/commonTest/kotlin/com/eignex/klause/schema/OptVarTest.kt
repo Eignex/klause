@@ -84,7 +84,7 @@ class OptComparisonSemanticsTest {
     }
 
     @Test
-    fun `absent x makes (x ge 3) false`() {
+    fun `absent x makes x ge 3 false`() {
         val s = S()
         val compiled = s.compile()
         val solver = LocalSearchSolver(

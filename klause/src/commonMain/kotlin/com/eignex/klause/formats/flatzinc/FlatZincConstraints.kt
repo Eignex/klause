@@ -1,4 +1,5 @@
 package com.eignex.klause.formats.flatzinc
+import com.eignex.klause.util.bsearch
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferent
@@ -1673,7 +1674,7 @@ private fun FlatZincCompiler.materialisePinnedSetLayout(name: String, members: I
     val layout = SetVarLayout(name, universe, indicatorIds)
     setVarsByName[name] = layout
     for (i in universe.indices) {
-        val inSet = if (members.isEmpty()) false else members.binarySearch(universe[i]) >= 0
+        val inSet = if (members.isEmpty()) false else members.bsearch(universe[i]) >= 0
         factors.add(Clause(intArrayOf(Lit.make(indicatorIds[i], inSet))))
     }
     return layout
@@ -1734,7 +1735,7 @@ internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
 private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, rExpr: FznExpr?) {
     if (elem is FznExpr.IntLit) {
         val v = elem.value.toInt()
-        val isMember = values.binarySearch(v) >= 0
+        val isMember = values.bsearch(v) >= 0
         if (rExpr != null) {
             val r = resolveBoolLit(rExpr)
             factors.add(Clause(intArrayOf(if (isMember) r else Lit.negate(r))))
@@ -1794,7 +1795,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
 }
 
 private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, rExpr: FznExpr?) {
-    val idx = layout.elements.binarySearch(xConst)
+    val idx = layout.elements.bsearch(xConst)
     if (idx < 0) {
         if (rExpr != null) {
             val r = resolveBoolLit(rExpr)
@@ -1826,7 +1827,7 @@ private fun FlatZincCompiler.emitSetInVarInt(
             coeffs = intArrayOf(1), vars = intArrayOf(xVar),
             op = LinearOp.EQ, bound = v,
         ))
-        val setIdx = layout.elements.binarySearch(v)
+        val setIdx = layout.elements.bsearch(v)
         if (rExpr == null) {
             // Non-reified: x ∈ S must hold.
             if (setIdx < 0) {
@@ -1882,7 +1883,7 @@ internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) 
         for (i in s.elements.indices) {
             val e = s.elements[i]
             val sBit = s.indicatorBoolIds[i]
-            val tIdx = t.elements.binarySearch(e)
+            val tIdx = t.elements.bsearch(e)
             if (tIdx < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
             } else {
@@ -1895,7 +1896,7 @@ internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) 
     val auxes = ArrayList<Int>(s.elements.size)
     for (i in s.elements.indices) {
         val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearch(s.elements[i])
+        val tIdx = t.elements.bsearch(s.elements[i])
         val aux = allocBool("__subset_aux_${s.name}_${t.name}_${s.elements[i]}")
         auxes += Lit.make(aux, true)
         if (tIdx < 0) {
@@ -1932,7 +1933,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
         for (i in s.elements.indices) {
             val e = s.elements[i]
             val sBit = s.indicatorBoolIds[i]
-            val tIdx = t.elements.binarySearch(e)
+            val tIdx = t.elements.bsearch(e)
             if (tIdx < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
             } else {
@@ -1942,7 +1943,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
             }
         }
         for (i in t.elements.indices) {
-            if (s.elements.binarySearch(t.elements[i]) < 0) {
+            if (s.elements.bsearch(t.elements[i]) < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
             }
         }
@@ -1961,7 +1962,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
     }
     for (i in s.elements.indices) {
         val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearch(s.elements[i])
+        val tIdx = t.elements.bsearch(s.elements[i])
         val aux = allocBool("__eq_aux_${s.name}_${t.name}_${s.elements[i]}")
         auxes.add(Lit.make(aux, true))
         if (tIdx < 0) {
@@ -1973,7 +1974,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
         }
     }
     for (i in t.elements.indices) {
-        if (s.elements.binarySearch(t.elements[i]) < 0) {
+        if (s.elements.bsearch(t.elements[i]) < 0) {
             val tBit = t.indicatorBoolIds[i]
             val aux = allocBool("__eq_aux_${s.name}_${t.name}_only_t_${t.elements[i]}")
             auxes.add(Lit.make(aux, true))
@@ -2106,7 +2107,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
     val emptyLit = com.eignex.klause.solver.Lit
     // Lookup S/T indicator (or null if elem not in that set's universe).
     fun indicator(set: SetVarLayout, elem: Int): Int? {
-        val idx = set.elements.binarySearch(elem)
+        val idx = set.elements.bsearch(elem)
         return if (idx < 0) null else set.indicatorBoolIds[idx]
     }
     // Top of table: b[last] = (S_has(last) → T_has(last))  ≡  (¬S_has ∨ T_has).
@@ -2276,7 +2277,7 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
             for (zi in z.elements.indices) {
                 val k = z.elements[zi]
                 val zBit = z.indicatorBoolIds[zi]
-                val yIdxInSet = ySet.elements.binarySearch(k)
+                val yIdxInSet = ySet.elements.bsearch(k)
                 if (yIdxInSet < 0) {
                     // ySet's universe doesn't contain k → if x=vi then z.ind[k]=false.
                     factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(
@@ -2320,7 +2321,7 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
         // Collect the set of x-values (1-indexed) for which k ∈ rows[x-1].
         val pick = ArrayList<Int>()
         for ((rowIdx, row) in rows.withIndex()) {
-            if (row.binarySearch(k) >= 0) pick.add(rowIdx + 1)
+            if (row.bsearch(k) >= 0) pick.add(rowIdx + 1)
         }
         when {
             pick.isEmpty() -> {
@@ -2365,7 +2366,7 @@ internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
     for (i in sets.indices) for (j in i + 1 until sets.size) {
         val a = sets[i]; val b = sets[j]
         for (ai in a.elements.indices) {
-            val bi = b.elements.binarySearch(a.elements[ai])
+            val bi = b.elements.bsearch(a.elements[ai])
             if (bi >= 0) {
                 factors.add(Clause(intArrayOf(
                     Lit.make(a.indicatorBoolIds[ai], false),
@@ -2397,7 +2398,7 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
             val uBit = u.indicatorBoolIds[i]
             val parts = ArrayList<Int>()
             for (s in sets) {
-                val si = s.elements.binarySearch(e)
+                val si = s.elements.bsearch(e)
                 if (si >= 0) parts += Lit.make(s.indicatorBoolIds[si], true)
             }
             if (parts.isEmpty()) {
@@ -2418,7 +2419,7 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
             // ⋁ᵢ Sᵢ[e] = true (since e must be in the partition).
             val parts = ArrayList<Int>()
             for (s in sets) {
-                val si = s.elements.binarySearch(e)
+                val si = s.elements.bsearch(e)
                 if (si >= 0) parts += Lit.make(s.indicatorBoolIds[si], true)
             }
             if (parts.isEmpty()) {
@@ -2431,7 +2432,7 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
     // Elements in some Sᵢ's universe but not in U must be excluded from Sᵢ.
     for (s in sets) {
         for (i in s.elements.indices) {
-            if (universe.binarySearch(s.elements[i]) < 0) {
+            if (universe.bsearch(s.elements[i]) < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(s.indicatorBoolIds[i], false))))
             }
         }
@@ -2451,7 +2452,7 @@ internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout,
     }
     for (i in s.elements.indices) {
         val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearch(s.elements[i])
+        val tIdx = t.elements.bsearch(s.elements[i])
         val aux = allocBool("__eq_aux_${s.name}_${t.name}_${s.elements[i]}")
         auxes.add(Lit.make(aux, true))
         if (tIdx < 0) {
@@ -2462,7 +2463,7 @@ internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout,
         }
     }
     for (i in t.elements.indices) {
-        if (s.elements.binarySearch(t.elements[i]) < 0) {
+        if (s.elements.bsearch(t.elements[i]) < 0) {
             val tBit = t.indicatorBoolIds[i]
             val aux = allocBool("__eq_aux_${s.name}_${t.name}_only_t_${t.elements[i]}")
             auxes.add(Lit.make(aux, true))
@@ -2520,8 +2521,8 @@ internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
     for (i in u.elements.indices) {
         val e = u.elements[i]
         val uBit = u.indicatorBoolIds[i]
-        val sIdx = s.elements.binarySearch(e)
-        val tIdx = t.elements.binarySearch(e)
+        val sIdx = s.elements.bsearch(e)
+        val tIdx = t.elements.bsearch(e)
         when {
             sIdx >= 0 && tIdx >= 0 -> {
                 val sBit = s.indicatorBoolIds[sIdx]
@@ -2550,12 +2551,12 @@ internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
     }
     // Elements in S or T's universe but not U's must be excluded from S/T.
     for (i in s.elements.indices) {
-        if (u.elements.binarySearch(s.elements[i]) < 0) {
+        if (u.elements.bsearch(s.elements[i]) < 0) {
             factors.add(Clause(intArrayOf(Lit.make(s.indicatorBoolIds[i], false))))
         }
     }
     for (i in t.elements.indices) {
-        if (u.elements.binarySearch(t.elements[i]) < 0) {
+        if (u.elements.bsearch(t.elements[i]) < 0) {
             factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
         }
     }
@@ -2572,8 +2573,8 @@ internal fun FlatZincCompiler.emitSetIntersect(c: FznConstraint) {
     for (i in u.elements.indices) {
         val e = u.elements[i]
         val uBit = u.indicatorBoolIds[i]
-        val sIdx = s.elements.binarySearch(e)
-        val tIdx = t.elements.binarySearch(e)
+        val sIdx = s.elements.bsearch(e)
+        val tIdx = t.elements.bsearch(e)
         if (sIdx >= 0 && tIdx >= 0) {
             val sBit = s.indicatorBoolIds[sIdx]
             val tBit = t.indicatorBoolIds[tIdx]
@@ -2597,14 +2598,14 @@ internal fun FlatZincCompiler.emitSetDiff(c: FznConstraint) {
     for (i in u.elements.indices) {
         val e = u.elements[i]
         val uBit = u.indicatorBoolIds[i]
-        val sIdx = s.elements.binarySearch(e)
+        val sIdx = s.elements.bsearch(e)
         if (sIdx < 0) {
             // Element not in S → can't be in S \ T.
             factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
             continue
         }
         val sBit = s.indicatorBoolIds[sIdx]
-        val tIdx = t.elements.binarySearch(e)
+        val tIdx = t.elements.bsearch(e)
         if (tIdx < 0) {
             // Element in S but not in T's universe → Uᵢ ↔ Sᵢ.
             factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(uBit, true))))
