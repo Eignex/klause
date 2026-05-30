@@ -660,6 +660,11 @@ class PropagationState(
     private val undoMinAnt = ArrayList<IntArray?>()                    // int: prior intMinAntecedents
     private val undoMaxAnt = ArrayList<IntArray?>()                    // int: prior intMaxAntecedents
 
+    /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
+     *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
+     *  a singleton, so this never allocates. Read-only: [undoTo] only iterates it. */
+    private val EMPTY_PAYLOADS: Map<Int, SnapshottablePayload> = emptyMap()
+
     /** When false, mutators skip undo-log recording. Default off so the one-shot
      *  propagation path ([Problem.propagate]) and bake-time fixpoint — neither of which
      *  backtracks — pay nothing. [PropagationSession] flips it true after bake, before its
@@ -954,16 +959,22 @@ class PropagationState(
     fun pollDirtyInt(): Int = if (dirtyInts.isEmpty()) -1 else dirtyInts.removeFirst()
 
     /** Max decision level of any variable in [boolVars] / [intVars]. Used by the driver to
-     *  set [currentLevel] before each factor invocation. */
+     *  set [currentLevel] before each factor invocation.
+     *
+     *  No variable's level can exceed the number of decisions pushed so far ([cap]); once
+     *  the running max reaches that ceiling, the remaining vars can't raise it, so we stop
+     *  early. This is an exact short-circuit (same result, fewer reads) — it mainly trims
+     *  the scan for large-arity global constraints that fire often during search. */
     fun maxLevelForVars(boolVars: IntArray, intVars: IntArray): Int {
+        val cap = levelToDecisionVar.size
         var max = 0
         for (v in boolVars) {
             // boolVars may include atom-var ids when a Clause has atom-lits; dispatch.
             val l = if (v < problem.numBoolVars) boolLevel[v]
                     else atomLevel[v - problem.numBoolVars]
-            if (l > max) max = l
+            if (l > max) { max = l; if (max >= cap) return max }
         }
-        for (v in intVars) { val l = intLevel[v]; if (l > max) max = l }
+        for (v in intVars) { val l = intLevel[v]; if (l > max) { max = l; if (max >= cap) return max } }
         return max
     }
 
@@ -971,11 +982,12 @@ class PropagationState(
      *  learned clauses that reference atom-vars, where the relevant decision level isn't
      *  captured by [boolVars] / [intVars] alone. */
     fun maxLevelForClause(literals: IntArray): Int {
+        val cap = levelToDecisionVar.size
         var max = 0
         for (lit in literals) {
             val v = com.eignex.klause.solver.Lit.variable(lit)
             val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevel[v - problem.numBoolVars]
-            if (l > max) max = l
+            if (l > max) { max = l; if (max >= cap) return max }
         }
         return max
     }
@@ -1089,23 +1101,28 @@ class PropagationState(
         internal val ltdvSize: Int,
         internal val pinOrderSize: Int,
         internal val atomCount: Int,
-        internal val snapshottablePayloads: HashMap<Int, SnapshottablePayload>,
+        internal val snapshottablePayloads: Map<Int, SnapshottablePayload>,
     )
 
     /** Capture a [LevelMark] at the current state. Cheap: four ints plus a snapshotCopy of
-     *  each [SnapshottablePayload] (usually none). */
+     *  each [SnapshottablePayload]. The map is allocated only when at least one payload is
+     *  present (Table / Mdd factors); the common no-payload case shares [EMPTY_PAYLOADS] and
+     *  never allocates per push. */
     fun mark(): LevelMark {
-        val payloads = HashMap<Int, SnapshottablePayload>()
+        var payloads: HashMap<Int, SnapshottablePayload>? = null
         for (i in _refPayload.indices) {
             val p = _refPayload[i]
-            if (p is SnapshottablePayload) payloads[i] = p.snapshotCopy()
+            if (p is SnapshottablePayload) {
+                val m = payloads ?: HashMap<Int, SnapshottablePayload>().also { payloads = it }
+                m[i] = p.snapshotCopy()
+            }
         }
         return LevelMark(
             undoSize = undoTag.size,
             ltdvSize = levelToDecisionVar.size,
             pinOrderSize = boolPinOrder.size,
             atomCount = atomIntVar.size,
-            snapshottablePayloads = payloads,
+            snapshottablePayloads = payloads ?: EMPTY_PAYLOADS,
         )
     }
 
