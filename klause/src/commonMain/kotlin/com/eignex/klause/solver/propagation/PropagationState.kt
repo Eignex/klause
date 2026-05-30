@@ -601,6 +601,61 @@ class PropagationState(
     val boolPinOrder: com.eignex.klause.util.IntArrayList =
         com.eignex.klause.util.IntArrayList(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
 
+    // -------- Undo trail (replaces per-level full-array snapshots) --------
+    //
+    // Each mutation that a pop must rewind appends one record here recording the cell's
+    // *prior* value. A pop replays records from the top down to a [LevelMark]'s [undoSize]
+    // — O(changes-since-mark) instead of the old snapshot/restore's O(numVars) per level.
+    //
+    // Records are stored column-wise across parallel lists (no per-record object alloc).
+    // Two record kinds:
+    //   tag 0 — bool pin: a bool was assigned at this level (prior state is always
+    //           unassigned, since [pinBoolImpl] only proceeds when the var was free), so
+    //           only [undoVar] is needed; the int/obj columns are padding.
+    //   tag 1 — int change: a tighten / exclude replaced the var's domain. The full prior
+    //           int-var state is recorded so replay restores it exactly even when the same
+    //           var is narrowed several times within a level.
+    //
+    // Atom-table mutations are *not* logged: [undoTo] re-derives surviving atoms' truth
+    // from the restored int domains (matching the old `restore`), and atoms allocated
+    // after a mark are truncated wholesale. atomLevel / atomAntecedents drift across pops,
+    // exactly as they did under the snapshot scheme (advisory, like watches).
+    private val undoTag = com.eignex.klause.util.IntArrayList()
+    private val undoVar = com.eignex.klause.util.IntArrayList()
+    private val undoLevel = com.eignex.klause.util.IntArrayList()      // int: prior intLevel
+    private val undoMinReason = com.eignex.klause.util.IntArrayList()  // int: prior intMinReason
+    private val undoMaxReason = com.eignex.klause.util.IntArrayList()  // int: prior intMaxReason
+    private val undoDomain = ArrayList<IntDomain?>()                   // int: prior intDomains[v]
+    private val undoMinAnt = ArrayList<IntArray?>()                    // int: prior intMinAntecedents
+    private val undoMaxAnt = ArrayList<IntArray?>()                    // int: prior intMaxAntecedents
+
+    /** When false, mutators skip undo-log recording. Default off so the one-shot
+     *  propagation path ([Problem.propagate]) and bake-time fixpoint — neither of which
+     *  backtracks — pay nothing. [PropagationSession] flips it true after bake, before its
+     *  first push. */
+    var undoLogging: Boolean = false
+
+    private fun logBoolPin(v: Int) {
+        undoTag.add(0); undoVar.add(v)
+        undoLevel.add(0); undoMinReason.add(0); undoMaxReason.add(0)
+        undoDomain.add(null); undoMinAnt.add(null); undoMaxAnt.add(null)
+    }
+
+    /** Capture int var [v]'s full prior state. Must be called *before* the mutation. */
+    private fun logIntChange(v: Int) {
+        undoTag.add(1); undoVar.add(v)
+        undoLevel.add(intLevel[v]); undoMinReason.add(intMinReason[v]); undoMaxReason.add(intMaxReason[v])
+        undoDomain.add(intDomains[v]); undoMinAnt.add(intMinAntecedents[v]); undoMaxAnt.add(intMaxAntecedents[v])
+    }
+
+    private fun truncateUndo(n: Int) {
+        undoTag.truncateTo(n); undoVar.truncateTo(n)
+        undoLevel.truncateTo(n); undoMinReason.truncateTo(n); undoMaxReason.truncateTo(n)
+        while (undoDomain.size > n) undoDomain.removeAt(undoDomain.size - 1)
+        while (undoMinAnt.size > n) undoMinAnt.removeAt(undoMinAnt.size - 1)
+        while (undoMaxAnt.size > n) undoMaxAnt.removeAt(undoMaxAnt.size - 1)
+    }
+
     init {
         for (fid in 0 until problem.numFactors) {
             val watchers = problem.factors[fid].initialBoolWatchers ?: continue
@@ -739,6 +794,7 @@ class PropagationState(
             if (currentFactor < 0) lastDecisionConflictVar = v
             return false
         }
+        if (undoLogging) logBoolPin(v)
         boolValues[v] = value
         boolLevel[v] = currentLevel
         boolReason[v] = currentFactor
@@ -760,6 +816,7 @@ class PropagationState(
             seedConflictFactor(currentFactor)
             return false
         }
+        if (undoLogging) logIntChange(v)
         // Preserve interior holes via the sparse-aware constructor path. For contiguous
         // domains this is functionally identical to `IntDomain(lo, d.max)`.
         intDomains[v] = d.withMinAtLeast(lo)
@@ -780,6 +837,7 @@ class PropagationState(
             seedConflictFactor(currentFactor)
             return false
         }
+        if (undoLogging) logIntChange(v)
         intDomains[v] = d.withMaxAtMost(hi)
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMaxReason[v] = currentFactor
@@ -811,6 +869,7 @@ class PropagationState(
             seedConflictFactor(currentFactor)
             return false
         }
+        if (undoLogging) logIntChange(v)
         val newDomain = d.excludeValue(value)
         intDomains[v] = newDomain
         intLevel[v] = maxOf(intLevel[v], currentLevel)
@@ -965,139 +1024,101 @@ class PropagationState(
         return out
     }
 
-    // Snapshot / restore for [PropagationSession]. Captures every mutable field so a pop
-    // can rewind the state to a prior fixpoint without re-propagating. Dirty queues are not
-    // snapshotted — the caller is expected to snapshot only between propagation cycles
-    // (i.e. when dirty queues are empty).
-    /** Opt-in marker for [refPayload] entries that need to participate in snapshot /
-     *  restore. By default refPayload drifts across push/pop (Clause-watcher style); a
-     *  factor that maintains level-sensitive incremental state (e.g. STR2 Table's sparse
-     *  set of valid tuples) implements this to get correct backtrack behavior. */
+    // Mark / undo for [PropagationSession]. A pop rewinds to a prior fixpoint by replaying
+    // the undo log (above) rather than re-propagating. The caller only ever marks / undoes
+    // between propagation cycles (i.e. when dirty queues are empty).
+    /** Opt-in marker for [refPayload] entries that need to participate in mark / undo.
+     *  By default refPayload drifts across push/pop (Clause-watcher style); a factor that
+     *  maintains level-sensitive incremental state (e.g. STR2 Table's sparse set of valid
+     *  tuples) implements this to get correct backtrack behavior. */
     interface SnapshottablePayload {
         fun snapshotCopy(): SnapshottablePayload
     }
 
     /**
-     * Per-level state capture. Fields are `val` but their array/Bits contents are mutable in
-     * place: [snapshotInto] uses [Bits.copyFrom] / [IntArray.copyInto] to overwrite the
-     * buffers, letting [PropagationSession]'s pool reuse a Snapshot across pushes rather
-     * than allocating ~10 fresh arrays per decision level.
-     *
-     * [decisionVars] is grow-able (one entry per decision level), so it stays an
-     * [IntArrayList] reused via [IntArrayList.clear]; ditto [snapshottablePayloads] which
-     * the factor implementor refreshes on demand.
+     * Lightweight per-level marker. Records only the *positions* a pop must rewind to: the
+     * undo-log size and the three append-only stacks' sizes, plus snapshot copies of any
+     * [SnapshottablePayload]s (the rare factors — Mdd / Table — whose incremental state
+     * isn't recomputed from scratch on each `propagate`). Replaces the old `Snapshot`,
+     * which copied ~12 numVars-sized arrays per level; [undoTo] instead replays the undo
+     * log in O(changes-since-mark).
      */
-    class Snapshot internal constructor(
-        internal val boolAssigned: Bits,
-        internal val boolValueBits: Bits,
-        internal val intDomains: Array<IntDomain>,
-        internal val boolLevel: IntArray,
-        internal val intLevel: IntArray,
-        internal val decisionVars: com.eignex.klause.util.IntArrayList,
-        internal val boolReason: IntArray,
-        internal val intMinReason: IntArray,
-        internal val intMaxReason: IntArray,
-        internal val boolAntecedents: Array<IntArray?>,
-        internal val intMinAntecedents: Array<IntArray?>,
-        internal val intMaxAntecedents: Array<IntArray?>,
+    class LevelMark internal constructor(
+        internal val undoSize: Int,
+        internal val ltdvSize: Int,
+        internal val pinOrderSize: Int,
+        internal val atomCount: Int,
         internal val snapshottablePayloads: HashMap<Int, SnapshottablePayload>,
-    ) {
-        internal var boolPinOrderSize: Int = 0
-        internal var atomCount: Int = 0
+    )
+
+    /** Capture a [LevelMark] at the current state. Cheap: four ints plus a snapshotCopy of
+     *  each [SnapshottablePayload] (usually none). */
+    fun mark(): LevelMark {
+        val payloads = HashMap<Int, SnapshottablePayload>()
+        for (i in _refPayload.indices) {
+            val p = _refPayload[i]
+            if (p is SnapshottablePayload) payloads[i] = p.snapshotCopy()
+        }
+        return LevelMark(
+            undoSize = undoTag.size,
+            ltdvSize = levelToDecisionVar.size,
+            pinOrderSize = boolPinOrder.size,
+            atomCount = atomIntVar.size,
+            snapshottablePayloads = payloads,
+        )
     }
 
     /**
-     * Allocate a fresh [Snapshot] sized to this state's current capacities. Used by
-     * [PropagationSession] to seed its snapshot pool; subsequent pushes call
-     * [snapshotInto] to overwrite contents instead of allocating new arrays.
+     * Rewind the state to [mark] by replaying the undo log from the top down to
+     * [LevelMark.undoSize], then truncating the append-only stacks (decision vars, pin
+     * order, atoms) and restoring snapshottable payloads. Replays in reverse so a var
+     * narrowed several times since the mark lands on its mark-time value. Transient
+     * bookkeeping (dirty queues, conflict seeds, current level/factor) is cleared — the
+     * caller only ever marks / undoes between propagation cycles, when those are idle.
      */
-    fun allocateSnapshotBuffer(): Snapshot = Snapshot(
-        boolAssigned = boolAssigned.copy(),
-        boolValueBits = boolValueBits.copy(),
-        intDomains = intDomains.copyOf(),
-        boolLevel = boolLevel.copyOf(),
-        intLevel = intLevel.copyOf(),
-        decisionVars = com.eignex.klause.util.IntArrayList(initialCapacity = 8),
-        boolReason = boolReason.copyOf(),
-        intMinReason = intMinReason.copyOf(),
-        intMaxReason = intMaxReason.copyOf(),
-        boolAntecedents = boolAntecedents.copyOf(),
-        intMinAntecedents = intMinAntecedents.copyOf(),
-        intMaxAntecedents = intMaxAntecedents.copyOf(),
-        snapshottablePayloads = HashMap(),
-    )
-
-    /** Fill [target] with the current state in place, no array allocation. Returns [target]
-     *  for fluent chaining. Callers must ensure [target] was sized for the same problem
-     *  (allocated via [allocateSnapshotBuffer] on this state). */
-    fun snapshotInto(target: Snapshot): Snapshot {
-        target.boolAssigned.copyFrom(boolAssigned)
-        target.boolValueBits.copyFrom(boolValueBits)
-        intDomains.copyInto(target.intDomains)
-        boolLevel.copyInto(target.boolLevel)
-        intLevel.copyInto(target.intLevel)
-        target.decisionVars.clear()
-        for (i in 0 until levelToDecisionVar.size) target.decisionVars.add(levelToDecisionVar[i])
-        boolReason.copyInto(target.boolReason)
-        intMinReason.copyInto(target.intMinReason)
-        intMaxReason.copyInto(target.intMaxReason)
-        boolAntecedents.copyInto(target.boolAntecedents)
-        intMinAntecedents.copyInto(target.intMinAntecedents)
-        intMaxAntecedents.copyInto(target.intMaxAntecedents)
-        target.boolPinOrderSize = boolPinOrder.size
-        target.atomCount = atomIntVar.size
-        // Refresh per-factor SnapshottablePayload captures. The factor's `snapshotCopy()` is
-        // free to allocate; we keep this map reused across snapshots but stale keys for
-        // factors that no longer have a SnapshottablePayload are cleared so they don't leak.
-        target.snapshottablePayloads.clear()
-        for (i in _refPayload.indices) {
-            val p = _refPayload[i]
-            if (p is SnapshottablePayload) target.snapshottablePayloads[i] = p.snapshotCopy()
+    fun undoTo(mark: LevelMark) {
+        var i = undoTag.size - 1
+        while (i >= mark.undoSize) {
+            when (undoTag[i]) {
+                0 -> {  // bool pin — prior state is always unassigned
+                    val v = undoVar[i]
+                    boolValues[v] = null
+                    boolLevel[v] = -1
+                    boolReason[v] = -1
+                    boolAntecedents[v] = null
+                }
+                else -> {  // int change — restore the full recorded prior int-var state
+                    val v = undoVar[i]
+                    intDomains[v] = undoDomain[i]!!
+                    intLevel[v] = undoLevel[i]
+                    intMinReason[v] = undoMinReason[i]
+                    intMaxReason[v] = undoMaxReason[i]
+                    intMinAntecedents[v] = undoMinAnt[i]
+                    intMaxAntecedents[v] = undoMaxAnt[i]
+                }
+            }
+            i--
         }
-        return target
-    }
-
-    /** Allocate-and-fill convenience. Equivalent to `snapshotInto(allocateSnapshotBuffer())`
-     *  but expressed as a single call for callers that don't pool. */
-    fun snapshot(): Snapshot = snapshotInto(allocateSnapshotBuffer())
-
-    fun restore(s: Snapshot) {
-        boolAssigned.copyFrom(s.boolAssigned)
-        boolValueBits.copyFrom(s.boolValueBits)
-        for (i in s.intDomains.indices) intDomains[i] = s.intDomains[i]
-        for (i in s.boolLevel.indices) boolLevel[i] = s.boolLevel[i]
-        for (i in s.intLevel.indices) intLevel[i] = s.intLevel[i]
-        for (i in s.boolReason.indices) boolReason[i] = s.boolReason[i]
-        for (i in s.intMinReason.indices) intMinReason[i] = s.intMinReason[i]
-        for (i in s.intMaxReason.indices) intMaxReason[i] = s.intMaxReason[i]
-        for (i in s.boolAntecedents.indices) boolAntecedents[i] = s.boolAntecedents[i]
-        for (i in s.intMinAntecedents.indices) intMinAntecedents[i] = s.intMinAntecedents[i]
-        for (i in s.intMaxAntecedents.indices) intMaxAntecedents[i] = s.intMaxAntecedents[i]
-        boolPinOrder.truncateTo(s.boolPinOrderSize)
-        // Restore snapshottable per-factor payloads. Replaces the current entry with a
-        // *fresh* snapshotCopy of the snapshot's snapshotCopy — defensively copying so
-        // a later restore from the same Snapshot returns to the same logical state.
-        for ((fid, payload) in s.snapshottablePayloads) {
+        truncateUndo(mark.undoSize)
+        boolPinOrder.truncateTo(mark.pinOrderSize)
+        levelToDecisionVar.truncateTo(mark.ltdvSize)
+        // Restore snapshottable per-factor payloads. Defensive snapshotCopy so a later
+        // undo to the same mark returns to the same logical state.
+        for ((fid, payload) in mark.snapshottablePayloads) {
             _refPayload[fid] = payload.snapshotCopy()
         }
-        // Atoms allocated after the snapshot are removed wholesale; their virtual var
-        // ids and watcher registrations are dropped to avoid dangling. Pre-snapshot
-        // atoms keep their state — but since the engine now tracks live atom truth
-        // via [propagateAtomsForVar], we re-derive their values from the restored
-        // intDomains rather than trusting the snapshot truth (which may reflect a
-        // later flip).
-        while (atomIntVar.size > s.atomCount) {
+        // Atoms allocated after the mark are removed wholesale; their virtual var ids and
+        // watcher registrations are dropped to avoid dangling.
+        while (atomIntVar.size > mark.atomCount) {
             val id = atomIntVar.size - 1
             val intVar = atomIntVar[id]
             val key = atomKey(intVar, atomKind[id], atomThreshold[id])
             atomByKey.remove(key)
-            // Remove from the per-int-var index.
             atomsByIntVar[intVar]?.let { list ->
-                for (i in 0 until list.size) {
-                    if (list[i] == id) { list.removeAt(i); break }
+                for (j in 0 until list.size) {
+                    if (list[j] == id) { list.removeAt(j); break }
                 }
             }
-            // Drop watcher entries for both atom-lits.
             atomWatchersByLit.remove(com.eignex.klause.solver.Lit.make(problem.numBoolVars + id, true))
             atomWatchersByLit.remove(com.eignex.klause.solver.Lit.make(problem.numBoolVars + id, false))
             atomIntVar.truncateTo(id)
@@ -1107,15 +1128,14 @@ class PropagationState(
             atomLevel.truncateTo(id)
             atomAntecedents.removeAt(atomAntecedents.size - 1)
         }
-        // Refresh remaining atoms' truth from the restored int domains.
+        // Re-derive surviving atoms' truth from the now-restored int domains. atomLevel /
+        // atomAntecedents are left to drift (advisory, like watches) — same as the old
+        // snapshot scheme, which never restored them either.
         for (atomId in 0 until atomIntVar.size) {
             val t = atomCurrentTruth(atomId) ?: continue
             atomValue[atomId] = if (t) 1 else 0
         }
         dirtyAtomFactors.clear()
-        levelToDecisionVar.clear()
-        for (i in 0 until s.decisionVars.size) levelToDecisionVar.add(s.decisionVars[i])
-        // Aborted pushes may have left dirty queue entries behind; drop them.
         dirtyBools.clear()
         dirtyInts.clear()
         conflictLevels = null

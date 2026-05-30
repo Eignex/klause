@@ -23,25 +23,14 @@ enum class VarKind { Bool, Int }
 class PropagationSession(val problem: Problem) {
     private val state: PropagationState = PropagationState(problem, Assumptions.None)
     private data class LevelState(
-        val snap: PropagationState.Snapshot,
+        val mark: PropagationState.LevelMark,
         val implied: PropagationResult.Implied,
     )
-    /** `levelStates[L]` is the state right after level [L]'s fixpoint. Index 0 = post-bake.
-     *  Array-backed stack with explicit [levelTop]; grows by doubling. */
+    /** `levelStates[L]` is the [PropagationState.LevelMark] right after level [L]'s
+     *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
+     *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
     private var levelStates: Array<LevelState?> = arrayOfNulls(8)
     private var levelTop: Int = 0
-    /** Pool of [PropagationState.Snapshot] buffers freed by [levelPop] /
-     *  [levelTruncateAfterRoot], reused by [makeSnapshot] in place of fresh allocation. Each
-     *  buffer's arrays match the state's capacity; the per-push cost shrinks from ~10
-     *  `copyOf` allocations to ~10 `copyInto` overwrites of recycled buffers. */
-    private val snapshotPool: ArrayDeque<PropagationState.Snapshot> = ArrayDeque()
-    private fun makeSnapshot(): PropagationState.Snapshot {
-        val buf = snapshotPool.removeLastOrNull() ?: state.allocateSnapshotBuffer()
-        return state.snapshotInto(buf)
-    }
-    private fun recycle(s: PropagationState.Snapshot) {
-        snapshotPool.addLast(s)
-    }
     private fun levelLast(): LevelState = levelStates[levelTop - 1]!!
     private fun levelPush(s: LevelState) {
         if (levelTop == levelStates.size) levelStates = levelStates.copyOf(levelStates.size * 2)
@@ -49,16 +38,10 @@ class PropagationSession(val problem: Problem) {
     }
     private fun levelPop() {
         levelTop--
-        val ls = levelStates[levelTop]
         levelStates[levelTop] = null
-        if (ls != null) recycle(ls.snap)
     }
     private fun levelTruncateAfterRoot() {
-        for (i in 1 until levelTop) {
-            val ls = levelStates[i]
-            levelStates[i] = null
-            if (ls != null) recycle(ls.snap)
-        }
+        for (i in 1 until levelTop) levelStates[i] = null
         levelTop = 1
     }
     private val pinnedBools: LinkedHashMap<Int, Boolean> = LinkedHashMap()
@@ -82,8 +65,12 @@ class PropagationSession(val problem: Problem) {
                 state.extractConflictFactors(),
             )
         }
+        // Bake-time fixpoint above ran with logging off (it never backtracks). Enable undo
+        // logging now, before the first push; the level-0 mark therefore has undoSize 0,
+        // and undoing to it rewinds every search mutation back to this post-bake baseline.
+        state.undoLogging = true
         val baseline = computeImplied()
-        levelPush(LevelState(makeSnapshot(), baseline))
+        levelPush(LevelState(state.mark(), baseline))
         lastImplied = baseline
     }
 
@@ -103,7 +90,7 @@ class PropagationSession(val problem: Problem) {
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
-        state.restore(levelStates[0]!!.snap)
+        state.undoTo(levelStates[0]!!.mark)
         if (levelTop > 1) levelTruncateAfterRoot()
         pinnedBools.clear()
         pinnedInts.clear()
@@ -189,7 +176,7 @@ class PropagationSession(val problem: Problem) {
         pinnedBools[v] = value
         trail.addLast(VarKind.Bool to v)
         val implied = computeImplied()
-        levelPush(LevelState(makeSnapshot(), implied))
+        levelPush(LevelState(state.mark(), implied))
         return implied
     }
 
@@ -201,7 +188,7 @@ class PropagationSession(val problem: Problem) {
         pinnedInts[v] = value
         trail.addLast(VarKind.Int to v)
         val implied = computeImplied()
-        levelPush(LevelState(makeSnapshot(), implied))
+        levelPush(LevelState(state.mark(), implied))
         return implied
     }
 
@@ -229,7 +216,7 @@ class PropagationSession(val problem: Problem) {
                 else -> null
             }
         }
-        state.restore(levelLast().snap)
+        state.undoTo(levelLast().mark)
         return PropagationResult.Unsat(bools, ints, levels, factors, learned)
     }
 
@@ -255,7 +242,7 @@ class PropagationSession(val problem: Problem) {
             }
             levelPop()
         }
-        state.restore(levelLast().snap)
+        state.undoTo(levelLast().mark)
         lastImplied = levelLast().implied
     }
 
