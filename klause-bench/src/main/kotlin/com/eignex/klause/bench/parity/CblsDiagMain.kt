@@ -34,72 +34,96 @@ object CblsDiagMain {
         println("vars: bool=${problem.numBoolVars} int=${problem.numIntVars}  factors=${problem.numFactors}")
 
         var globalBest = Long.MAX_VALUE
-        var bestState: LocalSearchState? = null
+        var bestBoolVals: BooleanArray? = null
+        var bestIntVals: IntArray? = null
         for (r in 0 until restarts) {
             val rng = Random(1000L + r)
             val state = LocalSearchState(problem, rng, Assumptions.None)
             randomize(state, rng)
             state.recompute()
             val noTabu = System.getProperty("klause.cblsdiag.notabu") == "true"
+            val noise = System.getProperty("klause.cblsdiag.noise")?.toDouble() ?: 0.05
             val strat = Cbls(
+                noiseProbability = noise,
                 tabu = if (noTabu) TabuFilter.Disabled
                 else TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
             )
             var minCost = state.cost
             var flipsToMin = 0L
             var f = 0L
+            // Snapshot the assignment whenever a new min cost is reached, so the post-run dump
+            // analyses the TRUE min-cost state (where the search got stuck), not the drifted end.
+            var minBool = snapshotBool(state)
+            var minInt = snapshotInt(state)
             while (f < flips && state.cost > 0) {
                 val move = strat.pickMove(state) ?: break
                 state.apply(move)
                 f++
-                if (state.cost < minCost) { minCost = state.cost; flipsToMin = f }
+                if (state.cost < minCost) {
+                    minCost = state.cost; flipsToMin = f
+                    minBool = snapshotBool(state); minInt = snapshotInt(state)
+                }
             }
             val solved = state.cost == 0L
-            println("restart $r: start=${"%6d".format(/* approx */ minCostStart(state))} " +
-                "min=$minCost (at flip $flipsToMin / $f)${if (solved) "  SOLVED" else ""}")
+            println("restart $r: min=$minCost (at flip $flipsToMin / $f)${if (solved) "  SOLVED" else ""}")
             if (minCost < globalBest) {
                 globalBest = minCost
-                // recompute leaves state AT min only if we never moved past it; for the dump we
-                // re-run to the min by keeping the last state — good enough as a plateau sample.
-                bestState = state
+                bestBoolVals = minBool; bestIntVals = minInt
             }
         }
-        println("global best cost (violated factors): $globalBest")
+        println("global best cost (sum of violation degrees): $globalBest")
 
-        bestState?.let { st ->
-            // Histogram of violated factor classes at the final plateau state.
-            val byClass = HashMap<String, Int>()
-            val violatedIds = st.violated.toIntArray()
-            for (fid in violatedIds) {
-                val name = st.factors[fid]::class.simpleName ?: "?"
-                byClass[name] = (byClass[name] ?: 0) + 1
-            }
-            println("--- violated factor classes at plateau (${violatedIds.size} total) ---")
-            byClass.entries.sortedByDescending { it.value }.forEach { (k, v) -> println("  %5d  %s".format(v, k)) }
-
-            // Zero-delta fraction: collect repair moves from every violated factor and check
-            // how many have netDelta == 0 (no immediate effect on violated-factor count).
-            val sink = MoveSink(Assumptions.None)
-            sink.clear()
-            for (fid in violatedIds) st.factors[fid].proposeRepairMoves(st, fid, sink)
-            val moves = sink.list
-            var zero = 0
-            var improving = 0
-            for (m in moves) {
-                val d = st.netDelta(m)
-                if (d == 0L) zero++ else if (d < 0) improving++
-            }
-            val n = moves.size
-            println("--- repair-move gradient at plateau ---")
-            println("  candidate repair moves: $n")
-            if (n > 0) {
-                println("  netDelta == 0 (flat):   $zero (${"%.1f".format(100.0 * zero / n)}%)")
-                println("  netDelta <  0 (improve): $improving (${"%.1f".format(100.0 * improving / n)}%)")
-            }
+        if (bestBoolVals != null) {
+            val st = LocalSearchState(problem, Random(7), Assumptions.None)
+            for (b in 0 until problem.numBoolVars) st.assignment.setBool(b, bestBoolVals!![b])
+            for (i in 0 until problem.numIntVars) st.assignment.setInt(i, bestIntVals!![i])
+            st.recompute()
+            dumpMinState(st)
         }
     }
 
-    private fun minCostStart(state: LocalSearchState): Long = state.cost
+    /** Detailed analysis at the (snapshotted) min-cost state: every violated factor, its
+     *  degree, and the best achievable repair-move scores (netDelta + weighted) — to reveal
+     *  whether the search sits in a strict local minimum it can't single-move out of. */
+    private fun dumpMinState(st: LocalSearchState) {
+        val violatedIds = st.violated.toIntArray()
+        val byClass = HashMap<String, Int>()
+        for (fid in violatedIds) {
+            val name = st.factors[fid]::class.simpleName ?: "?"
+            byClass[name] = (byClass[name] ?: 0) + 1
+        }
+        println("--- ${violatedIds.size} violated factor(s) at min cost ---")
+        byClass.entries.sortedByDescending { it.value }.forEach { (k, v) -> println("  %5d  %s".format(v, k)) }
+
+        // Per-violated-factor: degree + the best repair move it proposes (and that move's
+        // GLOBAL netDelta — repairing one factor may break others). Reveals whether the min is
+        // a strict local minimum (every repair worsens the total) vs a flat plateau.
+        println("--- per-violated-factor repair analysis ---")
+        var bestGlobal = Long.MAX_VALUE
+        for (fid in violatedIds.take(20)) {
+            val f = st.factors[fid]
+            val sink = MoveSink(Assumptions.None)
+            sink.clear()
+            f.proposeRepairMoves(st, fid, sink)
+            var bestForFactor = Long.MAX_VALUE
+            var bestMoveStr = "(none)"
+            for (m in sink.list) {
+                val d = st.netDelta(m)
+                if (d < bestForFactor) { bestForFactor = d; bestMoveStr = "$m Δ=$d" }
+                if (d < bestGlobal) bestGlobal = d
+            }
+            println("  ${f::class.simpleName} fid=$fid degree=${f.violationDegree(st, fid)} " +
+                "moves=${sink.list.size} bestΔ=$bestMoveStr")
+        }
+        println("--- best single repair move over all violated factors: Δ=$bestGlobal " +
+            "(${if (bestGlobal < 0) "improving — not a local min" else "≥0 — STRICT LOCAL MIN, needs worsening move/restart"}) ---")
+    }
+
+    private fun snapshotBool(s: LocalSearchState): BooleanArray =
+        BooleanArray(s.problem.numBoolVars) { s.assignment.boolValue(it) }
+
+    private fun snapshotInt(s: LocalSearchState): IntArray =
+        IntArray(s.problem.numIntVars) { s.assignment.intValue(it) }
 
     private fun randomize(state: LocalSearchState, rng: Random) {
         val p = state.problem
