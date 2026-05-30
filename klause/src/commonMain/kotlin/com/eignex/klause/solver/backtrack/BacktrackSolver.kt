@@ -650,10 +650,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 params.variableHeuristic.onConflict(node.varRef, r)
                 params.valueHeuristic.onConflict(node.varRef, outcome.value)
                 // CDB: if the analyzer produced a 1UIP clause with a non-chronological
-                // backjump target, signal it up. The clause itself isn't stored yet
-                // (LCG learning persistence is a follow-up); just the jump distance is
-                // honoured, which by itself prunes subtrees that would re-derive the
-                // same conflict at higher levels.
+                // backjump target, signal it up. The engine pops to the backjump level and
+                // then persists the clause via [PropagationSession.addLearnedClause] (see
+                // [backjumpAndLearn]), so the learned nogood both forces its asserting
+                // literal now and constrains all future propagation — not just the one-shot
+                // jump-distance prune.
                 val learned = r.learnedClause as? ConflictAnalyzer.AnalysisResult.Learned
                 if (learned != null) return AdvanceOutcome.Backjump(learned)
                 continue
