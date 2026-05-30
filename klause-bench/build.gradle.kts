@@ -14,6 +14,8 @@ repositories {
 dependencies {
     implementation(project(":klause"))
     implementation(project(":klause-logicng"))
+    // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
+    implementation("com.eignex:kumulant:0.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
@@ -221,6 +223,22 @@ tasks.register<JavaExec>("runSolverSweep") {
             if (key.startsWith("klause.solversweep.")) systemProperty(key, v.toString())
         }
         systemProperty("klause.workspace.root", workspaceRoot)
+    }
+}
+
+tasks.register<JavaExec>("runMeasureBacktrack") {
+    group = "verification"
+    description = "Run BacktrackSolver over a generated PHP / random-3SAT scaling series and dump SolveStats."
+    notCompatibleWithConfigurationCache(
+        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
+    )
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.MeasureBacktrackMainKt")
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.measure.")) systemProperty(key, v.toString())
+        }
     }
 }
 
