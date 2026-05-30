@@ -62,6 +62,37 @@ class PropagationState(
     private val dirtyInts: com.eignex.klause.util.IntArrayDeque =
         com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
 
+    // -------- Reusable propagation worklist (was allocated fresh per runToFixpoint) --------
+    //
+    // [propQueue] is the factor worklist; [propStamp] is a per-factor "currently queued"
+    // membership set encoded as a generation stamp so resetting between propagation runs is
+    // O(1) (just bump [propGen]) instead of zeroing a `BooleanArray(factorCount)` on every
+    // pin. A factor is queued iff `propStamp[fid] == propGen`; dequeuing writes `propGen - 1`
+    // (any value ≠ propGen) so a factor can still re-enqueue itself within the same run.
+    private val propQueue: com.eignex.klause.util.IntArrayDeque =
+        com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numFactors.coerceAtLeast(8))
+    private var propStamp: IntArray = IntArray(problem.numFactors.coerceAtLeast(8))
+    private var propGen: Int = 0
+
+    /** Reset the worklist for a new propagation run over [factorCount] factors. Grows
+     *  [propStamp] when learned clauses have pushed the factor count past its capacity, and
+     *  wraps [propGen] safely on the (astronomically rare) Int overflow. */
+    private fun propBegin(factorCount: Int) {
+        if (propStamp.size < factorCount) {
+            var n = propStamp.size
+            while (n < factorCount) n *= 2
+            propStamp = propStamp.copyOf(n)
+        }
+        if (propGen == Int.MAX_VALUE) { propStamp.fill(0); propGen = 0 }
+        propGen++
+        propQueue.clear()
+    }
+
+    /** Enqueue [fid] if not already queued this run. */
+    private fun propEnq(fid: Int) {
+        if (propStamp[fid] != propGen) { propStamp[fid] = propGen; propQueue.addLast(fid) }
+    }
+
     /** False iff seeding the assumptions themselves already produced a contradiction. */
     var seeded: Boolean = true
         private set
@@ -656,6 +687,16 @@ class PropagationState(
         while (undoMaxAnt.size > n) undoMaxAnt.removeAt(undoMaxAnt.size - 1)
     }
 
+    /** Current undo-log size. A [LevelMark] captures this; iterating [undoVarAt] /
+     *  [undoIsBoolAt] over `[base, undoTop)` enumerates exactly the variables mutated since
+     *  position `base` — used by [PropagationSession] to compute the implied-fact diff of a
+     *  push incrementally instead of scanning every variable. */
+    val undoTop: Int get() = undoTag.size
+    /** Variable id recorded by undo record [i]. */
+    fun undoVarAt(i: Int): Int = undoVar[i]
+    /** True iff undo record [i] is a bool pin (vs. an int-domain change). */
+    fun undoIsBoolAt(i: Int): Boolean = undoTag[i] == 0
+
     init {
         for (fid in 0 until problem.numFactors) {
             val watchers = problem.factors[fid].initialBoolWatchers ?: continue
@@ -1158,39 +1199,32 @@ class PropagationState(
         // would otherwise mix old seeds into a new conflict's core.
         conflictSeedFactors = null
         val factorCount = totalFactorCount
-        val pending = BooleanArray(factorCount)
-        val queue = com.eignex.klause.util.IntArrayDeque(initialCapacity = factorCount.coerceAtLeast(8))
+        propBegin(factorCount)
         if (allFactors) {
-            for (fid in 0 until factorCount) { pending[fid] = true; queue.addLast(fid) }
+            for (fid in 0 until factorCount) propEnq(fid)
         } else {
             while (true) {
                 val v = pollDirtyBool(); if (v < 0) break
-                enqueueForBoolChange(v, pending, queue)
+                enqueueForBoolChange(v)
             }
             while (true) {
                 val v = pollDirtyInt(); if (v < 0) break
-                for (fid in problem.intOccurrences[v]) {
-                    if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
-                }
+                for (fid in problem.intOccurrences[v]) propEnq(fid)
             }
             // Atom-lit watchers woken by int tightens before runToFixpoint was called.
             while (dirtyAtomFactors.isNotEmpty()) {
                 val fid = dirtyAtomFactors.removeFirst()
-                if (fid in 0 until factorCount && !pending[fid]) {
-                    pending[fid] = true; queue.addLast(fid)
-                }
+                if (fid in 0 until factorCount) propEnq(fid)
             }
             // Optional seed — used by [PropagationSession.addLearnedClause] to force the
             // newly-stored learned clause to fire on the next propagation cycle (it would
             // otherwise sit dormant since the watcher index only wakes on false-going
             // literals, and a freshly-added clause's watches haven't been triggered yet).
-            if (initialFactor in 0 until factorCount && !pending[initialFactor]) {
-                pending[initialFactor] = true; queue.addLast(initialFactor)
-            }
+            if (initialFactor in 0 until factorCount) propEnq(initialFactor)
         }
-        while (queue.isNotEmpty()) {
-            val fid = queue.removeFirst()
-            pending[fid] = false
+        while (propQueue.isNotEmpty()) {
+            val fid = propQueue.removeFirst()
+            propStamp[fid] = propGen - 1  // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
             currentLevel = maxLevelForVars(f.boolVars, f.intVars)
             // For learned Clauses (which may carry atom-lits), also consider the atoms'
@@ -1211,18 +1245,15 @@ class PropagationState(
             }
             while (true) {
                 val v = pollDirtyBool(); if (v < 0) break
-                enqueueForBoolChange(v, pending, queue)
+                enqueueForBoolChange(v)
             }
             while (true) {
                 val v = pollDirtyInt(); if (v < 0) break
-                for (other in problem.intOccurrences[v]) {
-                    if (!pending[other]) { pending[other] = true; queue.addLast(other) }
-                }
+                for (other in problem.intOccurrences[v]) propEnq(other)
             }
             // Wake factors registered as atom-lit watchers whose atom truth just flipped.
             while (dirtyAtomFactors.isNotEmpty()) {
-                val other = dirtyAtomFactors.removeFirst()
-                if (!pending[other]) { pending[other] = true; queue.addLast(other) }
+                propEnq(dirtyAtomFactors.removeFirst())
             }
         }
         return null
@@ -1235,22 +1266,13 @@ class PropagationState(
      * factors only the literal that just transitioned to *false* triggers a fire — true
      * literals satisfy the clause, no propagation needed.
      */
-    private fun enqueueForBoolChange(
-        v: Int,
-        pending: BooleanArray,
-        queue: com.eignex.klause.util.IntArrayDeque,
-    ) {
-        for (fid in problem.nonBoolWatcherBoolOccurrences[v]) {
-            if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
-        }
+    private fun enqueueForBoolChange(v: Int) {
+        for (fid in problem.nonBoolWatcherBoolOccurrences[v]) propEnq(fid)
         // The literal that just became false is the one whose polarity opposes the pin.
         // boolValues[v] is non-null here (the var was added to dirtyBools only after a
         // successful pin); read it directly.
         val falseLit = Lit.make(v, !boolValues[v]!!)
         val watchers = boolWatchersByLit[falseLit]
-        for (i in 0 until watchers.size) {
-            val fid = watchers[i]
-            if (!pending[fid]) { pending[fid] = true; queue.addLast(fid) }
-        }
+        for (i in 0 until watchers.size) propEnq(watchers[i])
     }
 }

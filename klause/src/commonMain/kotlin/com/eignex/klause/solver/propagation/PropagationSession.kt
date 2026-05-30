@@ -14,27 +14,24 @@ enum class VarKind { Bool, Int }
  * CSP-style DFS sampler can backjump directly past the deepest non-conflicting level.
  *
  * One persistent [PropagationState] is reused across pushes. Each successful push records a
- * post-fixpoint snapshot; [popLast] / [popToLevel] restore the snapshot at the target level
- * in O(numVars), no re-propagation. Conflict on push reverts the state to the last good
- * snapshot before returning Unsat — the session's trail is left at the pre-push level.
+ * [PropagationState.LevelMark]; [popLast] / [popToLevel] rewind to the target level's mark
+ * by replaying the state's undo log in O(changes), no re-propagation. Conflict on push
+ * reverts the state to the last good mark before returning Unsat — the session's trail is
+ * left at the pre-push level.
  *
  * Not thread-safe. One consumer per session.
  */
 class PropagationSession(val problem: Problem) {
     private val state: PropagationState = PropagationState(problem, Assumptions.None)
-    private data class LevelState(
-        val mark: PropagationState.LevelMark,
-        val implied: PropagationResult.Implied,
-    )
     /** `levelStates[L]` is the [PropagationState.LevelMark] right after level [L]'s
      *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
      *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
-    private var levelStates: Array<LevelState?> = arrayOfNulls(8)
+    private var levelStates: Array<PropagationState.LevelMark?> = arrayOfNulls(8)
     private var levelTop: Int = 0
-    private fun levelLast(): LevelState = levelStates[levelTop - 1]!!
-    private fun levelPush(s: LevelState) {
+    private fun levelLast(): PropagationState.LevelMark = levelStates[levelTop - 1]!!
+    private fun levelPush(m: PropagationState.LevelMark) {
         if (levelTop == levelStates.size) levelStates = levelStates.copyOf(levelStates.size * 2)
-        levelStates[levelTop++] = s
+        levelStates[levelTop++] = m
     }
     private fun levelPop() {
         levelTop--
@@ -44,12 +41,20 @@ class PropagationSession(val problem: Problem) {
         for (i in 1 until levelTop) levelStates[i] = null
         levelTop = 1
     }
-    private val pinnedBools: LinkedHashMap<Int, Boolean> = LinkedHashMap()
-    private val pinnedInts: LinkedHashMap<Int, Int> = LinkedHashMap()
-    private val trail: ArrayDeque<Pair<VarKind, Int>> = ArrayDeque()
-    /** Cumulative implied set as of the last successful push — used to diff push returns. */
-    private var lastImplied: PropagationResult.Implied =
-        PropagationResult.Implied.Empty
+
+    // Decision pins, primitive-encoded to avoid the boxing the old LinkedHashMap<Int,*> and
+    // ArrayDeque<Pair> paid on every push. [boolPinned] holds -1 (free) / 0 (false) / 1
+    // (true) per bool var; [intPinnedSet] + [intPinnedVal] hold the int decisions. Only
+    // *decision* pins live here — propagation-implied facts are read from [state]. [trail]
+    // is the decision stack used as a LIFO, each entry encoded as `v` (bool) or
+    // `numBoolVars + v` (int), matching PropagationState's level encoding.
+    private val boolPinned: IntArray = IntArray(problem.numBoolVars) { -1 }
+    private val intPinnedSet: BooleanArray = BooleanArray(problem.numIntVars)
+    private val intPinnedVal: IntArray = IntArray(problem.numIntVars)
+    private val trail: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    private fun encBool(v: Int): Int = v
+    private fun encInt(v: Int): Int = problem.numBoolVars + v
+    private fun trailIsBool(enc: Int): Boolean = enc < problem.numBoolVars
 
     /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
      *  All session operations short-circuit to this result. */
@@ -69,9 +74,7 @@ class PropagationSession(val problem: Problem) {
         // logging now, before the first push; the level-0 mark therefore has undoSize 0,
         // and undoing to it rewinds every search mutation back to this post-bake baseline.
         state.undoLogging = true
-        val baseline = computeImplied()
-        levelPush(LevelState(state.mark(), baseline))
-        lastImplied = baseline
+        levelPush(state.mark())
     }
 
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
@@ -90,12 +93,9 @@ class PropagationSession(val problem: Problem) {
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
-        state.undoTo(levelStates[0]!!.mark)
+        state.undoTo(levelStates[0]!!)
         if (levelTop > 1) levelTruncateAfterRoot()
-        pinnedBools.clear()
-        pinnedInts.clear()
-        trail.clear()
-        lastImplied = levelStates[0]!!.implied
+        clearPins()
 
         // Seed bool then int pins from the primitive sorted arrays. Iterating directly
         // (vs. forEachBool / forEachInt) lets us `return` the first Unsat without a
@@ -110,24 +110,29 @@ class PropagationSession(val problem: Problem) {
             val r = pushInt(ik[i], iv[i])
             if (r is PropagationResult.Unsat) return r
         }
-        lastImplied = levelLast().implied
         return computeImplied()
+    }
+
+    /** Drop every decision pin, restoring the primitive pin arrays to "free". Iterates the
+     *  trail (the decided vars) rather than clearing the whole arrays. */
+    private fun clearPins() {
+        for (i in 0 until trail.size) {
+            val e = trail[i]
+            if (trailIsBool(e)) boolPinned[e] = -1 else intPinnedSet[e - problem.numBoolVars] = false
+        }
+        trail.clear()
     }
 
     /** Push one bool pin at a fresh decision level. Returns newly-implied facts (diff). */
     fun pinBool(v: Int, value: Boolean): PropagationResult {
         bakedUnsat?.let { return it }
-        val r = pushBool(v, value)
-        if (r !is PropagationResult.Implied) return r
-        return diffAgainst(r, lastImplied).also { lastImplied = r }
+        return pushBool(v, value)
     }
 
     /** Push one int pin at a fresh decision level. */
     fun pinInt(v: Int, value: Int): PropagationResult {
         bakedUnsat?.let { return it }
-        val r = pushInt(v, value)
-        if (r !is PropagationResult.Implied) return r
-        return diffAgainst(r, lastImplied).also { lastImplied = r }
+        return pushInt(v, value)
     }
 
     /**
@@ -148,11 +153,11 @@ class PropagationSession(val problem: Problem) {
         lbd: Int,
     ): PropagationResult {
         bakedUnsat?.let { return it }
+        val base = state.undoTop
         val newFid = state.addLearnedClause(clause, lbd)
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid)
         if (conflict != null) return revertAndUnsat(conflict)
-        val implied = computeImplied()
-        return diffAgainst(implied, lastImplied).also { lastImplied = implied }
+        return impliedSince(base)
     }
 
     /** Forward to [PropagationState.forgetLearnedClauses]. Called by the engine's
@@ -169,27 +174,28 @@ class PropagationSession(val problem: Problem) {
     fun learnedClauseLbd(learnedIndex: Int): Int = state.learnedClauseLbd(learnedIndex)
 
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
-        if (pinnedBools[v] == value) return levelLast().implied
+        val want = if (value) 1 else 0
+        if (boolPinned[v] == want) return PropagationResult.Implied.Empty
+        val base = state.undoTop
         if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
-        pinnedBools[v] = value
-        trail.addLast(VarKind.Bool to v)
-        val implied = computeImplied()
-        levelPush(LevelState(state.mark(), implied))
-        return implied
+        boolPinned[v] = want
+        trail.add(encBool(v))
+        levelPush(state.mark())
+        return impliedSince(base)
     }
 
     private fun pushInt(v: Int, value: Int): PropagationResult {
-        if (pinnedInts[v] == value) return levelLast().implied
+        if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.Empty
+        val base = state.undoTop
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
-        pinnedInts[v] = value
-        trail.addLast(VarKind.Int to v)
-        val implied = computeImplied()
-        levelPush(LevelState(state.mark(), implied))
-        return implied
+        intPinnedSet[v] = true; intPinnedVal[v] = value
+        trail.add(encInt(v))
+        levelPush(state.mark())
+        return impliedSince(base)
     }
 
     /**
@@ -216,7 +222,7 @@ class PropagationSession(val problem: Problem) {
                 else -> null
             }
         }
-        state.undoTo(levelLast().mark)
+        state.undoTo(levelLast())
         return PropagationResult.Unsat(bools, ints, levels, factors, learned)
     }
 
@@ -235,50 +241,61 @@ class PropagationSession(val problem: Problem) {
             "popToLevel($level): out of range [0, ${trail.size}]"
         }
         while (trail.size > level) {
-            val (kind, v) = trail.removeLast()
-            when (kind) {
-                VarKind.Bool -> pinnedBools.remove(v)
-                VarKind.Int -> pinnedInts.remove(v)
-            }
+            val e = trail[trail.size - 1]
+            trail.removeAt(trail.size - 1)
+            if (trailIsBool(e)) boolPinned[e] = -1 else intPinnedSet[e - problem.numBoolVars] = false
             levelPop()
         }
-        state.undoTo(levelLast().mark)
-        lastImplied = levelLast().implied
+        state.undoTo(levelLast())
     }
 
     /** Pop until [v] of [kind] is no longer pinned. No-op if [v] is already unpinned. */
     fun popUntilUnpinned(kind: VarKind, v: Int) {
         val pinned = when (kind) {
-            VarKind.Bool -> pinnedBools.containsKey(v)
-            VarKind.Int -> pinnedInts.containsKey(v)
+            VarKind.Bool -> boolPinned[v] != -1
+            VarKind.Int -> intPinnedSet[v]
         }
         if (!pinned) return
-        while (trail.isNotEmpty()) {
-            val top = trail.last()
+        val target = if (kind == VarKind.Bool) encBool(v) else encInt(v)
+        while (trail.size > 0) {
+            val top = trail[trail.size - 1]
             popLast()
-            if (top.first == kind && top.second == v) break
+            if (top == target) break
         }
     }
 
-    /** Snapshot the current pin set as an [Assumptions]. Maps are fresh copies. */
-    fun currentAssumptions(): Assumptions =
-        Assumptions(bools = pinnedBools.toMap(), ints = pinnedInts.toMap())
+    /** Snapshot the current pin set as an [Assumptions]. Maps are fresh copies, in trail
+     *  (decision) order. */
+    fun currentAssumptions(): Assumptions {
+        val bools = LinkedHashMap<Int, Boolean>()
+        val ints = LinkedHashMap<Int, Int>()
+        for (i in 0 until trail.size) {
+            val e = trail[i]
+            if (trailIsBool(e)) bools[e] = boolPinned[e] == 1
+            else { val iv = e - problem.numBoolVars; ints[iv] = intPinnedVal[iv] }
+        }
+        return Assumptions(bools = bools, ints = ints)
+    }
 
     /** The (kind, var) decision at [level] (1-based), or `null` if [level] is out of range. */
-    fun decisionAt(level: Int): Pair<VarKind, Int>? =
-        if (level in 1..trail.size) trail.elementAt(level - 1) else null
+    fun decisionAt(level: Int): Pair<VarKind, Int>? {
+        if (level !in 1..trail.size) return null
+        val e = trail[level - 1]
+        return if (trailIsBool(e)) VarKind.Bool to e else VarKind.Int to (e - problem.numBoolVars)
+    }
 
     /**
      * Build a fresh [PropagationResult.Implied] from the propagation state, excluding
      * already-pinned vars. Iterates the var spaces in ascending id order so the resulting
-     * primitive arrays are naturally sorted — no separate sort step required.
+     * primitive arrays are naturally sorted — no separate sort step required. Used only for
+     * [seed]'s full-implied return (the hot push path uses the incremental [impliedSince]).
      */
     private fun computeImplied(): PropagationResult.Implied {
         val bKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         val bVals = ArrayList<Boolean>()
         for (v in 0 until problem.numBoolVars) {
             val b = state.boolValues[v] ?: continue
-            if (pinnedBools[v] == b) continue
+            if (boolPinned[v] != -1) continue
             bKeys.add(v); bVals.add(b)
         }
         val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
@@ -286,7 +303,7 @@ class PropagationSession(val problem: Problem) {
         for (v in 0 until problem.numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
-                if (pinnedInts[v] == d.min) continue
+                if (intPinnedSet[v]) continue
                 iKeys.add(v); iVals.add(d.min)
             }
         }
@@ -299,22 +316,48 @@ class PropagationSession(val problem: Problem) {
     }
 
     /**
-     * Filter [current] to entries that differ from [previous]. Both sides are key-sorted,
-     * so we walk in lockstep with binary-search misses replacing the old Map filtering.
+     * Newly-implied facts of a push (its "diff"): the variables mutated since undo position
+     * [base] that are now *determined* (bool assigned / int domain singleton) and aren't
+     * themselves decision pins. This is exactly the set the old `computeImplied` +
+     * `diffAgainst` produced, but read straight off the state's undo log in O(changes)
+     * rather than scanning every variable. Keys come out sorted ascending (matching the old
+     * ascending-id build), as [PropagationResult.Implied]'s binary-search lookups require.
      */
-    private fun diffAgainst(
-        current: PropagationResult.Implied,
-        previous: PropagationResult.Implied,
-    ): PropagationResult.Implied {
-        val bKeys = com.eignex.klause.util.IntArrayList(initialCapacity = current.numBools)
-        val bVals = ArrayList<Boolean>(current.numBools)
-        current.forEachBool { k, v ->
-            if (previous.boolValueOrNull(k) != v) { bKeys.add(k); bVals.add(v) }
+    private fun impliedSince(base: Int): PropagationResult.Implied {
+        val top = state.undoTop
+        if (top <= base) return PropagationResult.Implied.Empty
+        val bRaw = com.eignex.klause.util.IntArrayList()
+        val iRaw = com.eignex.klause.util.IntArrayList()
+        for (i in base until top) {
+            val v = state.undoVarAt(i)
+            if (state.undoIsBoolAt(i)) bRaw.add(v) else iRaw.add(v)
         }
-        val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = current.numInts)
-        val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = current.numInts)
-        current.forEachInt { k, v ->
-            if (previous.intValueOrNull(k) != v) { iKeys.add(k); iVals.add(v) }
+        val bKeys = com.eignex.klause.util.IntArrayList()
+        val bVals = ArrayList<Boolean>()
+        if (bRaw.size > 0) {
+            val sorted = bRaw.toIntArray(); sorted.sort()
+            var prev = -1
+            for (v in sorted) {
+                if (v == prev) continue
+                prev = v
+                if (boolPinned[v] != -1) continue        // decision var — excluded from implied
+                val b = state.boolValues[v] ?: continue   // must be determined
+                bKeys.add(v); bVals.add(b)
+            }
+        }
+        val iKeys = com.eignex.klause.util.IntArrayList()
+        val iVals = com.eignex.klause.util.IntArrayList()
+        if (iRaw.size > 0) {
+            val sorted = iRaw.toIntArray(); sorted.sort()
+            var prev = -1
+            for (v in sorted) {
+                if (v == prev) continue
+                prev = v
+                if (intPinnedSet[v]) continue             // decision var — excluded
+                val d = state.intDomains[v]
+                if (d.min != d.max) continue               // not yet determined
+                iKeys.add(v); iVals.add(d.min)
+            }
         }
         return PropagationResult.Implied(
             boolKeys = bKeys.toIntArray(),
