@@ -665,6 +665,12 @@ class PropagationState(
      *  a singleton, so this never allocates. Read-only: [undoTo] only iterates it. */
     private val EMPTY_PAYLOADS: Map<Int, SnapshottablePayload> = emptyMap()
 
+    /** Reusable conflict analyzer for this state — one instance whose scratch buffers
+     *  persist across conflicts instead of reallocating per analysis. Single-threaded
+     *  session, so [LazyThreadSafetyMode.NONE] is safe and skips the sync overhead.
+     *  Created on the first conflict. */
+    internal val conflictAnalyzer: ConflictAnalyzer by lazy(LazyThreadSafetyMode.NONE) { ConflictAnalyzer(this) }
+
     /** When false, mutators skip undo-log recording. Default off so the one-shot
      *  propagation path ([Problem.propagate]) and bake-time fixpoint — neither of which
      *  backtracks — pay nothing. [PropagationSession] flips it true after bake, before its

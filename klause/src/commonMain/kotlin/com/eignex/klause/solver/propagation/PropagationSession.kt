@@ -216,9 +216,9 @@ class PropagationSession(val problem: Problem) {
         val learned: ConflictAnalyzer.AnalysisResult? = run {
             val failingFid = state.currentFactor
             when {
-                failingFid >= 0 -> ConflictAnalyzer(state).analyze(failingFid)
+                failingFid >= 0 -> state.conflictAnalyzer.analyze(failingFid)
                 state.lastDecisionConflictVar >= 0 ->
-                    ConflictAnalyzer(state).analyzeDecisionConflict(state.lastDecisionConflictVar)
+                    state.conflictAnalyzer.analyzeDecisionConflict(state.lastDecisionConflictVar)
                 else -> null
             }
         }

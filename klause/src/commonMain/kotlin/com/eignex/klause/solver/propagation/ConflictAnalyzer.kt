@@ -29,6 +29,22 @@ import com.eignex.klause.util.IntArrayList
  */
 class ConflictAnalyzer internal constructor(private val state: PropagationState) {
 
+    // Reusable per-analysis scratch — grown once and cleared per call instead of
+    // reallocating three O(numVars) BooleanArrays on every conflict. [universe] is the live
+    // var space (bool vars + atoms) for the current analysis; all loops bound by it, since
+    // a buffer may be larger than the current universe after a deeper earlier conflict.
+    private var universe = 0
+    private var seen = BooleanArray(0)
+    private var inClause = BooleanArray(0)
+    private var toDrop = BooleanArray(0)
+
+    /** Return [arr] if already ≥ [n], else a fresh array; either way clear `[0, n)` to false. */
+    private fun scratch(arr: BooleanArray, n: Int): BooleanArray {
+        val a = if (arr.size >= n) arr else BooleanArray(n)
+        a.fill(false, 0, n)
+        return a
+    }
+
     sealed interface AnalysisResult {
         /**
          * @param literals the learned clause (disjunction of literals). At least one literal
@@ -115,11 +131,12 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         // so we sweep them after the bool trail is exhausted at currentLevel).
         val numBoolVars = state.problem.numBoolVars
         val atomCount = state.atomIntVar.size
-        val seen = BooleanArray(numBoolVars + atomCount)
+        universe = numBoolVars + atomCount
+        seen = scratch(seen, universe)
         var currentLevelCount = 0
         val learned = IntArrayList(seedReason.size)
 
-        ingestReason(seedReason, seen, learned, currentLevel) {
+        ingestReason(seedReason, learned, currentLevel) {
             currentLevelCount++
         }
 
@@ -155,14 +172,14 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
                 ?: run {
                     // Leaf pivot — promote and drain the rest.
                     learned.add(uipLit(pivot))
-                    drainSeenAsLeaves(seen, learned)
+                    drainSeenAsLeaves(learned)
                     return finalizeClause(learned, currentLevel)
                 }
-            ingestReason(antecedents, seen, learned, currentLevel) {
+            ingestReason(antecedents, learned, currentLevel) {
                 currentLevelCount++
             }
         }
-        drainSeenAsLeaves(seen, learned)
+        drainSeenAsLeaves(learned)
         return finalizeClause(learned, currentLevel)
     }
 
@@ -231,14 +248,14 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      */
     private fun minimize(learned: IntArrayList, currentLevel: Int): IntArrayList {
         if (learned.size <= 1) return learned
-        val universeSize = state.problem.numBoolVars + state.atomIntVar.size
-        val inClause = BooleanArray(universeSize)
+        val universeSize = universe
+        inClause = scratch(inClause, universeSize)
         for (i in 0 until learned.size) {
             val v = Lit.variable(learned[i])
-            if (v < inClause.size) inClause[v] = true
+            if (v < universeSize) inClause[v] = true
         }
         val cache = HashMap<Int, Boolean>(learned.size * 4)
-        val toDrop = BooleanArray(universeSize)
+        toDrop = scratch(toDrop, universeSize)
         var dropCount = 0
         for (i in 0 until learned.size) {
             val v = Lit.variable(learned[i])
@@ -302,7 +319,6 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      */
     private fun ingestReason(
         reason: IntArray,
-        seen: BooleanArray,
         learned: IntArrayList,
         currentLevel: Int,
         bumpCurrentLevel: () -> Unit,
@@ -310,7 +326,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         val numBoolVars = state.problem.numBoolVars
         for (lit in reason) {
             val v = Lit.variable(lit)
-            if (v >= seen.size) continue  // atom allocated after analyzer started; shouldn't happen
+            if (v >= universe) continue  // atom allocated after analyzer started; shouldn't happen
             if (seen[v]) continue
             val lvl = levelOf(v)
             if (lvl <= 0) continue
@@ -332,9 +348,9 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     }
 
     /** Convert every still-seen variable into a literal in [learned]. */
-    private fun drainSeenAsLeaves(seen: BooleanArray, learned: IntArrayList) {
+    private fun drainSeenAsLeaves(learned: IntArrayList) {
         val numBoolVars = state.problem.numBoolVars
-        for (v in seen.indices) {
+        for (v in 0 until universe) {
             if (!seen[v]) continue
             val lit: Int = if (v < numBoolVars) {
                 val pinned = state.boolValues[v] ?: continue
