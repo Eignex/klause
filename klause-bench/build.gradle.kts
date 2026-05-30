@@ -224,6 +224,22 @@ tasks.register<JavaExec>("runSolverSweep") {
     }
 }
 
+tasks.register<JavaExec>("runCblsDiag") {
+    group = "verification"
+    description = "Diagnose CBLS feasibility plateaus: cost trajectory + violated-class histogram + flat-gradient fraction."
+    notCompatibleWithConfigurationCache(
+        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
+    )
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.CblsDiagMain")
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.cblsdiag.")) systemProperty(key, v.toString())
+        }
+    }
+}
+
 /** Compile-only audit across the corpus. Per instance: MiniZinc → FZN, parse constraint
  *  kinds, optional klause-fzn-cli ingest smoke. Useful for spotting MiniZinc-side
  *  decomposition and per-family compile breakage without running any solve. See

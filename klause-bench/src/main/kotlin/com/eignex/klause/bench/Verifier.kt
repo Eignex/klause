@@ -49,6 +49,6 @@ object Verifier {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
         state.recompute()
-        return state.cost == 0
+        return state.cost == 0L
     }
 }
