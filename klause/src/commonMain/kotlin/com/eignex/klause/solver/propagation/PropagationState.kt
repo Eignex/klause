@@ -1259,13 +1259,15 @@ class PropagationState(
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1  // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
-            currentLevel = maxLevelForVars(f.boolVars, f.intVars)
-            // For learned Clauses (which may carry atom-lits), also consider the atoms'
-            // levels — those participate in the factor's "effective decision level".
-            if (f is com.eignex.klause.solver.factor.Clause) {
-                val clauseLevel = maxLevelForClause(f.literals)
-                if (clauseLevel > currentLevel) currentLevel = clauseLevel
-            }
+            // A Clause's [boolVars] is exactly the deduplicated variable set of its
+            // [literals] (atom-lits included) and its [intVars] is empty, so
+            // maxLevelForClause computes the same max decision level maxLevelForVars
+            // would — scanning the literals directly avoids a redundant second O(arity)
+            // pass over the same variables on every fire (the BCP hot path).
+            currentLevel = if (f is com.eignex.klause.solver.factor.Clause)
+                maxLevelForClause(f.literals)
+            else
+                maxLevelForVars(f.boolVars, f.intVars)
             currentFactor = fid
             conflictLevels = null
             if (!f.propagate(this, fid)) {
