@@ -143,6 +143,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "diffn_nonstrict", "fzn_diffn_nonstrict", "klause_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
     "table_int", "fzn_table_int", "klause_table_int" -> emitTable(c)
     "regular", "fzn_regular", "klause_regular" -> emitRegular(c)
+    "mdd", "fzn_mdd", "klause_mdd" -> emitMdd(c)
     "circuit", "fzn_circuit", "klause_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit", "klause_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
@@ -835,6 +836,69 @@ internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
         else -> failHere("regular: expected set literal for F, got ${fSet::class.simpleName}")
     }
     factors.add(Regular(seq, Q, S, transitions, q0, accepting))
+}
+
+/**
+ * `mdd(x, N, level, E, from, label, to)` — layered multi-valued decision diagram acceptance.
+ * MiniZinc's node/level/edge DAG form: nodes `1..N` with `level[node]` (root = node 1 at
+ * level 1), edges `(from[e], label[e], to[e])` with `to = 0` denoting the terminal at level
+ * `|x|+1`. Translated to klause's layered [com.eignex.klause.solver.factor.Mdd]: per-level
+ * local state renumbering, with the terminal as the single accepting state of the last layer.
+ */
+internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
+    require(c.args.size == 7)
+    val seq = evalIntVarArray(c.args[0])
+    val n = seq.size
+    val level = evalIntConstArray(c.args[2])     // level[node-1], 1-based, nodes 1..N
+    val from = evalIntConstArray(c.args[4])       // edge source node (1..N)
+    val to = evalIntConstArray(c.args[6])         // edge target node (0=terminal, else 1..N)
+    // `label` is an `array of set of int` — either an inline literal or a named param array.
+    fun setOfExpr(e: FznExpr): IntArray = when (e) {
+        is FznExpr.IntSetLit -> IntArray(e.values.size) { e.values[it].toInt() }
+        is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
+        else -> failHere("mdd: expected set literal label, got ${e::class.simpleName}")
+    }
+    val labels: List<IntArray> = when (val la = c.args[5]) {
+        is FznExpr.ArrayLit -> la.elements.map(::setOfExpr)
+        is FznExpr.Ident -> (arrays[la.name] as? FlatZincArray.IntSetParam)?.values
+            ?: failHere("mdd: `${la.name}` is not a set-of-int parameter array")
+        else -> failHere("mdd: unsupported label arg ${la::class.simpleName}")
+    }
+    val numLayers = n + 1
+    // Local index per node within its layer. Layer i (0-based) ↔ level i+1. Terminal occupies
+    // the last layer (index n) as local state 0.
+    val localIdx = IntArray(level.size) { -1 }
+    val countPerLayer = IntArray(numLayers)
+    countPerLayer[n] = 1  // terminal
+    for (node in 1..level.size) {
+        val lyr = level[node - 1] - 1   // 0-based layer
+        if (lyr in 0 until n) { localIdx[node - 1] = countPerLayer[lyr]; countPerLayer[lyr]++ }
+        else if (lyr == n) localIdx[node - 1] = 0  // a node explicitly at terminal level
+    }
+    // Bucket transitions by layer, then flatten with layerStarts.
+    val perLayer = Array(numLayers) { ArrayList<Int>() }
+    for (e in from.indices) {
+        val lyr = level[from[e] - 1] - 1
+        if (lyr !in 0 until n) continue
+        val src = localIdx[from[e] - 1]
+        val dst = if (to[e] == 0) 0 else localIdx[to[e] - 1]
+        for (v in labels[e]) { perLayer[lyr].add(src); perLayer[lyr].add(v); perLayer[lyr].add(dst) }
+    }
+    // n decision layers (0..n-1) carry transitions; layerStarts has n+1 entries delimiting
+    // them (the terminal layer n has no outgoing transitions).
+    val transitions = ArrayList<Int>()
+    val layerStarts = IntArray(numLayers)   // = n + 1
+    for (lyr in 0 until n) { layerStarts[lyr] = transitions.size; transitions.addAll(perLayer[lyr]) }
+    layerStarts[n] = transitions.size
+    factors.add(com.eignex.klause.solver.factor.Mdd(
+        seq = seq,
+        numStatesPerLayer = countPerLayer,
+        layerStarts = layerStarts,
+        transitions = transitions.toIntArray(),
+        initial = 0,
+        accepting = intArrayOf(0),
+        recordStride = 3,
+    ))
 }
 
 /**

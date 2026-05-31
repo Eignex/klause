@@ -375,6 +375,25 @@ class AllFactorsOracleTest {
         check(f, intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 2)))
     }
 
+    @Test fun mdd() {
+        // 2-var MDD over {1,2} accepting exactly (1,2) and (2,1) — the layered form klause's
+        // FZN front-end builds from `mdd(...)`. Layer0 state0: 1→s0, 2→s1 (layer1); layer1
+        // s0: 2→terminal, s1: 1→terminal. Terminal (layer2 state0) is accepting.
+        val f = Mdd(
+            seq = intArrayOf(0, 1),
+            numStatesPerLayer = intArrayOf(1, 2, 1),
+            layerStarts = intArrayOf(0, 6, 12),
+            transitions = intArrayOf(
+                0, 1, 0,  0, 2, 1,   // layer 0
+                0, 2, 0,  1, 1, 0,   // layer 1
+            ),
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 3,
+        )
+        check(f, intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)))
+    }
+
     // ---- Set algebra (bitset) ----------------------------------------------------
 
     @Test fun setBitsetSubset() {
