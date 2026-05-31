@@ -71,19 +71,28 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
         collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Common domain = ∩ dom(xs[i]) — implement as [maxOfMins, minOfMaxes].
+        // Common domain = ∩ dom(xs[i]) — implement as [maxOfMins, minOfMaxes]. Track which
+        // operand supplies each binding bound so the learned-clause antecedents can name
+        // just that var rather than the whole array.
         var commonMin = Int.MIN_VALUE
         var commonMax = Int.MAX_VALUE
+        var minVar = xs[0]   // operand whose lower bound == commonMin
+        var maxVar = xs[0]   // operand whose upper bound == commonMax
         for (v in xs) {
             val d = state.intDomains[v]
-            if (d.min > commonMin) commonMin = d.min
-            if (d.max < commonMax) commonMax = d.max
+            if (d.min > commonMin) { commonMin = d.min; minVar = v }
+            if (d.max < commonMax) { commonMax = d.max; maxVar = v }
         }
         if (commonMin > commonMax) return false
-        val ant = state.composeIntVarAtomAntecedents(xs)
+        // Sharp antecedents: every operand equals every other, so `v ≥ commonMin` is forced
+        // *solely* by [minVar]'s lower bound (clause `¬[minVar ≥ commonMin] ∨ [v ≥ commonMin]`
+        // is valid since AllEqual ⟹ v = minVar), and likewise `v ≤ commonMax` by [maxVar].
+        // Citing only the binding var instead of all `xs` keeps learned clauses short.
+        val minAnt = state.composeIntVarAtomAntecedents(intArrayOf(minVar))
+        val maxAnt = state.composeIntVarAtomAntecedents(intArrayOf(maxVar))
         for (v in xs) {
-            if (!state.tightenIntMin(v, commonMin, ant)) return false
-            if (!state.tightenIntMax(v, commonMax, ant)) return false
+            if (!state.tightenIntMin(v, commonMin, minAnt)) return false
+            if (!state.tightenIntMax(v, commonMax, maxAnt)) return false
         }
         return true
     }

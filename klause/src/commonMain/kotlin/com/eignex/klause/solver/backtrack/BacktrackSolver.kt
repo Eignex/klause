@@ -450,7 +450,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     val ordered = applyPhase(varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                     val node = makeNode(varRef, ordered)
                     val decsBefore = decisionsLeft
-                    val out = advance(node, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })
+                    val out = advance(node, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- }, sink)
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
                         AdvanceOutcome.Success -> {
@@ -496,7 +496,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     val top = trail.last()
                     session.popLast()
                     val decsBefore = decisionsLeft
-                    val out = advance(top, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- })
+                    val out = advance(top, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- }, sink)
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
                         AdvanceOutcome.Success -> {
@@ -637,11 +637,16 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         pruneIf: ((PropagationSession) -> Boolean)?,
         decisionsRemaining: () -> Long,
         decrement: () -> Unit,
+        sink: com.eignex.klause.solver.SolveStatsSink? = null,
     ): AdvanceOutcome {
         while (true) {
             if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
             decrement()
+            val propsBefore = session.propagationCount
             val outcome = node.applyNext(session) ?: return AdvanceOutcome.Exhausted
+            // Count every factor-forced assignment this pin triggered — including the
+            // propagation done on the way to a conflict (Unsat returns below).
+            sink?.observePropagation(session.propagationCount - propsBefore)
             val r = outcome.result
             if (r is PropagationResult.Unsat) {
                 // Forward the full conflict reason record so activity-, weight-, and
