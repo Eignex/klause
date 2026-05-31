@@ -118,27 +118,27 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "all_different_int", "klause_all_different_int" -> emitAllDifferent(c)
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
     "alldifferent_except", "fzn_alldifferent_except" -> emitAllDifferentExcept(c)
-    "all_equal_int", "fzn_all_equal_int" -> emitAllEqual(c)
-    "member_int", "fzn_member_int" -> emitMember(c)
-    "sort", "fzn_sort" -> emitSort(c)
-    "arg_sort_int", "fzn_arg_sort_int", "arg_sort" -> emitArgSort(c)
-    "symmetric_all_different", "fzn_symmetric_all_different" -> emitSymmetricAllDifferent(c)
-    "inverse", "fzn_inverse" -> emitInverse(c, withOffsets = false)
+    "all_equal_int", "fzn_all_equal_int", "klause_all_equal_int" -> emitAllEqual(c)
+    "member_int", "fzn_member_int", "klause_member_int" -> emitMember(c)
+    "sort", "fzn_sort", "klause_sort" -> emitSort(c)
+    "arg_sort_int", "fzn_arg_sort_int", "klause_arg_sort_int", "arg_sort" -> emitArgSort(c)
+    "symmetric_all_different", "fzn_symmetric_all_different", "klause_symmetric_all_different" -> emitSymmetricAllDifferent(c)
+    "inverse", "fzn_inverse", "klause_inverse" -> emitInverse(c, withOffsets = false)
     "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
-    "nvalue", "fzn_nvalue" -> emitNValue(c, NValue.Mode.Eq)
+    "nvalue", "fzn_nvalue", "klause_nvalue" -> emitNValue(c, NValue.Mode.Eq)
     "atleast_nvalues", "fzn_atleast_nvalues" -> emitNValue(c, NValue.Mode.AtLeast)
     "atmost_nvalues", "fzn_atmost_nvalues" -> emitNValue(c, NValue.Mode.AtMost)
-    "lex_less_int", "fzn_lex_less_int" -> emitLexLess(c, strict = true)
-    "lex_lesseq_int", "fzn_lex_lesseq_int" -> emitLexLess(c, strict = false)
+    "lex_less_int", "fzn_lex_less_int", "klause_lex_less_int" -> emitLexLess(c, strict = true)
+    "lex_lesseq_int", "fzn_lex_lesseq_int", "klause_lex_lesseq_int" -> emitLexLess(c, strict = false)
     "arg_max_int", "fzn_arg_max_int" -> emitArgMinMax(c, max = true)
     "arg_min_int", "fzn_arg_min_int" -> emitArgMinMax(c, max = false)
-    "value_precede_int", "fzn_value_precede_int" -> emitValuePrecede(c)
-    "value_precede_chain_int", "fzn_value_precede_chain_int" -> emitValuePrecedeChain(c)
+    "value_precede_int", "fzn_value_precede_int", "klause_value_precede_int" -> emitValuePrecede(c)
+    "value_precede_chain_int", "fzn_value_precede_chain_int", "klause_value_precede_chain_int" -> emitValuePrecedeChain(c)
     "sequence", "fzn_sequence" -> emitSequence(c)
-    "knapsack", "fzn_knapsack" -> emitKnapsack(c)
-    "bin_packing", "fzn_bin_packing" -> emitBinPacking(c, BinPacking.Mode.UniformCapacity)
-    "bin_packing_capa", "fzn_bin_packing_capa" -> emitBinPacking(c, BinPacking.Mode.PerBinCapacity)
-    "bin_packing_load", "fzn_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
+    "knapsack", "fzn_knapsack", "klause_knapsack" -> emitKnapsack(c)
+    "bin_packing", "fzn_bin_packing", "klause_bin_packing" -> emitBinPacking(c, BinPacking.Mode.UniformCapacity)
+    "bin_packing_capa", "fzn_bin_packing_capa", "klause_bin_packing_capa" -> emitBinPacking(c, BinPacking.Mode.PerBinCapacity)
+    "bin_packing_load", "fzn_bin_packing_load", "klause_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
     "diffn", "fzn_diffn" -> emitDiffn(c, nonStrict = false)
     "diffn_nonstrict", "fzn_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
     "table_int", "fzn_table_int", "klause_table_int" -> emitTable(c)
@@ -174,7 +174,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "count_lt", "fzn_count_lt" -> emitCountOp(c, Count.Op.Lt)
     "count_ge", "fzn_count_geq", "count_geq" -> emitCountOp(c, Count.Op.Ge)
     "count_gt", "fzn_count_gt" -> emitCountOp(c, Count.Op.Gt)
-    "among", "fzn_among" -> emitAmong(c)
+    "among", "fzn_among", "klause_among" -> emitAmong(c)
     "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, lowUp = false, closed = false)
     "global_cardinality_closed", "fzn_global_cardinality_closed" -> emitGcc(c, lowUp = false, closed = true)
     "global_cardinality_low_up", "fzn_global_cardinality_low_up" -> emitGcc(c, lowUp = true, closed = false)
@@ -182,9 +182,9 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "distribute", "fzn_distribute" -> emitDistribute(c)
 
     // Ordering
-    "increasing_int", "fzn_increasing_int" -> emitMonotone(c, ascending = true, strict = false)
+    "increasing_int", "fzn_increasing_int", "klause_increasing_int" -> emitMonotone(c, ascending = true, strict = false)
     "decreasing_int", "fzn_decreasing_int" -> emitMonotone(c, ascending = false, strict = false)
-    "strictly_increasing_int", "fzn_strictly_increasing_int" -> emitMonotone(c, ascending = true, strict = true)
+    "strictly_increasing_int", "fzn_strictly_increasing_int", "klause_strictly_increasing_int" -> emitMonotone(c, ascending = true, strict = true)
     "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, ascending = false, strict = true)
 
     // Array min/max
@@ -1006,6 +1006,9 @@ internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean
 internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
+    // 0 or 1 variables are trivially all-different; the native AllDifferent factor requires
+    // ≥2, so skip it (matches the std decomposition's empty `forall(i<j)`).
+    if (vars.size < 2) return
     // Find the union of all involved int domains to size AllDifferent.
     var lo = Int.MAX_VALUE
     var hi = Int.MIN_VALUE
