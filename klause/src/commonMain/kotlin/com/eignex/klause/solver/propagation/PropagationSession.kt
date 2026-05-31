@@ -208,8 +208,6 @@ class PropagationSession(val problem: Problem) {
      * happen before restore, since restore wipes the level-to-var mapping.
      */
     private fun revertAndUnsat(levels: Set<Int>): PropagationResult.Unsat {
-        val bools = state.extractConflictBools(levels)
-        val ints = state.extractConflictInts(levels)
         // Must extract factors *before* restoring — restore wipes the seed + reason arrays.
         val factors = state.extractConflictFactors()
         // Run 1UIP analysis BEFORE restore — the analyzer walks `state.boolAntecedents` /
@@ -225,6 +223,19 @@ class PropagationSession(val problem: Problem) {
                     state.conflictAnalyzer.analyzeDecisionConflict(state.lastDecisionConflictVar)
                 else -> null
             }
+        }
+        // Conflict-reason variable sets for activity heuristics (VSIDS / dom-wdeg). When
+        // 1UIP analysis produced a clause, prefer the canonical CDCL bump set — every
+        // variable seen while walking the implication graph — over the coarse "decision
+        // vars at the conflict levels" extraction. Sharper conflict focus ⇒ fewer conflicts.
+        val bools: Set<Int>
+        val ints: Set<Int>
+        if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
+            bools = state.conflictAnalyzer.lastBumpBoolVars().toSet()
+            ints = state.conflictAnalyzer.lastBumpIntVars().toSet()
+        } else {
+            bools = state.extractConflictBools(levels)
+            ints = state.extractConflictInts(levels)
         }
         state.undoTo(levelLast())
         return PropagationResult.Unsat(bools, ints, levels, factors, learned)
