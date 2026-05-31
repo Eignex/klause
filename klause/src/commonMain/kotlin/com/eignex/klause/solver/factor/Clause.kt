@@ -60,6 +60,24 @@ class Clause(
         absent = -1,
     )
 
+    /** CP-only memo: are all literals plain bool vars (no atom-lits)? `null` until first
+     *  queried. A pure-bool clause only ever fires when a watched bool literal just went
+     *  false at the *current* decision level, so its effective level is exactly the current
+     *  decision level — letting the propagation dispatch skip the per-fire level scan. Atom-
+     *  lit clauses can fire on an atom that flipped at a sub-decision level, so they still
+     *  need the scan. Intrinsic to the clause (numBoolVars is fixed per Problem), so it's
+     *  valid across learned-clause forget/remap. Unused by the local-search path. */
+    private var pureBoolMemo: Boolean? = null
+
+    /** True iff every literal is a plain bool var (variable id `< numBoolVars`), memoised. */
+    fun allLiteralsBool(numBoolVars: Int): Boolean =
+        pureBoolMemo ?: run {
+            var allBool = true
+            for (lit in literals) if (Lit.variable(lit) >= numBoolVars) { allBool = false; break }
+            pureBoolMemo = allBool
+            allBool
+        }
+
     private class Watches(var w1: Int, var w2: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {

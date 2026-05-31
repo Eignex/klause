@@ -6,11 +6,65 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.Vsids
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 class AllDifferentTest {
+
+    /**
+     * Soundness gate for the Hall-set conflict/prune explanations. The complete CDCL
+     * backtracker (VSIDS + LBD clause forgetting, so the Hall-set antecedents are exercised
+     * by clause learning) must enumerate EXACTLY the brute-force solution set on a battery
+     * of small, Hall-prone AllDifferent instances. An unsound explanation would prune a
+     * feasible subtree → a missing solution → a smaller set; an over-broad one only slows
+     * search. Range domains (per the [AllDifferent] common-domain contract) suffice to force
+     * tight Hall structure (e.g. two vars confined to {0,1} force the rest off those values).
+     */
+    @Test
+    fun `backtrack learning enumerates exactly the brute-force solution set`() {
+        // Each instance: per-var inclusive [min,max] ranges over a shared value space.
+        val instances = listOf(
+            listOf(0 to 3, 0 to 3, 0 to 3, 0 to 3),                 // permutations of 0..3
+            listOf(0 to 1, 0 to 1, 0 to 3, 2 to 3),                 // Hall {v0,v1}⊆{0,1}
+            listOf(1 to 3, 2 to 3, 3 to 3, 0 to 3),                 // cascading singleton
+            listOf(0 to 2, 1 to 2, 0 to 1, 0 to 2),                 // overlapping tight set
+            listOf(0 to 2, 1 to 3, 2 to 4, 0 to 4, 0 to 4),         // 5 vars, mixed widths
+        )
+        for ((idx, ranges) in instances.withIndex()) {
+            val k = ranges.size
+            val lo = ranges.minOf { it.first }
+            val hi = ranges.maxOf { it.second }
+            // Brute-force reference: every per-var value combination that is all-different.
+            val brute = HashSet<List<Int>>()
+            fun rec(i: Int, acc: IntArray) {
+                if (i == k) { if (acc.toHashSet().size == k) brute.add(acc.toList()); return }
+                for (v in ranges[i].first..ranges[i].second) { acc[i] = v; rec(i + 1, acc) }
+            }
+            rec(0, IntArray(k))
+
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = k,
+                intDomains = Array(k) { IntDomain(ranges[it].first, ranges[it].second) },
+                factors = arrayOf<Factor>(AllDifferent(IntArray(k) { it }, domainMin = lo, domainSize = hi - lo + 1)),
+            )
+            // CDCL config so conflict analysis + clause learning (hence the Hall-set
+            // explanations) actually run; no restarts to keep enumeration completeness simple.
+            val params = BacktrackParams(
+                randomSeed = 1,
+                variableHeuristic = Vsids(),
+                maxLearnedClauses = 1_000,
+            )
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
+        }
+    }
 
     @Test
     fun `four vars permutation over four values`() {

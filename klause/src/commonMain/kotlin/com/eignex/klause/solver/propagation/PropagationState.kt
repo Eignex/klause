@@ -729,20 +729,12 @@ class PropagationState(
      */
     fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
         if (oldLit == newLit) return
-        // Remove from old.
+        // Remove from old (swap-remove via a tight hoisted-local scan inside IntArrayList).
         val oldV = com.eignex.klause.solver.Lit.variable(oldLit)
         if (oldV < problem.numBoolVars) {
-            val from = boolWatchersByLit[oldLit]
-            for (i in 0 until from.size) {
-                if (from[i] == factorId) { from.removeAt(i); break }
-            }
+            boolWatchersByLit[oldLit].removeValue(factorId)
         } else {
-            val from = atomWatchersByLit[oldLit]
-            if (from != null) {
-                for (i in 0 until from.size) {
-                    if (from[i] == factorId) { from.removeAt(i); break }
-                }
-            }
+            atomWatchersByLit[oldLit]?.removeValue(factorId)
         }
         // Install on new.
         installLitWatch(newLit, factorId)
@@ -1259,13 +1251,21 @@ class PropagationState(
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1  // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
-            currentLevel = maxLevelForVars(f.boolVars, f.intVars)
-            // For learned Clauses (which may carry atom-lits), also consider the atoms'
-            // levels — those participate in the factor's "effective decision level".
-            if (f is com.eignex.klause.solver.factor.Clause) {
-                val clauseLevel = maxLevelForClause(f.literals)
-                if (clauseLevel > currentLevel) currentLevel = clauseLevel
-            }
+            // Level for the firing factor. A Clause's effective level is the max decision
+            // level over its literals; its [boolVars] is the deduplicated variable set of
+            // those literals and its [intVars] is empty, so maxLevelForVars is redundant
+            // with maxLevelForClause (a second O(arity) pass over the same variables on
+            // every fire — the BCP hot path). Better still: a *pure-bool* clause only ever
+            // fires when a watched bool literal just went false at the current decision
+            // level (bools are only pinned by decisions or clause propagation, all stamped
+            // at the current level), so its effective level is exactly the current decision
+            // level — no scan at all. Atom-lit clauses can fire on an atom that flipped at a
+            // sub-decision level, so they keep the literal scan.
+            currentLevel = if (f is com.eignex.klause.solver.factor.Clause)
+                if (f.allLiteralsBool(problem.numBoolVars)) levelToDecisionVar.size
+                else maxLevelForClause(f.literals)
+            else
+                maxLevelForVars(f.boolVars, f.intVars)
             currentFactor = fid
             conflictLevels = null
             if (!f.propagate(this, fid)) {

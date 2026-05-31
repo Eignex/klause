@@ -71,13 +71,23 @@ class Linear(
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         propagateLinearBounds(state, coeffs, vars, op, bound.toLong())
 
-    /** Reason set when [propagate] returns false: the current-bound atoms of every
-     *  participating var in their currently-false polarity. The sum's reachable range
-     *  proves infeasibility against [bound]; flipping any one of these bounds is a
-     *  necessary condition for satisfiability. Sound; analyzer 1UIP minimisation
-     *  trims redundancies. */
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
+    /** Reason set when [propagate] returns false. The conflict comes from exactly one sum
+     *  extreme breaching [bound]: `LE` / `EQ`-with-`sumLo>bound` from the lo side (`Σ rLo`),
+     *  `GE` / `EQ`-with-`sumHi<bound` from the hi side (`Σ rHi`). Cite only that side's
+     *  driving bounds (see [collectLinearDirAntecedents]) — those alone prove infeasibility,
+     *  so the nogood is sharper and more reusable than citing both bounds of every var.
+     *  `NE` (sum pinned to `bound`) needs both bounds, so it keeps the dense reason. Sound;
+     *  analyzer 1UIP minimisation trims any remaining redundancy. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        if (op == LinearOp.NE) return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
+        val range = linearSumRange(state, coeffs, vars)  // [sumLo, sumHi]
+        val useLo = when (op) {
+            LinearOp.LE -> true
+            LinearOp.GE -> false
+            else -> range[0] > bound.toLong()  // EQ: lo side (mins too big) vs hi side
+        }
+        return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
+    }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val sum = state.intPayload[factorId]
@@ -328,6 +338,64 @@ internal fun collectHoleAndBoundAntecedents(
     return out.toIntArray()
 }
 
+/**
+ * Direction-aware LCG antecedents for a linear deduction. A deduction (a bound tighten, or
+ * the whole-constraint conflict) is driven by exactly one of the two reachable sum extremes:
+ *   - **lo side** (`Σ rLo`, used by `LE` upper-bounds and the `sumLo > bound` conflict):
+ *     each var's contribution is `c·min` for `c>0` (cite `[v ≥ min]`) or `c·max` for `c<0`
+ *     (cite `[v ≤ max]`).
+ *   - **hi side** (`Σ rHi`, used by `GE` lower-bounds and the `sumHi < bound` conflict):
+ *     mirror — `c·max` for `c>0` (cite `[v ≤ max]`), `c·min` for `c<0` (cite `[v ≥ min]`).
+ *
+ * Only the literals on the driving side are cited (and only when tighter than the original
+ * domain — root-level bounds are global facts the analyzer minimises out). The opposite-side
+ * bounds and zero-coefficient vars play no part in the inequality, so omitting them yields a
+ * strictly more general nogood without changing soundness — the cited bounds alone prove the
+ * deduction. Sharper than [collectLinearTightenAntecedents] (which cited both bounds of every
+ * var), so learned clauses generalise and prune across more of the search.
+ */
+internal fun collectLinearDirAntecedents(
+    state: PropagationState,
+    coeffs: IntArray,
+    vars: IntArray,
+    excludeIdx: Int,
+    extraLit: Int,
+    useLo: Boolean,
+): IntArray? {
+    val seen = HashSet<Int>()
+    val out = IntArrayList()
+    if (extraLit != 0) { out.add(extraLit); seen.add(extraLit) }
+    var anyAboveRoot = false
+    for (j in vars.indices) {
+        if (j == excludeIdx) continue
+        if (state.intLevel[vars[j]] > 0) { anyAboveRoot = true; break }
+    }
+    for (j in vars.indices) {
+        if (j == excludeIdx) continue
+        val c = coeffs[j]
+        if (c == 0) continue
+        val v = vars[j]
+        if (anyAboveRoot && state.intLevel[v] <= 0) continue
+        // Which bound of this var feeds the driving sum side?
+        val citeMin = if (useLo) c > 0 else c < 0
+        val d = state.intDomains[v]
+        val orig = state.problem.intDomains[v]
+        if (citeMin) {
+            if (d.min > orig.min) {
+                val lit = com.eignex.klause.solver.Lit.make(state.atomVarGe(v, d.min), false)
+                if (seen.add(lit)) out.add(lit)
+            }
+        } else {
+            if (d.max < orig.max) {
+                val lit = com.eignex.klause.solver.Lit.make(state.atomVarLe(v, d.max), false)
+                if (seen.add(lit)) out.add(lit)
+            }
+        }
+    }
+    if (out.size == 0) return null
+    return out.toIntArray()
+}
+
 internal fun collectLinearTightenAntecedents(
     state: PropagationState,
     vars: IntArray,
@@ -420,9 +488,10 @@ internal fun propagateLinearBounds(
         val v = vars[i]
         val otherLo = sumLo - rLo[i]
         val otherHi = sumHi - rHi[i]
-        val ant = collectLinearTightenAntecedents(state, vars, i, extraLit)
         if (op == LinearOp.LE || op == LinearOp.EQ) {
+            // Upper-bound tighten driven by the lo side (Σ rLo of the other vars).
             val slack = bound - otherLo
+            val ant = collectLinearDirAntecedents(state, coeffs, vars, i, extraLit, useLo = true)
             if (c > 0) {
                 if (!tightenMaxClamped(state, v, floorDivLong(slack, c), ant)) return false
             } else {
@@ -430,7 +499,9 @@ internal fun propagateLinearBounds(
             }
         }
         if (op == LinearOp.GE || op == LinearOp.EQ) {
+            // Lower-bound tighten driven by the hi side (Σ rHi of the other vars).
             val needed = bound - otherHi
+            val ant = collectLinearDirAntecedents(state, coeffs, vars, i, extraLit, useLo = false)
             if (c > 0) {
                 if (!tightenMinClamped(state, v, ceilDivLong(needed, c), ant)) return false
             } else {

@@ -416,9 +416,11 @@ class FactorConflictReasonTest {
         assertEquals(3, state.intDomains[1].min)
         assertEquals(3, state.intDomains[1].max)
         // Allocate atom [v1 ≥ 3]: should hold (currently true), level 1 (when v1.min
-        // was tightened by Linear), antecedents from intMinAntecedents[v1] — which under
-        // the atom-lit migration are the per-bound premise atoms over v0: ¬[v0≥5] and
-        // ¬[v0≤5] (Linear's collectLinearTightenAntecedents emits these for the other vars).
+        // was tightened by Linear), antecedents from intMinAntecedents[v1]. v1's *lower*
+        // bound was forced by `v0 + v1 = 8` via the hi side (v1 ≥ 8 − v0.max = 8 − 5 = 3),
+        // so it depends only on v0.max — i.e. ¬[v0≤5]. The direction-aware antecedent
+        // collection (collectLinearDirAntecedents) correctly omits the irrelevant ¬[v0≥5]
+        // (v0's lower bound plays no part in v1's lower bound), yielding a sharper reason.
         val atomVarGE3 = state.atomVarGe(1, 3)
         val atomId = state.atomIdOf(atomVarGE3)
         assertEquals(1, state.atomValue[atomId], "atom [v1≥3] should hold (v1.min=3≥3)")
@@ -428,8 +430,10 @@ class FactorConflictReasonTest {
         val ge5 = Lit.make(state.atomVarGe(0, 5), false)
         val le5 = Lit.make(state.atomVarLe(0, 5), false)
         val antSet = ant!!.toSet()
-        assertTrue(ge5 in antSet && le5 in antSet,
-            "atom antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${ant.toList()}")
+        assertTrue(le5 in antSet,
+            "atom antecedents should contain the driving bound ¬[v0≤5], got ${ant.toList()}")
+        assertTrue(ge5 !in antSet,
+            "direction-aware reason should omit the irrelevant ¬[v0≥5], got ${ant.toList()}")
         // Allocate a second atom [v1 ≥ 10] — should be false (v1.max=3 < 10).
         val atomVarGE10 = state.atomVarGe(1, 10)
         val atomId10 = state.atomIdOf(atomVarGE10)

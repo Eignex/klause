@@ -20,6 +20,23 @@ class IntArrayList(initialCapacity: Int = 8) {
         data[index] = data[--size]
     }
 
+    /** Find the first occurrence of [value] and swap-remove it (O(1) removal, O(n) find);
+     *  returns true if found. Hoists [data] / [size] into locals so the scan is a tight
+     *  primitive-array loop with no per-iteration accessor or field reload — this is the
+     *  hot watcher-list removal in [com.eignex.klause.solver.propagation.PropagationState.moveBoolWatcher]. */
+    fun removeValue(value: Int): Boolean {
+        val d = data
+        val n = size
+        for (i in 0 until n) {
+            if (d[i] == value) {
+                d[i] = d[n - 1]
+                size = n - 1
+                return true
+            }
+        }
+        return false
+    }
+
     fun clear() {
         size = 0
     }
@@ -32,6 +49,14 @@ class IntArrayList(initialCapacity: Int = 8) {
     }
 
     fun toIntArray(): IntArray = data.copyOf(size)
+
+    /** Snapshot the current contents as a `Set<Int>` (deduplicating). Boxes — intended for
+     *  occasional use (e.g. building a conflict-reason set), not hot loops. */
+    fun toSet(): Set<Int> {
+        val s = HashSet<Int>(size)
+        for (i in 0 until size) s.add(data[i])
+        return s
+    }
 
     fun indexOf(value: Int): Int {
         for (i in 0 until size) if (data[i] == value) return i

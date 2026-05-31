@@ -38,6 +38,21 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     private var inClause = BooleanArray(0)
     private var toDrop = BooleanArray(0)
 
+    // Variables encountered (resolved through or kept) during the most recent analysis —
+    // the canonical CDCL VSIDS bump set (MiniSAT/Glucose bump every var seen while walking
+    // the implication graph, not just the decision vars at the conflict levels). Recorded
+    // as a side effect of [ingestReason]; bool-var ids in [bumpBool], underlying int-var
+    // ids (decoded from touched atoms) in [bumpInt]. Reused across analyses to avoid
+    // per-conflict allocation; the engine reads them after [analyze] when a clause is learned.
+    private val bumpBoolVars = IntArrayList()
+    private val bumpIntVars = IntArrayList()
+
+    /** Bool vars seen during the last analysis (the VSIDS bump set). Valid only when the
+     *  last call returned [AnalysisResult.Learned]; cleared at the start of each analysis. */
+    fun lastBumpBoolVars(): IntArrayList = bumpBoolVars
+    /** Underlying int vars seen during the last analysis (via touched atom-lits). */
+    fun lastBumpIntVars(): IntArrayList = bumpIntVars
+
     /** Return [arr] if already ≥ [n], else a fresh array; either way clear `[0, n)` to false. */
     private fun scratch(arr: BooleanArray, n: Int): BooleanArray {
         val a = if (arr.size >= n) arr else BooleanArray(n)
@@ -133,6 +148,8 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         val atomCount = state.atomIntVar.size
         universe = numBoolVars + atomCount
         seen = scratch(seen, universe)
+        bumpBoolVars.clear()
+        bumpIntVars.clear()
         var currentLevelCount = 0
         val learned = IntArrayList(seedReason.size)
 
@@ -331,6 +348,9 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             val lvl = levelOf(v)
             if (lvl <= 0) continue
             seen[v] = true
+            // Record for the VSIDS bump set (every conflict-side var, MiniSAT-style).
+            if (v < numBoolVars) bumpBoolVars.add(v)
+            else bumpIntVars.add(state.atomIntVar[v - numBoolVars])
             if (lvl == currentLevel) {
                 bumpCurrentLevel()
             } else {
