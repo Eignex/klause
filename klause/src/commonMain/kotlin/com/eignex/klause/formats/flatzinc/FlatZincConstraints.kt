@@ -143,8 +143,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "diffn_nonstrict", "fzn_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
     "table_int", "fzn_table_int", "klause_table_int" -> emitTable(c)
     "regular", "fzn_regular", "klause_regular" -> emitRegular(c)
-    "circuit", "fzn_circuit" -> emitCircuit(c, sub = false)
-    "subcircuit", "fzn_subcircuit" -> emitCircuit(c, sub = true)
+    "circuit", "fzn_circuit", "klause_circuit" -> emitCircuit(c, sub = false)
+    "subcircuit", "fzn_subcircuit", "klause_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
     "disjunctive", "fzn_disjunctive",
     "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c)

@@ -61,11 +61,18 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         state.intPayload[factorId] > 0
 
+    /** Graded violation: the [computeCost] distance to a single Hamiltonian cycle
+     *  (`|numCycles−1| + unreached-nodes + self-loops + out-of-bounds`). Exposing this magnitude
+     *  — rather than a binary flag — gives CBLS a gradient that rewards moves merging cycles
+     *  and reaching more nodes, the signal successor-encoded routing (e.g. cvrp) needs. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        state.intPayload[factorId]
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val pos = positionOfVar[intVar] ?: return 0
         val oldCost = state.intPayload[factorId]
         val newCost = computeCost(state, replaceAt = pos, replaceWith = newValue)
-        return (if (newCost > 0) 1 else 0) - (if (oldCost > 0) 1 else 0)
+        return newCost - oldCost
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -73,7 +80,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         val oldCost = state.intPayload[factorId]
         val newCost = computeCost(state, replaceAt = -1, replaceWith = 0)
         state.intPayload[factorId] = newCost
-        return (if (newCost > 0) 1 else 0) - (if (oldCost > 0) 1 else 0)
+        return newCost - oldCost
     }
 
     /**
