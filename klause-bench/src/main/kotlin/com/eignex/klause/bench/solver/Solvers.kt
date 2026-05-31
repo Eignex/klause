@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.solver
 
+import com.eignex.klause.choco.ChocoParams
+import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
 import com.eignex.klause.solver.Problem
@@ -105,11 +107,25 @@ private class BruteForceBench(
     override fun samplesSequence() = s.samples(params)
 }
 
+private class ChocoBench(
+    override val problem: Problem,
+    private val params: ChocoParams = ChocoParams(),
+) : InProcessSolver {
+    private val s = ChocoSolver(problem)
+    override val name = "choco"
+    override fun solve() = s.solve(params)
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
+    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
+}
+
 object Solvers {
     val KLAUSE_LS = SolverConfig("local-search", Backend.KLAUSE_LS)
     val KLAUSE_COMPLETE = SolverConfig("backtrack", Backend.KLAUSE_COMPLETE)
     val LOGICNG = SolverConfig("logicng", Backend.LOGICNG)
     val BRUTE_FORCE = SolverConfig("brute-force", Backend.BRUTE_FORCE)
+    val CHOCO = SolverConfig("choco", Backend.CHOCO)
 
     /** Build a bound solver for [problem]. */
     fun build(config: SolverConfig, problem: Problem): InProcessSolver = when (config.backend) {
@@ -117,8 +133,8 @@ object Solvers {
         Backend.KLAUSE_COMPLETE -> BacktrackBench(problem)
         Backend.LOGICNG -> LogicNGBench(problem)
         Backend.BRUTE_FORCE -> BruteForceBench(problem)
-        Backend.CHOCO, Backend.OSCAR_CBLS ->
-            error("${config.backend} reference adapter is wired in phase 2")
+        Backend.CHOCO -> ChocoBench(problem)
+        Backend.OSCAR_CBLS -> error("OscaR.cbls LS reference adapter is not yet wired")
     }
 
     /** The default in-process portfolio, mirroring the legacy `defaultSolvers`: LS +

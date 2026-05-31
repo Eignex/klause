@@ -6,6 +6,7 @@ import com.eignex.klause.bench.metric.Agreement
 import com.eignex.klause.bench.metric.Verifier
 import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.solver.SolveResult
 
 /** Resolved + cross-checked corpus, split into the full verify set and the benchable
@@ -21,6 +22,12 @@ data class LoadedCorpus(
  * is not in-process (e.g. MiniZinc) are skipped here — they belong to the phase-2 runners.
  */
 object BenchLoad {
+    /** Resolve every problem in the given suites with the appropriate runner (MiniZinc compile
+     *  or in-process), without the cross-backend verify gate. Used by differential metrics
+     *  (parity) that *are* the comparison. */
+    fun resolve(suiteIds: List<String>): List<ResolvedProblem> =
+        Catalog.problems(*suiteIds.toTypedArray()).map { Runners.resolve(it) }
+
     fun loadAndVerify(suiteIds: List<String>, quiet: Boolean = false): LoadedCorpus {
         val refs: List<ProblemRef> = Catalog.problems(*suiteIds.toTypedArray())
             .filter { InProcessRunner.supports(it) }

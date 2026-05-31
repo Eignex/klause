@@ -2,6 +2,7 @@ package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.CompletenessMetric
+import com.eignex.klause.bench.metric.ParityMetric
 import com.eignex.klause.bench.metric.TimeMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
 
@@ -25,12 +26,18 @@ object BenchCli {
         }
         val target = Targets.get(cmd)
         println("=== target '${target.id}' — ${target.description} ===")
-        val corpus = BenchLoad.loadAndVerify(target.suiteIds)
         when (target.metric) {
-            MetricKind.VERIFY -> println("\nverification passed for ${corpus.verifyEntries.size} entries")
-            MetricKind.TIME -> TimeMetric.run(corpus.benchEntries)
-            MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
-            MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
+            MetricKind.PARITY -> ParityMetric.run(BenchLoad.resolve(target.suiteIds), target.budget)
+            else -> {
+                val corpus = BenchLoad.loadAndVerify(target.suiteIds)
+                when (target.metric) {
+                    MetricKind.VERIFY -> println("\nverification passed for ${corpus.verifyEntries.size} entries")
+                    MetricKind.TIME -> TimeMetric.run(corpus.benchEntries)
+                    MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
+                    MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
+                    MetricKind.PARITY -> error("unreachable")
+                }
+            }
         }
     }
 

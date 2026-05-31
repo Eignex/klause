@@ -29,7 +29,7 @@ import com.eignex.klause.solver.factor.Xor
 object Suites {
 
     val all: List<Suite> by lazy {
-        listOf(handwrittenCore, dimacsCore, opbCore, schemaCore, flatzincCore, mznSmoke)
+        listOf(handwrittenCore, dimacsCore, opbCore, schemaCore, flatzincCore, mznSmoke, satlibUf20)
     }
 
     // --- In-code SAT/CSP (ported from the former Portfolio) ---
@@ -205,6 +205,19 @@ object Suites {
     }
 
     // --- In-tree MiniZinc smoke set (referenced from klause-mzn-lib/test-models/) ---
+
+    // --- External SAT collection (auto-fetched SATLIB tarball) ---
+
+    private val satlibUf20 = suite("satlib-uf20", "SATLIB uf20-91 SAT instances (auto-fetched sample)") {
+        // The full set is 1000 instances; reference a small, stable sample so the suite is
+        // usable out of the box. CorpusFetcher downloads the tarball on first resolve.
+        format = Format.DIMACS
+        val col = ExternalCollections.satlibUf20
+        // Tarball names instances `uf20-0<n>.cnf` (raw, unpadded n). Reference a small sample.
+        for (n in 1..5) {
+            external("uf20-$n", col, "uf20-0$n.cnf", Category.SAT, Expected.Sat)
+        }
+    }
 
     private val mznSmoke = suite("mzn-smoke", "Mandatory MiniZinc smoke models (CI parity)") {
         format = Format.MINIZINC; license = "internal"
