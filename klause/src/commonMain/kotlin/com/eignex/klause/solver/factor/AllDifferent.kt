@@ -194,14 +194,24 @@ class AllDifferent(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    /** Hall-style conflict reason: cites bound atoms plus `[v ≠ value]` literals for every
-     *  domain hole each var has accumulated post-bake. Tighter than bound-only because two
-     *  bounds can describe many interior configurations, but the matching/SCC pruning only
-     *  fires for the specific filtered domains we saw. */
+    /** The variable subset responsible for the most recent [propagate] failure — a Hall
+     *  violator (a set of `k` vars whose domains are jointly confined to `< k` values),
+     *  captured at the failing point because the matching state is local to [propagate].
+     *  Lets [conflictReason] cite only the Hall set rather than every var. Reset at the
+     *  start of each [propagate]; read immediately afterwards by the analyzer on failure. */
+    private var conflictHallVars: IntArray? = null
+
+    /** Hall-style conflict reason: bound + `[v ≠ value]` hole literals confining each
+     *  responsible var's domain. Uses the Hall violator captured by [propagate]
+     *  ([conflictHallVars]) when available — only those vars' domains jointly prove the
+     *  pigeonhole, so the others are irrelevant and citing them only over-specialises the
+     *  learned clause. Falls back to all vars if no Hall set was recorded (e.g. a failure
+     *  path that didn't set it). */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, vars)
+        collectHoleAndBoundAntecedents(state, conflictHallVars ?: vars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        conflictHallVars = null  // stale-guard; set at each failure point below.
         // Only the definitely-present positions participate in Régin filtering. Build a
         // local index map: filteredIdx → original position. Unpinned-presence positions
         // are dropped — they may still go absent and would otherwise force unsound prunes.
@@ -232,7 +242,12 @@ class AllDifferent(
             list
         }
         val numValues = idToValue.size
-        if (numValues < n) return false  // pigeonhole.
+        if (numValues < n) {
+            // Pigeonhole: the n present vars share only numValues < n distinct values, so
+            // their domains alone are the Hall violator.
+            conflictHallVars = filteredVars
+            return false
+        }
 
         // Maximum bipartite matching via successive augmenting paths. O(n · |E|).
         val matchVar = IntArray(n) { -1 }
@@ -240,7 +255,20 @@ class AllDifferent(
         val visited = BooleanArray(numValues)
         for (i in 0 until n) {
             for (j in visited.indices) visited[j] = false
-            if (!tryAugment(i, valuesPerVar, matchVar, matchVal, visited)) return false
+            if (!tryAugment(i, valuesPerVar, matchVar, matchVal, visited)) {
+                // Augment failed for var i: the alternating search saturated the `visited`
+                // values, each already matched. Those values K' and the vars occupying them
+                // plus i form a Hall violator (|{i}∪occupants| = |K'|+1 > |K'|), and every
+                // one of those vars' domains lies within K' (the search explored all their
+                // values). That subset alone proves infeasibility.
+                val hall = IntArrayList()
+                hall.add(filteredVars[i])
+                for (vid in 0 until numValues) {
+                    if (visited[vid] && matchVal[vid] >= 0) hall.add(filteredVars[matchVal[vid]])
+                }
+                conflictHallVars = hall.toIntArray()
+                return false
+            }
         }
 
         // Build directed graph (Régin orientation):
@@ -353,29 +381,50 @@ class AllDifferent(
             }
         }
 
-        // Prune: any var→value edge that's neither matched, nor in the same SCC, nor
-        // reachable from a free value cannot extend to a perfect matching and must be
-        // removed from the variable's domain. LCG antecedents: each prune's reason is
-        // the union of every *other* var's int antecedents — those domains together
-        // determined the matching/SCC structure that forbade this value.
-        val antecedents = composeAllDifferentAntecedents(state)
+        // Prune: any var→value edge that's neither matched, in the same SCC, nor reachable
+        // from a free value can't extend to a perfect matching, so the value is removed.
+        // LCG explanation (sharp): the value `vid` is held by a *tight* Hall set — the
+        // variables forward-reachable from `vid`'s value-node in the residual graph. Every
+        // such var's domain lies within the value set those nodes reach (the BFS adds every
+        // reached var's values), the matching bijects vars↔values there, and the pruned var
+        // `i` is provably outside it (else `i→vid` plus `vid→…→i` would force one SCC). So
+        // citing only that subset's domain literals soundly explains the prune and
+        // generalises far better than citing every var. Memoised per value-SCC — the
+        // forward-reach set is identical for all values in one SCC.
+        val sccHallVars = HashMap<Int, IntArray>()
+        fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
+            val vis = BooleanArray(total)
+            val bfs = IntArray(total)
+            var qh = 0; var qt = 0
+            vis[valNode] = true; bfs[qt++] = valNode
+            val acc = IntArrayList()
+            while (qh < qt) {
+                val u = bfs[qh++]
+                if (u < n) acc.add(filteredVars[u])
+                for (w in adj[u]) if (!vis[w]) { vis[w] = true; bfs[qt++] = w }
+            }
+            acc.toIntArray()
+        }
         for (i in 0 until n) {
             for (vid in valuesPerVar[i]) {
                 if (matchVar[i] == vid) continue
                 val valNode = n + vid
                 if (sccId[i] == sccId[valNode]) continue
                 if (reachedFromFree[valNode]) continue
-                if (!state.excludeIntValue(filteredVars[i], idToValue[vid], antecedents)) return false
+                val hall = hallVarsFor(valNode)
+                val ant = collectHoleAndBoundAntecedents(state, hall)
+                if (!state.excludeIntValue(filteredVars[i], idToValue[vid], ant)) {
+                    // Excluding vid emptied var i's domain: the Hall set forced out vid,
+                    // which was i's last feasible value. Reason = the Hall set plus i.
+                    val withI = hall.copyOf(hall.size + 1)
+                    withI[hall.size] = filteredVars[i]
+                    conflictHallVars = withI
+                    return false
+                }
             }
         }
         return true
     }
-
-    /** Per-bound atom-lit antecedents over every var in this AllDifferent — sound reason
-     *  for any Régin-SCC prune (every other var's bounds participated in the matching/SCC
-     *  analysis). Returns `null` when no var's bounds are tighter than its initial domain. */
-    private fun composeAllDifferentAntecedents(state: PropagationState): IntArray? =
-        state.composeIntVarAtomAntecedents(vars)
 
     /** Conservative repair: only act on present occupants when [presents] is set. We
      *  intentionally avoid forcing presence as a repair — the LS engine flips bools via
