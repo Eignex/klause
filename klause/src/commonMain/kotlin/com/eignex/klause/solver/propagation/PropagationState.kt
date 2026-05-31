@@ -1259,13 +1259,19 @@ class PropagationState(
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1  // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
-            // A Clause's [boolVars] is exactly the deduplicated variable set of its
-            // [literals] (atom-lits included) and its [intVars] is empty, so
-            // maxLevelForClause computes the same max decision level maxLevelForVars
-            // would — scanning the literals directly avoids a redundant second O(arity)
-            // pass over the same variables on every fire (the BCP hot path).
+            // Level for the firing factor. A Clause's effective level is the max decision
+            // level over its literals; its [boolVars] is the deduplicated variable set of
+            // those literals and its [intVars] is empty, so maxLevelForVars is redundant
+            // with maxLevelForClause (a second O(arity) pass over the same variables on
+            // every fire — the BCP hot path). Better still: a *pure-bool* clause only ever
+            // fires when a watched bool literal just went false at the current decision
+            // level (bools are only pinned by decisions or clause propagation, all stamped
+            // at the current level), so its effective level is exactly the current decision
+            // level — no scan at all. Atom-lit clauses can fire on an atom that flipped at a
+            // sub-decision level, so they keep the literal scan.
             currentLevel = if (f is com.eignex.klause.solver.factor.Clause)
-                maxLevelForClause(f.literals)
+                if (f.allLiteralsBool(problem.numBoolVars)) levelToDecisionVar.size
+                else maxLevelForClause(f.literals)
             else
                 maxLevelForVars(f.boolVars, f.intVars)
             currentFactor = fid
