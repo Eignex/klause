@@ -138,8 +138,16 @@ class Cbls(
 
         val raw = sink.list
         if (raw.isEmpty()) return null
-        val moves = tabu.filter(state, raw)
-        if (moves.isEmpty()) return null
+        val filtered = tabu.filter(state, raw)
+        // While stalled, never let tabu starve the pool into a null move (which forces a
+        // full restart and discards plateau progress): fall back to the unfiltered candidates
+        // so the search keeps walking the plateau. Off-stall, an empty tabu pool still yields
+        // null (the normal "let the engine restart" path).
+        val moves = if (filtered.isEmpty()) {
+            if (stalled) raw else return null
+        } else {
+            filtered
+        }
 
         val effectiveNoise = if (stalled) stallNoise else noiseProbability
         if (state.rng.nextDouble() < effectiveNoise) {
