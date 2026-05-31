@@ -113,7 +113,14 @@ object SolverSweepMain {
     )
     private fun backtrack(label: String = "backtrack") = SolverConfig(
         label,
-        sat = { p, seed, cancel -> BacktrackSolver(p).samples(cdclParams(seed, cancel)).firstOrNull() },
+        sat = { p, seed, cancel ->
+            if (System.getProperty("klause.solversweep.btstats") == "true") {
+                val r = BacktrackSolver(p).solve(cdclParams(seed, cancel))
+                val s = r.stats
+                println("[btstats] seed=$seed verdict=${r::class.simpleName} nodes=${s.nodes.sum} fails=${s.fails.sum} learned=${s.learnedClauses.sum} restarts=${s.restarts.sum} props=${s.propagations.sum}")
+                (r as? com.eignex.klause.solver.SolveResult.Sat)?.assignment
+            } else BacktrackSolver(p).samples(cdclParams(seed, cancel)).firstOrNull()
+        },
         opt = { p, objVar, maximize, seed, cancel ->
             val obj = if (maximize) p.maximizeInt(objVar) else p.minimizeInt(objVar)
             (BacktrackSolver(p).minimize(obj, cdclParams(seed, cancel)) as? MinimizeResult.WithSample)?.sample
