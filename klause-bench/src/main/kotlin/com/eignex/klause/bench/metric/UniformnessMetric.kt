@@ -1,17 +1,22 @@
-package com.eignex.klause.bench
+package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.report.EnvInfo
+import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.bench.solver.InProcessSolver
+import com.eignex.klause.bench.solver.Solvers
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
+import java.time.Instant
 import kotlin.math.ln
 import kotlinx.serialization.Serializable
 
 /**
  * Per-backend sampling-quality metrics for one [Problem]. Oracle fields ([coverageFraction],
  * [klFromUniform]) are populated only when the feasible space is enumerable via
- * [BruteForceSolver]; otherwise they're null and the no-oracle metrics
- * ([distinctnessRatio], [meanPairwiseHamming], [sampleEntropy]) carry the analysis alone.
+ * [BruteForceSolver]; otherwise the no-oracle metrics carry the analysis alone.
  */
 @Serializable
 data class UniformnessReport(
@@ -23,27 +28,54 @@ data class UniformnessReport(
     val meanPairwiseHamming: Double,
     val pairwiseHammingP5: Double,
     val pairwiseHammingP95: Double,
-    /** Shannon entropy over the empirical distribution of yielded samples (nats). Higher =
-     *  more spread across observed models. Always ≤ ln(distinctCount). */
     val sampleEntropy: Double,
-    /** Fraction of feasible models reached. Null when no oracle. */
     val coverageFraction: Double?,
-    /** KL divergence (nats) from uniform over feasible models. Null when no oracle. */
     val klFromUniform: Double?,
-    /** Number of feasible models, when known. */
     val oracleFeasibleCount: Int?,
 )
 
-object UniformnessBench {
+@Serializable
+data class UniformnessResults(
+    val timestamp: String,
+    val gitSha: String?,
+    val env: EnvInfo,
+    val sampleCount: Int,
+    val entries: List<UniformnessReport>,
+)
 
-    /** Default cap on oracle invocations — brute-force can balloon on bigger problems. */
+/** Draws independent samples per backend and measures distinctness / Hamming spread /
+ *  entropy, adding coverage + KL-from-uniform when the feasible space is enumerable. Ports
+ *  the legacy `UniformnessBench` + `UniformnessBenchMain`. */
+object UniformnessMetric {
     private const val ORACLE_MAX_MODELS = 4096
+    private const val DEFAULT_SAMPLE_COUNT = 200
 
-    fun analyse(
-        entryName: String,
-        backend: BenchSolver,
-        sampleCount: Int = 200,
-    ): UniformnessReport {
+    fun run(entries: List<ResolvedProblem>) {
+        val sampleCount = System.getProperty("klause.bench.uniformness.samples")?.toIntOrNull() ?: DEFAULT_SAMPLE_COUNT
+        println()
+        println("=== uniformness bench (n=$sampleCount per backend; entropy & Hamming always reported, " +
+            "coverage + KL only when oracle fits) ===")
+        val results = mutableListOf<UniformnessReport>()
+        for (entry in entries) {
+            val rows = mutableListOf<String>()
+            for (backend in Solvers.defaultPortfolio(entry.problem)) {
+                val r = analyse(entry.name, backend, sampleCount)
+                results += r
+                val cov = r.coverageFraction?.let { "%.2f".format(it) } ?: "—"
+                val kl = r.klFromUniform?.let { "%.3f".format(it) } ?: "—"
+                rows += "${backend.name} distinct=${r.distinctCount}/${r.sampleCount} " +
+                    "Hp50=${"%.1f".format(r.meanPairwiseHamming)} " +
+                    "H=${"%.2f".format(r.sampleEntropy)} cov=$cov KL=$kl"
+            }
+            println("[${entry.name}] ${rows.joinToString(" | ")}")
+        }
+        Reports.writeJson(
+            "build/bench-uniformness.json",
+            UniformnessResults(Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(), sampleCount, results),
+        )
+    }
+
+    fun analyse(entryName: String, backend: InProcessSolver, sampleCount: Int = DEFAULT_SAMPLE_COUNT): UniformnessReport {
         val samples = backend.samplesSequence().take(sampleCount).toList()
         val n = samples.size
         val distinct = samples.toSet()
@@ -55,15 +87,9 @@ object UniformnessBench {
         val hammings = ArrayList<Int>(distinct.size * (distinct.size - 1) / 2 + 1)
         val distinctList = distinct.toList()
         for (i in distinctList.indices) {
-            for (j in (i + 1) until distinctList.size) {
-                hammings += hamming(distinctList[i], distinctList[j])
-            }
+            for (j in (i + 1) until distinctList.size) hammings += hamming(distinctList[i], distinctList[j])
         }
         val meanH = if (hammings.isEmpty()) 0.0 else hammings.average()
-        val p5 = percentile(hammings, 5.0)
-        val p95 = percentile(hammings, 95.0)
-
-        // Oracle (if enumerable + small enough).
         val (coverage, kl, oracleSize) = oracleStats(backend.problem, counts, n)
 
         return UniformnessReport(
@@ -73,8 +99,8 @@ object UniformnessBench {
             distinctCount = distinct.size,
             distinctnessRatio = if (n == 0) 0.0 else distinct.size.toDouble() / n,
             meanPairwiseHamming = meanH,
-            pairwiseHammingP5 = p5,
-            pairwiseHammingP95 = p95,
+            pairwiseHammingP5 = percentile(hammings, 5.0),
+            pairwiseHammingP95 = percentile(hammings, 95.0),
             sampleEntropy = entropy,
             coverageFraction = coverage,
             klFromUniform = kl,
@@ -82,11 +108,7 @@ object UniformnessBench {
         )
     }
 
-    private fun oracleStats(
-        problem: Problem,
-        counts: Map<Sample, Int>,
-        n: Int,
-    ): Triple<Double?, Double?, Int?> {
+    private fun oracleStats(problem: Problem, counts: Map<Sample, Int>, n: Int): Triple<Double?, Double?, Int?> {
         if (!BruteForceSolver.fits(problem)) return Triple(null, null, null)
         val oracle: Set<Sample> = BruteForceSolver(problem)
             .enumerate(BruteForceParams())
@@ -97,8 +119,6 @@ object UniformnessBench {
         if (total == 0) return Triple(null, null, 0)
         val seenInOracle = counts.keys.count { it in oracle }
         val coverage = seenInOracle.toDouble() / total
-        // KL(P̂ || U) over feasible models. U(x) = 1/total. P̂(x) = count(x)/n if seen, 0 otherwise.
-        // For seen x: P̂(x) log(P̂(x) * total). Unseen contribute 0 (with limit convention).
         val kl = counts.entries.sumOf { (s, c) ->
             if (s !in oracle) return@sumOf 0.0
             val p = c.toDouble() / n

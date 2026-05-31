@@ -1,5 +1,7 @@
-package com.eignex.klause.bench
+package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.solver.InProcessSolver
+import com.eignex.klause.bench.solver.Solvers
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -21,10 +23,12 @@ enum class Agreement { Agree, Disagree, OnlyLocalSearch }
 
 data class SampleCheck(val sample: Sample, val satisfies: Boolean)
 
+/** Cross-checks the in-process backends agree on SAT/UNSAT and that every sample produced
+ *  actually satisfies the problem. Used as a correctness gate before benchmarking. */
 object Verifier {
     fun verify(
         problem: Problem,
-        solvers: List<BenchSolver> = defaultSolvers(problem),
+        solvers: List<InProcessSolver> = Solvers.defaultPortfolio(problem),
         sampleCount: Int = 5,
     ): VerificationReport {
         val verdicts = solvers.associate { it.name to it.solve() }
