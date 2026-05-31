@@ -23,7 +23,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.eignex.klause.bench.TimeBenchMainKt")
+    mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
 /** Forward any `-Dklause.bench.*` props from the gradle invocation into the JavaExec
@@ -39,28 +39,39 @@ fun JavaExec.forwardBenchProps() {
     }
 }
 
-tasks.register<JavaExec>("runTime") {
+/** Single bench entry point. `./gradlew :klause-bench:bench --args="<target-id>"`; pass
+ *  `list` (or no args) to see the available targets and catalog suites. Each target binds a
+ *  set of catalog suites to a metric (time / uniformness / completeness / verify). */
+tasks.register<JavaExec>("bench") {
     group = "bench"
-    description = "Time + propagation microbench. Writes build/bench-time.json."
+    description = "Run a bench target by id. Use --args=\"list\" to enumerate targets."
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.TimeBenchMainKt")
+    mainClass.set("com.eignex.klause.bench.target.BenchCli")
+    val workspaceRoot = rootDir.absolutePath
     forwardBenchProps()
+    doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
-tasks.register<JavaExec>("runUniformness") {
+/** Print vendored suites + external collections (with license and cache status). */
+tasks.register<JavaExec>("listCorpus") {
     group = "bench"
-    description = "Sampling-uniformness bench (coverage, KL, Hamming, entropy). Writes build/bench-uniformness.json."
+    description = "List catalog suites and external problem collections."
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.UniformnessBenchMainKt")
-    forwardBenchProps()
+    mainClass.set("com.eignex.klause.bench.tools.CorpusCli")
+    args("list")
+    val workspaceRoot = rootDir.absolutePath
+    doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
-tasks.register<JavaExec>("runCompleteness") {
+/** Pre-fetch external problem collections into the cache. `--args="warm <id|all>"`. */
+tasks.register<JavaExec>("warmCorpus") {
     group = "bench"
-    description = "Enumeration reach-under-budget bench. Writes build/bench-completeness.json."
+    description = "Fetch external problem collections into the cache. Use --args=\"warm <id|all>\"."
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.CompletenessBenchMainKt")
-    forwardBenchProps()
+    mainClass.set("com.eignex.klause.bench.tools.CorpusCli")
+    notCompatibleWithConfigurationCache("ProcessBuilder git/tar calls inside CorpusFetcher")
+    val workspaceRoot = rootDir.absolutePath
+    doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
 /** Opt-in: shallow-clone the MiniZinc Challenge benchmarks repo into `build/mzn/`.
@@ -338,7 +349,7 @@ tasks.register("dumpSchema", JavaExec::class) {
     mainClass.set("com.eignex.klause.bench.tools.SchemaDumperKt")
     doFirst {
         standardOutput = FileOutputStream(
-            layout.projectDirectory.file("src/main/resources/schema/campaign.json").asFile,
+            layout.projectDirectory.file("corpus/schema/campaign.json").asFile,
         )
     }
 }

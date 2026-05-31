@@ -1,4 +1,4 @@
-package com.eignex.klause.bench
+package com.eignex.klause.bench.metric
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Problem
@@ -8,28 +8,18 @@ import kotlin.random.Random
 
 /** Per-phase nanos for a propagation-heavy workload. */
 data class PropagationTimings(
-    /** Mean nanos per `Problem.propagate(Assumptions.None)` call. Measures bake-time cost. */
     val bakeNanos: Long,
-    /** Mean nanos per `propagate(N random pins)` one-shot call. */
     val oneShotPinNanos: Long,
-    /** Mean nanos per `PropagationSession.pinBool` step (incremental fixpoint over the trail). */
     val incrementalPinNanos: Long,
-    /** Pins used for `oneShotPinNanos` / `incrementalPinNanos`. */
     val pinCount: Int,
 )
 
 /**
- * Microbenchmark targeted at the propagation hot path. The full-search backends measured by
- * [Benchmarker] include LS / SAT-solver overhead that dominates over small propagation cost;
- * this harness isolates propagation alone — bake-time, one-shot with assumptions, and
- * incremental (session) — which is the regime combo's RF bandit runs in.
+ * Microbenchmark targeted at the propagation hot path, isolated from LS / SAT-solver
+ * overhead: bake-time, one-shot with assumptions, and incremental (session) pinning. Ports
+ * the legacy `PropagationBench`.
  */
-object PropagationBench {
-
-    /**
-     * Measure propagation on [problem] with [pinCount] random bool pins. Returns mean nanos
-     * per call across [repetitions] iterations.
-     */
+object PropagationMetric {
     fun bench(
         problem: Problem,
         pinCount: Int = 10,
@@ -38,21 +28,15 @@ object PropagationBench {
         seed: Long = 0L,
     ): PropagationTimings {
         val rng = Random(seed)
-        // Build a stable list of `pinCount` random pin specs (var, value) over unpinned bools.
         val baked = problem.baked
         val baseBools: Map<Int, Boolean> = if (baked is PropagationResult.Implied) baked.bools else emptyMap()
         val freeBools = (0 until problem.numBoolVars).filter { it !in baseBools }
-        if (freeBools.size < pinCount) {
-            // Not enough free vars — fall back to repeating; metric still meaningful for
-            // tiny problems.
-        }
         val pins: List<Pair<Int, Boolean>> = (0 until pinCount).map {
             val v = freeBools[rng.nextInt(freeBools.size.coerceAtLeast(1))]
             v to rng.nextBoolean()
         }
         val asm = Assumptions(bools = pins.toMap())
 
-        // Warm up the JIT.
         repeat(warmupReps) {
             problem.propagate()
             problem.propagate(asm)
@@ -63,20 +47,13 @@ object PropagationBench {
         val oneShotNs = repeatTimed(repetitions) { problem.propagate(asm) }
         val incrementalNs = repeatTimed(repetitions) { runSessionChain(problem, pins) } / pinCount.toLong().coerceAtLeast(1L)
 
-        return PropagationTimings(
-            bakeNanos = bakeNs,
-            oneShotPinNanos = oneShotNs,
-            incrementalPinNanos = incrementalNs,
-            pinCount = pinCount,
-        )
+        return PropagationTimings(bakeNs, oneShotNs, incrementalNs, pinCount)
     }
 
     private fun runSessionChain(problem: Problem, pins: List<Pair<Int, Boolean>>) {
         val s = PropagationSession(problem)
         s.seed(Assumptions.None)
-        for ((v, b) in pins) {
-            s.pinBool(v, b)
-        }
+        for ((v, b) in pins) s.pinBool(v, b)
     }
 
     private inline fun repeatTimed(n: Int, block: () -> Unit): Long {
