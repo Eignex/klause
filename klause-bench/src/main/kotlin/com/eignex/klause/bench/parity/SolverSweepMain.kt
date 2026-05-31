@@ -100,13 +100,23 @@ object SolverSweepMain {
         (solver.minimize(obj, params) as? MinimizeResult.WithSample)?.sample
     })
 
-    /** Complete backtracking search (both phases). Drop into [configs] to compare against LS. */
+    /** Complete backtracking search (both phases), configured as a real CDCL solver —
+     *  VSIDS + phase-saving + Luby restarts + LBD clause forgetting — so clause-learning
+     *  (and explanation) quality actually drives the result instead of random branching. */
+    private fun cdclParams(seed: Long, cancel: Cancellation) = BacktrackParams(
+        randomSeed = seed,
+        variableHeuristic = com.eignex.klause.solver.backtrack.Vsids(),
+        phaseSaving = true,
+        lubyRestartBase = 100L,
+        maxLearnedClauses = 20_000,
+        cancellation = cancel,
+    )
     private fun backtrack(label: String = "backtrack") = SolverConfig(
         label,
-        sat = { p, seed, cancel -> BacktrackSolver(p).samples(BacktrackParams(randomSeed = seed, cancellation = cancel)).firstOrNull() },
+        sat = { p, seed, cancel -> BacktrackSolver(p).samples(cdclParams(seed, cancel)).firstOrNull() },
         opt = { p, objVar, maximize, seed, cancel ->
             val obj = if (maximize) p.maximizeInt(objVar) else p.minimizeInt(objVar)
-            (BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = seed, cancellation = cancel)) as? MinimizeResult.WithSample)?.sample
+            (BacktrackSolver(p).minimize(obj, cdclParams(seed, cancel)) as? MinimizeResult.WithSample)?.sample
         },
     )
 
@@ -135,6 +145,8 @@ object SolverSweepMain {
             "compare" -> compareConfigs
             "focused" -> listOf(focused("FOCUSED"))
             "cbls" -> listOf(cbls("CBLS") { Cbls(tabu = baseTabu()) })
+            "backtrack" -> listOf(backtrack())
+            "btvscbls" -> listOf(backtrack(), cbls("CBLS") { Cbls(tabu = baseTabu()) })
             else -> tuneConfigs
         }
     }
