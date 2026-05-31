@@ -729,20 +729,12 @@ class PropagationState(
      */
     fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
         if (oldLit == newLit) return
-        // Remove from old.
+        // Remove from old (swap-remove via a tight hoisted-local scan inside IntArrayList).
         val oldV = com.eignex.klause.solver.Lit.variable(oldLit)
         if (oldV < problem.numBoolVars) {
-            val from = boolWatchersByLit[oldLit]
-            for (i in 0 until from.size) {
-                if (from[i] == factorId) { from.removeAt(i); break }
-            }
+            boolWatchersByLit[oldLit].removeValue(factorId)
         } else {
-            val from = atomWatchersByLit[oldLit]
-            if (from != null) {
-                for (i in 0 until from.size) {
-                    if (from[i] == factorId) { from.removeAt(i); break }
-                }
-            }
+            atomWatchersByLit[oldLit]?.removeValue(factorId)
         }
         // Install on new.
         installLitWatch(newLit, factorId)
