@@ -3,7 +3,7 @@ package com.eignex.klause.bench.target
 import com.eignex.klause.bench.runner.Budget
 
 /** Which measurement a target runs. */
-enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY }
+enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY }
 
 /**
  * A pre-configured bench: a set of catalog suites bound to a [metric] (and a [budget]). The
@@ -30,6 +30,9 @@ object Targets {
         Target("uniformness-core", "Sampling uniformness over the in-process core", IN_PROCESS_CORE, MetricKind.UNIFORMNESS),
         Target("completeness-core", "Enumeration reach-under-budget over the in-process core", IN_PROCESS_CORE, MetricKind.COMPLETENESS),
         Target("verify-core", "Cross-backend agreement + sample-validity gate over the in-process core", IN_PROCESS_CORE, MetricKind.VERIFY),
+        Target("parity-core", "Differential parity (klause vs Choco) over the in-process core", IN_PROCESS_CORE, MetricKind.PARITY),
+        Target("mzn-parity-smoke", "Differential parity (klause vs Choco) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY),
+        Target("satlib-parity", "Differential parity (klause vs Choco) over the auto-fetched SATLIB sample", listOf("satlib-uf20"), MetricKind.PARITY),
     )
 
     fun get(id: String): Target =

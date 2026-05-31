@@ -32,9 +32,11 @@ object CorpusFetcher {
         error("could not locate workspace root (no klause-mzn-lib parent); set -Dklause.workspace.root")
     }
 
-    /** Where fetched external collections are cached. */
+    /** Where fetched external collections are cached. Anchored at the workspace root so the
+     *  location is stable regardless of the process working directory. */
     val cacheRoot: File
-        get() = File(System.getProperty("klause.bench.corpusCache") ?: "klause-bench/build/corpus-cache")
+        get() = System.getProperty("klause.bench.corpusCache")?.let { File(it) }
+            ?: File(workspaceRoot(), "klause-bench/build/corpus-cache")
 
     /** Resolve [source] to a file, fetching an external collection if needed. */
     fun resolve(source: ProblemSource): File = when (source) {
