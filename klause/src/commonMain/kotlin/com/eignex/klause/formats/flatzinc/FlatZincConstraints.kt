@@ -139,8 +139,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "bin_packing", "fzn_bin_packing", "klause_bin_packing" -> emitBinPacking(c, BinPacking.Mode.UniformCapacity)
     "bin_packing_capa", "fzn_bin_packing_capa", "klause_bin_packing_capa" -> emitBinPacking(c, BinPacking.Mode.PerBinCapacity)
     "bin_packing_load", "fzn_bin_packing_load", "klause_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
-    "diffn", "fzn_diffn" -> emitDiffn(c, nonStrict = false)
-    "diffn_nonstrict", "fzn_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
+    "diffn", "fzn_diffn", "klause_diffn" -> emitDiffn(c, nonStrict = false)
+    "diffn_nonstrict", "fzn_diffn_nonstrict", "klause_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
     "table_int", "fzn_table_int", "klause_table_int" -> emitTable(c)
     "regular", "fzn_regular", "klause_regular" -> emitRegular(c)
     "circuit", "fzn_circuit", "klause_circuit" -> emitCircuit(c, sub = false)
@@ -853,9 +853,17 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
     require(c.args.size == 4)
     val xs = evalIntVarArray(c.args[0])
     val ys = evalIntVarArray(c.args[1])
-    val widths = evalIntConstArray(c.args[2])
-    val heights = evalIntConstArray(c.args[3])
-    factors.add(Diffn(xs, ys, widths, heights, nonStrict))
+    // Dimensions may be constant or variable (each axis independently): try const first,
+    // fall back to var ids. The native Diffn reads var sizes from the assignment.
+    val wConst = tryEvalIntConstArray(c.args[2])
+    val hConst = tryEvalIntConstArray(c.args[3])
+    val wVars = if (wConst == null) evalIntVarArray(c.args[2]) else null
+    val hVars = if (hConst == null) evalIntVarArray(c.args[3]) else null
+    factors.add(Diffn(
+        xs = xs, ys = ys,
+        widths = wConst ?: IntArray(0), heights = hConst ?: IntArray(0),
+        widthVars = wVars, heightVars = hVars, nonStrict = nonStrict,
+    ))
 }
 
 /**

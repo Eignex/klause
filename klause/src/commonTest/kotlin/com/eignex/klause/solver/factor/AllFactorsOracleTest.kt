@@ -339,6 +339,22 @@ class AllFactorsOracleTest {
         ))
     }
 
+    @Test fun diffnVarSize() {
+        // Two rectangles whose widths (vars 4,5) and heights (vars 6,7) are themselves
+        // variables — exercises the variable-size path (incl. propagateVarSizeSoundOnly).
+        val f = Diffn(
+            xs = intArrayOf(0, 1), ys = intArrayOf(2, 3),
+            widths = IntArray(0), heights = IntArray(0),
+            widthVars = intArrayOf(4, 5), heightVars = intArrayOf(6, 7),
+        )
+        check(f, intDomains = arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2),   // xs
+            IntDomain(0, 2), IntDomain(0, 2),   // ys
+            IntDomain(1, 2), IntDomain(1, 2),   // width vars
+            IntDomain(1, 2), IntDomain(1, 2),   // height vars
+        ))
+    }
+
     // ---- Automata ----------------------------------------------------------------
 
     @Test fun regular() {
