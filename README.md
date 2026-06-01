@@ -218,7 +218,9 @@ Use cases:
   reference adapters: `klause-choco` (Choco, complete) and `klause-ortools`
   (OR-Tools CP-SAT, anytime). No external solver binaries.
 - **metric** — time, sampling uniformness, enumeration completeness, cross-backend
-  verify, differential parity, and anytime optimization.
+  verify, differential parity, and anytime optimization. The reference solver for parity
+  and anytime is selectable (Choco or OR-Tools), per target or via
+  `-Dklause.bench.parity.reference` / `-Dklause.bench.anytime.reference`.
 
 Problems live in a declarative catalog (`catalog/Suites.kt`); a **target** binds a
 set of suites to a metric. One CLI runs everything:

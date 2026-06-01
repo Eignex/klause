@@ -5,8 +5,7 @@ import com.eignex.klause.bench.report.EnvInfo
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
-import com.eignex.klause.choco.ChocoParams
-import com.eignex.klause.choco.ChocoSolver
+import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
@@ -17,22 +16,26 @@ import java.time.Instant
 import kotlinx.serialization.Serializable
 
 /**
- * Differential parity: solve each problem with **klause** (complete backtracking) and the
- * **Choco** reference on the same in-process [com.eignex.klause.solver.Problem], then check
- * both against each other and against the recorded [Expected] oracle. Replaces the legacy
- * `MznParity`'s "klause vs Gecode via the minizinc CLI" with an in-process comparison — no
- * external solver binary.
+ * Differential parity: solve each problem with **klause** (complete backtracking) and an
+ * in-process [Reference] solver (Choco or OR-Tools) on the same
+ * [com.eignex.klause.solver.Problem], then check both against each other and against the
+ * recorded [Expected] oracle. Replaces the legacy `MznParity`'s "klause vs Gecode via the
+ * minizinc CLI" with an in-process comparison — no external solver binary.
  *
- *  - satisfaction problems compare feasibility (SAT/UNSAT) three ways (klause, choco, expected);
+ *  - satisfaction problems compare feasibility (SAT/UNSAT) three ways (klause, reference, expected);
  *  - optimization problems additionally compare the optimal objective value.
+ *
+ * The reference defaults to the target's choice and can be overridden with
+ * `-Dklause.bench.parity.reference=choco|ortools`.
  */
 @Serializable
 data class ParityRow(
     val name: String,
     val kind: String,            // "satisfy" | "optimize"
-    val verdict: String,         // OK | MISMATCH | KLAUSE_ERROR | CHOCO_ERROR
+    val verdict: String,         // OK | MISMATCH | KLAUSE_ERROR | REFERENCE_ERROR
     val klause: String,
-    val choco: String,
+    val reference: String,
+    val referenceSolver: String, // "choco" | "ortools"
     val expected: String,
     val detail: String = "",
 )
@@ -48,13 +51,14 @@ data class ParityResults(
 }
 
 object ParityMetric {
-    fun run(entries: List<ResolvedProblem>, budget: Budget = Budget()) {
+    fun run(entries: List<ResolvedProblem>, budget: Budget = Budget(), reference: Backend = Backend.CHOCO) {
+        val ref = System.getProperty("klause.bench.parity.reference")?.let { Reference.byId(it) } ?: Reference.of(reference)
         println()
-        println("=== parity (klause backtrack vs choco reference; checked against recorded expected) ===")
-        val rows = entries.map { row(it, budget) }
+        println("=== parity (klause backtrack vs ${ref.name} reference; checked against recorded expected) ===")
+        val rows = entries.map { row(it, budget, ref) }
         for (r in rows) {
             val mark = if (r.verdict == "OK") "ok " else "!! "
-            println("$mark[${r.name}] ${r.kind} klause=${r.klause} choco=${r.choco} expected=${r.expected}" +
+            println("$mark[${r.name}] ${r.kind} klause=${r.klause} ${r.referenceSolver}=${r.reference} expected=${r.expected}" +
                 if (r.detail.isNotEmpty()) " — ${r.detail}" else "")
         }
         val results = ParityResults(Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(), rows)
@@ -65,32 +69,32 @@ object ParityMetric {
         }
     }
 
-    private fun row(entry: ResolvedProblem, budget: Budget): ParityRow {
+    private fun row(entry: ResolvedProblem, budget: Budget, ref: Reference): ParityRow {
         val obj = entry.objective
-        return if (obj == null) satisfyRow(entry, budget) else optimizeRow(entry, obj, budget)
+        return if (obj == null) satisfyRow(entry, budget, ref) else optimizeRow(entry, obj, budget, ref)
     }
 
-    private fun satisfyRow(entry: ResolvedProblem, budget: Budget): ParityRow {
+    private fun satisfyRow(entry: ResolvedProblem, budget: Budget, ref: Reference): ParityRow {
         val klause = runCatching { feasibility(BacktrackSolver(entry.problem).solve(btParams(budget))) }
-            .getOrElse { return errorRow(entry, "satisfy", "KLAUSE_ERROR", it) }
-        val choco = runCatching { feasibility(ChocoSolver(entry.problem).solve(ChocoParams(budget.timeoutMillis))) }
-            .getOrElse { return errorRow(entry, "satisfy", "CHOCO_ERROR", it) }
+            .getOrElse { return errorRow(entry, "satisfy", "KLAUSE_ERROR", ref, it) }
+        val refFeas = runCatching { feasibility(ref.solve(entry.problem, budget)) }
+            .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
         val exp = expectedFeasible(entry.ref.expected)
         val verdict = when {
-            !agree(klause, choco) -> "MISMATCH"
-            exp != null && choco != null && choco != exp -> "MISMATCH"
+            !agree(klause, refFeas) -> "MISMATCH"
+            exp != null && refFeas != null && refFeas != exp -> "MISMATCH"
             else -> "OK"
         }
-        return ParityRow(entry.name, "satisfy", verdict, feasStr(klause), feasStr(choco), feasStr(exp))
+        return ParityRow(entry.name, "satisfy", verdict, feasStr(klause), feasStr(refFeas), ref.name, feasStr(exp))
     }
 
-    private fun optimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget): ParityRow {
+    private fun optimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget, ref: Reference): ParityRow {
         val klause = runCatching { BacktrackSolver(entry.problem).minimize(obj, btParams(budget)) }
-            .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", it) }
-        val choco = runCatching { ChocoSolver(entry.problem).minimize(obj, ChocoParams(budget.timeoutMillis)) }
-            .getOrElse { return errorRow(entry, "optimize", "CHOCO_ERROR", it) }
+            .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", ref, it) }
+        val refRes = runCatching { ref.minimize(entry.problem, obj, budget) }
+            .getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
         val kv = klause.objectiveValue
-        val cv = choco.objectiveValue
+        val cv = refRes.objectiveValue
         val exp = (entry.ref.expected as? Expected.Opt)?.value?.toDouble()
         val verdict = when {
             kv == null || cv == null -> if (kv == cv) "OK" else "MISMATCH"
@@ -99,7 +103,7 @@ object ParityMetric {
             else -> "OK"
         }
         return ParityRow(entry.name, "optimize", verdict,
-            optStr(klause), optStr(choco), exp?.toString() ?: "?")
+            optStr(klause), optStr(refRes), ref.name, exp?.toString() ?: "?")
     }
 
     private fun btParams(budget: Budget): BacktrackParams {
@@ -133,7 +137,8 @@ object ParityMetric {
         is MinimizeResult.Unknown -> "?"
     }
 
-    private fun errorRow(entry: ResolvedProblem, kind: String, verdict: String, t: Throwable) = ParityRow(
-        entry.name, kind, verdict, "-", "-", entry.ref.expected.toString(), t.message?.take(160) ?: t::class.simpleName ?: "error",
+    private fun errorRow(entry: ResolvedProblem, kind: String, verdict: String, ref: Reference, t: Throwable) = ParityRow(
+        entry.name, kind, verdict, "-", "-", ref.name, entry.ref.expected.toString(),
+        t.message?.take(160) ?: t::class.simpleName ?: "error",
     )
 }

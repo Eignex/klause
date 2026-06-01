@@ -6,6 +6,7 @@ import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.ParityMetric
 import com.eignex.klause.bench.metric.TimeMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
+import com.eignex.klause.bench.solver.Backend
 
 /**
  * Single entry point for the bench. `./gradlew :klause-bench:bench --args="<target-id>"`.
@@ -28,8 +29,8 @@ object BenchCli {
         val target = Targets.get(cmd)
         println("=== target '${target.id}' — ${target.description} ===")
         when (target.metric) {
-            MetricKind.PARITY -> ParityMetric.run(BenchLoad.resolve(target.suiteIds), target.budget)
-            MetricKind.ANYTIME -> AnytimeMetric.run(BenchLoad.resolve(target.suiteIds), target.budget)
+            MetricKind.PARITY -> ParityMetric.run(BenchLoad.resolve(target.suiteIds), target.budget, target.reference ?: Backend.CHOCO)
+            MetricKind.ANYTIME -> AnytimeMetric.run(BenchLoad.resolve(target.suiteIds), target.budget, target.reference ?: Backend.ORTOOLS)
             else -> {
                 val corpus = BenchLoad.loadAndVerify(target.suiteIds)
                 when (target.metric) {
