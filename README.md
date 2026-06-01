@@ -206,3 +206,34 @@ Use cases:
 - Independent infeasibility checks. External solvers emit DRAT proofs of UNSAT
   that can be verified separately.
 
+## Benchmarking
+
+`klause-bench` separates four orthogonal axes so you can control exactly what runs:
+
+- **format** — how an instance is encoded: DIMACS, OPB, JSON-Schema, FlatZinc,
+  MiniZinc, SMT-LIB QF_LIA, XCSP3, or built in-code.
+- **source** — where it comes from: vendored under `klause-bench/corpus/`, built
+  in Kotlin, or an external collection fetched on demand into a cache.
+- **solver** — klause's engines (local search, backtracking) plus in-process
+  reference adapters: `klause-choco` (Choco, complete) and `klause-ortools`
+  (OR-Tools CP-SAT, anytime). No external solver binaries.
+- **metric** — time, sampling uniformness, enumeration completeness, cross-backend
+  verify, differential parity, and anytime optimization. The reference solver for parity
+  and anytime is selectable (Choco or OR-Tools), per target or via
+  `-Dklause.bench.parity.reference` / `-Dklause.bench.anytime.reference`.
+
+Problems live in a declarative catalog (`catalog/Suites.kt`); a **target** binds a
+set of suites to a metric. One CLI runs everything:
+
+```
+./gradlew :klause-bench:bench --args="list"            # list targets + suites
+./gradlew :klause-bench:bench --args="parity-core"     # klause vs Choco on the in-process core
+./gradlew :klause-bench:bench --args="mzn-parity-smoke" # compile .mzn, solve, diff vs Choco
+./gradlew :klause-bench:listCorpus                     # vendored suites + external collections
+./gradlew :klause-bench:warmCorpus --args="warm all"   # pre-fetch external collections
+```
+
+To add a problem, edit the catalog; to add a comparison, add a target. Non-vendored
+collections (MiniZinc Challenge, SATLIB, …) are fetched transparently on first use and
+recorded with their license in `catalog/Suites.kt` and `corpus/PROVENANCE.md`.
+
