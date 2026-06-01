@@ -364,4 +364,29 @@ object ExternalCollections {
     )
 
     val all = listOf(minizincBenchmarks, libminizincTests, hakank, satlibUf20, satlibUuf50)
+
+    // --- XCSP3 competition library (per-year instance archives, xcsp.org / CRIL) ---
+    // Instances ship as individually `.xml.lzma`-compressed files inside each zip; the
+    // coverage tool decompresses them on the fly. The per-year archives 2017–2025 (no
+    // competition in 2020–2021) constitute the complete competition instance set.
+    private fun xcsp(year: Int, mb: Int) = ExternalCollection(
+        id = "xcsp3-$year",
+        url = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP${year % 100}.zip",
+        license = "XCSP3 competition (academic benchmarks)",
+        reason = "${mb}MB competition archive; fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
+    val xcsp3Competition = listOf(
+        xcsp(2017, 102), xcsp(2018, 69), xcsp(2019, 136),
+        xcsp(2022, 103), xcsp(2023, 86), xcsp(2024, 63), xcsp(2025, 31),
+    )
+
+    /** SMT-LIB QF_LIA non-incremental benchmark set (official CLC repository). */
+    val smtlibQfLia = ExternalCollection(
+        id = "smtlib-qf_lia",
+        url = "https://clc-gitlab.cs.uiowa.edu:2443/SMT-LIB-benchmarks/QF_LIA.git",
+        license = "SMT-LIB (per-family licenses)",
+        reason = "large benchmark set; fetched rather than vendored",
+        fetch = FetchMethod.GitClone(depth = 1),
+    )
 }
