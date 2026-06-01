@@ -62,18 +62,29 @@ object MiniZincFormat : ProblemFormat {
     override val inProcess = false
 }
 
-/** XCSP3 ingest (pragmatic integer CSP/COP subset → klause Problem). */
+/** XCSP3 ingest (pragmatic integer CSP/COP subset → klause Problem). Parser lives in
+ *  `com.eignex.klause.formats.xcsp3`; this wrapper reads bench-level config knobs. */
 object Xcsp3Format : ProblemFormat {
     override val format = Format.XCSP3
     override val inProcess = true
-    override fun ingest(file: File) = com.eignex.klause.bench.format.xcsp3.Xcsp3.parse(file.readText())
+    override fun ingest(file: File): Ingested {
+        val negTableCap = System.getProperty("klause.bench.xcsp3.negTableCap")?.toLongOrNull() ?: 1_000_000L
+        val parsed = com.eignex.klause.formats.xcsp3.Xcsp3.parse(file.readText(), negTableCap)
+        return Ingested(parsed.problem, parsed.objective)
+    }
 }
 
-/** SMT-LIB QF_LIA ingest (pragmatic subset → klause Problem). */
+/** SMT-LIB QF_LIA ingest (pragmatic subset → klause Problem). Parser lives in
+ *  `com.eignex.klause.formats.smtlib`; this wrapper reads bench-level config knobs. */
 object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB_QF_LIA
     override val inProcess = true
-    override fun ingest(file: File) = com.eignex.klause.bench.format.smtlib.SmtLibQfLia.parse(file.readText())
+    override fun ingest(file: File): Ingested {
+        val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toIntOrNull() ?: 100_000
+        val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
+        val parsed = com.eignex.klause.formats.smtlib.SmtLibQfLia.parse(file.readText(), intBound, strict)
+        return Ingested(parsed.problem, parsed.objective)
+    }
 }
 
 object Formats {

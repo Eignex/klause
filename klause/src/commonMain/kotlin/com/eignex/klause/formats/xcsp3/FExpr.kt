@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.format.xcsp3
+package com.eignex.klause.formats.xcsp3
 
 /**
  * Tiny parser for XCSP3 functional (intension) notation: `fn(arg, arg, ...)`, where args are

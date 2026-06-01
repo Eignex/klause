@@ -29,7 +29,7 @@ import com.eignex.klause.solver.factor.Xor
 object Suites {
 
     val all: List<Suite> by lazy {
-        listOf(handwrittenCore, slackAllDifferent, dimacsCore, opbCore, schemaCore, flatzincCore, smtlibCore, xcsp3Core, mznSmoke, satlibUf20)
+        listOf(handwrittenCore, slackAllDifferent, dimacsCore, opbCore, schemaCore, flatzincCore, smtlibCore, xcsp3Core, mznSmoke, satlibUf20, satLadder, satCrafted)
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
@@ -308,6 +308,31 @@ object Suites {
         }
     }
 
+    // --- SAT performance datasets ---
+
+    /** SATLIB random-3SAT phase-transition ladder (uf=SAT, uuf=UNSAT), V=50…250 — labelled
+     *  instances at increasing size for measuring CDCL scaling. A small sample per family
+     *  (the full tarball is fetched once and cached). */
+    private val satLadder = suite("sat-ladder", "SATLIB random-3SAT phase-transition ladder (uf=SAT / uuf=UNSAT, 50–250 vars)") {
+        format = Format.DIMACS; license = "SATLIB (public benchmarks)"
+        for ((name, col) in ExternalCollections.satlibLadder) {
+            val sat = name.startsWith("uf")
+            val prefix = name.substringBefore("-")   // instances are named "<vars>-0<n>.cnf" (e.g. uf50-01.cnf)
+            for (n in 1..5) external(
+                "$name-$n", col, "$prefix-0$n.cnf",
+                if (sat) Category.SAT else Category.UNSAT,
+                if (sat) Expected.Sat else Expected.Unsat,
+            )
+        }
+    }
+
+    /** In-code crafted SAT: pigeonhole PHPₙ (UNSAT, CDCL stress) + random-3SAT at the phase
+     *  transition. No fetch / no license; parametric for performance regression tracking. */
+    private val satCrafted = suite("sat-crafted", "In-code crafted SAT: pigeonhole (UNSAT) + random-3SAT (phase transition)") {
+        for (n in 5..9) inCode("php$n", Category.UNSAT, Expected.Unsat) { SatGenerators.php(n) }
+        for (v in intArrayOf(50, 100, 150, 200, 250)) inCode("rand3sat-$v", Category.SAT, Expected.Unknown) { SatGenerators.random3Sat(v) }
+    }
+
     private val mznSmoke = suite("mzn-smoke", "Mandatory MiniZinc smoke models (CI parity)") {
         format = Format.MINIZINC; license = "internal"
         val base = "klause-mzn-lib/test-models"
@@ -364,4 +389,44 @@ object ExternalCollections {
     )
 
     val all = listOf(minizincBenchmarks, libminizincTests, hakank, satlibUf20, satlibUuf50)
+
+    // --- XCSP3 competition library (per-year instance archives, xcsp.org / CRIL) ---
+    // Instances ship as individually `.xml.lzma`-compressed files inside each zip; the
+    // coverage tool decompresses them on the fly. The per-year archives 2017–2025 (no
+    // competition in 2020–2021) constitute the complete competition instance set.
+    private fun xcsp(year: Int, mb: Int) = ExternalCollection(
+        id = "xcsp3-$year",
+        url = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP${year % 100}.zip",
+        license = "XCSP3 competition (academic benchmarks)",
+        reason = "${mb}MB competition archive; fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
+    val xcsp3Competition = listOf(
+        xcsp(2017, 102), xcsp(2018, 69), xcsp(2019, 136),
+        xcsp(2022, 103), xcsp(2023, 86), xcsp(2024, 63), xcsp(2025, 31),
+    )
+
+    /** SMT-LIB QF_LIA non-incremental benchmark set (official CLC repository). */
+    val smtlibQfLia = ExternalCollection(
+        id = "smtlib-qf_lia",
+        url = "https://clc-gitlab.cs.uiowa.edu:2443/SMT-LIB-benchmarks/QF_LIA.git",
+        license = "SMT-LIB (per-family licenses)",
+        reason = "large benchmark set; fetched rather than vendored",
+        fetch = FetchMethod.GitClone(depth = 1),
+    )
+
+    /** SATLIB random-3SAT phase-transition ladder: `uf<V>-<C>` (SAT) and `uuf<V>-<C>` (UNSAT),
+     *  V = 50…250. Each is a 1000-instance family fetched on demand; flat `*.cnf` inside. */
+    private fun satlibRnd(name: String) = ExternalCollection(
+        id = "satlib-$name",
+        url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/$name.tar.gz",
+        license = "SATLIB (public benchmarks)",
+        reason = "1000-instance RND3SAT family; fetched rather than vendored",
+        fetch = FetchMethod.Tarball,
+    )
+    /** Ordered rungs (low→high vars) of the SAT and UNSAT ladders, keyed by family name. */
+    val satlibLadder: Map<String, ExternalCollection> = listOf(
+        "uf50-218", "uf75-325", "uf100-430", "uf125-538", "uf150-645", "uf175-753", "uf200-860", "uf225-960", "uf250-1065",
+        "uuf50-218", "uuf75-325", "uuf100-430", "uuf125-538", "uuf150-645", "uuf175-753", "uuf200-860", "uuf225-960", "uuf250-1065",
+    ).associateWith { satlibRnd(it) }
 }

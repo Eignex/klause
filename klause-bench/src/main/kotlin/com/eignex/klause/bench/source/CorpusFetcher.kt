@@ -58,6 +58,7 @@ object CorpusFetcher {
         when (val m = collection.fetch) {
             is FetchMethod.GitClone -> gitClone(collection, m, dir)
             FetchMethod.Tarball -> tarball(collection, dir)
+            FetchMethod.Zip -> zip(collection, dir)
         }
         return dir
     }
@@ -78,6 +79,14 @@ object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
         run("tar", "xzf", tar.absolutePath, "-C", dir.absolutePath)
         tar.delete()
+    }
+
+    private fun zip(c: ExternalCollection, dir: File) {
+        dir.mkdirs()
+        val zip = File(cacheRoot, "${c.id}.zip")
+        URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
+        run("unzip", "-q", "-o", zip.absolutePath, "-d", dir.absolutePath)
+        zip.delete()
     }
 
     private fun run(vararg cmd: String) = run(null, *cmd)

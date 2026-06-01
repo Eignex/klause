@@ -60,6 +60,10 @@ sealed interface FetchMethod {
     data class GitClone(val depth: Int = 1, val sparsePath: String? = null) : FetchMethod
     /** Download a `.tar.gz` from [url] and extract it. */
     data object Tarball : FetchMethod
+
+    /** Download a `.zip` from [url] and extract it (instances may stay individually
+     *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
+    data object Zip : FetchMethod
 }
 
 /**

@@ -35,6 +35,8 @@ object BenchCli {
             "diag:backtrack" -> MeasureBacktrack.run()
             "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
             "diag:lsconfig" -> LsConfigProbe.main(args.drop(1).toTypedArray())
+            "coverage:xcsp3" -> com.eignex.klause.bench.tools.FormatCoverage.xcsp3()
+            "coverage:smtlib" -> com.eignex.klause.bench.tools.FormatCoverage.smtlib()
             else -> runTarget(cmd)
         }
     }
