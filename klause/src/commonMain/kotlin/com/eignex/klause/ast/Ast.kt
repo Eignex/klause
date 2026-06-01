@@ -18,6 +18,17 @@ sealed interface VarSpec : SchemaEntry
 @SerialName("bool")
 data object BoolSpec : VarSpec
 
+/**
+ * Presence marker for an optional variable: a Boolean that gates the value variable named
+ * [valueName]. Compiles to an ordinary Boolean var, but its dedicated type lets the optional
+ * machinery (notably absent-value pinning) recognise the (presence, value) pairing
+ * *explicitly* — by type and the carried [valueName] — rather than by a fragile name
+ * convention that could misfire on an unrelated bool that merely shares a suffix.
+ */
+@Serializable
+@SerialName("presence")
+data class PresenceSpec(val valueName: String) : VarSpec
+
 @Serializable
 @SerialName("nominal")
 data class NominalSpec(val labels: List<String>) : VarSpec
