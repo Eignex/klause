@@ -49,7 +49,7 @@ import kotlin.random.Random
  * ))
  * ```
  */
-class HeuristicPortfolio(
+internal class HeuristicPortfolio(
     val arms: List<Arm>,
     private val bandit: MultiArmedBandit<*>,
     private val rewardFn: (RunStats) -> Double = { stats -> if (stats.solutionsFound > 0) 1.0 else 0.0 },

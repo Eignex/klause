@@ -7,6 +7,10 @@ plugins {
     kotlin("plugin.serialization") version "2.3.0"
 }
 
+repositories {
+    mavenLocal()
+}
+
 eignexPublish {
     description.set("Kotlin solver for Boolean and integer constraint problems. Finds and samples satisfying solutions, picks the best under a weighted objective, and exports to CNF for external SAT engines.")
     githubRepo.set("Eignex/klause")

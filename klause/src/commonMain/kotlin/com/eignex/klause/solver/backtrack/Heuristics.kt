@@ -312,7 +312,7 @@ object RandomVariable : VariableHeuristic {
  * Weights persist across [onRestart]; that's intentional, mirroring VSIDS's persistence.
  * Resizes the factor-weights array across problems for instance reuse.
  */
-class DomWdeg : VariableHeuristic {
+internal class DomWdeg : VariableHeuristic {
 
     private var factorWeights: DoubleArray = DoubleArray(0)
 
@@ -455,7 +455,7 @@ private fun pickByActivityWithDomDivider(
  * `LastConflict(Vsids())` to get last-conflict priority on top of activity-driven
  * picking.
  */
-class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
+internal class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
 
     private var pending: VarRef? = null
 
@@ -526,7 +526,7 @@ class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
  * captures the dominant signal on most CSPs — vars frequently forced into singletons are
  * exactly the structurally-critical ones.
  */
-class ActivityBasedSearch(
+internal class ActivityBasedSearch(
     private val decay: Double = 0.999,
     private val resetOnRestart: Boolean = false,
     private val rescaleThreshold: Double = 1e100,
@@ -623,7 +623,7 @@ class ActivityBasedSearch(
  * lead, activity drives the long tail. `ConflictOrdering(DomWdeg())` is the
  * Lecoutre-recommended configuration.
  */
-class ConflictOrdering(private val base: VariableHeuristic) : VariableHeuristic {
+internal class ConflictOrdering(private val base: VariableHeuristic) : VariableHeuristic {
 
     private var counter: Long = 0
     private var boolStamp: LongArray = LongArray(0)
@@ -720,7 +720,7 @@ class ConflictOrdering(private val base: VariableHeuristic) : VariableHeuristic 
  *
  * Pair with [IndomainBest] for a complete objective-aware (var, value) strategy.
  */
-class MaxRegret(
+internal class MaxRegret(
     private val objective: com.eignex.klause.solver.LinearObjective,
     private val base: VariableHeuristic = SmallestDomain,
 ) : VariableHeuristic {
@@ -823,7 +823,7 @@ object IndomainRandom : ValueHeuristic {
  * Allow-list value selection: tries only [allowedValues] (in order) intersected with the
  * current domain. Sparse-aware via the `in d` membership check.
  */
-class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
+internal class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
         is VarRef.Bool -> allowedValues.asSequence().filter { it == 0 || it == 1 }
 
@@ -855,7 +855,7 @@ class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
  * does more work. Use Impact when reasoning power per node matters, e.g. structured CSPs
  * with strong global propagators.
  */
-class Impact(private val maxProbes: Int = 32) : ValueHeuristic {
+internal class Impact(private val maxProbes: Int = 32) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
         probeAndOrder(session, varRef, rng, maxProbes, ascending = true)
 }
@@ -881,7 +881,7 @@ class Impact(private val maxProbes: Int = 32) : ValueHeuristic {
  *    where the solution manifold is "fat" near correct subtrees; Impact wins on
  *    pruning-heavy first-fail problems.
  */
-class MaxSd(private val maxProbes: Int = 32) : ValueHeuristic {
+internal class MaxSd(private val maxProbes: Int = 32) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
         probeAndOrder(session, varRef, rng, maxProbes, ascending = false)
 }
@@ -979,7 +979,7 @@ private fun logRemainingDomainProduct(session: PropagationSession): Double {
  * early. For a satisfiability problem, falls through to [IndomainMin] (every coefficient
  * is zero so ascending order is preserved).
  */
-class IndomainBest(private val objective: com.eignex.klause.solver.LinearObjective) : ValueHeuristic {
+internal class IndomainBest(private val objective: com.eignex.klause.solver.LinearObjective) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
         is VarRef.Bool -> {
             val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0.0
@@ -1025,7 +1025,7 @@ class IndomainBest(private val objective: com.eignex.klause.solver.LinearObjecti
  * inner choice — the engine still runs through the saved value first, but if that branch
  * proves infeasible, the inner heuristic's order takes over.
  */
-class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic {
+internal class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic {
 
     private var bools: BooleanArray? = null
     private var ints: IntArray? = null

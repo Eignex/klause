@@ -2,6 +2,10 @@ plugins {
     id("com.eignex.kmp") version "1.2.2"
 }
 
+repositories {
+    mavenLocal()
+}
+
 eignexPublish {
     description.set("SMT-engine adapter for klause via JavaSMT — one adapter, many backends (Z3, CVC5, MathSAT5, Bitwuzla, SMTInterpol, Yices2, Princess).")
     githubRepo.set("Eignex/klause")

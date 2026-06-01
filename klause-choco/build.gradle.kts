@@ -2,6 +2,10 @@ plugins {
     id("com.eignex.kmp") version "1.2.2"
 }
 
+repositories {
+    mavenLocal()
+}
+
 eignexPublish {
     description.set("Choco Solver complete-search reference adapter for klause.")
     githubRepo.set("Eignex/klause")

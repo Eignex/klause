@@ -211,7 +211,7 @@ sealed interface PropagationResult {
      *  not assume minimality. An empty result means the contradiction was implied by problem
      *  constraints alone (no input was load-bearing).
      */
-    data class Unsat(
+    data class Unsat internal constructor(
         val conflictBools: Set<Int> = emptySet(),
         val conflictInts: Set<Int> = emptySet(),
         val conflictLevels: Set<Int> = emptySet(),
@@ -223,6 +223,6 @@ sealed interface PropagationResult {
          * analyzer. Engines that support non-chronological backjump (CDB) read
          * `learnedClause` to pick a [ConflictAnalyzer.AnalysisResult.Learned.backjumpLevel].
          */
-        val learnedClause: ConflictAnalyzer.AnalysisResult? = null,
+        internal val learnedClause: ConflictAnalyzer.AnalysisResult? = null,
     ) : PropagationResult
 }

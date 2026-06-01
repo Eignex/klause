@@ -29,7 +29,7 @@ import kotlin.math.sqrt
  * literature but we expose it directly so callers can tune. Default 50 is a reasonable
  * starting point for small/medium instances.
  */
-class NoiseController(
+internal class NoiseController(
     initial: Double,
     val theta: Int = 50,
     val phi: Double = 0.2,

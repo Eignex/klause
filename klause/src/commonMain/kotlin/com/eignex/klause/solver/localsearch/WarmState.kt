@@ -10,7 +10,7 @@ package com.eignex.klause.solver.localsearch
  * `null` fields mean "no warm state available — fall back to the strategy's default
  * initialisation." [reset] returns the state to that empty baseline.
  */
-class WarmState {
+internal class WarmState {
     /** Per-factor weights, size = `problem.numFactors`, or `null` if not yet populated. */
     internal var factorWeights: DoubleArray? = null
 

@@ -26,7 +26,7 @@ import com.eignex.klause.solver.minimizeInt
  * to int-array ids in `intVarIdByName`. Float vars round-trip through their bucket index
  * using the [FloatSpec] in `floatDecoders`.
  */
-internal class CompiledProblem(
+class CompiledProblem internal constructor(
     val problem: Problem,
     val boolVarIdByName: Map<String, Int>,
     val intVarIdByName: Map<String, Int>,
@@ -40,7 +40,7 @@ internal class CompiledProblem(
     /** Per-set-var indicator layout: parallel `(universe[i], indicatorBoolId[i])`. Used by
      *  the set decoders to read indicator bools back into a [Set]. Nominal-set vars stash
      *  their label order in [setNominalLabels] alongside this. */
-    val setLayouts: Map<String, com.eignex.klause.compile.SetLayout> = emptyMap(),
+    internal val setLayouts: Map<String, com.eignex.klause.compile.SetLayout> = emptyMap(),
     /** Label list (in universe-index order) for each nominal-set var. Empty map entry for
      *  int-universe set vars. */
     val setNominalLabels: Map<String, List<String>> = emptyMap(),

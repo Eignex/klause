@@ -589,7 +589,7 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
     /** Walk every factor that touches bool var [v], call its `deltaIfBoolFlipped`, and
      *  hand the (factorId, delta) pair to [action]. Inline so callers stay allocation-
      *  free. Shared by [breakScore], [netDelta], and DDFW's weighted-break score. */
-    inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
+    internal inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in problem.boolOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfBoolFlipped(this, factorId, v))
         }
@@ -597,7 +597,7 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
 
     /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var [v] with
      *  target value [newValue]. */
-    inline fun forEachIntFactorDelta(v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit) {
+    internal inline fun forEachIntFactorDelta(v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in problem.intOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
         }

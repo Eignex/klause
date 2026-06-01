@@ -375,7 +375,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
      * sound, since the invariant is "watch is on a non-false literal", and pop reverts
      * pins which only *adds* non-false literals.
      */
-    val boolWatchersByLit: Array<com.eignex.klause.util.IntArrayList> =
+    internal val boolWatchersByLit: Array<com.eignex.klause.util.IntArrayList> =
         Array(2 * problem.numBoolVars) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
 
     /**
@@ -682,7 +682,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
      * *most recently pinned* variable in the current conflict, which requires this
      * append-only trail.
      */
-    val boolPinOrder: com.eignex.klause.util.IntArrayList =
+    internal val boolPinOrder: com.eignex.klause.util.IntArrayList =
         com.eignex.klause.util.IntArrayList(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
 
     // -------- Undo trail (replaces per-level full-array snapshots) --------

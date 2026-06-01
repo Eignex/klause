@@ -27,7 +27,7 @@ import com.eignex.klause.util.IntArrayList
  * [AnalysisResult.NotApplicable] when the analyzer can't produce a usable nogood (no
  * conflict reason, or the failing factor isn't clause-form).
  */
-class ConflictAnalyzer internal constructor(private val state: PropagationState) {
+internal class ConflictAnalyzer internal constructor(private val state: PropagationState) {
 
     // Reusable per-analysis scratch — grown once and cleared per call instead of
     // reallocating three O(numVars) BooleanArrays on every conflict. [universe] is the live

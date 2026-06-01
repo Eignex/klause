@@ -31,8 +31,8 @@ import kotlin.math.pow
  * The recognizable algorithm names survive as factory objects ([WalkSat], [ProbSat]); only
  * the strategy *type* is unified here.
  */
-class FocusedLs(
-    val selection: MoveSelection = NoiseGreedy(),
+class FocusedLs internal constructor(
+    internal val selection: MoveSelection = NoiseGreedy(),
     val tabu: TabuFilter = TabuFilter(tenure = 10),
     val configurationChecking: Boolean = false,
 ) : Strategy {
@@ -63,7 +63,7 @@ class FocusedLs(
 
 /** Candidate-selection rule for [FocusedLs]. Receives the tabu/CC-filtered, non-empty move
  *  list and returns one. Owns its own (optional) adaptive [NoiseController]. */
-sealed interface MoveSelection {
+internal sealed interface MoveSelection {
     fun pick(state: LocalSearchState, moves: List<Move>): Move
 }
 
@@ -72,7 +72,7 @@ sealed interface MoveSelection {
  * the smallest shaped break score (ties broken uniformly). When [controller] is non-null the
  * noise level is steered adaptively, overriding [noise].
  */
-class NoiseGreedy(val noise: Double = 0.5, private val controller: NoiseController? = null) : MoveSelection {
+internal class NoiseGreedy(val noise: Double = 0.5, private val controller: NoiseController? = null) : MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         val n = controller?.also { it.observe(state.cost) }?.level ?: noise
         if (state.rng.nextDouble() < n) return moves[state.rng.nextInt(moves.size)]
@@ -88,8 +88,11 @@ class NoiseGreedy(val noise: Double = 0.5, private val controller: NoiseControll
  * When [controller] is non-null, `cb` is steered toward `cb·(1 - level·0.5)`: it flattens the
  * distribution (more diversification) during stalls and sharpens on improvement.
  */
-class ProbSatWeighted(val cb: Double = 2.06, val eps: Double = 1.0, private val controller: NoiseController? = null) :
-    MoveSelection {
+internal class ProbSatWeighted(
+    val cb: Double = 2.06,
+    val eps: Double = 1.0,
+    private val controller: NoiseController? = null,
+) : MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         if (moves.size == 1) return moves[0]
         val cbNow = controller?.let {
@@ -126,7 +129,7 @@ class ProbSatWeighted(val cb: Double = 2.06, val eps: Double = 1.0, private val 
  * candidate passes after one pass, a random candidate is taken. Temperature is per-instance and
  * cools monotonically (not re-heated on restart), matching the original strategy's behaviour.
  */
-class Annealing(
+internal class Annealing(
     val initialTemperature: Double = 1.0,
     val coolingRate: Double = 0.999,
     val minTemperature: Double = 0.001,

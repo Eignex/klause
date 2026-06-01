@@ -130,7 +130,7 @@ class AdaptivePerturbationRestart(val maxFlipsBeforeRestart: Int = 10_000, val p
  * `factorWeights` and DDFW-style learnt state survive (`state.restart()` doesn't touch
  * them); only the assignment, `lastTouched`, and `step` reset.
  */
-class LubyRestart(val unit: Int = 100) : RestartPolicy {
+internal class LubyRestart(val unit: Int = 100) : RestartPolicy {
     private var u: Int = 1
     private var v: Int = 1
     private var cadence: Int = unit
