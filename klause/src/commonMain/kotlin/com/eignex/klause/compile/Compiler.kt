@@ -47,6 +47,7 @@ import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.SchemaEntry
+import com.eignex.klause.schema.PRESENCE_SUFFIX
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.skema.SchemaDef
 import com.eignex.klause.solver.Factor
@@ -69,11 +70,11 @@ import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
 
-class Compiler {
+class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current) {
 
-    fun compile(def: SchemaDef<SchemaEntry>): CompiledProblem = Build().run(def)
+    fun compile(def: SchemaDef<SchemaEntry>): CompiledProblem = Build(config).run(def)
 
-    internal class Build {
+    internal class Build(val config: com.eignex.klause.config.KlauseConfig) {
         val factors = mutableListOf<Factor>()
         val boolVarIdByName = mutableMapOf<String, Int>()
         val intVarIdByName = mutableMapOf<String, Int>()
@@ -159,6 +160,11 @@ class Compiler {
                 if (entry is NamedConstraint) assertExpr(entry.expr)
             }
 
+            // Opt-var pinning: when an optional variable is absent (its `__present` bool is
+            // false), fix its value to a canonical in-domain default so absent vars don't
+            // contribute dead-value symmetry. Gated by config so it can be turned off.
+            if (config.pinAbsentOptVars) emitOptVarPins(def)
+
             val metadata: com.eignex.klause.solver.FloatMetadata? =
                 if (floatMetaIntervals.isEmpty()) null
                 else com.eignex.klause.solver.FloatMetadata(
@@ -189,6 +195,38 @@ class Compiler {
                 setNominalLabels = setLabelOrder.toMap(),
                 defaultBacktrackParams = searchAnnotation?.let { searchAnnotationToParams(it) },
             )
+        }
+
+        /**
+         * Emit `¬present → value = default` for every optional variable. An opt var named
+         * `X` is declared (by [com.eignex.klause.schema.VariableSchema.optIntVar] and friends)
+         * alongside a synthetic presence Boolean named `X$PRESENCE_SUFFIX`; we detect the pair
+         * by that naming convention. Default per kind:
+         *  - int     → `0` coerced into `[min, max]` (always representable, so the pin can never
+         *              accidentally force `present` true by being unsatisfiable),
+         *  - bool    → `false`,
+         *  - nominal → the first declared label.
+         */
+        private fun emitOptVarPins(def: SchemaDef<SchemaEntry>) {
+            for ((name, entry) in def.entries) {
+                if (entry !is BoolSpec || !name.endsWith(PRESENCE_SUFFIX)) continue
+                val base = name.removeSuffix(PRESENCE_SUFFIX)
+                val absent = Not(BoolRef(name))
+                when {
+                    intVarIdByName.containsKey(base) -> {
+                        val d = intDomains[intVarIdByName.getValue(base)]
+                        val default = 0.coerceIn(d.min, d.max)
+                        assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(default))))
+                    }
+                    nominalIndicators.containsKey(base) -> {
+                        val firstLabel = nominalIndicators.getValue(base).keys.first()
+                        assertExpr(Implies(absent, NominalEq(base, firstLabel)))
+                    }
+                    boolVarIdByName.containsKey(base) -> {
+                        assertExpr(Implies(absent, Not(BoolRef(base))))
+                    }
+                }
+            }
         }
 
         fun newBoolVar(): Int = numBoolVars++
@@ -427,4 +465,6 @@ class Compiler {
     }
 }
 
-fun VariableSchema.compile(): CompiledProblem = Compiler().compile(this.definition())
+fun VariableSchema.compile(
+    config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current,
+): CompiledProblem = Compiler(config).compile(this.definition())

@@ -38,18 +38,16 @@ import kotlin.system.exitProcess
  * `-a` / `-n` flags apply to the satisfy path.
  */
 fun main(args: Array<String>) {
+    // Translate env vars / system properties into the central config once, up front, and
+    // install it as the process-wide ambient config so the compiler picks it up.
+    val config = com.eignex.klause.config.installKlauseConfigFromEnv()
     val opts = parseArgs(args)
     val source = File(opts.fznPath).readText()
     // Unbounded `var int` declarations get a default domain. Resolution order:
-    //   CLI flag → env var → built-in default.
-    // The env-var names mirror the CLI flag names so a `KLAUSE_FZN_UNBOUNDED_INT_LO`
-    // export reaches in-process callers too. Built-in defaults match Gecode/Chuffed.
-    val unboundedLo = opts.unboundedIntLo
-        ?: System.getenv("KLAUSE_FZN_UNBOUNDED_INT_LO")?.toIntOrNull()
-        ?: com.eignex.klause.formats.flatzinc.DEFAULT_UNBOUNDED_INT_LO
-    val unboundedHi = opts.unboundedIntHi
-        ?: System.getenv("KLAUSE_FZN_UNBOUNDED_INT_HI")?.toIntOrNull()
-        ?: com.eignex.klause.formats.flatzinc.DEFAULT_UNBOUNDED_INT_HI
+    //   CLI flag → KlauseConfig (env var / system property) → built-in default.
+    // Built-in defaults match Gecode/Chuffed.
+    val unboundedLo = opts.unboundedIntLo ?: config.unboundedIntLo
+    val unboundedHi = opts.unboundedIntHi ?: config.unboundedIntHi
     val program = parseFlatZinc(
         source = source,
         unboundedIntLo = unboundedLo,
