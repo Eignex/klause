@@ -14,7 +14,13 @@ import com.eignex.klause.solver.propagation.PropagationState
  * MiniZinc usage `|S|` is small (a handful of "good" values among many), so the constant
  * factor matters less than the structure being explicit.
  */
-class Among(val n: Int, val xs: IntArray, values: IntArray) : LocalSearchFactor {
+class Among(
+    /** Variable id holding the count of `xs` taking a value in `values`. */
+    val n: Int,
+    /** The variable ids being counted over. */
+    val xs: IntArray,
+    values: IntArray,
+) : LocalSearchFactor {
 
     /** Sorted, deduplicated value set. */
     val values: IntArray = values.distinct().sorted().toIntArray()

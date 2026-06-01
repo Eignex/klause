@@ -15,7 +15,11 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Propagation is the same singleton-take filter as the zero-only variant: any var pinned to
  * a non-excluded value `v` removes `v` from every other var's domain.
  */
-class AllDifferentExcept(val xs: IntArray, except: IntArray) : LocalSearchFactor {
+class AllDifferentExcept(
+    /** Integer variable ids required to be pairwise distinct outside [except]. */
+    val xs: IntArray,
+    except: IntArray,
+) : LocalSearchFactor {
 
     val except: IntArray = except.distinct().sorted().toIntArray()
     private val exceptSet: Set<Int> = this.except.toHashSet()

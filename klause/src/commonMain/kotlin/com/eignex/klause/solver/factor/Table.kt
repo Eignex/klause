@@ -24,6 +24,7 @@ class Table(
 
     /** Number of variables per tuple. */
     val arity: Int = xs.size
+
     /** Number of tuples. */
     val numTuples: Int = tuples.size / arity
 

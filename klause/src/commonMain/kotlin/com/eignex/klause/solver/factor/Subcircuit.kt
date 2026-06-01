@@ -32,7 +32,10 @@ import kotlin.math.abs
  * assignment (a chain's "closing" is only forbidden if it doesn't capture every
  * non-excluded node, and "non-excluded" itself depends on other vars). Worklist-driven.
  */
-class Subcircuit(val succ: IntArray) : LocalSearchFactor {
+class Subcircuit(
+    /** Successor variable id per node; `succ[i] = i` excludes node i, the rest form one cycle. */
+    val succ: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(succ.isNotEmpty()) { "Subcircuit needs at least one var, got ${succ.size}" }

@@ -18,7 +18,14 @@ import com.eignex.klause.solver.propagation.PropagationState
  * propagation lets BacktrackSolver find correct models because the singleton check
  * fires at every leaf attempt.
  */
-class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : LocalSearchFactor {
+class ValuePrecede(
+    /** The value that must first appear before [t]. */
+    val s: Int,
+    /** The value whose first occurrence must follow [s]. */
+    val t: Int,
+    /** The sequence variable ids. */
+    val xs: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(xs.isNotEmpty()) { "value_precede: empty xs" }

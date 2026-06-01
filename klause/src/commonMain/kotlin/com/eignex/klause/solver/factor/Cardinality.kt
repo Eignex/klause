@@ -575,10 +575,13 @@ class Cardinality(
 
     /** Factory and shared constants for this factor. */
     companion object {
+        /** At-most-one: at most one of [literals] is true. */
         fun atMostOne(literals: IntArray): Cardinality = Cardinality(literals, min = 0, max = 1)
 
+        /** At-least-one: at least one of [literals] is true. */
         fun atLeastOne(literals: IntArray): Cardinality = Cardinality(literals, min = 1, max = literals.size)
 
+        /** Exactly-one: exactly one of [literals] is true. */
         fun exactlyOne(literals: IntArray): Cardinality = Cardinality(literals, min = 1, max = 1)
 
         /** Cap on (true-lit, false-lit) swap-pair proposals in [proposeStructuredMoves].

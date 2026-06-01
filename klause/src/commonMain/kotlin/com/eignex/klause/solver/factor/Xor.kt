@@ -13,7 +13,12 @@ import com.eignex.klause.solver.propagation.PropagationState
  * parity (0 or 1). Each Boolean flip toggles the parity exactly once per occurrence of that var
  * in the literal list.
  */
-class Xor(val literals: IntArray, val targetParity: Int) : LocalSearchFactor {
+class Xor(
+    /** The literals whose parity is constrained. */
+    val literals: IntArray,
+    /** Required parity (0 = even number of true literals, 1 = odd). */
+    val targetParity: Int,
+) : LocalSearchFactor {
 
     init {
         require(literals.isNotEmpty()) { "Xor needs at least one literal" }

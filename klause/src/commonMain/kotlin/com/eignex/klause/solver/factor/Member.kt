@@ -14,7 +14,12 @@ import com.eignex.klause.util.IntArrayList
  * Propagation: when every `xs[i]`'s domain is disjoint from `y`'s domain, fail; when
  * `xs` has length 1, force `y = xs[0]`.
  */
-class Member(val xs: IntArray, val y: Int) : LocalSearchFactor {
+class Member(
+    /** The candidate variable ids. */
+    val xs: IntArray,
+    /** Variable id required to equal one of [xs]. */
+    val y: Int,
+) : LocalSearchFactor {
 
     init {
         require(xs.isNotEmpty()) { "member: empty xs" }

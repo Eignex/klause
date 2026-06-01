@@ -13,7 +13,10 @@ import com.eignex.klause.solver.propagation.PropagationState
  * `xs[i].min` as the common lower bound and the min of every `xs[i].max` as the
  * common upper bound, then push back to every operand.
  */
-class AllEqual(val xs: IntArray) : LocalSearchFactor {
+class AllEqual(
+    /** Integer variable ids required to all take the same value. */
+    val xs: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(xs.size >= 2) { "all_equal needs at least two variables" }

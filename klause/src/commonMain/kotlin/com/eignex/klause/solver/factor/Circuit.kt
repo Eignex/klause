@@ -42,7 +42,10 @@ import kotlin.math.abs
  *  - Worklist-driven: one propagate() call does one pass; the engine re-fires on
  *    subsequent tightenings, so cascades resolve over multiple calls.
  */
-class Circuit(val succ: IntArray) : LocalSearchFactor {
+class Circuit(
+    /** Successor variable id per node; the assignment must form one Hamiltonian cycle. */
+    val succ: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }

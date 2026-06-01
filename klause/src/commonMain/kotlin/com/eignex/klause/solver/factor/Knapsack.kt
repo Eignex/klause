@@ -14,7 +14,18 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Decomposed propagation: bound-tighten [w] and [p] from the per-element
  * `weights[i] · domain(xs[i])` and `profits[i] · domain(xs[i])` ranges.
  */
-class Knapsack(val weights: IntArray, val profits: IntArray, val xs: IntArray, val w: Int, val p: Int) :
+class Knapsack(
+    /** Per-item weights. */
+    val weights: IntArray,
+    /** Per-item profits. */
+    val profits: IntArray,
+    /** Per-item inclusion variable ids. */
+    val xs: IntArray,
+    /** Variable id holding the total selected weight. */
+    val w: Int,
+    /** Variable id holding the total selected profit. */
+    val p: Int,
+) :
     LocalSearchFactor {
 
     init {

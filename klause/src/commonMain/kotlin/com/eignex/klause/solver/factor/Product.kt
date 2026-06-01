@@ -14,7 +14,14 @@ import com.eignex.klause.solver.propagation.PropagationState
  *
  * No payload: the product is recomputed in O(1) from the current assignment on each query.
  */
-class Product(val a: Int, val b: Int, val result: Int) : LocalSearchFactor {
+class Product(
+    /** First factor variable id. */
+    val a: Int,
+    /** Second factor variable id. */
+    val b: Int,
+    /** Result variable id (`result = a * b`). */
+    val result: Int,
+) : LocalSearchFactor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = intArrayOf(a, b, result)

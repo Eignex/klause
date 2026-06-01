@@ -27,8 +27,14 @@ class Monotone(
     val strict: Boolean,
 ) : LocalSearchFactor {
 
-    /** The Direction case. */
-    enum class Direction { Increasing, Decreasing }
+    /** Sort direction for a [Monotone] sequence constraint. */
+    enum class Direction {
+        /** Each element is ≥ (or > if strict) the previous. */
+        Increasing,
+
+        /** Each element is ≤ (or < if strict) the previous. */
+        Decreasing,
+    }
 
     init {
         require(xs.size >= 2) { "Monotone needs at least two variables" }

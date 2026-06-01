@@ -24,7 +24,18 @@ import com.eignex.klause.solver.propagation.PropagationState
  * snap `result` to the selected element, snap the selected element to `result`, or re-point
  * `idx` at a position whose value already equals `result`.
  */
-class Element(val idx: Int, val result: Int, val arr: IntArray, val arrIsVars: Boolean, val indexOffset: Int = 1) :
+class Element(
+    /** Index variable id. */
+    val idx: Int,
+    /** Result variable id (`result = arr[idx - indexOffset]`). */
+    val result: Int,
+    /** The indexed array: variable ids when [arrIsVars], else constant values. */
+    val arr: IntArray,
+    /** Whether [arr] holds variable ids (true) or constants (false). */
+    val arrIsVars: Boolean,
+    /** Integer representing index 0 of [arr]. */
+    val indexOffset: Int = 1,
+) :
     LocalSearchFactor {
 
     init {
