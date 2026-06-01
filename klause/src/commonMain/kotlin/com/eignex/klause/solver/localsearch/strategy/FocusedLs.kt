@@ -42,7 +42,9 @@ class FocusedLs(
         val candidates = if (configurationChecking) {
             val cc = raw.filter { confChanged(state, it) }
             if (cc.isEmpty()) raw else cc
-        } else raw
+        } else {
+            raw
+        }
         val moves = tabu.filter(state, candidates)
         if (moves.isEmpty()) return null
         return selection.pick(state, moves)
@@ -94,7 +96,10 @@ class ProbSatWeighted(
 ) : MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         if (moves.size == 1) return moves[0]
-        val cbNow = controller?.let { it.observe(state.cost); cb * (1.0 - it.level * 0.5) } ?: cb
+        val cbNow = controller?.let {
+            it.observe(state.cost)
+            cb * (1.0 - it.level * 0.5)
+        } ?: cb
         val scores = DoubleArray(moves.size) { state.shapedBreakScore(moves[it]) }
         var minScore = scores[0]
         for (i in 1 until scores.size) if (scores[i] < minScore) minScore = scores[i]
@@ -183,11 +188,16 @@ object WalkSat {
         NoiseGreedy(
             noise = baselineNoise,
             controller = NoiseController(
-                initial = baselineNoise, theta = theta, phi = phi,
-                minLevel = baselineNoise, maxLevel = 1.0, ewmaAlpha = ewmaAlpha,
+                initial = baselineNoise,
+                theta = theta,
+                phi = phi,
+                minLevel = baselineNoise,
+                maxLevel = 1.0,
+                ewmaAlpha = ewmaAlpha,
             ),
         ),
-        tabu, configurationChecking,
+        tabu,
+        configurationChecking,
     )
 }
 
@@ -224,7 +234,8 @@ object ProbSat {
             eps = eps,
             controller = NoiseController(initial = 0.0, theta = theta, phi = phi, ewmaAlpha = ewmaAlpha),
         ),
-        tabu, configurationChecking,
+        tabu,
+        configurationChecking,
     )
 }
 
@@ -242,6 +253,7 @@ object SimulatedAnnealing {
         configurationChecking: Boolean = false,
     ): FocusedLs = FocusedLs(
         Annealing(initialTemperature, coolingRate, minTemperature),
-        tabu, configurationChecking,
+        tabu,
+        configurationChecking,
     )
 }

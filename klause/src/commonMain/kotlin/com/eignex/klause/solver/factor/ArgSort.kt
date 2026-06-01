@@ -65,16 +65,28 @@ class ArgSort(
         var will = false
         val seen = BooleanArray(n)
         for (p in permVals) {
-            if (p < 0 || p >= n) { will = true; break }
-            if (seen[p]) { will = true; break }
+            if (p < 0 || p >= n) {
+                will = true
+                break
+            }
+            if (seen[p]) {
+                will = true
+                break
+            }
             seen[p] = true
         }
         if (!will) {
             for (i in 0 until n - 1) {
                 val a = vals[permVals[i]]
                 val b = vals[permVals[i + 1]]
-                if (a > b) { will = true; break }
-                if (a == b && permVals[i] >= permVals[i + 1]) { will = true; break }
+                if (a > b) {
+                    will = true
+                    break
+                }
+                if (a == b && permVals[i] >= permVals[i + 1]) {
+                    will = true
+                    break
+                }
             }
         }
         return (if (will) 1 else 0) - (if (was) 1 else 0)
@@ -95,10 +107,12 @@ class ArgSort(
         val valuesNow = IntArray(n) { state.assignment.intValue(values[it]) }
         // Stable sort indices by valuesNow with tie-break by index (matches the constraint).
         val sortedIdx = indices.toTypedArray().also {
-            it.sortWith(Comparator { a, b ->
-                val c = valuesNow[a].compareTo(valuesNow[b])
-                if (c != 0) c else a.compareTo(b)
-            })
+            it.sortWith(
+                Comparator { a, b ->
+                    val c = valuesNow[a].compareTo(valuesNow[b])
+                    if (c != 0) c else a.compareTo(b)
+                }
+            )
         }
         for (i in 0 until n) {
             val target = sortedIdx[i] + permOffset
@@ -170,17 +184,24 @@ class ArgSort(
         var anyMultiValue = false
         for (p in perm) {
             val d = state.intDomains[p]
-            if (d.max > d.min) { anyMultiValue = true; break }
+            if (d.max > d.min) {
+                anyMultiValue = true
+                break
+            }
         }
         if (anyMultiValue && !reginOnPerm(state, ant)) return false
 
         // Pin-based sorted check (only fires when perm is fully assigned).
         var allPinned = true
-        for (p in perm) if (state.intDomains[p].min != state.intDomains[p].max) { allPinned = false; break }
+        for (p in perm) if (state.intDomains[p].min != state.intDomains[p].max) {
+            allPinned = false
+            break
+        }
         if (allPinned) {
             val pv = IntArray(n) { state.intDomains[perm[it]].min - permOffset }
             for (i in 0 until n - 1) {
-                val a = pv[i]; val b = pv[i + 1]
+                val a = pv[i]
+                val b = pv[i + 1]
                 if (!state.tightenIntMax(values[a], state.intDomains[values[b]].max, ant)) return false
                 if (!state.tightenIntMin(values[b], state.intDomains[values[a]].min, ant)) return false
                 if (a >= b) {
@@ -221,8 +242,11 @@ class ArgSort(
         val adj = Array(totalV) { ArrayList<Int>() }
         for (i in 0 until n) {
             for (vi in varAdj[i]) {
-                if (matchVarToVal[i] == vi) adj[n + vi].add(i)
-                else adj[i].add(n + vi)
+                if (matchVarToVal[i] == vi) {
+                    adj[n + vi].add(i)
+                } else {
+                    adj[i].add(n + vi)
+                }
             }
         }
         // No free vertices (matching is perfect); SCC alone determines vital edges.
@@ -238,8 +262,11 @@ class ArgSort(
             for (root in 0 until totalV) {
                 if (index[root] != -1) continue
                 callStack.addLast(intArrayOf(root, 0))
-                index[root] = idx; low[root] = idx; idx++
-                stack.addLast(root); onStack[root] = true
+                index[root] = idx
+                low[root] = idx
+                idx++
+                stack.addLast(root)
+                onStack[root] = true
                 while (callStack.isNotEmpty()) {
                     val top = callStack.last()
                     val u = top[0]
@@ -248,8 +275,11 @@ class ArgSort(
                         val w = edges[top[1]]
                         top[1]++
                         if (index[w] == -1) {
-                            index[w] = idx; low[w] = idx; idx++
-                            stack.addLast(w); onStack[w] = true
+                            index[w] = idx
+                            low[w] = idx
+                            idx++
+                            stack.addLast(w)
+                            onStack[w] = true
                             callStack.addLast(intArrayOf(w, 0))
                         } else if (onStack[w]) {
                             if (index[w] < low[u]) low[u] = index[w]

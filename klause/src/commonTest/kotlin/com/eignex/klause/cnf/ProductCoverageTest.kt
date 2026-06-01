@@ -11,7 +11,6 @@ class ProductCoverageTest {
 
     @Test
     fun `product over three ints matches enumeration`() {
-
         val factor = Product(a = 0, b = 1, result = 2)
         val problem = Problem(
             numBoolVars = 0,
@@ -26,7 +25,8 @@ class ProductCoverageTest {
             for ((idx, value) in listOf(av, bv, rv).withIndex()) {
                 val bits = cnf.intVarBits[idx]
                 for (i in bits.indices) {
-                    pins += bits[i]; pins += (value shr i) and 1
+                    pins += bits[i]
+                    pins += (value shr i) and 1
                 }
             }
             val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())

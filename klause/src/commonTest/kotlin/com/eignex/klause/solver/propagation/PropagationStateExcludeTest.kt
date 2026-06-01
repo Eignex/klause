@@ -12,7 +12,10 @@ class PropagationStateExcludeTest {
 
     private fun state(domains: Array<IntDomain>): PropagationState {
         val p = Problem(
-            numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = emptyArray(),
+            numBoolVars = 0,
+            numIntVars = domains.size,
+            intDomains = domains,
+            factors = emptyArray(),
         )
         return PropagationState(p, Assumptions.None)
     }
@@ -63,8 +66,8 @@ class PropagationStateExcludeTest {
     fun `tightenIntMin past holes preserves sparse representation`() {
         // Build a sparse domain by punching a hole at 3, then tighten min past 2.
         val s = state(arrayOf(IntDomain(1, 5)))
-        assertTrue(s.excludeIntValue(0, 3))  // domain = {1, 2, 4, 5}
-        assertTrue(s.tightenIntMin(0, 2))    // domain should be {2, 4, 5}
+        assertTrue(s.excludeIntValue(0, 3)) // domain = {1, 2, 4, 5}
+        assertTrue(s.tightenIntMin(0, 2)) // domain should be {2, 4, 5}
         val d = s.intDomains[0]
         assertEquals(2, d.min)
         assertEquals(5, d.max)
@@ -79,7 +82,7 @@ class PropagationStateExcludeTest {
         // Sparse domain {1, 2, 4, 5}, then ask for max <= 3 → new max should land on 2.
         val s = state(arrayOf(IntDomain(1, 5)))
         assertTrue(s.excludeIntValue(0, 3))
-        assertTrue(s.tightenIntMax(0, 3))  // 3 itself is a hole; lands at 2.
+        assertTrue(s.tightenIntMax(0, 3)) // 3 itself is a hole; lands at 2.
         val d = s.intDomains[0]
         assertEquals(1, d.min)
         assertEquals(2, d.max)

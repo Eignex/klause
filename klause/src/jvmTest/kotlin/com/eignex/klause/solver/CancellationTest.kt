@@ -1,6 +1,5 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.Clause
@@ -9,7 +8,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -54,7 +52,7 @@ class CancellationTest {
 
         assertTrue(elapsed < 2_000, "LS samples should stop within ~50ms of cancel; took ${elapsed}ms")
         // The sequence may have yielded any number of solutions before cancel fired.
-        assertTrue(samples.isNotEmpty() || samples.isEmpty())  // tautology — just exercising the path
+        assertTrue(samples.isNotEmpty() || samples.isEmpty()) // tautology — just exercising the path
     }
 
     /** Same but for backtrack — cancel a long enumeration and verify prompt exit. */
@@ -84,14 +82,18 @@ class CancellationTest {
         // get cancelled mid-search if we cancel before it finds one. Either way the
         // call returns promptly.
         assertTrue(elapsed < 2_000, "backtrack solve should respond to cancel within ~20ms; took ${elapsed}ms")
-        assertTrue(r is SolveResult.Sat || r is SolveResult.Unknown,
-            "expected Sat or Unknown (cancelled), got $r")
+        assertTrue(
+            r is SolveResult.Sat || r is SolveResult.Unknown,
+            "expected Sat or Unknown (cancelled), got $r"
+        )
     }
 
     private fun unsatThreeBools(): Problem {
         // x ∧ ¬x — direct contradiction
         return Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),

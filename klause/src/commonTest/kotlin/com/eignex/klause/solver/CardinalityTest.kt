@@ -1,8 +1,7 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.localsearch.LocalSearchState
-
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +15,8 @@ class CardinalityTest {
         val amo = Cardinality.atMostOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(amo))
         val state = LocalSearchState(problem, Random(0))
-        state.assignment.setBool(0, true); state.assignment.setBool(1, true)
+        state.assignment.setBool(0, true)
+        state.assignment.setBool(1, true)
         state.recompute()
         assertTrue(amo.isViolated(state, 0))
         assertEquals(2, state.intPayload[0])

@@ -1,10 +1,10 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -52,7 +52,9 @@ class FlatZincParseTest {
             constraint int_lin_ge([1], [cost], 3);
             solve minimize cost;
         """.trimIndent()
-        val program = parseFlatZinc(src.replace("int_lin_ge", "int_lin_le").replace("[1]", "[-1]").replace(", 3", ", -3"))
+        val program = parseFlatZinc(
+            src.replace("int_lin_ge", "int_lin_le").replace("[1]", "[-1]").replace(", 3", ", -3")
+        )
         // FlatZinc has no `int_lin_ge` natively; encoded as negated LE.
         val solve = assertIs<SolveDirective.Minimize>(program.solve)
         assertEquals("cost", solve.objVar)

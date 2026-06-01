@@ -1,9 +1,9 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.gcc
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -12,7 +12,6 @@ class GccDslTest {
 
     @Test
     fun `multi value gcc bounds hold in samples`() {
-
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -24,7 +23,8 @@ class GccDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 14)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -40,7 +40,6 @@ class GccDslTest {
 
     @Test
     fun `gcc can force exact distribution`() {
-
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -49,7 +48,8 @@ class GccDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 33)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

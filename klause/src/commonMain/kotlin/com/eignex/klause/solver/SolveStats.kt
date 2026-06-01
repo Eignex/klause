@@ -93,12 +93,18 @@ class SolveStatsSink(val backend: String) {
     fun observePropagation(count: Long = 1L) {
         // CountStat is unweighted-count-per-call; for batched propagation events pass count
         // > 1 by looping or by switching this field to SumStat later. For now batch-as-one.
-        if (count == 1L) propagations.update(1.0)
-        else for (i in 0 until count) propagations.update(1.0)
+        if (count == 1L) {
+            propagations.update(1.0)
+        } else {
+            for (i in 0 until count) propagations.update(1.0)
+        }
     }
     fun observeLearn(count: Long = 1L) {
-        if (count == 1L) learnedClauses.update(1.0)
-        else for (i in 0 until count) learnedClauses.update(1.0)
+        if (count == 1L) {
+            learnedClauses.update(1.0)
+        } else {
+            for (i in 0 until count) learnedClauses.update(1.0)
+        }
     }
 
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
@@ -122,4 +128,3 @@ class SolveStatsSink(val backend: String) {
         )
     }
 }
-

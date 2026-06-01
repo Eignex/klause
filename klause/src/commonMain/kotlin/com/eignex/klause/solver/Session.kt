@@ -37,13 +37,17 @@ interface Session<P : SolverParams> : AutoCloseable {
     fun pop()
 
     fun solve(params: P): SolveResult
+
     /** Default implementation drains [samples] for one yield. Wraps it in
      *  [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
      *  doesn't. Mirrors [Solver.sample]'s contract. */
     fun sample(params: P): SampleResult {
         val s = samples(params).firstOrNull()
-        return if (s != null) SampleResult.Found(s)
-        else SampleResult.Unknown(TerminationReason.BudgetExhausted)
+        return if (s != null) {
+            SampleResult.Found(s)
+        } else {
+            SampleResult.Unknown(TerminationReason.BudgetExhausted)
+        }
     }
     fun samples(params: P): Sequence<Sample>
     fun enumerate(params: P): Sequence<Sample>
@@ -57,7 +61,8 @@ interface Session<P : SolverParams> : AutoCloseable {
     fun minimize(objective: Objective, params: P): MinimizeResult {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer")
+                "Solver ${solver::class.simpleName} does not implement Optimizer"
+            )
         return opt.minimize(objective, params)
     }
 
@@ -65,7 +70,8 @@ interface Session<P : SolverParams> : AutoCloseable {
     fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer")
+                "Solver ${solver::class.simpleName} does not implement Optimizer"
+            )
         return opt.improvements(objective, params)
     }
 
@@ -121,14 +127,16 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun minimize(objective: Objective, params: P): MinimizeResult {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer")
+                "Solver ${solver::class.simpleName} does not implement Optimizer"
+            )
         return opt.minimize(objective, applyStack(params))
     }
 
     override fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer")
+                "Solver ${solver::class.simpleName} does not implement Optimizer"
+            )
         return opt.improvements(objective, applyStack(params))
     }
 }

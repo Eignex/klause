@@ -213,8 +213,11 @@ class AllDifferentExcept(
             }
             if (mayEscape[i]) {
                 // Match an unmatched may-escape var to sink, else var → sink unmatched.
-                if (matchVarToVal[i] == -1) adj[sinkV].add(i)
-                else adj[i].add(sinkV)
+                if (matchVarToVal[i] == -1) {
+                    adj[sinkV].add(i)
+                } else {
+                    adj[i].add(sinkV)
+                }
             }
         }
 
@@ -226,10 +229,16 @@ class AllDifferentExcept(
         // Forward BFS from all free vertices.
         val reachableFromFree = BooleanArray(totalV)
         val queue = ArrayDeque<Int>()
-        for (v in 0 until totalV) if (free[v]) { reachableFromFree[v] = true; queue.add(v) }
+        for (v in 0 until totalV) if (free[v]) {
+            reachableFromFree[v] = true
+            queue.add(v)
+        }
         while (queue.isNotEmpty()) {
             val u = queue.removeFirst()
-            for (w in adj[u]) if (!reachableFromFree[w]) { reachableFromFree[w] = true; queue.add(w) }
+            for (w in adj[u]) if (!reachableFromFree[w]) {
+                reachableFromFree[w] = true
+                queue.add(w)
+            }
         }
 
         // Tarjan SCC on the same oriented graph.
@@ -292,10 +301,10 @@ class AllDifferentExcept(
         for (i in 0 until n) {
             val d = state.intDomains[xs[i]]
             for (vi in varAdj[i]) {
-                if (matchVarToVal[i] == vi) continue  // matched edge keeps val
+                if (matchVarToVal[i] == vi) continue // matched edge keeps val
                 val valVertex = n + vi
-                if (reachableFromFree[valVertex]) continue  // on some alternating path
-                if (sccId[i] == sccId[valVertex]) continue  // on a closed alternating cycle
+                if (reachableFromFree[valVertex]) continue // on some alternating path
+                if (sccId[i] == sccId[valVertex]) continue // on a closed alternating cycle
                 val value = values[vi]
                 if (value in d.min..d.max) {
                     if (!state.excludeIntValue(xs[i], value, ant)) return false
@@ -370,12 +379,13 @@ class AllDifferentExcept(
         var seenTargets = 0
         d.forEach { target ->
             if (target == pickedValue) return@forEach
-            if (target in exceptSet) return@forEach  // already proposed above
+            if (target in exceptSet) return@forEach // already proposed above
             val count = s.counts[target] ?: 0
             if (count != 0) return@forEach
             seenTargets++
-            if (filled < budget) targets[filled++] = target
-            else {
+            if (filled < budget) {
+                targets[filled++] = target
+            } else {
                 val r = state.rng.nextInt(seenTargets)
                 if (r < budget) targets[r] = target
             }

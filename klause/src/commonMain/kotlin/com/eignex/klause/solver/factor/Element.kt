@@ -99,7 +99,7 @@ class Element(
         val idxDom = state.problem.intDomains[idx]
         val resultVal = state.assignment.intValue(result)
         val inRange = pos in 0 until len
-        if (inRange && resultVal == elementValue(state, pos)) return  // satisfied
+        if (inRange && resultVal == elementValue(state, pos)) return // satisfied
 
         if (inRange) {
             val ev = elementValue(state, pos)
@@ -156,7 +156,8 @@ class Element(
         idxDom.forEach { iv ->
             val pos = iv - indexOffset
             if (pos in 0 until len) {
-                val lo = elemLow(state, pos); val hi = elemHigh(state, pos)
+                val lo = elemLow(state, pos)
+                val hi = elemHigh(state, pos)
                 // Element range [lo,hi] disjoint from result's [min,max] ⇒ position infeasible.
                 if (hi < resultDom.min || lo > resultDom.max) {
                     (toExclude ?: com.eignex.klause.util.IntArrayList().also { toExclude = it }).add(iv)
@@ -177,12 +178,13 @@ class Element(
         survivor.forEach { iv ->
             val pos = iv - indexOffset
             if (pos in 0 until len) {
-                val lo = elemLow(state, pos); val hi = elemHigh(state, pos)
+                val lo = elemLow(state, pos)
+                val hi = elemHigh(state, pos)
                 if (lo < unionLo) unionLo = lo
                 if (hi > unionHi) unionHi = hi
             }
         }
-        if (unionLo > unionHi) return false  // no reachable position — infeasible
+        if (unionLo > unionHi) return false // no reachable position — infeasible
         val antIdx = state.composeIntVarAtomAntecedents(
             if (arrIsVars) intArrayOf(idx) + arr else intArrayOf(idx),
         )

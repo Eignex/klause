@@ -31,7 +31,9 @@ class FunctionalObjectiveTest {
         assertTrue(obj is FunctionalObjective)
         val fo = obj as FunctionalObjective
         // leaf vars should be a,b,c (the decision vars), not the aux/objective vars.
-        val aId = program.intVarsByName["a"]!!; val bId = program.intVarsByName["b"]!!; val cId = program.intVarsByName["c"]!!
+        val aId = program.intVarsByName["a"]!!
+        val bId = program.intVarsByName["b"]!!
+        val cId = program.intVarsByName["c"]!!
         assertEquals(setOf(aId, bId, cId), fo.leafVars.toSet())
 
         val rng = Random(7)
@@ -50,11 +52,22 @@ class FunctionalObjectiveTest {
             val predicted = obj.deltaIfApplied(state.assignment, move)
             state.assignment.setInt(v, nv)
             val after = obj.evaluate(snapshot(state, program))
-            assertEquals((after - before), predicted, 1e-9,
-                "delta mismatch: before=$before after=$after predicted=$predicted move=$move")
+            assertEquals(
+                (after - before),
+                predicted,
+                1e-9,
+                "delta mismatch: before=$before after=$after predicted=$predicted move=$move"
+            )
             // True objective at this assignment = |a-b|+|a-c| (minimize → positive).
-            val a = state.assignment.intValue(aId); val b = state.assignment.intValue(bId); val cc = state.assignment.intValue(cId)
-            assertEquals((kotlin.math.abs(a-b)+kotlin.math.abs(a-cc)).toDouble(), after, 1e-9, "evaluate != true objective")
+            val a = state.assignment.intValue(aId)
+            val b = state.assignment.intValue(bId)
+            val cc = state.assignment.intValue(cId)
+            assertEquals(
+                (kotlin.math.abs(a - b) + kotlin.math.abs(a - cc)).toDouble(),
+                after,
+                1e-9,
+                "evaluate != true objective"
+            )
         }
     }
 

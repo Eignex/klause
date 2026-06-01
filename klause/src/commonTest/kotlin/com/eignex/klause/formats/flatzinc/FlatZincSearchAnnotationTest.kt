@@ -7,8 +7,8 @@ import com.eignex.klause.solver.backtrack.InputOrder
 import com.eignex.klause.solver.backtrack.SmallestDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class FlatZincSearchAnnotationTest {
 

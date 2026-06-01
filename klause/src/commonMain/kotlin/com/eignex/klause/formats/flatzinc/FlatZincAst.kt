@@ -7,19 +7,26 @@ package com.eignex.klause.formats.flatzinc
 
 internal sealed interface FznType {
     data object Bool : FznType
+
     /** Unbounded int variable. */
     data object IntAny : FznType
+
     /** Integer in `[lo, hi]`. */
     data class IntRange(val lo: Long, val hi: Long) : FznType
+
     /** Integer drawn from a finite set (e.g. `{1, 3, 5}`). */
     data class IntSet(val values: LongArray) : FznType
+
     /** Unbounded float. */
     data object FloatAny : FznType
+
     /** Float in `[lo, hi]`. */
     data class FloatRange(val lo: Double, val hi: Double) : FznType
+
     /** `set of <element>` — set-valued variable. Klause has no native set support, so the
      *  compiler refuses these cleanly rather than silently treating them as ints. */
     data class SetOfInt(val element: FznType) : FznType
+
     /** Array of fixed length over an element type. [elementIsVar] is `true` when the
      *  declaration spelled `array [...] of var T` (the array structure is fixed but
      *  each element binds to a solver variable), `false` for `array [...] of T`. */
@@ -36,6 +43,7 @@ internal sealed interface FznExpr {
     data class ArrayLit(val elements: List<FznExpr>) : FznExpr
     data class IntSetLit(val values: LongArray) : FznExpr
     data class IntRangeLit(val lo: Long, val hi: Long) : FznExpr
+
     /** Annotation expression `name(arg1, arg2, ...)` — appears inside annotation lists. */
     data class AnnCall(val name: String, val args: List<FznExpr>) : FznExpr
 }

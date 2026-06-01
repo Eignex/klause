@@ -1,10 +1,8 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.propagation.PropagationResult
-
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -17,7 +15,9 @@ class FailedLiteralProbingTest {
         // (a ∨ b), (a ∨ c), (¬b ∨ ¬c). Direct propagation forces nothing. Probing
         // a=false forces b=true and c=true, then (¬b ∨ ¬c) fails → a must be true.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
@@ -32,7 +32,9 @@ class FailedLiteralProbingTest {
     @Test
     fun `probing off does not detect the failed literal`() {
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
@@ -47,7 +49,9 @@ class FailedLiteralProbingTest {
     @Test
     fun `probing detects Unsat when both polarities fail`() {
         val p = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
@@ -62,7 +66,9 @@ class FailedLiteralProbingTest {
         // Pass 1 forces a=true (via the (a∨b), (a∨c), (¬b∨¬c) triangle); pass 2 then
         // chains through (¬a ∨ d) to force d=true.
         val p = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
@@ -79,7 +85,9 @@ class FailedLiteralProbingTest {
     @Test
     fun `probing with already-Unsat problem reports Unsat`() {
         val p = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
@@ -92,10 +100,19 @@ class FailedLiteralProbingTest {
     @Test
     fun `probing on a feasible problem with no forced literals leaves baked unchanged`() {
         val p = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(
-                Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-            ))),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Cardinality.exactlyOne(
+                    intArrayOf(
+                        Lit.make(0, true),
+                        Lit.make(1, true),
+                        Lit.make(2, true),
+                        Lit.make(3, true),
+                    )
+                )
+            ),
             probeFailedLiterals = true,
         )
         val baked = assertIs<PropagationResult.Implied>(p.baked)

@@ -45,11 +45,16 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
         val out = ArrayList<Sample>()
         val cb = object : CpSolverSolutionCallback() {
             override fun onSolutionCallback() {
-                if (out.size >= params.maxModels) { stopSearch(); return }
-                out.add(Sample(
-                    BooleanArray(problem.numBoolVars) { value(m.boolVars[it]) == 1L },
-                    IntArray(problem.numIntVars) { value(m.intVars[it]).toInt() },
-                ))
+                if (out.size >= params.maxModels) {
+                    stopSearch()
+                    return
+                }
+                out.add(
+                    Sample(
+                        BooleanArray(problem.numBoolVars) { value(m.boolVars[it]) == 1L },
+                        IntArray(problem.numIntVars) { value(m.intVars[it]).toInt() },
+                    )
+                )
             }
         }
         solver.solve(m.model, cb)
@@ -75,15 +80,24 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
                     BooleanArray(problem.numBoolVars) { value(m.boolVars[it]) == 1L },
                     IntArray(problem.numIntVars) { value(m.intVars[it]).toInt() },
                 )
-                incumbents.add(MinimizeResult.BestFound(sample, objectiveValue() + objective.constant, TerminationReason.BudgetExhausted))
+                incumbents.add(
+                    MinimizeResult.BestFound(
+                        sample,
+                        objectiveValue() + objective.constant,
+                        TerminationReason.BudgetExhausted
+                    )
+                )
             }
         }
         val status = solver.solve(m.model, cb)
         val terminal: MinimizeResult = when (status) {
             CpSolverStatus.OPTIMAL -> {
                 val last = incumbents.lastOrNull()
-                if (last is MinimizeResult.BestFound) MinimizeResult.Optimal(last.sample, last.objective)
-                else MinimizeResult.Unknown(TerminationReason.SearchExhausted)
+                if (last is MinimizeResult.BestFound) {
+                    MinimizeResult.Optimal(last.sample, last.objective)
+                } else {
+                    MinimizeResult.Unknown(TerminationReason.SearchExhausted)
+                }
             }
             CpSolverStatus.INFEASIBLE -> MinimizeResult.Infeasible()
             CpSolverStatus.FEASIBLE -> incumbents.lastOrNull() ?: MinimizeResult.Unknown(TerminationReason.Timeout)
@@ -105,14 +119,23 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
         val coeffs = ArrayList<Long>()
         for (b in 0 until problem.numBoolVars) {
             val w = obj.boolWeights.getOrElse(b) { 0.0 }
-            if (w != 0.0) { args.add(m.boolVars[b]); coeffs.add(w.toLong()) }
+            if (w != 0.0) {
+                args.add(m.boolVars[b])
+                coeffs.add(w.toLong())
+            }
         }
         for (i in 0 until problem.numIntVars) {
             val c = obj.intCoefficients.getOrElse(i) { 0.0 }
-            if (c != 0.0) { args.add(m.intVars[i]); coeffs.add(c.toLong()) }
+            if (c != 0.0) {
+                args.add(m.intVars[i])
+                coeffs.add(c.toLong())
+            }
         }
-        return if (args.isEmpty()) LinearExpr.constant(0)
-        else LinearExpr.weightedSum(args.toTypedArray(), coeffs.toLongArray())
+        return if (args.isEmpty()) {
+            LinearExpr.constant(0)
+        } else {
+            LinearExpr.weightedSum(args.toTypedArray(), coeffs.toLongArray())
+        }
     }
 
     private fun readSample(m: OrToolsModel, solver: CpSolver): Sample = Sample(

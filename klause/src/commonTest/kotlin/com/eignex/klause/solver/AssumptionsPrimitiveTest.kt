@@ -32,8 +32,8 @@ class AssumptionsPrimitiveTest {
         val m = a.mergedWith(b)
         assertEquals(true, m.boolValueOrNull(0)) // from a, unique
         assertEquals(false, m.boolValueOrNull(1)) // overwritten by b
-        assertEquals(true, m.boolValueOrNull(2))  // from b, unique
-        assertEquals(9, m.intValueOrNull(10))     // overwritten by b
+        assertEquals(true, m.boolValueOrNull(2)) // from b, unique
+        assertEquals(9, m.intValueOrNull(10)) // overwritten by b
         assertEquals(3, m.intValueOrNull(20))
     }
 

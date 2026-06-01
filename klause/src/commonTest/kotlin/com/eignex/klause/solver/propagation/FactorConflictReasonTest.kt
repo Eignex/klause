@@ -2,9 +2,9 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -13,8 +13,8 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,17 +41,22 @@ class FactorConflictReasonTest {
     @Test
     fun `Cardinality conflict analyzer learns clause containing decision`() {
         val problem = Problem(
-            numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 5,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 forceFalseIf(trigger = 4, target = 0),
                 forceFalseIf(trigger = 4, target = 1),
                 forceFalseIf(trigger = 4, target = 2),
                 Cardinality(
                     literals = intArrayOf(
-                        Lit.make(0, true), Lit.make(1, true),
-                        Lit.make(2, true), Lit.make(3, true),
+                        Lit.make(0, true),
+                        Lit.make(1, true),
+                        Lit.make(2, true),
+                        Lit.make(3, true),
                     ),
-                    min = 2, max = 4,
+                    min = 2,
+                    max = 4,
                 ),
             ),
         )
@@ -59,8 +64,10 @@ class FactorConflictReasonTest {
         val r = session.pinBool(4, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(Lit.make(4, false) in learned.literals.toSet(),
-            "learned clause should contain ¬x (the UIP), got ${learned.literals.toList()}")
+        assertTrue(
+            Lit.make(4, false) in learned.literals.toSet(),
+            "learned clause should contain ¬x (the UIP), got ${learned.literals.toList()}"
+        )
     }
 
     @Test
@@ -68,13 +75,16 @@ class FactorConflictReasonTest {
         // AtMost(1) of (a, b). Helper Clauses force a and b BOTH true on x=true.
         // Then cardinality propagate sees trueCount=2 > max=1 → conflict.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
                 Cardinality(
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    min = 0, max = 1,
+                    min = 0,
+                    max = 1,
                 ),
             ),
         )
@@ -82,22 +92,27 @@ class FactorConflictReasonTest {
         val r = session.pinBool(2, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(Lit.make(2, false) in learned.literals.toSet(),
-            "learned should contain ¬x, got ${learned.literals.toList()}")
+        assertTrue(
+            Lit.make(2, false) in learned.literals.toSet(),
+            "learned should contain ¬x, got ${learned.literals.toList()}"
+        )
     }
 
     @Test
     fun `PseudoBoolean LE conflict analyzer learns clause containing decision`() {
         // 3a + 4b ≤ 5 ; force a, b true on x=true via Clauses → sum=7 > 5, conflict.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
                 PseudoBoolean(
                     weights = intArrayOf(3, 4),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    op = PbOp.LE, bound = 5,
+                    op = PbOp.LE,
+                    bound = 5,
                 ),
             ),
         )
@@ -105,8 +120,10 @@ class FactorConflictReasonTest {
         val r = session.pinBool(2, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(Lit.make(2, false) in learned.literals.toSet(),
-            "PB LE learned should contain ¬x, got ${learned.literals.toList()}")
+        assertTrue(
+            Lit.make(2, false) in learned.literals.toSet(),
+            "PB LE learned should contain ¬x, got ${learned.literals.toList()}"
+        )
     }
 
     @Test
@@ -114,7 +131,9 @@ class FactorConflictReasonTest {
         // r ↔ (3a + 4b ≤ 5). Pin r=true at level 1, then decision x=true forces
         // a=true, b=true → body violates → conflict inside ReifiedPseudoBoolean.
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(3, false), Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(3, false), Lit.make(1, true))),
@@ -122,7 +141,8 @@ class FactorConflictReasonTest {
                     auxBoolVar = 2,
                     weights = intArrayOf(3, 4),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    op = PbOp.LE, bound = 5,
+                    op = PbOp.LE,
+                    bound = 5,
                 ),
             ),
         )
@@ -131,10 +151,14 @@ class FactorConflictReasonTest {
         val r = session.pinBool(3, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(learned.literals.isNotEmpty(),
-            "ReifiedPB conflict should produce non-empty learned clause")
-        assertTrue(Lit.make(3, false) in learned.literals.toSet(),
-            "ReifiedPB learned should contain ¬x (UIP), got ${learned.literals.toList()}")
+        assertTrue(
+            learned.literals.isNotEmpty(),
+            "ReifiedPB conflict should produce non-empty learned clause"
+        )
+        assertTrue(
+            Lit.make(3, false) in learned.literals.toSet(),
+            "ReifiedPB learned should contain ¬x (UIP), got ${learned.literals.toList()}"
+        )
     }
 
     @Test
@@ -142,7 +166,9 @@ class FactorConflictReasonTest {
         // r ↔ AtLeast(2) of (a, b, c). With r=true, propagation forces body. If a, b
         // are both false, count + unassigned = 1 < 2 → body violates ⇒ propagate fails.
         val problem = Problem(
-            numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 5,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 forceFalseIf(trigger = 4, target = 0),
                 forceFalseIf(trigger = 4, target = 1),
@@ -150,7 +176,8 @@ class FactorConflictReasonTest {
                 ReifiedCardinality(
                     auxBoolVar = 3,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-                    min = 2, max = 3,
+                    min = 2,
+                    max = 3,
                 ),
             ),
         )
@@ -159,8 +186,10 @@ class FactorConflictReasonTest {
         val r = session.pinBool(4, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(learned.literals.isNotEmpty(),
-            "ReifiedCardinality conflict should produce non-empty learned clause")
+        assertTrue(
+            learned.literals.isNotEmpty(),
+            "ReifiedCardinality conflict should produce non-empty learned clause"
+        )
     }
 
     @Test
@@ -172,18 +201,23 @@ class FactorConflictReasonTest {
         // so x stays unassigned. Decision x=true pins both var0=5 and var1=5 → Linear
         // sees sum=10 ≠ 5 → return false. Default conflictReason emits [¬x].
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 2,
+            numBoolVars = 1,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
-                    coeffs = intArrayOf(1), vars = intArrayOf(0),
-                    op = LinearOp.EQ, bound = 5,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = 5,
                 ),
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
-                    coeffs = intArrayOf(1), vars = intArrayOf(1),
-                    op = LinearOp.EQ, bound = 5,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(1),
+                    op = LinearOp.EQ,
+                    bound = 5,
                 ),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 5),
             ),
@@ -192,8 +226,10 @@ class FactorConflictReasonTest {
         val r = session.pinBool(0, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(Lit.make(0, false) in learned.literals.toSet(),
-            "Linear int-domain conflict should learn [¬x], got ${learned.literals.toList()}")
+        assertTrue(
+            Lit.make(0, false) in learned.literals.toSet(),
+            "Linear int-domain conflict should learn [¬x], got ${learned.literals.toList()}"
+        )
     }
 
     @Test
@@ -201,18 +237,23 @@ class FactorConflictReasonTest {
         // Two ReifiedLinears share aux x, forcing var0 = var1 = 0 when x=true.
         // AllDifferent then sees a singleton-conflict at value 0.
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 3,
+            numBoolVars = 1,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
-                    coeffs = intArrayOf(1), vars = intArrayOf(0),
-                    op = LinearOp.EQ, bound = 0,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = 0,
                 ),
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
-                    coeffs = intArrayOf(1), vars = intArrayOf(1),
-                    op = LinearOp.EQ, bound = 0,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(1),
+                    op = LinearOp.EQ,
+                    bound = 0,
                 ),
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3),
             ),
@@ -221,8 +262,10 @@ class FactorConflictReasonTest {
         val r = session.pinBool(0, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(Lit.make(0, false) in learned.literals.toSet(),
-            "AllDifferent conflict should learn [¬x], got ${learned.literals.toList()}")
+        assertTrue(
+            Lit.make(0, false) in learned.literals.toSet(),
+            "AllDifferent conflict should learn [¬x], got ${learned.literals.toList()}"
+        )
     }
 
     @Test
@@ -230,25 +273,35 @@ class FactorConflictReasonTest {
         // 4 ints [0, 2], GCC requires value=1 exactly twice. Three ReifiedLinears share
         // aux x: forcing var0=var1=var2=1 when x=true. GCC sees definite=3 > hi=2 → fail.
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 4,
+            numBoolVars = 1,
+            numIntVars = 4,
             intDomains = arrayOf(
-                IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
             ),
             factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
-                    coeffs = intArrayOf(1), vars = intArrayOf(0),
-                    op = LinearOp.EQ, bound = 1,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = 1,
                 ),
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
-                    coeffs = intArrayOf(1), vars = intArrayOf(1),
-                    op = LinearOp.EQ, bound = 1,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(1),
+                    op = LinearOp.EQ,
+                    bound = 1,
                 ),
                 com.eignex.klause.solver.factor.ReifiedLinear(
                     auxBoolVar = 0,
-                    coeffs = intArrayOf(1), vars = intArrayOf(2),
-                    op = LinearOp.EQ, bound = 1,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(2),
+                    op = LinearOp.EQ,
+                    bound = 1,
                 ),
                 GlobalCardinality(
                     xs = intArrayOf(0, 1, 2, 3),
@@ -263,8 +316,10 @@ class FactorConflictReasonTest {
         val r = session.pinBool(0, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(Lit.make(0, false) in learned.literals.toSet(),
-            "GCC conflict should learn [¬x], got ${learned.literals.toList()}")
+        assertTrue(
+            Lit.make(0, false) in learned.literals.toSet(),
+            "GCC conflict should learn [¬x], got ${learned.literals.toList()}"
+        )
     }
 
     @Test
@@ -286,7 +341,8 @@ class FactorConflictReasonTest {
         // analyzer can actually exploit this chain in `minimize()` requires extending
         // `isRedundant` to substitute via int trail — separate from this plumbing layer.)
         val problem = Problem(
-            numBoolVars = 2, numIntVars = 1,
+            numBoolVars = 2,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 9)),
             factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
@@ -298,18 +354,23 @@ class FactorConflictReasonTest {
         assertIs<PropagationResult.Implied>(r)
         val ant = problem.factors.let {
             val s = com.eignex.klause.solver.propagation.PropagationState(
-                problem, com.eignex.klause.solver.Assumptions.None,
+                problem,
+                com.eignex.klause.solver.Assumptions.None,
             )
             s.pinBoolAsDecision(0, true)
             val confl = s.runToFixpoint(allFactors = false)
             assertTrue(confl == null, "unexpected conflict at level 1")
             s
         }
-        assertTrue(ant.intMinAntecedents[0] != null,
-            "v0.min antecedents should be set by ReifiedLinear A's body propagation")
+        assertTrue(
+            ant.intMinAntecedents[0] != null,
+            "v0.min antecedents should be set by ReifiedLinear A's body propagation"
+        )
         val xLit = Lit.make(0, false)
-        assertTrue(xLit in ant.intMinAntecedents[0]!!.toSet(),
-            "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}")
+        assertTrue(
+            xLit in ant.intMinAntecedents[0]!!.toSet(),
+            "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}"
+        )
         // z (bool var 1) implied true; its boolAntecedents now contain the *atom-lit*
         // form ¬[v0≥5] and ¬[v0≤5] — the per-bound premise atoms — rather than the
         // coarser ¬x union. Resolution through these atoms still traces back to ¬x via
@@ -319,8 +380,10 @@ class FactorConflictReasonTest {
         val ge5 = Lit.make(ant.atomVarGe(0, 5), false)
         val le5 = Lit.make(ant.atomVarLe(0, 5), false)
         val zAntSet = zAnt!!.toSet()
-        assertTrue(ge5 in zAntSet && le5 in zAntSet,
-            "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}")
+        assertTrue(
+            ge5 in zAntSet && le5 in zAntSet,
+            "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}"
+        )
     }
 
     @Test
@@ -349,7 +412,8 @@ class FactorConflictReasonTest {
         // Learned clause = [¬x] — strictly stronger than [¬x, ¬y] which a vanilla
         // CDCL with leaf antecedents would learn.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 1,
+            numBoolVars = 3,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 9)),
             factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
@@ -359,7 +423,7 @@ class FactorConflictReasonTest {
         )
         val session = PropagationSession(problem)
         assertIs<PropagationResult.Implied>(session.pinBool(0, true))
-        val r = session.pinBool(1, true)  // y=true; conflicts with implied y=false.
+        val r = session.pinBool(1, true) // y=true; conflicts with implied y=false.
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         val lits = learned.literals.toSet()
@@ -368,13 +432,17 @@ class FactorConflictReasonTest {
         // semantics: it rules out every assignment that forces v0=5 from any source, not
         // just x=true. Minimization still resolves y away (y's atom-lit antecedents are
         // already in the clause).
-        assertFalse(Lit.make(1, true) in lits,
-            "LCG should resolve y away; got ${learned.literals.toList()}")
+        assertFalse(
+            Lit.make(1, true) in lits,
+            "LCG should resolve y away; got ${learned.literals.toList()}"
+        )
         // We can't easily look up the atom-var ids without a state handle, but we can
         // assert the shape: every literal points at an atom var (id ≥ numBoolVars=3).
         for (l in learned.literals) {
-            assertTrue(Lit.variable(l) >= 3,
-                "expected only atom-lit literals (var ≥ 3), got var ${Lit.variable(l)} in ${learned.literals.toList()}")
+            assertTrue(
+                Lit.variable(l) >= 3,
+                "expected only atom-lit literals (var ≥ 3), got var ${Lit.variable(l)} in ${learned.literals.toList()}"
+            )
         }
     }
 
@@ -393,12 +461,16 @@ class FactorConflictReasonTest {
         // atom registry. This test verifies the atom infrastructure: allocation,
         // truth derivation, level tracking, and analyzer dispatch.
         val problem = Problem(
-            numBoolVars = 2, numIntVars = 2,
+            numBoolVars = 2,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
                 com.eignex.klause.solver.factor.Linear(
-                    intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 8,
+                    intArrayOf(1, 1),
+                    intArrayOf(0, 1),
+                    LinearOp.EQ,
+                    8,
                 ),
             ),
         )
@@ -406,7 +478,8 @@ class FactorConflictReasonTest {
         assertIs<PropagationResult.Implied>(session.pinBool(0, true))
         // State: v0=5, v1=3 (forced by Linear after x=true at level 1).
         val state = com.eignex.klause.solver.propagation.PropagationState(
-            problem, com.eignex.klause.solver.Assumptions.None,
+            problem,
+            com.eignex.klause.solver.Assumptions.None,
         )
         state.pinBoolAsDecision(0, true)
         state.runToFixpoint(allFactors = false)
@@ -430,15 +503,22 @@ class FactorConflictReasonTest {
         val ge5 = Lit.make(state.atomVarGe(0, 5), false)
         val le5 = Lit.make(state.atomVarLe(0, 5), false)
         val antSet = ant!!.toSet()
-        assertTrue(le5 in antSet,
-            "atom antecedents should contain the driving bound ¬[v0≤5], got ${ant.toList()}")
-        assertTrue(ge5 !in antSet,
-            "direction-aware reason should omit the irrelevant ¬[v0≥5], got ${ant.toList()}")
+        assertTrue(
+            le5 in antSet,
+            "atom antecedents should contain the driving bound ¬[v0≤5], got ${ant.toList()}"
+        )
+        assertTrue(
+            ge5 !in antSet,
+            "direction-aware reason should omit the irrelevant ¬[v0≥5], got ${ant.toList()}"
+        )
         // Allocate a second atom [v1 ≥ 10] — should be false (v1.max=3 < 10).
         val atomVarGE10 = state.atomVarGe(1, 10)
         val atomId10 = state.atomIdOf(atomVarGE10)
-        assertEquals(0, state.atomValue[atomId10],
-            "atom [v1≥10] should not hold (v1.max=3 < 10)")
+        assertEquals(
+            0,
+            state.atomValue[atomId10],
+            "atom [v1≥10] should not hold (v1.max=3 < 10)"
+        )
         // Identity: re-requesting the same atom should return the same id (cached).
         val atomVarGE3Again = state.atomVarGe(1, 3)
         assertEquals(atomVarGE3, atomVarGE3Again, "atom registry should dedupe")
@@ -456,12 +536,14 @@ class FactorConflictReasonTest {
         // tighten v0.max to 4 → atom `[v0 ≥ 5]` becomes false → clause unit-propagates
         // `[v1 ≥ 7]` to true, which re-derives as `tightenIntMin(v1, 7)`.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = emptyArray(),
         )
         val state = com.eignex.klause.solver.propagation.PropagationState(
-            problem, com.eignex.klause.solver.Assumptions.None,
+            problem,
+            com.eignex.klause.solver.Assumptions.None,
         )
         // Allocate atoms. Both currently undetermined (5 ∈ [0,9], 7 ∈ [0,9]).
         // Wait — atom truth derives from currentTruth(): [v0 ≥ 5] is true iff v0.min ≥ 5.
@@ -469,10 +551,12 @@ class FactorConflictReasonTest {
         val atomV0Ge5 = state.atomVarGe(0, 5)
         val atomV1Ge7 = state.atomVarGe(1, 7)
         // Add the clause as a learned clause.
-        val clause = com.eignex.klause.solver.factor.Clause(intArrayOf(
-            Lit.make(atomV0Ge5, true),
-            Lit.make(atomV1Ge7, true),
-        ))
+        val clause = com.eignex.klause.solver.factor.Clause(
+            intArrayOf(
+                Lit.make(atomV0Ge5, true),
+                Lit.make(atomV1Ge7, true),
+            )
+        )
         state.addLearnedClause(clause, lbd = 2)
         // Decide v0 ≤ 4 (which makes atom [v0 ≥ 5] false permanently, since v0.max < 5).
         // We do this by calling tightenIntMax directly with no antecedents (a decision).
@@ -482,15 +566,20 @@ class FactorConflictReasonTest {
         // unit-propagate [v1 ≥ 7] which translates to tightenIntMin(v1, 7).
         val conflict = state.runToFixpoint(allFactors = false)
         assertTrue(conflict == null, "no conflict expected; clause should unit-propagate")
-        assertEquals(7, state.intDomains[1].min,
-            "atom-lit clause should have unit-propagated [v1 ≥ 7] → tightenIntMin(v1, 7)")
+        assertEquals(
+            7,
+            state.intDomains[1].min,
+            "atom-lit clause should have unit-propagated [v1 ≥ 7] → tightenIntMin(v1, 7)"
+        )
     }
 
     @Test
     fun `Xor conflict analyzer learns clause containing decision`() {
         // a ⊕ b = 1. With Clauses forcing a, b both true on x=true → parity 0, conflict.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
@@ -501,7 +590,9 @@ class FactorConflictReasonTest {
         val r = session.pinBool(2, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertTrue(Lit.make(2, false) in learned.literals.toSet(),
-            "Xor learned should contain ¬x, got ${learned.literals.toList()}")
+        assertTrue(
+            Lit.make(2, false) in learned.literals.toSet(),
+            "Xor learned should contain ¬x, got ${learned.literals.toList()}"
+        )
     }
 }

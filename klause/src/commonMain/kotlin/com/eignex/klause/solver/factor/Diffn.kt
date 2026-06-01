@@ -61,8 +61,14 @@ class Diffn(
         if (heightVars == null) heights[i] else if (heightVars[i] == ov) nv else s.assignment.intValue(heightVars[i])
 
     private fun overlaps(
-        x1: Int, y1: Int, w1: Int, h1: Int,
-        x2: Int, y2: Int, w2: Int, h2: Int,
+        x1: Int,
+        y1: Int,
+        w1: Int,
+        h1: Int,
+        x2: Int,
+        y2: Int,
+        w2: Int,
+        h2: Int,
     ): Boolean {
         if (nonStrict && (w1 == 0 || h1 == 0 || w2 == 0 || h2 == 0)) return false
         val xOverlap = !(x1 + w1 <= x2 || x2 + w2 <= x1)
@@ -74,14 +80,24 @@ class Diffn(
     private fun countOverlaps(state: LocalSearchState, ov: Int, nv: Int): Int {
         var bad = 0
         for (i in 0 until n) {
-            val xi = rx(state, i, ov, nv); val yi = ry(state, i, ov, nv)
-            val wi = rw(state, i, ov, nv); val hi = rh(state, i, ov, nv)
+            val xi = rx(state, i, ov, nv)
+            val yi = ry(state, i, ov, nv)
+            val wi = rw(state, i, ov, nv)
+            val hi = rh(state, i, ov, nv)
             for (j in i + 1 until n) {
                 if (overlaps(
-                        xi, yi, wi, hi,
-                        rx(state, j, ov, nv), ry(state, j, ov, nv),
-                        rw(state, j, ov, nv), rh(state, j, ov, nv))
-                ) bad++
+                        xi,
+                        yi,
+                        wi,
+                        hi,
+                        rx(state, j, ov, nv),
+                        ry(state, j, ov, nv),
+                        rw(state, j, ov, nv),
+                        rh(state, j, ov, nv)
+                    )
+                ) {
+                    bad++
+                }
             }
         }
         return bad
@@ -123,14 +139,16 @@ class Diffn(
         if (varSize) return propagateVarSizeSoundOnly(state)
         val n = xs.size
         for (i in 0 until n) {
-            val wI = widths[i]; val hI = heights[i]
+            val wI = widths[i]
+            val hI = heights[i]
             if (nonStrict && (wI == 0 || hI == 0)) continue
             val xiLo = state.intDomains[xs[i]].min
             val xiHi = state.intDomains[xs[i]].max
             val yiLo = state.intDomains[ys[i]].min
             val yiHi = state.intDomains[ys[i]].max
             for (j in i + 1 until n) {
-                val wJ = widths[j]; val hJ = heights[j]
+                val wJ = widths[j]
+                val hJ = heights[j]
                 if (nonStrict && (wJ == 0 || hJ == 0)) continue
                 val xjLo = state.intDomains[xs[j]].min
                 val xjHi = state.intDomains[xs[j]].max
@@ -178,7 +196,10 @@ class Diffn(
         fun hMin(i: Int) = if (heightVars == null) heights[i] else state.intDomains[heightVars[i]].min
         for (i in 0 until n) {
             for (j in i + 1 until n) {
-                val wI = wMin(i); val hI = hMin(i); val wJ = wMin(j); val hJ = hMin(j)
+                val wI = wMin(i)
+                val hI = hMin(i)
+                val wJ = wMin(j)
+                val hJ = hMin(j)
                 if (nonStrict && (wI == 0 || hI == 0 || wJ == 0 || hJ == 0)) continue
                 val xMust = state.intDomains[xs[i]].max < state.intDomains[xs[j]].min + wJ &&
                     state.intDomains[xs[j]].max < state.intDomains[xs[i]].min + wI
@@ -203,11 +224,15 @@ class Diffn(
     ) {
         if (!isViolated(state, factorId)) return
         for (i in 0 until n) {
-            val xi = rx(state, i, -1, 0); val yi = ry(state, i, -1, 0)
-            val wi = rw(state, i, -1, 0); val hi = rh(state, i, -1, 0)
+            val xi = rx(state, i, -1, 0)
+            val yi = ry(state, i, -1, 0)
+            val wi = rw(state, i, -1, 0)
+            val hi = rh(state, i, -1, 0)
             for (j in i + 1 until n) {
-                val xj = rx(state, j, -1, 0); val yj = ry(state, j, -1, 0)
-                val wj = rw(state, j, -1, 0); val hj = rh(state, j, -1, 0)
+                val xj = rx(state, j, -1, 0)
+                val yj = ry(state, j, -1, 0)
+                val wj = rw(state, j, -1, 0)
+                val hj = rh(state, j, -1, 0)
                 if (!overlaps(xi, yi, wi, hi, xj, yj, wj, hj)) continue
                 val dxsI = state.problem.intDomains[xs[i]]
                 val dysI = state.problem.intDomains[ys[i]]
@@ -232,23 +257,28 @@ class Diffn(
                 fun proposeDiagonal(nx: Int, ny: Int) {
                     if (nx == xi && ny == yi) return
                     if (nx !in dxsI || ny !in dysI) return
-                    sink.addCompound(listOf(
-                        com.eignex.klause.solver.Move.IntSet(xs[i], nx),
-                        com.eignex.klause.solver.Move.IntSet(ys[i], ny),
-                    ))
+                    sink.addCompound(
+                        listOf(
+                            com.eignex.klause.solver.Move.IntSet(xs[i], nx),
+                            com.eignex.klause.solver.Move.IntSet(ys[i], ny),
+                        )
+                    )
                 }
                 proposeDiagonal(leftI, downI)
                 proposeDiagonal(leftI, upI)
                 proposeDiagonal(rightI, downI)
                 proposeDiagonal(rightI, upI)
                 if (xi != xj && yi != yj &&
-                    xj in dxsI && yj in dysI && xi in dxsJ && yi in dysJ) {
-                    sink.addCompound(listOf(
-                        com.eignex.klause.solver.Move.IntSet(xs[i], xj),
-                        com.eignex.klause.solver.Move.IntSet(ys[i], yj),
-                        com.eignex.klause.solver.Move.IntSet(xs[j], xi),
-                        com.eignex.klause.solver.Move.IntSet(ys[j], yi),
-                    ))
+                    xj in dxsI && yj in dysI && xi in dxsJ && yi in dysJ
+                ) {
+                    sink.addCompound(
+                        listOf(
+                            com.eignex.klause.solver.Move.IntSet(xs[i], xj),
+                            com.eignex.klause.solver.Move.IntSet(ys[i], yj),
+                            com.eignex.klause.solver.Move.IntSet(xs[j], xi),
+                            com.eignex.klause.solver.Move.IntSet(ys[j], yi),
+                        )
+                    )
                 }
             }
         }

@@ -1,19 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.Assignment
-import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.Objective
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.Solver
-import com.eignex.klause.solver.SolverParams
 
 /**
  * Pluggable restart logic for [LocalSearchSolver]. Decouples *when* to restart

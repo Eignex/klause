@@ -1,9 +1,8 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -29,9 +28,14 @@ class SampleLoopTest {
     }
 
     private fun exactlyOneOver4(): Problem {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         return Problem(4, 0, emptyArray(), listOf(factor))
     }
 }

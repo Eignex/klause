@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
@@ -54,18 +54,21 @@ class ReifiedLinear(
         val h = holds(sum)
         return when {
             aux == h -> 0
-            aux -> residual(sum)  // indicator wants it to hold; grade by how far off
-            else -> 1             // indicator wants it false but it holds; flip the aux
+            aux -> residual(sum) // indicator wants it to hold; grade by how far off
+            else -> 1 // indicator wants it false but it holds; flip the aux
         }
     }
 
     /** Distance the sum must move to satisfy the comparison, given it currently does not —
      *  run through [compressViolation] so far-off reified linears don't dominate the cost. */
     private fun residual(sum: Int): Int = when (op) {
-        LinearOp.LE -> compressViolation(sum.toLong() - bound)       // sum > bound
-        LinearOp.GE -> compressViolation(bound.toLong() - sum)       // sum < bound
-        LinearOp.EQ -> { val d = sum.toLong() - bound; compressViolation(if (d < 0) -d else d) }
-        LinearOp.NE -> 1                                             // sum == bound; one step off
+        LinearOp.LE -> compressViolation(sum.toLong() - bound) // sum > bound
+        LinearOp.GE -> compressViolation(bound.toLong() - sum) // sum < bound
+        LinearOp.EQ -> {
+            val d = sum.toLong() - bound
+            compressViolation(if (d < 0) -d else d)
+        }
+        LinearOp.NE -> 1 // sum == bound; one step off
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -137,8 +140,22 @@ class ReifiedLinear(
             propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = auxAntecedent)
         } else {
             when (op) {
-                LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1, extraLit = auxAntecedent)
-                LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1, extraLit = auxAntecedent)
+                LinearOp.LE -> propagateLinearBounds(
+                    state,
+                    coeffs,
+                    vars,
+                    LinearOp.GE,
+                    bnd + 1,
+                    extraLit = auxAntecedent
+                )
+                LinearOp.GE -> propagateLinearBounds(
+                    state,
+                    coeffs,
+                    vars,
+                    LinearOp.LE,
+                    bnd - 1,
+                    extraLit = auxAntecedent
+                )
                 LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, extraLit = auxAntecedent)
                 LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, extraLit = auxAntecedent)
             }
@@ -210,7 +227,7 @@ class ReifiedLinear(
         val targetEq = numerator / coeff
         return when (op) {
             LinearOp.EQ -> when {
-                wantHolds && numerator % coeff != 0 -> null   // no integer satisfies coeff·v = numerator
+                wantHolds && numerator % coeff != 0 -> null // no integer satisfies coeff·v = numerator
                 wantHolds -> targetEq
                 else -> targetEq + 1
             }
@@ -252,7 +269,9 @@ class ReifiedLinear(
      *  aux always toggles violation (sum unchanged), so the aux's own contribution simply
      *  swaps between break and make. */
     override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState, factorId: Int, flippedVar: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        flippedVar: Int,
     ) {
         val nowViolated = state.assignment.boolValue(auxBoolVar) != holds(state.intPayload[factorId])
         if (nowViolated) {
@@ -269,7 +288,10 @@ class ReifiedLinear(
     /** Aux's break/make contribution depends only on `holds(sum)` and `aux`. An int set
      *  may flip `holds`, in which case the aux's contribution swaps; otherwise no change. */
     override fun updateIntBreakMakeForIntSet(
-        state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        intVar: Int,
+        oldValue: Int,
     ) {
         val newSum = state.intPayload[factorId]
         val coeff = coeffOf(intVar)
@@ -277,7 +299,7 @@ class ReifiedLinear(
         val oldSum = newSum - coeff * (newValue - oldValue)
         val oldHolds = holds(oldSum)
         val newHolds = holds(newSum)
-        if (oldHolds == newHolds) return  // aux contribution unchanged
+        if (oldHolds == newHolds) return // aux contribution unchanged
         val aux = state.assignment.boolValue(auxBoolVar)
         val oldViolated = aux != oldHolds
         val newViolated = aux != newHolds

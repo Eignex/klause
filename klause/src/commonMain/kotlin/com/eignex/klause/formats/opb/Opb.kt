@@ -95,12 +95,19 @@ object Opb {
             )
         }
 
-        val objective: LinearObjective? = if (!hasObjective) null else {
+        val objective: LinearObjective? = if (!hasObjective) {
+            null
+        } else {
             val weights = DoubleArray(numVars)
             for ((v, w) in objWeights) weights[v] = w
             LinearObjective(boolWeights = weights, intCoefficients = DoubleArray(0), constant = objConstant)
         }
-        val problem = Problem(numBoolVars = numVars, numIntVars = 0, intDomains = emptyArray(), factors = factors.toTypedArray())
+        val problem = Problem(
+            numBoolVars = numVars,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = factors.toTypedArray()
+        )
         return OpbProblem(problem, objective)
     }
 

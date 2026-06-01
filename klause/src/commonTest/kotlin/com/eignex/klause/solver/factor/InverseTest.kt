@@ -9,7 +9,6 @@ import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class InverseTest {
 
@@ -17,7 +16,8 @@ class InverseTest {
     fun `0-based inverse pair`() {
         // 3 vars on each side, 0-based. Any valid permutation pair satisfies.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 6,
+            numBoolVars = 0,
+            numIntVars = 6,
             intDomains = Array(6) { IntDomain(0, 2) },
             factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
         )
@@ -33,12 +33,17 @@ class InverseTest {
     fun `inverse with 1-based offsets`() {
         // f, g both 1-indexed, domain [1..3].
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 6,
+            numBoolVars = 0,
+            numIntVars = 6,
             intDomains = Array(6) { IntDomain(1, 3) },
-            factors = arrayOf<Factor>(Inverse(
-                f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5),
-                fOffset = 1, gOffset = 1,
-            )),
+            factors = arrayOf<Factor>(
+                Inverse(
+                    f = intArrayOf(0, 1, 2),
+                    g = intArrayOf(3, 4, 5),
+                    fOffset = 1,
+                    gOffset = 1,
+                )
+            ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
@@ -52,10 +57,15 @@ class InverseTest {
     fun `singleton on one side forces the other`() {
         // f[0] = 2 pinned ⇒ g[2] = 0 forced.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 6,
+            numBoolVars = 0,
+            numIntVars = 6,
             intDomains = arrayOf(
-                IntDomain(2, 2), IntDomain(0, 2), IntDomain(0, 2),
-                IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
+                IntDomain(2, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
             ),
             factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
         )

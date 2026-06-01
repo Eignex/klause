@@ -16,11 +16,13 @@ import com.eignex.klause.solver.propagation.PropagationSession
  */
 sealed interface SatisfyResult {
     data class Sat(val sample: Sample) : SatisfyResult
+
     /** Subset of the input assumptions that's jointly infeasible against the problem's
      *  hard constraints. Sound (always unsat) but not necessarily minimal. For
      *  backends that can't extract a sub-core (LogicNG, Z3 without tracked assertions,
      *  local-search) this is the full input [Assumptions] verbatim. */
     data class UnsatUnderAssumptions(val core: Assumptions) : SatisfyResult
+
     /** Problem is unsat even with the assumptions dropped — the assumption layer is
      *  irrelevant. Distinct from [UnsatUnderAssumptions] so the MaxSAT loop can short-
      *  circuit instead of relaxing a fictitious core. */
@@ -51,10 +53,14 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     return when (val r = solve(merged as P)) {
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
         is SolveResult.Unsat ->
-            if (assumptions.isEmpty) SatisfyResult.GloballyUnsat(r.core)
-            else {
-                val core = if (minimizeCore) deletionMinimize(this, assumptions, params)
-                else assumptions
+            if (assumptions.isEmpty) {
+                SatisfyResult.GloballyUnsat(r.core)
+            } else {
+                val core = if (minimizeCore) {
+                    deletionMinimize(this, assumptions, params)
+                } else {
+                    assumptions
+                }
                 SatisfyResult.UnsatUnderAssumptions(core)
             }
         is SolveResult.Unknown -> SatisfyResult.Unknown(r.reason)
@@ -83,8 +89,11 @@ private fun satisfyUnderAssumptionsBacktrack(
     }
     val problem = solver.problem
     if (problem.baked is PropagationResult.Unsat) {
-        val core = if (problem.baked.conflictFactors.isEmpty()) null
-        else UnsatCore.of(problem.baked.conflictFactors)
+        val core = if (problem.baked.conflictFactors.isEmpty()) {
+            null
+        } else {
+            UnsatCore.of(problem.baked.conflictFactors)
+        }
         return SatisfyResult.GloballyUnsat(core)
     }
     val session = PropagationSession(problem)
@@ -139,10 +148,11 @@ private fun <P : SolverParams> deletionMinimize(
     val candidateInts = assumptions.intKeys.copyOf()
 
     for (id in candidateBools) {
-        if (current.boolValueOrNull(id) == null) continue  // already dropped
+        if (current.boolValueOrNull(id) == null) continue // already dropped
         val trial = current.dropBool(id)
-        if (trial.isEmpty) continue  // dropping it leaves nothing — last necessary pin
+        if (trial.isEmpty) continue // dropping it leaves nothing — last necessary pin
         val merged = params.withAssumptions(trial)
+
         @Suppress("UNCHECKED_CAST")
         val r = solver.solve(merged as P)
         if (r is SolveResult.Unsat) {
@@ -155,6 +165,7 @@ private fun <P : SolverParams> deletionMinimize(
         val trial = current.dropInt(id)
         if (trial.isEmpty) continue
         val merged = params.withAssumptions(trial)
+
         @Suppress("UNCHECKED_CAST")
         val r = solver.solve(merged as P)
         if (r is SolveResult.Unsat) current = trial
@@ -208,21 +219,34 @@ internal fun projectSeedConflictToAssumptions(
     val intHit = BooleanArray(ni)
     for (lvl in conflictLevels) {
         val idx = lvl - 1
-        if (idx in 0 until nb) boolHit[idx] = true
-        else if (idx in nb until nb + ni) intHit[idx - nb] = true
+        if (idx in 0 until nb) {
+            boolHit[idx] = true
+        } else if (idx in nb until nb + ni) intHit[idx - nb] = true
     }
-    var bc = 0; for (h in boolHit) if (h) bc++
-    var ic = 0; for (h in intHit) if (h) ic++
+    var bc = 0
+    for (h in boolHit) if (h) bc++
+    var ic = 0
+    for (h in intHit) if (h) ic++
     if (bc == 0 && ic == 0) {
         // Conflict surfaced but no level mapped back to a seed assumption — fall back
         // to the full input so the caller still has a sound core to refine.
         return input
     }
-    val bk = IntArray(bc); val bv = BooleanArray(bc)
+    val bk = IntArray(bc)
+    val bv = BooleanArray(bc)
     var w = 0
-    for (i in 0 until nb) if (boolHit[i]) { bk[w] = input.boolKeys[i]; bv[w] = input.boolValues[i]; w++ }
-    val ik = IntArray(ic); val iv = IntArray(ic)
+    for (i in 0 until nb) if (boolHit[i]) {
+        bk[w] = input.boolKeys[i]
+        bv[w] = input.boolValues[i]
+        w++
+    }
+    val ik = IntArray(ic)
+    val iv = IntArray(ic)
     w = 0
-    for (i in 0 until ni) if (intHit[i]) { ik[w] = input.intKeys[i]; iv[w] = input.intValues[i]; w++ }
+    for (i in 0 until ni) if (intHit[i]) {
+        ik[w] = input.intKeys[i]
+        iv[w] = input.intValues[i]
+        w++
+    }
     return Assumptions(bk, bv, ik, iv)
 }

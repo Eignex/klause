@@ -29,8 +29,11 @@ class CancellationCompositionTest {
         var b = false
         val combined = Cancellation { a } or Cancellation { b }
         assertFalse(combined())
-        a = true; assertTrue(combined())
-        a = false; b = true; assertTrue(combined())
+        a = true
+        assertTrue(combined())
+        a = false
+        b = true
+        assertTrue(combined())
     }
 
     @Test
@@ -39,8 +42,10 @@ class CancellationCompositionTest {
         var b = false
         val combined = Cancellation { a } and Cancellation { b }
         assertFalse(combined())
-        a = true; assertFalse(combined())
-        b = true; assertTrue(combined())
+        a = true
+        assertFalse(combined())
+        b = true
+        assertTrue(combined())
     }
 
     @Test

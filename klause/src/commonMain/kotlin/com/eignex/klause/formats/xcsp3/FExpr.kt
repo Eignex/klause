@@ -37,11 +37,16 @@ sealed interface FExpr {
                     while (true) {
                         args.add(parseExpr())
                         skipWs()
-                        if (pos < s.length && s[pos] == ',') { pos++; continue }
+                        if (pos < s.length && s[pos] == ',') {
+                            pos++
+                            continue
+                        }
                         break
                     }
                 }
-                skipWs(); require(pos < s.length && s[pos] == ')') { "expected ')' in '$s'" }; pos++
+                skipWs()
+                require(pos < s.length && s[pos] == ')') { "expected ')' in '$s'" }
+                pos++
                 Call(tok, args)
             } else {
                 tok.toIntOrNull()?.let { Num(it) } ?: Ref(tok)

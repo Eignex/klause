@@ -1,29 +1,23 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.SampleResult
-import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SampleResult
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
-import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.propagation.PropagationResult
-
-import com.eignex.klause.solver.localsearch.strategy.ProbSat
+import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.random.Random
 
 /**
@@ -225,40 +219,46 @@ class LocalSearchSolver(
             var flipsSinceYield = 0L
             var cancelCountdown = 0
 
-            try { while (flipsSinceYield < maxFlips) {
-                if (cancelCountdown-- <= 0) {
-                    if (params.cancellation()) return@sequence
-                    cancelCountdown = CANCEL_CHECK_INTERVAL
+            try {
+                while (flipsSinceYield < maxFlips) {
+                    if (cancelCountdown-- <= 0) {
+                        if (params.cancellation()) return@sequence
+                        cancelCountdown = CANCEL_CHECK_INTERVAL
+                    }
+                    if (state.cost == 0L) {
+                        val snap = state.assignment.snapshot()
+                        // Sync warm state on every yield so streaming consumers (which
+                        // typically take just one or a few samples and never drain the
+                        // sequence) still see captured weights.
+                        warm?.captureFrom(state)
+                        yield(snap)
+                        flipsSinceYield = 0
+                        restartPolicy.restart(state, bestSoFar = null)
+                        bestCost = state.cost
+                        bestSnap = state.assignment.snapshot()
+                        flipsSinceRestart = 0
+                        continue
+                    }
+                    if (restartPolicy.shouldRestart(flipsSinceRestart)) {
+                        restartPolicy.restart(state, bestSoFar = bestSnap)
+                        flipsSinceRestart = 0
+                        continue
+                    }
+                    val move = strategy.pickMove(state)
+                    if (move == null) {
+                        restartPolicy.restart(state, bestSoFar = bestSnap)
+                        flipsSinceRestart = 0
+                        continue
+                    }
+                    state.apply(move)
+                    if (state.cost < bestCost) {
+                        bestCost = state.cost
+                        bestSnap = state.assignment.snapshot()
+                    }
+                    flipsSinceRestart++
+                    flipsSinceYield++
                 }
-                if (state.cost == 0L) {
-                    val snap = state.assignment.snapshot()
-                    // Sync warm state on every yield so streaming consumers (which
-                    // typically take just one or a few samples and never drain the
-                    // sequence) still see captured weights.
-                    warm?.captureFrom(state)
-                    yield(snap)
-                    flipsSinceYield = 0
-                    restartPolicy.restart(state, bestSoFar = null)
-                    bestCost = state.cost; bestSnap = state.assignment.snapshot()
-                    flipsSinceRestart = 0
-                    continue
-                }
-                if (restartPolicy.shouldRestart(flipsSinceRestart)) {
-                    restartPolicy.restart(state, bestSoFar = bestSnap)
-                    flipsSinceRestart = 0
-                    continue
-                }
-                val move = strategy.pickMove(state)
-                if (move == null) {
-                    restartPolicy.restart(state, bestSoFar = bestSnap)
-                    flipsSinceRestart = 0
-                    continue
-                }
-                state.apply(move)
-                if (state.cost < bestCost) { bestCost = state.cost; bestSnap = state.assignment.snapshot() }
-                flipsSinceRestart++
-                flipsSinceYield++
-            } } finally {
+            } finally {
                 // Sync learned weights back into warm state when the loop exits naturally
                 // or when the consumer cancels (sequence builder closes the coroutine). On
                 // abandoned sequences this may not fire; that's accepted loss.
@@ -330,7 +330,10 @@ class LocalSearchSolver(
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
-                if (params.cancellation()) { cancelled = true; break }
+                if (params.cancellation()) {
+                    cancelled = true
+                    break
+                }
                 cancelCountdown = CANCEL_CHECK_INTERVAL
             }
             if (state.cost == 0L) {
@@ -387,7 +390,8 @@ class LocalSearchSolver(
                     continue
                 }
                 if (pairSwapBudget > 0 && largeEnoughForGreedy &&
-                    pairSwapStep(state, objective, pairSwapBudget)) {
+                    pairSwapStep(state, objective, pairSwapBudget)
+                ) {
                     flipsSinceRestart++
                     totalFlips++
                     continue
@@ -420,7 +424,8 @@ class LocalSearchSolver(
             }
             state.apply(move)
             if (state.cost in 1 until bestCostInfeasible) {
-                bestCostInfeasible = state.cost; bestCostSnap = state.assignment.snapshot()
+                bestCostInfeasible = state.cost
+                bestCostSnap = state.assignment.snapshot()
             }
             flipsSinceRestart++
             totalFlips++
@@ -428,8 +433,11 @@ class LocalSearchSolver(
         warm?.captureFrom(state)
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
         yield(
-            if (bestSample != null) MinimizeResult.BestFound(bestSample, bestObj, reason)
-            else MinimizeResult.Unknown(reason)
+            if (bestSample != null) {
+                MinimizeResult.BestFound(bestSample, bestObj, reason)
+            } else {
+                MinimizeResult.Unknown(reason)
+            }
         )
     }
 
@@ -468,7 +476,7 @@ class LocalSearchSolver(
             val cur = state.assignment.intValue(i)
             val d = problem.intDomains[i]
             for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue  // sparse-aware: rejects holes
+                if (target !in d) continue // sparse-aware: rejects holes
                 state.apply(Move.IntSet(i, target))
                 if (state.cost == 0L) {
                     val obj = objective.evaluate(state.assignment.snapshot())
@@ -521,7 +529,7 @@ class LocalSearchSolver(
             val cur = state.assignment.intValue(i)
             val d = problem.intDomains[i]
             for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue  // sparse-aware: rejects holes
+                if (target !in d) continue // sparse-aware: rejects holes
                 state.apply(Move.IntSet(i, target))
                 val obj = objective.evaluate(state.assignment.snapshot())
                 val shaped = shaping.shape(state.cost, obj)
@@ -559,7 +567,9 @@ class LocalSearchSolver(
         // given seed.
         for (i in order.size - 1 downTo 1) {
             val j = state.rng.nextInt(i + 1)
-            val tmp = order[i]; order[i] = order[j]; order[j] = tmp
+            val tmp = order[i]
+            order[i] = order[j]
+            order[j] = tmp
         }
         for (v in order) {
             if (v < problem.numBoolVars) {
@@ -584,7 +594,10 @@ class LocalSearchSolver(
                         val candidate = d.valueAt(idx)
                         if (candidate == cur) continue
                         state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) { bestCost = state.cost; bestVal = candidate }
+                        if (state.cost < bestCost) {
+                            bestCost = state.cost
+                            bestVal = candidate
+                        }
                         state.apply(Move.IntSet(intId, cur))
                     }
                 } else {
@@ -592,7 +605,10 @@ class LocalSearchSolver(
                         val candidate = d.valueAt(state.rng.nextInt(d.size))
                         if (candidate == cur) return@repeat
                         state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) { bestCost = state.cost; bestVal = candidate }
+                        if (state.cost < bestCost) {
+                            bestCost = state.cost
+                            bestVal = candidate
+                        }
                         state.apply(Move.IntSet(intId, cur))
                     }
                 }
@@ -639,7 +655,10 @@ class LocalSearchSolver(
             if (state.cost == 0L) {
                 val obj = objective.evaluate(state.assignment.snapshot())
                 val delta = obj - baselineObj
-                if (delta < bestDelta) { bestDelta = delta; bestMove = move }
+                if (delta < bestDelta) {
+                    bestDelta = delta
+                    bestMove = move
+                }
             }
             // Revert by re-applying the move's inverse. BoolFlip self-inverts; IntSet
             // needs the original value; Compound reverts each part in reverse order.
@@ -655,7 +674,7 @@ class LocalSearchSolver(
      *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
     private fun revertMove(state: LocalSearchState, move: Move, baselineSnap: Sample) {
         when (move) {
-            is Move.BoolFlip -> state.apply(move)  // self-inverse
+            is Move.BoolFlip -> state.apply(move) // self-inverse
             is Move.IntSet -> {
                 val old = baselineSnap.ints[move.varId]
                 if (old != state.assignment.intValue(move.varId)) state.apply(Move.IntSet(move.varId, old))

@@ -1,12 +1,10 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.propagation.PropagationResult
-
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -18,12 +16,17 @@ class ReifiedEqNegationTest {
         // ReifiedLinear: aux ↔ (x + y = 5). aux=false → x + y ≠ 5.
         // Pin y=2, the body becomes "x ≠ 3". If x's domain has 3 at an endpoint, it gets shaved.
         val p = Problem(
-            numBoolVars = 1, numIntVars = 2,
+            numBoolVars = 1,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(3, 6), IntDomain(0, 5)),
             factors = arrayOf<Factor>(
-                ReifiedLinear(auxBoolVar = 0,
-                    coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
-                    op = LinearOp.EQ, bound = 5),
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1, 1),
+                    vars = intArrayOf(0, 1),
+                    op = LinearOp.EQ,
+                    bound = 5
+                ),
             ),
         )
         val r = p.propagate(Assumptions(bools = mapOf(0 to false), ints = mapOf(1 to 2)))
@@ -31,7 +34,9 @@ class ReifiedEqNegationTest {
         // x=3 forbidden. With domain [3..6] and 3 forbidden at the min boundary, x should tighten.
         // We don't get a single forced value, but the propagation completes without Unsat.
         // Hard to assert exact value without more structure; verify no Unsat.
-        @Suppress("UNUSED_VARIABLE") val _ok = impl
+
+        @Suppress("UNUSED_VARIABLE")
+        val _ok = impl
     }
 
     @Test
@@ -39,12 +44,17 @@ class ReifiedEqNegationTest {
         // x + y = 5, x in {3..3}, y in {2..2}. Both pinned → x+y=5 forced.
         // aux=false → x+y ≠ 5 must hold → Unsat.
         val p = Problem(
-            numBoolVars = 1, numIntVars = 2,
+            numBoolVars = 1,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(2, 2)),
             factors = arrayOf<Factor>(
-                ReifiedLinear(auxBoolVar = 0,
-                    coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
-                    op = LinearOp.EQ, bound = 5),
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1, 1),
+                    vars = intArrayOf(0, 1),
+                    op = LinearOp.EQ,
+                    bound = 5
+                ),
             ),
         )
         // Without aux pinning: bake-time propagation forces aux=true (since sum is exactly 5).
@@ -62,12 +72,17 @@ class ReifiedEqNegationTest {
         // aux ↔ (sum = 5). With both lits true, sum=5 forced → aux must be true.
         // Pinning aux=false should yield Unsat.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                ReifiedPseudoBoolean(auxBoolVar = 2,
+                ReifiedPseudoBoolean(
+                    auxBoolVar = 2,
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    op = PbOp.EQ, bound = 5),
+                    op = PbOp.EQ,
+                    bound = 5
+                ),
             ),
         )
         val r = p.propagate(Assumptions(bools = mapOf(0 to true, 1 to true, 2 to false)))
@@ -79,12 +94,17 @@ class ReifiedEqNegationTest {
         // weights {2, 3}, lits {0, 1}, aux=false → sum ≠ 5.
         // Pin lit0=true, lit1=false → sum = 2. aux=false is consistent.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                ReifiedPseudoBoolean(auxBoolVar = 2,
+                ReifiedPseudoBoolean(
+                    auxBoolVar = 2,
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    op = PbOp.EQ, bound = 5),
+                    op = PbOp.EQ,
+                    bound = 5
+                ),
             ),
         )
         val r = p.propagate(Assumptions(bools = mapOf(0 to true, 1 to false, 2 to false)))
@@ -96,12 +116,17 @@ class ReifiedEqNegationTest {
         // weights {2, 3}, lits {0, 1}. With lit0=true (contribution 2) and aux=false,
         // we need 2 + 3*lit1 ≠ 5. So 3*lit1 ≠ 3 → lit1 ≠ true → lit1 = false.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                ReifiedPseudoBoolean(auxBoolVar = 2,
+                ReifiedPseudoBoolean(
+                    auxBoolVar = 2,
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    op = PbOp.EQ, bound = 5),
+                    op = PbOp.EQ,
+                    bound = 5
+                ),
             ),
         )
         val r = p.propagate(Assumptions(bools = mapOf(0 to true, 2 to false)))

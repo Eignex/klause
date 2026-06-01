@@ -47,7 +47,10 @@ class Inverse(
         for (i in f.indices) {
             val j = state.assignment.intValue(f[i])
             val gIdx = fValueToGIndex(j)
-            if (gIdx !in g.indices) { bad++; continue }
+            if (gIdx !in g.indices) {
+                bad++
+                continue
+            }
             val gVal = state.assignment.intValue(g[gIdx])
             if (gVal != i + fOffset) bad++
         }
@@ -55,7 +58,10 @@ class Inverse(
         for (i in g.indices) {
             val j = state.assignment.intValue(g[i])
             val fIdx = gValueToFIndex(j)
-            if (fIdx !in f.indices) { bad++; continue }
+            if (fIdx !in f.indices) {
+                bad++
+                continue
+            }
             val fVal = state.assignment.intValue(f[fIdx])
             if (fVal != i + gOffset) bad++
         }
@@ -93,14 +99,20 @@ class Inverse(
         for (i in f.indices) {
             val j = state.assignment.intValue(f[i])
             val gIdx = fValueToGIndex(j)
-            if (gIdx !in g.indices) { bad++; continue }
+            if (gIdx !in g.indices) {
+                bad++
+                continue
+            }
             val gVal = state.assignment.intValue(g[gIdx])
             if (gVal != i + fOffset) bad++
         }
         for (i in g.indices) {
             val j = state.assignment.intValue(g[i])
             val fIdx = gValueToFIndex(j)
-            if (fIdx !in f.indices) { bad++; continue }
+            if (fIdx !in f.indices) {
+                bad++
+                continue
+            }
             val fVal = state.assignment.intValue(f[fIdx])
             if (fVal != i + gOffset) bad++
         }
@@ -112,14 +124,20 @@ class Inverse(
         for (i in f.indices) {
             val j = if (f[i] == intVar) newValue else state.assignment.intValue(f[i])
             val gIdx = fValueToGIndex(j)
-            if (gIdx !in g.indices) { bad++; continue }
+            if (gIdx !in g.indices) {
+                bad++
+                continue
+            }
             val gVal = if (g[gIdx] == intVar) newValue else state.assignment.intValue(g[gIdx])
             if (gVal != i + fOffset) bad++
         }
         for (i in g.indices) {
             val j = if (g[i] == intVar) newValue else state.assignment.intValue(g[i])
             val fIdx = gValueToFIndex(j)
-            if (fIdx !in f.indices) { bad++; continue }
+            if (fIdx !in f.indices) {
+                bad++
+                continue
+            }
             val fVal = if (f[fIdx] == intVar) newValue else state.assignment.intValue(f[fIdx])
             if (fVal != i + gOffset) bad++
         }
@@ -177,8 +195,8 @@ class Inverse(
         for (i in f.indices) {
             val df = state.intDomains[f[i]]
             for (gIdx in g.indices) {
-                val jVal = gIdx + gOffset          // value f[i] would take to point to g[gIdx]
-                val iVal = i + fOffset             // value g[gIdx] would take to point back to f[i]
+                val jVal = gIdx + gOffset // value f[i] would take to point to g[gIdx]
+                val iVal = i + fOffset // value g[gIdx] would take to point back to f[i]
                 val dg = state.intDomains[g[gIdx]]
                 val fHas = jVal in df
                 val gHas = iVal in dg

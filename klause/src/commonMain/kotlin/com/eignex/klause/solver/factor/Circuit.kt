@@ -113,7 +113,9 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         // with next[i] = -1 are sinks. Walk from each unvisited start, track entry step
         // so a revisit can identify whether we closed a cycle (re-entered current path)
         // or merged into a previously-explored region (no new cycle).
-        val UNVISITED = 0; val ON_STACK = 1; val DONE = 2
+        val UNVISITED = 0
+        val ON_STACK = 1
+        val DONE = 2
         val markers = IntArray(n) // 0 = unvisited
         val enterStep = IntArray(n)
         var globalStep = 0
@@ -207,9 +209,14 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
             val onPath = BooleanArray(n)
             var cur = start
             while (cur in 0 until n && !visited[cur] && !onPath[cur]) {
-                path.add(cur); onPath[cur] = true
-                val sV = succ[cur]; val sD = state.intDomains[sV]
-                if (sD.min != sD.max) { cur = -2; break } // not singleton; chain ends here
+                path.add(cur)
+                onPath[cur] = true
+                val sV = succ[cur]
+                val sD = state.intDomains[sV]
+                if (sD.min != sD.max) {
+                    cur = -2
+                    break
+                } // not singleton; chain ends here
                 cur = sD.min
             }
             if (cur in 0 until n && onPath[cur]) {

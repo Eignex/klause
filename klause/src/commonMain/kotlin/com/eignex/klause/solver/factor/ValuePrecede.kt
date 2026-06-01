@@ -58,8 +58,11 @@ class ValuePrecede(
         var firstTAt = -1
         for (i in xs.indices) {
             val v = state.assignment.intValue(xs[i])
-            if (v == s) return  // satisfied — shouldn't reach here given !satisfied above
-            if (v == t) { firstTAt = i; break }
+            if (v == s) return // satisfied — shouldn't reach here given !satisfied above
+            if (v == t) {
+                firstTAt = i
+                break
+            }
         }
         if (firstTAt < 0) return
         // 1. Replace xs[firstTAt] with anything that's not t.
@@ -78,7 +81,9 @@ class ValuePrecede(
     private fun satisfied(state: LocalSearchState): Boolean = walk { state.assignment.intValue(it) }
 
     private fun satisfiedWithOverride(
-        state: LocalSearchState, intVar: Int, override: Int,
+        state: LocalSearchState,
+        intVar: Int,
+        override: Int,
     ): Boolean = walk { x -> if (x == intVar) override else state.assignment.intValue(x) }
 
     private inline fun walk(getValue: (Int) -> Int): Boolean {
@@ -86,7 +91,7 @@ class ValuePrecede(
             val v = getValue(x)
             // First `t` before first `s` → violated.
             if (v == t) return false
-            if (v == s) return true   // first `s` encountered → constraint satisfied
+            if (v == s) return true // first `s` encountered → constraint satisfied
         }
         // Neither `s` nor `t` ever appeared → vacuously true.
         return true
@@ -97,13 +102,16 @@ class ValuePrecede(
         var allSingleton = true
         for (x in xs) {
             val d = state.intDomains[x]
-            if (d.min != d.max) { allSingleton = false; break }
+            if (d.min != d.max) {
+                allSingleton = false
+                break
+            }
         }
         if (allSingleton) {
             for (x in xs) {
                 val v = state.intDomains[x].min
-                if (v == t) return false  // violated: first t before first s
-                if (v == s) return true   // satisfied
+                if (v == t) return false // violated: first t before first s
+                if (v == s) return true // satisfied
             }
         }
         return true

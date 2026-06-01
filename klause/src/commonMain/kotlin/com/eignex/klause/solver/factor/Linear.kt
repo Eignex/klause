@@ -2,11 +2,9 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.factor.ceilDivLong
-import com.eignex.klause.solver.factor.floorDivLong
 import com.eignex.klause.util.IntArrayList
 
 enum class LinearOp { LE, EQ, GE, NE }
@@ -80,11 +78,11 @@ class Linear(
      *  analyzer 1UIP minimisation trims any remaining redundancy. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         if (op == LinearOp.NE) return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
-        val range = linearSumRange(state, coeffs, vars)  // [sumLo, sumHi]
+        val range = linearSumRange(state, coeffs, vars) // [sumLo, sumHi]
         val useLo = when (op) {
             LinearOp.LE -> true
             LinearOp.GE -> false
-            else -> range[0] > bound.toLong()  // EQ: lo side (mins too big) vs hi side
+            else -> range[0] > bound.toLong() // EQ: lo side (mins too big) vs hi side
         }
         return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
     }
@@ -146,7 +144,8 @@ class Linear(
     private fun proposeEqPairShifts(state: LocalSearchState, sink: MoveSink) {
         val n = vars.size
         val tryPair = { a: Int, b: Int ->
-            val ca = coeffs[a]; val cb = coeffs[b]
+            val ca = coeffs[a]
+            val cb = coeffs[b]
             if (ca != 0 && cb != 0) {
                 val va = state.assignment.intValue(vars[a])
                 val vb = state.assignment.intValue(vars[b])
@@ -164,10 +163,12 @@ class Linear(
                     val domA = state.problem.intDomains[vars[a]]
                     val domB = state.problem.intDomains[vars[b]]
                     if (newA !in domA || newB !in domB) continue
-                    sink.addCompound(listOf(
-                        com.eignex.klause.solver.Move.IntSet(vars[a], newA),
-                        com.eignex.klause.solver.Move.IntSet(vars[b], newB),
-                    ))
+                    sink.addCompound(
+                        listOf(
+                            com.eignex.klause.solver.Move.IntSet(vars[a], newA),
+                            com.eignex.klause.solver.Move.IntSet(vars[b], newB),
+                        )
+                    )
                 }
             }
         }
@@ -178,7 +179,8 @@ class Linear(
             val rng = state.rng
             var tried = 0
             while (tried < PAIR_SAMPLE_CAP) {
-                val a = rng.nextInt(n); val b = rng.nextInt(n)
+                val a = rng.nextInt(n)
+                val b = rng.nextInt(n)
                 if (a != b) tryPair(a, b)
                 tried++
             }
@@ -233,7 +235,10 @@ class Linear(
     private fun degree(sum: Int): Int = when (op) {
         LinearOp.LE -> compressViolation(sum.toLong() - bound)
         LinearOp.GE -> compressViolation(bound.toLong() - sum)
-        LinearOp.EQ -> { val d = sum.toLong() - bound; compressViolation(if (d < 0) -d else d) }
+        LinearOp.EQ -> {
+            val d = sum.toLong() - bound
+            compressViolation(if (d < 0) -d else d)
+        }
         LinearOp.NE -> if (sum == bound) 1 else 0
     }
 
@@ -249,7 +254,7 @@ class Linear(
             // value to current works: shift the var by 1 in either direction (clamped). Caller
             // re-clamps to domain; if the shifted value re-creates the bound exactly, the
             // factor will re-fire and the next repair pass tries the other direction.
-            LinearOp.NE -> null  // proposeRepairMoves below handles NE explicitly.
+            LinearOp.NE -> null // proposeRepairMoves below handles NE explicitly.
         }
     }
 
@@ -312,7 +317,10 @@ internal fun collectHoleAndBoundAntecedents(
     // restrictions are unit-propagated globals), keep everything — the level-0 reason is
     // the only seed available and is needed for unsat-core construction.
     var anyAboveRoot = false
-    for (v in vars) if (state.intLevel[v] > 0) { anyAboveRoot = true; break }
+    for (v in vars) if (state.intLevel[v] > 0) {
+        anyAboveRoot = true
+        break
+    }
     for (v in vars) {
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val d = state.intDomains[v]
@@ -364,11 +372,17 @@ internal fun collectLinearDirAntecedents(
 ): IntArray? {
     val seen = HashSet<Int>()
     val out = IntArrayList()
-    if (extraLit != 0) { out.add(extraLit); seen.add(extraLit) }
+    if (extraLit != 0) {
+        out.add(extraLit)
+        seen.add(extraLit)
+    }
     var anyAboveRoot = false
     for (j in vars.indices) {
         if (j == excludeIdx) continue
-        if (state.intLevel[vars[j]] > 0) { anyAboveRoot = true; break }
+        if (state.intLevel[vars[j]] > 0) {
+            anyAboveRoot = true
+            break
+        }
     }
     for (j in vars.indices) {
         if (j == excludeIdx) continue
@@ -404,13 +418,19 @@ internal fun collectLinearTightenAntecedents(
 ): IntArray? {
     val seen = HashSet<Int>()
     val out = IntArrayList()
-    if (extraLit != 0) { out.add(extraLit); seen.add(extraLit) }
+    if (extraLit != 0) {
+        out.add(extraLit)
+        seen.add(extraLit)
+    }
     // Same sweep-prefix tightening as [collectHoleAndBoundAntecedents]: drop level-0 vars
     // when at least one non-excluded var has been tightened above the root level.
     var anyAboveRoot = false
     for (j in vars.indices) {
         if (j == excludeIdx) continue
-        if (state.intLevel[vars[j]] > 0) { anyAboveRoot = true; break }
+        if (state.intLevel[vars[j]] > 0) {
+            anyAboveRoot = true
+            break
+        }
     }
     for (j in vars.indices) {
         if (j == excludeIdx) continue
@@ -455,7 +475,13 @@ internal fun propagateLinearBounds(
         val c = coeffs[i].toLong()
         val a = c * d.min
         val b = c * d.max
-        if (a <= b) { rLo[i] = a; rHi[i] = b } else { rLo[i] = b; rHi[i] = a }
+        if (a <= b) {
+            rLo[i] = a
+            rHi[i] = b
+        } else {
+            rLo[i] = b
+            rHi[i] = a
+        }
         sumLo += rLo[i]
         sumHi += rHi[i]
     }
@@ -529,7 +555,13 @@ internal fun linearSumRange(
         val c = coeffs[i].toLong()
         val a = c * d.min
         val b = c * d.max
-        if (a <= b) { lo += a; hi += b } else { lo += b; hi += a }
+        if (a <= b) {
+            lo += a
+            hi += b
+        } else {
+            lo += b
+            hi += a
+        }
     }
     return longArrayOf(lo, hi)
 }

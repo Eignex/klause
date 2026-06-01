@@ -1,7 +1,5 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.le
@@ -12,10 +10,12 @@ import com.eignex.klause.ast.unaryMinus
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -115,7 +115,8 @@ class ArithmeticDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 17)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -150,7 +151,8 @@ class ArithmeticDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 3)).take(5).toList()
         for (s in samples) {
             val xv = compiled.decode(schema.x, s)
@@ -160,7 +162,6 @@ class ArithmeticDslTest {
 
     @Test
     fun `symmetry helper lit forwards through cnf`() {
-
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 3)

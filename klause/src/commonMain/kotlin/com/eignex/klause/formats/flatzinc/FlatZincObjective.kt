@@ -23,19 +23,25 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
         val defId = varIdOrNull(ann.args.firstOrNull() ?: continue) ?: continue
         if (defId !in byDef) byDef[defId] = c
     }
-    if (objId !in byDef) return null  // bare decision-var objective — LinearObjective is already exact
+    if (objId !in byDef) return null // bare decision-var objective — LinearObjective is already exact
 
     val nodes = ArrayList<FunctionalObjective.Node>()
     val visited = HashSet<Int>()
     var ok = true
     fun visit(id: Int) {
         if (!ok || id in visited) return
-        val c = byDef[id] ?: return  // leaf: a decision var (or otherwise not cone-defined)
+        val c = byDef[id] ?: return // leaf: a decision var (or otherwise not cone-defined)
         visited.add(id)
         val node = buildObjNode(c, id)
-        if (node == null) { ok = false; return }
-        for (inId in nodeInputVarIds(node)) { visit(inId); if (!ok) return }
-        nodes.add(node)  // post-order ⇒ inputs precede this node (topological)
+        if (node == null) {
+            ok = false
+            return
+        }
+        for (inId in nodeInputVarIds(node)) {
+            visit(inId)
+            if (!ok) return
+        }
+        nodes.add(node) // post-order ⇒ inputs precede this node (topological)
     }
     visit(objId)
     if (!ok) return null
@@ -94,8 +100,16 @@ private fun FlatZincCompiler.buildObjNode(c: FznConstraint, definedId: Int): Fun
             val xs = arrayOperands(c.args[1]) ?: return null
             FunctionalObjective.Extreme(definedId, xs, max = c.name.endsWith("maximum"))
         }
-        "int_times" -> FunctionalObjective.Times(definedId, operandOf(c.args[0]) ?: return null, operandOf(c.args[1]) ?: return null)
-        "int_plus" -> FunctionalObjective.Plus(definedId, operandOf(c.args[0]) ?: return null, operandOf(c.args[1]) ?: return null)
+        "int_times" -> FunctionalObjective.Times(
+            definedId,
+            operandOf(c.args[0]) ?: return null,
+            operandOf(c.args[1]) ?: return null
+        )
+        "int_plus" -> FunctionalObjective.Plus(
+            definedId,
+            operandOf(c.args[0]) ?: return null,
+            operandOf(c.args[1]) ?: return null
+        )
         "int_lin_eq" -> buildLinNode(c, definedId)
         else -> null
     }
@@ -108,12 +122,18 @@ private fun FlatZincCompiler.buildLinNode(c: FznConstraint, definedId: Int): Fun
     val cval = try { evalIntConst(c.args[2]) } catch (_: Exception) { return null }
     if (coeffs.size != vars.size) return null
     var slot = -1
-    for (k in vars.indices) if (vars[k].varId == definedId) { slot = k; break }
+    for (k in vars.indices) if (vars[k].varId == definedId) {
+        slot = k
+        break
+    }
     if (slot < 0) return null
     val outCoeff = coeffs[slot].toLong()
     if (outCoeff == 0L) return null
     val ins = ArrayList<Operand>(vars.size - 1)
     val cf = ArrayList<Long>(vars.size - 1)
-    for (k in vars.indices) if (k != slot) { ins.add(vars[k]); cf.add(coeffs[k].toLong()) }
+    for (k in vars.indices) if (k != slot) {
+        ins.add(vars[k])
+        cf.add(coeffs[k].toLong())
+    }
     return FunctionalObjective.Lin(definedId, outCoeff, cf.toLongArray(), ins.toTypedArray(), cval)
 }

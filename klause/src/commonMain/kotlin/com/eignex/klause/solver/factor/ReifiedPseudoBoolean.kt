@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.ast.PbOp
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (Σ weights[i] * lit_i ⟨op⟩ bound)`. Payload at `intPayload[factorId]` is the
@@ -128,10 +128,12 @@ class ReifiedPseudoBoolean(
         val auxAntecedent = Lit.make(auxBoolVar, !aux)
         return if (aux) {
             propagatePbBounds(state, weights, literals, op, bnd, extraLit = auxAntecedent)
-        } else when (op) {
-            PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = auxAntecedent)
-            PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = auxAntecedent)
-            PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = auxAntecedent)
+        } else {
+            when (op) {
+                PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = auxAntecedent)
+                PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = auxAntecedent)
+                PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = auxAntecedent)
+            }
         }
     }
 
@@ -168,9 +170,18 @@ class ReifiedPseudoBoolean(
             val lo: Long
             val hi: Long
             when {
-                b == null -> { lo = minOf(0L, w); hi = maxOf(0L, w) }
-                Lit.evaluate(literals[i], b) -> { lo = w; hi = w }
-                else -> { lo = 0L; hi = 0L }
+                b == null -> {
+                    lo = minOf(0L, w)
+                    hi = maxOf(0L, w)
+                }
+                Lit.evaluate(literals[i], b) -> {
+                    lo = w
+                    hi = w
+                }
+                else -> {
+                    lo = 0L
+                    hi = 0L
+                }
             }
             litLo[i] = lo
             litHi[i] = hi
@@ -242,15 +253,20 @@ class ReifiedPseudoBoolean(
     private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
         val signed = signedWeightByVar[boolVar]
         if (signed == 0) return 0
-        val pre = if (current) state.assignment.boolValue(boolVar)
-        else !state.assignment.boolValue(boolVar)
+        val pre = if (current) {
+            state.assignment.boolValue(boolVar)
+        } else {
+            !state.assignment.boolValue(boolVar)
+        }
         return if (pre) -signed else signed
     }
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
     override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState, factorId: Int, flippedVar: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        flippedVar: Int,
     ) {
         val newSum = state.intPayload[factorId]
         val newAux = state.assignment.boolValue(auxBoolVar)

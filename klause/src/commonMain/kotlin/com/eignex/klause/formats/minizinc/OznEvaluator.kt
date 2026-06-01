@@ -23,6 +23,7 @@ internal class OznEvaluator(items: List<OznItem>) {
     private val decls: Map<String, OznItem.VarDecl> = items
         .filterIsInstance<OznItem.VarDecl>()
         .associateBy { it.name }
+
     /** The single output item — there should be at most one in a well-formed .ozn. */
     private val output: OznItem.Output? = items.filterIsInstance<OznItem.Output>().singleOrNull()
 
@@ -100,7 +101,8 @@ internal class OznEvaluator(items: List<OznItem>) {
             var taken: OznValue? = null
             for ((cond, body) in e.branches) {
                 if ((eval(cond, ctx) as OznValue.BoolV).value) {
-                    taken = eval(body, ctx); break
+                    taken = eval(body, ctx)
+                    break
                 }
             }
             taken ?: eval(e.elseExpr, ctx)
@@ -202,16 +204,18 @@ internal class OznEvaluator(items: List<OznItem>) {
                 val rows = r1.size
                 val cols = r2.size
                 if (rows * cols != xs.elements.size) {
-                    throw OznEvalException("array2d size mismatch: ${rows}x${cols} != ${xs.elements.size}")
+                    throw OznEvalException("array2d size mismatch: ${rows}x$cols != ${xs.elements.size}")
                 }
                 OznValue.Array2dV(xs.elements, r1, r2)
             }
             "array3d" -> {
                 val xs = args.last() as OznValue.ArrayV
-                OznValue.Array3dV(xs.elements,
+                OznValue.Array3dV(
+                    xs.elements,
                     args[0] as OznValue.RangeV,
                     args[1] as OznValue.RangeV,
-                    args[2] as OznValue.RangeV)
+                    args[2] as OznValue.RangeV
+                )
             }
             "array4d", "array5d", "array6d" -> {
                 // Higher-dim arrays — stringify as a flat MZN array. Display fidelity is
@@ -234,21 +238,27 @@ internal class OznEvaluator(items: List<OznItem>) {
                     is OznValue.Array3dV -> a.elements
                     else -> throw OznEvalException("sum: expected array, got $a")
                 }
-                if (list.isEmpty()) OznValue.IntV(0)
-                else if (list[0] is OznValue.FloatV)
+                if (list.isEmpty()) {
+                    OznValue.IntV(0)
+                } else if (list[0] is OznValue.FloatV) {
                     OznValue.FloatV(list.sumOf { (it as OznValue.FloatV).value })
-                else OznValue.IntV(list.sumOf { (it as OznValue.IntV).value })
+                } else {
+                    OznValue.IntV(list.sumOf { (it as OznValue.IntV).value })
+                }
             }
             "product" -> {
                 val list = (args[0] as OznValue.ArrayV).elements
-                if (list.isEmpty()) OznValue.IntV(1)
-                else list.fold(OznValue.IntV(1) as OznValue) { acc, v ->
-                    when {
-                        acc is OznValue.IntV && v is OznValue.IntV -> OznValue.IntV(acc.value * v.value)
-                        else -> {
-                            val a = (acc as? OznValue.IntV)?.value?.toDouble() ?: (acc as OznValue.FloatV).value
-                            val b = (v as? OznValue.IntV)?.value?.toDouble() ?: (v as OznValue.FloatV).value
-                            OznValue.FloatV(a * b)
+                if (list.isEmpty()) {
+                    OznValue.IntV(1)
+                } else {
+                    list.fold(OznValue.IntV(1) as OznValue) { acc, v ->
+                        when {
+                            acc is OznValue.IntV && v is OznValue.IntV -> OznValue.IntV(acc.value * v.value)
+                            else -> {
+                                val a = (acc as? OznValue.IntV)?.value?.toDouble() ?: (acc as OznValue.FloatV).value
+                                val b = (v as? OznValue.IntV)?.value?.toDouble() ?: (v as OznValue.FloatV).value
+                                OznValue.FloatV(a * b)
+                            }
                         }
                     }
                 }
@@ -274,15 +284,23 @@ internal class OznEvaluator(items: List<OznItem>) {
                 is OznValue.Array3dV -> a.elements
                 else -> args
             }
-        } else args
+        } else {
+            args
+        }
         if (list.isEmpty()) throw OznEvalException("min/max: empty")
         if (list.all { it is OznValue.IntV }) {
-            val v = if (takeMin) list.minOf { (it as OznValue.IntV).value }
-            else list.maxOf { (it as OznValue.IntV).value }
+            val v = if (takeMin) {
+                list.minOf { (it as OznValue.IntV).value }
+            } else {
+                list.maxOf { (it as OznValue.IntV).value }
+            }
             return OznValue.IntV(v)
         }
-        val v = if (takeMin) list.minOf { (it as? OznValue.FloatV)?.value ?: (it as OznValue.IntV).value.toDouble() }
-        else list.maxOf { (it as? OznValue.FloatV)?.value ?: (it as OznValue.IntV).value.toDouble() }
+        val v = if (takeMin) {
+            list.minOf { (it as? OznValue.FloatV)?.value ?: (it as OznValue.IntV).value.toDouble() }
+        } else {
+            list.maxOf { (it as? OznValue.FloatV)?.value ?: (it as OznValue.IntV).value.toDouble() }
+        }
         return OznValue.FloatV(v)
     }
 

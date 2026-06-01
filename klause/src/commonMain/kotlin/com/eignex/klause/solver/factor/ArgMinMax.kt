@@ -36,7 +36,10 @@ class ArgMinMax(
         var bestValue = state.assignment.intValue(xs[0])
         for (i in 1 until xs.size) {
             val v = state.assignment.intValue(xs[i])
-            if (extreme(v, bestValue)) { bestIdx = i; bestValue = v }
+            if (extreme(v, bestValue)) {
+                bestIdx = i
+                bestValue = v
+            }
         }
         return bestIdx
     }
@@ -68,7 +71,10 @@ class ArgMinMax(
         var bestValue = valueAt(0)
         for (i in 1 until xs.size) {
             val v = valueAt(i)
-            if (extreme(v, bestValue)) { bestPos = i; bestValue = v }
+            if (extreme(v, bestValue)) {
+                bestPos = i
+                bestValue = v
+            }
         }
         if (bestPos == pos) return 0
         val gap = bestValue.toLong() - valueAt(pos)
@@ -139,14 +145,20 @@ class ArgMinMax(
         var allSingleton = true
         for (x in xs) {
             val d = state.intDomains[x]
-            if (d.min != d.max) { allSingleton = false; break }
+            if (d.min != d.max) {
+                allSingleton = false
+                break
+            }
         }
         if (allSingleton) {
             var bestPos = 0
             var bestVal = state.intDomains[xs[0]].min
             for (i in 1 until xs.size) {
                 val v = state.intDomains[xs[i]].min
-                if (extreme(v, bestVal)) { bestPos = i; bestVal = v }
+                if (extreme(v, bestVal)) {
+                    bestPos = i
+                    bestVal = v
+                }
             }
             val expected = bestPos + indexOffset
             val ant = state.composeIntVarAtomAntecedents(xs)

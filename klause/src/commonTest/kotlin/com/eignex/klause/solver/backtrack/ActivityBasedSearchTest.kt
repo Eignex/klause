@@ -15,15 +15,18 @@ class ActivityBasedSearchTest {
     @Test
     fun `ABS finds solutions in the engine`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 4) },
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(
-            variableHeuristic = ActivityBasedSearch(),
-            valueHeuristic = IndomainMin,
-            randomSeed = 0L,
-        ))
+        val r = BacktrackSolver(problem).solve(
+            BacktrackParams(
+                variableHeuristic = ActivityBasedSearch(),
+                valueHeuristic = IndomainMin,
+                randomSeed = 0L,
+            )
+        )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
     }
@@ -32,7 +35,8 @@ class ActivityBasedSearchTest {
     fun `ABS scores vars by activity over domain size`() {
         // 3 unpinned vars; bump var 2's activity heavily; pick should return var 2.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 9) },
             factors = emptyArray(),
         )
@@ -47,8 +51,11 @@ class ActivityBasedSearchTest {
         }
         // Verify var 2 wins.
         val picked = abs.pick(session, kotlin.random.Random(0L))
-        assertEquals(VarRef.IntVar(2), picked,
-            "ABS should prefer the var with bumped activity")
+        assertEquals(
+            VarRef.IntVar(2),
+            picked,
+            "ABS should prefer the var with bumped activity"
+        )
     }
 
     @Test
@@ -57,7 +64,8 @@ class ActivityBasedSearchTest {
         // then bump var 1 once at t=100. Activity of var 1 should exceed var 0 because
         // increment has grown.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 9) },
             factors = emptyArray(),
         )
@@ -71,14 +79,18 @@ class ActivityBasedSearchTest {
         // Now bump var 1 (gets the larger increment).
         abs.onPropagation(implied(intKeys = intArrayOf(1)))
         val picked = abs.pick(session, kotlin.random.Random(0L))
-        assertEquals(VarRef.IntVar(1), picked,
-            "recent bumps should outweigh older ones via implicit decay")
+        assertEquals(
+            VarRef.IntVar(1),
+            picked,
+            "recent bumps should outweigh older ones via implicit decay"
+        )
     }
 
     @Test
     fun `ABS reset-on-restart clears state`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 9) },
             factors = emptyArray(),
         )
@@ -97,8 +109,10 @@ class ActivityBasedSearchTest {
         // Internal ctor is module-scoped; commonTest sits in the same module so we can
         // call it directly. Aligned-length boolValues / intValues required.
         return PropagationResult.Implied(
-            boolKeys, BooleanArray(boolKeys.size),
-            intKeys, IntArray(intKeys.size),
+            boolKeys,
+            BooleanArray(boolKeys.size),
+            intKeys,
+            IntArray(intKeys.size),
         )
     }
 }

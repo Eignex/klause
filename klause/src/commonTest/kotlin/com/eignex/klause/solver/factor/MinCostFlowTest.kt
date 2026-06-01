@@ -26,7 +26,8 @@ class MinCostFlowTest {
             cost = 2,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 100)),
             factors = arrayOf<Factor>(factor),
         )
@@ -50,7 +51,8 @@ class MinCostFlowTest {
             cost = 1,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 100)),
             factors = arrayOf<Factor>(factor),
         )
@@ -71,7 +73,8 @@ class MinCostFlowTest {
             cost = 2,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(3, 3)),
             factors = arrayOf<Factor>(factor),
         )

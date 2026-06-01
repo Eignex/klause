@@ -58,27 +58,29 @@ internal class OznLexer(private val source: String) {
 
     private fun stringLit(ln: Int): OznToken {
         require(source[pos] == '"')
-        pos++  // skip opening quote
+        pos++ // skip opening quote
         val sb = StringBuilder()
         while (pos < source.length && source[pos] != '"') {
             val c = source[pos]
             if (c == '\\' && pos + 1 < source.length) {
-                sb.append(when (val n = source[pos + 1]) {
-                    'n' -> '\n'
-                    't' -> '\t'
-                    'r' -> '\r'
-                    '\\' -> '\\'
-                    '"' -> '"'
-                    '\'' -> '\''
-                    else -> n
-                })
+                sb.append(
+                    when (val n = source[pos + 1]) {
+                        'n' -> '\n'
+                        't' -> '\t'
+                        'r' -> '\r'
+                        '\\' -> '\\'
+                        '"' -> '"'
+                        '\'' -> '\''
+                        else -> n
+                    }
+                )
                 pos += 2
             } else {
                 sb.append(c)
                 pos++
             }
         }
-        if (pos < source.length) pos++  // skip closing quote
+        if (pos < source.length) pos++ // skip closing quote
         return OznToken(OznTokenKind.STRING, sb.toString(), ln)
     }
 
@@ -87,8 +89,9 @@ internal class OznLexer(private val source: String) {
         while (pos < source.length && source[pos].isDigit()) pos++
         // Float?
         if (pos < source.length && source[pos] == '.' &&
-            pos + 1 < source.length && source[pos + 1].isDigit()) {
-            pos++  // dot
+            pos + 1 < source.length && source[pos + 1].isDigit()
+        ) {
+            pos++ // dot
             while (pos < source.length && source[pos].isDigit()) pos++
             return OznToken(OznTokenKind.FLOAT, source.substring(start, pos), ln)
         }

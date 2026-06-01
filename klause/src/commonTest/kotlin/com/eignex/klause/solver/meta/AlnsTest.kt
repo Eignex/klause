@@ -1,15 +1,6 @@
 package com.eignex.klause.solver.meta
 
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.localsearch.meta.Alns
-import com.eignex.klause.solver.localsearch.meta.DestroyOperator
-import com.eignex.klause.solver.localsearch.meta.FreedVars
-import com.eignex.klause.solver.localsearch.meta.GreedyConstructionRepair
-import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
-import com.eignex.klause.solver.localsearch.meta.RepairOperator
-import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
-import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
-
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -18,6 +9,14 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.meta.Alns
+import com.eignex.klause.solver.localsearch.meta.DestroyOperator
+import com.eignex.klause.solver.localsearch.meta.FreedVars
+import com.eignex.klause.solver.localsearch.meta.GreedyConstructionRepair
+import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
+import com.eignex.klause.solver.localsearch.meta.RepairOperator
+import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
+import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,7 +45,12 @@ class AlnsTest {
         // stay within one component).
         val fA = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
         val fB = Cardinality.atLeastOne(IntArray(4) { Lit.make(it + 4, true) })
-        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(fA, fB))
+        val problem = Problem(
+            numBoolVars = 8,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(fA, fB)
+        )
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
@@ -62,7 +66,12 @@ class AlnsTest {
         // BFS must re-seed into the second component after exhausting the first.
         val fA = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
         val fB = Cardinality.atLeastOne(IntArray(4) { Lit.make(it + 4, true) })
-        val problem = Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(fA, fB))
+        val problem = Problem(
+            numBoolVars = 8,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(fA, fB)
+        )
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.75)
@@ -84,9 +93,14 @@ class AlnsTest {
 
     @Test
     fun `alns minimizes weighted exactly-one`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
@@ -104,9 +118,14 @@ class AlnsTest {
 
     @Test
     fun `alns with multiple repair operators iterates and varies repair picks`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
@@ -131,9 +150,14 @@ class AlnsTest {
         // Greedy needs to flip one bool to true; under FeasibilityFirst shaping the only
         // accepted flips are those reaching feasibility, so greedy picks bool 3 (cheapest
         // weight = 3) and rejects flips to 0/1/2 which would have higher shaped score.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
@@ -157,9 +181,14 @@ class AlnsTest {
     fun `greedy construction respects pinned vars`() {
         // 4 bools, exactly-one. Pin bools 0..2 false; only bool 3 free. Greedy must set
         // bool 3 = true (the only path to feasibility); pinned vars stay at 0.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
@@ -207,9 +236,14 @@ class AlnsTest {
         // the inner solver's per-call activity capture survives into the next iteration's
         // destroy phase, where activityBiased reads it. Without a session, the activity
         // operator falls back to random — verified by checking recency stays empty.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val solver = LocalSearchSolver(problem)
@@ -236,9 +270,14 @@ class AlnsTest {
         // Smoke test: plug a MultiArmedBandit(BetaBernoulliTS()) into Alns and verify it
         // produces a feasible sample. The kumulant bandit family is tested in kumulant
         // itself; here we just verify the integration point.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
@@ -246,8 +285,16 @@ class AlnsTest {
             inner = inner,
             destroyOperators = DestroyOperator.Defaults,
             repairOperators = RepairOperator.Defaults,
-            destroyBandit = MultiArmedBandit(DestroyOperator.Defaults.size, policy = BetaBernoulliTS(), random = Random(1)),
-            repairBandit = MultiArmedBandit(RepairOperator.Defaults.size, policy = BetaBernoulliTS(), random = Random(2)),
+            destroyBandit = MultiArmedBandit(
+                DestroyOperator.Defaults.size,
+                policy = BetaBernoulliTS(),
+                random = Random(1)
+            ),
+            repairBandit = MultiArmedBandit(
+                RepairOperator.Defaults.size,
+                policy = BetaBernoulliTS(),
+                random = Random(2)
+            ),
             // BetaBernoulliTS expects rewards in [0, 1]; normalize from the (3, 1, 0) ALNS defaults.
             newBestReward = 1.0,
             acceptedReward = 0.33,
@@ -261,8 +308,12 @@ class AlnsTest {
 
     @Test
     fun `freed vars empty triggers reward and continue`() {
-        val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true)))))
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true))))
+        )
         val objective = LinearObjective(boolWeights = doubleArrayOf(1.0))
         val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }
         val inner = LocalSearchSolver(problem)

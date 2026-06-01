@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -23,7 +23,8 @@ class DisjunctiveTest {
     private fun threeUnitTasks(): Problem {
         val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(1, 1, 1))
         return Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(factor),
         )
@@ -58,7 +59,8 @@ class DisjunctiveTest {
         // start_1.min to 3, so this trivially holds.
         val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(3, 1))
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 5)),
             factors = arrayOf<Factor>(factor),
         )
@@ -84,7 +86,8 @@ class DisjunctiveTest {
         // pair triggers (est_i + dur_i ≤ lst_j for every i, j pair in [0, 3] dom).
         val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(2, 2, 2))
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
@@ -137,7 +140,8 @@ class DisjunctiveTest {
         // Task 1: dom [5, 5] duration 1 — same! Clearly infeasible.
         val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(1, 1))
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(5, 5), IntDomain(5, 5)),
             factors = arrayOf<Factor>(factor),
         )

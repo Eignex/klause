@@ -18,7 +18,8 @@ class ConflictOrderingTest {
     @Test
     fun `COS delegates to base when no conflicts have happened yet`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 4) },
             factors = emptyArray(),
         )
@@ -30,7 +31,8 @@ class ConflictOrderingTest {
     @Test
     fun `COS picks the most recently conflicting var`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 4) },
             factors = emptyArray(),
         )
@@ -46,7 +48,8 @@ class ConflictOrderingTest {
     @Test
     fun `COS replays conflict order in reverse after a pin removes the top`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 4) },
             factors = emptyArray(),
         )
@@ -63,7 +66,8 @@ class ConflictOrderingTest {
     @Test
     fun `COS stamps conflict-graph vars from unsat reason`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 4) },
             factors = emptyArray(),
         )
@@ -74,22 +78,27 @@ class ConflictOrderingTest {
         // Pin var 3 and verify pick returns one of {0, 2} (stamped via unsat reason set).
         session.pinInt(3, 0)
         val picked = cos.pick(session, Random(0L))
-        assertTrue(picked == VarRef.IntVar(0) || picked == VarRef.IntVar(2),
-            "should pick a stamped conflict-graph var; got $picked")
+        assertTrue(
+            picked == VarRef.IntVar(0) || picked == VarRef.IntVar(2),
+            "should pick a stamped conflict-graph var; got $picked"
+        )
     }
 
     @Test
     fun `COS still solves`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 4) },
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(
-            variableHeuristic = ConflictOrdering(DomWdeg()),
-            valueHeuristic = IndomainMin,
-            randomSeed = 0L,
-        ))
+        val r = BacktrackSolver(problem).solve(
+            BacktrackParams(
+                variableHeuristic = ConflictOrdering(DomWdeg()),
+                valueHeuristic = IndomainMin,
+                randomSeed = 0L,
+            )
+        )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
     }

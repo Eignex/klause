@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -151,7 +150,9 @@ class Disjunctive(
         for ((idx, ev) in events.withIndex()) {
             val t = ev[0]
             if (t > cursor && level > 0) {
-                segFrom[segCount] = cursor; segTo[segCount] = t; segCount++
+                segFrom[segCount] = cursor
+                segTo[segCount] = t
+                segCount++
             }
             level += ev[1]
             cursor = t
@@ -168,14 +169,17 @@ class Disjunctive(
             val v = starts[i]
             val dom = state.intDomains[v]
             if (dom.min == dom.max) continue
-            val lstI = dom.max; val ectI = dom.min + d
+            val lstI = dom.max
+            val ectI = dom.min + d
             val ownsMandatory = lstI < ectI
             // Tighten dom.min upward.
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
                 if (mandatoryConflicts(segFrom, segTo, segCount, newMin, newMin + d, ownsMandatory, lstI, ectI)) {
                     newMin++
-                } else break
+                } else {
+                    break
+                }
             }
             if (newMin > state.intDomains[v].max) return false
             if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin)) return false
@@ -184,7 +188,9 @@ class Disjunctive(
             while (newMax >= state.intDomains[v].min) {
                 if (mandatoryConflicts(segFrom, segTo, segCount, newMax, newMax + d, ownsMandatory, lstI, ectI)) {
                     newMax--
-                } else break
+                } else {
+                    break
+                }
             }
             if (newMax < state.intDomains[v].min) return false
             if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, state.composeIntVarAtomAntecedents(starts))) return false
@@ -195,12 +201,18 @@ class Disjunctive(
     /** True iff placing a task `[s, sPlusD)` would coincide with any existing mandatory
      *  segment (subtracting the task's own already-counted mandatory contribution). */
     private fun mandatoryConflicts(
-        segFrom: IntArray, segTo: IntArray, segCount: Int,
-        s: Int, sPlusD: Int,
-        ownsMandatory: Boolean, lstI: Int, ectI: Int,
+        segFrom: IntArray,
+        segTo: IntArray,
+        segCount: Int,
+        s: Int,
+        sPlusD: Int,
+        ownsMandatory: Boolean,
+        lstI: Int,
+        ectI: Int,
     ): Boolean {
         for (k in 0 until segCount) {
-            val from = segFrom[k]; val to = segTo[k]
+            val from = segFrom[k]
+            val to = segTo[k]
             if (to <= s || from >= sPlusD) continue
             if (ownsMandatory) {
                 // The task's own mandatory part shadows the segment; the placement only
@@ -331,7 +343,8 @@ class Disjunctive(
             while (j >= 0) {
                 val cmpKey = state.intDomains[starts[arr[j]]].max + effDur[arr[j]]
                 if (cmpKey <= curKey) break
-                arr[j + 1] = arr[j]; j--
+                arr[j + 1] = arr[j]
+                j--
             }
             arr[j + 1] = cur
         }
@@ -345,8 +358,10 @@ class Disjunctive(
             while (j >= 0) {
                 val cmpKey = state.intDomains[starts[arr[j]]].min
                 if (cmpKey >= curKey) break
-                arr[j + 1] = arr[j]; j--
+                arr[j + 1] = arr[j]
+                j--
             }
             arr[j + 1] = cur
         }
-    }}
+    }
+}

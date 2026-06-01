@@ -64,7 +64,8 @@ object DegreeConsistencyOracle {
             // Probe exactness (graded factors only).
             if (exactProbe) {
                 assertEquals(
-                    costBefore + predicted, state.cost,
+                    costBefore + predicted,
+                    state.cost,
                     "$label: netDelta($move)=$predicted did not predict the cost change " +
                         "($costBefore → ${state.cost}) on iter=$iter — graded deltaIf* probe is " +
                         "not exact (CBLS gradient would be wrong).",
@@ -74,12 +75,16 @@ object DegreeConsistencyOracle {
     }
 
     private fun assertDegreeInvariants(
-        state: LocalSearchState, factor: LocalSearchFactor, label: String, where: String,
+        state: LocalSearchState,
+        factor: LocalSearchFactor,
+        label: String,
+        where: String,
     ) {
         val deg = factor.violationDegree(state, 0)
         assertTrue(deg >= 0, "$label: violationDegree=$deg is negative ($where)")
         assertEquals(
-            deg > 0, factor.isViolated(state, 0),
+            deg > 0,
+            factor.isViolated(state, 0),
             "$label: (violationDegree>0)=${deg > 0} disagrees with isViolated=${factor.isViolated(state, 0)} ($where)",
         )
     }
@@ -87,17 +92,23 @@ object DegreeConsistencyOracle {
     /** The engine maintains `cost` and per-factor `factorDegree` incrementally; assert they
      *  equal what a clean recompute of the identical assignment yields. */
     private fun assertMatchesFreshRecompute(
-        state: LocalSearchState, fresh: LocalSearchState, problem: Problem, label: String, where: String,
+        state: LocalSearchState,
+        fresh: LocalSearchState,
+        problem: Problem,
+        label: String,
+        where: String,
     ) {
         for (b in 0 until problem.numBoolVars) fresh.assignment.setBool(b, state.assignment.boolValue(b))
         for (i in 0 until problem.numIntVars) fresh.assignment.setInt(i, state.assignment.intValue(i))
         fresh.recompute()
         assertEquals(
-            fresh.cost, state.cost,
+            fresh.cost,
+            state.cost,
             "$label: maintained cost=${state.cost} != fresh recompute cost=${fresh.cost} ($where)",
         )
         assertEquals(
-            fresh.factorDegree[0], state.factorDegree[0],
+            fresh.factorDegree[0],
+            state.factorDegree[0],
             "$label: maintained factorDegree=${state.factorDegree[0]} != fresh=${fresh.factorDegree[0]} ($where)",
         )
     }

@@ -129,8 +129,11 @@ class IntDomain private constructor(
                     clearBit(bits, value - min)
                     IntDomain(min, max, null, bits, min)
                 } else {
-                    val newHoles = if (holes == null) intArrayOf(value)
-                    else insertSorted(holes, value)
+                    val newHoles = if (holes == null) {
+                        intArrayOf(value)
+                    } else {
+                        insertSorted(holes, value)
+                    }
                     IntDomain(min, max, newHoles, null, 0)
                 }
             }
@@ -235,7 +238,7 @@ class IntDomain private constructor(
             }
             remaining -= cnt
         }
-        error("valueAt($i) out of range; size=${size}")
+        error("valueAt($i) out of range; size=$size")
     }
 
     /**

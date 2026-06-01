@@ -123,7 +123,7 @@ class Count(
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasPresent = present(state, i)
-            val willBePresent = !wasPresent  // flipping the bool inverts the literal's truth
+            val willBePresent = !wasPresent // flipping the bool inverts the literal's truth
             val matchesValue = matches(state.assignment.intValue(xs[i]))
             if (!matchesValue) continue
             if (wasPresent && !willBePresent) deltaCount--
@@ -201,8 +201,8 @@ class Count(
         val nv = state.assignment.intValue(n)
         // (a) Snap n to the current count.
         if (cur in state.problem.intDomains[n]) sink.addChannelingIntSet(state, n, cur)
-        if (nv == cur) return  // already satisfied (shouldn't happen given violation)
-        val needIncrease = cur < nv   // need more matches
+        if (nv == cur) return // already satisfied (shouldn't happen given violation)
+        val needIncrease = cur < nv // need more matches
         val needDecrease = cur > nv
         for (i in xs.indices) {
             if (!present(state, i)) continue
@@ -224,7 +224,11 @@ class Count(
     /** Pick an in-domain value that matches the predicate; returns null if impossible. */
     private fun pickMatching(d: com.eignex.klause.solver.IntDomain, avoid: Int): Int? = when (op) {
         Op.Eq -> if (v in d && v != avoid) v else null
-        Op.Ne -> { var pick: Int? = null; d.forEach { if (it != v && it != avoid && pick == null) pick = it }; pick }
+        Op.Ne -> {
+            var pick: Int? = null
+            d.forEach { if (it != v && it != avoid && pick == null) pick = it }
+            pick
+        }
         Op.Le -> if (d.min <= v) d.min.takeIf { it != avoid } ?: d.min else null
         Op.Lt -> if (d.min < v) d.min.takeIf { it != avoid } ?: d.min else null
         Op.Ge -> if (d.max >= v) d.max.takeIf { it != avoid } ?: d.max else null
@@ -233,7 +237,11 @@ class Count(
 
     /** Pick an in-domain value that does NOT match the predicate; returns null if impossible. */
     private fun pickNonMatching(d: com.eignex.klause.solver.IntDomain, avoid: Int): Int? = when (op) {
-        Op.Eq -> { var pick: Int? = null; d.forEach { if (it != v && it != avoid && pick == null) pick = it }; pick }
+        Op.Eq -> {
+            var pick: Int? = null
+            d.forEach { if (it != v && it != avoid && pick == null) pick = it }
+            pick
+        }
         Op.Ne -> if (v in d && v != avoid) v else null
         Op.Le -> if (d.max > v) d.max.takeIf { it != avoid } ?: d.max else null
         Op.Lt -> if (d.max >= v) d.max.takeIf { it != avoid } ?: d.max else null

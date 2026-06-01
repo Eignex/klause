@@ -105,17 +105,23 @@ sealed interface PropagationResult {
          *  failed-literal probing in `Problem` and by tests; hot paths should use
          *  [forEachBool] / [boolValueOrNull] instead. */
         val bools: Map<Int, Boolean>
-            get() = if (boolKeys.isEmpty()) emptyMap() else
+            get() = if (boolKeys.isEmpty()) {
+                emptyMap()
+            } else {
                 LinkedHashMap<Int, Boolean>(boolKeys.size).also { m ->
                     for (i in boolKeys.indices) m[boolKeys[i]] = boolValues[i]
                 }
+            }
 
         /** Map view. See [bools]. */
         val ints: Map<Int, Int>
-            get() = if (intKeys.isEmpty()) emptyMap() else
+            get() = if (intKeys.isEmpty()) {
+                emptyMap()
+            } else {
                 LinkedHashMap<Int, Int>(intKeys.size).also { m ->
                     for (i in intKeys.indices) m[intKeys[i]] = intValues[i]
                 }
+            }
 
         override fun equals(other: Any?): Boolean {
             if (other !is Implied) return false
@@ -137,12 +143,16 @@ sealed interface PropagationResult {
             append("Implied(bools={")
             for (i in boolKeys.indices) {
                 if (i > 0) append(", ")
-                append(boolKeys[i]); append("="); append(boolValues[i])
+                append(boolKeys[i])
+                append("=")
+                append(boolValues[i])
             }
             append("}, ints={")
             for (i in intKeys.indices) {
                 if (i > 0) append(", ")
-                append(intKeys[i]); append("="); append(intValues[i])
+                append(intKeys[i])
+                append("=")
+                append(intValues[i])
             }
             append("})")
         }
@@ -164,14 +174,19 @@ sealed interface PropagationResult {
                 intHoleValues: IntArray = IntArray(0),
             ): Implied {
                 if (bools.isEmpty() && ints.isEmpty() &&
-                    intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()) return Empty
+                    intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()
+                ) {
+                    return Empty
+                }
                 val bKeys = bools.keys.toIntArray().also { it.sort() }
                 val bVals = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) }
                 val iKeys = ints.keys.toIntArray().also { it.sort() }
                 val iVals = IntArray(iKeys.size) { ints.getValue(iKeys[it]) }
-                return Implied(bKeys, bVals, iKeys, iVals,
+                return Implied(
+                    bKeys, bVals, iKeys, iVals,
                     intMinKeys, intMinValues, intMaxKeys, intMaxValues,
-                    intHoleVarIds, intHoleValues)
+                    intHoleVarIds, intHoleValues
+                )
             }
         }
     }

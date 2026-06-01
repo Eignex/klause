@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.optimize
 
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams

@@ -47,7 +47,8 @@ private fun unionDomainSize(ranges: List<Pair<Int, Int>>): Long {
             if (hi > curHi) curHi = hi
         } else {
             total += (curHi - curLo + 1).toLong()
-            curLo = lo; curHi = hi
+            curLo = lo
+            curHi = hi
         }
     }
     total += (curHi - curLo + 1).toLong()

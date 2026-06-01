@@ -1,11 +1,11 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.factor.Cardinality
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,7 +32,11 @@ class IteratedLocalSearchTest {
 
     @Test
     fun `SA acceptance always accepts improvements and cools toward Improving`() {
-        val sa = AcceptanceCriterion.SimulatedAnnealing(initialTemperature = 1e6, coolingRate = 0.5, minTemperature = 1e-9)
+        val sa = AcceptanceCriterion.SimulatedAnnealing(
+            initialTemperature = 1e6,
+            coolingRate = 0.5,
+            minTemperature = 1e-9
+        )
         val rng = Random(0)
         var acceptedWorse = 0
         repeat(10) { if (sa.accept(10.0, 1.0, rng)) acceptedWorse++ }
@@ -45,7 +49,11 @@ class IteratedLocalSearchTest {
 
     @Test
     fun `SA temperature respects min floor`() {
-        val sa = AcceptanceCriterion.SimulatedAnnealing(initialTemperature = 1.0, coolingRate = 0.001, minTemperature = 0.5)
+        val sa = AcceptanceCriterion.SimulatedAnnealing(
+            initialTemperature = 1.0,
+            coolingRate = 0.001,
+            minTemperature = 0.5
+        )
         val rng = Random(0)
         repeat(100) { sa.accept(0.0, 0.0, rng) }
         assertTrue(sa.temperature >= 0.5, "temperature escaped min floor: ${sa.temperature}")
@@ -53,7 +61,11 @@ class IteratedLocalSearchTest {
 
     @Test
     fun `SA reset restores initial temperature`() {
-        val sa = AcceptanceCriterion.SimulatedAnnealing(initialTemperature = 2.0, coolingRate = 0.5, minTemperature = 0.01)
+        val sa = AcceptanceCriterion.SimulatedAnnealing(
+            initialTemperature = 2.0,
+            coolingRate = 0.5,
+            minTemperature = 0.01
+        )
         val rng = Random(0)
         repeat(10) { sa.accept(0.0, 0.0, rng) }
         assertTrue(sa.temperature < 2.0, "expected cooling, got ${sa.temperature}")
@@ -154,19 +166,30 @@ class IteratedLocalSearchTest {
 
         policy.restart(state, bestSoFar = null)
         val trues = (0 until 8).count { state.assignment.boolValue(it) }
-        assertTrue(trues in 1..7,
-            "expected mixed assignment after crossover, got $trues true (8 bits, both parents pure)")
+        assertTrue(
+            trues in 1..7,
+            "expected mixed assignment after crossover, got $trues true (8 bits, both parents pure)"
+        )
     }
 
     @Test
     fun `BetterBiased crossover skews toward the better parent`() {
         val bias = com.eignex.klause.solver.localsearch.CrossoverBias.BetterBiased(rate = 0.5)
-        assertEquals(1.0, bias.probParentA(parentAObjective = 1.0, parentBObjective = 10.0),
-            "fully-biased should pick A when A is better")
-        assertEquals(0.0, bias.probParentA(parentAObjective = 10.0, parentBObjective = 1.0),
-            "fully-biased should pick B when B is better")
-        assertEquals(0.5, bias.probParentA(parentAObjective = 5.0, parentBObjective = 5.0),
-            "tied parents should fall back to uniform")
+        assertEquals(
+            1.0,
+            bias.probParentA(parentAObjective = 1.0, parentBObjective = 10.0),
+            "fully-biased should pick A when A is better"
+        )
+        assertEquals(
+            0.0,
+            bias.probParentA(parentAObjective = 10.0, parentBObjective = 1.0),
+            "fully-biased should pick B when B is better"
+        )
+        assertEquals(
+            0.5,
+            bias.probParentA(parentAObjective = 5.0, parentBObjective = 5.0),
+            "tied parents should fall back to uniform"
+        )
     }
 
     @Test
@@ -191,9 +214,14 @@ class IteratedLocalSearchTest {
 
     @Test
     fun `ils restart solves exact one cardinality`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val solver = LocalSearchSolver(problem, restartPolicy = IteratedLocalSearchRestart(maxFlipsBeforeRestart = 50))

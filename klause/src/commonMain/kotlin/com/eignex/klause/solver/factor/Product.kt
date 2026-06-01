@@ -1,13 +1,11 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.factor.ceilDivLong
-import com.eignex.klause.solver.factor.floorDivLong
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -121,7 +119,7 @@ class Product(
         divisorDomain: IntDomain,
         r: IntDomain,
     ): Boolean {
-        if (0 in divisorDomain.min..divisorDomain.max) return true   // skip: zero-crossing
+        if (0 in divisorDomain.min..divisorDomain.max) return true // skip: zero-crossing
         if (divisorDomain.min == divisorDomain.max) {
             return narrowByDivisor(state, target, divisorDomain.min.toLong(), r)
         }
@@ -147,9 +145,13 @@ class Product(
         if (tLo > tHi) return false
         // Antecedents: union of result and the divisor var. The factor's a/b/result form
         // a triangle; the third var is the target being tightened, the other two drove it.
-        val others = if (target == a) intArrayOf(b, result)
-                     else if (target == b) intArrayOf(a, result)
-                     else intArrayOf(a, b)
+        val others = if (target == a) {
+            intArrayOf(b, result)
+        } else if (target == b) {
+            intArrayOf(a, result)
+        } else {
+            intArrayOf(a, b)
+        }
         return tightenLong(state, target, tLo, tHi, state.composeIntVarAtomAntecedents(others))
     }
 
@@ -175,9 +177,13 @@ class Product(
             hi = floorDivLong(rLo, divisor)
         }
         if (lo > hi) return false
-        val others = if (target == a) intArrayOf(b, result)
-                     else if (target == b) intArrayOf(a, result)
-                     else intArrayOf(a, b)
+        val others = if (target == a) {
+            intArrayOf(b, result)
+        } else if (target == b) {
+            intArrayOf(a, result)
+        } else {
+            intArrayOf(a, b)
+        }
         return tightenLong(state, target, lo, hi, state.composeIntVarAtomAntecedents(others))
     }
 
@@ -231,7 +237,7 @@ class Product(
     ) {
         if (otherValue == 0) return
         val rv = state.assignment.intValue(result)
-        val center = rv / otherValue   // truncated
+        val center = rv / otherValue // truncated
         val domain = state.problem.intDomains[operandVar]
         var bestCandidate = currentValue
         var bestError = kotlin.math.abs(currentValue.toLong() * otherValue - rv)
@@ -260,11 +266,12 @@ class Product(
         return minOf(p1, p2, p3, p4) to maxOf(p1, p2, p3, p4)
     }
 
-private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long, ant: IntArray? = null): Boolean {
+    private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long, ant: IntArray? = null): Boolean {
         if (lo > Int.MAX_VALUE || hi < Int.MIN_VALUE) return false
         val loI = if (lo < Int.MIN_VALUE) Int.MIN_VALUE else lo.toInt()
         val hiI = if (hi > Int.MAX_VALUE) Int.MAX_VALUE else hi.toInt()
         if (!state.tightenIntMin(v, loI, ant)) return false
         if (!state.tightenIntMax(v, hiI, ant)) return false
         return true
-    }}
+    }
+}

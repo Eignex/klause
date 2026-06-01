@@ -8,7 +8,6 @@ class MultiplyTest {
 
     @Test
     fun `three bit times three bit matches integer multiplication`() {
-
         val builder = CnfBuilder()
         val a = IntArray(3) { Lit.make(builder.newVar(), positive = true) }
         val b = IntArray(3) { Lit.make(builder.newVar(), positive = true) }
@@ -25,10 +24,12 @@ class MultiplyTest {
             val pins = IntArray(2 * (a.size + b.size))
             var p = 0
             for (i in a.indices) {
-                pins[p++] = Lit.variable(a[i]); pins[p++] = (av shr i) and 1
+                pins[p++] = Lit.variable(a[i])
+                pins[p++] = (av shr i) and 1
             }
             for (i in b.indices) {
-                pins[p++] = Lit.variable(b[i]); pins[p++] = (bv shr i) and 1
+                pins[p++] = Lit.variable(b[i])
+                pins[p++] = (bv shr i) and 1
             }
 
             for (i in product.indices) {

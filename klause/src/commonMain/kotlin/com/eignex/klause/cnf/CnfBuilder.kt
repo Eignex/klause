@@ -52,7 +52,8 @@ class CnfBuilder {
     /** Sort + drop exact-duplicate literals. */
     private fun sortDedup(a: IntArray): IntArray {
         if (a.size <= 1) return a
-        val s = a.copyOf(); s.sort()
+        val s = a.copyOf()
+        s.sort()
         var w = 0
         for (i in s.indices) if (w == 0 || s[i] != s[w - 1]) s[w++] = s[i]
         return if (w == s.size) s else s.copyOf(w)
@@ -125,9 +126,16 @@ class CnfBuilder {
      *  operands. Four clauses on a miss. */
     fun tseitinXor(a: Int, b: Int): Int {
         var parity = 0
-        var x = a; var y = b
-        if (!Lit.isPositive(x)) { parity = parity xor 1; x = Lit.negate(x) }
-        if (!Lit.isPositive(y)) { parity = parity xor 1; y = Lit.negate(y) }
+        var x = a
+        var y = b
+        if (!Lit.isPositive(x)) {
+            parity = parity xor 1
+            x = Lit.negate(x)
+        }
+        if (!Lit.isPositive(y)) {
+            parity = parity xor 1
+            y = Lit.negate(y)
+        }
         if (x == y) return if (parity == 1) trueLit() else falseLit() // a⊕a=0, ¬a⊕a=1
         val lo = if (x <= y) x else y
         val hi = if (x <= y) y else x
@@ -149,7 +157,8 @@ class CnfBuilder {
 
     /** `aux ↔ majority(a, b, c)`. Carry bit of a full adder. Hash-consed (sorted operands). */
     fun tseitinMaj3(a: Int, b: Int, c: Int): Int {
-        val ops = intArrayOf(a, b, c); ops.sort()
+        val ops = intArrayOf(a, b, c)
+        ops.sort()
         val key = GateKey(OP_MAJ, ops)
         gateCache[key]?.let { return it }
         val aux = Lit.make(newVar(), positive = true)

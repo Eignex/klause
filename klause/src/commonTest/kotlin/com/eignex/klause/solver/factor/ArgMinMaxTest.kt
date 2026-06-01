@@ -16,7 +16,8 @@ class ArgMinMaxTest {
     fun `arg_max with pinned xs identifies maximum index`() {
         // xs = [1, 3, 2, 3]. arg_max should be 1 (first occurrence of max 3, lex tiebreak).
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(IntDomain(1, 1), IntDomain(3, 3), IntDomain(2, 2), IntDomain(3, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = true)),
         )
@@ -28,7 +29,8 @@ class ArgMinMaxTest {
     @Test
     fun `arg_min with pinned xs`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(IntDomain(5, 5), IntDomain(1, 1), IntDomain(3, 3), IntDomain(1, 1), IntDomain(0, 3)),
             factors = arrayOf<Factor>(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = false)),
         )
@@ -41,7 +43,8 @@ class ArgMinMaxTest {
     fun `arg_max with 1-based offset`() {
         // Same data, but idx in 1-based domain. arg_max should be 2 (position 2, 1-based).
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(IntDomain(1, 1), IntDomain(3, 3), IntDomain(2, 2), IntDomain(3, 3), IntDomain(1, 4)),
             factors = arrayOf<Factor>(ArgMinMax(idx = 4, xs = intArrayOf(0, 1, 2, 3), max = true, indexOffset = 1)),
         )

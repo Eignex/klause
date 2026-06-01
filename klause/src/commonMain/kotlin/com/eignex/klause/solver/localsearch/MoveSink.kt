@@ -82,7 +82,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         when (val m = state.synthesizeChannelingMove(varId, newValue)) {
             is Move.IntSet -> addIntSet(varId, newValue)
             is Move.Compound -> addCompound(m.parts)
-            is Move.BoolFlip -> addBoolFlip(m.varId)  // shouldn't happen but stay total
+            is Move.BoolFlip -> addBoolFlip(m.varId) // shouldn't happen but stay total
         }
     }
 

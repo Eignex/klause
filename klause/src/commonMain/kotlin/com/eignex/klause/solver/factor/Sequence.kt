@@ -88,7 +88,10 @@ class Sequence(
             for (w in wLo..wHi) sim[w] += delta
         }
         var willViolate = false
-        for (c in sim) if (c < low || c > high) { willViolate = true; break }
+        for (c in sim) if (c < low || c > high) {
+            willViolate = true
+            break
+        }
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
@@ -109,7 +112,12 @@ class Sequence(
                 val wHi = minOf(windowCount - 1, i)
                 for (w in wLo..wHi) sim[w] += delta
             }
-            var v = false; for (c in sim) if (c < low || c > high) { v = true; break }; v
+            var v = false
+            for (c in sim) if (c < low || c > high) {
+                v = true
+                break
+            }
+            v
         }
         // Apply real update.
         for (i in xs.indices) {
@@ -141,8 +149,11 @@ class Sequence(
                 var allIn = true
                 var anyIn = false
                 d.forEach { value ->
-                    if (matches(value)) anyIn = true
-                    else allIn = false
+                    if (matches(value)) {
+                        anyIn = true
+                    } else {
+                        allIn = false
+                    }
                 }
                 if (allIn) definite++
                 if (anyIn) possible++
@@ -175,7 +186,10 @@ class Sequence(
                 } else if (!isMatch && needIncrease) {
                     // Pick a matching value from the set.
                     var pick: Int? = null
-                    for (vv in values) if (vv in d && vv != cur) { pick = vv; break }
+                    for (vv in values) if (vv in d && vv != cur) {
+                        pick = vv
+                        break
+                    }
                     if (pick != null) sink.addChannelingIntSet(state, xi, pick!!)
                 }
             }

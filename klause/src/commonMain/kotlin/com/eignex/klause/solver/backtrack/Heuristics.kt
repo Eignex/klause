@@ -28,11 +28,14 @@ sealed interface VarRef {
  */
 interface VariableHeuristic {
     fun pick(session: PropagationSession, rng: Random): VarRef?
+
     /** Called once per propagation conflict at [varRef]; bump activity / failure weight. */
     fun onConflict(varRef: VarRef) {}
+
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
      *  the assignment here so they can bias future picks toward it. Default no-op. */
     fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
+
     /**
      * Richer conflict notification: [varRef] is the decision that triggered the conflict,
      * [unsat] carries the full reason set (decision variables, decision levels, contributing
@@ -44,8 +47,10 @@ interface VariableHeuristic {
     fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
         onConflict(varRef)
     }
+
     /** Called once per successful pin of [varRef]; useful for phase-saving-like state. */
     fun onCommit(varRef: VarRef) {}
+
     /**
      * Called after every successful propagation step (pin + fixpoint). [implied] carries
      * the variables newly forced into singletons during this step. Activity-Based Search
@@ -53,6 +58,7 @@ interface VariableHeuristic {
      * agnostic heuristics ignore. Default no-op.
      */
     fun onPropagation(implied: PropagationResult.Implied) {}
+
     /** Called when the engine restarts (Luby / geometric); decay activity or reset
      *  per-run counters here. */
     fun onRestart() {}
@@ -75,6 +81,7 @@ interface ValueHeuristic {
     fun onConflict(varRef: VarRef, value: Int) {}
     fun onCommit(varRef: VarRef, value: Int) {}
     fun onRestart() {}
+
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
      *  the assignment here so they can bias future picks toward it. Default no-op. */
     fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
@@ -107,13 +114,15 @@ object SmallestDomain : VariableHeuristic {
         val problem = session.problem
         for (v in 0 until problem.numBoolVars) {
             if (session.boolValue(v) == null && 2 < bestSize) {
-                best = VarRef.Bool(v); bestSize = 2
+                best = VarRef.Bool(v)
+                bestSize = 2
             }
         }
         for (v in 0 until problem.numIntVars) {
             val size = session.intDomain(v).size
             if (size > 1 && size < bestSize) {
-                best = VarRef.IntVar(v); bestSize = size
+                best = VarRef.IntVar(v)
+                bestSize = size
             }
         }
         return best
@@ -128,13 +137,15 @@ object LargestDomain : VariableHeuristic {
         val problem = session.problem
         for (v in 0 until problem.numBoolVars) {
             if (session.boolValue(v) == null && 2 > bestSize) {
-                best = VarRef.Bool(v); bestSize = 2
+                best = VarRef.Bool(v)
+                bestSize = 2
             }
         }
         for (v in 0 until problem.numIntVars) {
             val size = session.intDomain(v).size
             if (size > bestSize) {
-                best = VarRef.IntVar(v); bestSize = size
+                best = VarRef.IntVar(v)
+                bestSize = size
             }
         }
         return best
@@ -173,6 +184,7 @@ class Vsids(
     }
 
     private var increment: Double = 1.0
+
     // Combined index space: 0..numBool-1 are bool ids; numBool..numBool+numInt-1 are int ids
     // offset by numBool. One indexed max-heap over both gives O(log n) bumps and amortised
     // O((1 + pinned-skip) · log n) picks instead of the O(numBool + numInt) linear scan the
@@ -180,6 +192,7 @@ class Vsids(
     private var heap: IndexedMaxHeap? = null
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
+
     // Scratch buffer for picks: ids extracted but rejected because pinned. Restored at the
     // end of pick() so the heap stays complete across calls. Field rather than local so it
     // doesn't re-allocate per pick.
@@ -203,10 +216,16 @@ class Vsids(
         while (h.size > 0) {
             val id = h.extractMax()
             if (id < numBoolCached) {
-                if (session.boolValue(id) == null) { result = VarRef.Bool(id); break }
+                if (session.boolValue(id) == null) {
+                    result = VarRef.Bool(id)
+                    break
+                }
             } else {
                 val intId = id - numBoolCached
-                if (session.intDomain(intId).size > 1) { result = VarRef.IntVar(intId); break }
+                if (session.intDomain(intId).size > 1) {
+                    result = VarRef.IntVar(intId)
+                    break
+                }
             }
             pickSkipBuffer.add(id)
         }
@@ -299,6 +318,7 @@ object RandomVariable : VariableHeuristic {
 class DomWdeg : VariableHeuristic {
 
     private var factorWeights: DoubleArray = DoubleArray(0)
+
     // Combined bool+int heap keyed on `wdeg(v) = Σ factorWeights[f]`; the dom(v) divider
     // is applied at pick time via an upper-bound prune. See [pickByActivityWithDomDivider].
     private var heap: IndexedMaxHeap? = null
@@ -306,6 +326,7 @@ class DomWdeg : VariableHeuristic {
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
     private val pickSkipBuffer = IntArrayList(16)
+
     /** Conflict bumps that arrived before the first [pick] (so before we'd captured the
      *  problem reference). Applied as part of the next [pick]'s heap init. */
     private val pendingBumps = IntArrayList(8)
@@ -402,14 +423,20 @@ private fun pickByActivityWithDomDivider(
         if (topId < numBool) {
             if (session.boolValue(topId) == null) {
                 val score = activity / 2.0
-                if (score > bestScore) { bestScore = score; best = VarRef.Bool(topId) }
+                if (score > bestScore) {
+                    bestScore = score
+                    best = VarRef.Bool(topId)
+                }
             }
         } else {
             val intId = topId - numBool
             val dom = session.intDomain(intId).size
             if (dom > 1) {
                 val score = activity / dom.toDouble()
-                if (score > bestScore) { bestScore = score; best = VarRef.IntVar(intId) }
+                if (score > bestScore) {
+                    bestScore = score
+                    best = VarRef.IntVar(intId)
+                }
             }
         }
     }
@@ -443,7 +470,7 @@ class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
                 is VarRef.IntVar -> session.intDomain(candidate.varId).size > 1
             }
             if (stillFree) return candidate
-            pending = null  // assigned away (likely via propagation); drop the prioritisation
+            pending = null // assigned away (likely via propagation); drop the prioritisation
         }
         return base.pick(session, rng)
     }
@@ -513,6 +540,7 @@ class ActivityBasedSearch(
     }
 
     private var increment: Double = 1.0
+
     // Combined bool+int heap keyed on raw activity; dom(v) divider applied at pick time.
     // Shares [pickByActivityWithDomDivider] with [DomWdeg].
     private var heap: IndexedMaxHeap? = null
@@ -617,12 +645,18 @@ class ConflictOrdering(private val base: VariableHeuristic) : VariableHeuristic 
         for (v in 0 until problem.numBoolVars) {
             if (session.boolValue(v) != null) continue
             val s = boolStamp[v]
-            if (s > bestStamp) { bestStamp = s; best = VarRef.Bool(v) }
+            if (s > bestStamp) {
+                bestStamp = s
+                best = VarRef.Bool(v)
+            }
         }
         for (v in 0 until problem.numIntVars) {
             if (session.intDomain(v).size <= 1) continue
             val s = intStamp[v]
-            if (s > bestStamp) { bestStamp = s; best = VarRef.IntVar(v) }
+            if (s > bestStamp) {
+                bestStamp = s
+                best = VarRef.IntVar(v)
+            }
         }
         return best ?: base.pick(session, rng)
     }
@@ -635,16 +669,28 @@ class ConflictOrdering(private val base: VariableHeuristic) : VariableHeuristic 
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
         counter++
-        for (b in unsat.conflictBools) { growBool(b); boolStamp[b] = counter }
-        for (i in unsat.conflictInts) { growInt(i); intStamp[i] = counter }
+        for (b in unsat.conflictBools) {
+            growBool(b)
+            boolStamp[b] = counter
+        }
+        for (i in unsat.conflictInts) {
+            growInt(i)
+            intStamp[i] = counter
+        }
         stamp(varRef)
         base.onConflict(varRef, unsat)
     }
 
     private fun stamp(varRef: VarRef) {
         when (varRef) {
-            is VarRef.Bool -> { growBool(varRef.varId); boolStamp[varRef.varId] = counter }
-            is VarRef.IntVar -> { growInt(varRef.varId); intStamp[varRef.varId] = counter }
+            is VarRef.Bool -> {
+                growBool(varRef.varId)
+                boolStamp[varRef.varId] = counter
+            }
+            is VarRef.IntVar -> {
+                growInt(varRef.varId)
+                intStamp[varRef.varId] = counter
+            }
         }
     }
 
@@ -689,14 +735,20 @@ class MaxRegret(
             if (session.boolValue(v) != null) continue
             val w = if (v < objective.boolWeights.size) objective.boolWeights[v] else 0.0
             val r = kotlin.math.abs(w)
-            if (r > bestRegret) { bestRegret = r; best = VarRef.Bool(v) }
+            if (r > bestRegret) {
+                bestRegret = r
+                best = VarRef.Bool(v)
+            }
         }
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
             if (d.size <= 1) continue
             val c = if (v < objective.intCoefficients.size) objective.intCoefficients[v] else 0.0
             val r = kotlin.math.abs(c) * (d.max - d.min)
-            if (r > bestRegret) { bestRegret = r; best = VarRef.IntVar(v) }
+            if (r > bestRegret) {
+                bestRegret = r
+                best = VarRef.IntVar(v)
+            }
         }
         return best ?: base.pick(session, rng)
     }
@@ -863,15 +915,19 @@ private fun probeAndOrder(
         is VarRef.Bool -> intArrayOf(0, 1)
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            if (d.size <= maxProbes) IntArray(d.size) { d.valueAt(it) }
-            else {
+            if (d.size <= maxProbes) {
+                IntArray(d.size) { d.valueAt(it) }
+            } else {
                 val seen = HashSet<Int>(maxProbes * 2)
                 val sample = IntArray(maxProbes)
                 var i = 0
                 var guard = 0
                 while (i < maxProbes && guard < maxProbes * 8) {
                     val candidate = d.valueAt(rng.nextInt(d.size))
-                    if (seen.add(candidate)) { sample[i] = candidate; i++ }
+                    if (seen.add(candidate)) {
+                        sample[i] = candidate
+                        i++
+                    }
                     guard++
                 }
                 if (i < maxProbes) sample.copyOf(i) else sample
@@ -894,7 +950,8 @@ private fun probeAndOrder(
         val d = session.intDomain(varRef.varId)
         if (candidates.size < d.size) {
             val probed = HashSet<Int>(candidates.size * 2).apply {
-                for ((p, _) in scored) add(p); for (c in candidates) add(c)
+                for ((p, _) in scored) add(p)
+                for (c in candidates) add(c)
             }
             val ordered = scored.asSequence().map { it.first }
             return ordered + sequence { d.forEach { if (it !in probed) yield(it) } }
@@ -942,8 +999,11 @@ class IndomainBest(
             is VarRef.IntVar -> {
                 val c = if (varRef.varId < objective.intCoefficients.size) objective.intCoefficients[varRef.varId] else 0.0
                 val d = session.intDomain(varRef.varId)
-                if (c >= 0.0) sequence { d.forEach { yield(it) } }
-                else sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }
+                if (c >= 0.0) {
+                    sequence { d.forEach { yield(it) } }
+                } else {
+                    sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }
+                }
             }
         }
 }

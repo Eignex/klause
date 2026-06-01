@@ -36,7 +36,10 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
         var willViolate = false
         for (i in xs.indices) {
             val v = if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
-            if (v != v0) { willViolate = true; break }
+            if (v != v0) {
+                willViolate = true
+                break
+            }
         }
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
@@ -76,12 +79,18 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
         // just that var rather than the whole array.
         var commonMin = Int.MIN_VALUE
         var commonMax = Int.MAX_VALUE
-        var minVar = xs[0]   // operand whose lower bound == commonMin
-        var maxVar = xs[0]   // operand whose upper bound == commonMax
+        var minVar = xs[0] // operand whose lower bound == commonMin
+        var maxVar = xs[0] // operand whose upper bound == commonMax
         for (v in xs) {
             val d = state.intDomains[v]
-            if (d.min > commonMin) { commonMin = d.min; minVar = v }
-            if (d.max < commonMax) { commonMax = d.max; maxVar = v }
+            if (d.min > commonMin) {
+                commonMin = d.min
+                minVar = v
+            }
+            if (d.max < commonMax) {
+                commonMax = d.max
+                maxVar = v
+            }
         }
         if (commonMin > commonMax) return false
         // Sharp antecedents: every operand equals every other, so `v ≥ commonMin` is forced

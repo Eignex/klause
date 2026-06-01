@@ -128,6 +128,9 @@ interface LocalSearchFactor : Factor {
      *  [maintainsIntBreakMakeIncrementallyForIntSet] is true. Net adjustment must equal
      *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
     fun updateIntBreakMakeForIntSet(
-        state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        intVar: Int,
+        oldValue: Int,
     ) {}
 }

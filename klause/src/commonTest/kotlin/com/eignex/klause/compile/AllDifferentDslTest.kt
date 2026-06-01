@@ -1,12 +1,12 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.allDifferent
 import com.eignex.klause.ast.implies
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -24,7 +24,8 @@ class AllDifferentDslTest {
         val compiled = schema.compile()
 
         assertTrue(compiled.problem.factors.any { it is AllDifferent })
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 4)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -46,7 +47,8 @@ class AllDifferentDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 9)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         var sawFlagSet = false
@@ -61,7 +63,6 @@ class AllDifferentDslTest {
         }
 
         if (!sawFlagSet) {
-
         }
     }
 }

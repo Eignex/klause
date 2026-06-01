@@ -37,7 +37,10 @@ class SExprReader(private val src: String) {
         while (true) {
             skipWs()
             require(pos < src.length) { "unterminated list" }
-            if (src[pos] == ')') { pos++; break }
+            if (src[pos] == ')') {
+                pos++
+                break
+            }
             items.add(readExpr())
         }
         return SExpr.SList(items)

@@ -66,6 +66,7 @@ class FunctionalObjective internal constructor(
     class Plus(override val out: Int, val a: Operand, val b: Operand) : Node() {
         override fun compute(valOf: (Int) -> Long): Long = a.value(valOf) + b.value(valOf)
     }
+
     /** Linear definition `outCoeff·out + Σ coeffs[k]·ins[k] = c`  ⇒  `out = (c − Σ …)/outCoeff`.
      *  The compiler guarantees integrality of the quotient (it's a real defines_var output). */
     class Lin(
@@ -106,7 +107,7 @@ class FunctionalObjective internal constructor(
     private fun collectIntMoves(move: Move, into: HashMap<Int, Long>) {
         when (move) {
             is Move.IntSet -> into[move.varId] = move.newValue.toLong()
-            is Move.BoolFlip -> {}  // bool moves don't change int-cone leaf values
+            is Move.BoolFlip -> {} // bool moves don't change int-cone leaf values
             is Move.Compound -> for (p in move.parts) collectIntMoves(p, into)
         }
     }

@@ -1,9 +1,4 @@
 package com.eignex.klause.solver
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
-
-import com.eignex.klause.solver.localsearch.LocalSearchState
-
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.factor.AllDifferent
@@ -13,9 +8,11 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.reifiedIntCompare
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.reifiedIntCompare
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,14 +46,22 @@ class LocalSearchStateRecomputeTest {
                 copyAssignment(state, sibling)
                 sibling.recompute()
 
-                assertEquals(sibling.cost, state.cost,
-                    "${case.name} seed=$seed: cost drifted from recompute")
-                assertEquals(sibling.violated.toIntArray().sortedArray().toList(),
+                assertEquals(
+                    sibling.cost,
+                    state.cost,
+                    "${case.name} seed=$seed: cost drifted from recompute"
+                )
+                assertEquals(
+                    sibling.violated.toIntArray().sortedArray().toList(),
                     state.violated.toIntArray().sortedArray().toList(),
-                    "${case.name} seed=$seed: violated set drifted")
+                    "${case.name} seed=$seed: violated set drifted"
+                )
                 for (fid in 0 until case.problem.numFactors) {
-                    assertEquals(sibling.intPayload[fid], state.intPayload[fid],
-                        "${case.name} seed=$seed: intPayload[$fid] drifted")
+                    assertEquals(
+                        sibling.intPayload[fid],
+                        state.intPayload[fid],
+                        "${case.name} seed=$seed: intPayload[$fid] drifted"
+                    )
                     val fa = case.problem.factors[fid] as LocalSearchFactor
                     assertEquals(
                         fa.isViolated(sibling, fid),
@@ -71,7 +76,6 @@ class LocalSearchStateRecomputeTest {
 
     @Test
     fun `violated set is subset of factor space`() {
-
         for (case in cases) {
             val state = LocalSearchState(case.problem, Random(0))
             state.restart()
@@ -80,8 +84,10 @@ class LocalSearchStateRecomputeTest {
                 val move = randomMove(case.problem, state, rng) ?: return@repeat
                 state.apply(move)
                 for (fid in state.violated.toIntArray()) {
-                    assertTrue(fid in 0 until case.problem.numFactors,
-                        "${case.name}: violated set contains out-of-range $fid")
+                    assertTrue(
+                        fid in 0 until case.problem.numFactors,
+                        "${case.name}: violated set contains out-of-range $fid"
+                    )
                 }
             }
         }
@@ -104,7 +110,10 @@ class LocalSearchStateRecomputeTest {
             var target = cur
             repeat(8) {
                 val cand = d.min + rng.nextInt(d.size)
-                if (cand != cur) { target = cand; return@repeat }
+                if (cand != cur) {
+                    target = cand
+                    return@repeat
+                }
             }
             if (target == cur) null else Move.IntSet(v, target)
         }
@@ -116,27 +125,27 @@ class LocalSearchStateRecomputeTest {
     }
 
     private fun boolHeavyCase(): Case {
-
         val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true), Lit.make(4, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(4, false))),
             Cardinality(
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-                min = 1, max = 3,
+                min = 1,
+                max = 3,
             ),
             Xor(intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(4, true)), targetParity = 1),
             PseudoBoolean(
                 weights = intArrayOf(2, 1, 3, 1),
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false), Lit.make(3, true)),
-                op = PbOp.LE, bound = 4,
+                op = PbOp.LE,
+                bound = 4,
             ),
         )
         return Case("boolHeavy", Problem(numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(), factors = factors))
     }
 
     private fun intHeavyCase(): Case {
-
         val intDomains = arrayOf(IntDomain(-3, 3), IntDomain(-3, 3), IntDomain(0, 5))
         val factors = arrayOf<Factor>(
             Linear(coeffs = intArrayOf(2, -1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.LE, 4),
@@ -148,28 +157,31 @@ class LocalSearchStateRecomputeTest {
     }
 
     private fun mixedReifiedCase(): Case {
-
         val intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-2, 3))
         val factors = arrayOf<Factor>(
             ReifiedLinear(
                 auxBoolVar = 0,
                 coeffs = intArrayOf(2, -1),
                 vars = intArrayOf(0, 1),
-                op = LinearOp.LE, bound = 3,
+                op = LinearOp.LE,
+                bound = 3,
             ),
             ReifiedCardinality(
                 auxBoolVar = 1,
                 literals = intArrayOf(Lit.make(2, true), Lit.make(3, true), Lit.make(4, true)),
-                min = 1, max = 2,
+                min = 1,
+                max = 2,
             ),
             reifiedIntCompare(auxBoolVar = 5, intVar = 0, op = IntCmpOp.GE, 0),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(5, false))),
         )
-        return Case("mixedReified", Problem(numBoolVars = 6, numIntVars = 2, intDomains = intDomains, factors = factors))
+        return Case(
+            "mixedReified",
+            Problem(numBoolVars = 6, numIntVars = 2, intDomains = intDomains, factors = factors)
+        )
     }
 
     private fun permutationCase(): Case {
-
         val intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3))
         val factors = arrayOf<Factor>(
             AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4),

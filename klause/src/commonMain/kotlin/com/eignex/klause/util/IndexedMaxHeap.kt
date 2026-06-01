@@ -18,9 +18,9 @@ package com.eignex.klause.util
  */
 class IndexedMaxHeap(val capacity: Int) {
 
-    private val heap = IntArray(capacity)            // heap-position → id
-    private val pos = IntArray(capacity) { -1 }      // id → heap-position, or -1 if absent
-    private val keys = DoubleArray(capacity)         // id → current key
+    private val heap = IntArray(capacity) // heap-position → id
+    private val pos = IntArray(capacity) { -1 } // id → heap-position, or -1 if absent
+    private val keys = DoubleArray(capacity) // id → current key
     var size: Int = 0
         private set
 
@@ -142,7 +142,10 @@ class IndexedMaxHeap(val capacity: Int) {
             var pickKey = keys[heap[left]]
             if (right < n) {
                 val rk = keys[heap[right]]
-                if (rk > pickKey) { pick = right; pickKey = rk }
+                if (rk > pickKey) {
+                    pick = right
+                    pickKey = rk
+                }
             }
             if (pickKey <= k) break
             val cid = heap[pick]

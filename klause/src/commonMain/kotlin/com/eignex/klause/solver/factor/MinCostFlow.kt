@@ -28,7 +28,7 @@ class MinCostFlow(
     val balance: IntArray,
     val flow: IntArray,
     val weight: IntArray?,
-    val cost: Int,  // -1 when no cost variable
+    val cost: Int, // -1 when no cost variable
     val nodeOffset: Int = 0,
 ) : LocalSearchFactor {
 
@@ -68,8 +68,14 @@ class MinCostFlow(
         run {
             val parent = IntArray(numNodes) { it }
             fun find(x: Int): Int {
-                var r = x; while (parent[r] != r) r = parent[r]
-                var i = x; while (parent[i] != r) { val nx = parent[i]; parent[i] = r; i = nx }
+                var r = x
+                while (parent[r] != r) r = parent[r]
+                var i = x
+                while (parent[i] != r) {
+                    val nx = parent[i]
+                    parent[i] = r
+                    i = nx
+                }
                 return r
             }
             for (a in arcFrom.indices) {
@@ -77,7 +83,8 @@ class MinCostFlow(
                 if (d.min == 0 && d.max == 0) continue
                 val u = arcFrom[a] - nodeOffset
                 val v = arcTo[a] - nodeOffset
-                val ru = find(u); val rv = find(v)
+                val ru = find(u)
+                val rv = find(v)
                 if (ru != rv) parent[ru] = rv
             }
             val sums = IntArray(numNodes)
@@ -93,10 +100,20 @@ class MinCostFlow(
         }
         // Per-node interval tightening.
         for (n in 0 until numNodes) {
-            var inMin = 0L; var inMax = 0L
-            for (a in inArcs[n]) { val d = state.intDomains[flow[a]]; inMin += d.min; inMax += d.max }
-            var outMin = 0L; var outMax = 0L
-            for (a in outArcs[n]) { val d = state.intDomains[flow[a]]; outMin += d.min; outMax += d.max }
+            var inMin = 0L
+            var inMax = 0L
+            for (a in inArcs[n]) {
+                val d = state.intDomains[flow[a]]
+                inMin += d.min
+                inMax += d.max
+            }
+            var outMin = 0L
+            var outMax = 0L
+            for (a in outArcs[n]) {
+                val d = state.intDomains[flow[a]]
+                outMin += d.min
+                outMax += d.max
+            }
             val balN = balance[n].toLong()
             if (inMin - outMax > balN) return false
             if (inMax - outMin < balN) return false
@@ -117,11 +134,18 @@ class MinCostFlow(
         }
         // Cost relaxation: trivial linear bounds.
         if (cost >= 0 && weight != null) {
-            var sumMin = 0L; var sumMax = 0L
+            var sumMin = 0L
+            var sumMax = 0L
             for (a in flow.indices) {
-                val w = weight[a]; val d = state.intDomains[flow[a]]
-                if (w >= 0) { sumMin += w.toLong() * d.min; sumMax += w.toLong() * d.max }
-                else { sumMin += w.toLong() * d.max; sumMax += w.toLong() * d.min }
+                val w = weight[a]
+                val d = state.intDomains[flow[a]]
+                if (w >= 0) {
+                    sumMin += w.toLong() * d.min
+                    sumMax += w.toLong() * d.max
+                } else {
+                    sumMin += w.toLong() * d.max
+                    sumMax += w.toLong() * d.min
+                }
             }
             val cdHi = sumMax.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             val cdLo = sumMin.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt()
@@ -143,10 +167,12 @@ class MinCostFlow(
         val n = numNodes
         val m = flow.size
         // Lower bounds and capacities.
-        val lb = IntArray(m); val ub = IntArray(m)
+        val lb = IntArray(m)
+        val ub = IntArray(m)
         for (a in 0 until m) {
             val d = state.intDomains[flow[a]]
-            lb[a] = d.min; ub[a] = d.max
+            lb[a] = d.min
+            ub[a] = d.max
         }
         // Residual supply at each node after saturating lower bounds.
         // residual[n] = balance[n] - (in_lb - out_lb). If positive, node has supply to send.
@@ -190,7 +216,7 @@ class MinCostFlow(
                 val u = arcFrom[a] - nodeOffset
                 val v = arcTo[a] - nodeOffset
                 val rc = ww[a].toLong() + potential[u] - potential[v]
-                if (rc < 0) continue  // negative rc only on saturated arcs at optimality
+                if (rc < 0) continue // negative rc only on saturated arcs at optimality
                 val basePlus = if (pass == 0) (fixed + sspCost) + rc else -(fixed + sspCost) - rc
                 if (pass == 0 && basePlus > cmax) {
                     // Forbid increasing arc a — pin to lb.
@@ -223,7 +249,7 @@ class MinCostFlow(
         // Build per-node adjacency to residual arcs. For each original arc a we maintain a
         // residual capacity counter; reverse arc cap starts at 0 and grows as we push.
         val resFwd = IntArray(m) { ub[it] - lb[it] }
-        val resBwd = IntArray(m)  // reverse arcs have 0 cap initially
+        val resBwd = IntArray(m) // reverse arcs have 0 cap initially
         val adj = Array(n) { mutableListOf<Int>() }
         // Encode arcs as: index < m → forward arc a; m+a → reverse of a.
         for (a in 0 until m) {
@@ -238,7 +264,10 @@ class MinCostFlow(
         while (true) {
             // Find any source with positive supply and run SPFA shortest paths to all nodes.
             var src = -1
-            for (i in 0 until n) if (supply[i] > 0) { src = i; break }
+            for (i in 0 until n) if (supply[i] > 0) {
+                src = i
+                break
+            }
             if (src == -1) break
             val dist = LongArray(n) { INF }
             val prevArc = IntArray(n) { -1 }
@@ -246,16 +275,24 @@ class MinCostFlow(
             val inQueue = BooleanArray(n)
             dist[src] = 0L
             val q = ArrayDeque<Int>()
-            q.addLast(src); inQueue[src] = true
+            q.addLast(src)
+            inQueue[src] = true
             while (q.isNotEmpty()) {
-                val u = q.removeFirst(); inQueue[u] = false
+                val u = q.removeFirst()
+                inQueue[u] = false
                 for (e in adj[u]) {
-                    val cap: Int; val ec: Long; val v: Int
+                    val cap: Int
+                    val ec: Long
+                    val v: Int
                     if (e < m) {
-                        cap = resFwd[e]; ec = w[e].toLong(); v = arcTo[e] - nodeOffset
+                        cap = resFwd[e]
+                        ec = w[e].toLong()
+                        v = arcTo[e] - nodeOffset
                     } else {
                         val a = e - m
-                        cap = resBwd[a]; ec = -w[a].toLong(); v = arcFrom[a] - nodeOffset
+                        cap = resBwd[a]
+                        ec = -w[a].toLong()
+                        v = arcFrom[a] - nodeOffset
                     }
                     if (cap <= 0) continue
                     val nd = dist[u] + ec
@@ -263,7 +300,10 @@ class MinCostFlow(
                         dist[v] = nd
                         prevArc[v] = e
                         prevNode[v] = u
-                        if (!inQueue[v]) { q.addLast(v); inQueue[v] = true }
+                        if (!inQueue[v]) {
+                            q.addLast(v)
+                            inQueue[v] = true
+                        }
                     }
                 }
             }
@@ -271,7 +311,10 @@ class MinCostFlow(
             var bestSink = -1
             var bestDist = INF
             for (i in 0 until n) {
-                if (supply[i] < 0 && dist[i] < bestDist) { bestDist = dist[i]; bestSink = i }
+                if (supply[i] < 0 && dist[i] < bestDist) {
+                    bestDist = dist[i]
+                    bestSink = i
+                }
             }
             if (bestSink == -1) return Triple(false, 0L, potential)
             // Determine the bottleneck along the path from src to bestSink.
@@ -290,8 +333,14 @@ class MinCostFlow(
                 var v = bestSink
                 while (v != src) {
                     val e = prevArc[v]
-                    if (e < m) { resFwd[e] -= bottleneck; resBwd[e] += bottleneck }
-                    else { val a = e - m; resBwd[a] -= bottleneck; resFwd[a] += bottleneck }
+                    if (e < m) {
+                        resFwd[e] -= bottleneck
+                        resBwd[e] += bottleneck
+                    } else {
+                        val a = e - m
+                        resBwd[a] -= bottleneck
+                        resFwd[a] += bottleneck
+                    }
                     v = prevNode[v]
                 }
             }

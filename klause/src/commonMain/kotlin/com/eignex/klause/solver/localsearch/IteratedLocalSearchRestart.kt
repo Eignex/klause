@@ -58,7 +58,6 @@ class IteratedLocalSearchRestart(
     val linkageAware: Boolean = false,
 ) : RestartPolicy {
 
-
     init {
         require(populationSize >= 1) { "populationSize must be ≥ 1, got $populationSize" }
         require(crossoverRate in 0.0..1.0) { "crossoverRate must be in [0, 1], got $crossoverRate" }
@@ -80,8 +79,11 @@ class IteratedLocalSearchRestart(
         stepsSinceLastRestart >= maxFlipsBeforeRestart
 
     override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
-        val worstObjective = if (population.size < populationSize) Double.POSITIVE_INFINITY
-                             else population.last().objective
+        val worstObjective = if (population.size < populationSize) {
+            Double.POSITIVE_INFINITY
+        } else {
+            population.last().objective
+        }
         val accept = population.isEmpty() || acceptance.accept(objective, worstObjective, state.rng)
         if (accept) {
             insertSortedByObjective(Incumbent(sample, objective))
@@ -111,8 +113,11 @@ class IteratedLocalSearchRestart(
             return
         }
         val anchor = pickAnchor(state) ?: bestSoFar
-        if (anchor == null) state.restart()
-        else anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
+        if (anchor == null) {
+            state.restart()
+        } else {
+            anchorAndPerturb(state, anchor, perturbationStrength, perturbationKind)
+        }
     }
 
     private fun pickAnchor(state: LocalSearchState): Sample? {
@@ -128,7 +133,11 @@ class IteratedLocalSearchRestart(
     }
 
     private fun biasedCrossover(
-        state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: kotlin.random.Random,
+        state: LocalSearchState,
+        a: Sample,
+        b: Sample,
+        probA: Double,
+        rng: kotlin.random.Random,
     ): Sample {
         if (linkageAware) return linkageAwareCrossover(state, a, b, probA, rng)
         val bools = BooleanArray(a.bools.size) { if (rng.nextDouble() < probA) a.bools[it] else b.bools[it] }
@@ -143,7 +152,11 @@ class IteratedLocalSearchRestart(
      *  *last* factor processed (later factors override). Vars touched by no factor fall
      *  back to a per-variable coin flip. */
     private fun linkageAwareCrossover(
-        state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: kotlin.random.Random,
+        state: LocalSearchState,
+        a: Sample,
+        b: Sample,
+        probA: Double,
+        rng: kotlin.random.Random,
     ): Sample {
         val bools = BooleanArray(a.bools.size)
         val ints = IntArray(a.ints.size)
@@ -153,10 +166,16 @@ class IteratedLocalSearchRestart(
             val pickA = rng.nextDouble() < probA
             val source = if (pickA) a else b
             for (v in f.boolVars) {
-                if (v in source.bools.indices) { bools[v] = source.bools[v]; boolSet[v] = true }
+                if (v in source.bools.indices) {
+                    bools[v] = source.bools[v]
+                    boolSet[v] = true
+                }
             }
             for (v in f.intVars) {
-                if (v in source.ints.indices) { ints[v] = source.ints[v]; intSet[v] = true }
+                if (v in source.ints.indices) {
+                    ints[v] = source.ints[v]
+                    intSet[v] = true
+                }
             }
         }
         for (i in bools.indices) if (!boolSet[i]) {

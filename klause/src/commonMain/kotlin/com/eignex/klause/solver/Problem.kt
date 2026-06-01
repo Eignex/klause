@@ -124,11 +124,17 @@ class Problem(
         val watcherFid = BooleanArray(factors.size)
         var any = false
         for (i in factors.indices) {
-            if (factors[i].initialBoolWatchers != null) { watcherFid[i] = true; any = true }
+            if (factors[i].initialBoolWatchers != null) {
+                watcherFid[i] = true
+                any = true
+            }
         }
-        if (!any) boolOccurrences
-        else Array(numBoolVars) { v ->
-            boolOccurrences[v].filter { !watcherFid[it] }.toIntArray()
+        if (!any) {
+            boolOccurrences
+        } else {
+            Array(numBoolVars) { v ->
+                boolOccurrences[v].filter { !watcherFid[it] }.toIntArray()
+            }
         }
     }
 
@@ -199,11 +205,13 @@ class Problem(
                     if (totalCalls >= probeTotalBudget) return acc
                     if (k !in orig) continue
                     if (k in existingHoles) continue
-                    perVarCalls[v]++; totalCalls++
+                    perVarCalls[v]++
+                    totalCalls++
                     val pin = propagate(accAsAssumptions.withInt(v, k))
                     if (pin is PropagationResult.Unsat) {
                         bumpFactorWeights(pin, factorWeights)
-                        perVarCalls[v]++; totalCalls++
+                        perVarCalls[v]++
+                        totalCalls++
                         val r = propagate(accAsAssumptions.withIntHole(v, k))
                         if (r is PropagationResult.Unsat) return r
                         acc = addHoleToImplied(acc, v, k)
@@ -225,15 +233,21 @@ class Problem(
         val sorted = holeSet.toLongArray().also { it.sort() }
         val ids = IntArray(sorted.size) { (sorted[it] ushr 32).toInt() }
         val vals = IntArray(sorted.size) { sorted[it].toInt() }
-        val mins = HashMap<Int, Int>(); a.forEachIntMin { k, vv -> mins[k] = vv }
-        val maxes = HashMap<Int, Int>(); a.forEachIntMax { k, vv -> maxes[k] = vv }
+        val mins = HashMap<Int, Int>()
+        a.forEachIntMin { k, vv -> mins[k] = vv }
+        val maxes = HashMap<Int, Int>()
+        a.forEachIntMax { k, vv -> maxes[k] = vv }
         val minK = mins.keys.toIntArray().also { it.sort() }
         val maxK = maxes.keys.toIntArray().also { it.sort() }
         return PropagationResult.Implied(
-            bools = a.bools, ints = a.ints,
-            intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
-            intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
-            intHoleVarIds = ids, intHoleValues = vals,
+            bools = a.bools,
+            ints = a.ints,
+            intMinKeys = minK,
+            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+            intMaxKeys = maxK,
+            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+            intHoleVarIds = ids,
+            intHoleValues = vals,
         )
     }
 
@@ -262,10 +276,13 @@ class Problem(
         }
         val tie = IntArray(numIntVars) { rng.nextInt() }
         val boxed = Array(numIntVars) { it }
-        boxed.sortWith(Comparator { a, b ->
-            val sa = scores[a]; val sb = scores[b]
-            if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
-        })
+        boxed.sortWith(
+            Comparator { a, b ->
+                val sa = scores[a]
+                val sb = scores[b]
+                if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
+            }
+        )
         return IntArray(numIntVars) { boxed[it] }
     }
 
@@ -304,11 +321,13 @@ class Problem(
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
                 val accAsAssumptions = acc.toAssumptions()
-                perVarCalls[v]++; totalCalls++
+                perVarCalls[v]++
+                totalCalls++
                 val pinMin = propagate(accAsAssumptions.withInt(v, curMin))
                 if (pinMin is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMin, factorWeights)
-                    perVarCalls[v]++; totalCalls++
+                    perVarCalls[v]++
+                    totalCalls++
                     val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
                     val r = propagate(tightened)
                     if (r is PropagationResult.Unsat) return r
@@ -319,11 +338,13 @@ class Problem(
                 }
                 if (perVarCalls[v] >= probeBudgetPerVar) continue
                 if (totalCalls >= probeTotalBudget) return acc
-                perVarCalls[v]++; totalCalls++
+                perVarCalls[v]++
+                totalCalls++
                 val pinMax = propagate(accAsAssumptions.withInt(v, curMax))
                 if (pinMax is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMax, factorWeights)
-                    perVarCalls[v]++; totalCalls++
+                    perVarCalls[v]++
+                    totalCalls++
                     val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
                     val r = propagate(tightened)
                     if (r is PropagationResult.Unsat) return r
@@ -345,10 +366,14 @@ class Problem(
         val minK = mins.keys.toIntArray().also { it.sort() }
         val maxK = maxes.keys.toIntArray().also { it.sort() }
         return PropagationResult.Implied(
-            bools = a.bools, ints = a.ints,
-            intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
-            intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
-            intHoleVarIds = a.intHoleVarIds.copyOf(), intHoleValues = a.intHoleValues.copyOf(),
+            bools = a.bools,
+            ints = a.ints,
+            intMinKeys = minK,
+            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+            intMaxKeys = maxK,
+            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+            intHoleVarIds = a.intHoleVarIds.copyOf(),
+            intHoleValues = a.intHoleValues.copyOf(),
         )
     }
 
@@ -361,10 +386,14 @@ class Problem(
         val minK = mins.keys.toIntArray().also { it.sort() }
         val maxK = maxes.keys.toIntArray().also { it.sort() }
         return PropagationResult.Implied(
-            bools = a.bools, ints = a.ints,
-            intMinKeys = minK, intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
-            intMaxKeys = maxK, intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
-            intHoleVarIds = a.intHoleVarIds.copyOf(), intHoleValues = a.intHoleValues.copyOf(),
+            bools = a.bools,
+            ints = a.ints,
+            intMinKeys = minK,
+            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+            intMaxKeys = maxK,
+            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+            intHoleVarIds = a.intHoleVarIds.copyOf(),
+            intHoleValues = a.intHoleValues.copyOf(),
         )
     }
 
@@ -373,11 +402,15 @@ class Problem(
         a: PropagationResult.Implied,
         b: PropagationResult.Implied,
     ): PropagationResult.Implied {
-        val bools = HashMap(a.bools); b.forEachBool { k, v -> bools[k] = v }
-        val ints = HashMap(a.ints); b.forEachInt { k, v -> ints[k] = v }
-        val mins = HashMap<Int, Int>(); a.forEachIntMin { k, v -> mins[k] = v }
+        val bools = HashMap(a.bools)
+        b.forEachBool { k, v -> bools[k] = v }
+        val ints = HashMap(a.ints)
+        b.forEachInt { k, v -> ints[k] = v }
+        val mins = HashMap<Int, Int>()
+        a.forEachIntMin { k, v -> mins[k] = v }
         b.forEachIntMin { k, v -> mins[k] = maxOf(mins[k] ?: Int.MIN_VALUE, v) }
-        val maxes = HashMap<Int, Int>(); a.forEachIntMax { k, v -> maxes[k] = v }
+        val maxes = HashMap<Int, Int>()
+        a.forEachIntMax { k, v -> maxes[k] = v }
         b.forEachIntMax { k, v -> maxes[k] = minOf(maxes[k] ?: Int.MAX_VALUE, v) }
         // Holes — union.
         val holes = HashSet<Long>()
@@ -385,7 +418,8 @@ class Problem(
         b.forEachIntHole { id, v -> holes.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
         // Drop now-pinned vars from the bound and hole sets.
         for (k in ints.keys) {
-            mins.remove(k); maxes.remove(k)
+            mins.remove(k)
+            maxes.remove(k)
             holes.removeAll { (it ushr 32).toInt() == k }
         }
         val minK = mins.keys.toIntArray().also { it.sort() }
@@ -394,7 +428,8 @@ class Problem(
         val holeIds = IntArray(holesSorted.size) { (holesSorted[it] ushr 32).toInt() }
         val holeVals = IntArray(holesSorted.size) { holesSorted[it].toInt() }
         return PropagationResult.Implied(
-            bools = bools, ints = ints,
+            bools = bools,
+            ints = ints,
             intMinKeys = minK,
             intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
             intMaxKeys = maxK,
@@ -487,7 +522,8 @@ class Problem(
         for (v in 0 until numBoolVars) {
             val b = state.boolValues[v] ?: continue
             if (assumptions.boolValueOrNull(v) == b) continue
-            bKeys.add(v); bVals.add(b)
+            bKeys.add(v)
+            bVals.add(b)
         }
         val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
@@ -501,15 +537,22 @@ class Problem(
             val d = state.intDomains[v]
             if (d.min == d.max) {
                 if (assumptions.intValueOrNull(v) == d.min) continue
-                iKeys.add(v); iVals.add(d.min)
+                iKeys.add(v)
+                iVals.add(d.min)
                 continue
             }
             // Non-singleton: emit bound tightenings relative to the effective seed bounds.
             val orig = intDomains[v]
             val seedMin = maxOf(orig.min, assumptions.intMinOrNull(v) ?: Int.MIN_VALUE)
             val seedMax = minOf(orig.max, assumptions.intMaxOrNull(v) ?: Int.MAX_VALUE)
-            if (d.min > seedMin) { iMinKeys.add(v); iMinVals.add(d.min) }
-            if (d.max < seedMax) { iMaxKeys.add(v); iMaxVals.add(d.max) }
+            if (d.min > seedMin) {
+                iMinKeys.add(v)
+                iMinVals.add(d.min)
+            }
+            if (d.max < seedMax) {
+                iMaxKeys.add(v)
+                iMaxVals.add(d.max)
+            }
             // Interior holes: values strictly between current (d.min, d.max) that are in
             // [orig] but absent from [d]. Skip values already in the seed assumption's
             // hole set so we only emit newly-derived ones.
@@ -519,9 +562,16 @@ class Problem(
                     var preExisting = false
                     for (i in 0 until assumptions.intHoleVarIds.size) {
                         if (assumptions.intHoleVarIds[i] == v &&
-                            assumptions.intHoleValues[i] == value) { preExisting = true; break }
+                            assumptions.intHoleValues[i] == value
+                        ) {
+                            preExisting = true
+                            break
+                        }
                     }
-                    if (!preExisting) { iHoleIds.add(v); iHoleVals.add(value) }
+                    if (!preExisting) {
+                        iHoleIds.add(v)
+                        iHoleVals.add(value)
+                    }
                 }
             }
         }

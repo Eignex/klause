@@ -41,8 +41,12 @@ class IntIntMap private constructor(
         ): IntIntMap {
             require(keys.size == values.size) { "keys/values length mismatch" }
             if (keys.isEmpty()) return IntIntMap(EmptyBacking, absent)
-            var lo = keys[0]; var hi = keys[0]
-            for (k in keys) { if (k < lo) lo = k; if (k > hi) hi = k }
+            var lo = keys[0]
+            var hi = keys[0]
+            for (k in keys) {
+                if (k < lo) lo = k
+                if (k > hi) hi = k
+            }
             val range = (hi - lo).toLong() + 1
             return if (range <= denseThreshold.toLong() * keys.size) {
                 val arr = IntArray(range.toInt()) { absent }

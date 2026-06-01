@@ -22,8 +22,11 @@ class XorCoverageTest {
                 pins[i * 2] = cnf.boolVarToCnfVar[i]
                 pins[i * 2 + 1] = (mask shr i) and 1
             }
-            assertEquals(expected, SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask parity=$parity expected=$expected")
+            assertEquals(
+                expected,
+                SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
+                "mask=$mask parity=$parity expected=$expected"
+            )
         }
     }
 
@@ -41,8 +44,11 @@ class XorCoverageTest {
                 pins[i * 2] = cnf.boolVarToCnfVar[i]
                 pins[i * 2 + 1] = (mask shr i) and 1
             }
-            assertEquals(expected, SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask parity=$parity expected=$expected")
+            assertEquals(
+                expected,
+                SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
+                "mask=$mask parity=$parity expected=$expected"
+            )
         }
     }
 }

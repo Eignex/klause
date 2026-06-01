@@ -15,33 +15,40 @@ import kotlin.test.assertTrue
 class HeuristicPortfolioTest {
 
     private fun simpleAllDifferent(n: Int) = Problem(
-        numBoolVars = 0, numIntVars = n,
+        numBoolVars = 0,
+        numIntVars = n,
         intDomains = Array(n) { IntDomain(0, n - 1) },
         factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
     )
 
     @Test
     fun `portfolio solves with default Bernoulli reward`() {
-        val portfolio = HeuristicPortfolio.ucb1(listOf(
-            HeuristicPortfolio.Arm("input+min", InputOrder, IndomainMin),
-            HeuristicPortfolio.Arm("smallest+random", SmallestDomain, IndomainRandom),
-        ))
-        val r = BacktrackSolver(simpleAllDifferent(5)).solve(BacktrackParams(
-            variableHeuristic = portfolio.variableHeuristic,
-            valueHeuristic = portfolio.valueHeuristic,
-            randomSeed = 0L,
-        ))
+        val portfolio = HeuristicPortfolio.ucb1(
+            listOf(
+                HeuristicPortfolio.Arm("input+min", InputOrder, IndomainMin),
+                HeuristicPortfolio.Arm("smallest+random", SmallestDomain, IndomainRandom),
+            )
+        )
+        val r = BacktrackSolver(simpleAllDifferent(5)).solve(
+            BacktrackParams(
+                variableHeuristic = portfolio.variableHeuristic,
+                valueHeuristic = portfolio.valueHeuristic,
+                randomSeed = 0L,
+            )
+        )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
     }
 
     @Test
     fun `portfolio switches arms across restarts`() {
-        val portfolio = HeuristicPortfolio.ucb1(listOf(
-            HeuristicPortfolio.Arm("a", InputOrder, IndomainMin),
-            HeuristicPortfolio.Arm("b", SmallestDomain, IndomainMax),
-            HeuristicPortfolio.Arm("c", RandomVariable, IndomainRandom),
-        ))
+        val portfolio = HeuristicPortfolio.ucb1(
+            listOf(
+                HeuristicPortfolio.Arm("a", InputOrder, IndomainMin),
+                HeuristicPortfolio.Arm("b", SmallestDomain, IndomainMax),
+                HeuristicPortfolio.Arm("c", RandomVariable, IndomainRandom),
+            )
+        )
         val visited = HashSet<Int>()
         visited.add(portfolio.currentArmIndex)
         // Trigger several restarts manually via the var-heuristic onRestart hook.
@@ -50,8 +57,10 @@ class HeuristicPortfolioTest {
             portfolio.valueHeuristic.onRestart()
             visited.add(portfolio.currentArmIndex)
         }
-        assertTrue(visited.size >= 2,
-            "UCB1 should have explored at least 2 arms across 20 restarts; got ${visited.size}")
+        assertTrue(
+            visited.size >= 2,
+            "UCB1 should have explored at least 2 arms across 20 restarts; got ${visited.size}"
+        )
     }
 
     @Test
@@ -74,7 +83,10 @@ class HeuristicPortfolioTest {
                 HeuristicPortfolio.Arm("b", InputOrder, IndomainMax),
             ),
             bandit = MultiArmedBandit(nbrArms = 2, policy = UCB1()),
-            rewardFn = { stats -> lastStats = stats; if (stats.solutionsFound > 0) 1.0 else 0.0 },
+            rewardFn = { stats ->
+                lastStats = stats
+                if (stats.solutionsFound > 0) 1.0 else 0.0
+            },
         )
         // Synthetic conflicts and a solution on the first run, then a restart.
         portfolio.variableHeuristic.onConflict(VarRef.IntVar(0))

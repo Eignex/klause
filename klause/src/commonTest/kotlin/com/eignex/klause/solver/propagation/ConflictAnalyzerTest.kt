@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.propagation
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -28,7 +28,9 @@ class ConflictAnalyzerTest {
         // {¬a from clause 1} ∪ {¬a from antecedent} → just {a}. Now only one
         // current-level var remains → UIP = a. Learned clause: [¬a].
         val problem = Problem(
-            numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
@@ -41,10 +43,16 @@ class ConflictAnalyzerTest {
         // Expected learned clause: {¬a}. Backjump to level 0 (only literal is at level 1
         // and after the jump, the clause is empty/unit at level 0 which immediately
         // forces a=false in the next propagation).
-        assertEquals(setOf(Lit.make(0, false)), learned.literals.toSet(),
-            "learned clause should be [¬a], got ${learned.literals.toList()}")
-        assertEquals(0, learned.backjumpLevel,
-            "single-level conflict over a single decision should backjump to level 0")
+        assertEquals(
+            setOf(Lit.make(0, false)),
+            learned.literals.toSet(),
+            "learned clause should be [¬a], got ${learned.literals.toList()}"
+        )
+        assertEquals(
+            0,
+            learned.backjumpLevel,
+            "single-level conflict over a single decision should backjump to level 0"
+        )
     }
 
     @Test
@@ -64,7 +72,9 @@ class ConflictAnalyzerTest {
         // current-level var left → UIP = b. Learned clause = [¬a, ¬b]; backjump to
         // level 1.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
@@ -76,10 +86,16 @@ class ConflictAnalyzerTest {
         val r2 = session.pinBool(1, true)
         val unsat = assertIs<PropagationResult.Unsat>(r2)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)), learned.literals.toSet(),
-            "1UIP learned clause should be [¬a, ¬b], got ${learned.literals.toList()}")
-        assertEquals(1, learned.backjumpLevel,
-            "backjump should target level 1 (the only lower-level variable's level)")
+        assertEquals(
+            setOf(Lit.make(0, false), Lit.make(1, false)),
+            learned.literals.toSet(),
+            "1UIP learned clause should be [¬a, ¬b], got ${learned.literals.toList()}"
+        )
+        assertEquals(
+            1,
+            learned.backjumpLevel,
+            "backjump should target level 1 (the only lower-level variable's level)"
+        )
     }
 
     @Test
@@ -88,12 +104,15 @@ class ConflictAnalyzerTest {
         // reason from it today, so it bails out. The engine falls back to chronological
         // backtrack (which is the search behaviour without LCG).
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(com.eignex.klause.solver.IntDomain(0, 3)),
             factors = arrayOf<Factor>(
                 com.eignex.klause.solver.factor.Linear(
-                    intArrayOf(1), intArrayOf(0),
-                    com.eignex.klause.solver.factor.LinearOp.EQ, 5,
+                    intArrayOf(1),
+                    intArrayOf(0),
+                    com.eignex.klause.solver.factor.LinearOp.EQ,
+                    5,
                 ),
             ),
         )
@@ -107,7 +126,9 @@ class ConflictAnalyzerTest {
         // engine), the search terminates immediately — the analyzer's bake-time clause
         // is empty so no jump is requested, but the engine still arrives at Unsat.
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
@@ -126,20 +147,27 @@ class ConflictAnalyzerTest {
         // pin of b=true would conflict). Direct way to test: hand-walk the session,
         // re-pin a=true post-learn, and observe the cascade.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(
-            variableHeuristic = InputOrder, randomSeed = 0L,
-        ))
+        val r = BacktrackSolver(problem).solve(
+            BacktrackParams(
+                variableHeuristic = InputOrder,
+                randomSeed = 0L,
+            )
+        )
         val sat = assertIs<SolveResult.Sat>(r)
         val a = sat.assignment.bools[0]
         val b = sat.assignment.bools[1]
-        assertTrue(!(a && b),
-            "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b")
+        assertTrue(
+            !(a && b),
+            "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b"
+        )
     }
 
     @Test
@@ -150,12 +178,14 @@ class ConflictAnalyzerTest {
         // solver's correctness — the more direct check would require exposing the
         // learned-clause list, which would be a public API concession).
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(2, true),  Lit.make(3, false))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
             ),
         )
@@ -170,8 +200,10 @@ class ConflictAnalyzerTest {
             listOf(Lit.make(2, false), Lit.make(3, true)),
         )
         for ((i, c) in clauses.withIndex()) {
-            assertTrue(c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by $s")
+            assertTrue(
+                c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
+                "clause $i not satisfied by $s"
+            )
         }
     }
 
@@ -181,7 +213,9 @@ class ConflictAnalyzerTest {
         // but here we assert the LBD field. Learned clause is [¬a, ¬b]; literals span
         // two distinct decision levels (1 and 2) → LBD = 2 (glue-clause boundary).
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
@@ -198,23 +232,27 @@ class ConflictAnalyzerTest {
     fun `forgetLearnedClauses removes high-LBD clauses and remaps watcher entries`() {
         // Drive a search that learns multiple clauses, then prune.
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true),  Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(2, true),  Lit.make(3, false))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(
-            // Cap at 0 → forgetting will drop everything except glue (LBD ≤ 2). Combined
-            // with a tight Luby restart base, the forgetting pass triggers reliably.
-            lubyRestartBase = 4,
-            maxLearnedClauses = 0,
-            lbdGlueThreshold = 2,
-            randomSeed = 7L,
-        ))
+        val r = BacktrackSolver(problem).solve(
+            BacktrackParams(
+                // Cap at 0 → forgetting will drop everything except glue (LBD ≤ 2). Combined
+                // with a tight Luby restart base, the forgetting pass triggers reliably.
+                lubyRestartBase = 4,
+                maxLearnedClauses = 0,
+                lbdGlueThreshold = 2,
+                randomSeed = 7L,
+            )
+        )
         // Correctness must survive forgetting — every original clause must still be
         // satisfied. (The bound enforces forgetting actually runs.)
         val sat = assertIs<SolveResult.Sat>(r)
@@ -227,8 +265,10 @@ class ConflictAnalyzerTest {
             listOf(Lit.make(2, false), Lit.make(3, true)),
         )
         for ((i, c) in clauses.withIndex()) {
-            assertTrue(c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by ${s.toList()}")
+            assertTrue(
+                c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
+                "clause $i not satisfied by ${s.toList()}"
+            )
         }
     }
 
@@ -238,7 +278,9 @@ class ConflictAnalyzerTest {
         // the middle one, and verify the remaining are correctly renumbered and the
         // watcher index points at the new ids.
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
         val state = PropagationState(problem, com.eignex.klause.solver.Assumptions.None)
@@ -253,19 +295,28 @@ class ConflictAnalyzerTest {
         assertEquals(baseFid + 1, fid1)
         assertEquals(baseFid + 2, fid2)
         assertEquals(3, state.learnedClauses.size)
-        assertTrue(state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
-            "c1 should be in ¬b watcher list before forget")
+        assertTrue(
+            state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
+            "c1 should be in ¬b watcher list before forget"
+        )
 
         state.forgetLearnedClauses { _, lbd -> lbd <= 1 }
-        assertEquals(2, state.learnedClauses.size,
-            "expected 2 clauses kept after dropping the high-LBD one")
+        assertEquals(
+            2,
+            state.learnedClauses.size,
+            "expected 2 clauses kept after dropping the high-LBD one"
+        )
         assertEquals(c0, state.learnedClauses[0])
         assertEquals(c2, state.learnedClauses[1])
-        assertTrue(!state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
-            "watcher entry for the dropped clause should be removed")
+        assertTrue(
+            !state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
+            "watcher entry for the dropped clause should be removed"
+        )
         val newFid2 = baseFid + 1
-        assertTrue(state.boolWatchersByLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
-            "c2 should be findable at its new fid (${newFid2}) via its watch literal")
+        assertTrue(
+            state.boolWatchersByLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
+            "c2 should be findable at its new fid ($newFid2) via its watch literal"
+        )
     }
 
     @Test
@@ -294,7 +345,9 @@ class ConflictAnalyzerTest {
         // already in clause). Drop c. Variable b is implied by a (antecedents = [¬a],
         // also in clause). Drop b. Result: just {¬a}.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
@@ -305,11 +358,17 @@ class ConflictAnalyzerTest {
         val r = session.pinBool(0, true)
         val unsat = assertIs<PropagationResult.Unsat>(r)
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertEquals(setOf(Lit.make(0, false)), learned.literals.toSet(),
+        assertEquals(
+            setOf(Lit.make(0, false)),
+            learned.literals.toSet(),
             "minimization should drop ¬b and ¬c (both implied by ¬a via the chain), " +
-            "leaving just [¬a]; got ${learned.literals.toList()}")
-        assertEquals(0, learned.backjumpLevel,
-            "unit-clause learning forces backjump to level 0")
+                "leaving just [¬a]; got ${learned.literals.toList()}"
+        )
+        assertEquals(
+            0,
+            learned.backjumpLevel,
+            "unit-clause learning forces backjump to level 0"
+        )
         assertEquals(1, learned.lbd, "minimized to single literal → LBD = 1")
     }
 
@@ -318,7 +377,9 @@ class ConflictAnalyzerTest {
         // End-to-end check: run a CDB search that learns minimizable clauses, verify
         // the resulting assignment satisfies every original clause.
         val problem = Problem(
-            numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 5,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
@@ -338,8 +399,10 @@ class ConflictAnalyzerTest {
             listOf(Lit.make(0, true), Lit.make(4, true)),
         )
         for ((i, c) in clauses.withIndex()) {
-            assertTrue(c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by ${s.toList()}")
+            assertTrue(
+                c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
+                "clause $i not satisfied by ${s.toList()}"
+            )
         }
     }
 
@@ -351,7 +414,9 @@ class ConflictAnalyzerTest {
         // analyzer (which runs on every conflict; here there are none) and the new
         // sealed AdvanceOutcome path don't break the no-conflict happy path.
         val problem = Problem(
-            numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 5,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),

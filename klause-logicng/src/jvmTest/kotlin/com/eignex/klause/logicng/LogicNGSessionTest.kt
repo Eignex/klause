@@ -1,7 +1,7 @@
 package com.eignex.klause.logicng
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -16,11 +16,19 @@ class LogicNGSessionTest {
 
     /** 3-var exactly-one — three satisfying models: {a}, {b}, {c}. */
     private fun threeVarExactlyOne(): Problem {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
-        ))
-        return Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf<Factor>(factor))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+            )
+        )
+        return Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(factor)
+        )
     }
 
     @Test
@@ -90,8 +98,10 @@ class LogicNGSessionTest {
         val session = LogicNGSession(LogicNGSolver(problem))
         val r1 = session.solve(LogicNGParams(assumptions = Assumptions(bools = mapOf(0 to true))))
         val r2 = session.solve(LogicNGParams(assumptions = Assumptions(bools = mapOf(1 to true))))
-        assertTrue(r1 is SolveResult.Sat && r2 is SolveResult.Sat,
-            "both pinned solves should be SAT; got $r1 and $r2")
+        assertTrue(
+            r1 is SolveResult.Sat && r2 is SolveResult.Sat,
+            "both pinned solves should be SAT; got $r1 and $r2"
+        )
         assertEquals(true, (r1 as SolveResult.Sat).assignment.bools[0])
         assertEquals(true, (r2 as SolveResult.Sat).assignment.bools[1])
     }

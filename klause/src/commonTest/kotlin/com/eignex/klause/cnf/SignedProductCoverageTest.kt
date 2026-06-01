@@ -11,7 +11,6 @@ class SignedProductCoverageTest {
 
     @Test
     fun `signed product at most negative boundary matches enumeration`() {
-
         val factor = Product(a = 0, b = 1, result = 2)
         val problem = Problem(
             numBoolVars = 0,
@@ -29,7 +28,8 @@ class SignedProductCoverageTest {
                 val bits = cnf.intVarBits[idx]
                 val offset = values[idx] - mins[idx]
                 for (i in bits.indices) {
-                    pins += bits[i]; pins += (offset shr i) and 1
+                    pins += bits[i]
+                    pins += (offset shr i) and 1
                 }
             }
             val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
@@ -39,7 +39,6 @@ class SignedProductCoverageTest {
 
     @Test
     fun `signed product matches enumeration`() {
-
         val factor = Product(a = 0, b = 1, result = 2)
         val problem = Problem(
             numBoolVars = 0,
@@ -57,7 +56,8 @@ class SignedProductCoverageTest {
                 val bits = cnf.intVarBits[idx]
                 val offset = values[idx] - mins[idx]
                 for (i in bits.indices) {
-                    pins += bits[i]; pins += (offset shr i) and 1
+                    pins += bits[i]
+                    pins += (offset shr i) and 1
                 }
             }
             val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())

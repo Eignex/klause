@@ -117,8 +117,11 @@ data class FloatBucketing(
     val buckets: Int,
 ) {
     fun valueOf(bucketIndex: Int): Double =
-        if (buckets <= 1) lo
-        else lo + bucketIndex * (hi - lo) / (buckets - 1)
+        if (buckets <= 1) {
+            lo
+        } else {
+            lo + bucketIndex * (hi - lo) / (buckets - 1)
+        }
 }
 
 /** Captures arrays declared in the FlatZinc file (parameter or variable arrays). */
@@ -136,12 +139,14 @@ sealed interface FlatZincArray {
     data class FloatParam(override val name: String, val values: DoubleArray) : FlatZincArray {
         override val length: Int get() = values.size
     }
+
     /** Parameter array of set-of-int constants. Each `values[i]` is a sorted int array
      *  giving the elements of the i-th set. Read by `array_set_element` to materialise
      *  the per-universe-element selection mask. */
     data class IntSetParam(override val name: String, val values: List<IntArray>) : FlatZincArray {
         override val length: Int get() = values.size
     }
+
     /** Variable array: each element is a klause var id. `elementKind` says how to read it. */
     data class Vars(
         override val name: String,
@@ -171,8 +176,10 @@ sealed interface FlatZincArray {
 sealed interface OutputItem {
     /** Quoted string from the output literal — emitted as-is. */
     data class Literal(val text: String) : OutputItem
+
     /** `show(x)` for a scalar variable. The writer looks up `name` in the program's var maps. */
     data class ShowVar(val name: String) : OutputItem
+
     /** `show(arr)` for an array — writer formats as `[a, b, c, ...]`. */
     data class ShowArray(val name: String) : OutputItem
 }

@@ -19,9 +19,12 @@ package com.eignex.klause.solver.factor
 internal fun compressViolation(raw: Long): Int {
     if (raw <= 0L) return 0
     if (raw <= SOFT) return raw.toInt()
-    var extra = raw - SOFT      // ≥ 1
+    var extra = raw - SOFT // ≥ 1
     var bits = 0
-    while (extra > 0L) { extra = extra shr 1; bits++ }   // ⌊log2(raw−SOFT)⌋ + 1
+    while (extra > 0L) {
+        extra = extra shr 1
+        bits++
+    } // ⌊log2(raw−SOFT)⌋ + 1
     return (SOFT + bits).toInt()
 }
 

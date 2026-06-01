@@ -15,7 +15,8 @@ class AllEqualTest {
     @Test
     fun `every var takes the same value`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 4) },
             factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1, 2))),
         )
@@ -29,7 +30,8 @@ class AllEqualTest {
     fun `propagation intersects domains`() {
         // v0 ∈ [1, 5], v1 ∈ [3, 7], v2 ∈ [4, 8]. Intersection [4, 5].
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(1, 5), IntDomain(3, 7), IntDomain(4, 8)),
             factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1, 2))),
         )
@@ -43,7 +45,8 @@ class AllEqualTest {
     @Test
     fun `disjoint domains is Unsat`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(5, 9)),
             factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1))),
         )

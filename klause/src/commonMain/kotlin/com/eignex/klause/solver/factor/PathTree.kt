@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -132,13 +131,17 @@ class Path(
             val fwd = BooleanArray(numNodes)
             run {
                 fwd[src] = true
-                val q = ArrayDeque<Int>(); q.add(src)
+                val q = ArrayDeque<Int>()
+                q.add(src)
                 while (q.isNotEmpty()) {
                     val v = q.removeFirst()
                     for (e in outArcs[v]) {
                         if (edgeState(state, e) == -1) continue
                         val u = to[e] - nodeOffset
-                        if (!fwd[u] && nodeState(state, u) != -1) { fwd[u] = true; q.add(u) }
+                        if (!fwd[u] && nodeState(state, u) != -1) {
+                            fwd[u] = true
+                            q.add(u)
+                        }
                     }
                 }
             }
@@ -148,13 +151,17 @@ class Path(
             val bwd = BooleanArray(numNodes)
             run {
                 bwd[snk] = true
-                val q = ArrayDeque<Int>(); q.add(snk)
+                val q = ArrayDeque<Int>()
+                q.add(snk)
                 while (q.isNotEmpty()) {
                     val v = q.removeFirst()
                     for (e in inArcs[v]) {
                         if (edgeState(state, e) == -1) continue
                         val u = from[e] - nodeOffset
-                        if (!bwd[u] && nodeState(state, u) != -1) { bwd[u] = true; q.add(u) }
+                        if (!bwd[u] && nodeState(state, u) != -1) {
+                            bwd[u] = true
+                            q.add(u)
+                        }
                     }
                 }
             }
@@ -214,13 +221,17 @@ class Tree(
             // Forward reachable from root over not-forced-false edges/nodes.
             val fwd = BooleanArray(numNodes)
             fwd[r] = true
-            val q = ArrayDeque<Int>(); q.add(r)
+            val q = ArrayDeque<Int>()
+            q.add(r)
             while (q.isNotEmpty()) {
                 val v = q.removeFirst()
                 for (e in outArcs[v]) {
                     if (edgeState(state, e) == -1) continue
                     val u = to[e] - nodeOffset
-                    if (!fwd[u] && nodeState(state, u) != -1) { fwd[u] = true; q.add(u) }
+                    if (!fwd[u] && nodeState(state, u) != -1) {
+                        fwd[u] = true
+                        q.add(u)
+                    }
                 }
             }
             // Any forced-present node must be forward-reachable from root.

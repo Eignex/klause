@@ -99,7 +99,9 @@ class Cumulative(
         val extra = (if (durationVars.isNotEmpty()) durationVars.size else 0) +
             (if (resourceVars.isNotEmpty()) resourceVars.size else 0) +
             (if (capacityVar >= 0) 1 else 0)
-        if (extra == 0) starts else {
+        if (extra == 0) {
+            starts
+        } else {
             val out = IntArray(starts.size + extra)
             var k = 0
             for (v in starts) out[k++] = v
@@ -114,6 +116,7 @@ class Cumulative(
         OptPresence.isPresentInAssignment(presents, idx, state)
 
     private val n: Int = starts.size
+
     /** Variable role: which side of a task the changed int-var represents. */
     private enum class VarRole { START, DURATION, RESOURCE, CAPACITY }
     private val startPos: Map<Int, Int> = starts.withIndex().associate { (i, v) -> v to i }
@@ -177,17 +180,27 @@ class Cumulative(
             else -> {
                 val sp = startPos[intVar]
                 if (sp != null) {
-                    if (!present(state, sp)) 0 else {
-                        val d = curDur(state, sp); val r = curRes(state, sp)
-                        if (d <= 0 || r <= 0) 0
-                        else simulateStartDelta(ls, oldVal, newValue, d, r)
+                    if (!present(state, sp)) {
+                        0
+                    } else {
+                        val d = curDur(state, sp)
+                        val r = curRes(state, sp)
+                        if (d <= 0 || r <= 0) {
+                            0
+                        } else {
+                            simulateStartDelta(ls, oldVal, newValue, d, r)
+                        }
                     }
                 } else {
                     val dp = durPos[intVar]
                     if (dp != null) {
-                        if (!present(state, dp)) 0 else {
+                        if (!present(state, dp)) {
+                            0
+                        } else {
                             val r = curRes(state, dp)
-                            if (r <= 0) 0 else {
+                            if (r <= 0) {
+                                0
+                            } else {
                                 val s = state.assignment.intValue(starts[dp])
                                 simulateDurDelta(ls, s, oldVal, newValue, r)
                             }
@@ -195,14 +208,20 @@ class Cumulative(
                     } else {
                         val rp = resPos[intVar]
                         if (rp != null) {
-                            if (!present(state, rp)) 0 else {
+                            if (!present(state, rp)) {
+                                0
+                            } else {
                                 val d = curDur(state, rp)
-                                if (d <= 0) 0 else {
+                                if (d <= 0) {
+                                    0
+                                } else {
                                     val s = state.assignment.intValue(starts[rp])
                                     simulateResDelta(ls, s, d, oldVal, newValue)
                                 }
                             }
-                        } else 0
+                        } else {
+                            0
+                        }
                     }
                 }
             }
@@ -222,7 +241,8 @@ class Cumulative(
                 val sp = startPos[intVar]
                 if (sp != null) {
                     if (!present(state, sp)) return 0
-                    val d = curDur(state, sp); val r = curRes(state, sp)
+                    val d = curDur(state, sp)
+                    val r = curRes(state, sp)
                     if (d <= 0 || r <= 0) return 0
                     applyStartDelta(ls, oldValue, newValue, d, r)
                 } else {
@@ -307,10 +327,14 @@ class Cumulative(
     /** Overage Δ of shifting task from [oldStart,+d) → [newStart,+d). Pure simulation. */
     private fun simulateStartDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int): Int {
         val cap = ls.cap
-        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val usage = ls.usage
+        val tLow = ls.tLow
+        val size = usage.size
         var delta = 0
-        val oldFrom = oldStart - tLow; val oldTo = oldFrom + d
-        val newFrom = newStart - tLow; val newTo = newFrom + d
+        val oldFrom = oldStart - tLow
+        val oldTo = oldFrom + d
+        val newFrom = newStart - tLow
+        val newTo = newFrom + d
         for (t in oldFrom until oldTo) {
             if (t in newFrom until newTo) continue
             if (t < 0 || t >= size) continue
@@ -328,20 +352,28 @@ class Cumulative(
 
     private fun applyStartDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int) {
         val cap = ls.cap
-        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val usage = ls.usage
+        val tLow = ls.tLow
+        val size = usage.size
         var deltaOv = 0
-        val oldFrom = oldStart - tLow; val oldTo = oldFrom + d
-        val newFrom = newStart - tLow; val newTo = newFrom + d
+        val oldFrom = oldStart - tLow
+        val oldTo = oldFrom + d
+        val newFrom = newStart - tLow
+        val newTo = newFrom + d
         for (t in oldFrom until oldTo) {
             if (t in newFrom until newTo) continue
             if (t < 0 || t >= size) continue
-            val u = usage[t]; val nu = u - r; usage[t] = nu
+            val u = usage[t]
+            val nu = u - r
+            usage[t] = nu
             deltaOv += max(0, nu - cap) - max(0, u - cap)
         }
         for (t in newFrom until newTo) {
             if (t in oldFrom until oldTo) continue
             if (t < 0 || t >= size) continue
-            val u = usage[t]; val nu = u + r; usage[t] = nu
+            val u = usage[t]
+            val nu = u + r
+            usage[t] = nu
             deltaOv += max(0, nu - cap) - max(0, u - cap)
         }
         ls.overage += deltaOv
@@ -351,16 +383,20 @@ class Cumulative(
     private fun simulateDurDelta(ls: LsState, s: Int, oldD: Int, newD: Int, r: Int): Int {
         if (r <= 0 || oldD == newD) return 0
         val cap = ls.cap
-        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val usage = ls.usage
+        val tLow = ls.tLow
+        val size = usage.size
         var delta = 0
         if (newD > oldD) {
-            val from = max(0, s + oldD - tLow); val to = min(size, s + newD - tLow)
+            val from = max(0, s + oldD - tLow)
+            val to = min(size, s + newD - tLow)
             for (t in from until to) {
                 val u = usage[t]
                 delta += max(0, u + r - cap) - max(0, u - cap)
             }
         } else {
-            val from = max(0, s + newD - tLow); val to = min(size, s + oldD - tLow)
+            val from = max(0, s + newD - tLow)
+            val to = min(size, s + oldD - tLow)
             for (t in from until to) {
                 val u = usage[t]
                 delta += max(0, u - r - cap) - max(0, u - cap)
@@ -372,18 +408,26 @@ class Cumulative(
     private fun applyDurDelta(ls: LsState, s: Int, oldD: Int, newD: Int, r: Int) {
         if (r <= 0 || oldD == newD) return
         val cap = ls.cap
-        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val usage = ls.usage
+        val tLow = ls.tLow
+        val size = usage.size
         var deltaOv = 0
         if (newD > oldD) {
-            val from = max(0, s + oldD - tLow); val to = min(size, s + newD - tLow)
+            val from = max(0, s + oldD - tLow)
+            val to = min(size, s + newD - tLow)
             for (t in from until to) {
-                val u = usage[t]; val nu = u + r; usage[t] = nu
+                val u = usage[t]
+                val nu = u + r
+                usage[t] = nu
                 deltaOv += max(0, nu - cap) - max(0, u - cap)
             }
         } else {
-            val from = max(0, s + newD - tLow); val to = min(size, s + oldD - tLow)
+            val from = max(0, s + newD - tLow)
+            val to = min(size, s + oldD - tLow)
             for (t in from until to) {
-                val u = usage[t]; val nu = u - r; usage[t] = nu
+                val u = usage[t]
+                val nu = u - r
+                usage[t] = nu
                 deltaOv += max(0, nu - cap) - max(0, u - cap)
             }
         }
@@ -394,9 +438,12 @@ class Cumulative(
     private fun simulateResDelta(ls: LsState, s: Int, d: Int, oldR: Int, newR: Int): Int {
         if (d <= 0 || oldR == newR) return 0
         val cap = ls.cap
-        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val usage = ls.usage
+        val tLow = ls.tLow
+        val size = usage.size
         val diff = newR - oldR
-        val from = max(0, s - tLow); val to = min(size, s + d - tLow)
+        val from = max(0, s - tLow)
+        val to = min(size, s + d - tLow)
         var delta = 0
         for (t in from until to) {
             val u = usage[t]
@@ -408,12 +455,17 @@ class Cumulative(
     private fun applyResDelta(ls: LsState, s: Int, d: Int, oldR: Int, newR: Int) {
         if (d <= 0 || oldR == newR) return
         val cap = ls.cap
-        val usage = ls.usage; val tLow = ls.tLow; val size = usage.size
+        val usage = ls.usage
+        val tLow = ls.tLow
+        val size = usage.size
         val diff = newR - oldR
-        val from = max(0, s - tLow); val to = min(size, s + d - tLow)
+        val from = max(0, s - tLow)
+        val to = min(size, s + d - tLow)
         var deltaOv = 0
         for (t in from until to) {
-            val u = usage[t]; val nu = u + diff; usage[t] = nu
+            val u = usage[t]
+            val nu = u + diff
+            usage[t] = nu
             deltaOv += max(0, nu - cap) - max(0, u - cap)
         }
         ls.overage += deltaOv
@@ -421,7 +473,8 @@ class Cumulative(
 
     /** Overage Δ when capacity changes; full O(horizon) rescan. */
     private fun capacityDelta(ls: LsState, newCap: Int): Int {
-        val usage = ls.usage; val oldCap = ls.cap
+        val usage = ls.usage
+        val oldCap = ls.cap
         if (newCap == oldCap) return 0
         var newOv = 0
         for (u in usage) if (u > newCap) newOv += u - newCap
@@ -449,8 +502,11 @@ class Cumulative(
         for (i in 0 until n) {
             // durations[i] is the constant or the var's ub (set by the compiler) — both
             // are sound upper bounds for horizon sizing.
-            val dUb = if (durationVars.isEmpty()) durations[i]
-                      else max(durations[i], state.problem.intDomains[durationVars[i]].max)
+            val dUb = if (durationVars.isEmpty()) {
+                durations[i]
+            } else {
+                max(durations[i], state.problem.intDomains[durationVars[i]].max)
+            }
             val cand = max(state.problem.intDomains[starts[i]].max, state.assignment.intValue(starts[i])) + dUb
             hi = max(hi, cand)
         }
@@ -482,18 +538,24 @@ class Cumulative(
         val effDur = IntArray(n)
         val effRes = IntArray(n)
         for (i in 0 until n) {
-            if (durationVars.isEmpty()) effDur[i] = durations[i] else {
+            if (durationVars.isEmpty()) {
+                effDur[i] = durations[i]
+            } else {
                 val d = state.intDomains[durationVars[i]]
                 if (d.min != d.max) return true
                 effDur[i] = d.min
             }
-            if (resourceVars.isEmpty()) effRes[i] = resources[i] else {
+            if (resourceVars.isEmpty()) {
+                effRes[i] = resources[i]
+            } else {
                 val d = state.intDomains[resourceVars[i]]
                 if (d.min != d.max) return true
                 effRes[i] = d.min
             }
         }
-        val effCap = if (capacityVar < 0) capacity else {
+        val effCap = if (capacityVar < 0) {
+            capacity
+        } else {
             val d = state.intDomains[capacityVar]
             if (d.min != d.max) return true
             d.min
@@ -554,7 +616,9 @@ class Cumulative(
         for ((idx, ev) in events.withIndex()) {
             val t = ev[0]
             if (t > cursor && level > 0) {
-                segFrom[segCount] = cursor; segTo[segCount] = t; segLevel[segCount] = level
+                segFrom[segCount] = cursor
+                segTo[segCount] = t
+                segLevel[segCount] = level
                 segCount++
             }
             level += ev[1]
@@ -576,20 +640,30 @@ class Cumulative(
             val ownsMandatory = lstI < ectI
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
-                if (overloadsAt(segFrom, segTo, segLevel, segCount,
-                        newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI)) {
+                if (overloadsAt(
+                        segFrom, segTo, segLevel, segCount,
+                        newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI
+                    )
+                ) {
                     newMin++
-                } else break
+                } else {
+                    break
+                }
             }
             if (newMin > state.intDomains[v].max) return false
             val ant = state.composeIntVarAtomAntecedents(starts)
             if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
-                if (overloadsAt(segFrom, segTo, segLevel, segCount,
-                        newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI)) {
+                if (overloadsAt(
+                        segFrom, segTo, segLevel, segCount,
+                        newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI
+                    )
+                ) {
                     newMax--
-                } else break
+                } else {
+                    break
+                }
             }
             if (newMax < state.intDomains[v].min) return false
             if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
@@ -603,16 +677,27 @@ class Cumulative(
      * subtracting the task's own already-contributed mandatory part on overlapping segments.
      */
     private fun overloadsAt(
-        segFrom: IntArray, segTo: IntArray, segLevel: IntArray, segCount: Int,
-        s: Int, sPlusD: Int, r: Int, cap: Int,
-        ownsMandatory: Boolean, lstI: Int, ectI: Int,
+        segFrom: IntArray,
+        segTo: IntArray,
+        segLevel: IntArray,
+        segCount: Int,
+        s: Int,
+        sPlusD: Int,
+        r: Int,
+        cap: Int,
+        ownsMandatory: Boolean,
+        lstI: Int,
+        ectI: Int,
     ): Boolean {
         for (k in 0 until segCount) {
-            val from = segFrom[k]; val to = segTo[k]; val lvl = segLevel[k]
+            val from = segFrom[k]
+            val to = segTo[k]
+            val lvl = segLevel[k]
             if (to <= s || from >= sPlusD) continue
             var effective = lvl
             if (ownsMandatory) {
-                val ovFrom = max(from, lstI); val ovTo = min(to, ectI)
+                val ovFrom = max(from, lstI)
+                val ovTo = min(to, ectI)
                 if (ovFrom < ovTo) effective -= r
             }
             if (effective + r > cap) return true
@@ -704,7 +789,10 @@ class Cumulative(
         var peakV = ls.cap
         val usage = ls.usage
         for (t in usage.indices) {
-            if (usage[t] > peakV) { peakV = usage[t]; peakT = t }
+            if (usage[t] > peakV) {
+                peakV = usage[t]
+                peakT = t
+            }
         }
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0
@@ -745,7 +833,8 @@ class Cumulative(
     private fun collectPeakTasks(state: LocalSearchState, absT: Int): IntArray {
         val out = com.eignex.klause.util.IntArrayList()
         for (i in 0 until n) {
-            val r = curRes(state, i); val d = curDur(state, i)
+            val r = curRes(state, i)
+            val d = curDur(state, i)
             if (r <= 0 || d <= 0) continue
             if (!present(state, i)) continue
             val cur = state.assignment.intValue(starts[i])
@@ -759,7 +848,10 @@ class Cumulative(
      *  swap doesn't push usage above capacity at a new slot. Capped at [MAX_SWAPS] to
      *  bound the proposal-set size. */
     private fun emitFeasibleSwaps(
-        state: LocalSearchState, ls: LsState, peakTasks: IntArray, sink: MoveSink,
+        state: LocalSearchState,
+        ls: LsState,
+        peakTasks: IntArray,
+        sink: MoveSink,
     ) {
         var swapsAdded = 0
         for (i in peakTasks) {
@@ -770,7 +862,8 @@ class Cumulative(
             for (j in 0 until n) {
                 if (swapsAdded >= MAX_SWAPS) break
                 if (j == i) continue
-                val dj0 = curDur(state, j); val rj0 = curRes(state, j)
+                val dj0 = curDur(state, j)
+                val rj0 = curRes(state, j)
                 if (dj0 <= 0 || rj0 <= 0) continue
                 if (!present(state, j)) continue
                 val jV = starts[j]
@@ -779,11 +872,13 @@ class Cumulative(
                 if (jCur == iCur) continue
                 val di = simulateStartDelta(ls, iCur, jCur, curDur(state, i), curRes(state, i))
                 val dj = simulateStartDelta(ls, jCur, iCur, dj0, rj0)
-                if (di + dj >= 0) continue  // not feasibility-preserving by this approximation
-                sink.addCompound(listOf(
-                    com.eignex.klause.solver.Move.IntSet(iV, jCur),
-                    com.eignex.klause.solver.Move.IntSet(jV, iCur),
-                ))
+                if (di + dj >= 0) continue // not feasibility-preserving by this approximation
+                sink.addCompound(
+                    listOf(
+                        com.eignex.klause.solver.Move.IntSet(iV, jCur),
+                        com.eignex.klause.solver.Move.IntSet(jV, iCur),
+                    )
+                )
                 swapsAdded++
             }
         }

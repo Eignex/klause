@@ -35,7 +35,10 @@ data class TabuFilter(
         // Pass 1: detect whether any move is tabu (skips allocation when nothing is).
         var anyTabu = false
         for (m in raw) {
-            if (state.isTaboo(m, effective)) { anyTabu = true; break }
+            if (state.isTaboo(m, effective)) {
+                anyTabu = true
+                break
+            }
         }
         if (!anyTabu) return raw
 
@@ -83,8 +86,11 @@ data class TabuFilter(
             require(base >= 0 && max >= base) { "expected 0 ≤ base ≤ max, got base=$base max=$max" }
             require(maxAtStep > 0) { "maxAtStep must be positive, got $maxAtStep" }
             return { step ->
-                if (step >= maxAtStep) max
-                else base + ((max - base) * step / maxAtStep).toInt()
+                if (step >= maxAtStep) {
+                    max
+                } else {
+                    base + ((max - base) * step / maxAtStep).toInt()
+                }
             }
         }
     }

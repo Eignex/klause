@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true
@@ -39,10 +39,15 @@ class Cardinality(
      * and the general scanner handles it. */
     private val atLeastWatchSize: Int =
         if (min == 0) 0 else (min + 1).let { if (it > literals.size) -1 else it }
+
     /** Mirror of [atLeastWatchSize] for the at-most-max side. */
     private val atMostWatchSize: Int =
-        if (max == literals.size) 0 else (literals.size - max + 1).let {
-            if (it > literals.size) -1 else it
+        if (max == literals.size) {
+            0
+        } else {
+            (literals.size - max + 1).let {
+                if (it > literals.size) -1 else it
+            }
         }
 
     /** Pre-computed map from a Boolean var id to the sum of polarity signs across every
@@ -133,8 +138,11 @@ class Cardinality(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
-        if (initialBoolWatchers != null) propagateWatched(state, factorId)
-        else propagateScanning(state)
+        if (initialBoolWatchers != null) {
+            propagateWatched(state, factorId)
+        } else {
+            propagateScanning(state)
+        }
 
     /**
      * Clause-form nogood when [propagate] returns false. Two failure modes:
@@ -236,16 +244,26 @@ class Cardinality(
         }
         if (atLeastWatchSize > 0 &&
             !propagateAtLeastSide(state, factorId, watches, 0, atLeastWatchSize)
-        ) return false
+        ) {
+            return false
+        }
         if (atMostWatchSize > 0 &&
-            !propagateAtMostSide(state, factorId, watches, atLeastWatchSize,
-                atLeastWatchSize + atMostWatchSize)
-        ) return false
+            !propagateAtMostSide(
+                state, factorId, watches, atLeastWatchSize,
+                atLeastWatchSize + atMostWatchSize
+            )
+        ) {
+            return false
+        }
         return true
     }
 
     private fun propagateAtLeastSide(
-        state: PropagationState, factorId: Int, watches: IntArray, start: Int, end: Int,
+        state: PropagationState,
+        factorId: Int,
+        watches: IntArray,
+        start: Int,
+        end: Int,
     ): Boolean {
         for (i in start until end) {
             if (!litFalseAt(state, watches[i])) continue
@@ -262,7 +280,11 @@ class Cardinality(
     }
 
     private fun propagateAtMostSide(
-        state: PropagationState, factorId: Int, watches: IntArray, start: Int, end: Int,
+        state: PropagationState,
+        factorId: Int,
+        watches: IntArray,
+        start: Int,
+        end: Int,
     ): Boolean {
         for (i in start until end) {
             if (!litTrueAt(state, watches[i])) continue
@@ -274,15 +296,21 @@ class Cardinality(
             }
             // Watcher index is keyed on the *negation* — that's the lit that transitions
             // to false when the underlying literal becomes true.
-            state.moveBoolWatcher(factorId,
-                Lit.negate(literals[watches[i]]), Lit.negate(literals[rep]))
+            state.moveBoolWatcher(
+                factorId,
+                Lit.negate(literals[watches[i]]),
+                Lit.negate(literals[rep])
+            )
             watches[i] = rep
         }
         return true
     }
 
     private fun findNonFalseOutside(
-        state: PropagationState, watches: IntArray, start: Int, end: Int,
+        state: PropagationState,
+        watches: IntArray,
+        start: Int,
+        end: Int,
     ): Int {
         outer@ for (i in literals.indices) {
             for (w in start until end) if (watches[w] == i) continue@outer
@@ -292,7 +320,10 @@ class Cardinality(
     }
 
     private fun findNonTrueOutside(
-        state: PropagationState, watches: IntArray, start: Int, end: Int,
+        state: PropagationState,
+        watches: IntArray,
+        start: Int,
+        end: Int,
     ): Int {
         outer@ for (i in literals.indices) {
             for (w in start until end) if (watches[w] == i) continue@outer
@@ -302,7 +333,11 @@ class Cardinality(
     }
 
     private fun unitPinWatchedToTrue(
-        state: PropagationState, watches: IntArray, start: Int, end: Int, skipIdx: Int,
+        state: PropagationState,
+        watches: IntArray,
+        start: Int,
+        end: Int,
+        skipIdx: Int,
     ): Boolean {
         for (i in start until end) {
             if (i == skipIdx) continue
@@ -313,14 +348,18 @@ class Cardinality(
                 val ant = antecedentsForTruePin(state, v)
                 if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
             } else if (!Lit.evaluate(lit, b)) {
-                return false  // already false → conflict; can't make it true
+                return false // already false → conflict; can't make it true
             }
         }
         return true
     }
 
     private fun unitPinWatchedToFalse(
-        state: PropagationState, watches: IntArray, start: Int, end: Int, skipIdx: Int,
+        state: PropagationState,
+        watches: IntArray,
+        start: Int,
+        end: Int,
+        skipIdx: Int,
     ): Boolean {
         for (i in start until end) {
             if (i == skipIdx) continue
@@ -331,7 +370,7 @@ class Cardinality(
                 val ant = antecedentsForFalsePin(state, v)
                 if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
             } else if (Lit.evaluate(lit, b)) {
-                return false  // already true → conflict
+                return false // already true → conflict
             }
         }
         return true
@@ -411,8 +450,9 @@ class Cardinality(
                 if (Lit.variable(lit) != v) continue
                 netChange += if (Lit.evaluate(lit, state.assignment.boolValue(v))) -1 else +1
             }
-            if (wantIncrease && netChange > 0) sink.addBoolFlip(v)
-            else if (!wantIncrease && netChange < 0) sink.addBoolFlip(v)
+            if (wantIncrease && netChange > 0) {
+                sink.addBoolFlip(v)
+            } else if (!wantIncrease && netChange < 0) sink.addBoolFlip(v)
         }
     }
 
@@ -434,11 +474,15 @@ class Cardinality(
         if (boolVars.size != literals.size) return
         val trueLits = IntArray(literals.size)
         val falseLits = IntArray(literals.size)
-        var nT = 0; var nF = 0
+        var nT = 0
+        var nF = 0
         for (lit in literals) {
             val v = Lit.variable(lit)
-            if (Lit.evaluate(lit, state.assignment.boolValue(v))) trueLits[nT++] = v
-            else falseLits[nF++] = v
+            if (Lit.evaluate(lit, state.assignment.boolValue(v))) {
+                trueLits[nT++] = v
+            } else {
+                falseLits[nF++] = v
+            }
         }
         if (nT == 0 || nF == 0) return
         // Cap pairings: pick min(nT, nF) × pair-stride samples, biased toward fresh
@@ -447,20 +491,24 @@ class Cardinality(
         val total = nT * nF
         if (total <= PAIR_PROPOSAL_CAP) {
             for (i in 0 until nT) for (j in 0 until nF) {
-                sink.addCompound(listOf(
-                    com.eignex.klause.solver.Move.BoolFlip(trueLits[i]),
-                    com.eignex.klause.solver.Move.BoolFlip(falseLits[j]),
-                ))
+                sink.addCompound(
+                    listOf(
+                        com.eignex.klause.solver.Move.BoolFlip(trueLits[i]),
+                        com.eignex.klause.solver.Move.BoolFlip(falseLits[j]),
+                    )
+                )
             }
         } else {
             val rng = state.rng
             repeat(PAIR_PROPOSAL_CAP) {
                 val a = trueLits[rng.nextInt(nT)]
                 val b = falseLits[rng.nextInt(nF)]
-                sink.addCompound(listOf(
-                    com.eignex.klause.solver.Move.BoolFlip(a),
-                    com.eignex.klause.solver.Move.BoolFlip(b),
-                ))
+                sink.addCompound(
+                    listOf(
+                        com.eignex.klause.solver.Move.BoolFlip(a),
+                        com.eignex.klause.solver.Move.BoolFlip(b),
+                    )
+                )
             }
         }
     }
@@ -486,7 +534,9 @@ class Cardinality(
      *  max - maxAbsSigned]` interior — in that region no further flip can move `n` outside
      *  `[min, max]`, so every var's contribution is 0 in both pre and post states. */
     override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState, factorId: Int, flippedVar: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        flippedVar: Int,
     ) {
         val signedFlipped = signedOccurrencesByVar[flippedVar]
         if (signedFlipped == 0) return
@@ -500,7 +550,8 @@ class Cardinality(
         // flip could move them out. Every var's break/make contribution is 0 in both.
         if (!oldViolated && !newViolated &&
             oldN - maxAbsSigned >= min && oldN + maxAbsSigned <= max &&
-            newN - maxAbsSigned >= min && newN + maxAbsSigned <= max) {
+            newN - maxAbsSigned >= min && newN + maxAbsSigned <= max
+        ) {
             return
         }
         for (u in boolVars) {

@@ -17,7 +17,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  */
 class Table(
     val xs: IntArray,
-    val tuples: IntArray,  // row-major; length must be a multiple of xs.size
+    val tuples: IntArray, // row-major; length must be a multiple of xs.size
 ) : LocalSearchFactor {
 
     val arity: Int = xs.size
@@ -50,7 +50,8 @@ class Table(
             var match = true
             for (col in 0 until arity) {
                 if (state.assignment.intValue(xs[col]) != tuples[row * arity + col]) {
-                    match = false; break
+                    match = false
+                    break
                 }
             }
             if (match) return false
@@ -168,7 +169,10 @@ class Table(
             var feasible = true
             for (col in 0 until arity) {
                 val v = tuples[row * arity + col]
-                if (v !in state.intDomains[xs[col]]) { feasible = false; break }
+                if (v !in state.intDomains[xs[col]]) {
+                    feasible = false
+                    break
+                }
             }
             if (!feasible) {
                 val last = s.numValid - 1
@@ -195,12 +199,18 @@ class Table(
             // First / last set bit ⇒ tightened bounds.
             var firstSet = -1
             for (w in bits.indices) {
-                if (bits[w] != 0L) { firstSet = (w shl 6) + bits[w].countTrailingZeroBits(); break }
+                if (bits[w] != 0L) {
+                    firstSet = (w shl 6) + bits[w].countTrailingZeroBits()
+                    break
+                }
             }
-            if (firstSet < 0) return false  // No supports — fail.
+            if (firstSet < 0) return false // No supports — fail.
             var lastSet = -1
             for (w in bits.indices.reversed()) {
-                if (bits[w] != 0L) { lastSet = (w shl 6) + (63 - bits[w].countLeadingZeroBits()); break }
+                if (bits[w] != 0L) {
+                    lastSet = (w shl 6) + (63 - bits[w].countLeadingZeroBits())
+                    break
+                }
             }
             val minSup = lo[col] + firstSet
             val maxSup = lo[col] + lastSet

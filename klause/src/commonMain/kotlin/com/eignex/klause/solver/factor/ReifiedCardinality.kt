@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (#true literals in [min, max])`. Created by the compiler when a
@@ -107,8 +107,11 @@ class ReifiedCardinality(
     private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
         val signed = signedOccurrencesByVar[boolVar]
         if (signed == 0) return 0
-        val pre = if (current) state.assignment.boolValue(boolVar)
-        else !state.assignment.boolValue(boolVar)
+        val pre = if (current) {
+            state.assignment.boolValue(boolVar)
+        } else {
+            !state.assignment.boolValue(boolVar)
+        }
         return if (pre) -signed else signed
     }
 
@@ -172,7 +175,7 @@ class ReifiedCardinality(
         //   - up-only & need == unassigned → force every unassigned literal *true*.
         //   - down-only & cap == 0          → force every unassigned literal *false*.
         // Any other combination is undetermined; future literal pins narrow it organically.
-        if (unassigned == 0) return true  // no flexibility left to force anyway
+        if (unassigned == 0) return true // no flexibility left to force anyway
         val downBranchFeasible = trueCount < min
         val upBranchFeasible = trueCount + unassigned > max
         // The double-infeasibility case (both branches blocked) is unreachable here: it's
@@ -252,7 +255,9 @@ class ReifiedCardinality(
     /** Recover the pre-flip count and aux value from the now-committed state, then walk
      *  each touched variable once applying the change in its break/make contribution. */
     override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState, factorId: Int, flippedVar: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        flippedVar: Int,
     ) {
         val newN = state.intPayload[factorId]
         val newAux = state.assignment.boolValue(auxBoolVar)
@@ -264,7 +269,7 @@ class ReifiedCardinality(
         } else {
             oldAux = newAux
             val signedFlipped = signedOccurrencesByVar[flippedVar]
-            if (signedFlipped == 0) return  // body lit whose occurrences cancel — nothing changed
+            if (signedFlipped == 0) return // body lit whose occurrences cancel — nothing changed
             val flippedPost = state.assignment.boolValue(flippedVar)
             val changeV = if (flippedPost) signedFlipped else -signedFlipped
             oldN = newN - changeV

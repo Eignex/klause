@@ -10,7 +10,6 @@ class LiftOverflowTest {
 
     @Test
     fun `mul product domain overflow fails at compile time`() {
-
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100_000)
             val y by intVar(min = 0, max = 100_000)

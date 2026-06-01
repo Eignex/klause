@@ -1,14 +1,12 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -18,9 +16,14 @@ class OptimizerTest {
 
     @Test
     fun `local search optimizer picks min weight single select`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val solver = LocalSearchSolver(problem)
@@ -38,7 +41,9 @@ class OptimizerTest {
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
-            factors = arrayOf<Factor>(com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
+            factors = arrayOf<Factor>(
+                com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)
+            ),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val sample = LocalSearchSolver(problem)
@@ -79,7 +84,9 @@ class OptimizerTest {
     @Test
     fun `local search optimizer returns null when infeasible`() {
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),

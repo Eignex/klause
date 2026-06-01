@@ -107,7 +107,9 @@ class Subcircuit(val succ: IntArray) : LocalSearchFactor {
         }
         // Cycle decomposition restricted to included nodes (use successor only when in
         // range, not self-loop, and successor is also included — otherwise dead-end).
-        val UNVISITED = 0; val ON_STACK = 1; val DONE = 2
+        val UNVISITED = 0
+        val ON_STACK = 1
+        val DONE = 2
         val markers = IntArray(n)
         val enterStep = IntArray(n)
         var globalStep = 0

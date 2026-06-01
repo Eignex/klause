@@ -10,7 +10,8 @@ internal object SatCheck {
         val assign = IntArray(numVars)
         var i = 0
         while (i < fixed.size) {
-            val v = fixed[i]; val target = if (fixed[i + 1] == 1) 1 else -1
+            val v = fixed[i]
+            val target = if (fixed[i + 1] == 1) 1 else -1
             if (assign[v] != 0 && assign[v] != target) return false
             assign[v] = target
             i += 2

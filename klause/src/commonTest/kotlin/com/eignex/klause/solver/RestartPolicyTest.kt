@@ -1,15 +1,13 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LubyRestart
-
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.LubyRestart
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,9 +27,13 @@ class RestartPolicyTest {
 
     @Test
     fun `adaptive perturbation falls back when no best`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+            )
+        )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         state.restart()
@@ -49,7 +51,6 @@ class RestartPolicyTest {
 
     @Test
     fun `adaptive perturbation anchors to best then perturbs`() {
-
         val problem = Problem(6, 0, emptyArray(), emptyList())
         val state = LocalSearchState(problem, Random(0))
         state.restart()
@@ -60,15 +61,17 @@ class RestartPolicyTest {
         policy.restart(state, bestSoFar = best)
 
         val differences = (0..5).count { state.assignment.boolValue(it) != best.bools[it] }
-        assertTrue(differences in 0..2,
-            "perturbed assignment differs from bestSoFar in $differences positions, expected 0..2")
+        assertTrue(
+            differences in 0..2,
+            "perturbed assignment differs from bestSoFar in $differences positions, expected 0..2"
+        )
     }
 
     @Test
     fun `adaptive perturbation restart integrates with local search optimizer`() {
-
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
@@ -102,7 +105,6 @@ class RestartPolicyTest {
 
         val emitted = mutableListOf<Int>()
         repeat(15) {
-
             var n = 1
             while (!p.shouldRestart(n)) n++
             emitted += n
@@ -114,7 +116,6 @@ class RestartPolicyTest {
 
     @Test
     fun `luby integrates with local search solver`() {
-
         val clauses = listOf(
             com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),

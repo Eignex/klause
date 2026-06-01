@@ -1,11 +1,9 @@
 package com.eignex.klause.solver.factor
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
-
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,11 +13,14 @@ class CardinalityRepairTest {
 
     @Test
     fun `at most violated proposes only true literal flips`() {
-
-        val a = 0; val b = 1; val c = 2; val d = 3
+        val a = 0
+        val b = 1
+        val c = 2
+        val d = 3
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(a, true), Lit.make(b, true), Lit.make(c, true), Lit.make(d, true)),
-            min = 0, max = 2,
+            min = 0,
+            max = 2,
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -36,11 +37,13 @@ class CardinalityRepairTest {
 
     @Test
     fun `at least violated proposes only false literal flips`() {
-
-        val a = 0; val b = 1; val c = 2
+        val a = 0
+        val b = 1
+        val c = 2
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(a, true), Lit.make(b, true), Lit.make(c, true)),
-            min = 2, max = 3,
+            min = 2,
+            max = 3,
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -57,11 +60,12 @@ class CardinalityRepairTest {
 
     @Test
     fun `mixed polarity counts correctly`() {
-
-        val a = 0; val b = 1
+        val a = 0
+        val b = 1
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(a, true), Lit.make(b, false)),
-            min = 2, max = 2,
+            min = 2,
+            max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -78,10 +82,12 @@ class CardinalityRepairTest {
 
     @Test
     fun `satisfied cardinality proposes nothing`() {
-        val a = 0; val b = 1
+        val a = 0
+        val b = 1
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(a, true), Lit.make(b, true)),
-            min = 1, max = 2,
+            min = 1,
+            max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))

@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -61,8 +60,10 @@ class Geost(
 
     /** Overlap length of the box pair (i, j) on dim [d] under the optional override. */
     private fun overlapLen(state: LocalSearchState, i: Int, j: Int, d: Int, ov: Int, nv: Int): Int {
-        val si = start(state, i, d, ov, nv); val li = length[i * numDims + d]
-        val sj = start(state, j, d, ov, nv); val lj = length[j * numDims + d]
+        val si = start(state, i, d, ov, nv)
+        val li = length[i * numDims + d]
+        val sj = start(state, j, d, ov, nv)
+        val lj = length[j * numDims + d]
         return max(0, min(si + li, sj + lj) - max(si, sj))
     }
 
@@ -119,18 +120,22 @@ class Geost(
         for (i in 0 until numObjects) for (j in i + 1 until numObjects) {
             if (overlapVolume(state, i, j, ov = -1, nv = 0) == 0L) continue
             for (d in 0 until numDims) {
-                val oiVar = origin[i * numDims + d]; val li = length[i * numDims + d]
-                val ojVar = origin[j * numDims + d]; val lj = length[j * numDims + d]
+                val oiVar = origin[i * numDims + d]
+                val li = length[i * numDims + d]
+                val ojVar = origin[j * numDims + d]
+                val lj = length[j * numDims + d]
                 val si = state.assignment.intValue(oiVar)
                 val sj = state.assignment.intValue(ojVar)
                 val di = state.problem.intDomains[oiVar]
                 val dj = state.problem.intDomains[ojVar]
                 // Move i to just-left (before j) or just-right (after j) on dim d.
-                val iLeft = sj - li; val iRight = sj + lj
+                val iLeft = sj - li
+                val iRight = sj + lj
                 if (iLeft in di && iLeft != si) sink.addChannelingIntSet(state, oiVar, iLeft)
                 if (iRight in di && iRight != si) sink.addChannelingIntSet(state, oiVar, iRight)
                 // Symmetric for j.
-                val jLeft = si - lj; val jRight = si + li
+                val jLeft = si - lj
+                val jRight = si + li
                 if (jLeft in dj && jLeft != sj) sink.addChannelingIntSet(state, ojVar, jLeft)
                 if (jRight in dj && jRight != sj) sink.addChannelingIntSet(state, ojVar, jRight)
             }
@@ -157,7 +162,9 @@ class Geost(
         // caused solely by the two objects' origin bounds — cite just those.
         for (i in 0 until numObjects) for (j in i + 1 until numObjects) {
             if (mustOverlapEveryDim(state, i, j, exceptDim = -1)) {
-                val acc = IntArrayList(); objectVarsInto(i, acc); objectVarsInto(j, acc)
+                val acc = IntArrayList()
+                objectVarsInto(i, acc)
+                objectVarsInto(j, acc)
                 conflictVars = acc.toIntArray()
                 return false
             }
@@ -185,12 +192,22 @@ class Geost(
                 while (changed) {
                     changed = false
                     for (k in intervals.indices step 2) {
-                        val fLo = intervals[k]; val fHi = intervals[k + 1]
-                        if (lo in fLo..fHi) { lo = fHi + 1; changed = true }
-                        if (hi in fLo..fHi) { hi = fLo - 1; changed = true }
+                        val fLo = intervals[k]
+                        val fHi = intervals[k + 1]
+                        if (lo in fLo..fHi) {
+                            lo = fHi + 1
+                            changed = true
+                        }
+                        if (hi in fLo..fHi) {
+                            hi = fLo - 1
+                            changed = true
+                        }
                     }
                 }
-                if (lo > hi) { conflictVars = antVars.toIntArray(); return false }
+                if (lo > hi) {
+                    conflictVars = antVars.toIntArray()
+                    return false
+                }
                 if (!state.tightenIntMin(oi, lo, ant)) return false
                 if (!state.tightenIntMax(oi, hi, ant)) return false
             }
@@ -205,7 +222,11 @@ class Geost(
      * `j` is appended to [contributors] so the caller can build a sharp conflict antecedent.
      */
     private fun collectForbidden(
-        state: PropagationState, i: Int, d: Int, si: Int, contributors: IntArrayList,
+        state: PropagationState,
+        i: Int,
+        d: Int,
+        si: Int,
+        contributors: IntArrayList,
     ): IntArray {
         val acc = IntArray(numObjects * 2)
         var n = 0
@@ -218,7 +239,9 @@ class Geost(
             val flo = dj.max + 1 - si
             val fhi = dj.min + sj - 1
             if (flo <= fhi) {
-                acc[n] = flo; acc[n + 1] = fhi; n += 2
+                acc[n] = flo
+                acc[n + 1] = fhi
+                n += 2
                 contributors.add(j)
             }
         }

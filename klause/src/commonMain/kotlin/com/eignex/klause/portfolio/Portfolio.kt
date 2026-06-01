@@ -10,9 +10,6 @@ import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.TerminationReason
-import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicLong
-import kotlin.concurrent.atomics.AtomicReference
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -20,6 +17,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 
 /**
  * Parallel portfolio of klause [Session] workers. Each worker is single-threaded and
@@ -78,10 +78,11 @@ class Portfolio<P : SolverParams>(
     suspend fun solve(params: P): SolveResult = coroutineScope {
         val winnerFlag = AtomicBoolean(false)
         val token: Cancellation = { winnerFlag.load() }
+
         @Suppress("UNCHECKED_CAST")
         val workerParams = when (strategy) {
             PortfolioStrategy.RaceFirstFeasible -> params.withCancellation(token) as P
-            PortfolioStrategy.Exhaustive -> params  // no cross-worker cancellation
+            PortfolioStrategy.Exhaustive -> params // no cross-worker cancellation
         }
 
         val results = workers.map { session ->
@@ -187,12 +188,21 @@ class Portfolio<P : SolverParams>(
         val sample = bestSample.load()
         val finalBound = readBound()
         if (sample != null) {
-            return@coroutineScope if (anyDirtyUnknown) MinimizeResult.BestFound(
-                sample, finalBound, TerminationReason.BudgetExhausted,
-            ) else MinimizeResult.Optimal(sample, finalBound)
+            return@coroutineScope if (anyDirtyUnknown) {
+                MinimizeResult.BestFound(
+                    sample,
+                    finalBound,
+                    TerminationReason.BudgetExhausted,
+                )
+            } else {
+                MinimizeResult.Optimal(sample, finalBound)
+            }
         }
-        if (anyDirtyUnknown) MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-        else MinimizeResult.Infeasible()
+        if (anyDirtyUnknown) {
+            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+        } else {
+            MinimizeResult.Infeasible()
+        }
     }
 
     private fun updateSharedBound(
@@ -206,7 +216,10 @@ class Portfolio<P : SolverParams>(
             val cur = Double.fromBits(curBits)
             if (objective >= cur) return
             val newBits = objective.toRawBits()
-            if (boundBits.compareAndSet(curBits, newBits)) { best.store(sample); return }
+            if (boundBits.compareAndSet(curBits, newBits)) {
+                best.store(sample)
+                return
+            }
         }
     }
 
@@ -221,6 +234,7 @@ class Portfolio<P : SolverParams>(
                 // Capture the worker coroutine's Job and bridge its cancellation state
                 // into the (non-suspending) Cancellation predicate the engine checks.
                 val job = coroutineContext[Job]!!
+
                 @Suppress("UNCHECKED_CAST")
                 val workerParams = params.withCancellation { !job.isActive } as P
                 for (s in session.samples(workerParams)) {
@@ -241,6 +255,7 @@ class Portfolio<P : SolverParams>(
 sealed interface PortfolioStrategy {
     /** First worker to produce a definitive answer wins; others are cancelled. Default. */
     data object RaceFirstFeasible : PortfolioStrategy
+
     /**
      * Run every worker to its own budget without cross-worker cancellation. The portfolio
      * reduces over the full set of results afterwards. Useful when each worker contributes

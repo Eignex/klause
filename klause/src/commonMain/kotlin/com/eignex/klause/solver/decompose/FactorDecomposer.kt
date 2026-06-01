@@ -1,49 +1,49 @@
 package com.eignex.klause.solver.decompose
 
+import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.factor.AllEqual
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferentExcept
 import com.eignex.klause.solver.factor.AllDifferentExceptZero
+import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
+import com.eignex.klause.solver.factor.ArgSort
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.BinPacking
+import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Circuit
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Count
+import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Diffn
+import com.eignex.klause.solver.factor.Disjunctive
+import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ArgSort
-import com.eignex.klause.solver.factor.Circuit
-import com.eignex.klause.solver.factor.Cumulative
-import com.eignex.klause.solver.factor.Diffn
-import com.eignex.klause.solver.factor.Disjunctive
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Sort
-import com.eignex.klause.solver.factor.Subcircuit
+import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.MinCostFlow
 import com.eignex.klause.solver.factor.Monotone
-import com.eignex.klause.solver.factor.Regular
-import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Path
 import com.eignex.klause.solver.factor.PseudoBoolean
-import com.eignex.klause.solver.factor.Tree
-import com.eignex.klause.solver.factor.Sequence
-import com.eignex.klause.solver.factor.SymmetricAllDifferent
-import com.eignex.klause.solver.factor.ValuePrecede
-import com.eignex.klause.solver.factor.Member
-import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.Lit
-import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.factor.Sequence
+import com.eignex.klause.solver.factor.Sort
+import com.eignex.klause.solver.factor.Subcircuit
+import com.eignex.klause.solver.factor.SymmetricAllDifferent
+import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.factor.Tree
+import com.eignex.klause.solver.factor.ValuePrecede
 
 /**
  * Allocator hook for fresh aux variables used by [FactorDecomposer]. Backends that
@@ -54,8 +54,10 @@ import com.eignex.klause.ast.PbOp
 interface DecompositionContext {
     /** Allocate and return the id of a fresh Boolean variable. */
     fun freshBool(): Int
+
     /** Allocate and return the id of a fresh integer variable over [domain]. */
     fun freshInt(domain: IntDomain): Int
+
     /** Current domain of int var [id]. Used by decompositions that need to enumerate
      *  reified equalities across a variable's possible values (e.g. NValue,
      *  GlobalCardinality, set-membership). */
@@ -189,11 +191,15 @@ object FactorDecomposer {
             for (j in i + 1 until xs.size) {
                 val neAux = ctx.freshBool()
                 out.add(ReifiedLinear(neAux, intArrayOf(1, -1), intArrayOf(xs[i], xs[j]), LinearOp.NE, 0))
-                out.add(Clause(intArrayOf(
-                    Lit.make(inExcept[i], true),
-                    Lit.make(inExcept[j], true),
-                    Lit.make(neAux, true),
-                )))
+                out.add(
+                    Clause(
+                        intArrayOf(
+                            Lit.make(inExcept[i], true),
+                            Lit.make(inExcept[j], true),
+                            Lit.make(neAux, true),
+                        )
+                    )
+                )
             }
         }
         return out
@@ -212,12 +218,14 @@ object FactorDecomposer {
             // descending non-strict: xs[i] - xs[i+1] >= 0
             // descending strict:     xs[i] - xs[i+1] >= 1
             val (a, b) = if (ascending) f.xs[i + 1] to f.xs[i] else f.xs[i] to f.xs[i + 1]
-            out.add(Linear(
-                coeffs = intArrayOf(1, -1),
-                vars = intArrayOf(a, b),
-                op = LinearOp.GE,
-                bound = if (strict) 1 else 0,
-            ))
+            out.add(
+                Linear(
+                    coeffs = intArrayOf(1, -1),
+                    vars = intArrayOf(a, b),
+                    op = LinearOp.GE,
+                    bound = if (strict) 1 else 0,
+                )
+            )
         }
         return out
     }
@@ -312,8 +320,9 @@ object FactorDecomposer {
         val eqLits = IntArray(f.xs.size) { i ->
             val eq = ctx.freshBool()
             out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, f.v))
-            if (f.presents.isEmpty()) Lit.make(eq, true)
-            else {
+            if (f.presents.isEmpty()) {
+                Lit.make(eq, true)
+            } else {
                 val pres = f.presents[i]
                 val gated = ctx.freshBool()
                 out.add(Clause(intArrayOf(Lit.make(gated, false), Lit.make(eq, true))))
@@ -374,7 +383,7 @@ object FactorDecomposer {
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
         }
-        if (lo > hi) return emptyList()  // empty xs is impossible per factor invariant
+        if (lo > hi) return emptyList() // empty xs is impossible per factor invariant
         val out = ArrayList<Factor>()
         val usedLits = ArrayList<Int>()
         for (v in lo..hi) {
@@ -382,8 +391,9 @@ object FactorDecomposer {
             val eqLits = IntArray(f.xs.size) { i ->
                 val eq = ctx.freshBool()
                 out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, v))
-                if (f.presents.isEmpty()) Lit.make(eq, true)
-                else {
+                if (f.presents.isEmpty()) {
+                    Lit.make(eq, true)
+                } else {
                     val pres = f.presents[i]
                     val gated = ctx.freshBool()
                     out.add(Clause(intArrayOf(Lit.make(gated, false), Lit.make(eq, true))))
@@ -442,10 +452,22 @@ object FactorDecomposer {
      *  pulled to the LHS via a `-1` coefficient. */
     private fun decomposeKnapsack(f: Knapsack): List<Factor> {
         val n = f.xs.size
-        val wCoeffs = IntArray(n + 1).apply { for (i in 0 until n) this[i] = f.weights[i]; this[n] = -1 }
-        val wVars = IntArray(n + 1).apply { for (i in 0 until n) this[i] = f.xs[i]; this[n] = f.w }
-        val pCoeffs = IntArray(n + 1).apply { for (i in 0 until n) this[i] = f.profits[i]; this[n] = -1 }
-        val pVars = IntArray(n + 1).apply { for (i in 0 until n) this[i] = f.xs[i]; this[n] = f.p }
+        val wCoeffs = IntArray(n + 1).apply {
+            for (i in 0 until n) this[i] = f.weights[i]
+            this[n] = -1
+        }
+        val wVars = IntArray(n + 1).apply {
+            for (i in 0 until n) this[i] = f.xs[i]
+            this[n] = f.w
+        }
+        val pCoeffs = IntArray(n + 1).apply {
+            for (i in 0 until n) this[i] = f.profits[i]
+            this[n] = -1
+        }
+        val pVars = IntArray(n + 1).apply {
+            for (i in 0 until n) this[i] = f.xs[i]
+            this[n] = f.p
+        }
         return listOf(
             Linear(wCoeffs, wVars, LinearOp.EQ, 0),
             Linear(pCoeffs, pVars, LinearOp.EQ, 0),
@@ -573,15 +595,26 @@ object FactorDecomposer {
             val coeffs = IntArray(sz)
             val vars = IntArray(sz)
             var w = 0
-            for (a in ins) { coeffs[w] = 1; vars[w] = f.flow[a]; w++ }
-            for (a in outs) { coeffs[w] = -1; vars[w] = f.flow[a]; w++ }
+            for (a in ins) {
+                coeffs[w] = 1
+                vars[w] = f.flow[a]
+                w++
+            }
+            for (a in outs) {
+                coeffs[w] = -1
+                vars[w] = f.flow[a]
+                w++
+            }
             out.add(Linear(coeffs, vars, LinearOp.EQ, f.balance[n]))
         }
         if (f.cost >= 0 && f.weight != null) {
             val sz = f.flow.size + 1
             val coeffs = IntArray(sz)
             val vars = IntArray(sz)
-            for (i in f.flow.indices) { coeffs[i] = f.weight[i]; vars[i] = f.flow[i] }
+            for (i in f.flow.indices) {
+                coeffs[i] = f.weight[i]
+                vars[i] = f.flow[i]
+            }
             coeffs[f.flow.size] = -1
             vars[f.flow.size] = f.cost
             out.add(Linear(coeffs, vars, LinearOp.EQ, 0))
@@ -651,7 +684,11 @@ object FactorDecomposer {
             //   (prefixEq[i+1] ∨ ¬prefixEq[i] ∨ ¬eq[i])
             out.add(Clause(intArrayOf(Lit.make(prefixEq[i + 1], false), Lit.make(prefixEq[i], true))))
             out.add(Clause(intArrayOf(Lit.make(prefixEq[i + 1], false), Lit.make(eq[i], true))))
-            out.add(Clause(intArrayOf(Lit.make(prefixEq[i + 1], true), Lit.make(prefixEq[i], false), Lit.make(eq[i], false))))
+            out.add(
+                Clause(
+                    intArrayOf(Lit.make(prefixEq[i + 1], true), Lit.make(prefixEq[i], false), Lit.make(eq[i], false))
+                )
+            )
         }
         // win_i ↔ prefixEq[i] ∧ lt[i].
         val win = IntArray(n) { ctx.freshBool() }
@@ -806,7 +843,11 @@ object FactorDecomposer {
                 out.add(Clause(intArrayOf(Lit.make(fires, false), Lit.make(a1, true))))
                 out.add(Clause(intArrayOf(Lit.make(fires, false), Lit.make(a2, true))))
                 out.add(Clause(intArrayOf(Lit.make(fires, false), Lit.make(a3, true))))
-                out.add(Clause(intArrayOf(Lit.make(fires, true), Lit.make(a1, false), Lit.make(a2, false), Lit.make(a3, false))))
+                out.add(
+                    Clause(
+                        intArrayOf(Lit.make(fires, true), Lit.make(a1, false), Lit.make(a2, false), Lit.make(a3, false))
+                    )
+                )
                 if (f.recordStride == 4) {
                     allFires.add(Lit.make(fires, true))
                     allWeights.add(f.transitions[base + 3])
@@ -848,18 +889,40 @@ object FactorDecomposer {
         for (i in 0 until f.starts.size - 1) {
             for (j in i + 1 until f.starts.size) {
                 val aij = ctx.freshBool()
-                out.add(ReifiedLinear(aij, intArrayOf(1, -1), intArrayOf(f.starts[i], f.starts[j]), LinearOp.LE, -f.durations[i]))
+                out.add(
+                    ReifiedLinear(
+                        aij,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.starts[i], f.starts[j]),
+                        LinearOp.LE,
+                        -f.durations[i]
+                    )
+                )
                 val aji = ctx.freshBool()
-                out.add(ReifiedLinear(aji, intArrayOf(1, -1), intArrayOf(f.starts[j], f.starts[i]), LinearOp.LE, -f.durations[j]))
+                out.add(
+                    ReifiedLinear(
+                        aji,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.starts[j], f.starts[i]),
+                        LinearOp.LE,
+                        -f.durations[j]
+                    )
+                )
                 // Non-opt: at least one separation holds. Opt-aware: if either is absent
                 // the pair is vacuous, so add ¬present_i ∨ ¬present_j to the disjunction.
                 if (f.presents.isEmpty()) {
                     out.add(Clause(intArrayOf(Lit.make(aij, true), Lit.make(aji, true))))
                 } else {
-                    out.add(Clause(intArrayOf(
-                        Lit.make(aij, true), Lit.make(aji, true),
-                        Lit.negate(f.presents[i]), Lit.negate(f.presents[j]),
-                    )))
+                    out.add(
+                        Clause(
+                            intArrayOf(
+                                Lit.make(aij, true),
+                                Lit.make(aji, true),
+                                Lit.negate(f.presents[i]),
+                                Lit.negate(f.presents[j]),
+                            )
+                        )
+                    )
                 }
             }
         }
@@ -880,7 +943,7 @@ object FactorDecomposer {
                 val ay = ctx.freshBool()
                 val bx = ctx.freshBool()
                 val by = ctx.freshBool()
-                val opX = if (f.nonStrict) LinearOp.LE else LinearOp.LE  // strict not natively expressible — use LE with bound +1
+                val opX = if (f.nonStrict) LinearOp.LE else LinearOp.LE // strict not natively expressible — use LE with bound +1
                 val xAdj = if (f.nonStrict) -f.widths[i] else -f.widths[i] + 1
                 val xAdjRev = if (f.nonStrict) -f.widths[j] else -f.widths[j] + 1
                 val yAdj = if (f.nonStrict) -f.heights[i] else -f.heights[i] + 1
@@ -896,7 +959,9 @@ object FactorDecomposer {
                 out.add(ReifiedLinear(bx, intArrayOf(1, -1), intArrayOf(f.xs[j], f.xs[i]), opX, xAdjRev))
                 out.add(ReifiedLinear(ay, intArrayOf(1, -1), intArrayOf(f.ys[i], f.ys[j]), opX, yAdj))
                 out.add(ReifiedLinear(by, intArrayOf(1, -1), intArrayOf(f.ys[j], f.ys[i]), opX, yAdjRev))
-                out.add(Clause(intArrayOf(Lit.make(ax, true), Lit.make(bx, true), Lit.make(ay, true), Lit.make(by, true))))
+                out.add(
+                    Clause(intArrayOf(Lit.make(ax, true), Lit.make(bx, true), Lit.make(ay, true), Lit.make(by, true)))
+                )
             }
         }
         return out
@@ -955,8 +1020,8 @@ object FactorDecomposer {
         //          ↔ (starts[i] ≤ t) ∧ (starts[i] ≥ t − durations[i] + 1)
         val active = Array(nTasks) { i ->
             IntArray(horizon) { t ->
-                val lo = ctx.freshBool()  // starts[i] ≤ t
-                val hi = ctx.freshBool()  // starts[i] ≥ t − dur[i] + 1
+                val lo = ctx.freshBool() // starts[i] ≤ t
+                val hi = ctx.freshBool() // starts[i] ≥ t − dur[i] + 1
                 out.add(ReifiedLinear(lo, intArrayOf(1), intArrayOf(f.starts[i]), LinearOp.LE, t))
                 out.add(ReifiedLinear(hi, intArrayOf(1), intArrayOf(f.starts[i]), LinearOp.GE, t - f.durations[i] + 1))
                 val act = ctx.freshBool()
@@ -992,7 +1057,15 @@ object FactorDecomposer {
                 out.add(ReifiedLinear(ge, intArrayOf(1, -1), intArrayOf(f.starts[i], f.starts[j]), LinearOp.GE, 0))
                 // start_i − start_j ≤ dur_j − 1
                 val le = ctx.freshBool()
-                out.add(ReifiedLinear(le, intArrayOf(1, -1), intArrayOf(f.starts[i], f.starts[j]), LinearOp.LE, f.durations[j] - 1))
+                out.add(
+                    ReifiedLinear(
+                        le,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.starts[i], f.starts[j]),
+                        LinearOp.LE,
+                        f.durations[j] - 1
+                    )
+                )
                 val both = ctx.freshBool()
                 out.add(Clause(intArrayOf(Lit.make(both, false), Lit.make(ge, true))))
                 out.add(Clause(intArrayOf(Lit.make(both, false), Lit.make(le, true))))
@@ -1027,11 +1100,14 @@ object FactorDecomposer {
                 out.add(Linear(intArrayOf(1, -1), intArrayOf(f.succ[i], f.succ[j]), LinearOp.NE, 0))
             }
         }
-        if (n == 1) return out  // trivial 1-node "cycle" — succ[0] = 0 enforced by domain
+        if (n == 1) return out // trivial 1-node "cycle" — succ[0] = 0 enforced by domain
         // Level vars: level[0] pinned to 0; level[i] ∈ [1, n-1] for i ≠ 0.
         val level = IntArray(n) { i ->
-            if (i == 0) ctx.freshInt(com.eignex.klause.solver.IntDomain(0, 0))
-            else ctx.freshInt(com.eignex.klause.solver.IntDomain(1, n - 1))
+            if (i == 0) {
+                ctx.freshInt(com.eignex.klause.solver.IntDomain(0, 0))
+            } else {
+                ctx.freshInt(com.eignex.klause.solver.IntDomain(1, n - 1))
+            }
         }
         // For each i, for each j ∈ [1, n-1]: succ[i] = j ⇒ level[j] = level[i] + 1.
         for (i in 0 until n) {
@@ -1081,12 +1157,16 @@ object FactorDecomposer {
                 val diff = ctx.freshBool()
                 out.add(ReifiedLinear(diff, intArrayOf(1, -1), intArrayOf(level[j], level[i]), LinearOp.EQ, 1))
                 // (eq ∧ in_cycle_i ∧ in_cycle_j) ⇒ diff
-                out.add(Clause(intArrayOf(
-                    Lit.make(eq, false),
-                    Lit.make(inCycle[i], false),
-                    Lit.make(inCycle[j], false),
-                    Lit.make(diff, true),
-                )))
+                out.add(
+                    Clause(
+                        intArrayOf(
+                            Lit.make(eq, false),
+                            Lit.make(inCycle[i], false),
+                            Lit.make(inCycle[j], false),
+                            Lit.make(diff, true),
+                        )
+                    )
+                )
             }
         }
         return out
@@ -1126,8 +1206,14 @@ object FactorDecomposer {
             // weights [+1]*nx + [-1]*ny over (xsEq ++ ysEq) lits, op=EQ, bound=0.
             val allLits = IntArray(xsEq.size + ysEq.size)
             val allWeights = IntArray(xsEq.size + ysEq.size)
-            for (i in xsEq.indices) { allLits[i] = xsEq[i]; allWeights[i] = 1 }
-            for (i in ysEq.indices) { allLits[xsEq.size + i] = ysEq[i]; allWeights[xsEq.size + i] = -1 }
+            for (i in xsEq.indices) {
+                allLits[i] = xsEq[i]
+                allWeights[i] = 1
+            }
+            for (i in ysEq.indices) {
+                allLits[xsEq.size + i] = ysEq[i]
+                allWeights[xsEq.size + i] = -1
+            }
             out.add(PseudoBoolean(allWeights, allLits, com.eignex.klause.ast.PbOp.EQ, 0))
         }
         return out
@@ -1222,7 +1308,7 @@ object FactorDecomposer {
                     // bool-as-int via reified aux  bAux ↔ (edgePresent[e] = 1); fold via
                     // PseudoBoolean instead: Σ bool − inDeg = 0 ⇒ PB with lits = edge
                     // present positives weight 1, plus an aux equality for inDeg.
-                    vars[idx] = 0  // placeholder; rewrite via PB below
+                    vars[idx] = 0 // placeholder; rewrite via PB below
                     coeffs[idx] = 0
                 }
             }
@@ -1288,8 +1374,26 @@ object FactorDecomposer {
             out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSink, false), Lit.make(inEq1, true))))
             out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSink, false), Lit.make(outEq0, true))))
             // present ∧ ¬source ∧ ¬sink → inDeg = 1 ∧ outDeg = 1
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSource, true), Lit.make(isSink, true), Lit.make(inEq1, true))))
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSource, true), Lit.make(isSink, true), Lit.make(outEq1, true))))
+            out.add(
+                Clause(
+                    intArrayOf(
+                        Lit.make(present, false),
+                        Lit.make(isSource, true),
+                        Lit.make(isSink, true),
+                        Lit.make(inEq1, true)
+                    )
+                )
+            )
+            out.add(
+                Clause(
+                    intArrayOf(
+                        Lit.make(present, false),
+                        Lit.make(isSource, true),
+                        Lit.make(isSink, true),
+                        Lit.make(outEq1, true)
+                    )
+                )
+            )
             // source → present; sink → present.
             out.add(Clause(intArrayOf(Lit.make(isSource, false), Lit.make(present, true))))
             out.add(Clause(intArrayOf(Lit.make(isSink, false), Lit.make(present, true))))
@@ -1416,8 +1520,9 @@ object FactorDecomposer {
                 val eq = ctx.freshBool()
                 out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, v))
                 if (f.closed) coverLitsPerIndex[i].add(Lit.make(eq, true))
-                if (f.presents.isEmpty()) Lit.make(eq, true)
-                else {
+                if (f.presents.isEmpty()) {
+                    Lit.make(eq, true)
+                } else {
                     val pres = f.presents[i]
                     val gated = ctx.freshBool()
                     out.add(Clause(intArrayOf(Lit.make(gated, false), Lit.make(eq, true))))
@@ -1451,7 +1556,8 @@ object FactorDecomposer {
                     }
                     // Touch aux so the unused-var warning is silenced; it's the placeholder
                     // counter we added above.
-                    @Suppress("UNUSED_VARIABLE") val _t = auxCount
+                    @Suppress("UNUSED_VARIABLE")
+                    val _t = auxCount
                 }
                 f.countLow != null || f.countHigh != null -> {
                     val low = f.countLow?.get(ci) ?: 0

@@ -22,16 +22,17 @@ class GeostTest {
         val factor = Geost(
             numDims = 2,
             numObjects = 2,
-            origin = intArrayOf(0, 1, 2, 3),  // (b0x, b0y, b1x, b1y) as variable ids
+            origin = intArrayOf(0, 1, 2, 3), // (b0x, b0y, b1x, b1y) as variable ids
             length = intArrayOf(2, 2, 2, 2),
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(
-                IntDomain(0, 0),  // b0.x pinned to 0
-                IntDomain(0, 3),  // b0.y free
-                IntDomain(0, 0),  // b1.x pinned to 0 — forced x-overlap
-                IntDomain(0, 0),  // b1.y pinned to 0 (forces b0.y into M = [-1, 1] to overlap)
+                IntDomain(0, 0), // b0.x pinned to 0
+                IntDomain(0, 3), // b0.y free
+                IntDomain(0, 0), // b1.x pinned to 0 — forced x-overlap
+                IntDomain(0, 0), // b1.y pinned to 0 (forces b0.y into M = [-1, 1] to overlap)
             ),
             factors = arrayOf<Factor>(factor),
         )
@@ -51,10 +52,13 @@ class GeostTest {
             length = intArrayOf(3, 3, 3, 3),
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(
-                IntDomain(0, 0), IntDomain(0, 0),
-                IntDomain(0, 0), IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
             ),
             factors = arrayOf<Factor>(factor),
         )

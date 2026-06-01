@@ -33,6 +33,7 @@ internal sealed interface OznType {
     data object Int : OznType
     data object Float : OznType
     data object SetOfInt : OznType
+
     /** Array. Each entry in [indexRanges] is an [OznExpr] that evaluates to a range. */
     data class ArrayOf(val indexRanges: List<OznExpr>, val element: OznType) : OznType
 }
@@ -44,10 +45,13 @@ internal sealed interface OznExpr {
     data class StringLit(val value: String) : OznExpr
     data class Ident(val name: String) : OznExpr
     data class Range(val lo: OznExpr, val hi: OznExpr) : OznExpr
+
     /** `[ e1, e2, ... ]`. */
     data class ArrayLit(val elements: List<OznExpr>) : OznExpr
+
     /** `{ e1, e2, ... }`. */
     data class SetLit(val elements: List<OznExpr>) : OznExpr
+
     /** `[ body | i in r1, j in r2 where cond ]` or the `{ ... }` set form. */
     data class Comprehension(
         val body: OznExpr,
@@ -55,17 +59,21 @@ internal sealed interface OznExpr {
         val isSet: Boolean,
     ) : OznExpr
     data class Generator(val names: List<String>, val source: OznExpr, val where: OznExpr?)
+
     /** Built-in function call: `show(x)`, `array2d(r1, r2, xs)`, `bool2int(b)`, etc. */
     data class Call(val name: String, val args: List<OznExpr>) : OznExpr
+
     /** Array subscript: `x[i]`, `x[i, j]`, `x[i, j, k]`. */
     data class Subscript(val target: OznExpr, val indices: List<OznExpr>) : OznExpr
     data class Unary(val op: String, val operand: OznExpr) : OznExpr
     data class Binary(val op: String, val left: OznExpr, val right: OznExpr) : OznExpr
+
     /** `if c then a [elseif c2 then a2]* else b endif`. */
     data class If(
-        val branches: List<Pair<OznExpr, OznExpr>>,  // (cond, then) including initial if
+        val branches: List<Pair<OznExpr, OznExpr>>, // (cond, then) including initial if
         val elseExpr: OznExpr,
     ) : OznExpr
+
     /** `let { decls } in body`. Local bindings within an expression. */
     data class Let(val decls: List<OznItem.VarDecl>, val body: OznExpr) : OznExpr
 }

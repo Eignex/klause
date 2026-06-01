@@ -6,7 +6,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.TerminationReason
-import org.logicng.datastructures.Assignment as LogicNGAssignment
 import org.logicng.datastructures.Tristate
 import org.logicng.formulas.Formula
 import org.logicng.formulas.FormulaFactory
@@ -14,6 +13,7 @@ import org.logicng.formulas.Literal
 import org.logicng.solvers.MiniSat
 import org.logicng.solvers.SATSolver
 import kotlin.random.Random
+import org.logicng.datastructures.Assignment as LogicNGAssignment
 
 /**
  * Stateful session over a [LogicNGSolver]. Holds ONE underlying MiniSat solver instance
@@ -64,6 +64,7 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         }
     }
 
+    @Suppress("LoopWithTooManyJumpStatements")
     override fun samples(params: LogicNGParams): Sequence<Sample> = sequence {
         val baseLits = assumptionsToLiterals(mergedAssumptions(params.assumptions))
         val rng = Random(params.randomSeed ?: System.nanoTime())
@@ -77,6 +78,7 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         }
     }
 
+    @Suppress("LoopWithTooManyJumpStatements")
     override fun enumerate(params: LogicNGParams): Sequence<Sample> = sequence {
         val baseLits = assumptionsToLiterals(mergedAssumptions(params.assumptions))
         val window = ArrayDeque<Sample>()

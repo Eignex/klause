@@ -11,7 +11,6 @@ class PseudoBooleanCoverageTest {
 
     @Test
     fun `pb at most matches enumeration`() {
-
         val weights = intArrayOf(3, 2, 5, 1)
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = PseudoBoolean(weights, lits, PbOp.LE, 4)
@@ -26,8 +25,11 @@ class PseudoBooleanCoverageTest {
                 pins[i * 2] = cnf.boolVarToCnfVar[i]
                 pins[i * 2 + 1] = (mask shr i) and 1
             }
-            assertEquals(expected, SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask sum=$sum expected=$expected")
+            assertEquals(
+                expected,
+                SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
+                "mask=$mask sum=$sum expected=$expected"
+            )
         }
     }
 
@@ -47,8 +49,11 @@ class PseudoBooleanCoverageTest {
                 pins[i * 2] = cnf.boolVarToCnfVar[i]
                 pins[i * 2 + 1] = (mask shr i) and 1
             }
-            assertEquals(expected, SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask sum=$sum expected=$expected")
+            assertEquals(
+                expected,
+                SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
+                "mask=$mask sum=$sum expected=$expected"
+            )
         }
     }
 }

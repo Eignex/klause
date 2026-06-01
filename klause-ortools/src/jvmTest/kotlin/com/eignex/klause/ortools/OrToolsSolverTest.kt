@@ -19,9 +19,14 @@ class OrToolsSolverTest {
 
     @Test
     fun `native library loads and solves a clause problem`() {
-        val p = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-        ))
+        val p = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            )
+        )
         val r = OrToolsSolver(p).solve(OrToolsParams())
         assertTrue(r is SolveResult.Sat)
         assertTrue(r.assignment.bools[0] || r.assignment.bools[1])
@@ -29,17 +34,26 @@ class OrToolsSolverTest {
 
     @Test
     fun `proves unsat`() {
-        val p = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(0, false))),
-        ))
+        val p = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+            )
+        )
         assertTrue(OrToolsSolver(p).solve(OrToolsParams()) is SolveResult.Unsat)
     }
 
     @Test
     fun `minimizes a linear objective with anytime incumbents`() {
-        val p = Problem(numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)))
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 9)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2))
+        )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val improvements = OrToolsSolver(p).improvements(obj, OrToolsParams()).toList()
         assertTrue(improvements.isNotEmpty())
@@ -50,9 +64,12 @@ class OrToolsSolverTest {
 
     @Test
     fun `enumerates a permutation domain`() {
-        val p = Problem(numBoolVars = 0, numIntVars = 3,
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)))
+            factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3))
+        )
         assertEquals(6, OrToolsSolver(p).enumerate(OrToolsParams()).toList().size)
     }
 }

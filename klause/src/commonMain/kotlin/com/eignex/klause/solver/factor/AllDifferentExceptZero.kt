@@ -170,8 +170,9 @@ class AllDifferentExceptZero(
             val count = s.counts[target] ?: 0
             if (count != 0) return@forEach
             seenTargets++
-            if (filled < budget) targets[filled++] = target
-            else {
+            if (filled < budget) {
+                targets[filled++] = target
+            } else {
                 val r = state.rng.nextInt(seenTargets)
                 if (r < budget) targets[r] = target
             }

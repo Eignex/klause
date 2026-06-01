@@ -148,6 +148,9 @@ class FloatExpr internal constructor(
 
     /** `0 = 0` for true and `0 ≠ 0` for false; the compiler's affine pass folds these. */
     private fun constantBool(value: Boolean): BoolExpr =
-        if (value) IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
-        else IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
+        if (value) {
+            IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
+        } else {
+            IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
+        }
 }

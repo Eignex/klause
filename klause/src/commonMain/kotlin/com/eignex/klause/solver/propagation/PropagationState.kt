@@ -83,14 +83,20 @@ class PropagationState(
             while (n < factorCount) n *= 2
             propStamp = propStamp.copyOf(n)
         }
-        if (propGen == Int.MAX_VALUE) { propStamp.fill(0); propGen = 0 }
+        if (propGen == Int.MAX_VALUE) {
+            propStamp.fill(0)
+            propGen = 0
+        }
         propGen++
         propQueue.clear()
     }
 
     /** Enqueue [fid] if not already queued this run. */
     private fun propEnq(fid: Int) {
-        if (propStamp[fid] != propGen) { propStamp[fid] = propGen; propQueue.addLast(fid) }
+        if (propStamp[fid] != propGen) {
+            propStamp[fid] = propGen
+            propQueue.addLast(fid)
+        }
     }
 
     /** False iff seeding the assumptions themselves already produced a contradiction. */
@@ -101,6 +107,7 @@ class PropagationState(
 
     /** Decision level when each bool was first pinned (-1 = unpinned). */
     val boolLevel: IntArray = IntArray(problem.numBoolVars) { -1 }
+
     /** Deepest decision level contributing to this int var's current domain (-1 = untouched). */
     val intLevel: IntArray = IntArray(problem.numIntVars) { -1 }
 
@@ -136,17 +143,21 @@ class PropagationState(
             val orig = problem.intDomains[v]
             if (d.min > orig.min) {
                 val key = (v.toLong() shl 33) or (0L shl 32) or
-                          (d.min.toLong() - Int.MIN_VALUE.toLong())
-                if (seen.add(key)) out.add(
-                    com.eignex.klause.solver.Lit.make(atomVarGe(v, d.min), false)
-                )
+                    (d.min.toLong() - Int.MIN_VALUE.toLong())
+                if (seen.add(key)) {
+                    out.add(
+                        com.eignex.klause.solver.Lit.make(atomVarGe(v, d.min), false)
+                    )
+                }
             }
             if (d.max < orig.max) {
                 val key = (v.toLong() shl 33) or (1L shl 32) or
-                          (d.max.toLong() - Int.MIN_VALUE.toLong())
-                if (seen.add(key)) out.add(
-                    com.eignex.klause.solver.Lit.make(atomVarLe(v, d.max), false)
-                )
+                    (d.max.toLong() - Int.MIN_VALUE.toLong())
+                if (seen.add(key)) {
+                    out.add(
+                        com.eignex.klause.solver.Lit.make(atomVarLe(v, d.max), false)
+                    )
+                }
             }
         }
         if (out.size == 0) return null
@@ -176,11 +187,13 @@ class PropagationState(
      *  [extractConflictFactors] to walk the propagation graph backwards from a conflict and
      *  collect every factor that contributed. */
     val boolReason: IntArray = IntArray(problem.numBoolVars) { -1 }
+
     /** Factor that most recently tightened this int var's lower bound. `-1` = decision /
      *  initial domain. Tracked separately from [intMaxReason] so two-sided narrowing
      *  conflicts (one factor tightens min, another tightens max into infeasibility) both
      *  surface in the core. */
     val intMinReason: IntArray = IntArray(problem.numIntVars) { -1 }
+
     /** Mirror of [intMinReason] for the upper bound. */
     val intMaxReason: IntArray = IntArray(problem.numIntVars) { -1 }
 
@@ -252,8 +265,11 @@ class PropagationState(
     /** Unified factor accessor; routes static factor ids to [Problem.factors] and learned
      *  factor ids (≥ `problem.numFactors`) to [learnedClauses]. */
     fun factorAt(fid: Int): com.eignex.klause.solver.Factor =
-        if (fid < problem.numFactors) problem.factors[fid]
-        else _learnedClauses[fid - problem.numFactors]
+        if (fid < problem.numFactors) {
+            problem.factors[fid]
+        } else {
+            _learnedClauses[fid - problem.numFactors]
+        }
 
     /**
      * Register a learned clause and return its assigned factor id. Performs four things:
@@ -299,12 +315,12 @@ class PropagationState(
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         val n = _learnedClauses.size
         if (n == 0) return
-        val remap = IntArray(n)  // remap[i] = new learned index, or -1 if dropped
+        val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
         var newCount = 0
         for (i in 0 until n) {
             remap[i] = if (keep(i, _learnedLbd[i])) newCount++ else -1
         }
-        if (newCount == n) return  // nothing dropped
+        if (newCount == n) return // nothing dropped
 
         // Compact _learnedClauses + _learnedLbd in place using a two-pointer walk —
         // every kept entry slides down to its new position; tail beyond newCount is
@@ -393,6 +409,7 @@ class PropagationState(
      * approximation suffices for the common bool-decisions-cause-int-facts pattern.
      */
     val intMinAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
+
     /** Mirror of [intMinAntecedents] for the upper-bound side. */
     val intMaxAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
 
@@ -414,18 +431,23 @@ class PropagationState(
     /** Atom id → (intVar, kind = 0 for GE / 1 for LE, threshold). Packed into a single
      *  long for the reverse lookup; stored separately here for fast iteration. */
     internal val atomIntVar: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+
     /** 0 = `[x ≥ k]`, 1 = `[x ≤ k]`. */
     internal val atomKind: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+
     /** Threshold value `k` for the atom. */
     internal val atomThreshold: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+
     /** Truth of the atom at allocation time. `true` = atom holds (bound met),
      *  `false` = atom is currently violated (bound not met). Never null — allocation
      *  is only ever requested for atoms whose truth can be derived from current
      *  domains. */
-    internal val atomValue: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()  // 1 / 0
+    internal val atomValue: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList() // 1 / 0
+
     /** Decision level at which the atom became true (or 0 for atoms that were already
      *  true at problem-bake time). Mirrors [boolLevel] for atoms. */
     internal val atomLevel: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+
     /** Per-atom antecedents — bool literals (or other atom literals via their virtual
      *  ids) whose collective truth forced this atom. Mirrors [boolAntecedents]. */
     internal val atomAntecedents: ArrayList<IntArray?> = ArrayList()
@@ -496,8 +518,11 @@ class PropagationState(
      *  reason about literal truth. */
     fun litTruth(lit: Int): Boolean? {
         val v = com.eignex.klause.solver.Lit.variable(lit)
-        val raw: Boolean? = if (v < problem.numBoolVars) boolValues[v]
-        else atomCurrentTruth(atomIdOf(v))
+        val raw: Boolean? = if (v < problem.numBoolVars) {
+            boolValues[v]
+        } else {
+            atomCurrentTruth(atomIdOf(v))
+        }
         if (raw == null) return null
         return com.eignex.klause.solver.Lit.evaluate(lit, raw)
     }
@@ -519,13 +544,22 @@ class PropagationState(
         val intVar = atomIntVar[atomId]
         val k = atomThreshold[atomId]
         return when (atomKind[atomId]) {
-            0 -> if (pos) tightenIntMinImpl(intVar, k, antecedents)       // [v ≥ k] true → v.min ≥ k
-                 else    tightenIntMaxImpl(intVar, k - 1, antecedents)    // [v ≥ k] false → v ≤ k-1
-            1 -> if (pos) tightenIntMaxImpl(intVar, k, antecedents)       // [v ≤ k] true → v.max ≤ k
-                 else    tightenIntMinImpl(intVar, k + 1, antecedents)    // [v ≤ k] false → v ≥ k+1
-            2 -> if (pos) tightenIntMinImpl(intVar, k, antecedents) &&    // [v = k] true → v = k
-                          tightenIntMaxImpl(intVar, k, antecedents)
-                 else    excludeIntValueImpl(intVar, k, antecedents)      // [v = k] false → v ≠ k
+            0 -> if (pos) {
+                tightenIntMinImpl(intVar, k, antecedents) // [v ≥ k] true → v.min ≥ k
+            } else {
+                tightenIntMaxImpl(intVar, k - 1, antecedents) // [v ≥ k] false → v ≤ k-1
+            }
+            1 -> if (pos) {
+                tightenIntMaxImpl(intVar, k, antecedents) // [v ≤ k] true → v.max ≤ k
+            } else {
+                tightenIntMinImpl(intVar, k + 1, antecedents) // [v ≤ k] false → v ≥ k+1
+            }
+            2 -> if (pos) {
+                tightenIntMinImpl(intVar, k, antecedents) && // [v = k] true → v = k
+                    tightenIntMaxImpl(intVar, k, antecedents)
+            } else {
+                excludeIntValueImpl(intVar, k, antecedents) // [v = k] false → v ≠ k
+            }
             else -> error("unknown atom kind")
         }
     }
@@ -537,11 +571,11 @@ class PropagationState(
         atomIntVar.add(intVar)
         atomKind.add(kind)
         atomThreshold.add(threshold)
-        atomAntecedents.add(null)  // overwritten below if truth is determined
+        atomAntecedents.add(null) // overwritten below if truth is determined
         // Compute initial truth (may be null = undetermined).
         val truth = atomTruthOf(intVar, kind, threshold)
         if (truth == null) {
-            atomValue.add(2)   // 2 = undetermined sentinel
+            atomValue.add(2) // 2 = undetermined sentinel
             atomLevel.add(0)
         } else {
             atomValue.add(if (truth) 1 else 0)
@@ -556,10 +590,12 @@ class PropagationState(
                     val d = intDomains[intVar]
                     if (truth == true) {
                         composeIntVarAtomAntecedents(intArrayOf(intVar))
-                    } else when {
-                        threshold < d.min -> intMinAntecedents[intVar]
-                        threshold > d.max -> intMaxAntecedents[intVar]
-                        else -> null
+                    } else {
+                        when {
+                            threshold < d.min -> intMinAntecedents[intVar]
+                            threshold > d.max -> intMaxAntecedents[intVar]
+                            else -> null
+                        }
                     }
                 }
                 else -> null
@@ -585,8 +621,8 @@ class PropagationState(
                 else -> null
             }
             2 -> when {
-                d.min == d.max && d.min == k -> true        // singleton {k} → eq true
-                k !in d -> false                            // k absent → eq false
+                d.min == d.max && d.min == k -> true // singleton {k} → eq true
+                k !in d -> false // k absent → eq false
                 else -> null
             }
             else -> error("unknown atom kind")
@@ -604,7 +640,7 @@ class PropagationState(
             val newT = atomCurrentTruth(atomId) ?: continue
             val oldRaw = atomValue[atomId]
             val newRaw = if (newT) 1 else 0
-            if (oldRaw == newRaw) continue   // already at this truth
+            if (oldRaw == newRaw) continue // already at this truth
             // Truth changed (either from the sentinel "unknown" or from the opposite
             // boolean value). Update the snapshot and fire the now-false lit's watchers.
             atomValue[atomId] = newRaw
@@ -659,12 +695,12 @@ class PropagationState(
     // exactly as they did under the snapshot scheme (advisory, like watches).
     private val undoTag = com.eignex.klause.util.IntArrayList()
     private val undoVar = com.eignex.klause.util.IntArrayList()
-    private val undoLevel = com.eignex.klause.util.IntArrayList()      // int: prior intLevel
-    private val undoMinReason = com.eignex.klause.util.IntArrayList()  // int: prior intMinReason
-    private val undoMaxReason = com.eignex.klause.util.IntArrayList()  // int: prior intMaxReason
-    private val undoDomain = ArrayList<IntDomain?>()                   // int: prior intDomains[v]
-    private val undoMinAnt = ArrayList<IntArray?>()                    // int: prior intMinAntecedents
-    private val undoMaxAnt = ArrayList<IntArray?>()                    // int: prior intMaxAntecedents
+    private val undoLevel = com.eignex.klause.util.IntArrayList() // int: prior intLevel
+    private val undoMinReason = com.eignex.klause.util.IntArrayList() // int: prior intMinReason
+    private val undoMaxReason = com.eignex.klause.util.IntArrayList() // int: prior intMaxReason
+    private val undoDomain = ArrayList<IntDomain?>() // int: prior intDomains[v]
+    private val undoMinAnt = ArrayList<IntArray?>() // int: prior intMinAntecedents
+    private val undoMaxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents
 
     /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
      *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
@@ -684,21 +720,34 @@ class PropagationState(
     var undoLogging: Boolean = false
 
     private fun logBoolPin(v: Int) {
-        undoTag.add(0); undoVar.add(v)
-        undoLevel.add(0); undoMinReason.add(0); undoMaxReason.add(0)
-        undoDomain.add(null); undoMinAnt.add(null); undoMaxAnt.add(null)
+        undoTag.add(0)
+        undoVar.add(v)
+        undoLevel.add(0)
+        undoMinReason.add(0)
+        undoMaxReason.add(0)
+        undoDomain.add(null)
+        undoMinAnt.add(null)
+        undoMaxAnt.add(null)
     }
 
     /** Capture int var [v]'s full prior state. Must be called *before* the mutation. */
     private fun logIntChange(v: Int) {
-        undoTag.add(1); undoVar.add(v)
-        undoLevel.add(intLevel[v]); undoMinReason.add(intMinReason[v]); undoMaxReason.add(intMaxReason[v])
-        undoDomain.add(intDomains[v]); undoMinAnt.add(intMinAntecedents[v]); undoMaxAnt.add(intMaxAntecedents[v])
+        undoTag.add(1)
+        undoVar.add(v)
+        undoLevel.add(intLevel[v])
+        undoMinReason.add(intMinReason[v])
+        undoMaxReason.add(intMaxReason[v])
+        undoDomain.add(intDomains[v])
+        undoMinAnt.add(intMinAntecedents[v])
+        undoMaxAnt.add(intMaxAntecedents[v])
     }
 
     private fun truncateUndo(n: Int) {
-        undoTag.truncateTo(n); undoVar.truncateTo(n)
-        undoLevel.truncateTo(n); undoMinReason.truncateTo(n); undoMaxReason.truncateTo(n)
+        undoTag.truncateTo(n)
+        undoVar.truncateTo(n)
+        undoLevel.truncateTo(n)
+        undoMinReason.truncateTo(n)
+        undoMaxReason.truncateTo(n)
         while (undoDomain.size > n) undoDomain.removeAt(undoDomain.size - 1)
         while (undoMinAnt.size > n) undoMinAnt.removeAt(undoMinAnt.size - 1)
         while (undoMaxAnt.size > n) undoMaxAnt.removeAt(undoMaxAnt.size - 1)
@@ -709,8 +758,10 @@ class PropagationState(
      *  position `base` — used by [PropagationSession] to compute the implied-fact diff of a
      *  push incrementally instead of scanning every variable. */
     val undoTop: Int get() = undoTag.size
+
     /** Variable id recorded by undo record [i]. */
     fun undoVarAt(i: Int): Int = undoVar[i]
+
     /** True iff undo record [i] is a bool pin (vs. an int-domain change). */
     fun undoIsBoolAt(i: Int): Boolean = undoTag[i] == 0
 
@@ -748,32 +799,37 @@ class PropagationState(
      *  `false`) on the first contradiction. Direct primitive-array iteration so the early
      *  exit is a clean `return`. */
     private fun seedAssumptions(a: Assumptions): Boolean {
-        val bk = a.boolKeys; val bv = a.boolValues
+        val bk = a.boolKeys
+        val bv = a.boolValues
         for (i in bk.indices) {
             if (!pinBoolAsDecision(bk[i], bv[i])) return false
         }
-        val ik = a.intKeys; val iv = a.intValues
+        val ik = a.intKeys
+        val iv = a.intValues
         for (i in ik.indices) {
             if (!setIntAsDecision(ik[i], iv[i])) return false
         }
         // Non-singleton bound tightenings ride at the same decision level as int pins —
         // they're seed-time inputs, not propagated conclusions. Each takes its own level
         // so the conflict analyzer can attribute backjumps to the specific tightening.
-        val minK = a.intMinKeys; val minV = a.intMinValues
+        val minK = a.intMinKeys
+        val minV = a.intMinValues
         for (i in minK.indices) {
             levelToDecisionVar.add(problem.numBoolVars + minK[i])
             currentLevel = levelToDecisionVar.size
             currentFactor = -1
             if (!tightenIntMinImpl(minK[i], minV[i], null)) return false
         }
-        val maxK = a.intMaxKeys; val maxV = a.intMaxValues
+        val maxK = a.intMaxKeys
+        val maxV = a.intMaxValues
         for (i in maxK.indices) {
             levelToDecisionVar.add(problem.numBoolVars + maxK[i])
             currentLevel = levelToDecisionVar.size
             currentFactor = -1
             if (!tightenIntMaxImpl(maxK[i], maxV[i], null)) return false
         }
-        val holeIds = a.intHoleVarIds; val holeVals = a.intHoleValues
+        val holeIds = a.intHoleVarIds
+        val holeVals = a.intHoleValues
         for (i in holeIds.indices) {
             levelToDecisionVar.add(problem.numBoolVars + holeIds[i])
             currentLevel = levelToDecisionVar.size
@@ -803,6 +859,7 @@ class PropagationState(
     }
 
     fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value, antecedents = null)
+
     /** Variant that records [antecedents] — the literals whose truth values implied this
      *  pin. Lets the conflict analyzer reconstruct the propagation chain backwards. Pass
      *  `null` (the default no-arg form) when the factor doesn't track antecedents — that's
@@ -810,6 +867,7 @@ class PropagationState(
     fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean =
         pinBoolImpl(v, value, antecedents)
     fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo, null)
+
     /** Variant that records [antecedents] — bool literals (false in the current state)
      *  whose collective truth forced this lower-bound tightening. Used by the conflict
      *  analyzer to walk the implication graph backwards through int-domain factors. */
@@ -820,6 +878,7 @@ class PropagationState(
         tightenIntMaxImpl(v, hi, antecedents)
     fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value, null)
     fun setInt(v: Int, value: Int, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
+
     /** Punch a hole in [v]'s domain at [value]. Returns `true` on success (including the
      *  no-op case when [value] is already absent), `false` on conflict (would empty the
      *  domain). When [value] is at the current endpoint, this is equivalent to a
@@ -978,11 +1037,23 @@ class PropagationState(
         var max = 0
         for (v in boolVars) {
             // boolVars may include atom-var ids when a Clause has atom-lits; dispatch.
-            val l = if (v < problem.numBoolVars) boolLevel[v]
-                    else atomLevel[v - problem.numBoolVars]
-            if (l > max) { max = l; if (max >= cap) return max }
+            val l = if (v < problem.numBoolVars) {
+                boolLevel[v]
+            } else {
+                atomLevel[v - problem.numBoolVars]
+            }
+            if (l > max) {
+                max = l
+                if (max >= cap) return max
+            }
         }
-        for (v in intVars) { val l = intLevel[v]; if (l > max) { max = l; if (max >= cap) return max } }
+        for (v in intVars) {
+            val l = intLevel[v]
+            if (l > max) {
+                max = l
+                if (max >= cap) return max
+            }
+        }
         return max
     }
 
@@ -995,7 +1066,10 @@ class PropagationState(
         for (lit in literals) {
             val v = com.eignex.klause.solver.Lit.variable(lit)
             val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevel[v - problem.numBoolVars]
-            if (l > max) { max = l; if (max >= cap) return max }
+            if (l > max) {
+                max = l
+                if (max >= cap) return max
+            }
         }
         return max
     }
@@ -1015,7 +1089,10 @@ class PropagationState(
             val l = if (v < numBool) boolLevel[v] else atomLevel[v - numBool]
             if (l > 0) out.add(l)
         }
-        for (v in intVars) { val l = intLevel[v]; if (l > 0) out.add(l) }
+        for (v in intVars) {
+            val l = intLevel[v]
+            if (l > 0) out.add(l)
+        }
         return out
     }
 
@@ -1146,14 +1223,14 @@ class PropagationState(
         var i = undoTag.size - 1
         while (i >= mark.undoSize) {
             when (undoTag[i]) {
-                0 -> {  // bool pin — prior state is always unassigned
+                0 -> { // bool pin — prior state is always unassigned
                     val v = undoVar[i]
                     boolValues[v] = null
                     boolLevel[v] = -1
                     boolReason[v] = -1
                     boolAntecedents[v] = null
                 }
-                else -> {  // int change — restore the full recorded prior int-var state
+                else -> { // int change — restore the full recorded prior int-var state
                     val v = undoVar[i]
                     intDomains[v] = undoDomain[i]!!
                     intLevel[v] = undoLevel[i]
@@ -1182,7 +1259,10 @@ class PropagationState(
             atomByKey.remove(key)
             atomsByIntVar[intVar]?.let { list ->
                 for (j in 0 until list.size) {
-                    if (list[j] == id) { list.removeAt(j); break }
+                    if (list[j] == id) {
+                        list.removeAt(j)
+                        break
+                    }
                 }
             }
             atomWatchersByLit.remove(com.eignex.klause.solver.Lit.make(problem.numBoolVars + id, true))
@@ -1229,11 +1309,13 @@ class PropagationState(
             for (fid in 0 until factorCount) propEnq(fid)
         } else {
             while (true) {
-                val v = pollDirtyBool(); if (v < 0) break
+                val v = pollDirtyBool()
+                if (v < 0) break
                 enqueueForBoolChange(v)
             }
             while (true) {
-                val v = pollDirtyInt(); if (v < 0) break
+                val v = pollDirtyInt()
+                if (v < 0) break
                 for (fid in problem.intOccurrences[v]) propEnq(fid)
             }
             // Atom-lit watchers woken by int tightens before runToFixpoint was called.
@@ -1249,7 +1331,7 @@ class PropagationState(
         }
         while (propQueue.isNotEmpty()) {
             val fid = propQueue.removeFirst()
-            propStamp[fid] = propGen - 1  // mark dequeued (≠ propGen) so it can re-enqueue
+            propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
             // Level for the firing factor. A Clause's effective level is the max decision
             // level over its literals; its [boolVars] is the deduplicated variable set of
@@ -1261,11 +1343,15 @@ class PropagationState(
             // at the current level), so its effective level is exactly the current decision
             // level — no scan at all. Atom-lit clauses can fire on an atom that flipped at a
             // sub-decision level, so they keep the literal scan.
-            currentLevel = if (f is com.eignex.klause.solver.factor.Clause)
-                if (f.allLiteralsBool(problem.numBoolVars)) levelToDecisionVar.size
-                else maxLevelForClause(f.literals)
-            else
+            currentLevel = if (f is com.eignex.klause.solver.factor.Clause) {
+                if (f.allLiteralsBool(problem.numBoolVars)) {
+                    levelToDecisionVar.size
+                } else {
+                    maxLevelForClause(f.literals)
+                }
+            } else {
                 maxLevelForVars(f.boolVars, f.intVars)
+            }
             currentFactor = fid
             conflictLevels = null
             if (!f.propagate(this, fid)) {
@@ -1277,11 +1363,13 @@ class PropagationState(
                 return conflictLevels ?: collectLevelsForVars(f.boolVars, f.intVars)
             }
             while (true) {
-                val v = pollDirtyBool(); if (v < 0) break
+                val v = pollDirtyBool()
+                if (v < 0) break
                 enqueueForBoolChange(v)
             }
             while (true) {
-                val v = pollDirtyInt(); if (v < 0) break
+                val v = pollDirtyInt()
+                if (v < 0) break
                 for (other in problem.intOccurrences[v]) propEnq(other)
             }
             // Wake factors registered as atom-lit watchers whose atom truth just flipped.

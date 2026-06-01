@@ -2,20 +2,16 @@ package com.eignex.klause.schema
 
 import com.eignex.klause.ast.IntSpec
 import com.eignex.klause.ast.PresenceSpec
-import com.eignex.klause.ast.NamedConstraint
-import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.allDifferentOpt
 import com.eignex.klause.ast.countEqOpt
-import com.eignex.klause.ast.ge
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.le
 import com.eignex.klause.ast.cumulativeOpt
 import com.eignex.klause.ast.disjunctiveOpt
 import com.eignex.klause.ast.gccOpt
+import com.eignex.klause.ast.ge
+import com.eignex.klause.ast.implies
+import com.eignex.klause.ast.le
 import com.eignex.klause.ast.nValueOpt
 import com.eignex.klause.compile.compile
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Count
@@ -23,6 +19,8 @@ import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.NValue
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -98,8 +96,10 @@ class OptComparisonSemanticsTest {
         val anyAbsentWithBigY = samples.any { sample ->
             compiled.decode(s.x, sample) == null && compiled.decode(s.y, sample) > 0
         }
-        assertTrue(anyAbsentWithBigY,
-            "Expected an absent-x sample with y>0, since absence should bypass the implication.")
+        assertTrue(
+            anyAbsentWithBigY,
+            "Expected an absent-x sample with y>0, since absence should bypass the implication."
+        )
     }
 }
 
@@ -143,8 +143,11 @@ class OptAllDifferentTest {
             val vb = if (pb) sample.ints[compiled.intVarIdByName["b"]!!] else null
             val vc = if (pc) sample.ints[compiled.intVarIdByName["c"]!!] else null
             val presentVals = listOfNotNull(va, vb, vc)
-            assertEquals(presentVals.size, presentVals.toSet().size,
-                "Present-only values must be distinct: pa=$pa pb=$pb pc=$pc va=$va vb=$vb vc=$vc")
+            assertEquals(
+                presentVals.size,
+                presentVals.toSet().size,
+                "Present-only values must be distinct: pa=$pa pb=$pb pc=$pc va=$va vb=$vb vc=$vc"
+            )
         }
     }
 }
@@ -185,8 +188,11 @@ class OptCountTest {
             val vc = sample.ints[compiled.intVarIdByName["c"]!!]
             val expected = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 1 }
             val actual = compiled.decode(s.cnt, sample)
-            assertEquals(expected, actual,
-                "count opt mismatch: presents=($pa,$pb,$pc) values=($va,$vb,$vc) cnt=$actual")
+            assertEquals(
+                expected,
+                actual,
+                "count opt mismatch: presents=($pa,$pb,$pc) values=($va,$vb,$vc) cnt=$actual"
+            )
         }
     }
 }
@@ -238,6 +244,7 @@ class OptGccTest {
         val a by optIntVar(min = 0, max = 2)
         val b by optIntVar(min = 0, max = 2)
         val c by optIntVar(min = 0, max = 2)
+
         // At least one present xs must be 0, at most two of them.
         val gcc by constraint {
             gccOpt(
@@ -266,8 +273,10 @@ class OptGccTest {
             val vb = sample.ints[compiled.intVarIdByName["b"]!!]
             val vc = sample.ints[compiled.intVarIdByName["c"]!!]
             val zeros = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 0 }
-            assertTrue(zeros in 1..2,
-                "gcc opt out of range: zeros=$zeros (presents=$pa,$pb,$pc values=$va,$vb,$vc)")
+            assertTrue(
+                zeros in 1..2,
+                "gcc opt out of range: zeros=$zeros (presents=$pa,$pb,$pc values=$va,$vb,$vc)"
+            )
         }
     }
 }
@@ -347,8 +356,10 @@ class OptCumulativeTest {
             val usage = IntArray(6)
             for (i in 0..2) if (ps[i]) for (t in vs[i] until vs[i] + 2) if (t in usage.indices) usage[t]++
             val peak = usage.max()
-            assertTrue(peak <= 2,
-                "cumulative peak ${peak} exceeds capacity (presents=$ps starts=$vs)")
+            assertTrue(
+                peak <= 2,
+                "cumulative peak $peak exceeds capacity (presents=$ps starts=$vs)"
+            )
         }
     }
 }

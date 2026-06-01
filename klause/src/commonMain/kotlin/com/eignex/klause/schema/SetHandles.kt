@@ -3,21 +3,21 @@ package com.eignex.klause.schema
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntTerm
+import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.SetCard
+import com.eignex.klause.ast.SetDiff
 import com.eignex.klause.ast.SetDisjoint
 import com.eignex.klause.ast.SetEq
 import com.eignex.klause.ast.SetExpr
 import com.eignex.klause.ast.SetIn
 import com.eignex.klause.ast.SetIntersect
+import com.eignex.klause.ast.SetLiteral
 import com.eignex.klause.ast.SetNominalIn
 import com.eignex.klause.ast.SetNominalLiteral
-import com.eignex.klause.ast.SetLiteral
 import com.eignex.klause.ast.SetRef
 import com.eignex.klause.ast.SetSubsetOf
 import com.eignex.klause.ast.SetTerm
 import com.eignex.klause.ast.SetUnion
-import com.eignex.klause.ast.SetDiff
-import com.eignex.klause.ast.Not
 
 /**
  * Set variable handle over an integer universe. Internally lowers to one indicator

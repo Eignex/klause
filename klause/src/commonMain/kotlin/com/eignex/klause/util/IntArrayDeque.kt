@@ -15,8 +15,8 @@ package com.eignex.klause.util
 class IntArrayDeque(initialCapacity: Int = 8) {
 
     private var buf: IntArray = IntArray(nextPow2(maxOf(initialCapacity, 1)))
-    private var head: Int = 0   // index of first element
-    private var count: Int = 0  // number of elements
+    private var head: Int = 0 // index of first element
+    private var count: Int = 0 // number of elements
 
     val size: Int get() = count
     fun isEmpty(): Boolean = count == 0

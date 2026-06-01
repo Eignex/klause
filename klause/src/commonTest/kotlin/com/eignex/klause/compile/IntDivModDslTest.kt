@@ -1,13 +1,13 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.div
 import com.eignex.klause.ast.eq
 import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.rem
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +25,10 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 27)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -46,7 +49,10 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 41)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -71,7 +77,6 @@ class IntDivModDslTest {
     /** Euclidean: -7 = 3*(-3) + 2, so (-7) div 3 = -3 (not -2 like Java truncation). */
     @Test
     fun `negative numerator Euclidean division`() {
-
         class S : VariableSchema() {
             val n by intVar(min = -7, max = -7)
             val d by intVar(min = 1, max = 3)
@@ -79,7 +84,10 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 61)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -95,7 +103,6 @@ class IntDivModDslTest {
      *  with `0 ≤ r < |d|`. e.g. 4 div -2 = -2 (r=0), 5 div -2 = -2 (r=1). */
     @Test
     fun `negative denominator Euclidean division`() {
-
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 6)
             val d by intVar(min = -3, max = -1)
@@ -103,15 +110,20 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 71)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         val expectedPairs = setOf(2 to -1, 4 to -2, 5 to -2, 6 to -3)
         for (s in samples) {
             val nv = compiled.decode(schema.n, s)
             val dv = compiled.decode(schema.d, s)
-            assertTrue((nv to dv) in expectedPairs,
-                "n=$nv d=$dv not in expected Euclidean q=-2 pairs $expectedPairs")
+            assertTrue(
+                (nv to dv) in expectedPairs,
+                "n=$nv d=$dv not in expected Euclidean q=-2 pairs $expectedPairs"
+            )
         }
     }
 
@@ -119,7 +131,6 @@ class IntDivModDslTest {
      *  (not -1 like Java's `%`). */
     @Test
     fun `negative numerator Euclidean mod is non-negative`() {
-
         class S : VariableSchema() {
             val n by intVar(min = -10, max = -10)
             val d by intVar(min = 3, max = 3)
@@ -127,7 +138,10 @@ class IntDivModDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 47)).take(5).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

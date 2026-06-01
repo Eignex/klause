@@ -1,7 +1,6 @@
 package com.eignex.klause.cnf
 
 import com.eignex.klause.formats.dimacs.Dimacs
-import com.eignex.klause.solver.Lit
 
 /**
  * Result of bit-blasting a [com.eignex.klause.solver.Problem] to propositional CNF.

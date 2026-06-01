@@ -27,8 +27,10 @@ class SetPredicateTest {
         val sat = assertIs<SolveResult.Sat>(r)
         val layout = program.setVarsByName.getValue("s")
         val twoIdx = layout.elements.indexOf(2)
-        assertTrue(sat.assignment.bools[layout.indicatorBoolIds[twoIdx]],
-            "element 2 must be in s; bools=${sat.assignment.bools.toList()}")
+        assertTrue(
+            sat.assignment.bools[layout.indicatorBoolIds[twoIdx]],
+            "element 2 must be in s; bools=${sat.assignment.bools.toList()}"
+        )
     }
 
     @Test
@@ -68,8 +70,10 @@ class SetPredicateTest {
         for (i in sLayout.elements.indices) {
             if (sat.assignment.bools[sLayout.indicatorBoolIds[i]]) {
                 val tIdx = tLayout.elements.indexOf(sLayout.elements[i])
-                assertTrue(sat.assignment.bools[tLayout.indicatorBoolIds[tIdx]],
-                    "element ${sLayout.elements[i]} in s but not t")
+                assertTrue(
+                    sat.assignment.bools[tLayout.indicatorBoolIds[tIdx]],
+                    "element ${sLayout.elements[i]} in s but not t"
+                )
             }
         }
     }
@@ -263,8 +267,10 @@ class SetPredicateTest {
         val program = parseFlatZinc(src)
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        assertTrue(sat.assignment.bools[program.boolVarsByName.getValue("r")],
-            "r must be true when s ⊆ t")
+        assertTrue(
+            sat.assignment.bools[program.boolVarsByName.getValue("r")],
+            "r must be true when s ⊆ t"
+        )
     }
 
     @Test
@@ -286,8 +292,10 @@ class SetPredicateTest {
         val program = parseFlatZinc(src)
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 1L))
         val sat = assertIs<SolveResult.Sat>(r)
-        assertTrue(!sat.assignment.bools[program.boolVarsByName.getValue("r")],
-            "r must be false when 3 ∈ s but 3 ∉ t")
+        assertTrue(
+            !sat.assignment.bools[program.boolVarsByName.getValue("r")],
+            "r must be false when 3 ∈ s but 3 ∉ t"
+        )
     }
 
     @Test
@@ -373,8 +381,10 @@ class SetPredicateTest {
         for (i in sets.indices) for (j in i + 1 until sets.size) {
             val m1 = membersOf(sets[i])
             val m2 = membersOf(sets[j])
-            assertTrue(m1.intersect(m2).isEmpty(),
-                "sets a[${i+1}]=$m1 and a[${j+1}]=$m2 must be disjoint")
+            assertTrue(
+                m1.intersect(m2).isEmpty(),
+                "sets a[${i + 1}]=$m1 and a[${j + 1}]=$m2 must be disjoint"
+            )
         }
     }
 
@@ -455,8 +465,11 @@ class SetPredicateTest {
         val layout = program.setVarsByName.getValue("s")
         for ((i, e) in layout.elements.withIndex()) {
             val expected = e in setOf(1, 3, 5)
-            assertEquals(expected, sat.assignment.bools[layout.indicatorBoolIds[i]],
-                "element $e expected in-set=$expected")
+            assertEquals(
+                expected,
+                sat.assignment.bools[layout.indicatorBoolIds[i]],
+                "element $e expected in-set=$expected"
+            )
         }
     }
 
@@ -472,8 +485,11 @@ class SetPredicateTest {
         val layout = program.setVarsByName.getValue("s")
         for ((i, e) in layout.elements.withIndex()) {
             val expected = e in 2..4
-            assertEquals(expected, sat.assignment.bools[layout.indicatorBoolIds[i]],
-                "element $e expected in-set=$expected")
+            assertEquals(
+                expected,
+                sat.assignment.bools[layout.indicatorBoolIds[i]],
+                "element $e expected in-set=$expected"
+            )
         }
     }
 }

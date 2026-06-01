@@ -82,6 +82,7 @@ class HeuristicPortfolio(
 
     /** The arm currently driving search. Updates at every restart. */
     val current: Arm get() = arms[currentArm]
+
     /** Index of [current] within [arms]. Inspectable for telemetry. */
     val currentArmIndex: Int get() = currentArm
 
@@ -114,7 +115,11 @@ class HeuristicPortfolio(
 
     /** Drop-in [ValueHeuristic] slot for [BacktrackParams.valueHeuristic]. */
     val valueHeuristic: ValueHeuristic = object : ValueHeuristic {
-        override fun values(session: com.eignex.klause.solver.propagation.PropagationSession, varRef: VarRef, rng: Random) =
+        override fun values(
+            session: com.eignex.klause.solver.propagation.PropagationSession,
+            varRef: VarRef,
+            rng: Random
+        ) =
             current.valueHeuristic.values(session, varRef, rng)
         override fun onConflict(varRef: VarRef, value: Int) =
             current.valueHeuristic.onConflict(varRef, value)

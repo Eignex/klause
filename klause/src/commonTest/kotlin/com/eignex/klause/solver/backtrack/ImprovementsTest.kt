@@ -20,16 +20,20 @@ class ImprovementsTest {
         // the DFS tries 5 first (objective 5) → BestFound(5) → backtrack → 4 → BestFound(4)
         // → ... → 0 → BestFound(0) → no more values → Optimal(0). 6 yields total.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
             factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
-        val seq = BacktrackSolver(problem).improvements(obj, BacktrackParams(
-            randomSeed = 0L,
-            variableHeuristic = InputOrder,
-            valueHeuristic = IndomainMax,
-        )).toList()
+        val seq = BacktrackSolver(problem).improvements(
+            obj,
+            BacktrackParams(
+                randomSeed = 0L,
+                variableHeuristic = InputOrder,
+                valueHeuristic = IndomainMax,
+            )
+        ).toList()
         // Last yield is the terminal verdict.
         val terminal = seq.last()
         assertIs<MinimizeResult.Optimal>(terminal)
@@ -49,7 +53,8 @@ class ImprovementsTest {
     fun `improvements on an infeasible problem yields a single Infeasible`() {
         // Single int var [3, 5], constraint forces it ≤ 1 → Unsat.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(3, 5)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
         )
@@ -63,7 +68,8 @@ class ImprovementsTest {
     fun `minimize equals improvements last`() {
         // Contract: minimize is improvements().last(). Verify on a small problem.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 7)),
             factors = emptyArray(),
         )

@@ -67,14 +67,19 @@ class SubcircuitTest {
     fun `two disjoint cycles among included nodes is violated`() {
         val factor = Subcircuit(succ = intArrayOf(0, 1, 2, 3, 4, 5))
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 6,
+            numBoolVars = 0,
+            numIntVars = 6,
             intDomains = Array(6) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
         // Two 3-cycles: 0→1→2→0 and 3→4→5→3. All included, but two cycles → violated.
-        state.assignment.setInt(0, 1); state.assignment.setInt(1, 2); state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 4); state.assignment.setInt(4, 5); state.assignment.setInt(5, 3)
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 0)
+        state.assignment.setInt(3, 4)
+        state.assignment.setInt(4, 5)
+        state.assignment.setInt(5, 3)
         state.recompute()
         assertTrue(state.cost > 0, "two disjoint included cycles should violate Subcircuit")
     }

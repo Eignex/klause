@@ -14,7 +14,8 @@ internal sealed interface CoeffLookup {
         fun build(vars: IntArray, coeffs: IntArray): CoeffLookup {
             require(vars.size == coeffs.size) { "vars/coeffs length mismatch" }
             if (vars.isEmpty()) return MapLookup(HashMap())
-            var lo = vars[0]; var hi = vars[0]
+            var lo = vars[0]
+            var hi = vars[0]
             for (v in vars) {
                 if (v < lo) lo = v
                 if (v > hi) hi = v

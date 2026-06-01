@@ -1,14 +1,14 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -29,11 +29,11 @@ class AllDifferentTest {
     fun `backtrack learning enumerates exactly the brute-force solution set`() {
         // Each instance: per-var inclusive [min,max] ranges over a shared value space.
         val instances = listOf(
-            listOf(0 to 3, 0 to 3, 0 to 3, 0 to 3),                 // permutations of 0..3
-            listOf(0 to 1, 0 to 1, 0 to 3, 2 to 3),                 // Hall {v0,v1}⊆{0,1}
-            listOf(1 to 3, 2 to 3, 3 to 3, 0 to 3),                 // cascading singleton
-            listOf(0 to 2, 1 to 2, 0 to 1, 0 to 2),                 // overlapping tight set
-            listOf(0 to 2, 1 to 3, 2 to 4, 0 to 4, 0 to 4),         // 5 vars, mixed widths
+            listOf(0 to 3, 0 to 3, 0 to 3, 0 to 3), // permutations of 0..3
+            listOf(0 to 1, 0 to 1, 0 to 3, 2 to 3), // Hall {v0,v1}⊆{0,1}
+            listOf(1 to 3, 2 to 3, 3 to 3, 0 to 3), // cascading singleton
+            listOf(0 to 2, 1 to 2, 0 to 1, 0 to 2), // overlapping tight set
+            listOf(0 to 2, 1 to 3, 2 to 4, 0 to 4, 0 to 4), // 5 vars, mixed widths
         )
         for ((idx, ranges) in instances.withIndex()) {
             val k = ranges.size
@@ -42,8 +42,14 @@ class AllDifferentTest {
             // Brute-force reference: every per-var value combination that is all-different.
             val brute = HashSet<List<Int>>()
             fun rec(i: Int, acc: IntArray) {
-                if (i == k) { if (acc.toHashSet().size == k) brute.add(acc.toList()); return }
-                for (v in ranges[i].first..ranges[i].second) { acc[i] = v; rec(i + 1, acc) }
+                if (i == k) {
+                    if (acc.toHashSet().size == k) brute.add(acc.toList())
+                    return
+                }
+                for (v in ranges[i].first..ranges[i].second) {
+                    acc[i] = v
+                    rec(i + 1, acc)
+                }
             }
             rec(0, IntArray(k))
 
@@ -85,7 +91,6 @@ class AllDifferentTest {
 
     @Test
     fun `three vars room for one duplicate requires unique values`() {
-
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)
         val problem = Problem(
             numBoolVars = 0,
@@ -121,8 +126,10 @@ class AllDifferentTest {
         val intSets = sink.list.filterIsInstance<com.eignex.klause.solver.Move.IntSet>()
         assertTrue(intSets.size in 2..4, "expected 2-4 candidates (cap 4), got ${intSets.size}: $intSets")
         val occupantSet = intSets.map { it.varId }.toSet()
-        assertTrue(occupantSet.size == 1 && (occupantSet.contains(0) || occupantSet.contains(1)),
-            "candidates should pin one occupant, got $occupantSet")
+        assertTrue(
+            occupantSet.size == 1 && (occupantSet.contains(0) || occupantSet.contains(1)),
+            "candidates should pin one occupant, got $occupantSet"
+        )
         val targetSet = intSets.map { it.newValue }.toSet()
         assertTrue(targetSet.size == intSets.size, "duplicate targets: $intSets")
         for (t in targetSet) {
@@ -156,10 +163,14 @@ class AllDifferentTest {
             val a = c.parts[0] as com.eignex.klause.solver.Move.IntSet
             val b = c.parts[1] as com.eignex.klause.solver.Move.IntSet
             assertTrue(a.varId != b.varId, "swap should target distinct vars")
-            assertTrue(a.newValue == state.assignment.intValue(b.varId),
-                "swap part 0 takes part 1's old value")
-            assertTrue(b.newValue == state.assignment.intValue(a.varId),
-                "swap part 1 takes part 0's old value")
+            assertTrue(
+                a.newValue == state.assignment.intValue(b.varId),
+                "swap part 0 takes part 1's old value"
+            )
+            assertTrue(
+                b.newValue == state.assignment.intValue(a.varId),
+                "swap part 1 takes part 0's old value"
+            )
         }
     }
 
@@ -169,41 +180,55 @@ class AllDifferentTest {
         // and should be bumped to 4.
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 6)
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(
-                IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3),
+                IntDomain(1, 3),
+                IntDomain(1, 3),
+                IntDomain(1, 3),
                 IntDomain(2, 5),
             ),
             factors = arrayOf<Factor>(factor),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
         val v3Domain = session.intDomain(3)
-        kotlin.test.assertEquals(4, v3Domain.min,
-            "v3's min should be tightened to 4 (Hall set [1,3] forbids 2,3 for v3); got $v3Domain")
-        kotlin.test.assertEquals(5, v3Domain.max,
-            "v3's max should remain 5; got $v3Domain")
+        kotlin.test.assertEquals(
+            4,
+            v3Domain.min,
+            "v3's min should be tightened to 4 (Hall set [1,3] forbids 2,3 for v3); got $v3Domain"
+        )
+        kotlin.test.assertEquals(
+            5,
+            v3Domain.max,
+            "v3's max should remain 5; got $v3Domain"
+        )
     }
 
     @Test
     fun `hall interval detects infeasibility - pigeonhole over interval`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)),
             factors = arrayOf<Factor>(factor),
         )
         val baked = problem.baked
-        assertTrue(baked is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
-            "expected bake-time Unsat from Hall pigeonhole; got $baked")
+        assertTrue(
+            baked is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
+            "expected bake-time Unsat from Hall pigeonhole; got $baked"
+        )
     }
 
     @Test
     fun `hall interval prunes overlapping bounds on both sides`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 8)
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(
-                IntDomain(3, 4), IntDomain(3, 4),
+                IntDomain(3, 4),
+                IntDomain(3, 4),
                 IntDomain(4, 7),
                 IntDomain(1, 3),
             ),
@@ -224,7 +249,8 @@ class AllDifferentTest {
         // interior of another var's domain (here value 3 in v1's [1, 5]).
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 6)
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 5)),
             factors = arrayOf<Factor>(factor),
         )
@@ -243,9 +269,12 @@ class AllDifferentTest {
         // punch interior values out (min/max can't move past the holes).
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 8)
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(
-                IntDomain(3, 5), IntDomain(3, 5), IntDomain(3, 5),
+                IntDomain(3, 5),
+                IntDomain(3, 5),
+                IntDomain(3, 5),
                 IntDomain(1, 7),
             ),
             factors = arrayOf<Factor>(factor),
@@ -277,7 +306,8 @@ class AllDifferentTest {
             val lo = ranges.minOf { it.first }
             val hi = ranges.maxOf { it.second }
             val problem = Problem(
-                numBoolVars = 0, numIntVars = n,
+                numBoolVars = 0,
+                numIntVars = n,
                 intDomains = Array(n) { IntDomain(ranges[it].first, ranges[it].second) },
                 factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = lo, domainSize = hi - lo + 1)),
             )
@@ -287,7 +317,6 @@ class AllDifferentTest {
 
     @Test
     fun `mismatched domain bounds fail at initialize`() {
-
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
         val problem = Problem(
             numBoolVars = 0,
@@ -297,7 +326,10 @@ class AllDifferentTest {
         )
 
         assertFails {
-            LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50)).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
+            LocalSearchSolver(
+                problem,
+                restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50)
+            ).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
         }
     }
 }

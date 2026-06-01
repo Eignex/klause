@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.propagation.PropagationState
@@ -43,7 +43,7 @@ class ReginGacTest {
         // x0, x1 ∈ {1, 3} (sparse). x2 ∈ {1, 2, 3}. {1, 3} is a Hall set monopolised by
         // x0+x1 — Régin must prune both 1 and 3 from x2, leaving {2}. Old Hall-interval
         // code only checked contiguous intervals and would miss this.
-        val d01 = IntDomain(1, 3).excludeValue(2)  // sparse {1, 3}
+        val d01 = IntDomain(1, 3).excludeValue(2) // sparse {1, 3}
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 3)
         val state = stateWith(factor, arrayOf(d01, d01, IntDomain(1, 3)))
         assertTrue(factor.propagate(state, factorId = 0))
@@ -184,9 +184,11 @@ class ReginGacTest {
             numBoolVars = 0,
             numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(3, 3), IntDomain(3, 7).excludeValue(4).excludeValue(5).excludeValue(6),
+                IntDomain(3, 3),
                 IntDomain(3, 7).excludeValue(4).excludeValue(5).excludeValue(6),
-                IntDomain(0, 3), IntDomain(0, 3),
+                IntDomain(3, 7).excludeValue(4).excludeValue(5).excludeValue(6),
+                IntDomain(0, 3),
+                IntDomain(0, 3),
             ),
             factors = arrayOf<Factor>(factor),
         )

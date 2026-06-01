@@ -38,7 +38,7 @@ class Assignment(
         if (tail != 0) ws[ws.size - 1] = ws[ws.size - 1] and ((1L shl tail) - 1L)
         for (i in 0 until numIntVars) {
             val d = intDomains[i]
-            ints[i] = d.valueAt(rng.nextInt(d.size))   // sparse-aware uniform pick
+            ints[i] = d.valueAt(rng.nextInt(d.size)) // sparse-aware uniform pick
         }
     }
 

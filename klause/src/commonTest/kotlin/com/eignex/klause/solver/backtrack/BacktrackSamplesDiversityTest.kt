@@ -21,16 +21,23 @@ class BacktrackSamplesDiversityTest {
         assertEquals(20, results.size)
         // With random restarts we expect several different "which var is true" outcomes.
         val distinctTrueIndices = results.map { it.bools.indexOfFirst { b -> b } }.toSet()
-        assertTrue(distinctTrueIndices.size >= 3,
-            "expected diverse samples; got only ${distinctTrueIndices.size} distinct true-vars: $distinctTrueIndices")
+        assertTrue(
+            distinctTrueIndices.size >= 3,
+            "expected diverse samples; got only ${distinctTrueIndices.size} distinct true-vars: $distinctTrueIndices"
+        )
     }
 
     @Test
     fun `enumerate still distinct and complete on small problem`() {
         // 4-var cardinality — exactly 4 feasible models. Enumerate must produce all 4 distinct.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val models = BacktrackSolver(problem)
             .enumerate(BacktrackParams(minHammingDistance = 0))

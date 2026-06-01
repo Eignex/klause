@@ -1,6 +1,7 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.BoolExpr
+import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntAbs
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
@@ -15,16 +16,11 @@ import com.eignex.klause.ast.IntMod
 import com.eignex.klause.ast.IntMul
 import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntScale
-import com.eignex.klause.ast.Implies
+import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.IntSum
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
-import com.eignex.klause.solver.factor.ReifiedLinear
-import kotlin.math.abs
 
 /**
  * Affine-fragment lift for [Compiler.Build]. Rewrites a tree of [IntExpr] so the
@@ -101,7 +97,8 @@ internal fun Compiler.Build.liftDivMod(num: IntExpr, den: IntExpr, returnRemaind
 }
 
 internal fun Compiler.Build.liftMul(left: IntExpr, right: IntExpr): IntExpr {
-    val l = lift(left); val r = lift(right)
+    val l = lift(left)
+    val r = lift(right)
     // Constant folding: const * x or x * const → IntScale.
     if (l is IntLit) return IntScale(l.value, r)
     if (r is IntLit) return IntScale(r.value, l)
@@ -110,8 +107,10 @@ internal fun Compiler.Build.liftMul(left: IntExpr, right: IntExpr): IntExpr {
     val aDom = intDomains[intVarOf(aRef.name)]
     val bDom = intDomains[intVarOf(bRef.name)]
     val cornersLong = longArrayOf(
-        aDom.min.toLong() * bDom.min, aDom.min.toLong() * bDom.max,
-        aDom.max.toLong() * bDom.min, aDom.max.toLong() * bDom.max,
+        aDom.min.toLong() * bDom.min,
+        aDom.min.toLong() * bDom.max,
+        aDom.max.toLong() * bDom.min,
+        aDom.max.toLong() * bDom.max,
     )
     val pMin = cornersLong.min()
     val pMax = cornersLong.max()
@@ -203,10 +202,12 @@ internal fun Compiler.Build.liftAbs(child: IntExpr): IntExpr {
     assertExpr(IntCompare(auxRef, IntCmpOp.GE, lifted))
     assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntScale(-1, lifted)))
     assertExpr(
-        Or(listOf(
-            IntCompare(auxRef, IntCmpOp.EQ, lifted),
-            IntCompare(auxRef, IntCmpOp.EQ, IntScale(-1, lifted)),
-        )),
+        Or(
+            listOf(
+                IntCompare(auxRef, IntCmpOp.EQ, lifted),
+                IntCompare(auxRef, IntCmpOp.EQ, IntScale(-1, lifted)),
+            )
+        ),
     )
     return auxRef
 }
@@ -228,10 +229,12 @@ internal fun Compiler.Build.domainOf(expr: IntExpr): IntDomain = when (expr) {
         if (c >= 0) IntDomain(c * d.min, c * d.max) else IntDomain(c * d.max, c * d.min)
     }
     is IntSum -> {
-        var lo = 0; var hi = 0
+        var lo = 0
+        var hi = 0
         for (ch in expr.children) {
             val d = domainOf(ch)
-            lo += d.min; hi += d.max
+            lo += d.min
+            hi += d.max
         }
         IntDomain(lo, hi)
     }

@@ -16,7 +16,8 @@ class SymmetricAllDifferentTest {
     fun `0-based self-inverse permutation`() {
         // 4 vars, 0-based. xs[xs[i]] = i. Possible solutions: identity, single swap, two swaps.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
         )
@@ -32,7 +33,8 @@ class SymmetricAllDifferentTest {
     fun `singleton forces mirror`() {
         // xs[0] pinned to 2 ⇒ xs[2] must be 0.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(2, 2), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
         )

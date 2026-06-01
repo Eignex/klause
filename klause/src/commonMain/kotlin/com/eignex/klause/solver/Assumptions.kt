@@ -114,17 +114,35 @@ class Assumptions internal constructor(
      */
     fun mergedWith(other: Assumptions): Assumptions {
         if (other.isEmpty &&
-            other.intMinKeys.isEmpty() && other.intMaxKeys.isEmpty() && other.intHoleVarIds.isEmpty()) return this
+            other.intMinKeys.isEmpty() && other.intMaxKeys.isEmpty() && other.intHoleVarIds.isEmpty()
+        ) {
+            return this
+        }
         if (this.isEmpty &&
-            intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()) return other
+            intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()
+        ) {
+            return other
+        }
         val mergedBoolKeys = ArrayList<Int>(boolKeys.size + other.boolKeys.size)
         val mergedBoolValues = ArrayList<Boolean>(boolKeys.size + other.boolKeys.size)
-        sortedMergeBools(boolKeys, boolValues, other.boolKeys, other.boolValues,
-            mergedBoolKeys, mergedBoolValues)
+        sortedMergeBools(
+            boolKeys,
+            boolValues,
+            other.boolKeys,
+            other.boolValues,
+            mergedBoolKeys,
+            mergedBoolValues
+        )
         val mergedIntKeys = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
         val mergedIntValues = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
-        sortedMergeInts(intKeys, intValues, other.intKeys, other.intValues,
-            mergedIntKeys, mergedIntValues)
+        sortedMergeInts(
+            intKeys,
+            intValues,
+            other.intKeys,
+            other.intValues,
+            mergedIntKeys,
+            mergedIntValues
+        )
         // Bound tightenings: take max for mins, min for maxes; on overlap with an
         // exact int pin from either side, drop the bound (the pin subsumes).
         val pinned = HashSet<Int>()
@@ -144,7 +162,13 @@ class Assumptions internal constructor(
         // Holes: union of (varId, value) pairs, dropping pinned vars.
         val holeSet = HashSet<Long>()
         forEachIntHole { id, v -> if (id !in pinned) holeSet.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
-        other.forEachIntHole { id, v -> if (id !in pinned) holeSet.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
+        other.forEachIntHole { id, v ->
+            if (id !in pinned) {
+                holeSet.add(
+                    (id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)
+                )
+            }
+        }
         val holes = holeSet.toLongArray().also { it.sort() }
         val holeIds = IntArray(holes.size) { (holes[it] ushr 32).toInt() }
         val holeVals = IntArray(holes.size) { holes[it].toInt() }
@@ -167,7 +191,8 @@ class Assumptions internal constructor(
     fun withBool(id: Int, value: Boolean): Assumptions {
         val idx = boolKeys.binarySearchInt(id)
         return if (idx >= 0) {
-            val nv = boolValues.copyOf(); nv[idx] = value
+            val nv = boolValues.copyOf()
+            nv[idx] = value
             Assumptions(boolKeys, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
@@ -175,7 +200,8 @@ class Assumptions internal constructor(
             val nv = BooleanArray(boolKeys.size + 1)
             boolKeys.copyInto(nk, 0, 0, insert)
             boolValues.copyInto(nv, 0, 0, insert)
-            nk[insert] = id; nv[insert] = value
+            nk[insert] = id
+            nv[insert] = value
             boolKeys.copyInto(nk, insert + 1, insert)
             boolValues.copyInto(nv, insert + 1, insert)
             Assumptions(nk, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
@@ -197,7 +223,10 @@ class Assumptions internal constructor(
             intMinValues.copyInto(newMinV, 0, 0, minIdx)
             intMinKeys.copyInto(newMinK, minIdx, minIdx + 1)
             intMinValues.copyInto(newMinV, minIdx, minIdx + 1)
-        } else { newMinK = intMinKeys; newMinV = intMinValues }
+        } else {
+            newMinK = intMinKeys
+            newMinV = intMinValues
+        }
         val newMaxK: IntArray
         val newMaxV: IntArray
         if (maxIdx >= 0) {
@@ -207,10 +236,14 @@ class Assumptions internal constructor(
             intMaxValues.copyInto(newMaxV, 0, 0, maxIdx)
             intMaxKeys.copyInto(newMaxK, maxIdx, maxIdx + 1)
             intMaxValues.copyInto(newMaxV, maxIdx, maxIdx + 1)
-        } else { newMaxK = intMaxKeys; newMaxV = intMaxValues }
+        } else {
+            newMaxK = intMaxKeys
+            newMaxV = intMaxValues
+        }
         val idx = intKeys.binarySearchInt(id)
         return if (idx >= 0) {
-            val nv = intValues.copyOf(); nv[idx] = value
+            val nv = intValues.copyOf()
+            nv[idx] = value
             Assumptions(boolKeys, boolValues, intKeys, nv, newMinK, newMinV, newMaxK, newMaxV, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
@@ -218,7 +251,8 @@ class Assumptions internal constructor(
             val nv = IntArray(intKeys.size + 1)
             intKeys.copyInto(nk, 0, 0, insert)
             intValues.copyInto(nv, 0, 0, insert)
-            nk[insert] = id; nv[insert] = value
+            nk[insert] = id
+            nv[insert] = value
             intKeys.copyInto(nk, insert + 1, insert)
             intValues.copyInto(nv, insert + 1, insert)
             Assumptions(boolKeys, boolValues, nk, nv, newMinK, newMinV, newMaxK, newMaxV, intHoleVarIds, intHoleValues)
@@ -230,7 +264,8 @@ class Assumptions internal constructor(
     fun withTightenedMin(id: Int, value: Int): Assumptions {
         val idx = intMinKeys.binarySearchInt(id)
         return if (idx >= 0) {
-            val nv = intMinValues.copyOf(); nv[idx] = maxOf(nv[idx], value)
+            val nv = intMinValues.copyOf()
+            nv[idx] = maxOf(nv[idx], value)
             Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, nv, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
@@ -238,7 +273,8 @@ class Assumptions internal constructor(
             val nv = IntArray(intMinKeys.size + 1)
             intMinKeys.copyInto(nk, 0, 0, insert)
             intMinValues.copyInto(nv, 0, 0, insert)
-            nk[insert] = id; nv[insert] = value
+            nk[insert] = id
+            nv[insert] = value
             intMinKeys.copyInto(nk, insert + 1, insert)
             intMinValues.copyInto(nv, insert + 1, insert)
             Assumptions(boolKeys, boolValues, intKeys, intValues, nk, nv, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
@@ -260,7 +296,7 @@ class Assumptions internal constructor(
             when {
                 cmp < 0 -> lo = mid + 1
                 cmp > 0 -> hi = mid
-                else -> return this  // already present
+                else -> return this // already present
             }
         }
         val insert = lo
@@ -268,18 +304,22 @@ class Assumptions internal constructor(
         val nv = IntArray(intHoleValues.size + 1)
         intHoleVarIds.copyInto(nk, 0, 0, insert)
         intHoleValues.copyInto(nv, 0, 0, insert)
-        nk[insert] = id; nv[insert] = value
+        nk[insert] = id
+        nv[insert] = value
         intHoleVarIds.copyInto(nk, insert + 1, insert)
         intHoleValues.copyInto(nv, insert + 1, insert)
-        return Assumptions(boolKeys, boolValues, intKeys, intValues,
-            intMinKeys, intMinValues, intMaxKeys, intMaxValues, nk, nv)
+        return Assumptions(
+            boolKeys, boolValues, intKeys, intValues,
+            intMinKeys, intMinValues, intMaxKeys, intMaxValues, nk, nv
+        )
     }
 
     /** Return a fresh [Assumptions] with [id]'s upper bound tightened to at most [value]. */
     fun withTightenedMax(id: Int, value: Int): Assumptions {
         val idx = intMaxKeys.binarySearchInt(id)
         return if (idx >= 0) {
-            val nv = intMaxValues.copyOf(); nv[idx] = minOf(nv[idx], value)
+            val nv = intMaxValues.copyOf()
+            nv[idx] = minOf(nv[idx], value)
             Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, nv, intHoleVarIds, intHoleValues)
         } else {
             val insert = -(idx + 1)
@@ -287,7 +327,8 @@ class Assumptions internal constructor(
             val nv = IntArray(intMaxKeys.size + 1)
             intMaxKeys.copyInto(nk, 0, 0, insert)
             intMaxValues.copyInto(nv, 0, 0, insert)
-            nk[insert] = id; nv[insert] = value
+            nk[insert] = id
+            nv[insert] = value
             intMaxKeys.copyInto(nk, insert + 1, insert)
             intMaxValues.copyInto(nv, insert + 1, insert)
             Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, nk, nv, intHoleVarIds, intHoleValues)
@@ -298,17 +339,23 @@ class Assumptions internal constructor(
      *  [Problem]'s failed-literal probing and by tests; hot paths should call
      *  [forEachBool] / [boolValueOrNull] instead. */
     val bools: Map<Int, Boolean>
-        get() = if (boolKeys.isEmpty()) emptyMap() else
+        get() = if (boolKeys.isEmpty()) {
+            emptyMap()
+        } else {
             LinkedHashMap<Int, Boolean>(boolKeys.size).also { m ->
                 for (i in boolKeys.indices) m[boolKeys[i]] = boolValues[i]
             }
+        }
 
     /** Map view. Allocates per access — see [bools]. */
     val ints: Map<Int, Int>
-        get() = if (intKeys.isEmpty()) emptyMap() else
+        get() = if (intKeys.isEmpty()) {
+            emptyMap()
+        } else {
             LinkedHashMap<Int, Int>(intKeys.size).also { m ->
                 for (i in intKeys.indices) m[intKeys[i]] = intValues[i]
             }
+        }
 
     override fun equals(other: Any?): Boolean {
         if (other !is Assumptions) return false
@@ -342,12 +389,16 @@ class Assumptions internal constructor(
         append("Assumptions(bools={")
         for (i in boolKeys.indices) {
             if (i > 0) append(", ")
-            append(boolKeys[i]); append("="); append(boolValues[i])
+            append(boolKeys[i])
+            append("=")
+            append(boolValues[i])
         }
         append("}, ints={")
         for (i in intKeys.indices) {
             if (i > 0) append(", ")
-            append(intKeys[i]); append("="); append(intValues[i])
+            append(intKeys[i])
+            append("=")
+            append(intValues[i])
         }
         append("})")
     }
@@ -371,35 +422,87 @@ class Assumptions internal constructor(
         }
 
         private fun sortedMergeBools(
-            ak: IntArray, av: BooleanArray, bk: IntArray, bv: BooleanArray,
-            outK: ArrayList<Int>, outV: ArrayList<Boolean>,
+            ak: IntArray,
+            av: BooleanArray,
+            bk: IntArray,
+            bv: BooleanArray,
+            outK: ArrayList<Int>,
+            outV: ArrayList<Boolean>,
         ) {
-            var i = 0; var j = 0
+            var i = 0
+            var j = 0
             while (i < ak.size && j < bk.size) {
                 when {
-                    ak[i] < bk[j] -> { outK.add(ak[i]); outV.add(av[i]); i++ }
-                    ak[i] > bk[j] -> { outK.add(bk[j]); outV.add(bv[j]); j++ }
-                    else -> { outK.add(bk[j]); outV.add(bv[j]); i++; j++ } // last-write wins → b
+                    ak[i] < bk[j] -> {
+                        outK.add(ak[i])
+                        outV.add(av[i])
+                        i++
+                    }
+                    ak[i] > bk[j] -> {
+                        outK.add(bk[j])
+                        outV.add(bv[j])
+                        j++
+                    }
+                    else -> {
+                        outK.add(bk[j])
+                        outV.add(bv[j])
+                        i++
+                        j++
+                    } // last-write wins → b
                 }
             }
-            while (i < ak.size) { outK.add(ak[i]); outV.add(av[i]); i++ }
-            while (j < bk.size) { outK.add(bk[j]); outV.add(bv[j]); j++ }
+            while (i < ak.size) {
+                outK.add(ak[i])
+                outV.add(av[i])
+                i++
+            }
+            while (j < bk.size) {
+                outK.add(bk[j])
+                outV.add(bv[j])
+                j++
+            }
         }
 
         private fun sortedMergeInts(
-            ak: IntArray, av: IntArray, bk: IntArray, bv: IntArray,
-            outK: com.eignex.klause.util.IntArrayList, outV: com.eignex.klause.util.IntArrayList,
+            ak: IntArray,
+            av: IntArray,
+            bk: IntArray,
+            bv: IntArray,
+            outK: com.eignex.klause.util.IntArrayList,
+            outV: com.eignex.klause.util.IntArrayList,
         ) {
-            var i = 0; var j = 0
+            var i = 0
+            var j = 0
             while (i < ak.size && j < bk.size) {
                 when {
-                    ak[i] < bk[j] -> { outK.add(ak[i]); outV.add(av[i]); i++ }
-                    ak[i] > bk[j] -> { outK.add(bk[j]); outV.add(bv[j]); j++ }
-                    else -> { outK.add(bk[j]); outV.add(bv[j]); i++; j++ }
+                    ak[i] < bk[j] -> {
+                        outK.add(ak[i])
+                        outV.add(av[i])
+                        i++
+                    }
+                    ak[i] > bk[j] -> {
+                        outK.add(bk[j])
+                        outV.add(bv[j])
+                        j++
+                    }
+                    else -> {
+                        outK.add(bk[j])
+                        outV.add(bv[j])
+                        i++
+                        j++
+                    }
                 }
             }
-            while (i < ak.size) { outK.add(ak[i]); outV.add(av[i]); i++ }
-            while (j < bk.size) { outK.add(bk[j]); outV.add(bv[j]); j++ }
+            while (i < ak.size) {
+                outK.add(ak[i])
+                outV.add(av[i])
+                i++
+            }
+            while (j < bk.size) {
+                outK.add(bk[j])
+                outV.add(bv[j])
+                j++
+            }
         }
     }
 }

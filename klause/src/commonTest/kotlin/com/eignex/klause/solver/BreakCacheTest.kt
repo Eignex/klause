@@ -1,13 +1,9 @@
 package com.eignex.klause.solver
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
-
-import com.eignex.klause.solver.localsearch.LocalSearchState
-
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,7 +29,6 @@ class BreakCacheTest {
 
     @Test
     fun `cache matches scan after random move sequence on mixed problem`() {
-
         val numBool = 4
         val numInt = 2
         val intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5))
@@ -77,7 +72,6 @@ class BreakCacheTest {
 
     @Test
     fun `restart clears stale cache`() {
-
         val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
         )

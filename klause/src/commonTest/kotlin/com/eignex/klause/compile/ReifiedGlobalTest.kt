@@ -1,6 +1,5 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.AllDifferent
 import com.eignex.klause.ast.CircuitExpr
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.DisjunctiveExpr
@@ -11,8 +10,6 @@ import com.eignex.klause.ast.cumulativeOpt
 import com.eignex.klause.ast.disjunctiveOpt
 import com.eignex.klause.ast.gccOpt
 import com.eignex.klause.ast.iff
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.le
 import com.eignex.klause.ast.nValueOpt
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
@@ -35,6 +32,7 @@ class ReifiedGlobalTest {
         val n1 by intVar(min = 0, max = 2)
         val n2 by intVar(min = 0, max = 2)
         val flag by boolVar()
+
         // Sub-expression position: reify the global behind iff/implies.
         val c by constraint {
             flag iff CircuitExpr(listOf(n0.toIntExpr(), n1.toIntExpr(), n2.toIntExpr()))
@@ -98,8 +96,10 @@ class ReifiedGlobalTest {
     fun `reified cumulative solves and bit-blasts`() {
         val compiled = CumulativeReifiedSchema().compile()
         val cnf = BitBlaster.compile(compiled.problem)
-        assertTrue(cnf.clauses.isNotEmpty(),
-            "BitBlaster should accept the reified cumulative decomposition")
+        assertTrue(
+            cnf.clauses.isNotEmpty(),
+            "BitBlaster should accept the reified cumulative decomposition"
+        )
     }
 
     private class DisjunctiveReifiedSchema : VariableSchema() {

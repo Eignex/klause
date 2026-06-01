@@ -17,7 +17,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(4, 5, 6, 7)
         val factor = SetBitsetSubset(left, right)
         val problem = Problem(
-            numBoolVars = 8, numIntVars = 0,
+            numBoolVars = 8,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
@@ -32,7 +33,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(4, 5, 6, 7)
         val factor = SetBitsetSubset(left, right)
         val problem = Problem(
-            numBoolVars = 8, numIntVars = 0,
+            numBoolVars = 8,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
@@ -48,7 +50,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(4, 5, -1, 6)
         val factor = SetBitsetSubset(left, right)
         val problem = Problem(
-            numBoolVars = 7, numIntVars = 0,
+            numBoolVars = 7,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
@@ -63,7 +66,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(2, 3)
         val factor = SetBitsetSubset(left, right)
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0,
+            numBoolVars = 4,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
@@ -77,7 +81,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(3, 4, 5)
         val factor = SetBitsetDisjoint(left, right)
         val problem = Problem(
-            numBoolVars = 6, numIntVars = 0,
+            numBoolVars = 6,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
@@ -92,7 +97,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(2, 3)
         val factor = SetBitsetDisjoint(left, right)
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0,
+            numBoolVars = 4,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
@@ -106,7 +112,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(3, 4, 5)
         val factor = SetBitsetEq(left, right)
         val problem = Problem(
-            numBoolVars = 6, numIntVars = 0,
+            numBoolVars = 6,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
@@ -122,7 +129,8 @@ class SetBitsetAlgebraTest {
         val right = intArrayOf(2, -1, 3)
         val factor = SetBitsetEq(left, right)
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0,
+            numBoolVars = 4,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )

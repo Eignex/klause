@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
@@ -92,6 +91,7 @@ class Cbls(
     private var lastImprovingStep: Long = -1L
     private var lastSeenStep: Long = -1L
     private var lastCost: Long = Long.MAX_VALUE
+
     /** Step of the last strict cost decrease — unlike [lastImprovingStep] this is *not* reset
      *  by a weight bump, so it measures a true "no progress" stall window for plateau escape. */
     private var lastDropStep: Long = 0L
@@ -115,7 +115,7 @@ class Cbls(
             } else if (state.step - lastImprovingStep >= stallSteps) {
                 bumpViolatedWeights(state, stallIncrement)
                 if (smoothProb > 0.0 && state.rng.nextDouble() < smoothProb) smoothAllWeights(state)
-                lastImprovingStep = state.step  // reset stall window after the bump
+                lastImprovingStep = state.step // reset stall window after the bump
             }
             lastSeenStep = state.step
         }
@@ -160,7 +160,9 @@ class Cbls(
         for (i in 1 until moves.size) {
             val s = score(state, moves[i])
             if (s < bestScore) {
-                bestMove = moves[i]; bestScore = s; tieCount = 1
+                bestMove = moves[i]
+                bestScore = s
+                tieCount = 1
             } else if (s == bestScore) {
                 tieCount++
                 if (state.rng.nextInt(tieCount) == 0) bestMove = moves[i]
@@ -245,7 +247,10 @@ class Cbls(
     /** Emit ±1 int-steps and bool flips for every variable of factor [nf], spending from and
      *  returning the remaining [budget]. */
     private fun addNeighbourMoves(
-        state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink, nf: Int, budget: Int,
+        state: LocalSearchState,
+        sink: com.eignex.klause.solver.localsearch.MoveSink,
+        nf: Int,
+        budget: Int,
     ): Int {
         var b = budget
         val nfac = state.factors[nf]
@@ -253,13 +258,20 @@ class Cbls(
             if (b <= 0) return b
             val cur = state.assignment.intValue(u)
             val d = state.problem.intDomains[u]
-            if (cur < d.max) { sink.addChannelingIntSet(state, u, cur + 1); b-- }
+            if (cur < d.max) {
+                sink.addChannelingIntSet(state, u, cur + 1)
+                b--
+            }
             if (b <= 0) return b
-            if (cur > d.min) { sink.addChannelingIntSet(state, u, cur - 1); b-- }
+            if (cur > d.min) {
+                sink.addChannelingIntSet(state, u, cur - 1)
+                b--
+            }
         }
         for (u in nfac.boolVars) {
             if (b <= 0) return b
-            sink.addBoolFlip(u); b--
+            sink.addBoolFlip(u)
+            b--
         }
         return b
     }
@@ -321,7 +333,8 @@ class Cbls(
                     val d = state.problem.intDomains[v]
                     var step = 1
                     while (step <= OBJ_SEED_MAX_STEP) {
-                        val up = cur + step; val down = cur - step
+                        val up = cur + step
+                        val down = cur - step
                         if (up <= d.max) sink.addChannelingIntSet(state, v, up)
                         if (down >= d.min) sink.addChannelingIntSet(state, v, down)
                         if (up > d.max && down < d.min) break

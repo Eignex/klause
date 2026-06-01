@@ -91,14 +91,18 @@ class CircuitTest {
         val problem = fourNodeProblem()
         val state = LocalSearchState(problem, Random(0))
 
-        state.assignment.setInt(0, 1); state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 3); state.assignment.setInt(3, 2)
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 3)
+        state.assignment.setInt(3, 2)
         state.recompute()
         val cost2 = state.intPayload[0]
         assertEquals(1, cost2, "two 2-cycles should yield graded cost 1")
 
-        state.assignment.setInt(0, 0); state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 2); state.assignment.setInt(3, 3)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 2)
+        state.assignment.setInt(3, 3)
         state.recompute()
         val cost4 = state.intPayload[0]
         assertEquals(9, cost4, "4 self-loops should yield graded cost 9")
@@ -110,8 +114,10 @@ class CircuitTest {
     fun `cached cost matches recomputed after applying a move`() {
         val problem = fourNodeProblem()
         val state = LocalSearchState(problem, Random(0))
-        state.assignment.setInt(0, 1); state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 3); state.assignment.setInt(3, 0)
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 3)
+        state.assignment.setInt(3, 0)
         state.recompute()
         assertEquals(0, state.cost, "Hamiltonian baseline")
         state.apply(com.eignex.klause.solver.Move.IntSet(0, 2))
@@ -143,14 +149,17 @@ class CircuitTest {
     fun `propagator forces last edge when N-1 successors are fixed`() {
         val factor = Circuit(succ = intArrayOf(0, 1, 2, 3))
         val problem = com.eignex.klause.solver.Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(factor),
         )
         val assumptions = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 1, 1 to 2, 2 to 3))
         val result = problem.propagate(assumptions)
-        assertTrue(result is com.eignex.klause.solver.propagation.PropagationResult.Implied,
-            "propagation should succeed and force the closing edge; got $result")
+        assertTrue(
+            result is com.eignex.klause.solver.propagation.PropagationResult.Implied,
+            "propagation should succeed and force the closing edge; got $result"
+        )
         assertEquals(0, result.ints[3], "succ[3] should be forced to 0; got implied=${result.ints}")
     }
 
@@ -158,14 +167,17 @@ class CircuitTest {
     fun `propagator detects pigeonhole infeasibility`() {
         val factor = Circuit(succ = intArrayOf(0, 1, 2, 3))
         val problem = com.eignex.klause.solver.Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(factor),
         )
         val assumptions = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 2, 1 to 2))
         val result = problem.propagate(assumptions)
-        assertTrue(result is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
-            "should detect infeasibility; got $result")
+        assertTrue(
+            result is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
+            "should detect infeasibility; got $result"
+        )
     }
 
     @Test

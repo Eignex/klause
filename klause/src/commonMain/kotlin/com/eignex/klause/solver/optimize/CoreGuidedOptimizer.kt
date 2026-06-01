@@ -138,7 +138,10 @@ class CoreGuidedOptimizer(val baseProblem: Problem) {
         while (true) {
             val activeIdx = collectActive(workings, threshold)
             if (activeIdx.isEmpty()) {
-                if (strata.isNotEmpty()) { threshold = strata.removeFirst(); continue }
+                if (strata.isNotEmpty()) {
+                    threshold = strata.removeFirst()
+                    continue
+                }
                 return finalSolve(baseProblem, workings, exactly1Lits, nextBoolId, params, lb, cores)
             }
             val problem = buildProblem(baseProblem, workings, exactly1Lits, nextBoolId)
@@ -231,8 +234,9 @@ class CoreGuidedOptimizer(val baseProblem: Problem) {
         for (f in base.factors) factors.add(f)
         for (w in workings) factors.add(w.relaxerClause())
         for (lits in exactly1s) {
-            if (lits.size >= 2) factors.add(Cardinality(lits, min = 1, max = 1))
-            else if (lits.size == 1) {
+            if (lits.size >= 2) {
+                factors.add(Cardinality(lits, min = 1, max = 1))
+            } else if (lits.size == 1) {
                 // Singleton core: ExactlyOne reduces to "this lit = true", i.e. the
                 // relaxation must fire.
                 factors.add(Clause(lits))

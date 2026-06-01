@@ -12,7 +12,6 @@ class CompileTimeUnsatTest {
 
     @Test
     fun `constant false equality fails at compile time`() {
-
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val cap by constraint { (x - x) eq 5 }

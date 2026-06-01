@@ -1,11 +1,9 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.LocalSearchSession
-
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSession
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +21,9 @@ class LocalSearchSessionTest {
         // is exactly the learned state the session must capture/persist. Vars 3–5 are left
         // unconstrained so the variable-activity assertions still see all 6 slots.
         return Problem(
-            numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 6,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Cardinality.exactlyOne(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
@@ -36,11 +36,17 @@ class LocalSearchSessionTest {
     fun `maxInstructions tightens flip budget vs maxFlips when smaller`() {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem)
-        val tight = solver.solve(LocalSearchParams(
-            maxFlips = Long.MAX_VALUE, maxInstructions = 5L, randomSeed = 0L,
-        ))
-        assertTrue(tight is SolveResult.Sat || tight is SolveResult.Unknown,
-            "tight maxInstructions must terminate cleanly, got $tight")
+        val tight = solver.solve(
+            LocalSearchParams(
+                maxFlips = Long.MAX_VALUE,
+                maxInstructions = 5L,
+                randomSeed = 0L,
+            )
+        )
+        assertTrue(
+            tight is SolveResult.Sat || tight is SolveResult.Unknown,
+            "tight maxInstructions must terminate cleanly, got $tight"
+        )
     }
 
     @Test
@@ -115,13 +121,17 @@ class LocalSearchSessionTest {
         val session = LocalSearchSession(solver)
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
         val firstWatermark = session.warmStateView.bestCostSeen()
-        assertTrue(firstWatermark < Int.MAX_VALUE,
-            "expected watermark after first call, got $firstWatermark")
+        assertTrue(
+            firstWatermark < Int.MAX_VALUE,
+            "expected watermark after first call, got $firstWatermark"
+        )
 
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L)).assignment
         val secondWatermark = session.warmStateView.bestCostSeen()
-        assertTrue(secondWatermark <= firstWatermark,
-            "watermark must monotone-decrease: $firstWatermark -> $secondWatermark")
+        assertTrue(
+            secondWatermark <= firstWatermark,
+            "watermark must monotone-decrease: $firstWatermark -> $secondWatermark"
+        )
     }
 
     @Test
@@ -132,8 +142,11 @@ class LocalSearchSessionTest {
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L)).assignment
         assertTrue(session.warmStateView.bestCostSeen() < Long.MAX_VALUE)
         session.reset()
-        assertEquals(Long.MAX_VALUE, session.warmStateView.bestCostSeen(),
-            "reset should restore the bestCost watermark to its empty default")
+        assertEquals(
+            Long.MAX_VALUE,
+            session.warmStateView.bestCostSeen(),
+            "reset should restore the bestCost watermark to its empty default"
+        )
     }
 
     @Test
@@ -149,8 +162,10 @@ class LocalSearchSessionTest {
         val bumpOnlyPeak = peakWeightAfterRun(Cbls())
         val smoothedPeak = peakWeightAfterRun(Cbls(smoothProb = 1.0, smoothFactor = 0.5))
         assertTrue(bumpOnlyPeak > 1.0, "bump-only run should grow weights, got peak=$bumpOnlyPeak")
-        assertTrue(smoothedPeak < bumpOnlyPeak,
-            "smoothing should bound growth: smoothed=$smoothedPeak vs bump-only=$bumpOnlyPeak")
+        assertTrue(
+            smoothedPeak < bumpOnlyPeak,
+            "smoothing should bound growth: smoothed=$smoothedPeak vs bump-only=$bumpOnlyPeak"
+        )
     }
 
     @Test

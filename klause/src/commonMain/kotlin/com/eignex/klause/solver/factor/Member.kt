@@ -40,7 +40,10 @@ class Member(
         var matched = false
         for (x in xs) {
             val xv = if (x == intVar) newValue else state.assignment.intValue(x)
-            if (xv == yv) { matched = true; break }
+            if (xv == yv) {
+                matched = true
+                break
+            }
         }
         val willViolate = !matched
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
@@ -82,12 +85,18 @@ class Member(
         if (dy.min == dy.max) {
             val yv = dy.min
             var anyContains = false
-            for (x in xs) if (yv in state.intDomains[x]) { anyContains = true; break }
+            for (x in xs) if (yv in state.intDomains[x]) {
+                anyContains = true
+                break
+            }
             if (!anyContains) return false
         }
         // Singleton-xs[i]: if every xs[i] is singleton, y must equal one of them.
         var allSingleton = true
-        for (x in xs) if (state.intDomains[x].min != state.intDomains[x].max) { allSingleton = false; break }
+        for (x in xs) if (state.intDomains[x].min != state.intDomains[x].max) {
+            allSingleton = false
+            break
+        }
         if (allSingleton) {
             val values = HashSet<Int>()
             for (x in xs) values.add(state.intDomains[x].min)

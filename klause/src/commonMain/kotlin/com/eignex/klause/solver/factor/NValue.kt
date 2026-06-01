@@ -117,8 +117,12 @@ class NValue(
         if (occurrences > 0) {
             val oldCount = s.counts[oldValue] ?: 0
             val after = oldCount - occurrences
-            if (after == 0) { s.counts.remove(oldValue); s.distinctCount-- }
-            else s.counts[oldValue] = after
+            if (after == 0) {
+                s.counts.remove(oldValue)
+                s.distinctCount--
+            } else {
+                s.counts[oldValue] = after
+            }
             val newCount = s.counts[cur] ?: 0
             if (newCount == 0) s.distinctCount++
             s.counts[cur] = newCount + occurrences
@@ -133,7 +137,7 @@ class NValue(
         val wasViolated = isViolatedInternal(s, state.assignment.intValue(n))
         // Simulate the flip's net effect on distinct.
         var distinct = s.distinctCount
-        val touched = HashMap<Int, Int>()  // value → delta to counts[value]
+        val touched = HashMap<Int, Int>() // value → delta to counts[value]
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasP = present(state, i)
@@ -166,8 +170,12 @@ class NValue(
             } else {
                 val before = s.counts[value] ?: error("nvalue: absent flip without prior count")
                 val after = before - 1
-                if (after == 0) { s.counts.remove(value); s.distinctCount-- }
-                else s.counts[value] = after
+                if (after == 0) {
+                    s.counts.remove(value)
+                    s.distinctCount--
+                } else {
+                    s.counts[value] = after
+                }
             }
         }
         val nowViolated = isViolatedInternal(s, state.assignment.intValue(n))
@@ -194,7 +202,7 @@ class NValue(
         if (s.distinctCount in nDom) sink.addChannelingIntSet(state, n, s.distinctCount)
         val needIncrease = when (mode) {
             Mode.Eq -> nv > s.distinctCount
-            Mode.AtLeast -> true   // nv > distinct → must raise distinct
+            Mode.AtLeast -> true // nv > distinct → must raise distinct
             Mode.AtMost -> false
         }
         val needDecrease = when (mode) {

@@ -35,7 +35,8 @@ class AllFactorsOracleTest {
     @Test fun cardinality() {
         val f = Cardinality(
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-            min = 1, max = 2,
+            min = 1,
+            max = 2,
         )
         check(f, numBoolVars = 3)
     }
@@ -44,7 +45,8 @@ class AllFactorsOracleTest {
         val f = PseudoBoolean(
             weights = intArrayOf(3, -2, 5),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-            op = PbOp.LE, bound = 4,
+            op = PbOp.LE,
+            bound = 4,
         )
         check(f, numBoolVars = 3)
     }
@@ -64,7 +66,8 @@ class AllFactorsOracleTest {
             auxBoolVar = 0,
             coeffs = intArrayOf(1, 1),
             vars = intArrayOf(0, 1),
-            op = LinearOp.LE, bound = 2,
+            op = LinearOp.LE,
+            bound = 2,
         )
         check(f, numBoolVars = 1, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
     }
@@ -74,7 +77,8 @@ class AllFactorsOracleTest {
             auxBoolVar = 0,
             weights = intArrayOf(1, 1, 1),
             literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-            op = PbOp.LE, bound = 1,
+            op = PbOp.LE,
+            bound = 1,
         )
         check(f, numBoolVars = 4)
     }
@@ -83,7 +87,8 @@ class AllFactorsOracleTest {
         val f = ReifiedCardinality(
             auxBoolVar = 0,
             literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-            min = 1, max = 2,
+            min = 1,
+            max = 2,
         )
         check(f, numBoolVars = 4)
     }
@@ -91,8 +96,12 @@ class AllFactorsOracleTest {
     @Test fun reifiedIntCompare() {
         for (op in IntCmpOp.entries) {
             val f = reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = op, bound = 1)
-            check(f, numBoolVars = 1, intDomains = arrayOf(IntDomain(-1, 2)),
-                  label = "reifiedIntCompare.$op")
+            check(
+                f,
+                numBoolVars = 1,
+                intDomains = arrayOf(IntDomain(-1, 2)),
+                label = "reifiedIntCompare.$op"
+            )
         }
     }
 
@@ -128,24 +137,35 @@ class AllFactorsOracleTest {
     @Test fun count() {
         // n (the count var) is a *separate* var (3), not aliased with a counted xs element.
         val f = Count(xs = intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = 3)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
-              exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
+            exactProbe = true
+        )
     }
 
     @Test fun among() {
         // n (the count var) is a *separate* var (3), not aliased with a counted xs element.
         val f = Among(n = 3, xs = intArrayOf(0, 1, 2), values = intArrayOf(1, 2))
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
-              exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
+            exactProbe = true
+        )
     }
 
     @Test fun nValue() {
         val f = NValue(n = 0, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.Eq)
         // n is an int var (index 0 in problem ordering after xs? actually xs is intVars[0..2], n is intVars[3])
         // Need to know NValue's intVars layout. Build per its constructor — xs are indices into int var space.
-        check(f, intDomains = arrayOf(
-            IntDomain(1, 3),    // n
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(1, 3), // n
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2)
+            ),
         )
     }
 
@@ -156,10 +176,16 @@ class AllFactorsOracleTest {
             cover = intArrayOf(0, 1),
             countVars = intArrayOf(0, 1),
         )
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 3), IntDomain(0, 3),
-            IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
-        ))
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 3),
+                IntDomain(0, 3),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+            )
+        )
     }
 
     // ---- Sequencing / global -----------------------------------------------------
@@ -213,26 +239,38 @@ class AllFactorsOracleTest {
 
     @Test fun arrayMin() {
         val f = ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = false)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-              exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            exactProbe = true
+        )
     }
 
     @Test fun arrayMax() {
         val f = ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = true)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-              exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            exactProbe = true
+        )
     }
 
     @Test fun argMin() {
         val f = ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-              exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            exactProbe = true
+        )
     }
 
     @Test fun argMax() {
         val f = ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = true)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-              exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            exactProbe = true
+        )
     }
 
     @Test fun member() {
@@ -249,35 +287,62 @@ class AllFactorsOracleTest {
     @Test fun elementVar() {
         // result(0) = arr[idx(1)], arr = vars 2,3,4; idx 1-based ∈ [1,3].
         val f = Element(idx = 1, result = 0, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 3),                       // result
-            IntDomain(0, 4),                       // idx
-            IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3),  // arr vars
-        ), exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 3), // result
+                IntDomain(0, 4), // idx
+                IntDomain(0, 3),
+                IntDomain(0, 3),
+                IntDomain(0, 3), // arr vars
+            ),
+            exactProbe = true
+        )
     }
 
     @Test fun sort() {
         val f = Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-        ))
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            )
+        )
     }
 
     @Test fun argSort() {
         val f = ArgSort(values = intArrayOf(0, 1, 2), perm = intArrayOf(3, 4, 5))
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-        ))
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            )
+        )
     }
 
     @Test fun inverse() {
         val f = Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-        ))
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            )
+        )
     }
 
     // ---- Circuit / path ----------------------------------------------------------
@@ -314,7 +379,10 @@ class AllFactorsOracleTest {
             w = 3,
             p = 4,
         )
-        check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 5)))
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 5))
+        )
     }
 
     @Test fun cumulative() {
@@ -335,9 +403,16 @@ class AllFactorsOracleTest {
     @Test fun slidingSum() {
         // Every window of 2 consecutive elements sums into [1, 3]; 4 vars ∈ [0,2].
         val f = SlidingSum(low = 1, up = 3, seq = 2, vs = intArrayOf(0, 1, 2, 3))
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-        ), exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            ),
+            exactProbe = true
+        )
     }
 
     @Test fun cumulativesUpper() {
@@ -351,10 +426,18 @@ class AllFactorsOracleTest {
             upper = true,
             minMachine = 0,
         )
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),   // starts
-            IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),   // machines (∈ {0,1})
-        ), exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2), // starts
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1), // machines (∈ {0,1})
+            ),
+            exactProbe = true
+        )
     }
 
     @Test fun cumulativesLower() {
@@ -368,49 +451,80 @@ class AllFactorsOracleTest {
             upper = false,
             minMachine = 0,
         )
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2),   // starts
-            IntDomain(0, 1), IntDomain(0, 1),   // machines
-        ), exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2), // starts
+                IntDomain(0, 1),
+                IntDomain(0, 1), // machines
+            ),
+            exactProbe = true
+        )
     }
 
     @Test fun diffn() {
         val f = Diffn(
-            xs = intArrayOf(0, 1), ys = intArrayOf(2, 3),
-            widths = intArrayOf(2, 1), heights = intArrayOf(1, 2),
+            xs = intArrayOf(0, 1),
+            ys = intArrayOf(2, 3),
+            widths = intArrayOf(2, 1),
+            heights = intArrayOf(1, 2),
         )
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2),
-            IntDomain(0, 2), IntDomain(0, 2),
-        ))
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            )
+        )
     }
 
     @Test fun diffnVarSize() {
         // Two rectangles whose widths (vars 4,5) and heights (vars 6,7) are themselves
         // variables — exercises the variable-size path (incl. propagateVarSizeSoundOnly).
         val f = Diffn(
-            xs = intArrayOf(0, 1), ys = intArrayOf(2, 3),
-            widths = IntArray(0), heights = IntArray(0),
-            widthVars = intArrayOf(4, 5), heightVars = intArrayOf(6, 7),
+            xs = intArrayOf(0, 1),
+            ys = intArrayOf(2, 3),
+            widths = IntArray(0),
+            heights = IntArray(0),
+            widthVars = intArrayOf(4, 5),
+            heightVars = intArrayOf(6, 7),
         )
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2),   // xs
-            IntDomain(0, 2), IntDomain(0, 2),   // ys
-            IntDomain(1, 2), IntDomain(1, 2),   // width vars
-            IntDomain(1, 2), IntDomain(1, 2),   // height vars
-        ))
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2), // xs
+                IntDomain(0, 2),
+                IntDomain(0, 2), // ys
+                IntDomain(1, 2),
+                IntDomain(1, 2), // width vars
+                IntDomain(1, 2),
+                IntDomain(1, 2), // height vars
+            )
+        )
     }
 
     @Test fun geost() {
         // 2 boxes in 2D, each 2×2, origins ∈ [0,2]. Row-major origin = [o0x,o0y, o1x,o1y].
         val f = Geost(
-            numDims = 2, numObjects = 2,
+            numDims = 2,
+            numObjects = 2,
             origin = intArrayOf(0, 1, 2, 3),
             length = intArrayOf(2, 2, 2, 2),
         )
-        check(f, intDomains = arrayOf(
-            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
-        ), exactProbe = true)
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            ),
+            exactProbe = true
+        )
     }
 
     // ---- Automata ----------------------------------------------------------------
@@ -419,8 +533,10 @@ class AllFactorsOracleTest {
         // Even count of '0' over alphabet {0,1}. States 1-based: 1 = even (accept), 2 = odd.
         // Alphabet symbols are also 1-based; xs values map to symbol = value (1 or 2).
         val transitions = intArrayOf(
-            2, 1,  // from state 1: '1' → 2, '2' → 1
-            1, 2,  // from state 2: '1' → 1, '2' → 2
+            2,
+            1, // from state 1: '1' → 2, '2' → 1
+            1,
+            2, // from state 2: '1' → 1, '2' → 2
         )
         val f = Regular(
             seq = intArrayOf(0, 1, 2),
@@ -442,8 +558,8 @@ class AllFactorsOracleTest {
             numStatesPerLayer = intArrayOf(1, 2, 1),
             layerStarts = intArrayOf(0, 6, 12),
             transitions = intArrayOf(
-                0, 1, 0,  0, 2, 1,   // layer 0
-                0, 2, 0,  1, 1, 0,   // layer 1
+                0, 1, 0, 0, 2, 1, // layer 0
+                0, 2, 0, 1, 1, 0, // layer 1
             ),
             initial = 0,
             accepting = intArrayOf(0),
@@ -475,7 +591,7 @@ class AllFactorsOracleTest {
         // x0 ∈ {0,1}, x1 ∈ {0,1}, x2 ∈ {0,1}; allowed tuples: (0,0,0), (1,1,0), (1,0,1).
         val f = Table(
             xs = intArrayOf(0, 1, 2),
-            tuples = intArrayOf(0, 0, 0,  1, 1, 0,  1, 0, 1),
+            tuples = intArrayOf(0, 0, 0, 1, 1, 0, 1, 0, 1),
         )
         check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)), exactProbe = true)
     }

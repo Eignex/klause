@@ -76,8 +76,10 @@ class ArrayMinMax(
         var init = false
         for (v in xs) {
             val current = if (v == intVar) newValue else state.assignment.intValue(v)
-            if (!init) { best = current; init = true }
-            else if (cmp(current, best)) best = current
+            if (!init) {
+                best = current
+                init = true
+            } else if (cmp(current, best)) best = current
         }
         return best
     }
@@ -113,7 +115,8 @@ class ArrayMinMax(
         if ((max && rv > best) || (!max && rv < best)) {
             for (v in xs) {
                 if (rv in state.problem.intDomains[v] && rv != state.assignment.intValue(v)) {
-                    sink.addChannelingIntSet(state, v, rv); break
+                    sink.addChannelingIntSet(state, v, rv)
+                    break
                 }
             }
         }
@@ -130,36 +133,56 @@ class ArrayMinMax(
         val antResult = state.composeIntVarAtomAntecedents(intArrayOf(result))
         if (max) {
             // result = max(xs).
-            var hiBound = Int.MIN_VALUE       // max of xs.max — caps result above
-            var loBound = Int.MIN_VALUE       // max of xs.min — floors result below
-            var loVar = xs[0]                 // operand whose lower bound == loBound
+            var hiBound = Int.MIN_VALUE // max of xs.max — caps result above
+            var loBound = Int.MIN_VALUE // max of xs.min — floors result below
+            var loVar = xs[0] // operand whose lower bound == loBound
             for (i in xs) {
                 val d = state.intDomains[i]
                 if (d.max > hiBound) hiBound = d.max
-                if (d.min > loBound) { loBound = d.min; loVar = i }
+                if (d.min > loBound) {
+                    loBound = d.min
+                    loVar = i
+                }
             }
             // result ≤ hiBound needs *every* operand's upper bound — raising any could lift
             // the cap — so its reason is genuinely all of xs.
             if (!state.tightenIntMax(result, hiBound, state.composeIntVarAtomAntecedents(xs))) return false
             // result ≥ loBound is forced solely by [loVar] (result = max(xs) ≥ loVar ≥ loBound);
             // cite only it.
-            if (!state.tightenIntMin(result, loBound, state.composeIntVarAtomAntecedents(intArrayOf(loVar)))) return false
+            if (!state.tightenIntMin(
+                    result,
+                    loBound,
+                    state.composeIntVarAtomAntecedents(intArrayOf(loVar))
+                )
+            ) {
+                return false
+            }
             val rMax = state.intDomains[result].max
             for (i in xs) if (!state.tightenIntMax(i, rMax, antResult)) return false
         } else {
             // result = min(xs).
-            var loBound = Int.MAX_VALUE       // min of xs.min — floors result below
-            var hiBound = Int.MAX_VALUE       // min of xs.max — caps result above
-            var hiVar = xs[0]                 // operand whose upper bound == hiBound
+            var loBound = Int.MAX_VALUE // min of xs.min — floors result below
+            var hiBound = Int.MAX_VALUE // min of xs.max — caps result above
+            var hiVar = xs[0] // operand whose upper bound == hiBound
             for (i in xs) {
                 val d = state.intDomains[i]
                 if (d.min < loBound) loBound = d.min
-                if (d.max < hiBound) { hiBound = d.max; hiVar = i }
+                if (d.max < hiBound) {
+                    hiBound = d.max
+                    hiVar = i
+                }
             }
             // result ≥ loBound needs every operand's lower bound — stays coarse.
             if (!state.tightenIntMin(result, loBound, state.composeIntVarAtomAntecedents(xs))) return false
             // result ≤ hiBound is forced solely by [hiVar] (result = min(xs) ≤ hiVar ≤ hiBound).
-            if (!state.tightenIntMax(result, hiBound, state.composeIntVarAtomAntecedents(intArrayOf(hiVar)))) return false
+            if (!state.tightenIntMax(
+                    result,
+                    hiBound,
+                    state.composeIntVarAtomAntecedents(intArrayOf(hiVar))
+                )
+            ) {
+                return false
+            }
             val rMin = state.intDomains[result].min
             for (i in xs) if (!state.tightenIntMin(i, rMin, antResult)) return false
         }

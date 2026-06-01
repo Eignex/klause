@@ -62,7 +62,7 @@ class Xcsp3Test {
         val obj = requireNotNull(parsed.objective)
         val r = BacktrackSolver(parsed.problem).minimize(obj, BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
-        assertEquals(-10.0, r.objective)   // internal min of negated maximize (max of 10).
+        assertEquals(-10.0, r.objective) // internal min of negated maximize (max of 10).
     }
 
     @Test
@@ -127,7 +127,9 @@ class Xcsp3Test {
         assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Element })
         val v = sat(xml)
         // i=1, v=2 ⇒ t[1] must equal 2. ids: t[0]=0,t[1]=1,t[2]=2,i=3,v=4
-        assertEquals(2, v[1]); assertEquals(1, v[3]); assertEquals(2, v[4])
+        assertEquals(2, v[1])
+        assertEquals(1, v[3])
+        assertEquals(2, v[4])
     }
 
     @Test
@@ -145,7 +147,10 @@ class Xcsp3Test {
         """.trimIndent()
         assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Inverse })
         val v = sat(xml)
-        for (i in 0..2) { val j = v[i]; assertEquals(i, v[3 + j], "y[$j] should equal $i") }
+        for (i in 0..2) {
+            val j = v[i]
+            assertEquals(i, v[3 + j], "y[$j] should equal $i")
+        }
     }
 
     @Test
@@ -158,9 +163,14 @@ class Xcsp3Test {
         """.trimIndent()
         assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Circuit })
         val v = sat(xml)
-        val seen = HashSet<Int>(); var cur = 0
-        repeat(3) { seen.add(cur); cur = v[cur] }
-        assertEquals(setOf(0, 1, 2), seen); assertEquals(0, cur)
+        val seen = HashSet<Int>()
+        var cur = 0
+        repeat(3) {
+            seen.add(cur)
+            cur = v[cur]
+        }
+        assertEquals(setOf(0, 1, 2), seen)
+        assertEquals(0, cur)
     }
 
     @Test
@@ -258,6 +268,6 @@ class Xcsp3Test {
         val obj = requireNotNull(parsed.objective)
         val r = BacktrackSolver(parsed.problem).minimize(obj, BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
-        assertEquals(2.0, r.objective)   // sum >= 6 over three vars ⇒ max minimized at 2.
+        assertEquals(2.0, r.objective) // sum >= 6 over three vars ⇒ max minimized at 2.
     }
 }

@@ -6,7 +6,6 @@ import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -26,36 +25,52 @@ object FactorPropagationOracle {
         val samples = enumerateSat(problem)
         val result = problem.propagate()
         if (samples.isEmpty()) {
-            assertTrue(result is PropagationResult.Unsat,
-                "$label: propagate returned $result but brute found zero satisfying assignments")
+            assertTrue(
+                result is PropagationResult.Unsat,
+                "$label: propagate returned $result but brute found zero satisfying assignments"
+            )
             return
         }
-        assertTrue(result is PropagationResult.Implied,
-            "$label: propagate returned Unsat but brute found ${samples.size} satisfying assignments")
+        assertTrue(
+            result is PropagationResult.Implied,
+            "$label: propagate returned Unsat but brute found ${samples.size} satisfying assignments"
+        )
 
         // Bool pins
         result.forEachBool { v, b ->
-            for (s in samples) assertEquals(b, s.bools[v],
-                "$label: propagate pinned bool $v=$b but a satisfying assignment has ${s.bools[v]}")
+            for (s in samples) assertEquals(
+                b,
+                s.bools[v],
+                "$label: propagate pinned bool $v=$b but a satisfying assignment has ${s.bools[v]}"
+            )
         }
         // Int pins
         result.forEachInt { v, value ->
-            for (s in samples) assertEquals(value, s.ints[v],
-                "$label: propagate pinned int $v=$value but a satisfying assignment has ${s.ints[v]}")
+            for (s in samples) assertEquals(
+                value,
+                s.ints[v],
+                "$label: propagate pinned int $v=$value but a satisfying assignment has ${s.ints[v]}"
+            )
         }
         // Bound tightenings
         result.forEachIntMin { v, lo ->
-            for (s in samples) assertTrue(s.ints[v] >= lo,
-                "$label: propagate tightened min of int $v to $lo but a satisfying assignment has ${s.ints[v]}")
+            for (s in samples) assertTrue(
+                s.ints[v] >= lo,
+                "$label: propagate tightened min of int $v to $lo but a satisfying assignment has ${s.ints[v]}"
+            )
         }
         result.forEachIntMax { v, hi ->
-            for (s in samples) assertTrue(s.ints[v] <= hi,
-                "$label: propagate tightened max of int $v to $hi but a satisfying assignment has ${s.ints[v]}")
+            for (s in samples) assertTrue(
+                s.ints[v] <= hi,
+                "$label: propagate tightened max of int $v to $hi but a satisfying assignment has ${s.ints[v]}"
+            )
         }
         // Interior holes
         result.forEachIntHole { v, value ->
-            for (s in samples) assertTrue(s.ints[v] != value,
-                "$label: propagate declared hole int $v != $value but a satisfying assignment has ${s.ints[v]}")
+            for (s in samples) assertTrue(
+                s.ints[v] != value,
+                "$label: propagate declared hole int $v != $value but a satisfying assignment has ${s.ints[v]}"
+            )
         }
     }
 

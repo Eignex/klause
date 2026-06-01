@@ -1,6 +1,7 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.AllDifferent
+import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
@@ -8,8 +9,13 @@ import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.CardinalityExpr
 import com.eignex.klause.ast.CircuitExpr
+import com.eignex.klause.ast.CountExprOpt
+import com.eignex.klause.ast.CountOp
 import com.eignex.klause.ast.CumulativeExpr
+import com.eignex.klause.ast.CumulativeExprOpt
 import com.eignex.klause.ast.DisjunctiveExpr
+import com.eignex.klause.ast.DisjunctiveExprOpt
+import com.eignex.klause.ast.GccExprOpt
 import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
@@ -17,10 +23,11 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
+import com.eignex.klause.ast.NValueExprOpt
+import com.eignex.klause.ast.NValueMode
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.PbOp
 import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.TableConstraint
@@ -28,27 +35,19 @@ import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
-import com.eignex.klause.ast.AllDifferentOpt
-import com.eignex.klause.ast.CountExprOpt
-import com.eignex.klause.ast.CountOp
-import com.eignex.klause.ast.CumulativeExprOpt
-import com.eignex.klause.ast.DisjunctiveExprOpt
-import com.eignex.klause.ast.GccExprOpt
-import com.eignex.klause.ast.NValueExprOpt
-import com.eignex.klause.ast.NValueMode
-import com.eignex.klause.solver.factor.Count as CountFactor
-import com.eignex.klause.solver.factor.GlobalCardinality as GccFactor
-import com.eignex.klause.solver.factor.NValue as NValueFactor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.Circuit as CircuitFactor
+import com.eignex.klause.solver.factor.Count as CountFactor
 import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
 import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
+import com.eignex.klause.solver.factor.GlobalCardinality as GccFactor
+import com.eignex.klause.solver.factor.NValue as NValueFactor
 import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
 
 /**
@@ -123,7 +122,7 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
                 literals = lits,
                 op = expr.op,
                 bound = expr.bound,
-)
+            )
         }
         is XorExpr -> {
             val lits = lowerAllBool(expr.children)
@@ -135,9 +134,11 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
 internal fun Compiler.Build.expandTable(t: TableConstraint): BoolExpr {
     val lifted = t.terms.map { lift(it) }
     val tuples = t.tuples.map { tup ->
-        And(lifted.indices.map { i ->
-            IntCompare(lifted[i], IntCmpOp.EQ, IntLit(tup[i]))
-        })
+        And(
+            lifted.indices.map { i ->
+                IntCompare(lifted[i], IntCmpOp.EQ, IntLit(tup[i]))
+            }
+        )
     }
     return if (t.negative) {
         And(tuples.map { Not(it) })
@@ -240,16 +241,20 @@ internal fun Compiler.Build.assertCircuit(succ: List<IntExpr>, valueOffset: Int,
             "variable reference (no arithmetic). Got ${lifted.map { it::class.simpleName }}."
     }
     val srcIds = IntArray(n) { intVarOf((lifted[it] as IntRef).name) }
-    val ids = if (valueOffset == 0) srcIds else IntArray(n) { i ->
-        // Channel: aux = src - valueOffset, with aux ∈ [0, n − 1].
-        val auxId = newIntVar(IntDomain(0, n - 1))
-        factors += Linear(
-            coeffs = intArrayOf(1, -1),
-            vars = intArrayOf(srcIds[i], auxId),
-            op = LinearOp.EQ,
-            bound = valueOffset,
-        )
-        auxId
+    val ids = if (valueOffset == 0) {
+        srcIds
+    } else {
+        IntArray(n) { i ->
+            // Channel: aux = src - valueOffset, with aux ∈ [0, n − 1].
+            val auxId = newIntVar(IntDomain(0, n - 1))
+            factors += Linear(
+                coeffs = intArrayOf(1, -1),
+                vars = intArrayOf(srcIds[i], auxId),
+                op = LinearOp.EQ,
+                bound = valueOffset,
+            )
+            auxId
+        }
     }
     factors += if (sub) SubcircuitFactor(succ = ids) else CircuitFactor(succ = ids)
 }
@@ -501,7 +506,9 @@ internal fun Compiler.Build.emitSingleVar(
 }
 
 internal fun Compiler.Build.emitSingleVarCanonical(
-    name: String, op: IntCmpOp, bound: Int,
+    name: String,
+    op: IntCmpOp,
+    bound: Int,
 ) {
     val v = intVarOf(name)
     factors += Linear(intArrayOf(1), intArrayOf(v), op.toLinearOp(), bound)
@@ -514,4 +521,3 @@ internal fun IntCmpOp.toLinearOp(): LinearOp = when (this) {
     IntCmpOp.NE -> LinearOp.NE
     IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
 }
-

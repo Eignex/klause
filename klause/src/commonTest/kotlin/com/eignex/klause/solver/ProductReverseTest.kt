@@ -1,9 +1,7 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.propagation.PropagationResult
-
 import com.eignex.klause.solver.factor.Product
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -14,21 +12,25 @@ class ProductReverseTest {
     fun `singleton-b narrows a's domain`() {
         // a * 3 = result, with result in [6..9]. a must be in [2..3].
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(-10, 10), IntDomain(3, 3), IntDomain(6, 9)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val r = assertIs<PropagationResult.Implied>(p.propagate())
         // The Implied map only contains singleton-pinned vars; a's [2..3] narrowing
         // isn't returned. Tighter-result tests below cover the singleton case.
-        @Suppress("UNUSED_VARIABLE") val _ok = r
+
+        @Suppress("UNUSED_VARIABLE")
+        val _ok = r
     }
 
     @Test
     fun `singleton-b with singleton-result forces a`() {
         // a * 5 = 15 → a = 3.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 100), IntDomain(5, 5), IntDomain(15, 15)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
@@ -40,7 +42,8 @@ class ProductReverseTest {
     fun `singleton-a with singleton-result forces b`() {
         // 4 * b = 12 → b = 3.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(4, 4), IntDomain(0, 100), IntDomain(12, 12)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
@@ -52,7 +55,8 @@ class ProductReverseTest {
     fun `singleton-b negative narrows a correctly`() {
         // a * -2 = -6 → a = 3.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(-10, 10), IntDomain(-2, -2), IntDomain(-6, -6)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
@@ -64,7 +68,8 @@ class ProductReverseTest {
     fun `non-divisible singleton result yields Unsat`() {
         // a * 4 = 5 has no integer solution → Unsat.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 100), IntDomain(4, 4), IntDomain(5, 5)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
@@ -76,7 +81,8 @@ class ProductReverseTest {
         // a * b = result over a ∈ [-100, 100], b ∈ [2, 4], result ∈ [10, 20].
         // Corner division gives a ∈ [ceil(10/4), floor(20/2)] = [3, 10].
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(2, 4), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
@@ -91,7 +97,8 @@ class ProductReverseTest {
         // a * b = result, b ∈ [-4, -2], result ∈ [10, 20]; corner division yields
         // a.min = min ceil(r/b) = -10 and a.max = max floor(r/b) = -3.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(-4, -2), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
@@ -107,7 +114,8 @@ class ProductReverseTest {
         // (a/0 is undefined). a's domain endpoints are not on 0 either (-100 / 100), so
         // the zero-exclusion endpoint check doesn't fire. Expect a's domain unchanged.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(-2, 3), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
@@ -122,28 +130,33 @@ class ProductReverseTest {
         // Contiguous-interval domains can only kick 0 out at an endpoint, so a's
         // domain is started at 0 to exercise the endpoint-exclusion path.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(1, 5), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         val session = com.eignex.klause.solver.propagation.PropagationSession(p)
         val daAfter = session.intDomain(0)
-        kotlin.test.assertTrue(daAfter.min >= 1,
-            "a.min=0 should have been pushed up since 0 * b = 0 ∉ result; got $daAfter")
+        kotlin.test.assertTrue(
+            daAfter.min >= 1,
+            "a.min=0 should have been pushed up since 0 * b = 0 ∉ result; got $daAfter"
+        )
     }
 
     @Test
     fun `zero-singleton operand requires zero result`() {
         // a * 0 = result. If result must be 0, fine. If result domain excludes 0, Unsat.
         val pSat = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(-5, 5), IntDomain(0, 0), IntDomain(0, 0)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         assertIs<PropagationResult.Implied>(pSat.propagate())
 
         val pUnsat = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(-5, 5), IntDomain(0, 0), IntDomain(5, 5)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )

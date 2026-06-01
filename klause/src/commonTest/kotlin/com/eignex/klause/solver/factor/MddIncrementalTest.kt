@@ -20,17 +20,18 @@ class MddIncrementalTest {
             numStatesPerLayer = intArrayOf(1, 1, 1),
             layerStarts = intArrayOf(0, 6, 12),
             transitions = intArrayOf(
-                0, 1, 0,  // layer 0: 0 --1--> 0
-                0, 2, 0,  // layer 0: 0 --2--> 0
-                0, 1, 0,  // layer 1: 0 --1--> 0
-                0, 2, 0,  // layer 1: 0 --2--> 0
+                0, 1, 0, // layer 0: 0 --1--> 0
+                0, 2, 0, // layer 0: 0 --2--> 0
+                0, 1, 0, // layer 1: 0 --1--> 0
+                0, 2, 0, // layer 1: 0 --2--> 0
             ),
             initial = 0,
             accepting = intArrayOf(0),
             recordStride = 3,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
             factors = arrayOf<Factor>(factor),
         )

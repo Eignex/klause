@@ -9,7 +9,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
-import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
@@ -193,7 +192,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 is SearchOutcome.Found -> {
                     val o = objective.evaluate(outcome.sample)
                     if (o < bestObj) {
-                        bestObj = o; best = outcome.sample
+                        bestObj = o
+                        best = outcome.sample
                         // Yield each new incumbent eagerly — consumers can react to it
                         // before search continues toward the bound. The reason here is
                         // a hint ("more might come"); the terminal yield carries the
@@ -211,19 +211,26 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     // calling portfolio can upgrade to Optimal/Infeasible after combining
                     // every worker's verdict.
                     val externalShared = params.objectiveBoundSupplier != null
-                    yield(when {
-                        externalShared && best != null ->
-                            MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted)
-                        externalShared ->
-                            MinimizeResult.Unknown(TerminationReason.SearchExhausted)
-                        best != null -> MinimizeResult.Optimal(best, bestObj)
-                        else -> MinimizeResult.Infeasible(outcome.core)
-                    })
+                    yield(
+                        when {
+                            externalShared && best != null ->
+                                MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted)
+                            externalShared ->
+                                MinimizeResult.Unknown(TerminationReason.SearchExhausted)
+                            best != null -> MinimizeResult.Optimal(best, bestObj)
+                            else -> MinimizeResult.Infeasible(outcome.core)
+                        }
+                    )
                     return@sequence
                 }
                 SearchOutcome.BudgetCapped -> {
-                    yield(if (best != null) MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
-                          else MinimizeResult.Unknown(TerminationReason.BudgetExhausted))
+                    yield(
+                        if (best != null) {
+                            MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
+                        } else {
+                            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                        }
+                    )
                     return@sequence
                 }
             }
@@ -269,7 +276,10 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     /** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
      *  levels. Returns `null` when the input was empty (no assumption layer to
      *  project) or no level was touched (no information). */
-    private fun projectTouchedToAssumptions(input: com.eignex.klause.solver.Assumptions, levels: IntArray): com.eignex.klause.solver.Assumptions? {
+    private fun projectTouchedToAssumptions(
+        input: com.eignex.klause.solver.Assumptions,
+        levels: IntArray
+    ): com.eignex.klause.solver.Assumptions? {
         if (input.isEmpty || levels.isEmpty()) return null
         val touched = HashSet<Int>(levels.size)
         for (l in levels) touched.add(l)
@@ -290,11 +300,15 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      *  collapses to `null` — the API contract is "core absent" rather than "core empty",
      *  since an empty core wouldn't be actionable. */
     private fun coreOf(unsat: PropagationResult.Unsat): UnsatCore? =
-        if (unsat.conflictFactors.isEmpty()) null
-        else UnsatCore.of(unsat.conflictFactors)
+        if (unsat.conflictFactors.isEmpty()) {
+            null
+        } else {
+            UnsatCore.of(unsat.conflictFactors)
+        }
 
     private sealed interface SearchOutcome {
         data class Found(val sample: Sample) : SearchOutcome
+
         /** DFS exhausted without finding a model. [core] is non-null when the exhaustion
          *  was forced by root-level propagation (bake or seed); after a full DFS-tree
          *  walk, no single-factor core explains the result and [core] stays null.
@@ -363,7 +377,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         sink: com.eignex.klause.solver.SolveStatsSink? = null,
     ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
-            yield(SearchOutcome.Exhausted(coreOf(problem.baked))); return@sequence
+            yield(SearchOutcome.Exhausted(coreOf(problem.baked)))
+            return@sequence
         }
         val session = PropagationSession(problem)
         // Number of decision levels seed pushes uses — bool pins first then int pins.
@@ -414,7 +429,10 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
 
             inner@ while (true) {
                 if (cancelCheckCountdown-- <= 0) {
-                    if (params.cancellation()) { yield(SearchOutcome.BudgetCapped); return@sequence }
+                    if (params.cancellation()) {
+                        yield(SearchOutcome.BudgetCapped)
+                        return@sequence
+                    }
                     cancelCheckCountdown = CANCEL_CHECK_INTERVAL
                 }
                 // Luby budget hit → pop back to root and restart.
@@ -463,7 +481,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             continue@inner
                         }
                         AdvanceOutcome.BudgetCapped -> {
-                            yield(SearchOutcome.BudgetCapped); return@sequence
+                            yield(SearchOutcome.BudgetCapped)
+                            return@sequence
                         }
                         is AdvanceOutcome.Backjump -> {
                             sink?.observeFail()
@@ -474,24 +493,38 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             // Trail size == session.decisionLevel here (the failed pin was
                             // self-reverted by the session); execute the backjump + learn
                             // sequence. On cascading conflict during assertion, recurse.
-                            val term = backjumpAndLearn(out.learned, trail, session, params,
-                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false)
+                            val term = backjumpAndLearn(
+                                out.learned, trail, session, params,
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false
+                            )
                             when (term) {
-                                BackjumpTerm.Resume -> { descend = true; continue@inner }
-                                BackjumpTerm.Exhausted -> {
-                                    yield(SearchOutcome.Exhausted(
-                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                    )); return@sequence
+                                BackjumpTerm.Resume -> {
+                                    descend = true
+                                    continue@inner
                                 }
-                                BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                                BackjumpTerm.Exhausted -> {
+                                    yield(
+                                        SearchOutcome.Exhausted(
+                                            touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                                        )
+                                    )
+                                    return@sequence
+                                }
+                                BackjumpTerm.Stuck -> {
+                                    descend = false
+                                    continue@inner
+                                }
                             }
                         }
                     }
                 } else {
                     if (trail.isEmpty()) {
-                        yield(SearchOutcome.Exhausted(
-                            touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                        )); return@sequence
+                        yield(
+                            SearchOutcome.Exhausted(
+                                touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                            )
+                        )
+                        return@sequence
                     }
                     val top = trail.last()
                     session.popLast()
@@ -507,7 +540,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             trail.removeAt(trail.size - 1)
                         }
                         AdvanceOutcome.BudgetCapped -> {
-                            yield(SearchOutcome.BudgetCapped); return@sequence
+                            yield(SearchOutcome.BudgetCapped)
+                            return@sequence
                         }
                         is AdvanceOutcome.Backjump -> {
                             if (touchedSeedLevels != null) {
@@ -515,16 +549,27 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             }
                             // Else-path: session has been popped below trail.last; align
                             // first (trail.removeAt) then proceed to backjump + learn.
-                            val term = backjumpAndLearn(out.learned, trail, session, params,
-                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true)
+                            val term = backjumpAndLearn(
+                                out.learned, trail, session, params,
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true
+                            )
                             when (term) {
-                                BackjumpTerm.Resume -> { descend = true; continue@inner }
-                                BackjumpTerm.Exhausted -> {
-                                    yield(SearchOutcome.Exhausted(
-                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                    )); return@sequence
+                                BackjumpTerm.Resume -> {
+                                    descend = true
+                                    continue@inner
                                 }
-                                BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                                BackjumpTerm.Exhausted -> {
+                                    yield(
+                                        SearchOutcome.Exhausted(
+                                            touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                                        )
+                                    )
+                                    return@sequence
+                                }
+                                BackjumpTerm.Stuck -> {
+                                    descend = false
+                                    continue@inner
+                                }
                             }
                         }
                     }
@@ -541,21 +586,27 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     private fun applyPhase(
         varRef: VarRef,
         values: Sequence<Int>,
-        boolPhase: BooleanArray?, boolPhaseSet: BooleanArray?,
-        intPhase: IntArray?, intPhaseSet: BooleanArray?,
+        boolPhase: BooleanArray?,
+        boolPhaseSet: BooleanArray?,
+        intPhase: IntArray?,
+        intPhaseSet: BooleanArray?,
     ): Sequence<Int> {
         return when (varRef) {
             is VarRef.Bool -> {
                 if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[varRef.varId]) {
                     val saved = if (boolPhase[varRef.varId]) 1 else 0
                     sequenceOf(saved) + values.filter { it != saved }
-                } else values
+                } else {
+                    values
+                }
             }
             is VarRef.IntVar -> {
                 if (intPhase != null && intPhaseSet != null && intPhaseSet[varRef.varId]) {
                     val saved = intPhase[varRef.varId]
                     sequenceOf(saved) + values.filter { it != saved }
-                } else values
+                } else {
+                    values
+                }
             }
         }
     }
@@ -563,21 +614,30 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     /** Record the variable's currently-pinned value for phase-saving. Called after every
      *  successful pin (descent into a node). */
     private fun capturePhase(
-        varRef: VarRef, session: PropagationSession,
-        boolPhase: BooleanArray?, boolPhaseSet: BooleanArray?,
-        intPhase: IntArray?, intPhaseSet: BooleanArray?,
+        varRef: VarRef,
+        session: PropagationSession,
+        boolPhase: BooleanArray?,
+        boolPhaseSet: BooleanArray?,
+        intPhase: IntArray?,
+        intPhaseSet: BooleanArray?,
     ) {
         when (varRef) {
             is VarRef.Bool -> {
                 if (boolPhase != null && boolPhaseSet != null) {
                     val v = session.boolValue(varRef.varId)
-                    if (v != null) { boolPhase[varRef.varId] = v; boolPhaseSet[varRef.varId] = true }
+                    if (v != null) {
+                        boolPhase[varRef.varId] = v
+                        boolPhaseSet[varRef.varId] = true
+                    }
                 }
             }
             is VarRef.IntVar -> {
                 if (intPhase != null && intPhaseSet != null) {
                     val d = session.intDomain(varRef.varId)
-                    if (d.min == d.max) { intPhase[varRef.varId] = d.min; intPhaseSet[varRef.varId] = true }
+                    if (d.min == d.max) {
+                        intPhase[varRef.varId] = d.min
+                        intPhaseSet[varRef.varId] = true
+                    }
                 }
             }
         }
@@ -618,16 +678,21 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     private sealed interface AdvanceOutcome {
         /** A value pinned cleanly; commit the node to the trail. */
         data object Success : AdvanceOutcome
+
         /** Node has no more values; chronological backtrack. */
         data object Exhausted : AdvanceOutcome
+
         /** Decision budget hit. */
         data object BudgetCapped : AdvanceOutcome
+
         /** Non-chronological backjump requested. After the engine pops trail to
          *  `learned.backjumpLevel`, it materialises [learned.literals] as a `Clause`,
          *  hands it to [PropagationSession.addLearnedClause], and resumes with the new
          *  clause now constraining future search and unit-propagating the asserting
          *  literal. */
-        data class Backjump(val learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned) : AdvanceOutcome
+        data class Backjump(
+            val learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
+        ) : AdvanceOutcome
     }
 
     private fun advance(
@@ -700,7 +765,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         // Bucket non-glue clauses by LBD and pick the lowest LBDs up to the residual
         // capacity. We do this as: compute LBD per index, sort ascending, and define
         // `keep(i, lbd) = lbd <= glueThreshold || rank(i) < remaining`.
-        val nonGlue = ArrayList<IntArray>(learnedSize)  // [lbd, index] pairs
+        val nonGlue = ArrayList<IntArray>(learnedSize) // [lbd, index] pairs
         for (i in 0 until learnedSize) {
             val lbd = session.learnedClauseLbd(i)
             if (lbd > glueThreshold) nonGlue.add(intArrayOf(lbd, i))
@@ -709,8 +774,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         if (nonGlue.isEmpty()) return
         val glueCount = learnedSize - nonGlue.size
         val remainingCap = (cap - glueCount).coerceAtLeast(0)
-        if (nonGlue.size <= remainingCap) return  // already under cap
-        nonGlue.sortBy { it[0] }  // ascending LBD
+        if (nonGlue.size <= remainingCap) return // already under cap
+        nonGlue.sortBy { it[0] } // ascending LBD
         val kept = HashSet<Int>(remainingCap)
         for (k in 0 until remainingCap) kept.add(nonGlue[k][1])
         session.forgetLearnedClauses { idx, lbd ->
@@ -722,9 +787,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
     private enum class BackjumpTerm {
         /** Backjumped, learned clause asserted cleanly. Resume by descending. */
         Resume,
+
         /** Asserting the learned clause forced a level-0 contradiction; the entire search
          *  space is infeasible. Engine yields [SearchOutcome.Exhausted]. */
         Exhausted,
+
         /** Cascading conflicts couldn't be resolved further (e.g., assertion reached
          *  level 0 without a useful new clause). Fall back to chronological backtrack. */
         Stuck,
@@ -789,12 +856,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     }
                     current = next
                 }
-                else -> return BackjumpTerm.Stuck  // shouldn't happen — addLearnedClause returns only Implied/Unsat
+                else -> return BackjumpTerm.Stuck // shouldn't happen — addLearnedClause returns only Implied/Unsat
             }
         }
         return BackjumpTerm.Stuck
     }
-
 
     private fun snapshotAssignment(session: PropagationSession): Sample {
         val sp = session.problem
@@ -813,6 +879,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
          *  responsive; higher = lower overhead. 256 is a few microseconds per check at
          *  worst, and the search stops within a few hundred decisions of a cancel. */
         const val CANCEL_CHECK_INTERVAL: Int = 256
+
         /** Cap on cascading CDB backjumps within a single search step. Defensive; under
          *  a well-formed analyzer the loop terminates well before this. */
         const val MAX_CASCADING_BACKJUMPS: Int = 64

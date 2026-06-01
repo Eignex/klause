@@ -16,9 +16,13 @@ class CountAmongTest {
     fun `count_eq detects exact count`() {
         // 4 xs ∈ [0..3], count of "= 1" = 2 → exactly 2 ones.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3),
+                IntDomain(0, 3),
+                IntDomain(0, 3),
+                IntDomain(0, 3),
+                IntDomain(0, 3),
                 IntDomain(2, 2),
             ),
             factors = arrayOf<Factor>(Count(xs = intArrayOf(0, 1, 2, 3), v = 1, op = Count.Op.Eq, n = 4)),
@@ -32,9 +36,13 @@ class CountAmongTest {
     @Test
     fun `count_le tally`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
                 IntDomain(3, 3),
             ),
             factors = arrayOf<Factor>(Count(xs = intArrayOf(0, 1, 2, 3), v = 2, op = Count.Op.Le, n = 4)),
@@ -48,14 +56,18 @@ class CountAmongTest {
     @Test
     fun `count_ge tally with var n`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
                 IntDomain(0, 4),
             ),
             factors = arrayOf<Factor>(
                 Count(xs = intArrayOf(0, 1, 2, 3), v = 3, op = Count.Op.Ge, n = 4),
-                Count(xs = intArrayOf(0, 1, 2, 3), v = 3, op = Count.Op.Ge, n = 4),  // dup ok
+                Count(xs = intArrayOf(0, 1, 2, 3), v = 3, op = Count.Op.Ge, n = 4), // dup ok
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -68,9 +80,13 @@ class CountAmongTest {
     fun `among tallies membership in a value set`() {
         // 4 xs ∈ [0..5]; among in {1, 3, 5} must equal 2.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(0, 5),
                 IntDomain(2, 2),
             ),
             factors = arrayOf<Factor>(Among(n = 4, xs = intArrayOf(0, 1, 2, 3), values = intArrayOf(1, 3, 5))),

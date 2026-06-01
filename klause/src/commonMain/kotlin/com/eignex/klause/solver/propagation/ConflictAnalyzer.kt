@@ -50,6 +50,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
     /** Bool vars seen during the last analysis (the VSIDS bump set). Valid only when the
      *  last call returned [AnalysisResult.Learned]; cleared at the start of each analysis. */
     fun lastBumpBoolVars(): IntArrayList = bumpBoolVars
+
     /** Underlying int vars seen during the last analysis (via touched atom-lits). */
     fun lastBumpIntVars(): IntArrayList = bumpIntVars
 
@@ -86,11 +87,11 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             val decisionLevels: IntArray,
         ) : AnalysisResult {
             override fun equals(other: Any?): Boolean =
-                other is Learned
-                    && literals.contentEquals(other.literals)
-                    && backjumpLevel == other.backjumpLevel
-                    && lbd == other.lbd
-                    && decisionLevels.contentEquals(other.decisionLevels)
+                other is Learned &&
+                    literals.contentEquals(other.literals) &&
+                    backjumpLevel == other.backjumpLevel &&
+                    lbd == other.lbd &&
+                    decisionLevels.contentEquals(other.decisionLevels)
             override fun hashCode(): Int =
                 31 * (31 * (31 * literals.contentHashCode() + backjumpLevel) + lbd) +
                     decisionLevels.contentHashCode()
@@ -127,10 +128,13 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         // The just-attempted decision lit (currently false in state because the prior
         // pin still holds and pinBoolImpl rejected the new value).
         val decisionLit = com.eignex.klause.solver.Lit.make(conflictedVar, !priorValue)
-        val seed = if (priorAnt == null) intArrayOf(decisionLit)
-        else IntArray(priorAnt.size + 1).also {
-            for (i in priorAnt.indices) it[i] = priorAnt[i]
-            it[priorAnt.size] = decisionLit
+        val seed = if (priorAnt == null) {
+            intArrayOf(decisionLit)
+        } else {
+            IntArray(priorAnt.size + 1).also {
+                for (i in priorAnt.indices) it[i] = priorAnt[i]
+                it[priorAnt.size] = decisionLit
+            }
         }
         return analyzeFromSeed(seed)
     }
@@ -169,13 +173,19 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             while (pinIdx >= 0) {
                 val v = state.boolPinOrder[pinIdx]
                 pinIdx--
-                if (seen[v] && state.boolLevel[v] == currentLevel) { pivot = v; break }
+                if (seen[v] && state.boolLevel[v] == currentLevel) {
+                    pivot = v
+                    break
+                }
             }
             if (pivot < 0) {
                 // Look for an atom pivot at currentLevel.
                 for (id in 0 until atomCount) {
                     val v = numBoolVars + id
-                    if (seen[v] && state.atomLevel[id] == currentLevel) { pivot = v; break }
+                    if (seen[v] && state.atomLevel[id] == currentLevel) {
+                        pivot = v
+                        break
+                    }
                 }
                 if (pivot < 0) break
             }
@@ -216,8 +226,11 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
 
     private fun antecedentsOf(v: Int): IntArray? {
         val numBoolVars = state.problem.numBoolVars
-        return if (v < numBoolVars) state.boolAntecedents[v]
-        else state.atomAntecedents[v - numBoolVars]
+        return if (v < numBoolVars) {
+            state.boolAntecedents[v]
+        } else {
+            state.atomAntecedents[v - numBoolVars]
+        }
     }
 
     /**
@@ -278,7 +291,10 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             val v = Lit.variable(learned[i])
             if (v >= universeSize) continue
             if (levelOf(v) == currentLevel) continue
-            if (isRedundant(v, inClause, cache)) { toDrop[v] = true; dropCount++ }
+            if (isRedundant(v, inClause, cache)) {
+                toDrop[v] = true
+                dropCount++
+            }
         }
         if (dropCount == 0) return learned
         val out = IntArrayList(learned.size - dropCount)
@@ -300,11 +316,14 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      * keeps the total work linear.
      */
     private fun isRedundant(
-        v: Int, inClause: BooleanArray, cache: HashMap<Int, Boolean>,
+        v: Int,
+        inClause: BooleanArray,
+        cache: HashMap<Int, Boolean>,
     ): Boolean {
         cache[v]?.let { return it }
         val antecedents = antecedentsOf(v) ?: run {
-            cache[v] = false; return false
+            cache[v] = false
+            return false
         }
         for (lit in antecedents) {
             val u = Lit.variable(lit)
@@ -324,8 +343,11 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      *  and atom vars (via [PropagationState.atomLevel]). */
     private fun levelOf(v: Int): Int {
         val numBoolVars = state.problem.numBoolVars
-        return if (v < numBoolVars) state.boolLevel[v]
-        else state.atomLevel[v - numBoolVars]
+        return if (v < numBoolVars) {
+            state.boolLevel[v]
+        } else {
+            state.atomLevel[v - numBoolVars]
+        }
     }
 
     /**
@@ -343,14 +365,17 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
         val numBoolVars = state.problem.numBoolVars
         for (lit in reason) {
             val v = Lit.variable(lit)
-            if (v >= universe) continue  // atom allocated after analyzer started; shouldn't happen
+            if (v >= universe) continue // atom allocated after analyzer started; shouldn't happen
             if (seen[v]) continue
             val lvl = levelOf(v)
             if (lvl <= 0) continue
             seen[v] = true
             // Record for the VSIDS bump set (every conflict-side var, MiniSAT-style).
-            if (v < numBoolVars) bumpBoolVars.add(v)
-            else bumpIntVars.add(state.atomIntVar[v - numBoolVars])
+            if (v < numBoolVars) {
+                bumpBoolVars.add(v)
+            } else {
+                bumpIntVars.add(state.atomIntVar[v - numBoolVars])
+            }
             if (lvl == currentLevel) {
                 bumpCurrentLevel()
             } else {
@@ -382,7 +407,10 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
             }
             var present = false
             for (i in 0 until learned.size) {
-                if (Lit.variable(learned[i]) == v) { present = true; break }
+                if (Lit.variable(learned[i]) == v) {
+                    present = true
+                    break
+                }
             }
             if (present) continue
             learned.add(lit)

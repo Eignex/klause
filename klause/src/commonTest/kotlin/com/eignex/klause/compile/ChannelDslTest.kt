@@ -1,9 +1,9 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.channel
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -22,7 +22,10 @@ class ChannelDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 21)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -45,7 +48,10 @@ class ChannelDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 6)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

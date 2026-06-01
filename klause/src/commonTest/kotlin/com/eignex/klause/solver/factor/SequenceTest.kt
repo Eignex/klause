@@ -17,11 +17,18 @@ class SequenceTest {
         // 6 vars ∈ {0,1}. Window k=3, S={1}, low=1, high=2.
         // Every 3-window has at least 1 and at most 2 ones.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 6,
+            numBoolVars = 0,
+            numIntVars = 6,
             intDomains = Array(6) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(Sequence(low = 1, high = 2, k = 3,
-                xs = intArrayOf(0, 1, 2, 3, 4, 5),
-                values = intArrayOf(1))),
+            factors = arrayOf<Factor>(
+                Sequence(
+                    low = 1,
+                    high = 2,
+                    k = 3,
+                    xs = intArrayOf(0, 1, 2, 3, 4, 5),
+                    values = intArrayOf(1)
+                )
+            ),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
             for (w in 0..3) {
@@ -36,11 +43,18 @@ class SequenceTest {
         // 4 vars ∈ {1}, all pinned. k=3, S={0}, low=1, high=3. No 0s anywhere → window
         // count = 0 < low = 1 → Unsat.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 1) },
-            factors = arrayOf<Factor>(Sequence(low = 1, high = 3, k = 3,
-                xs = intArrayOf(0, 1, 2, 3),
-                values = intArrayOf(0))),
+            factors = arrayOf<Factor>(
+                Sequence(
+                    low = 1,
+                    high = 3,
+                    k = 3,
+                    xs = intArrayOf(0, 1, 2, 3),
+                    values = intArrayOf(0)
+                )
+            ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }

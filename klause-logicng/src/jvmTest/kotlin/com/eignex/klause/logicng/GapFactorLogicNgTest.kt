@@ -37,9 +37,14 @@ class GapFactorLogicNgTest {
     @Test
     fun `circuit is satisfiable and forms a single hamiltonian cycle`() {
         val n = 4
-        val problem = Problem(0, n, Array(n) { IntDomain(0, n - 1) }, arrayOf<Factor>(
-            Circuit(succ = IntArray(n) { it }),
-        ))
+        val problem = Problem(
+            0,
+            n,
+            Array(n) { IntDomain(0, n - 1) },
+            arrayOf<Factor>(
+                Circuit(succ = IntArray(n) { it }),
+            )
+        )
         val result = solve(problem)
         val sat = assertIs<SolveResult.Sat>(result, "circuit should be satisfiable")
         val succ = sat.assignment.ints
@@ -60,26 +65,36 @@ class GapFactorLogicNgTest {
         // Pin succ = [1,0,3,2]: a permutation with no self-loops but two 2-cycles. The MTZ
         // position reasoning must rule it out.
         val n = 4
-        val problem = Problem(0, n, Array(n) { IntDomain(0, n - 1) }, arrayOf<Factor>(
-            Circuit(succ = IntArray(n) { it }),
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-            Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
-            Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 3),
-            Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 2),
-        ))
+        val problem = Problem(
+            0,
+            n,
+            Array(n) { IntDomain(0, n - 1) },
+            arrayOf<Factor>(
+                Circuit(succ = IntArray(n) { it }),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 3),
+                Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 2),
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem), "two disjoint 2-cycles must be UNSAT for circuit")
     }
 
     @Test
     fun `subcircuit allows an all-excluded assignment`() {
         val n = 3
-        val problem = Problem(0, n, Array(n) { IntDomain(0, n - 1) }, arrayOf<Factor>(
-            Subcircuit(succ = IntArray(n) { it }),
-            // Force every node to self-loop (excluded): succ[i] = i. Valid empty subcircuit.
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
-            Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
-            Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2),
-        ))
+        val problem = Problem(
+            0,
+            n,
+            Array(n) { IntDomain(0, n - 1) },
+            arrayOf<Factor>(
+                Subcircuit(succ = IntArray(n) { it }),
+                // Force every node to self-loop (excluded): succ[i] = i. Valid empty subcircuit.
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2),
+            )
+        )
         assertIs<SolveResult.Sat>(solve(problem), "all-excluded subcircuit should be satisfiable")
     }
 
@@ -88,13 +103,18 @@ class GapFactorLogicNgTest {
         // n=4, force a 2-cycle on {0,1} and self-loops on {2,3}: 0→1→0, 2,3 excluded. This is
         // a valid subcircuit (single cycle among included nodes). Sanity SAT check.
         val n = 4
-        val problem = Problem(0, n, Array(n) { IntDomain(0, n - 1) }, arrayOf<Factor>(
-            Subcircuit(succ = IntArray(n) { it }),
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-            Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
-            Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2),
-            Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 3),
-        ))
+        val problem = Problem(
+            0,
+            n,
+            Array(n) { IntDomain(0, n - 1) },
+            arrayOf<Factor>(
+                Subcircuit(succ = IntArray(n) { it }),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2),
+                Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 3),
+            )
+        )
         assertIs<SolveResult.Sat>(solve(problem), "single included 2-cycle with exclusions should be SAT")
     }
 
@@ -103,110 +123,200 @@ class GapFactorLogicNgTest {
     @Test
     fun `argmin picks the first minimum position`() {
         // xs = [3, 1, 2] (vars 1,2,3), idx (var0) free. arg_min ⇒ idx = 1 (value 1).
-        val problem = Problem(0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             arrayOf<Factor>(
                 ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false, indexOffset = 0),
-                eq(1, 3), eq(2, 1), eq(3, 2),
-            ))
+                eq(1, 3),
+                eq(2, 1),
+                eq(3, 2),
+            )
+        )
         val sat = assertIs<SolveResult.Sat>(solve(problem))
         assertEquals(1, sat.assignment.ints[0], "arg_min should select position 1")
     }
 
     @Test
     fun `argmin rejects a non-optimal forced index`() {
-        val problem = Problem(0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             arrayOf<Factor>(
                 ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false, indexOffset = 0),
-                eq(1, 3), eq(2, 1), eq(3, 2), eq(0, 0), // claim position 0 (value 3) is the min — false
-            ))
+                eq(1, 3),
+                eq(2, 1),
+                eq(3, 2),
+                eq(0, 0), // claim position 0 (value 3) is the min — false
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `regular rejects a string the dfa does not accept`() {
         // Even number of symbol-2; a single 2 ends in non-accepting state 2.
-        val problem = Problem(0, 1, arrayOf(IntDomain(1, 2)), arrayOf<Factor>(
-            Regular(seq = intArrayOf(0), numStates = 2, alphabetSize = 2,
-                transitions = intArrayOf(1, 2, 2, 1), q0 = 1, accepting = intArrayOf(1)),
-            eq(0, 2),
-        ))
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(1, 2)),
+            arrayOf<Factor>(
+                Regular(
+                    seq = intArrayOf(0),
+                    numStates = 2,
+                    alphabetSize = 2,
+                    transitions = intArrayOf(1, 2, 2, 1),
+                    q0 = 1,
+                    accepting = intArrayOf(1)
+                ),
+                eq(0, 2),
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `regular accepts a valid string`() {
-        val problem = Problem(0, 2, arrayOf(IntDomain(1, 2), IntDomain(1, 2)), arrayOf<Factor>(
-            Regular(seq = intArrayOf(0, 1), numStates = 2, alphabetSize = 2,
-                transitions = intArrayOf(1, 2, 2, 1), q0 = 1, accepting = intArrayOf(1)),
-            eq(0, 2), eq(1, 2), // two 2s ⇒ back to accepting state 1
-        ))
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
+            arrayOf<Factor>(
+                Regular(
+                    seq = intArrayOf(0, 1),
+                    numStates = 2,
+                    alphabetSize = 2,
+                    transitions = intArrayOf(1, 2, 2, 1),
+                    q0 = 1,
+                    accepting = intArrayOf(1)
+                ),
+                eq(0, 2),
+                eq(1, 2), // two 2s ⇒ back to accepting state 1
+            )
+        )
         assertIs<SolveResult.Sat>(solve(problem))
     }
 
     @Test
     fun `inverse rejects inconsistent channels`() {
         // f = [1,0,2]; the consistent inverse is g = [1,0,2]. Force g = identity ⇒ UNSAT.
-        val problem = Problem(0, 6, Array(6) { IntDomain(0, 2) }, arrayOf<Factor>(
-            Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5)),
-            eq(0, 1), eq(1, 0), eq(2, 2),
-            eq(3, 0), eq(4, 1), eq(5, 2),
-        ))
+        val problem = Problem(
+            0,
+            6,
+            Array(6) { IntDomain(0, 2) },
+            arrayOf<Factor>(
+                Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5)),
+                eq(0, 1),
+                eq(1, 0),
+                eq(2, 2),
+                eq(3, 0),
+                eq(4, 1),
+                eq(5, 2),
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `lex_less strict rejects equal vectors`() {
-        val problem = Problem(0, 4, Array(4) { IntDomain(0, 3) }, arrayOf<Factor>(
-            LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true),
-            eq(0, 1), eq(1, 2), eq(2, 1), eq(3, 2), // xs == ys
-        ))
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
+            arrayOf<Factor>(
+                LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true),
+                eq(0, 1),
+                eq(1, 2),
+                eq(2, 1),
+                eq(3, 2), // xs == ys
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `element rejects a value mismatch`() {
         // idx = 1 selects arr[0] = 5, but result forced to 7 ⇒ UNSAT.
-        val problem = Problem(0, 2, arrayOf(IntDomain(1, 3), IntDomain(5, 9)), arrayOf<Factor>(
-            Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1),
-            eq(0, 1), eq(1, 7),
-        ))
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(1, 3), IntDomain(5, 9)),
+            arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1),
+                eq(0, 1),
+                eq(1, 7),
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `table rejects a non-listed tuple`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(
-            Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 2, 2, 1)),
-            eq(0, 0), eq(1, 1), // (0,1) is not a listed tuple
-        ))
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            arrayOf<Factor>(
+                Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 2, 2, 1)),
+                eq(0, 0),
+                eq(1, 1), // (0,1) is not a listed tuple
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `value_precede rejects t before any s`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(
-            ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2)),
-            eq(0, 2), // t at position 0 with no earlier s
-        ))
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(
+                ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2)),
+                eq(0, 2), // t at position 0 with no earlier s
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `all_equal rejects a mismatch`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, arrayOf<Factor>(
-            AllEqual(intArrayOf(0, 1, 2)), eq(0, 0), eq(1, 1),
-        ))
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 3) },
+            arrayOf<Factor>(
+                AllEqual(intArrayOf(0, 1, 2)),
+                eq(0, 0),
+                eq(1, 1),
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
     @Test
     fun `bin_packing rejects an over-capacity bin`() {
         // Three weight-1 items all forced into bin 1, uniform capacity 2 ⇒ overload.
-        val problem = Problem(0, 3, Array(3) { IntDomain(1, 2) }, arrayOf<Factor>(
-            BinPacking(bins = intArrayOf(0, 1, 2), weights = intArrayOf(1, 1, 1),
-                mode = BinPacking.Mode.UniformCapacity, uniformCapacity = 2, numBins = 2, binOffset = 1),
-            eq(0, 1), eq(1, 1), eq(2, 1),
-        ))
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(1, 2) },
+            arrayOf<Factor>(
+                BinPacking(
+                    bins = intArrayOf(0, 1, 2),
+                    weights = intArrayOf(1, 1, 1),
+                    mode = BinPacking.Mode.UniformCapacity,
+                    uniformCapacity = 2,
+                    numBins = 2,
+                    binOffset = 1
+                ),
+                eq(0, 1),
+                eq(1, 1),
+                eq(2, 1),
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
 
@@ -214,12 +324,21 @@ class GapFactorLogicNgTest {
     fun `cumulative rejects an over-capacity forced overlap`() {
         // Two unit-window tasks both forced to start at 0, each demanding 1, capacity 1 →
         // overload at t=0. UNSAT.
-        val problem = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), arrayOf<Factor>(
-            Cumulative(starts = intArrayOf(0, 1), durations = intArrayOf(2, 2),
-                resources = intArrayOf(1, 1), capacity = 1),
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
-            Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
-        ))
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            arrayOf<Factor>(
+                Cumulative(
+                    starts = intArrayOf(0, 1),
+                    durations = intArrayOf(2, 2),
+                    resources = intArrayOf(1, 1),
+                    capacity = 1
+                ),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
+            )
+        )
         assertIs<SolveResult.Unsat>(solve(problem), "over-capacity overlap must be UNSAT")
     }
 }

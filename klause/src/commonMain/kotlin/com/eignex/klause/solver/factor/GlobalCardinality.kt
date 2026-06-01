@@ -78,7 +78,7 @@ class GlobalCardinality(
         for (i in xs.indices) {
             if (!present(state, i)) continue
             val value = state.assignment.intValue(xs[i])
-            val idx = coverIndexByValue[value] ?: continue  // out-of-cover; counts unaffected
+            val idx = coverIndexByValue[value] ?: continue // out-of-cover; counts unaffected
             counts[idx]++
         }
         state.refPayload[factorId] = State(counts)
@@ -124,12 +124,18 @@ class GlobalCardinality(
     }
 
     private fun simulatedViolation(
-        state: LocalSearchState, intVar: Int, newValue: Int, simCounts: IntArray,
+        state: LocalSearchState,
+        intVar: Int,
+        newValue: Int,
+        simCounts: IntArray,
     ): Boolean {
         for (k in cover.indices) {
             if (countVars != null) {
-                val expected = if (countVars[k] == intVar) newValue
-                else state.assignment.intValue(countVars[k])
+                val expected = if (countVars[k] == intVar) {
+                    newValue
+                } else {
+                    state.assignment.intValue(countVars[k])
+                }
                 if (expected != simCounts[k]) return true
             } else {
                 if (simCounts[k] < countLow!![k] || simCounts[k] > countHigh!![k]) return true
@@ -160,8 +166,8 @@ class GlobalCardinality(
             if (occ > 0) {
                 val oldIdx = coverIndexByValue[oldValue]
                 val newIdx = coverIndexByValue[cur]
-                if (newIdx != null) sim[newIdx] -= occ  // undo post-update
-                if (oldIdx != null) sim[oldIdx] += occ  // restore pre-update
+                if (newIdx != null) sim[newIdx] -= occ // undo post-update
+                if (oldIdx != null) sim[oldIdx] += occ // restore pre-update
             }
             simulatedViolation(state, intVar, oldValue, sim)
         }
@@ -234,14 +240,18 @@ class GlobalCardinality(
         // Opt-aware: filter to definitely-present xs for the flow analysis. Definitely-
         // absent xs contribute nothing; unpinned-presence xs may still go absent, so we
         // can't require them to take a cover value — skip them too for soundness.
-        val origIdx: IntArray = if (presents.isEmpty()) IntArray(xs.size) { it }
-        else {
+        val origIdx: IntArray = if (presents.isEmpty()) {
+            IntArray(xs.size) { it }
+        } else {
             val acc = IntArrayList()
             for (i in xs.indices) if (OptPresence.isDefinitelyPresent(presents, i, state)) acc.add(i)
             IntArray(acc.size) { acc[it] }
         }
-        val effectiveXs: IntArray = if (presents.isEmpty()) xs
-            else IntArray(origIdx.size) { xs[origIdx[it]] }
+        val effectiveXs: IntArray = if (presents.isEmpty()) {
+            xs
+        } else {
+            IntArray(origIdx.size) { xs[origIdx[it]] }
+        }
         val n = effectiveXs.size
         val m = cover.size
         val coverSet = coverIndexByValue.keys
@@ -253,7 +263,14 @@ class GlobalCardinality(
                 val d = state.intDomains[x]
                 val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (k in 0 until toRemove.size) if (!state.excludeIntValue(x, toRemove[k], gccAntecedents)) return false
+                for (k in 0 until toRemove.size) if (!state.excludeIntValue(
+                        x,
+                        toRemove[k],
+                        gccAntecedents
+                    )
+                ) {
+                    return false
+                }
             }
         }
         val definite = IntArray(m)
@@ -338,12 +355,12 @@ class GlobalCardinality(
             val d = state.intDomains[effectiveXs[i]]
             for (k in 0 until m) {
                 if (cover[k] in d) {
-                    val eIdx = flow.addEdge(varNode[i], covNode[k], 1)  // [0, 1]
+                    val eIdx = flow.addEdge(varNode[i], covNode[k], 1) // [0, 1]
                     xToCovEdgeIdx[i][k] = eIdx
                 }
             }
             if (otherNode != -1 && hasOtherVar[i]) {
-                xToOtherEdgeIdx[i] = flow.addEdge(varNode[i], otherNode, 1)  // [0, 1]
+                xToOtherEdgeIdx[i] = flow.addEdge(varNode[i], otherNode, 1) // [0, 1]
             }
         }
 
@@ -389,8 +406,8 @@ class GlobalCardinality(
             for (k in 0 until m) {
                 val eIdx = xToCovEdgeIdx[i][k]
                 if (eIdx < 0) continue
-                if (flow.flowOf(eIdx) > 0) continue  // active in current flow; alive.
-                if (sccId[varNode[i]] == sccId[covNode[k]]) continue  // may carry flow elsewhere.
+                if (flow.flowOf(eIdx) > 0) continue // active in current flow; alive.
+                if (sccId[varNode[i]] == sccId[covNode[k]]) continue // may carry flow elsewhere.
                 if (!state.excludeIntValue(effectiveXs[i], cover[k], gccAntecedents)) return false
             }
             // If the var→other arc exists but cannot carry flow in any feasible flow,
@@ -400,7 +417,14 @@ class GlobalCardinality(
                 val d = state.intDomains[effectiveXs[i]]
                 val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (k in 0 until toRemove.size) if (!state.excludeIntValue(effectiveXs[i], toRemove[k], gccAntecedents)) return false
+                for (k in 0 until toRemove.size) if (!state.excludeIntValue(
+                        effectiveXs[i],
+                        toRemove[k],
+                        gccAntecedents
+                    )
+                ) {
+                    return false
+                }
             }
         }
         return true
@@ -426,9 +450,13 @@ class GlobalCardinality(
 
         fun addEdge(u: Int, v: Int, c: Int): Int {
             val eIdx = edgeTo.size
-            edgeTo.add(v); cap.add(c); originalCap.add(c)
+            edgeTo.add(v)
+            cap.add(c)
+            originalCap.add(c)
             adj[u].add(eIdx)
-            edgeTo.add(u); cap.add(0); originalCap.add(0)
+            edgeTo.add(u)
+            cap.add(0)
+            originalCap.add(0)
             adj[v].add(eIdx + 1)
             return eIdx
         }
@@ -442,7 +470,8 @@ class GlobalCardinality(
             while (true) {
                 parentEdge.fill(-1)
                 parentEdge[source] = -2
-                var qHead = 0; var qTail = 0
+                var qHead = 0
+                var qTail = 0
                 queue[qTail++] = source
                 var found = false
                 while (qHead < qTail && !found) {
@@ -453,7 +482,10 @@ class GlobalCardinality(
                         val v = edgeTo[eIdx]
                         if (parentEdge[v] != -1 || cap[eIdx] <= 0) continue
                         parentEdge[v] = eIdx
-                        if (v == sink) { found = true; break }
+                        if (v == sink) {
+                            found = true
+                            break
+                        }
                         queue[qTail++] = v
                     }
                 }
@@ -604,7 +636,10 @@ class GlobalCardinality(
                 if (cur in coverIndexByValue) continue
                 val d = state.problem.intDomains[xs[i]]
                 for (cv in cover) {
-                    if (cv in d && cv != cur) { sink.addChannelingIntSet(state, xs[i], cv); break }
+                    if (cv in d && cv != cur) {
+                        sink.addChannelingIntSet(state, xs[i], cv)
+                        break
+                    }
                 }
             }
         }

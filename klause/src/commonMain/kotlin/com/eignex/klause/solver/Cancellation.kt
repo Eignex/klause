@@ -64,4 +64,3 @@ fun interface Cancellation {
         }
     }
 }
-

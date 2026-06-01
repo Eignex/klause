@@ -47,7 +47,6 @@ class DimacsTest {
 
     @Test
     fun `round trips through cnf problem`() {
-
         val cnf = CnfProblem(
             numVars = 4,
             clauses = listOf(
@@ -88,7 +87,6 @@ class DimacsTest {
 
     @Test
     fun `ignores trailing percent block`() {
-
         val text = """
             p cnf 2 1
             1 -2 0

@@ -18,17 +18,20 @@ class RegularTest {
         // δ(1, 1) = 1, δ(1, 2) = 2, δ(2, 1) = 1, δ(2, 2) = 2.
         // Accepts strings ending in 2. 4-length seq ∈ {1, 2}^4.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 2) },
-            factors = arrayOf<Factor>(Regular(
-                seq = intArrayOf(0, 1, 2, 3),
-                numStates = 2,
-                alphabetSize = 2,
-                // T[(q-1)*S + (s-1)] :  (1,1)→1, (1,2)→2, (2,1)→1, (2,2)→2
-                transitions = intArrayOf(1, 2, 1, 2),
-                q0 = 1,
-                accepting = intArrayOf(2),
-            )),
+            factors = arrayOf<Factor>(
+                Regular(
+                    seq = intArrayOf(0, 1, 2, 3),
+                    numStates = 2,
+                    alphabetSize = 2,
+                    // T[(q-1)*S + (s-1)] :  (1,1)→1, (1,2)→2, (2,1)→1, (2,2)→2
+                    transitions = intArrayOf(1, 2, 1, 2),
+                    q0 = 1,
+                    accepting = intArrayOf(2),
+                )
+            ),
         )
         // Every accepted string must end in 2.
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
@@ -40,14 +43,19 @@ class RegularTest {
     fun `regular rejects pinned-to-fail strings`() {
         // Same DFA. Pin seq = (1, 1, 1, 1) → ends in state 1 ∉ F. Unsat.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(1, 1) },
-            factors = arrayOf<Factor>(Regular(
-                seq = intArrayOf(0, 1, 2, 3),
-                numStates = 2, alphabetSize = 2,
-                transitions = intArrayOf(1, 2, 1, 2),
-                q0 = 1, accepting = intArrayOf(2),
-            )),
+            factors = arrayOf<Factor>(
+                Regular(
+                    seq = intArrayOf(0, 1, 2, 3),
+                    numStates = 2,
+                    alphabetSize = 2,
+                    transitions = intArrayOf(1, 2, 1, 2),
+                    q0 = 1,
+                    accepting = intArrayOf(2),
+                )
+            ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }

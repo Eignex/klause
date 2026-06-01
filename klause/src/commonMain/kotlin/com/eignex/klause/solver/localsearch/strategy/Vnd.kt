@@ -63,7 +63,10 @@ class Vnd(
             for (m in filtered) {
                 if (skewedImproves(state, m)) {
                     val s = state.shapedBreakScore(m)
-                    if (s < bestImpScore) { bestImpScore = s; bestImp = m }
+                    if (s < bestImpScore) {
+                        bestImpScore = s
+                        bestImp = m
+                    }
                 }
             }
             if (bestImp != null) return bestImp

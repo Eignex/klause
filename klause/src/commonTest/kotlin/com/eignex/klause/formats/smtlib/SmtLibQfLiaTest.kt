@@ -32,7 +32,8 @@ class SmtLibQfLiaTest {
         val parsed = SmtLibQfLia.parse(text)
         assertEquals(2, parsed.problem.numIntVars)
         val ints = solve(text)
-        val x = ints[0]; val y = ints[1]
+        val x = ints[0]
+        val y = ints[1]
         assertTrue(x >= 0 && y >= 0 && x + y <= 10 && (x >= 7 || y >= 7), "x=$x y=$y")
     }
 
@@ -61,7 +62,8 @@ class SmtLibQfLiaTest {
             (check-sat)
         """.trimIndent()
         val ints = solve(text)
-        val x = ints[0]; val y = ints[1]
+        val x = ints[0]
+        val y = ints[1]
         assertTrue(x + y <= 10 && 2 * x >= 4, "x=$x y=$y")
     }
 
@@ -112,7 +114,7 @@ class SmtLibQfLiaTest {
     fun `bound inference falls back to the default bound when unprovable`() {
         val p = SmtLibQfLia.parse("(declare-const x Int) (assert (<= x 4))", intBound = 50).problem
         assertEquals(4, p.intDomains[0].max)
-        assertEquals(-50, p.intDomains[0].min)   // no lower bound provable ⇒ -intBound
+        assertEquals(-50, p.intDomains[0].min) // no lower bound provable ⇒ -intBound
     }
 
     @Test

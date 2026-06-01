@@ -1,12 +1,9 @@
 package com.eignex.klause.solver.factor
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
-
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,8 +13,9 @@ class ClauseRepairTest {
 
     @Test
     fun `violated clause proposes every var once`() {
-
-        val a = 0; val b = 1; val c = 2
+        val a = 0
+        val b = 1
+        val c = 2
         val factor = Clause(intArrayOf(Lit.make(a, true), Lit.make(b, false), Lit.make(c, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -35,7 +33,8 @@ class ClauseRepairTest {
 
     @Test
     fun `satisfied clause proposes nothing`() {
-        val a = 0; val b = 1
+        val a = 0
+        val b = 1
         val factor = Clause(intArrayOf(Lit.make(a, true), Lit.make(b, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))

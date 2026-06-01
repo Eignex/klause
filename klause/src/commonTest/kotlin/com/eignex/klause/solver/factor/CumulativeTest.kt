@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -31,7 +31,8 @@ class CumulativeTest {
             capacity = 1,
         )
         return Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
@@ -51,7 +52,8 @@ class CumulativeTest {
             capacity = 1,
         )
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(factor),
         )
@@ -95,7 +97,8 @@ class CumulativeTest {
             capacity = 3,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
             factors = arrayOf<Factor>(factor),
         )
@@ -119,7 +122,9 @@ class CumulativeTest {
         state.apply(com.eignex.klause.solver.Move.IntSet(2, 4))
         val afterIncr = state.intPayload[0]
         val fresh = LocalSearchState(problem, Random(0))
-        fresh.assignment.setInt(0, 0); fresh.assignment.setInt(1, 2); fresh.assignment.setInt(2, 4)
+        fresh.assignment.setInt(0, 0)
+        fresh.assignment.setInt(1, 2)
+        fresh.assignment.setInt(2, 4)
         fresh.recompute()
         assertEquals(0, afterIncr, "spread schedule should be feasible")
         assertEquals(fresh.intPayload[0], afterIncr, "incremental apply must agree with recompute")
@@ -136,7 +141,8 @@ class CumulativeTest {
             capacity = 2,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
             factors = arrayOf<Factor>(factor),
         )
@@ -157,7 +163,8 @@ class CumulativeTest {
             capacity = 1,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
@@ -175,7 +182,8 @@ class CumulativeTest {
             capacity = 1,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 6)),
             factors = arrayOf<Factor>(factor),
         )
@@ -237,14 +245,18 @@ class CumulativeTest {
             capacity = 3,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 10)),
             factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
-        assertEquals(3, result.intMinOrNullCompat(2),
-            "edge-finding should push C's start min from 0 to 3")
+        assertEquals(
+            3,
+            result.intMinOrNullCompat(2),
+            "edge-finding should push C's start min from 0 to 3"
+        )
     }
 
     @Test
@@ -256,7 +268,8 @@ class CumulativeTest {
             capacity = 3,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
             factors = arrayOf<Factor>(factor),
         )
@@ -275,23 +288,26 @@ class CumulativeTest {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(2, 2),
-            resources = intArrayOf(1, 1),  // ubs
+            resources = intArrayOf(1, 1), // ubs
             capacity = 1,
             resourceVars = intArrayOf(2, 3),
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 1), IntDomain(0, 1)),
             factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 1); state.assignment.setInt(3, 1)
+        state.assignment.setInt(2, 1)
+        state.assignment.setInt(3, 1)
         state.recompute()
         assertTrue(state.cost > 0, "both resources at 1 should overload capacity 1")
         // Drop r1 to 0 — overlap is now between a unit-demand and a zero-demand task.
-        state.assignment.setInt(3, 0); state.recompute()
+        state.assignment.setInt(3, 0)
+        state.recompute()
         assertEquals(0, state.cost, "zero resource on one task should remove the overage")
     }
 
@@ -306,15 +322,19 @@ class CumulativeTest {
             capacityVar = 2,
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(1, 2)),
             factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
-        state.assignment.setInt(0, 0); state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 1); state.recompute()
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 1)
+        state.recompute()
         assertTrue(state.cost > 0, "cap=1 with unit overlap should overage")
-        state.assignment.setInt(2, 2); state.recompute()
+        state.assignment.setInt(2, 2)
+        state.recompute()
         assertEquals(0, state.cost, "raising cap to 2 should clear overage")
     }
 
@@ -324,22 +344,26 @@ class CumulativeTest {
         // no overlap. With d0=3, task 0 ends at 3 and overlaps task 1 at t=2.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(3, 3),  // ubs
+            durations = intArrayOf(3, 3), // ubs
             resources = intArrayOf(1, 1),
             capacity = 1,
             durationVars = intArrayOf(2, 3),
         )
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(1, 3), IntDomain(1, 3)),
             factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
-        state.assignment.setInt(0, 0); state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 2); state.assignment.setInt(3, 2)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 2)
+        state.assignment.setInt(3, 2)
         state.recompute()
         assertEquals(0, state.cost, "duration 2 each at starts 0 and 2 shouldn't overlap")
-        state.assignment.setInt(2, 3); state.recompute()
+        state.assignment.setInt(2, 3)
+        state.recompute()
         assertTrue(state.cost > 0, "extending d0 to 3 overlaps task 1 at t=2")
     }
 }

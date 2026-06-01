@@ -1,7 +1,8 @@
 package com.eignex.klause.ast
 
 infix fun BoolTerm.and(other: BoolTerm): BoolExpr {
-    val l = toExpr(); val r = other.toExpr()
+    val l = toExpr()
+    val r = other.toExpr()
     val children = mutableListOf<BoolExpr>()
     if (l is And) children.addAll(l.children) else children.add(l)
     if (r is And) children.addAll(r.children) else children.add(r)
@@ -9,7 +10,8 @@ infix fun BoolTerm.and(other: BoolTerm): BoolExpr {
 }
 
 infix fun BoolTerm.or(other: BoolTerm): BoolExpr {
-    val l = toExpr(); val r = other.toExpr()
+    val l = toExpr()
+    val r = other.toExpr()
     val children = mutableListOf<BoolExpr>()
     if (l is Or) children.addAll(l.children) else children.add(l)
     if (r is Or) children.addAll(r.children) else children.add(r)

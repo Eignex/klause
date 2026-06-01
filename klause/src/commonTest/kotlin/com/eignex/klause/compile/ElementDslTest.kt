@@ -1,11 +1,11 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.element
 import com.eignex.klause.ast.eq
 import com.eignex.klause.ast.ge
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -23,7 +23,8 @@ class ElementDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 5)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -36,7 +37,6 @@ class ElementDslTest {
 
     @Test
     fun `element with larger index domain constrains to valid range`() {
-
         class S : VariableSchema() {
             val idx by intVar(min = 0, max = 5)
             val a by intVar(min = 0, max = 5)
@@ -46,7 +46,8 @@ class ElementDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver =
+            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 13)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

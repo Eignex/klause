@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.ast.PbOp
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -139,11 +139,13 @@ class PseudoBoolean(
             val falseVars = falseByWeight[w] ?: continue
             for (i in 0 until trueVars.size) {
                 for (j in 0 until falseVars.size) {
-                    if (trueVars[i] == falseVars[j]) continue  // same var — degenerate
-                    sink.addCompound(listOf(
-                        com.eignex.klause.solver.Move.BoolFlip(trueVars[i]),
-                        com.eignex.klause.solver.Move.BoolFlip(falseVars[j]),
-                    ))
+                    if (trueVars[i] == falseVars[j]) continue // same var — degenerate
+                    sink.addCompound(
+                        listOf(
+                            com.eignex.klause.solver.Move.BoolFlip(trueVars[i]),
+                            com.eignex.klause.solver.Move.BoolFlip(falseVars[j]),
+                        )
+                    )
                     proposed++
                     if (proposed >= PAIR_PROPOSAL_CAP) break@outer
                 }
@@ -163,8 +165,9 @@ class PseudoBoolean(
                 val change = if (isTrue) -weights[i] else weights[i]
                 val effChange = if (Lit.isPositive(lit)) change else -change
                 val newSum = sum + effChange
-                if (op == PbOp.LE && newSum <= bound) sink.addBoolFlip(v)
-                else if (op == PbOp.GE && newSum >= bound) sink.addBoolFlip(v)
+                if (op == PbOp.LE && newSum <= bound) {
+                    sink.addBoolFlip(v)
+                } else if (op == PbOp.GE && newSum >= bound) sink.addBoolFlip(v)
             }
         }
     }
@@ -188,8 +191,11 @@ class PseudoBoolean(
         // true → false contributes `-signed`; false → true contributes `+signed`. If we
         // want the delta from the *pre*-flip value (i.e. the engine has already committed
         // the flip), the polarity inverts.
-        val pre = if (current) state.assignment.boolValue(boolVar)
-        else !state.assignment.boolValue(boolVar)
+        val pre = if (current) {
+            state.assignment.boolValue(boolVar)
+        } else {
+            !state.assignment.boolValue(boolVar)
+        }
         return if (pre) -signed else signed
     }
 
@@ -199,7 +205,9 @@ class PseudoBoolean(
      *  O(arity)) with a single per-var diff. Computes pre- vs post-flip break/make
      *  contributions from [signedWeightByVar] and applies only the changes. */
     override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState, factorId: Int, flippedVar: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        flippedVar: Int,
     ) {
         val signedFlipped = signedWeightByVar[flippedVar]
         if (signedFlipped == 0) return
@@ -250,8 +258,14 @@ internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: In
         val v = Lit.variable(literals[i])
         val b = state.boolValues[v]
         when {
-            b == null -> { lo += minOf(0L, w); hi += maxOf(0L, w) }
-            Lit.evaluate(literals[i], b) -> { lo += w; hi += w }
+            b == null -> {
+                lo += minOf(0L, w)
+                hi += maxOf(0L, w)
+            }
+            Lit.evaluate(literals[i], b) -> {
+                lo += w
+                hi += w
+            }
             else -> { /* contributes 0 */ }
         }
     }
@@ -270,7 +284,7 @@ internal fun pbFalseFormAntecedents(
     state: PropagationState,
     literals: IntArray,
     excludeVar: Int,
-    extraLit: Int,  // 0 == no extra literal
+    extraLit: Int, // 0 == no extra literal
 ): IntArray? {
     var n = 0
     if (extraLit != 0) n++
@@ -322,11 +336,21 @@ internal fun propagatePbBounds(
         val w = weights[i].toLong()
         val v = Lit.variable(literals[i])
         val b = state.boolValues[v]
-        val lo: Long; val hi: Long
+        val lo: Long
+        val hi: Long
         when {
-            b == null -> { lo = minOf(0L, w); hi = maxOf(0L, w) }
-            Lit.evaluate(literals[i], b) -> { lo = w; hi = w }
-            else -> { lo = 0L; hi = 0L }
+            b == null -> {
+                lo = minOf(0L, w)
+                hi = maxOf(0L, w)
+            }
+            Lit.evaluate(literals[i], b) -> {
+                lo = w
+                hi = w
+            }
+            else -> {
+                lo = 0L
+                hi = 0L
+            }
         }
         litLo[i] = lo
         litHi[i] = hi

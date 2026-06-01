@@ -25,6 +25,7 @@ class SolveStatsTest {
         val q3 by intVar(0, 5)
         val q4 by intVar(0, 5)
         val q5 by intVar(0, 5)
+
         // All-different rows + diagonals via aux abs-difference checks for a tiny n=6.
         val rows by constraint { allDifferent(q0, q1, q2, q3, q4, q5) }
     }
@@ -68,11 +69,13 @@ class SolveStatsTest {
         class S : VariableSchema() {
             val x by intVar(0, 0)
             val y by intVar(1, 1)
-            val c by constraint { com.eignex.klause.ast.IntCompare(
-                com.eignex.klause.ast.IntRef("x"),
-                com.eignex.klause.ast.IntCmpOp.EQ,
-                com.eignex.klause.ast.IntRef("y"),
-            ) }
+            val c by constraint {
+                com.eignex.klause.ast.IntCompare(
+                    com.eignex.klause.ast.IntRef("x"),
+                    com.eignex.klause.ast.IntCmpOp.EQ,
+                    com.eignex.klause.ast.IntRef("y"),
+                )
+            }
         }
         val compiled = S().compile()
         val r = BacktrackSolver(compiled.problem).solve(BacktrackParams())

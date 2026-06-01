@@ -1,15 +1,13 @@
 package com.eignex.klause.solver.factor
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
-
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,16 +25,17 @@ class FactorPropertyTest {
     @Test fun `cardinality delta matches apply`() {
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, false)),
-            min = 1, max = 2,
+            min = 1,
+            max = 2,
         )
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 2)
     }
 
     @Test fun `cardinality slow path delta matches apply`() {
-
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true), Lit.make(2, true)),
-            min = 2, max = 3,
+            min = 2,
+            max = 3,
         )
         runFactorPropertyCheck(factor, numBoolVars = 3, intDomains = emptyDomains, seed = 3)
     }
@@ -45,7 +44,8 @@ class FactorPropertyTest {
         val factor = PseudoBoolean(
             weights = intArrayOf(3, -2, 5, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, true)),
-            op = PbOp.LE, bound = 4,
+            op = PbOp.LE,
+            bound = 4,
         )
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 4)
     }
@@ -54,7 +54,8 @@ class FactorPropertyTest {
         val factor = PseudoBoolean(
             weights = intArrayOf(2, 1, 1, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-            op = PbOp.GE, bound = 3,
+            op = PbOp.GE,
+            bound = 3,
         )
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 5)
     }
@@ -68,7 +69,6 @@ class FactorPropertyTest {
     }
 
     @Test fun `xor repeated var delta matches apply`() {
-
         val factor = Xor(
             literals = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true), Lit.make(2, true)),
             targetParity = 0,
@@ -80,10 +80,12 @@ class FactorPropertyTest {
         val factor = Linear(
             coeffs = intArrayOf(2, -1, 3),
             vars = intArrayOf(0, 1, 2),
-            op = LinearOp.LE, bound = 5,
+            op = LinearOp.LE,
+            bound = 5,
         )
         runFactorPropertyCheck(
-            factor, numBoolVars = 0,
+            factor,
+            numBoolVars = 0,
             intDomains = arrayOf(IntDomain(-3, 3), IntDomain(-3, 3), IntDomain(-3, 3)),
             seed = 8,
         )
@@ -93,10 +95,12 @@ class FactorPropertyTest {
         val factor = Linear(
             coeffs = intArrayOf(1, 1, 1),
             vars = intArrayOf(0, 1, 2),
-            op = LinearOp.EQ, bound = 5,
+            op = LinearOp.EQ,
+            bound = 5,
         )
         runFactorPropertyCheck(
-            factor, numBoolVars = 0,
+            factor,
+            numBoolVars = 0,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             seed = 9,
         )
@@ -105,7 +109,8 @@ class FactorPropertyTest {
     @Test fun `product delta matches apply`() {
         val factor = Product(a = 0, b = 1, result = 2)
         runFactorPropertyCheck(
-            factor, numBoolVars = 0,
+            factor,
+            numBoolVars = 0,
             intDomains = arrayOf(IntDomain(-3, 3), IntDomain(-3, 3), IntDomain(-9, 9)),
             seed = 10,
         )
@@ -114,7 +119,8 @@ class FactorPropertyTest {
     @Test fun `all different delta matches apply`() {
         val factor = AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 1, domainSize = 4)
         runFactorPropertyCheck(
-            factor, numBoolVars = 0,
+            factor,
+            numBoolVars = 0,
             intDomains = arrayOf(IntDomain(1, 4), IntDomain(1, 4), IntDomain(1, 4), IntDomain(1, 4)),
             seed = 11,
         )
@@ -123,41 +129,50 @@ class FactorPropertyTest {
     @Test fun `int eq delta matches apply`() {
         runFactorPropertyCheck(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
-            numBoolVars = 0, intDomains = arrayOf(IntDomain(0, 5)), seed = 12,
+            numBoolVars = 0,
+            intDomains = arrayOf(IntDomain(0, 5)),
+            seed = 12,
         )
     }
 
     @Test fun `int geq delta matches apply`() {
         runFactorPropertyCheck(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
-            numBoolVars = 0, intDomains = arrayOf(IntDomain(-3, 3)), seed = 13,
+            numBoolVars = 0,
+            intDomains = arrayOf(IntDomain(-3, 3)),
+            seed = 13,
         )
     }
 
     @Test fun `int leq delta matches apply`() {
         runFactorPropertyCheck(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            numBoolVars = 0, intDomains = arrayOf(IntDomain(-3, 3)), seed = 14,
+            numBoolVars = 0,
+            intDomains = arrayOf(IntDomain(-3, 3)),
+            seed = 14,
         )
     }
 
     @Test fun `int neq delta matches apply`() {
         runFactorPropertyCheck(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
-            numBoolVars = 0, intDomains = arrayOf(IntDomain(-2, 2)), seed = 15,
+            numBoolVars = 0,
+            intDomains = arrayOf(IntDomain(-2, 2)),
+            seed = 15,
         )
     }
 
     @Test fun `reified linear delta matches apply`() {
-
         val factor = ReifiedLinear(
             auxBoolVar = 0,
             coeffs = intArrayOf(2, -1),
             vars = intArrayOf(0, 1),
-            op = LinearOp.LE, bound = 3,
+            op = LinearOp.LE,
+            bound = 3,
         )
         runFactorPropertyCheck(
-            factor, numBoolVars = 1,
+            factor,
+            numBoolVars = 1,
             intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-2, 3)),
             seed = 16,
         )
@@ -168,7 +183,8 @@ class FactorPropertyTest {
             auxBoolVar = 0,
             weights = intArrayOf(2, 1, 3, 1),
             literals = intArrayOf(Lit.make(1, true), Lit.make(2, false), Lit.make(3, true), Lit.make(4, true)),
-            op = PbOp.LE, bound = 4,
+            op = PbOp.LE,
+            bound = 4,
         )
         runFactorPropertyCheck(factor, numBoolVars = 5, intDomains = emptyDomains, seed = 17)
     }
@@ -177,7 +193,8 @@ class FactorPropertyTest {
         val factor = ReifiedCardinality(
             auxBoolVar = 0,
             literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true), Lit.make(4, false)),
-            min = 1, max = 2,
+            min = 1,
+            max = 2,
         )
         runFactorPropertyCheck(factor, numBoolVars = 5, intDomains = emptyDomains, seed = 18)
     }
@@ -186,7 +203,8 @@ class FactorPropertyTest {
         for (op in IntCmpOp.entries) {
             val factor = reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = op, 1)
             runFactorPropertyCheck(
-                factor, numBoolVars = 1,
+                factor,
+                numBoolVars = 1,
                 intDomains = arrayOf(IntDomain(-2, 3)),
                 seed = 19 + op.ordinal,
             )
@@ -194,7 +212,6 @@ class FactorPropertyTest {
     }
 
     @Test fun `propose repair moves are valid`() {
-
         val cases: List<Pair<LocalSearchFactor, FactorEnv>> = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)))
                 to FactorEnv(numBoolVars = 3),
@@ -274,17 +291,25 @@ class FactorPropertyTest {
             for (move in sink.list) {
                 when (move) {
                     is Move.BoolFlip -> {
-                        assertTrue(move.varId in factor.boolVars,
-                            "${factor::class.simpleName} proposed flip of var ${move.varId} not in boolVars ${factor.boolVars.toList()}")
+                        assertTrue(
+                            move.varId in factor.boolVars,
+                            "${factor::class.simpleName} proposed flip of var ${move.varId} not in boolVars ${factor.boolVars.toList()}"
+                        )
                     }
                     is Move.IntSet -> {
-                        assertTrue(move.varId in factor.intVars,
-                            "${factor::class.simpleName} proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}")
+                        assertTrue(
+                            move.varId in factor.intVars,
+                            "${factor::class.simpleName} proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}"
+                        )
                         val d = problem.intDomains[move.varId]
-                        assertTrue(move.newValue in d.min..d.max,
-                            "${factor::class.simpleName} proposed IntSet target ${move.newValue} out of domain $d")
-                        assertTrue(move.newValue != state.assignment.intValue(move.varId),
-                            "${factor::class.simpleName} proposed no-op IntSet at ${move.newValue}")
+                        assertTrue(
+                            move.newValue in d.min..d.max,
+                            "${factor::class.simpleName} proposed IntSet target ${move.newValue} out of domain $d"
+                        )
+                        assertTrue(
+                            move.newValue != state.assignment.intValue(move.varId),
+                            "${factor::class.simpleName} proposed no-op IntSet at ${move.newValue}"
+                        )
                     }
                     is Move.Compound -> { /* no factor proposes Compound today; covered by CompoundMoveTest */ }
                 }
@@ -295,8 +320,10 @@ class FactorPropertyTest {
                 val before = sibling.cost
                 sibling.apply(move)
                 val after = sibling.cost
-                assertTrue(after <= before,
-                    "${factor::class.simpleName} repair $move increased cost $before → $after")
+                assertTrue(
+                    after <= before,
+                    "${factor::class.simpleName} repair $move increased cost $before → $after"
+                )
             }
         }
     }
@@ -329,22 +356,40 @@ class FactorPropertyTest {
             // the binary isViolated change for binary factors and the magnitude change for
             // graded ones like Linear).
             val observedDelta = factor.violationDegree(state, 0) - degreeBefore
-            assertEquals(predicted, observedDelta,
-                "${factor::class.simpleName}: predicted Δ != observed Δ on iter=$i move=$move")
-            assertEquals(costBefore + predicted, state.cost,
-                "${factor::class.simpleName}: cost drift after $move on iter=$i")
-            assertEquals(violatedAfter, state.violated.contains(0),
-                "${factor::class.simpleName}: violated set drift after $move on iter=$i")
+            assertEquals(
+                predicted,
+                observedDelta,
+                "${factor::class.simpleName}: predicted Δ != observed Δ on iter=$i move=$move"
+            )
+            assertEquals(
+                costBefore + predicted,
+                state.cost,
+                "${factor::class.simpleName}: cost drift after $move on iter=$i"
+            )
+            assertEquals(
+                violatedAfter,
+                state.violated.contains(0),
+                "${factor::class.simpleName}: violated set drift after $move on iter=$i"
+            )
 
             val sibling = LocalSearchState(problem, Random(seed.toLong()))
             copyAssignment(state, sibling)
             sibling.recompute()
-            assertEquals(sibling.intPayload[0], state.intPayload[0],
-                "${factor::class.simpleName}: intPayload drift after $move on iter=$i")
-            assertEquals(sibling.cost, state.cost,
-                "${factor::class.simpleName}: cost drift vs recompute on iter=$i")
-            assertEquals(sibling.violated.contains(0), state.violated.contains(0),
-                "${factor::class.simpleName}: violation drift vs recompute on iter=$i")
+            assertEquals(
+                sibling.intPayload[0],
+                state.intPayload[0],
+                "${factor::class.simpleName}: intPayload drift after $move on iter=$i"
+            )
+            assertEquals(
+                sibling.cost,
+                state.cost,
+                "${factor::class.simpleName}: cost drift vs recompute on iter=$i"
+            )
+            assertEquals(
+                sibling.violated.contains(0),
+                state.violated.contains(0),
+                "${factor::class.simpleName}: violation drift vs recompute on iter=$i"
+            )
 
             if (i > 0 && i % 30 == 0) {
                 randomizeAssignment(state, FactorEnv(numBoolVars, intDomains), rng)
@@ -376,7 +421,10 @@ class FactorPropertyTest {
             var target = cur
             repeat(8) {
                 val candidate = d.min + rng.nextInt(d.size)
-                if (candidate != cur) { target = candidate; return@repeat }
+                if (candidate != cur) {
+                    target = candidate
+                    return@repeat
+                }
             }
             if (target == cur) return null
             Move.IntSet(v, target)

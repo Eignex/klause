@@ -155,15 +155,31 @@ class Alns(
             }
             destroyBandit.update(destroyIdx, reward)
             repairBandit.update(repairIdx, reward)
-            _iterationLog.add(IterationRecord(destroyIdx, repairIdx, freed.bools.size + freed.ints.size,
-                incumbentObj, repairedObj, accept, isNewBest))
+            _iterationLog.add(
+                IterationRecord(
+                    destroyIdx,
+                    repairIdx,
+                    freed.bools.size + freed.ints.size,
+                    incumbentObj,
+                    repairedObj,
+                    accept,
+                    isNewBest
+                )
+            )
 
-            if (isNewBest) { bestSample = repaired; bestObj = repairedObj }
-            if (accept) { incumbent = repaired; incumbentObj = repairedObj }
+            if (isNewBest) {
+                bestSample = repaired
+                bestObj = repairedObj
+            }
+            if (accept) {
+                incumbent = repaired
+                incumbentObj = repairedObj
+            }
         }
         // ALNS is incomplete — every successful run returns BestFound, never Optimal.
         return MinimizeResult.BestFound(
-            sample = bestSample, objective = bestObj,
+            sample = bestSample,
+            objective = bestObj,
             reason = TerminationReason.BudgetExhausted,
         )
     }

@@ -1,6 +1,5 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -34,10 +33,12 @@ class CompoundMoveTest {
         assertFails { Move.Compound(emptyList()) }
         assertFails { Move.Compound(listOf(Move.BoolFlip(0))) }
         assertFails {
-            Move.Compound(listOf(
-                Move.BoolFlip(0),
-                Move.Compound(listOf(Move.BoolFlip(1), Move.BoolFlip(2))),
-            ))
+            Move.Compound(
+                listOf(
+                    Move.BoolFlip(0),
+                    Move.Compound(listOf(Move.BoolFlip(1), Move.BoolFlip(2))),
+                )
+            )
         }
     }
 

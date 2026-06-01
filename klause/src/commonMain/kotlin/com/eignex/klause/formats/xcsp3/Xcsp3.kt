@@ -55,7 +55,7 @@ object Xcsp3 {
     }
 
     private class Builder(val negTableCap: Long) {
-        private val varIds = LinkedHashMap<String, Int>()    // resolved name (incl. array cells) -> int var id
+        private val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         private val domains = ArrayList<IntDomain>()
         private val factors = ArrayList<Factor>()
         private var nextBool = 0
@@ -77,8 +77,14 @@ object Xcsp3 {
             }
         }
 
-        private fun addVar(name: String, dom: IntDomain) { varIds[name] = domains.size; domains.add(dom) }
-        private fun newAuxVar(lo: Int, hi: Int): Int { domains.add(IntDomain(lo, hi)); return domains.size - 1 }
+        private fun addVar(name: String, dom: IntDomain) {
+            varIds[name] = domains.size
+            domains.add(dom)
+        }
+        private fun newAuxVar(lo: Int, hi: Int): Int {
+            domains.add(IntDomain(lo, hi))
+            return domains.size - 1
+        }
         private fun newBool(): Int = nextBool++
 
         private fun parseDomain(text: String): IntDomain {
@@ -88,7 +94,8 @@ object Xcsp3 {
                 if (r.size == 2) (r[0].toInt()..r[1].toInt()).forEach { values.add(it) } else values.add(tok.toInt())
             }
             if (values.isEmpty()) throw UnsupportedXcsp3Exception("empty domain")
-            val lo = values.min(); val hi = values.max()
+            val lo = values.min()
+            val hi = values.max()
             var dom = IntDomain(lo, hi)
             for (v in lo..hi) if (v !in values) dom = dom.excludeValue(v)
             return dom
@@ -158,15 +165,31 @@ object Xcsp3 {
             val arity = vars.size
             val valuesPer = vars.map { domainValues(it) }
             var product = 1L
-            for (vs in valuesPer) { product *= vs.size; if (product > negTableCap) throw UnsupportedXcsp3Exception("negative table cartesian product exceeds cap ($negTableCap)") }
+            for (vs in valuesPer) {
+                product *= vs.size
+                if (product > negTableCap) {
+                    throw UnsupportedXcsp3Exception(
+                        "negative table cartesian product exceeds cap ($negTableCap)"
+                    )
+                }
+            }
             val forbidden = HashSet<List<Int>>()
             var i = 0
-            while (i < conflicts.size) { forbidden.add((0 until arity).map { conflicts[i + it] }); i += arity }
+            while (i < conflicts.size) {
+                forbidden.add((0 until arity).map { conflicts[i + it] })
+                i += arity
+            }
             val allowed = ArrayList<Int>()
             val cur = IntArray(arity)
             fun rec(p: Int) {
-                if (p == arity) { if (cur.toList() !in forbidden) for (v in cur) allowed.add(v); return }
-                for (v in valuesPer[p]) { cur[p] = v; rec(p + 1) }
+                if (p == arity) {
+                    if (cur.toList() !in forbidden) for (v in cur) allowed.add(v)
+                    return
+                }
+                for (v in valuesPer[p]) {
+                    cur[p] = v
+                    rec(p + 1)
+                }
             }
             rec(0)
             return Table(xs = vars, tuples = allowed.toIntArray())
@@ -185,7 +208,7 @@ object Xcsp3 {
 
         private fun compileBool(e: FExpr): Int = when (e) {
             is FExpr.Num -> if (e.value != 0) trueLit() else Lit.negate(trueLit())
-            is FExpr.Ref -> reifyRel(FExpr.Call("ge", listOf(e, FExpr.Num(1))))  // 0/1 var truthiness
+            is FExpr.Ref -> reifyRel(FExpr.Call("ge", listOf(e, FExpr.Num(1)))) // 0/1 var truthiness
             is FExpr.Call -> when (e.fn) {
                 "not" -> Lit.negate(compileBool(e.args[0]))
                 "and" -> tseitinAnd(e.args.map { compileBool(it) })
@@ -200,7 +223,12 @@ object Xcsp3 {
 
         private var trueLitCache = -1
         private fun trueLit(): Int {
-            if (trueLitCache < 0) { trueLitCache = Lit.make(newBool(), true); factors.add(Clause(intArrayOf(trueLitCache))) }
+            if (trueLitCache < 0) {
+                trueLitCache = Lit.make(newBool(), true)
+                factors.add(
+                    Clause(intArrayOf(trueLitCache))
+                )
+            }
             return trueLitCache
         }
 
@@ -230,17 +258,23 @@ object Xcsp3 {
         private fun reifyRel(node: FExpr.Call): Int {
             val lin = relationLinear(node)
             val aux = newBool()
-            factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = lin.coeffs, vars = lin.vars, op = lin.op, bound = lin.bound))
+            factors.add(
+                ReifiedLinear(auxBoolVar = aux, coeffs = lin.coeffs, vars = lin.vars, op = lin.op, bound = lin.bound)
+            )
             return Lit.make(aux, true)
         }
 
         /** `rel(lhs, rhs)` → a [Linear] `coeffs·vars OP bound`. */
         private fun relationLinear(node: FExpr.Call): Linear {
             val op = when (node.fn) {
-                "le", "lt" -> LinearOp.LE; "ge", "gt" -> LinearOp.GE; "eq" -> LinearOp.EQ; "ne" -> LinearOp.NE
+                "le", "lt" -> LinearOp.LE
+                "ge", "gt" -> LinearOp.GE
+                "eq" -> LinearOp.EQ
+                "ne" -> LinearOp.NE
                 else -> throw UnsupportedXcsp3Exception("relation '${node.fn}'")
             }
-            val lhs = linear(node.args[0]); val rhs = linear(node.args[1])
+            val lhs = linear(node.args[0])
+            val rhs = linear(node.args[1])
             val combined = HashMap(lhs.coeffs)
             for ((v, c) in rhs.coeffs) combined[v] = (combined[v] ?: 0) - c
             combined.entries.removeAll { it.value == 0 }
@@ -267,18 +301,30 @@ object Xcsp3 {
         private fun element(e: XmlElement) {
             val arr = refList(e.child("list")!!.textContent).toIntArray()
             val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
-            val idx = singleTermVar(e.child("index")?.textContent
-                ?: throw UnsupportedXcsp3Exception("element: missing <index>"))
+            val idx = singleTermVar(
+                e.child("index")?.textContent
+                    ?: throw UnsupportedXcsp3Exception("element: missing <index>")
+            )
             val value = e.child("value")?.textContent?.trim()
                 ?: throw UnsupportedXcsp3Exception("element: missing <value>")
-            factors.add(Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = true, indexOffset = offset))
+            factors.add(
+                Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = true, indexOffset = offset)
+            )
         }
 
         private fun channel(e: XmlElement) {
             val lists = e.children.filter { it.tag == "list" }
             when (lists.size) {
-                1 -> { val f = refList(lists[0].textContent).toIntArray(); factors.add(Inverse(f = f, g = f)) }
-                2 -> factors.add(Inverse(f = refList(lists[0].textContent).toIntArray(), g = refList(lists[1].textContent).toIntArray()))
+                1 -> {
+                    val f = refList(lists[0].textContent).toIntArray()
+                    factors.add(Inverse(f = f, g = f))
+                }
+                2 -> factors.add(
+                    Inverse(
+                        f = refList(lists[0].textContent).toIntArray(),
+                        g = refList(lists[1].textContent).toIntArray()
+                    )
+                )
                 else -> throw UnsupportedXcsp3Exception("channel: only 1- or 2-list forms supported")
             }
         }
@@ -296,23 +342,41 @@ object Xcsp3 {
             val stateIdx = LinkedHashMap<String, Int>()
             fun stateOf(st: String) = stateIdx.getOrPut(st) { stateIdx.size + 1 }
             stateOf(start)
-            trs.forEach { stateOf(it.src); stateOf(it.dst) }
+            trs.forEach {
+                stateOf(it.src)
+                stateOf(it.dst)
+            }
             val q = stateIdx.size
 
-            val minSym = trs.minOf { it.sym }; val maxSym = trs.maxOf { it.sym }
+            val minSym = trs.minOf { it.sym }
+            val maxSym = trs.maxOf { it.sym }
             val offset = 1 - minSym
             val s = maxSym - minSym + 1
-            val table = IntArray(q * s)   // 0 = dead state
+            val table = IntArray(q * s) // 0 = dead state
             for (t in trs) table[(stateOf(t.src) - 1) * s + (t.sym + offset - 1)] = stateOf(t.dst)
             val accepting = finals.map { stateOf(it) }.toIntArray()
 
-            val seq = if (offset == 0) seqVars else IntArray(seqVars.size) { i ->
-                val sv = seqVars[i]; val d = domains[sv]
-                val c = newAuxVar(d.min + offset, d.max + offset)
-                factors.add(Linear(intArrayOf(1, -1), intArrayOf(c, sv), LinearOp.EQ, offset))  // c - sv = offset
-                c
+            val seq = if (offset == 0) {
+                seqVars
+            } else {
+                IntArray(seqVars.size) { i ->
+                    val sv = seqVars[i]
+                    val d = domains[sv]
+                    val c = newAuxVar(d.min + offset, d.max + offset)
+                    factors.add(Linear(intArrayOf(1, -1), intArrayOf(c, sv), LinearOp.EQ, offset)) // c - sv = offset
+                    c
+                }
             }
-            factors.add(Regular(seq = seq, numStates = q, alphabetSize = s, transitions = table, q0 = stateOf(start), accepting = accepting))
+            factors.add(
+                Regular(
+                    seq = seq,
+                    numStates = q,
+                    alphabetSize = s,
+                    transitions = table,
+                    q0 = stateOf(start),
+                    accepting = accepting
+                )
+            )
         }
 
         private fun cumulative(e: XmlElement) {
@@ -322,7 +386,11 @@ object Xcsp3 {
             val resources = parseInts(e.child("heights")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("cumulative: only constant <heights> supported")
             val (op, cap) = condition(e.child("condition")!!.textContent.trim())
-            if (op != LinearOp.LE) throw UnsupportedXcsp3Exception("cumulative: only (le, capacity) conditions supported")
+            if (op != LinearOp.LE) {
+                throw UnsupportedXcsp3Exception(
+                    "cumulative: only (le, capacity) conditions supported"
+                )
+            }
             factors.add(Cumulative(starts = starts, durations = durations, resources = resources, capacity = cap))
         }
 
@@ -337,12 +405,15 @@ object Xcsp3 {
             if (lists.size < 2) throw UnsupportedXcsp3Exception("lex: needs at least two lists")
             val opText = (e.child("operator")?.textContent?.trim() ?: e.attr("operator")).ifBlank { "lt" }
             val (strict, swap) = when (opText) {
-                "lt" -> true to false; "le" -> false to false
-                "gt" -> true to true; "ge" -> false to true
+                "lt" -> true to false
+                "le" -> false to false
+                "gt" -> true to true
+                "ge" -> false to true
                 else -> throw UnsupportedXcsp3Exception("lex operator '$opText'")
             }
             for (i in 0 until lists.size - 1) {
-                val a = lists[i]; val b = lists[i + 1]
+                val a = lists[i]
+                val b = lists[i + 1]
                 if (swap) factors.add(LexLess(b, a, strict)) else factors.add(LexLess(a, b, strict))
             }
         }
@@ -394,7 +465,8 @@ object Xcsp3 {
         }
 
         private fun addLin(a: Lin, b: Lin): Lin {
-            val m = HashMap(a.coeffs); for ((v, c) in b.coeffs) m[v] = (m[v] ?: 0) + c
+            val m = HashMap(a.coeffs)
+            for ((v, c) in b.coeffs) m[v] = (m[v] ?: 0) + c
             return Lin(m, a.constant + b.constant)
         }
         private fun scaleLin(a: Lin, k: Int) = Lin(a.coeffs.mapValues { it.value * k }, a.constant * k)
@@ -429,7 +501,9 @@ object Xcsp3 {
                 return varIds.keys.filter { it.startsWith("$base[") }
             }
             RANGE_REF.find(tok)?.let { m ->
-                val base = m.groupValues[1]; val lo = m.groupValues[2].toInt(); val hi = m.groupValues[3].toInt()
+                val base = m.groupValues[1]
+                val lo = m.groupValues[2].toInt()
+                val hi = m.groupValues[3].toInt()
                 return (lo..hi).map { "$base[$it]" }
             }
             return listOf(tok)
@@ -451,7 +525,8 @@ object Xcsp3 {
         private fun domainMin(vars: IntArray) = vars.minOf { domains[it].min }
         private fun domainSpan(vars: IntArray) = vars.maxOf { domains[it].max } - domainMin(vars) + 1
         private fun domainValues(v: Int): List<Int> {
-            val d = domains[v]; val out = ArrayList<Int>(d.size)
+            val d = domains[v]
+            val out = ArrayList<Int>(d.size)
             for (k in 0 until d.size) out.add(d.valueAt(k))
             return out
         }
@@ -461,14 +536,23 @@ object Xcsp3 {
                 ?: throw UnsupportedXcsp3Exception("condition '$text' (only (op,const) supported)")
             val k = m.groupValues[2].toInt()
             return when (m.groupValues[1]) {
-                "le" -> LinearOp.LE to k; "ge" -> LinearOp.GE to k; "eq" -> LinearOp.EQ to k
-                "ne" -> LinearOp.NE to k; "lt" -> LinearOp.LE to (k - 1); "gt" -> LinearOp.GE to (k + 1)
+                "le" -> LinearOp.LE to k
+                "ge" -> LinearOp.GE to k
+                "eq" -> LinearOp.EQ to k
+                "ne" -> LinearOp.NE to k
+                "lt" -> LinearOp.LE to (k - 1)
+                "gt" -> LinearOp.GE to (k + 1)
                 else -> throw UnsupportedXcsp3Exception("condition op '${m.groupValues[1]}'")
             }
         }
 
         fun build(): Xcsp3Problem = Xcsp3Problem(
-            Problem(numBoolVars = nextBool, numIntVars = domains.size, intDomains = domains.toTypedArray(), factors = factors.toTypedArray()),
+            Problem(
+                numBoolVars = nextBool,
+                numIntVars = domains.size,
+                intDomains = domains.toTypedArray(),
+                factors = factors.toTypedArray()
+            ),
             objective,
         )
 

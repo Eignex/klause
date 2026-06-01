@@ -1,15 +1,15 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.implies
 import com.eignex.klause.ast.pbAtLeast
 import com.eignex.klause.ast.pbAtMost
 import com.eignex.klause.ast.pbExactly
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -39,7 +39,10 @@ class PseudoBooleanDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 31)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -62,7 +65,10 @@ class PseudoBooleanDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 13)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -84,7 +90,10 @@ class PseudoBooleanDslTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+        val solver = LocalSearchSolver(
+            compiled.problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+        )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 41)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

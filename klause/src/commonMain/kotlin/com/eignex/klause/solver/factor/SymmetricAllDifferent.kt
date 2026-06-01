@@ -49,11 +49,20 @@ class SymmetricAllDifferent(
         var willViolate = false
         for (i in xs.indices) {
             val v = if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
-            if (!seen.add(v)) { willViolate = true; break }
+            if (!seen.add(v)) {
+                willViolate = true
+                break
+            }
             val target = v - indexOffset
-            if (target !in xs.indices) { willViolate = true; break }
+            if (target !in xs.indices) {
+                willViolate = true
+                break
+            }
             val backVal = if (xs[target] == intVar) newValue else state.assignment.intValue(xs[target])
-            if (backVal != i + indexOffset) { willViolate = true; break }
+            if (backVal != i + indexOffset) {
+                willViolate = true
+                break
+            }
         }
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
@@ -90,7 +99,7 @@ class SymmetricAllDifferent(
                 val backTarget = backVal - indexOffset
                 if (backTarget in xs.indices) {
                     // Pick a value where the mirror is consistent.
-                    val candidate = backTarget + indexOffset  // points at j with xs[j]=v...; trial
+                    val candidate = backTarget + indexOffset // points at j with xs[j]=v...; trial
                     if (candidate in xiDom && candidate != v) sink.addChannelingIntSet(state, xs[i], candidate)
                 }
                 // Self-pair fallback: xs[i] = i (self-map) trivially satisfies the involution

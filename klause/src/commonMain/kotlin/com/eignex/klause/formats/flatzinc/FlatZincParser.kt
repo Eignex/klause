@@ -58,8 +58,9 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         //   bool : id = expr ;      (parameter form)
         val startTok = peek()
         var isVar = false
-        if (matchKw("var")) isVar = true
-        else if (matchKw("par")) isVar = false
+        if (matchKw("var")) {
+            isVar = true
+        } else if (matchKw("par")) isVar = false
         // `array [1..N] of (var)? T` — handle.
         val type: FznType = parseType()
         expect(":", "expected `:` in variable declaration")
@@ -110,11 +111,21 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         val tok = peek()
         if (tok is FznToken.Kw) {
             return when (tok.keyword) {
-                "bool" -> { advance(); FznType.Bool }
-                "int" -> { advance(); FznType.IntAny }
-                "float" -> { advance(); FznType.FloatAny }
+                "bool" -> {
+                    advance()
+                    FznType.Bool
+                }
+                "int" -> {
+                    advance()
+                    FznType.IntAny
+                }
+                "float" -> {
+                    advance()
+                    FznType.FloatAny
+                }
                 "set" -> {
-                    advance(); expectKw("of")
+                    advance()
+                    expectKw("of")
                     val element = parseScalarType()
                     FznType.SetOfInt(element)
                 }
@@ -123,13 +134,15 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         }
         // Otherwise expect a range literal: `1..10` or `{1,3,5}` or `1.0..3.0`.
         if (tok is FznToken.IntLit) {
-            val lo = tok.value; advance()
+            val lo = tok.value
+            advance()
             expect("..", "expected `..` in int range")
             val hi = expectIntLit()
             return FznType.IntRange(lo, hi)
         }
         if (tok is FznToken.FloatLit) {
-            val lo = tok.value; advance()
+            val lo = tok.value
+            advance()
             expect("..", "expected `..` in float range")
             val hi = expectFloatOrIntAsDouble()
             return FznType.FloatRange(lo, hi)
@@ -195,7 +208,11 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         val tok = peek()
         if (tok !is FznToken.Kw) failHere("expected `satisfy` / `minimize` / `maximize`")
         return when (tok.keyword) {
-            "satisfy" -> { advance(); expect(";", "expected `;`"); FznSolve.Satisfy(anns) }
+            "satisfy" -> {
+                advance()
+                expect(";", "expected `;`")
+                FznSolve.Satisfy(anns)
+            }
             "minimize" -> {
                 advance()
                 val obj = parseExpr()
@@ -231,22 +248,38 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         val tok = peek()
         return when (tok) {
             is FznToken.Kw -> when (tok.keyword) {
-                "true" -> { advance(); FznExpr.BoolLit(true) }
-                "false" -> { advance(); FznExpr.BoolLit(false) }
+                "true" -> {
+                    advance()
+                    FznExpr.BoolLit(true)
+                }
+                "false" -> {
+                    advance()
+                    FznExpr.BoolLit(false)
+                }
                 else -> failHere("unexpected keyword '${tok.keyword}' in expression")
             }
             is FznToken.IntLit -> {
-                val lo = tok.value; advance()
+                val lo = tok.value
+                advance()
                 if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "..") {
                     advance()
                     val hi = expectIntLit()
                     FznExpr.IntRangeLit(lo, hi)
-                } else FznExpr.IntLit(lo)
+                } else {
+                    FznExpr.IntLit(lo)
+                }
             }
-            is FznToken.FloatLit -> { advance(); FznExpr.FloatLit(tok.value) }
-            is FznToken.StringLit -> { advance(); FznExpr.StringLit(tok.value) }
+            is FznToken.FloatLit -> {
+                advance()
+                FznExpr.FloatLit(tok.value)
+            }
+            is FznToken.StringLit -> {
+                advance()
+                FznExpr.StringLit(tok.value)
+            }
             is FznToken.Ident -> {
-                val name = tok.name; advance()
+                val name = tok.name
+                advance()
                 if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "[") {
                     advance()
                     val idx = expectIntLit()
@@ -262,7 +295,9 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                     }
                     expect(")", "expected `)` closing call")
                     FznExpr.AnnCall(name, args)
-                } else FznExpr.Ident(name)
+                } else {
+                    FznExpr.Ident(name)
+                }
             }
             is FznToken.Punct -> when (tok.symbol) {
                 "[" -> parseArrayLit()
@@ -302,12 +337,18 @@ internal class FlatZincParser(tokens: List<FznToken>) {
 
     private fun matchKw(kw: String): Boolean {
         val t = peek()
-        if (t is FznToken.Kw && t.keyword == kw) { advance(); return true }
+        if (t is FznToken.Kw && t.keyword == kw) {
+            advance()
+            return true
+        }
         return false
     }
     private fun matchPunct(s: String): Boolean {
         val t = peek()
-        if (t is FznToken.Punct && t.symbol == s) { advance(); return true }
+        if (t is FznToken.Punct && t.symbol == s) {
+            advance()
+            return true
+        }
         return false
     }
     private fun expectKw(kw: String) {
@@ -319,18 +360,26 @@ internal class FlatZincParser(tokens: List<FznToken>) {
     private fun expectIdent(): String {
         val t = peek()
         if (t !is FznToken.Ident) failHere("expected identifier")
-        advance(); return t.name
+        advance()
+        return t.name
     }
     private fun expectIntLit(): Long {
         val t = peek()
         if (t !is FznToken.IntLit) failHere("expected int literal")
-        advance(); return t.value
+        advance()
+        return t.value
     }
     private fun expectFloatOrIntAsDouble(): Double {
         val t = peek()
         return when (t) {
-            is FznToken.FloatLit -> { advance(); t.value }
-            is FznToken.IntLit -> { advance(); t.value.toDouble() }
+            is FznToken.FloatLit -> {
+                advance()
+                t.value
+            }
+            is FznToken.IntLit -> {
+                advance()
+                t.value.toDouble()
+            }
             else -> failHere("expected float literal")
         }
     }
@@ -350,5 +399,4 @@ internal class FlatZincParser(tokens: List<FznToken>) {
             if (t is FznToken.Punct && t.symbol == ";") return
         }
     }
-
 }

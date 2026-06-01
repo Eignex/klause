@@ -1,8 +1,6 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -26,7 +24,9 @@ class ReifiedCardinalityPropTest {
         // only "count > max = 2" is feasible. Required additional trues: max-trueCount+1
         // = 2 = unassigned. So every unassigned literal must be forced true.
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 // Force v0 = true.
                 Clause(intArrayOf(Lit.make(0, true))),
@@ -34,7 +34,8 @@ class ReifiedCardinalityPropTest {
                 ReifiedCardinality(
                     auxBoolVar = 3,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-                    min = 1, max = 2,
+                    min = 1,
+                    max = 2,
                 ),
             ),
         )
@@ -46,7 +47,8 @@ class ReifiedCardinalityPropTest {
         assertEquals(true, session.boolValue(1), "v1 should be forced true")
         assertEquals(true, session.boolValue(2), "v2 should be forced true")
         // Silence unused warning.
-        @Suppress("UNUSED_VARIABLE") val _r = implied
+        @Suppress("UNUSED_VARIABLE")
+        val _r = implied
     }
 
     @Test
@@ -58,12 +60,15 @@ class ReifiedCardinalityPropTest {
         //   trueCount=0 (so cap = min - 0 - 1 = 0). Up-branch needs 3 trues > 2
         //   unassigned → infeasible. cap == 0 → both literals forced false.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 ReifiedCardinality(
                     auxBoolVar = 2,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    min = 1, max = 2,
+                    min = 1,
+                    max = 2,
                 ),
             ),
         )
@@ -73,7 +78,8 @@ class ReifiedCardinalityPropTest {
         // Expect v0 and v1 forced false.
         assertEquals(false, session.boolValue(0), "v0 should be forced false")
         assertEquals(false, session.boolValue(1), "v1 should be forced false")
-        @Suppress("UNUSED_VARIABLE") val _r = implied
+        @Suppress("UNUSED_VARIABLE")
+        val _r = implied
     }
 
     @Test
@@ -82,14 +88,17 @@ class ReifiedCardinalityPropTest {
         // pinned false. ReifiedCardinality's `definitelyIn` check pins aux=true, which
         // conflicts with the prior aux=false pin → Unsat surfaced via revertAndUnsat.
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(1, true))),
                 ReifiedCardinality(
                     auxBoolVar = 2,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-                    min = 1, max = 2,
+                    min = 1,
+                    max = 2,
                 ),
             ),
         )
@@ -102,13 +111,16 @@ class ReifiedCardinalityPropTest {
     fun `aux true unchanged - boundary forcing still fires`() {
         // Sanity: the aux=true case still pins all unassigned to !pos when trueCount == max.
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),  // force v0 = true
+                Clause(intArrayOf(Lit.make(0, true))), // force v0 = true
                 ReifiedCardinality(
                     auxBoolVar = 3,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-                    min = 0, max = 1,
+                    min = 0,
+                    max = 1,
                 ),
             ),
         )

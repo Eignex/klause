@@ -33,11 +33,13 @@ class IncrementalBreakMakeTest {
             val incMake = state.boolMakeCountSnapshot()
             state.recompute()
             assertEquals(
-                incBreak.toList(), state.boolBreakCountSnapshot().toList(),
+                incBreak.toList(),
+                state.boolBreakCountSnapshot().toList(),
                 "boolBreakCount mismatch after flipping var=$v",
             )
             assertEquals(
-                incMake.toList(), state.boolMakeCountSnapshot().toList(),
+                incMake.toList(),
+                state.boolMakeCountSnapshot().toList(),
                 "boolMakeCount mismatch after flipping var=$v",
             )
         }
@@ -60,8 +62,12 @@ class IncrementalBreakMakeTest {
     @Test
     fun `cardinality bounded range with mixed polarity`() {
         val lits = intArrayOf(
-            Lit.make(0, true), Lit.make(1, false), Lit.make(2, true),
-            Lit.make(3, false), Lit.make(4, true), Lit.make(5, true),
+            Lit.make(0, true),
+            Lit.make(1, false),
+            Lit.make(2, true),
+            Lit.make(3, false),
+            Lit.make(4, true),
+            Lit.make(5, true),
         )
         val factor = Cardinality(lits, min = 2, max = 4)
         assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
@@ -71,9 +77,12 @@ class IncrementalBreakMakeTest {
     fun `cardinality with repeated vars and cancelling polarities`() {
         // var 0 appears twice positive (signed = +2); var 1 once pos + once neg (signed = 0).
         val lits = intArrayOf(
-            Lit.make(0, true), Lit.make(0, true),
-            Lit.make(1, true), Lit.make(1, false),
-            Lit.make(2, true), Lit.make(3, false),
+            Lit.make(0, true),
+            Lit.make(0, true),
+            Lit.make(1, true),
+            Lit.make(1, false),
+            Lit.make(2, true),
+            Lit.make(3, false),
         )
         val factor = Cardinality(lits, min = 1, max = 3)
         assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
@@ -89,7 +98,10 @@ class IncrementalBreakMakeTest {
     @Test
     fun `xor even target stays consistent`() {
         val lits = intArrayOf(
-            Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false),
+            Lit.make(0, true),
+            Lit.make(1, false),
+            Lit.make(2, true),
+            Lit.make(3, false),
         )
         val factor = Xor(lits, targetParity = 0)
         assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
@@ -100,7 +112,8 @@ class IncrementalBreakMakeTest {
         val factor = PseudoBoolean(
             weights = intArrayOf(3, 2, 1, 5, 4),
             literals = IntArray(5) { Lit.make(it, positive = true) },
-            op = PbOp.LE, bound = 7,
+            op = PbOp.LE,
+            bound = 7,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -110,9 +123,13 @@ class IncrementalBreakMakeTest {
         val factor = PseudoBoolean(
             weights = intArrayOf(2, 4, 3, 1),
             literals = intArrayOf(
-                Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false),
+                Lit.make(0, true),
+                Lit.make(1, false),
+                Lit.make(2, true),
+                Lit.make(3, false),
             ),
-            op = PbOp.GE, bound = 5,
+            op = PbOp.GE,
+            bound = 5,
         )
         assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
     }
@@ -122,7 +139,8 @@ class IncrementalBreakMakeTest {
         val factor = PseudoBoolean(
             weights = intArrayOf(1, 1, 1, 1, 1),
             literals = IntArray(5) { Lit.make(it, positive = true) },
-            op = PbOp.EQ, bound = 3,
+            op = PbOp.EQ,
+            bound = 3,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -132,7 +150,8 @@ class IncrementalBreakMakeTest {
         val factor = PseudoBoolean(
             weights = intArrayOf(2, -3, 4, -1),
             literals = IntArray(4) { Lit.make(it, positive = true) },
-            op = PbOp.LE, bound = 1,
+            op = PbOp.LE,
+            bound = 1,
         )
         assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
     }
@@ -143,7 +162,8 @@ class IncrementalBreakMakeTest {
         val factor = ReifiedCardinality(
             auxBoolVar = 5,
             literals = IntArray(5) { Lit.make(it, positive = true) },
-            min = 2, max = 3,
+            min = 2,
+            max = 3,
         )
         assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
     }
@@ -153,9 +173,13 @@ class IncrementalBreakMakeTest {
         val factor = ReifiedCardinality(
             auxBoolVar = 4,
             literals = intArrayOf(
-                Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false),
+                Lit.make(0, true),
+                Lit.make(1, false),
+                Lit.make(2, true),
+                Lit.make(3, false),
             ),
-            min = 1, max = 2,
+            min = 1,
+            max = 2,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -166,7 +190,8 @@ class IncrementalBreakMakeTest {
             auxBoolVar = 5,
             weights = intArrayOf(2, 3, 1, 4, 2),
             literals = IntArray(5) { Lit.make(it, positive = true) },
-            op = PbOp.LE, bound = 6,
+            op = PbOp.LE,
+            bound = 6,
         )
         assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
     }
@@ -177,9 +202,13 @@ class IncrementalBreakMakeTest {
             auxBoolVar = 4,
             weights = intArrayOf(3, 2, 4, 1),
             literals = intArrayOf(
-                Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false),
+                Lit.make(0, true),
+                Lit.make(1, false),
+                Lit.make(2, true),
+                Lit.make(3, false),
             ),
-            op = PbOp.GE, bound = 5,
+            op = PbOp.GE,
+            bound = 5,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -190,7 +219,8 @@ class IncrementalBreakMakeTest {
             auxBoolVar = 4,
             weights = intArrayOf(1, 1, 1, 1),
             literals = IntArray(4) { Lit.make(it, positive = true) },
-            op = PbOp.EQ, bound = 2,
+            op = PbOp.EQ,
+            bound = 2,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -201,7 +231,8 @@ class IncrementalBreakMakeTest {
             auxBoolVar = 0,
             coeffs = intArrayOf(2, 3, 1),
             vars = intArrayOf(0, 1, 2),
-            op = LinearOp.LE, bound = 10,
+            op = LinearOp.LE,
+            bound = 10,
         )
         val intDomains = Array(3) { com.eignex.klause.solver.IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
@@ -220,11 +251,13 @@ class IncrementalBreakMakeTest {
             val incMake = state.boolMakeCountSnapshot()
             state.recompute()
             assertEquals(
-                incBreak.toList(), state.boolBreakCountSnapshot().toList(),
+                incBreak.toList(),
+                state.boolBreakCountSnapshot().toList(),
                 "boolBreakCount mismatch after IntSet(v=$v, target=$target)",
             )
             assertEquals(
-                incMake.toList(), state.boolMakeCountSnapshot().toList(),
+                incMake.toList(),
+                state.boolMakeCountSnapshot().toList(),
                 "boolMakeCount mismatch after IntSet(v=$v, target=$target)",
             )
         }
@@ -237,7 +270,8 @@ class IncrementalBreakMakeTest {
             auxBoolVar = 0,
             coeffs = intArrayOf(2, 3, 1),
             vars = intArrayOf(0, 1, 2),
-            op = LinearOp.LE, bound = 10,
+            op = LinearOp.LE,
+            bound = 10,
         )
         val intDomains = Array(3) { com.eignex.klause.solver.IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
@@ -260,22 +294,32 @@ class IncrementalBreakMakeTest {
         // Combined problem with all three factor kinds touching overlapping variables.
         val card = Cardinality(
             literals = intArrayOf(
-                Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
             ),
-            min = 1, max = 3,
+            min = 1,
+            max = 3,
         )
         val xor = Xor(
             literals = intArrayOf(
-                Lit.make(0, true), Lit.make(2, true), Lit.make(4, true),
+                Lit.make(0, true),
+                Lit.make(2, true),
+                Lit.make(4, true),
             ),
             targetParity = 1,
         )
         val pb = PseudoBoolean(
             weights = intArrayOf(2, 1, 3, 2),
             literals = intArrayOf(
-                Lit.make(1, true), Lit.make(3, false), Lit.make(4, true), Lit.make(5, true),
+                Lit.make(1, true),
+                Lit.make(3, false),
+                Lit.make(4, true),
+                Lit.make(5, true),
             ),
-            op = PbOp.LE, bound = 4,
+            op = PbOp.LE,
+            bound = 4,
         )
         assertConsistent(Problem(6, 0, emptyArray(), listOf<Factor>(card, xor, pb)))
     }

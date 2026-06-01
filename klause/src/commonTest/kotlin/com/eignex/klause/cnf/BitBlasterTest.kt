@@ -37,14 +37,16 @@ class BitBlasterTest {
         val cnf = BitBlaster.compile(problem)
         for (v in 0..7) {
             val expectedSat = v <= 5
-            assertEquals(expectedSat, isSat(cnf, pinInt(cnf, 0, v)),
-                "x=$v: expected SAT=$expectedSat")
+            assertEquals(
+                expectedSat,
+                isSat(cnf, pinInt(cnf, 0, v)),
+                "x=$v: expected SAT=$expectedSat"
+            )
         }
     }
 
     @Test
     fun `int eq and domain constraint`() {
-
         val factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 4)
         val problem = Problem(0, 1, arrayOf(IntDomain(2, 5)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -76,7 +78,6 @@ class BitBlasterTest {
 
     @Test
     fun `linear le over two tiny vars matches enumeration`() {
-
         val factor = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -89,7 +90,6 @@ class BitBlasterTest {
 
     @Test
     fun `linear var vs var matches enumeration`() {
-
         val factor = Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -102,7 +102,6 @@ class BitBlasterTest {
 
     @Test
     fun `reified int compare tracks aux value`() {
-
         val factor = reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 3)), listOf(factor))
         val cnf = BitBlaster.compile(problem)
@@ -117,7 +116,6 @@ class BitBlasterTest {
 
     @Test
     fun `clauses and cardinality round trip`() {
-
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -134,9 +132,12 @@ class BitBlasterTest {
             val b2 = (mask and 4) == 4
             val expectedSat = (b0 || b1) && (listOf(b0, b1, b2).count { it } <= 1)
             val pins = intArrayOf(
-                cnf.boolVarToCnfVar[0], if (b0) 1 else 0,
-                cnf.boolVarToCnfVar[1], if (b1) 1 else 0,
-                cnf.boolVarToCnfVar[2], if (b2) 1 else 0,
+                cnf.boolVarToCnfVar[0],
+                if (b0) 1 else 0,
+                cnf.boolVarToCnfVar[1],
+                if (b1) 1 else 0,
+                cnf.boolVarToCnfVar[2],
+                if (b2) 1 else 0,
             )
             assertEquals(expectedSat, isSat(cnf, pins), "x0=$b0 x1=$b1 x2=$b2")
         }
@@ -145,7 +146,8 @@ class BitBlasterTest {
     @Test
     fun `dimacs round trips header`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 3)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
         )

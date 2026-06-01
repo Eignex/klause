@@ -7,8 +7,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertFails
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SessionTest {
@@ -48,12 +48,12 @@ class SessionTest {
         val session = BacktrackSolver(problem).session()
 
         session.push(Assumptions(bools = mapOf(0 to true, 1 to false, 2 to false)))
-        session.push(Assumptions(bools = mapOf(1 to true)))  // overrides 1 = false
+        session.push(Assumptions(bools = mapOf(1 to true))) // overrides 1 = false
         // Now 0 = true and 1 = true both pinned → infeasible for exactly-one.
         val r = session.solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
 
-        session.pop()  // back to just 0 = true, 1 = false, 2 = false → feasible
+        session.pop() // back to just 0 = true, 1 = false, 2 = false → feasible
         val r2 = session.solve(BacktrackParams(randomSeed = 0L))
         assertTrue(r2 is SolveResult.Sat)
         assertTrue(r2.assignment.bools[0])

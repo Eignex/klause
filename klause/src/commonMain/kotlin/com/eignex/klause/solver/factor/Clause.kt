@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * Disjunction of Boolean literals.
@@ -42,8 +42,11 @@ class Clause(
      *  watches drift during propagation, [propagate] keeps the index in sync by calling
      *  `state.moveBoolWatcher`. */
     override val initialBoolWatchers: IntArray =
-        if (literals.size == 1) intArrayOf(literals[0])
-        else intArrayOf(literals[0], literals[1])
+        if (literals.size == 1) {
+            intArrayOf(literals[0])
+        } else {
+            intArrayOf(literals[0], literals[1])
+        }
 
     /** When [propagate] returns false, every literal of this clause was false — that's
      *  the textbook clause-form nogood for conflict analysis. Returning the literals
@@ -73,7 +76,10 @@ class Clause(
     fun allLiteralsBool(numBoolVars: Int): Boolean =
         pureBoolMemo ?: run {
             var allBool = true
-            for (lit in literals) if (Lit.variable(lit) >= numBoolVars) { allBool = false; break }
+            for (lit in literals) if (Lit.variable(lit) >= numBoolVars) {
+                allBool = false
+                break
+            }
             pureBoolMemo = allBool
             allBool
         }
@@ -89,8 +95,9 @@ class Clause(
         for (i in literals.indices) {
             if (litTrue(state, i)) {
                 trueCount++
-                if (first == -1) first = i
-                else if (second == -1) second = i
+                if (first == -1) {
+                    first = i
+                } else if (second == -1) second = i
             }
         }
         if (first == -1) {
@@ -214,10 +221,12 @@ class Clause(
      *
      *  Transitions 2↔3, 3↔4, ... touch no break/make state. */
     override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState, factorId: Int, flippedVar: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        flippedVar: Int,
     ) {
         val li = litIndexByVar[flippedVar]
-        if (li < 0) return  // flippedVar isn't in this clause (shouldn't happen via occurrence list)
+        if (li < 0) return // flippedVar isn't in this clause (shouldn't happen via occurrence list)
         val newCount = state.intPayload[factorId]
         val nowTrue = litTrue(state, li)
         // Old count was newCount - (delta), where delta = ±1 depending on lit transition.
@@ -285,8 +294,11 @@ class Clause(
             // Unit clause: no second watch to play with. Trivial check-or-pin.
             val lit = literals[0]
             val t = state.litTruth(lit)
-            return if (t == null) state.pinLit(lit, antecedents = null)
-                   else t  // already true → satisfied; already false → conflict.
+            return if (t == null) {
+                state.pinLit(lit, antecedents = null)
+            } else {
+                t // already true → satisfied; already false → conflict.
+            }
         }
         val watches = (state.refPayload[factorId] as IntArray?) ?: run {
             // First fire on this session: initial watches at indices 0 and 1. The body
@@ -346,8 +358,9 @@ class Clause(
      *  clauses re-derive as int-bound tightens on the underlying var. */
     private fun pinUnit(state: PropagationState, unitIdx: Int): Boolean {
         val unitLit = literals[unitIdx]
-        val antecedents: IntArray? = if (literals.size <= 1) null
-        else {
+        val antecedents: IntArray? = if (literals.size <= 1) {
+            null
+        } else {
             val out = IntArray(literals.size - 1)
             var w = 0
             for (i in literals.indices) if (i != unitIdx) out[w++] = literals[i]
@@ -412,4 +425,4 @@ class Clause(
             if (litTrue(state, i)) return i
         }
         return -1
-    }}
+    } }

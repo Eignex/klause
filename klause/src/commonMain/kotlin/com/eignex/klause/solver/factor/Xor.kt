@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `XOR(lit_1, ..., lit_n) == targetParity`. `targetParity = 1` means an odd number of literals
@@ -80,8 +80,9 @@ class Xor(
         for (lit in literals) {
             val v = Lit.variable(lit)
             val b = state.boolValues[v]
-            if (b == null) unassigned.add(v)
-            else if (Lit.evaluate(lit, b)) pinnedParity = pinnedParity xor 1
+            if (b == null) {
+                unassigned.add(v)
+            } else if (Lit.evaluate(lit, b)) pinnedParity = pinnedParity xor 1
         }
         // Only variables with odd-count occurrences ("effective") affect parity.
         var effective = -1
@@ -89,7 +90,7 @@ class Xor(
         for (v in unassigned) {
             if (parityByVar.coeffOf(v) == 1) {
                 effectiveCount++
-                if (effectiveCount > 1) return true  // 2+ effective: parity not yet decidable
+                if (effectiveCount > 1) return true // 2+ effective: parity not yet decidable
                 effective = v
             }
         }
@@ -112,7 +113,7 @@ class Xor(
             parityIfFalse == targetParity && parityIfTrue != targetParity ->
                 state.pinBool(v, false, parityAntecedents(state, excludeVar = v))
             parityIfTrue != targetParity && parityIfFalse != targetParity -> false
-            else -> true  // both work (shouldn't happen when var has odd parity contribution)
+            else -> true // both work (shouldn't happen when var has odd parity contribution)
         }
     }
 
@@ -144,7 +145,7 @@ class Xor(
         for (v in boolVars) {
             if (v == excludeVar) continue
             val b = state.boolValues[v] ?: continue
-            out[w++] = Lit.make(v, !b)  // the literal that's currently false for this var
+            out[w++] = Lit.make(v, !b) // the literal that's currently false for this var
         }
         return out
     }
@@ -164,7 +165,9 @@ class Xor(
      *  to: if the flipped var's parity contribution is 0, nothing changed; otherwise
      *  violation flips and every parity-contributing var swaps break↔make. */
     override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState, factorId: Int, flippedVar: Int,
+        state: LocalSearchState,
+        factorId: Int,
+        flippedVar: Int,
     ) {
         if (parityByVar.coeffOf(flippedVar) == 0) return
         val newParity = state.intPayload[factorId]

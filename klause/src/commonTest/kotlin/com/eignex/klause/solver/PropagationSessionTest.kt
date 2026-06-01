@@ -1,14 +1,12 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.solver.propagation.VarKind
-import com.eignex.klause.solver.propagation.PropagationResult
-
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.solver.propagation.VarKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -19,7 +17,9 @@ class PropagationSessionTest {
     @Test
     fun `push pins agree with one-shot propagate`() {
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
@@ -39,7 +39,9 @@ class PropagationSessionTest {
     fun `pop restores feasibility`() {
         // (x0 ∨ x1). After pinning x0=false x1=false → Unsat. Pop one → feasible again.
         val p = Problem(
-            numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
@@ -68,7 +70,8 @@ class PropagationSessionTest {
     @Test
     fun `pinInt with subsequent contradiction Unsat`() {
         val p = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
@@ -98,7 +101,9 @@ class PropagationSessionTest {
     fun `seed propagates clause implications`() {
         // (x0 ∨ x1) — seed with x0=false; expect implied {1: true}.
         val p = Problem(
-            numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
@@ -111,9 +116,13 @@ class PropagationSessionTest {
     fun `push reports only newly implied facts`() {
         // exactly-one over 3 vars. Pinning x0=true implies x1=false, x2=false at the
         // first push. A no-op subsequent push must report empty new facts.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+            )
+        )
         val p = Problem(3, 0, emptyArray(), listOf(factor))
         val s = PropagationSession(p)
         s.seed(Assumptions.None)

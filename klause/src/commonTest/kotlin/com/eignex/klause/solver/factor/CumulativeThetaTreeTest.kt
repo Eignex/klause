@@ -81,8 +81,10 @@ class CumulativeThetaTreeTest {
         // Same task set, different leaf orderings: the recurrence anchors at the
         // leftmost EST in the subtree, so EST-ascending leaf order is the one that
         // gives the correct envelope.
-        val a_est = 0; val a_e = 10L
-        val b_est = 5; val b_e = 4L
+        val a_est = 0
+        val a_e = 10L
+        val b_est = 5
+        val b_e = 4L
         val capacity = 1
 
         val ordered = CumulativeThetaTree(n = 2, capacity = capacity)
@@ -180,8 +182,11 @@ class CumulativeThetaTreeTest {
 
             val expected = bruteEnv(capacity, ests, energies, active)
             val got = tree.envOfTheta()
-            assertEquals(expected, got,
-                "mismatch: n=$n cap=$capacity ests=${ests.toList()} e=${energies.toList()} active=${active.toList()}")
+            assertEquals(
+                expected,
+                got,
+                "mismatch: n=$n cap=$capacity ests=${ests.toList()} e=${energies.toList()} active=${active.toList()}"
+            )
 
             val expectedE = (0 until n).filter { active[it] }.sumOf { energies[it] }
             assertEquals(expectedE, tree.energyOfTheta())

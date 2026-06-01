@@ -5,7 +5,6 @@ import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
-import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.SetCard
 import com.eignex.klause.ast.SetDiff
 import com.eignex.klause.ast.SetDisjoint
@@ -208,10 +207,12 @@ internal fun Compiler.Build.assertSetIn(expr: SetIn) {
     for (i in set.universe.indices) {
         val e = set.universe[i]
         val bId = set.indicatorBoolIds[i]
-        pieces += com.eignex.klause.ast.And(listOf(
-            IntCompare(expr.elem, IntCmpOp.EQ, IntLit(e)),
-            indicatorBoolExpr(bId),
-        ))
+        pieces += com.eignex.klause.ast.And(
+            listOf(
+                IntCompare(expr.elem, IntCmpOp.EQ, IntLit(e)),
+                indicatorBoolExpr(bId),
+            )
+        )
     }
     val expanded = if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.Or(pieces)
     assertExpr(expanded)
@@ -327,10 +328,12 @@ internal fun Compiler.Build.reifySetIn(expr: SetIn): Int {
     val set = materializeSet(expr.set)
     val pieces = mutableListOf<BoolExpr>()
     for (i in set.universe.indices) {
-        pieces += com.eignex.klause.ast.And(listOf(
-            IntCompare(expr.elem, IntCmpOp.EQ, IntLit(set.universe[i])),
-            indicatorBoolExpr(set.indicatorBoolIds[i]),
-        ))
+        pieces += com.eignex.klause.ast.And(
+            listOf(
+                IntCompare(expr.elem, IntCmpOp.EQ, IntLit(set.universe[i])),
+                indicatorBoolExpr(set.indicatorBoolIds[i]),
+            )
+        )
     }
     return lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.Or(pieces))
 }
@@ -375,8 +378,11 @@ internal fun Compiler.Build.reifySetDisjoint(expr: SetDisjoint): Int {
         val rl = indicatorBoolExpr(r.indicatorBoolIds[ri])
         pieces += com.eignex.klause.ast.Or(listOf(com.eignex.klause.ast.Not(ll), com.eignex.klause.ast.Not(rl)))
     }
-    return if (pieces.isEmpty()) trueLit()
-    else lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.And(pieces))
+    return if (pieces.isEmpty()) {
+        trueLit()
+    } else {
+        lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.And(pieces))
+    }
 }
 
 internal fun Compiler.Build.reifySetEq(expr: SetEq): Int {

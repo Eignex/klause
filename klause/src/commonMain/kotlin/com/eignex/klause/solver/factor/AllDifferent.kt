@@ -4,9 +4,9 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -80,7 +80,7 @@ class AllDifferent(
             val idx = state.assignment.intValue(vars[i]) - domainMin
             val prev = counts[idx]
             counts[idx] = prev + 1
-            if (prev == 1) dups++   // count goes 1 -> 2: new duplicate value.
+            if (prev == 1) dups++ // count goes 1 -> 2: new duplicate value.
         }
         state.refPayload[factorId] = State(counts, dups)
     }
@@ -106,7 +106,7 @@ class AllDifferent(
         if (cur == oldValue) return 0
         val wasViolated = s.duplicateCount > 0
         val n = presentOccurrences(state, intVar)
-        if (n == 0) return 0  // every occurrence of [intVar] is currently absent.
+        if (n == 0) return 0 // every occurrence of [intVar] is currently absent.
         val oldIdx = oldValue - domainMin
         val oldCount = s.counts[oldIdx]
         if (oldCount == 2) s.duplicateCount--
@@ -160,7 +160,7 @@ class AllDifferent(
         val s = state.refPayload[factorId] as State
         val wasViolated = s.duplicateCount > 0
         // Simulate on a counts snapshot — touch only indices the flip would toggle.
-        val touched = mutableListOf<IntArray>()  // each: [valueIdx, delta]
+        val touched = mutableListOf<IntArray>() // each: [valueIdx, delta]
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasP = present(state, i)
@@ -211,12 +211,13 @@ class AllDifferent(
         collectHoleAndBoundAntecedents(state, conflictHallVars ?: vars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        conflictHallVars = null  // stale-guard; set at each failure point below.
+        conflictHallVars = null // stale-guard; set at each failure point below.
         // Only the definitely-present positions participate in Régin filtering. Build a
         // local index map: filteredIdx → original position. Unpinned-presence positions
         // are dropped — they may still go absent and would otherwise force unsound prunes.
-        val filtered: IntArray = if (presents.isEmpty()) IntArray(vars.size) { it }
-        else {
+        val filtered: IntArray = if (presents.isEmpty()) {
+            IntArray(vars.size) { it }
+        } else {
             val acc = IntArrayList()
             for (i in vars.indices) {
                 if (OptPresence.isDefinitelyPresent(presents, i, state)) acc.add(i)
@@ -224,7 +225,7 @@ class AllDifferent(
             IntArray(acc.size) { acc[it] }
         }
         val n = filtered.size
-        if (n < 2) return true  // nothing to filter on a single (or zero) present position.
+        if (n < 2) return true // nothing to filter on a single (or zero) present position.
         val filteredVars = IntArray(n) { vars[filtered[it]] }
 
         // Build compact value-id mapping and per-var sorted value-id lists from current
@@ -236,7 +237,10 @@ class AllDifferent(
             val list = IntArray(d.size)
             var k = 0
             d.forEach { v ->
-                val id = valueId.getOrPut(v) { idToValue.add(v); idToValue.size - 1 }
+                val id = valueId.getOrPut(v) {
+                    idToValue.add(v)
+                    idToValue.size - 1
+                }
                 list[k++] = id
             }
             list
@@ -315,8 +319,12 @@ class AllDifferent(
         val radjFill = IntArray(total)
         for (i in 0 until n) {
             for (vid in valuesPerVar[i]) {
-                if (matchVar[i] == vid) radj[i][radjFill[i]++] = n + vid
-                else { val src = n + vid; radj[src][radjFill[src]++] = i }
+                if (matchVar[i] == vid) {
+                    radj[i][radjFill[i]++] = n + vid
+                } else {
+                    val src = n + vid
+                    radj[src][radjFill[src]++] = i
+                }
             }
         }
         val reachedFromFree = BooleanArray(total)
@@ -415,13 +423,18 @@ class AllDifferent(
         fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
             val vis = BooleanArray(total)
             val bfs = IntArray(total)
-            var qh = 0; var qt = 0
-            vis[valNode] = true; bfs[qt++] = valNode
+            var qh = 0
+            var qt = 0
+            vis[valNode] = true
+            bfs[qt++] = valNode
             val acc = IntArrayList()
             while (qh < qt) {
                 val u = bfs[qh++]
                 if (u < n) acc.add(filteredVars[u])
-                for (w in adj[u]) if (!vis[w]) { vis[w] = true; bfs[qt++] = w }
+                for (w in adj[u]) if (!vis[w]) {
+                    vis[w] = true
+                    bfs[qt++] = w
+                }
             }
             acc.toIntArray()
         }
@@ -535,16 +548,19 @@ class AllDifferent(
         for (w in d.min..d.max) {
             if (swapsAdded >= MAX_SWAP_CANDIDATES) break
             if (w == value) continue
-            if (w !in d) continue  // sparse-aware: skip holes in occupant's domain
+            if (w !in d) continue // sparse-aware: skip holes in occupant's domain
             val wIdx = w - domainMin
             if (wIdx !in s.counts.indices || s.counts[wIdx] != 1) continue
             // Locate the unique holder of w. O(|vars|) per candidate; bounded by
             // MAX_SWAP_CANDIDATES so total cost is fixed.
             var holder = -1
-            for (v in vars) if (state.assignment.intValue(v) == w) { holder = v; break }
+            for (v in vars) if (state.assignment.intValue(v) == w) {
+                holder = v
+                break
+            }
             if (holder == -1 || holder == occupant) continue
             val hd = state.problem.intDomains[holder]
-            if (value !in hd) continue  // also sparse-aware on holder's domain
+            if (value !in hd) continue // also sparse-aware on holder's domain
             sink.addCompound(listOf(Move.IntSet(occupant, w), Move.IntSet(holder, value)))
             swapsAdded++
         }
@@ -560,6 +576,7 @@ class AllDifferent(
          *  evaluation in WalkSat/probSAT, so don't go wild — the fan only needs to be wide enough
          *  for the strategy to discriminate. */
         const val MAX_REPAIR_TARGETS: Int = 4
+
         /** Cap on swap-pair candidates per call. Each pair requires an O(|vars|) holder lookup
          *  plus the apply-and-revert in [LocalSearchState.evaluateCompound]; two is enough for
          *  the strategy to pick a swap over a single-var move when the domain is saturated. */

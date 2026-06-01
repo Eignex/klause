@@ -166,7 +166,10 @@ class LocalSearchState(
     fun recompute() {
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0L
-        for (v in boolBreakCount.indices) { boolBreakCount[v] = 0; boolMakeCount[v] = 0 }
+        for (v in boolBreakCount.indices) {
+            boolBreakCount[v] = 0
+            boolMakeCount[v] = 0
+        }
         factors.forEachIndexed { id, factor ->
             factor.initialize(this, id)
             val deg = factor.violationDegree(this, id)
@@ -182,8 +185,9 @@ class LocalSearchState(
             val f = factors[id]
             for (w in f.boolVars) {
                 val d = f.deltaIfBoolFlipped(this, id, w)
-                if (d > 0) boolBreakCount[w]++
-                else if (d < 0) boolMakeCount[w]++
+                if (d > 0) {
+                    boolBreakCount[w]++
+                } else if (d < 0) boolMakeCount[w]++
             }
         }
         if (cost < bestCostSeen) bestCostSeen = cost
@@ -221,7 +225,7 @@ class LocalSearchState(
             forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
             count
         }
-        is Move.Compound -> 0  // Compound make rarely useful; skip the apply-revert dance.
+        is Move.Compound -> 0 // Compound make rarely useful; skip the apply-revert dance.
     }
 
     /**
@@ -272,13 +276,17 @@ class LocalSearchState(
             if (v < obj.boolWeights.size) {
                 val w = obj.boolWeights[v]
                 if (assignment.boolValue(v)) -w else w
-            } else 0.0
+            } else {
+                0.0
+            }
         }
         is Move.IntSet -> {
             val v = move.varId
             if (v < obj.intCoefficients.size) {
                 obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))
-            } else 0.0
+            } else {
+                0.0
+            }
         }
         is Move.Compound -> {
             // Linear deltas are additive over parts evaluated against the initial
@@ -313,7 +321,7 @@ class LocalSearchState(
      */
     fun synthesizeChannelingMove(intVar: Int, newValue: Int): Move {
         val cur = assignment.intValue(intVar)
-        if (cur == newValue) return Move.IntSet(intVar, newValue)  // caller handles no-op
+        if (cur == newValue) return Move.IntSet(intVar, newValue) // caller handles no-op
         val parts = ArrayList<Move>(4)
         // Pinned-target set: vars whose update we've already committed to so a sibling
         // factor doesn't try to override the choice. Without this two Linear EQs sharing
@@ -351,7 +359,8 @@ class LocalSearchState(
             // counter-shift would undo the repair. Side-effect preservation only.
             if (f is com.eignex.klause.solver.factor.Linear &&
                 f.op == com.eignex.klause.solver.factor.LinearOp.EQ &&
-                !violated.contains(fid)) {
+                !violated.contains(fid)
+            ) {
                 propagateLinearEqShift(f, intVar, cur, newValue, parts, pinned)
             }
         }
@@ -371,7 +380,10 @@ class LocalSearchState(
         pinned: HashSet<Int>,
     ) {
         var coeffV = 0
-        for (i in f.vars.indices) if (f.vars[i] == intVar) { coeffV = f.coeffs[i]; break }
+        for (i in f.vars.indices) if (f.vars[i] == intVar) {
+            coeffV = f.coeffs[i]
+            break
+        }
         if (coeffV == 0) return
         val drift = coeffV.toLong() * (newV - oldV)
         // Pick the lowest-|coeff| participant other than intVar to absorb the drift —
@@ -393,7 +405,7 @@ class LocalSearchState(
         val u = f.vars[bestIdx]
         if (assumptions.isFrozenInt(u)) return
         val cu = f.coeffs[bestIdx]
-        val uShift = -drift / cu  // (uShift * cu) cancels the drift
+        val uShift = -drift / cu // (uShift * cu) cancels the drift
         val curU = assignment.intValue(u)
         val newU = curU + uShift.toInt()
         if (newU == curU) return
@@ -461,8 +473,9 @@ class LocalSearchState(
             if (f.maintainsBreakMakeIncrementally) continue
             for (w in f.boolVars) {
                 val d = f.deltaIfBoolFlipped(this, factorId, w)
-                if (d > 0) boolBreakCount[w]--
-                else if (d < 0) boolMakeCount[w]--
+                if (d > 0) {
+                    boolBreakCount[w]--
+                } else if (d < 0) boolMakeCount[w]--
             }
         }
         // Phase 2: commit the flip and let each factor update its own payload.
@@ -483,8 +496,9 @@ class LocalSearchState(
             } else {
                 for (w in f.boolVars) {
                     val d = f.deltaIfBoolFlipped(this, factorId, w)
-                    if (d > 0) boolBreakCount[w]++
-                    else if (d < 0) boolMakeCount[w]++
+                    if (d > 0) {
+                        boolBreakCount[w]++
+                    } else if (d < 0) boolMakeCount[w]++
                 }
             }
         }
@@ -508,8 +522,9 @@ class LocalSearchState(
             if (f.maintainsIntBreakMakeIncrementallyForIntSet) continue
             for (w in f.boolVars) {
                 val d = f.deltaIfBoolFlipped(this, factorId, w)
-                if (d > 0) boolBreakCount[w]--
-                else if (d < 0) boolMakeCount[w]--
+                if (d > 0) {
+                    boolBreakCount[w]--
+                } else if (d < 0) boolMakeCount[w]--
             }
         }
         assignment.setInt(intVar, newValue)
@@ -526,8 +541,9 @@ class LocalSearchState(
             } else {
                 for (w in f.boolVars) {
                     val d = f.deltaIfBoolFlipped(this, factorId, w)
-                    if (d > 0) boolBreakCount[w]++
-                    else if (d < 0) boolMakeCount[w]++
+                    if (d > 0) {
+                        boolBreakCount[w]++
+                    } else if (d < 0) boolMakeCount[w]++
                 }
             }
         }
@@ -560,7 +576,9 @@ class LocalSearchState(
     /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var [v] with
      *  target value [newValue]. */
     inline fun forEachIntFactorDelta(
-        v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit,
+        v: Int,
+        newValue: Int,
+        action: (factorId: Int, delta: Int) -> Unit,
     ) {
         for (factorId in problem.intOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
@@ -591,7 +609,9 @@ class LocalSearchState(
         for (m in moves) {
             val brk = shapedBreakScore(m)
             if (brk < bestBreak) {
-                bestBreak = brk; bestCount = 1; pick = m
+                bestBreak = brk
+                bestCount = 1
+                pick = m
             } else if (brk == bestBreak) {
                 bestCount++
                 if (rng.nextInt(bestCount) == 0) pick = m

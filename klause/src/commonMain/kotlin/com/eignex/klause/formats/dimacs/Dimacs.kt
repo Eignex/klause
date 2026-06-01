@@ -67,7 +67,16 @@ object Dimacs {
         }
         require(current == null) { "DIMACS file ends mid-clause (no terminating 0)" }
         require(numVars >= 0) { "DIMACS file has no `p cnf` header" }
-        return Problem(numBoolVars = numVars, numIntVars = 0, intDomains = emptyArray(), factors = Array<Factor>(clauses.size) { clauses[it] })
+        return Problem(
+            numBoolVars = numVars,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = Array<Factor>(
+                clauses.size
+            ) {
+                clauses[it]
+            }
+        )
     }
 
     /**
@@ -119,7 +128,9 @@ object Dimacs {
             val weight: Long
             val litStart: Int
             if (tokens[0] == "h") {
-                isHard = true; weight = 0L; litStart = 1
+                isHard = true
+                weight = 0L
+                litStart = 1
             } else {
                 weight = tokens[0].toLongOrNull()
                     ?: error("Unparseable wcnf weight: '${tokens[0]}'")
@@ -139,8 +150,11 @@ object Dimacs {
             require(tokens.subList(litStart, tokens.size).any { it == "0" }) {
                 "wcnf clause not terminated by 0: '$rawLine'"
             }
-            if (isHard) hardClauses.add(Clause(lits.toIntArray()))
-            else softClauses.add(weight to lits.toIntArray())
+            if (isHard) {
+                hardClauses.add(Clause(lits.toIntArray()))
+            } else {
+                softClauses.add(weight to lits.toIntArray())
+            }
         }
         require(numVars >= 0) { "wcnf file has no clauses and no header to fix numVars" }
 

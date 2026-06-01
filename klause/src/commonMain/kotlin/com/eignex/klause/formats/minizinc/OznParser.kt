@@ -60,7 +60,8 @@ internal class OznParser(private val tokens: List<OznToken>) {
                 while (depth > 0 && peek().kind != OznTokenKind.EOF) {
                     val t = advance()
                     if (t.kind == OznTokenKind.PUNCT) {
-                        when (t.text) { "(" -> depth++; ")" -> depth-- }
+                        when (t.text) { "(" -> depth++
+                            ")" -> depth-- }
                     }
                 }
             }
@@ -68,7 +69,9 @@ internal class OznParser(private val tokens: List<OznToken>) {
         val init = if (peekPunct("=")) {
             advance()
             parseExpr()
-        } else null
+        } else {
+            null
+        }
         expectPunct(";")
         return OznItem.VarDecl(name, type, init)
     }
@@ -94,11 +97,20 @@ internal class OznParser(private val tokens: List<OznToken>) {
             expectKeyword("int")
             return OznType.SetOfInt
         }
-        if (peekKeyword("var")) advance()  // tolerate `var int`
+        if (peekKeyword("var")) advance() // tolerate `var int`
         return when {
-            peekKeyword("int") -> { advance(); OznType.Int }
-            peekKeyword("bool") -> { advance(); OznType.Bool }
-            peekKeyword("float") -> { advance(); OznType.Float }
+            peekKeyword("int") -> {
+                advance()
+                OznType.Int
+            }
+            peekKeyword("bool") -> {
+                advance()
+                OznType.Bool
+            }
+            peekKeyword("float") -> {
+                advance()
+                OznType.Float
+            }
             else -> {
                 // Could be a range / domain: parse an expression and treat as int domain.
                 // .ozn doesn't really emit domain-typed names; tolerate `1..n` style.
@@ -148,8 +160,11 @@ internal class OznParser(private val tokens: List<OznToken>) {
     private fun parseLogical(): OznExpr {
         // \/ /\ -> <- xor — coarse same-precedence chain; correct enough for .ozn output.
         var left = parseComparison()
-        while (peek().kind == OznTokenKind.PUNCT && (peek().text == "\\/" || peek().text == "/\\" ||
-                peek().text == "->" || peek().text == "<-")) {
+        while (peek().kind == OznTokenKind.PUNCT && (
+                peek().text == "\\/" || peek().text == "/\\" ||
+                    peek().text == "->" || peek().text == "<-"
+                )
+        ) {
             val op = advance().text
             val right = parseComparison()
             left = OznExpr.Binary(op, left, right)
@@ -245,10 +260,22 @@ internal class OznParser(private val tokens: List<OznToken>) {
         if (t.kind == OznTokenKind.KEYWORD && t.text == "if") return parseIf()
         if (t.kind == OznTokenKind.KEYWORD && t.text == "let") return parseLet()
         return when (t.kind) {
-            OznTokenKind.INT -> { advance(); OznExpr.IntLit(t.text.toLong()) }
-            OznTokenKind.FLOAT -> { advance(); OznExpr.FloatLit(t.text.toDouble()) }
-            OznTokenKind.BOOL -> { advance(); OznExpr.BoolLit(t.text == "true") }
-            OznTokenKind.STRING -> { advance(); OznExpr.StringLit(t.text) }
+            OznTokenKind.INT -> {
+                advance()
+                OznExpr.IntLit(t.text.toLong())
+            }
+            OznTokenKind.FLOAT -> {
+                advance()
+                OznExpr.FloatLit(t.text.toDouble())
+            }
+            OznTokenKind.BOOL -> {
+                advance()
+                OznExpr.BoolLit(t.text == "true")
+            }
+            OznTokenKind.STRING -> {
+                advance()
+                OznExpr.StringLit(t.text)
+            }
             OznTokenKind.IDENT, OznTokenKind.KEYWORD -> {
                 val name = advance().text
                 // Function call?
@@ -292,23 +319,36 @@ internal class OznParser(private val tokens: List<OznToken>) {
                 val row = ArrayList<OznExpr>()
                 if (!peekPunct("|")) {
                     row.add(parseExpr())
-                    while (peekPunct(",")) { advance(); row.add(parseExpr()) }
+                    while (peekPunct(",")) {
+                        advance()
+                        row.add(parseExpr())
+                    }
                 }
                 if (row.isNotEmpty()) rows.add(row)
                 if (peekPunct("|")) {
                     advance()
-                    if (peekPunct("]")) { advance(); break }
-                } else if (peekPunct("]")) { advance(); break }
-                else break
+                    if (peekPunct("]")) {
+                        advance()
+                        break
+                    }
+                } else if (peekPunct("]")) {
+                    advance()
+                    break
+                } else {
+                    break
+                }
             }
             val n = rows.size
             val m = rows.firstOrNull()?.size ?: 0
             val flat = rows.flatten()
-            return OznExpr.Call("array2d", listOf(
-                OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(n.toLong())),
-                OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(m.toLong())),
-                OznExpr.ArrayLit(flat),
-            ))
+            return OznExpr.Call(
+                "array2d",
+                listOf(
+                    OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(n.toLong())),
+                    OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(m.toLong())),
+                    OznExpr.ArrayLit(flat),
+                )
+            )
         }
         val first = parseExpr()
         // Detect comprehension: `expr | ident in ...`.
@@ -368,7 +408,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
             // multi-bound generator: `i, j in 1..n`. We disambiguate by checking whether
             // the second ident is followed by `in` or `,` (then in).
             val save = pos
-            advance()  // consume comma
+            advance() // consume comma
             if (peek().kind == OznTokenKind.IDENT) {
                 val nxt = peek().text
                 advance()
@@ -378,7 +418,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
                     names.add(nxt)
                     continue
                 } else {
-                    pos = save  // rewind
+                    pos = save // rewind
                     break
                 }
             } else {
@@ -391,7 +431,9 @@ internal class OznParser(private val tokens: List<OznToken>) {
         val where: OznExpr? = if (peekKeyword("where")) {
             advance()
             parseExpr()
-        } else null
+        } else {
+            null
+        }
         return OznExpr.Generator(names, source, where)
     }
 

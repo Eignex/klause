@@ -1,6 +1,5 @@
 package com.eignex.klause.cnf
 
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cardinality
@@ -18,7 +17,6 @@ class CardinalityCoverageTest {
 
     @Test
     fun `at most k exactly matches enumeration`() {
-
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Cardinality(lits, min = 0, max = 2)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
@@ -37,7 +35,6 @@ class CardinalityCoverageTest {
 
     @Test
     fun `at least k exactly matches enumeration`() {
-
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Cardinality(lits, min = 2, max = 4)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
@@ -56,7 +53,6 @@ class CardinalityCoverageTest {
 
     @Test
     fun `range cardinality 2 to 3 over four`() {
-
         val lits = IntArray(4) { Lit.make(it, true) }
         val factor = Cardinality(lits, min = 2, max = 3)
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
@@ -75,7 +71,6 @@ class CardinalityCoverageTest {
 
     @Test
     fun `reified cardinality tracks aux`() {
-
         val lits = IntArray(4) { i -> Lit.make(i + 1, true) }
         val factor = ReifiedCardinality(auxBoolVar = 0, literals = lits, min = 1, max = 2)
         val problem = Problem(5, 0, emptyArray(), listOf(factor))
@@ -85,7 +80,8 @@ class CardinalityCoverageTest {
             val want = count in 1..2
             val expectedSat = (auxV == 1) == want
             val pins = IntArray(10)
-            pins[0] = cnf.boolVarToCnfVar[0]; pins[1] = auxV
+            pins[0] = cnf.boolVarToCnfVar[0]
+            pins[1] = auxV
             for (i in 0..3) {
                 pins[(i + 1) * 2] = cnf.boolVarToCnfVar[i + 1]
                 pins[(i + 1) * 2 + 1] = (mask shr i) and 1

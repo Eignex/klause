@@ -2,7 +2,6 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -120,8 +119,9 @@ class Cumulatives(
     /** Per-timepoint penalty for a usage level against a machine bound. Capacity overflow
      *  (upper) or coverage shortfall (lower, only where the machine is in use). */
     private fun penalty(usage: Int, bound: Int): Int =
-        if (upper) max(0, usage - bound)
-        else if (usage > 0) max(0, bound - usage) else 0
+        if (upper) {
+            max(0, usage - bound)
+        } else if (usage > 0) max(0, bound - usage) else 0
 
     /** Dense per-machine timeline plus the running raw violation. */
     private class LsState(
@@ -143,10 +143,12 @@ class Cumulatives(
             if (!present(state, i)) continue
             val idx = machineIdx(state.assignment.intValue(machines[i]))
             if (!inRange(idx)) continue
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
             val s = state.assignment.intValue(starts[i])
-            val from = max(0, s - tLow); val to = min(horizon, s + d - tLow)
+            val from = max(0, s - tLow)
+            val to = min(horizon, s + d - tLow)
             for (t in from until to) usage[idx * horizon + t] += r
         }
         var raw = 0L
@@ -175,22 +177,29 @@ class Cumulatives(
     }
 
     private fun rawDeltaForIntSet(
-        state: LocalSearchState, ls: LsState, intVar: Int, oldVal: Int, newValue: Int,
+        state: LocalSearchState,
+        ls: LsState,
+        intVar: Int,
+        oldVal: Int,
+        newValue: Int,
     ): Long {
         startPos[intVar]?.let { i ->
             if (!present(state, i)) return 0L
             val idx = machineIdx(state.assignment.intValue(machines[i]))
             if (!inRange(idx)) return 0L
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             if (d <= 0 || r <= 0) return 0L
             return shiftDelta(ls, idx, curBound(state, idx), oldVal, newValue, d, r)
         }
         machinePos[intVar]?.let { i ->
             if (!present(state, i)) return 0L
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             if (d <= 0 || r <= 0) return 0L
             val s = state.assignment.intValue(starts[i])
-            val oldIdx = machineIdx(oldVal); val newIdx = machineIdx(newValue)
+            val oldIdx = machineIdx(oldVal)
+            val newIdx = machineIdx(newValue)
             var delta = 0L
             if (inRange(oldIdx)) delta += spanDelta(ls, oldIdx, curBound(state, oldIdx), s, d, -r)
             if (inRange(newIdx)) delta += spanDelta(ls, newIdx, curBound(state, newIdx), s, d, +r)
@@ -228,9 +237,10 @@ class Cumulatives(
             if (Lit.variable(presents[i]) != boolVar) continue
             val idx = machineIdx(state.assignment.intValue(machines[i]))
             if (!inRange(idx)) continue
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
-            val sign = if (present(state, i)) -1 else +1   // flip toggles presence
+            val sign = if (present(state, i)) -1 else +1 // flip toggles presence
             val s = state.assignment.intValue(starts[i])
             rawDelta += spanDelta(ls, idx, curBound(state, idx), s, d, sign * r)
         }
@@ -250,13 +260,18 @@ class Cumulatives(
     }
 
     private fun applyIntSetRaw(
-        state: LocalSearchState, ls: LsState, intVar: Int, oldValue: Int, newValue: Int,
+        state: LocalSearchState,
+        ls: LsState,
+        intVar: Int,
+        oldValue: Int,
+        newValue: Int,
     ) {
         startPos[intVar]?.let { i ->
             if (!present(state, i)) return
             val idx = machineIdx(state.assignment.intValue(machines[i]))
             if (!inRange(idx)) return
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             if (d <= 0 || r <= 0) return
             val cap = curBound(state, idx)
             addSpan(ls, idx, cap, oldValue, d, -r)
@@ -265,10 +280,12 @@ class Cumulatives(
         }
         machinePos[intVar]?.let { i ->
             if (!present(state, i)) return
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             if (d <= 0 || r <= 0) return
             val s = state.assignment.intValue(starts[i])
-            val oldIdx = machineIdx(oldValue); val newIdx = machineIdx(newValue)
+            val oldIdx = machineIdx(oldValue)
+            val newIdx = machineIdx(newValue)
             if (inRange(oldIdx)) addSpan(ls, oldIdx, curBound(state, oldIdx), s, d, -r)
             if (inRange(newIdx)) addSpan(ls, newIdx, curBound(state, newIdx), s, d, +r)
             return
@@ -282,8 +299,11 @@ class Cumulatives(
             val s = state.assignment.intValue(starts[i])
             val cap = curBound(state, idx)
             // Shrink/extend the tail between old and new end.
-            if (newValue > oldValue) addSpanRange(ls, idx, cap, s + oldValue, s + newValue, +r)
-            else addSpanRange(ls, idx, cap, s + newValue, s + oldValue, -r)
+            if (newValue > oldValue) {
+                addSpanRange(ls, idx, cap, s + oldValue, s + newValue, +r)
+            } else {
+                addSpanRange(ls, idx, cap, s + newValue, s + oldValue, -r)
+            }
             return
         }
         resPos[intVar]?.let { i ->
@@ -311,9 +331,10 @@ class Cumulatives(
             if (Lit.variable(presents[i]) != boolVar) continue
             val idx = machineIdx(state.assignment.intValue(machines[i]))
             if (!inRange(idx)) continue
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
-            val sign = if (present(state, i)) +1 else -1   // assignment already updated
+            val sign = if (present(state, i)) +1 else -1 // assignment already updated
             val s = state.assignment.intValue(starts[i])
             addSpan(ls, idx, curBound(state, idx), s, d, sign * r)
         }
@@ -340,8 +361,10 @@ class Cumulatives(
      *  it stays exact and non-mutating regardless of how the intervals overlap. */
     private fun shiftDelta(ls: LsState, k: Int, cap: Int, oldS: Int, newS: Int, d: Int, r: Int): Long {
         if (oldS == newS || d <= 0 || r <= 0) return 0L
-        val oldFrom = oldS; val oldTo = oldS + d
-        val newFrom = newS; val newTo = newS + d
+        val oldFrom = oldS
+        val oldTo = oldS + d
+        val newFrom = newS
+        val newTo = newS + d
         var delta = 0L
         for (t in oldFrom until oldTo) if (t < newFrom || t >= newTo) delta += cellDelta(ls, k, cap, t, -r)
         for (t in newFrom until newTo) if (t < oldFrom || t >= oldTo) delta += cellDelta(ls, k, cap, t, +r)
@@ -355,7 +378,8 @@ class Cumulatives(
     }
 
     private fun spanRangeDelta(ls: LsState, k: Int, cap: Int, fromAbs: Int, toAbs: Int, amount: Int): Long {
-        val from = max(0, fromAbs - ls.tLow); val to = min(ls.horizon, toAbs - ls.tLow)
+        val from = max(0, fromAbs - ls.tLow)
+        val to = min(ls.horizon, toAbs - ls.tLow)
         var delta = 0L
         for (t in from until to) {
             val u = ls.usage[cell(ls, k, t)]
@@ -367,8 +391,11 @@ class Cumulatives(
     /** Penalty Δ of a duration change `[s,s+oldD) → [s,s+newD)` at constant [r] on machine [k]. */
     private fun durDelta(ls: LsState, k: Int, cap: Int, s: Int, oldD: Int, newD: Int, r: Int): Long {
         if (oldD == newD || r <= 0) return 0L
-        return if (newD > oldD) spanRangeDelta(ls, k, cap, s + oldD, s + newD, +r)
-        else spanRangeDelta(ls, k, cap, s + newD, s + oldD, -r)
+        return if (newD > oldD) {
+            spanRangeDelta(ls, k, cap, s + oldD, s + newD, +r)
+        } else {
+            spanRangeDelta(ls, k, cap, s + newD, s + oldD, -r)
+        }
     }
 
     /** Mutating: add [amount] over `[s, s+d)` on machine [k], updating usage and rawV. */
@@ -379,10 +406,12 @@ class Cumulatives(
 
     private fun addSpanRange(ls: LsState, k: Int, cap: Int, fromAbs: Int, toAbs: Int, amount: Int) {
         if (amount == 0) return
-        val from = max(0, fromAbs - ls.tLow); val to = min(ls.horizon, toAbs - ls.tLow)
+        val from = max(0, fromAbs - ls.tLow)
+        val to = min(ls.horizon, toAbs - ls.tLow)
         for (t in from until to) {
             val c = cell(ls, k, t)
-            val u = ls.usage[c]; val nu = u + amount
+            val u = ls.usage[c]
+            val nu = u + amount
             ls.usage[c] = nu
             ls.rawV += penalty(nu, cap) - penalty(u, cap)
         }
@@ -405,8 +434,11 @@ class Cumulatives(
     private fun computeTHigh(state: LocalSearchState): Int {
         var hi = Int.MIN_VALUE
         for (i in 0 until n) {
-            val dUb = if (durationVars.isEmpty()) durations[i]
-                      else max(durations[i], state.problem.intDomains[durationVars[i]].max)
+            val dUb = if (durationVars.isEmpty()) {
+                durations[i]
+            } else {
+                max(durations[i], state.problem.intDomains[durationVars[i]].max)
+            }
             val cand = max(state.problem.intDomains[starts[i]].max, state.assignment.intValue(starts[i])) + dUb
             hi = max(hi, cand)
         }
@@ -422,12 +454,18 @@ class Cumulatives(
         val ls = state.refPayload[factorId] as LsState
         if (ls.rawV <= 0L) return
         // Locate the worst-penalty cell.
-        var peakK = -1; var peakT = -1; var peakPen = 0
+        var peakK = -1
+        var peakT = -1
+        var peakPen = 0
         for (k in 0 until machineCount) {
             val cap = curBound(state, k)
             for (t in 0 until ls.horizon) {
                 val p = penalty(ls.usage[cell(ls, k, t)], cap)
-                if (p > peakPen) { peakPen = p; peakK = k; peakT = t }
+                if (p > peakPen) {
+                    peakPen = p
+                    peakK = k
+                    peakT = t
+                }
             }
         }
         val absT = if (peakT >= 0) peakT + ls.tLow else 0
@@ -435,13 +473,15 @@ class Cumulatives(
         for (i in 0 until n) {
             val sv = starts[i]
             val sCur = state.assignment.intValue(sv)
-            val d = curDur(state, i); val r = curRes(state, i)
+            val d = curDur(state, i)
+            val r = curRes(state, i)
             val mIdx = machineIdx(state.assignment.intValue(machines[i]))
             val sDom = state.problem.intDomains[sv]
             val runsAtPeak = peakK >= 0 && mIdx == peakK && r > 0 && d > 0 && sCur <= absT && absT < sCur + d
             if (runsAtPeak && upper) {
                 // Upper-bound peak: push this task off the overloaded slot.
-                val after = absT + 1; val before = absT - d
+                val after = absT + 1
+                val before = absT - d
                 if (after in sDom && after != sCur) sink.addChannelingIntSet(state, sv, after)
                 if (before in sDom && before != sCur) sink.addChannelingIntSet(state, sv, before)
                 // Or move it to a machine with the most slack at this slot.
@@ -467,22 +507,32 @@ class Cumulatives(
         val mv = machines[i]
         val mDom = state.problem.intDomains[mv]
         val cur = state.assignment.intValue(mv)
-        val s = state.assignment.intValue(starts[i]); val d = curDur(state, i); val r = curRes(state, i)
-        var bestVal = cur; var bestDelta = 0L
+        val s = state.assignment.intValue(starts[i])
+        val d = curDur(state, i)
+        val r = curRes(state, i)
+        var bestVal = cur
+        var bestDelta = 0L
         mDom.forEach { cand ->
             if (cand == cur) return@forEach
             val idx = machineIdx(cand)
             if (!inRange(idx)) return@forEach
             val delta = spanDelta(ls, idx, curBound(state, idx), s, d, +r) +
                 spanDelta(ls, machineIdx(cur), curBound(state, machineIdx(cur)), s, d, -r)
-            if (delta < bestDelta) { bestDelta = delta; bestVal = cand }
+            if (delta < bestDelta) {
+                bestDelta = delta
+                bestVal = cand
+            }
         }
         if (bestVal != cur) sink.addChannelingIntSet(state, mv, bestVal)
     }
 
     private fun enumerateOrSample(
-        state: LocalSearchState, v: Int, cur: Int,
-        dom: com.eignex.klause.solver.IntDomain, maxTargets: Int, sink: MoveSink,
+        state: LocalSearchState,
+        v: Int,
+        cur: Int,
+        dom: com.eignex.klause.solver.IntDomain,
+        maxTargets: Int,
+        sink: MoveSink,
     ) {
         if (dom.size <= maxTargets) {
             dom.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }
@@ -530,7 +580,7 @@ class Cumulatives(
      *  profile over the machine's capacity — giving the complete solver real propagation. */
     private fun propagateUpper(state: PropagationState): Boolean {
         for (k in 0 until machineCount) {
-            val cap = fixedBound(state, k) ?: continue   // var bound not yet fixed → skip machine
+            val cap = fixedBound(state, k) ?: continue // var bound not yet fixed → skip machine
             // Tasks definitely present and pinned to machine k, with fixed duration / resource.
             val members = ArrayList<Int>()
             for (i in 0 until n) {
@@ -544,28 +594,44 @@ class Cumulatives(
             // Mandatory-profile events.
             val events = ArrayList<IntArray>()
             for (i in members) {
-                val d = fixedDur(state, i)!!; val r = fixedRes(state, i)!!
+                val d = fixedDur(state, i)!!
+                val r = fixedRes(state, i)!!
                 val dom = state.intDomains[starts[i]]
-                val lst = dom.max; val ect = dom.min + d
-                if (lst < ect) { events.add(intArrayOf(lst, +r)); events.add(intArrayOf(ect, -r)) }
+                val lst = dom.max
+                val ect = dom.min + d
+                if (lst < ect) {
+                    events.add(intArrayOf(lst, +r))
+                    events.add(intArrayOf(ect, -r))
+                }
             }
             events.sortWith(compareBy({ it[0] }, { -it[1] }))
-            val segFrom = IntArray(events.size); val segTo = IntArray(events.size); val segLevel = IntArray(events.size)
-            var segCount = 0; var level = 0
+            val segFrom = IntArray(events.size)
+            val segTo = IntArray(events.size)
+            val segLevel = IntArray(events.size)
+            var segCount = 0
+            var level = 0
             var cursor = if (events.isEmpty()) 0 else events[0][0]
             for ((idx, ev) in events.withIndex()) {
                 val t = ev[0]
-                if (t > cursor && level > 0) { segFrom[segCount] = cursor; segTo[segCount] = t; segLevel[segCount] = level; segCount++ }
-                level += ev[1]; cursor = t
+                if (t > cursor && level > 0) {
+                    segFrom[segCount] = cursor
+                    segTo[segCount] = t
+                    segLevel[segCount] = level
+                    segCount++
+                }
+                level += ev[1]
+                cursor = t
                 if (idx == events.size - 1 || events[idx + 1][0] != t) { if (level > cap) return false }
             }
             // Tighten each member's start against overloading placements.
             for (i in members) {
-                val d = fixedDur(state, i)!!; val r = fixedRes(state, i)!!
+                val d = fixedDur(state, i)!!
+                val r = fixedRes(state, i)!!
                 val v = starts[i]
                 val dom = state.intDomains[v]
                 if (dom.min == dom.max) continue
-                val lstI = dom.max; val ectI = dom.min + d
+                val lstI = dom.max
+                val ectI = dom.min + d
                 val owns = lstI < ectI
                 // The deduction depends on the other tasks' starts AND their (fixed) machine
                 // assignments / durations / resources / this machine's bound — cite all touched
@@ -573,12 +639,14 @@ class Cumulatives(
                 val ant = state.composeIntVarAtomAntecedents(intVars)
                 var newMin = dom.min
                 while (newMin <= state.intDomains[v].max &&
-                    overloadsAt(segFrom, segTo, segLevel, segCount, newMin, newMin + d, r, cap, owns, lstI, ectI)) newMin++
+                    overloadsAt(segFrom, segTo, segLevel, segCount, newMin, newMin + d, r, cap, owns, lstI, ectI)
+                    ) newMin++
                 if (newMin > state.intDomains[v].max) return false
                 if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
                 var newMax = state.intDomains[v].max
                 while (newMax >= state.intDomains[v].min &&
-                    overloadsAt(segFrom, segTo, segLevel, segCount, newMax, newMax + d, r, cap, owns, lstI, ectI)) newMax--
+                    overloadsAt(segFrom, segTo, segLevel, segCount, newMax, newMax + d, r, cap, owns, lstI, ectI)
+                    ) newMax--
                 if (newMax < state.intDomains[v].min) return false
                 if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
             }
@@ -590,14 +658,29 @@ class Cumulatives(
      *  segments would push a segment over [cap], after discounting the task's own already-
      *  counted mandatory part. Mirrors [Cumulative.overloadsAt]. */
     private fun overloadsAt(
-        segFrom: IntArray, segTo: IntArray, segLevel: IntArray, segCount: Int,
-        s: Int, sPlusD: Int, r: Int, cap: Int, owns: Boolean, lstI: Int, ectI: Int,
+        segFrom: IntArray,
+        segTo: IntArray,
+        segLevel: IntArray,
+        segCount: Int,
+        s: Int,
+        sPlusD: Int,
+        r: Int,
+        cap: Int,
+        owns: Boolean,
+        lstI: Int,
+        ectI: Int,
     ): Boolean {
         for (kk in 0 until segCount) {
-            val from = segFrom[kk]; val to = segTo[kk]; val lvl = segLevel[kk]
+            val from = segFrom[kk]
+            val to = segTo[kk]
+            val lvl = segLevel[kk]
             if (to <= s || from >= sPlusD) continue
             var effective = lvl
-            if (owns) { val ovFrom = max(from, lstI); val ovTo = min(to, ectI); if (ovFrom < ovTo) effective -= r }
+            if (owns) {
+                val ovFrom = max(from, lstI)
+                val ovTo = min(to, ectI)
+                if (ovFrom < ovTo) effective -= r
+            }
             if (effective + r > cap) return true
         }
         return false
@@ -607,7 +690,7 @@ class Cumulatives(
     private fun propagateLowerIfFixed(state: PropagationState): Boolean {
         for (i in 0 until n) {
             if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) return true   // presence open
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) return true // presence open
             val sd = state.intDomains[starts[i]]
             if (sd.min != sd.max) return true
             if (fixedMachineIdx(state, i) < 0) return true
@@ -615,10 +698,12 @@ class Cumulatives(
         }
         for (k in 0 until machineCount) if (fixedBound(state, k) == null) return true
         // All fixed: build the exact per-machine usage and reject any coverage shortfall.
-        var lo = Int.MAX_VALUE; var hi = Int.MIN_VALUE
+        var lo = Int.MAX_VALUE
+        var hi = Int.MIN_VALUE
         for (i in 0 until n) {
             val s = state.intDomains[starts[i]].min
-            lo = min(lo, s); hi = max(hi, s + (fixedDur(state, i) ?: 0))
+            lo = min(lo, s)
+            hi = max(hi, s + (fixedDur(state, i) ?: 0))
         }
         if (lo > hi) return true
         val horizon = hi - lo
@@ -626,7 +711,8 @@ class Cumulatives(
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val k = fixedMachineIdx(state, i)
-            val d = fixedDur(state, i)!!; val r = fixedRes(state, i)!!
+            val d = fixedDur(state, i)!!
+            val r = fixedRes(state, i)!!
             if (d <= 0 || r <= 0) continue
             val s = state.intDomains[starts[i]].min
             for (t in (s - lo) until (s - lo + d)) usage[k * horizon + t] += r

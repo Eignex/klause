@@ -61,7 +61,10 @@ class LexLess(
         for (i in 0 until len) {
             val a = state.assignment.intValue(xs[i])
             val b = state.assignment.intValue(ys[i])
-            if (a != b) { k = i; break }
+            if (a != b) {
+                k = i
+                break
+            }
         }
         if (k < 0) {
             // Comparable prefix fully equal — break it at the earliest slot with room.
@@ -70,18 +73,21 @@ class LexLess(
         }
         val a = state.assignment.intValue(xs[k])
         val b = state.assignment.intValue(ys[k])
-        if (a < b) return  // unreachable: satisfied() would have returned true
-        val xV = xs[k]; val yV = ys[k]
+        if (a < b) return // unreachable: satisfied() would have returned true
+        val xV = xs[k]
+        val yV = ys[k]
         val dx = state.problem.intDomains[xV]
         val dy = state.problem.intDomains[yV]
-        val needXLE = if (strict) b - 1 else b  // xs[k] must reach ≤ this for the relation to hold
-        val needYGE = if (strict) a + 1 else a  // ys[k] must reach ≥ this
+        val needXLE = if (strict) b - 1 else b // xs[k] must reach ≤ this for the relation to hold
+        val needYGE = if (strict) a + 1 else a // ys[k] must reach ≥ this
         // Lower xs[k] toward `needXLE` (preferred), or as close as the domain allows.
-        if (needXLE in dx) sink.addChannelingIntSet(state, xV, needXLE)
-        else if (dx.min <= needXLE) sink.addChannelingIntSet(state, xV, dx.min)
+        if (needXLE in dx) {
+            sink.addChannelingIntSet(state, xV, needXLE)
+        } else if (dx.min <= needXLE) sink.addChannelingIntSet(state, xV, dx.min)
         // Raise ys[k] toward `needYGE` (preferred), or as close as the domain allows.
-        if (needYGE in dy) sink.addChannelingIntSet(state, yV, needYGE)
-        else if (dy.max >= needYGE) sink.addChannelingIntSet(state, yV, dy.max)
+        if (needYGE in dy) {
+            sink.addChannelingIntSet(state, yV, needYGE)
+        } else if (dy.max >= needYGE) sink.addChannelingIntSet(state, yV, dy.max)
         // Lex-preserving swap: if each side's current value sits in the other's domain,
         // swapping resolves the violation (xs[k]=b, ys[k]=a → satisfies xs[k] < ys[k]).
         if (xV != yV && b in dx && a in dy) {
@@ -103,8 +109,14 @@ class LexLess(
             val dx = state.problem.intDomains[xs[i]]
             val dy = state.problem.intDomains[ys[i]]
             var added = false
-            if (a > dx.min) { sink.addChannelingIntSet(state, xs[i], a - 1); added = true }
-            if (b < dy.max) { sink.addChannelingIntSet(state, ys[i], b + 1); added = true }
+            if (a > dx.min) {
+                sink.addChannelingIntSet(state, xs[i], a - 1)
+                added = true
+            }
+            if (b < dy.max) {
+                sink.addChannelingIntSet(state, ys[i], b + 1)
+                added = true
+            }
             if (added) return
         }
     }
@@ -117,8 +129,14 @@ class LexLess(
 
     /** Same but with a single var overridden by [override]. */
     private fun satisfiedWithOverride(state: LocalSearchState, intVar: Int, override: Int): Boolean = compare(
-        getX = { val v = xs[it]; if (v == intVar) override else state.assignment.intValue(v) },
-        getY = { val v = ys[it]; if (v == intVar) override else state.assignment.intValue(v) },
+        getX = {
+            val v = xs[it]
+            if (v == intVar) override else state.assignment.intValue(v)
+        },
+        getY = {
+            val v = ys[it]
+            if (v == intVar) override else state.assignment.intValue(v)
+        },
     )
 
     private inline fun compare(getX: (Int) -> Int, getY: (Int) -> Int): Boolean {
@@ -135,7 +153,7 @@ class LexLess(
         return when {
             xs.size == ys.size -> !strict
             xs.size < ys.size -> true
-            else -> false  // xs.size > ys.size
+            else -> false // xs.size > ys.size
         }
     }
 
@@ -152,7 +170,8 @@ class LexLess(
      *  decides exclusively on bounds (no interior-hole pruning). Sound. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val combined = IntArray(xs.size + ys.size).also {
-            xs.copyInto(it, 0); ys.copyInto(it, xs.size)
+            xs.copyInto(it, 0)
+            ys.copyInto(it, xs.size)
         }
         return collectLinearTightenAntecedents(state, combined, excludeIdx = -1, extraLit = 0)
     }
@@ -183,9 +202,12 @@ class LexLess(
             val dy = state.intDomains[ys[i]]
             if (dx.min == dx.max && dy.min == dy.max) {
                 when {
-                    dx.min < dy.min -> return true   // relation forced, tail unconstrained
-                    dx.min > dy.min -> return false  // violated at i
-                    else -> { i++; continue }        // equal — advance
+                    dx.min < dy.min -> return true // relation forced, tail unconstrained
+                    dx.min > dy.min -> return false // violated at i
+                    else -> {
+                        i++
+                        continue
+                    } // equal — advance
                 }
             }
             // Forced satisfaction: xs[i] can't reach ys[i]'s range, so xs <_lex ys.

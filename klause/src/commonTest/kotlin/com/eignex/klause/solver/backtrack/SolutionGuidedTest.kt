@@ -18,7 +18,8 @@ class SolutionGuidedTest {
     @Test
     fun `before any solution it delegates to base verbatim`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = emptyArray(),
         )
@@ -32,7 +33,8 @@ class SolutionGuidedTest {
     @Test
     fun `after a solution saved value is tried first`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = emptyArray(),
         )
@@ -48,7 +50,8 @@ class SolutionGuidedTest {
     @Test
     fun `saved bool polarity is tried first`() {
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 0,
+            numBoolVars = 1,
+            numIntVars = 0,
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
@@ -64,7 +67,8 @@ class SolutionGuidedTest {
     fun `when saved value is no longer in domain fall through to base`() {
         // v0 ∈ [2, 4]; saved v0 = 0 is out of domain; expect IndomainMin order verbatim.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(2, 4)),
             factors = emptyArray(),
         )
@@ -78,15 +82,18 @@ class SolutionGuidedTest {
     @Test
     fun `engine still solves with solution-guided wrapper`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(
-            variableHeuristic = SmallestDomain,
-            valueHeuristic = SolutionGuided(IndomainMin),
-            randomSeed = 0L,
-        ))
+        val r = BacktrackSolver(problem).solve(
+            BacktrackParams(
+                variableHeuristic = SmallestDomain,
+                valueHeuristic = SolutionGuided(IndomainMin),
+                randomSeed = 0L,
+            )
+        )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..3).toSet(), sat.assignment.ints.toSet())
     }
@@ -101,13 +108,17 @@ class SolutionGuidedTest {
             override fun onSolution(snapshot: Sample) { recorded.add(snapshot) }
         }
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
             factors = emptyArray(),
         )
-        BacktrackSolver(problem).enumerate(BacktrackParams(
-            valueHeuristic = spy, randomSeed = 0L,
-        )).toList()
+        BacktrackSolver(problem).enumerate(
+            BacktrackParams(
+                valueHeuristic = spy,
+                randomSeed = 0L,
+            )
+        ).toList()
         assertTrue(recorded.isNotEmpty(), "spy should have received at least one onSolution call")
         assertEquals(4, recorded.size, "expected 4 SAT leaves (2^2); got ${recorded.size}")
     }

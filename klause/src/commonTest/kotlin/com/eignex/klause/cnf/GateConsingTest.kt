@@ -61,7 +61,9 @@ class GateConsingTest {
         val s = IntArray(8) { Lit.make(single.newVar(), true) }
         val t = IntArray(8) { Lit.make(single.newVar(), true) }
         single.unsignedLeq(s, t)
-        assertTrue(b.numVars < single.numVars * 2,
-            "50 identical comparators (${b.numVars} vars) should be near one (${single.numVars} vars)")
+        assertTrue(
+            b.numVars < single.numVars * 2,
+            "50 identical comparators (${b.numVars} vars) should be near one (${single.numVars} vars)"
+        )
     }
 }

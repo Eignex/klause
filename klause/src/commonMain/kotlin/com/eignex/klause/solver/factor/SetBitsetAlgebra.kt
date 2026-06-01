@@ -76,9 +76,15 @@ class SetBitsetSubset(
             val lv = if (lb == boolVar) !state.assignment.boolValue(lb) else state.assignment.boolValue(lb)
             if (!lv) continue
             val rb = rightBools[i]
-            if (rb < 0) { nowV = true; break }
+            if (rb < 0) {
+                nowV = true
+                break
+            }
             val rv = if (rb == boolVar) !state.assignment.boolValue(rb) else state.assignment.boolValue(rb)
-            if (!rv) { nowV = true; break }
+            if (!rv) {
+                nowV = true
+                break
+            }
         }
         return (if (nowV) 1 else 0) - (if (wasV) 1 else 0)
     }
@@ -165,8 +171,12 @@ class SetBitsetDisjoint(
     override val boolVars: IntArray = run {
         val seen = LinkedHashSet<Int>()
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
-            if (lb >= 0 && rb >= 0) { seen.add(lb); seen.add(rb) }
+            val lb = leftBools[i]
+            val rb = rightBools[i]
+            if (lb >= 0 && rb >= 0) {
+                seen.add(lb)
+                seen.add(rb)
+            }
         }
         val out = IntArray(seen.size)
         var i = 0
@@ -179,7 +189,8 @@ class SetBitsetDisjoint(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             if (lb < 0 || rb < 0) continue
             if (state.assignment.boolValue(lb) && state.assignment.boolValue(rb)) return true
         }
@@ -190,11 +201,15 @@ class SetBitsetDisjoint(
         val wasV = isViolated(state, factorId)
         var nowV = false
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             if (lb < 0 || rb < 0) continue
             val lv = if (lb == boolVar) !state.assignment.boolValue(lb) else state.assignment.boolValue(lb)
             val rv = if (rb == boolVar) !state.assignment.boolValue(rb) else state.assignment.boolValue(rb)
-            if (lv && rv) { nowV = true; break }
+            if (lv && rv) {
+                nowV = true
+                break
+            }
         }
         return (if (nowV) 1 else 0) - (if (wasV) 1 else 0)
     }
@@ -206,7 +221,8 @@ class SetBitsetDisjoint(
         var emitted = 0
         for (i in leftBools.indices) {
             if (emitted >= SET_BITSET_MAX_PROPOSALS) break
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             if (lb < 0 || rb < 0) continue
             if (!state.assignment.boolValue(lb) || !state.assignment.boolValue(rb)) continue
             sink.addBoolFlip(lb)
@@ -218,7 +234,8 @@ class SetBitsetDisjoint(
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             if (lb < 0 || rb < 0) continue
             val lLit = Lit.make(lb, positive = true)
             val rLit = Lit.make(rb, positive = true)
@@ -231,7 +248,8 @@ class SetBitsetDisjoint(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             if (lb < 0 || rb < 0) continue
             val lLit = Lit.make(lb, positive = true)
             val rLit = Lit.make(rb, positive = true)
@@ -274,7 +292,8 @@ class SetBitsetEq(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             val lv = lb >= 0 && state.assignment.boolValue(lb)
             val rv = rb >= 0 && state.assignment.boolValue(rb)
             if (lv != rv) return true
@@ -286,12 +305,16 @@ class SetBitsetEq(
         val wasV = isViolated(state, factorId)
         var nowV = false
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             val lvRaw = lb >= 0 && state.assignment.boolValue(lb)
             val rvRaw = rb >= 0 && state.assignment.boolValue(rb)
             val lv = if (lb == boolVar) !lvRaw else lvRaw
             val rv = if (rb == boolVar) !rvRaw else rvRaw
-            if (lv != rv) { nowV = true; break }
+            if (lv != rv) {
+                nowV = true
+                break
+            }
         }
         return (if (nowV) 1 else 0) - (if (wasV) 1 else 0)
     }
@@ -303,7 +326,8 @@ class SetBitsetEq(
         var emitted = 0
         for (i in leftBools.indices) {
             if (emitted >= SET_BITSET_MAX_PROPOSALS) break
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             val lv = lb >= 0 && state.assignment.boolValue(lb)
             val rv = rb >= 0 && state.assignment.boolValue(rb)
             if (lv == rv) continue
@@ -315,7 +339,8 @@ class SetBitsetEq(
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             val lLit = if (lb >= 0) Lit.make(lb, positive = true) else -1
             val rLit = if (rb >= 0) Lit.make(rb, positive = true) else -1
             val lT = lb >= 0 && state.litTrue(lLit)
@@ -330,7 +355,8 @@ class SetBitsetEq(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         for (i in leftBools.indices) {
-            val lb = leftBools[i]; val rb = rightBools[i]
+            val lb = leftBools[i]
+            val rb = rightBools[i]
             // Both absent ⇒ vacuous position.
             if (lb < 0 && rb < 0) continue
             if (lb < 0) {
@@ -352,8 +378,10 @@ class SetBitsetEq(
             }
             val lLit = Lit.make(lb, positive = true)
             val rLit = Lit.make(rb, positive = true)
-            val lT = state.litTrue(lLit); val lF = state.litFalse(lLit)
-            val rT = state.litTrue(rLit); val rF = state.litFalse(rLit)
+            val lT = state.litTrue(lLit)
+            val lF = state.litFalse(lLit)
+            val rT = state.litTrue(rLit)
+            val rF = state.litFalse(rLit)
             if (lT && rF) return false
             if (lF && rT) return false
             if (lT && !rT) {

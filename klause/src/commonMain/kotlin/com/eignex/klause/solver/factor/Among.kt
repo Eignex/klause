@@ -115,7 +115,10 @@ class Among(
             } else if (!isMatch && needIncrease) {
                 // Pick the closest in-domain matching value.
                 var pick: Int? = null
-                for (vv in values) if (vv in d && vv != curX) { pick = vv; break }
+                for (vv in values) if (vv in d && vv != curX) {
+                    pick = vv
+                    break
+                }
                 if (pick != null) sink.addChannelingIntSet(state, x, pick!!)
             }
         }
@@ -133,8 +136,11 @@ class Among(
             var allIn = true
             var anyIn = false
             d.forEach { value ->
-                if (matches(value)) anyIn = true
-                else allIn = false
+                if (matches(value)) {
+                    anyIn = true
+                } else {
+                    allIn = false
+                }
             }
             if (allIn) definite++
             if (anyIn) possible++

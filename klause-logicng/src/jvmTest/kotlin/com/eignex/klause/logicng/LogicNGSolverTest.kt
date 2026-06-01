@@ -3,17 +3,17 @@ package com.eignex.klause.logicng
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,7 +46,6 @@ class LogicNGSolverTest {
 
     @Test
     fun `enumerate produces all solutions exactly once`() {
-
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -63,7 +62,6 @@ class LogicNGSolverTest {
 
     @Test
     fun `sample allows duplicates`() {
-
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -95,7 +93,6 @@ class LogicNGSolverTest {
 
     @Test
     fun `enumerate honours min hamming distance`() {
-
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -118,7 +115,6 @@ class LogicNGSolverTest {
 
     @Test
     fun `local search and logic ng agree on satisfiability`() {
-
         for (case in satPortfolio() + unsatPortfolio()) {
             val ls = LocalSearchSolver(case.problem)
                 .solve(LocalSearchParams(maxFlips = 50_000L, randomSeed = 0L))
@@ -214,7 +210,6 @@ class LogicNGSolverTest {
     )
 
     private fun assertSatisfiesProblem(problem: Problem, sample: Sample, label: String) {
-
         val state = LocalSearchState(problem, Random(0))
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
@@ -224,4 +219,4 @@ class LogicNGSolverTest {
             state.cost,
             "$label: sample $sample violates ${state.violated.size} hard factor(s)"
         )
-    }}
+    } }

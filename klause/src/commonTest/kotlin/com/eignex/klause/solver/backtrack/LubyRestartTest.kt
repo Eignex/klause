@@ -1,17 +1,14 @@
 package com.eignex.klause.solver.backtrack
 
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 
 class LubyRestartTest {
 
@@ -19,9 +16,14 @@ class LubyRestartTest {
     fun `restart-enabled search still finds a satisfying assignment`() {
         // Trivial 4-bool problem with exactly-one constraint — 4 distinct feasibles.
         // The restart loop should land on one of them.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val params = BacktrackParams(
             randomSeed = 0L,
@@ -39,8 +41,12 @@ class LubyRestartTest {
     fun `minimize with restarts converges to the optimum`() {
         // 16 independent bools with weights 1..16; optimum is all-false.
         val n = 16
-        val problem = Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyArray())
+        val problem = Problem(
+            numBoolVars = n,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = emptyArray()
+        )
         val obj = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
         val result = BacktrackSolver(problem).minimize(
             obj,
@@ -67,8 +73,12 @@ class LubyRestartTest {
         // the saved phase for each var is the value it was committed to in that leaf
         // (false). The next leaf reached should respect the saved phases where the
         // backtrack still permits — DFS toggles only the most recently flipped var.
-        val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
-            factors = emptyArray())
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = emptyArray()
+        )
         val params = BacktrackParams(
             randomSeed = 0L,
             phaseSaving = true,
@@ -89,9 +99,14 @@ class LubyRestartTest {
         // Indirect check: with lubyRestartBase = 1, the first 7 restarts run 1+1+2+1+1+2+4
         // = 12 total decisions before finding a solution on a 4-bool instance — verify the
         // search terminates within a generous budget. (We don't expose lubyN directly.)
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val params = BacktrackParams(
             randomSeed = 0L,
@@ -108,14 +123,23 @@ class LubyRestartTest {
     fun `phase-saving without restarts does not change enumerate output set`() {
         // Phase-saving only re-orders within a DFS — the *set* of yielded models is
         // identical. Verify that on a small instance enumerate returns all 4 models.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val samples = BacktrackSolver(problem).enumerate(BacktrackParams(
-            randomSeed = 0L, phaseSaving = true,
-            variableHeuristic = InputOrder, valueHeuristic = IndomainMin,
-        )).toList()
+        val samples = BacktrackSolver(problem).enumerate(
+            BacktrackParams(
+                randomSeed = 0L,
+                phaseSaving = true,
+                variableHeuristic = InputOrder,
+                valueHeuristic = IndomainMin,
+            )
+        ).toList()
         assertEquals(4, samples.size)
         // Each is exactly-one-true.
         for (s in samples) assertEquals(1, s.bools.count { it })

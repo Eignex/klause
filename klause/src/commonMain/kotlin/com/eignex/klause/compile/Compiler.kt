@@ -3,72 +3,51 @@ package com.eignex.klause.compile
 import com.eignex.klause.ast.AllDifferent
 import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
-import com.eignex.klause.ast.CircuitExpr
-import com.eignex.klause.ast.CountExprOpt
-import com.eignex.klause.ast.CumulativeExprOpt
-import com.eignex.klause.ast.DisjunctiveExprOpt
-import com.eignex.klause.ast.GccExprOpt
-import com.eignex.klause.ast.NValueExprOpt
-import com.eignex.klause.ast.CumulativeExpr
-import com.eignex.klause.ast.DisjunctiveExpr
-import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
-import com.eignex.klause.ast.PbOp
-import com.eignex.klause.ast.PseudoBooleanExpr
-import com.eignex.klause.ast.TableConstraint
-import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.BoolSpec
 import com.eignex.klause.ast.CardinalityExpr
+import com.eignex.klause.ast.CircuitExpr
+import com.eignex.klause.ast.CountExprOpt
+import com.eignex.klause.ast.CumulativeExpr
+import com.eignex.klause.ast.CumulativeExprOpt
+import com.eignex.klause.ast.DisjunctiveExpr
+import com.eignex.klause.ast.DisjunctiveExprOpt
 import com.eignex.klause.ast.FloatSpec
+import com.eignex.klause.ast.GccExprOpt
 import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
-import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
-import com.eignex.klause.ast.IntAbs
-import com.eignex.klause.ast.IntDiv
-import com.eignex.klause.ast.IntElement
-import com.eignex.klause.ast.IntIfThenElse
-import com.eignex.klause.ast.IntMax
-import com.eignex.klause.ast.IntMin
-import com.eignex.klause.ast.IntMod
-import com.eignex.klause.ast.IntMul
 import com.eignex.klause.ast.IntRef
-import com.eignex.klause.ast.IntScale
 import com.eignex.klause.ast.IntSpec
-import com.eignex.klause.ast.IntSum
+import com.eignex.klause.ast.NValueExprOpt
+import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.NamedConstraint
+import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.SchemaEntry
-import com.eignex.klause.schema.PRESENCE_SUFFIX
+import com.eignex.klause.ast.SubcircuitExpr
+import com.eignex.klause.ast.TableConstraint
+import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.skema.SchemaDef
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.Product
-import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
-import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
-import com.eignex.klause.solver.factor.Circuit as CircuitFactor
-import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
-import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
-import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
+import com.eignex.skema.SchemaDef
 
 class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current) {
 
@@ -80,6 +59,7 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
         val intVarIdByName = mutableMapOf<String, Int>()
         val intDomains = mutableListOf<IntDomain>()
         val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
+
         // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per
         // float-var name (so the schema can decode `sample.ints[id]` back to a Double).
         // `floatMetaIntervals` / `floatMetaIntVarIds` / `floatMetaBuckets` are the parallel
@@ -89,8 +69,9 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
         val floatMetaIntervals = mutableListOf<com.eignex.klause.solver.FloatInterval>()
         val floatMetaIntVarIds = mutableListOf<Int>()
         val floatMetaBuckets = mutableListOf<Int>()
-        val floatVarIdByName = mutableMapOf<String, Int>()  // float-id (metadata index) by name
+        val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
         val floatMetaConstraints = mutableListOf<com.eignex.klause.solver.RealLinearConstraint>()
+
         /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
          *  `SetVarLayout`: for set var `S` over universe `[e_0, …, e_{n-1}]`,
          *  `setLayouts["S"].indicatorBoolIds[i]` is the klause bool var that's `true` iff
@@ -98,6 +79,7 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
          *  [com.eignex.klause.ast.MultipleSpec] (nominal universe) populate this — the
          *  difference is the decoder shape (ints vs label strings). */
         val setLayouts = mutableMapOf<String, SetLayout>()
+
         /** Label → universe index for set vars whose universe is a nominal label list.
          *  Empty for int-universe set vars. */
         val setLabelOrder = mutableMapOf<String, List<String>>()
@@ -167,13 +149,16 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
             if (config.pinAbsentOptVars) emitOptVarPins(def)
 
             val metadata: com.eignex.klause.solver.FloatMetadata? =
-                if (floatMetaIntervals.isEmpty()) null
-                else com.eignex.klause.solver.FloatMetadata(
-                    intervals = floatMetaIntervals.toTypedArray(),
-                    bucketCounts = floatMetaBuckets.toIntArray(),
-                    intVarByFloatVar = floatMetaIntVarIds.toIntArray(),
-                    constraints = floatMetaConstraints.toList(),
-                )
+                if (floatMetaIntervals.isEmpty()) {
+                    null
+                } else {
+                    com.eignex.klause.solver.FloatMetadata(
+                        intervals = floatMetaIntervals.toTypedArray(),
+                        bucketCounts = floatMetaBuckets.toIntArray(),
+                        intVarByFloatVar = floatMetaIntVarIds.toIntArray(),
+                        constraints = floatMetaConstraints.toList(),
+                    )
+                }
 
             // Pick up the last `__search*` annotation in declaration order — schemas may
             // re-declare to refine an inherited choice.
@@ -270,8 +255,10 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                 // truth side. Today we have FloatLinear but not ReifiedFloatLinear, so
                 // the implication is inert in the engine — usable as a top-level constraint
                 // but not yet as a sub-expression. Tracked as a follow-up.
-                error("FloatLinearConstraint at non-top-level position is not yet supported; " +
-                    "ReifiedFloatLinear factor still TODO.")
+                error(
+                    "FloatLinearConstraint at non-top-level position is not yet supported; " +
+                        "ReifiedFloatLinear factor still TODO."
+                )
             }
             is AtMost -> reifyCardinality(expr.children, 0, expr.k)
             is AtLeast -> reifyCardinality(expr.children, expr.k, expr.children.size)
@@ -286,7 +273,9 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
             is com.eignex.klause.ast.TreeExpr -> error("tree: reified context not supported (use at top-level)")
             is com.eignex.klause.ast.MddExpr -> error("mdd: reified context not supported (use at top-level)")
             is com.eignex.klause.ast.CostMddExpr -> error("cost_mdd: reified context not supported (use at top-level)")
-            is com.eignex.klause.ast.CostRegularExpr -> error("cost_regular: reified context not supported (use at top-level)")
+            is com.eignex.klause.ast.CostRegularExpr -> error(
+                "cost_regular: reified context not supported (use at top-level)"
+            )
             is CircuitExpr -> reifyCircuit(expr)
             is SubcircuitExpr -> reifySubcircuit(expr)
             is CumulativeExpr -> reifyCumulative(expr)
@@ -372,8 +361,10 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                 1 -> op to bound
                 -1 -> {
                     val flipped = when (op) {
-                        IntCmpOp.LE -> IntCmpOp.GE; IntCmpOp.GE -> IntCmpOp.LE
-                        IntCmpOp.EQ -> IntCmpOp.EQ; IntCmpOp.NE -> IntCmpOp.NE
+                        IntCmpOp.LE -> IntCmpOp.GE
+                        IntCmpOp.GE -> IntCmpOp.LE
+                        IntCmpOp.EQ -> IntCmpOp.EQ
+                        IntCmpOp.NE -> IntCmpOp.NE
                         IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
                     }
                     flipped to -bound

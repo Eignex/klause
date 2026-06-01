@@ -246,7 +246,7 @@ class BinPacking(
                 for (j in bins.indices) {
                     if (j == itemI) continue
                     val jBin = state.assignment.intValue(bins[j]) - binOffset
-                    if (jBin == b) continue  // both in overloaded bin — skip
+                    if (jBin == b) continue // both in overloaded bin — skip
                     if (jBin < 0 || jBin >= numBins) continue
                     val wJ = weights[j]
                     // Net effect on b: -wI + wJ. Want ≤ 0 (i.e. wJ ≤ wI) so we reduce
@@ -258,10 +258,12 @@ class BinPacking(
                     val targetForJ = b + binOffset
                     if (targetForI !in domI) continue
                     if (targetForJ !in state.problem.intDomains[bins[j]]) continue
-                    sink.addCompound(listOf(
-                        com.eignex.klause.solver.Move.IntSet(binVarI, targetForI),
-                        com.eignex.klause.solver.Move.IntSet(bins[j], targetForJ),
-                    ))
+                    sink.addCompound(
+                        listOf(
+                            com.eignex.klause.solver.Move.IntSet(binVarI, targetForI),
+                            com.eignex.klause.solver.Move.IntSet(bins[j], targetForJ),
+                        )
+                    )
                     if (++swapsAdded >= MAX_SWAPS_PER_ITEM) break
                 }
             }

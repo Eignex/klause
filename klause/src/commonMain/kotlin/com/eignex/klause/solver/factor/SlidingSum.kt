@@ -150,20 +150,22 @@ class SlidingSum(
         if (numWindows == 0) return true
         val ant = state.composeIntVarAtomAntecedents(vs)
         for (w in 0 until numWindows) {
-            var sumMin = 0L; var sumMax = 0L
+            var sumMin = 0L
+            var sumMax = 0L
             for (j in w until w + seq) {
                 val d = state.intDomains[vs[j]]
-                sumMin += d.min; sumMax += d.max
+                sumMin += d.min
+                sumMax += d.max
             }
-            if (sumMin > up || sumMax < low) return false   // window infeasible
+            if (sumMin > up || sumMax < low) return false // window infeasible
             for (j in w until w + seq) {
                 val v = vs[j]
                 val d = state.intDomains[v]
                 // Others' contribution range with vs[j] removed.
                 val othersMin = sumMin - d.min
                 val othersMax = sumMax - d.max
-                val loBound = low - othersMax         // vs[j] ≥ low − Σ_{k≠j} max
-                val hiBound = up - othersMin           // vs[j] ≤ up  − Σ_{k≠j} min
+                val loBound = low - othersMax // vs[j] ≥ low − Σ_{k≠j} max
+                val hiBound = up - othersMin // vs[j] ≤ up  − Σ_{k≠j} min
                 if (loBound > d.max || hiBound < d.min) return false
                 if (loBound > d.min && !state.tightenIntMin(v, loBound.toInt(), ant)) return false
                 if (hiBound < d.max && !state.tightenIntMax(v, hiBound.toInt(), ant)) return false

@@ -1,10 +1,10 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.ViolationPenalty
-import com.eignex.klause.solver.factor.Cardinality
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -178,9 +178,14 @@ class CostShapingTest {
     @Test
     fun `linear shaping minimize on exact one cardinality finds the cheapest pick`() {
         // Same setup as OptimizerTest's exactly-one weighted case, but using shaped descent.
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+                Lit.make(3, true),
+            )
+        )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val solver = LocalSearchSolver(problem)

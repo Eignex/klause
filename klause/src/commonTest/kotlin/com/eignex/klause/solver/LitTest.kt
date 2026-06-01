@@ -46,7 +46,6 @@ class LitTest {
 
     @Test
     fun `different vars produce distinct literals`() {
-
         val seen = HashSet<Int>()
         for (v in 0..15) {
             for (pos in listOf(true, false)) {

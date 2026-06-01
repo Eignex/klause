@@ -131,7 +131,10 @@ class GreedyConstructionRepair(
                 if (v == cur) continue
                 state.apply(Move.IntSet(i, v))
                 val s = currentScore()
-                if (s < bestScore) { bestScore = s; bestVal = v }
+                if (s < bestScore) {
+                    bestScore = s
+                    bestVal = v
+                }
                 state.apply(Move.IntSet(i, cur)) // revert
             }
             if (bestVal != cur) state.apply(Move.IntSet(i, bestVal))
@@ -179,8 +182,11 @@ class RegretRepair(
         for (i in context.freed.ints) {
             val d = problem.intDomains[i]
             val cur = state.assignment.intValue(i)
-            val cand: IntArray = if (d.size <= intDomainSampleCap) IntArray(d.size) { d.valueAt(it) }
-                                  else IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+            val cand: IntArray = if (d.size <= intDomainSampleCap) {
+                IntArray(d.size) { d.valueAt(it) }
+            } else {
+                IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+            }
             var best = cur
             var bestScore = currentScore()
             var second = Double.POSITIVE_INFINITY
@@ -188,8 +194,11 @@ class RegretRepair(
                 if (v == cur) continue
                 state.apply(Move.IntSet(i, v))
                 val s = currentScore()
-                if (s < bestScore) { second = bestScore; bestScore = s; best = v }
-                else if (s < second) second = s
+                if (s < bestScore) {
+                    second = bestScore
+                    bestScore = s
+                    best = v
+                } else if (s < second) second = s
                 state.apply(Move.IntSet(i, cur))
             }
             val regret = if (second == Double.POSITIVE_INFINITY) 0.0 else second - bestScore
@@ -237,19 +246,28 @@ class BestImprovingRepair(
             for (b in context.freed.bools) {
                 state.apply(Move.BoolFlip(b))
                 val s = currentScore()
-                if (s < bestScore) { bestScore = s; bestMove = Move.BoolFlip(b) }
+                if (s < bestScore) {
+                    bestScore = s
+                    bestMove = Move.BoolFlip(b)
+                }
                 state.apply(Move.BoolFlip(b))
             }
             for (i in context.freed.ints) {
                 val d = problem.intDomains[i]
                 val cur = state.assignment.intValue(i)
-                val cand: IntArray = if (d.size <= intDomainSampleCap) IntArray(d.size) { d.valueAt(it) }
-                                      else IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                val cand: IntArray = if (d.size <= intDomainSampleCap) {
+                    IntArray(d.size) { d.valueAt(it) }
+                } else {
+                    IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                }
                 for (v in cand) {
                     if (v == cur) continue
                     state.apply(Move.IntSet(i, v))
                     val s = currentScore()
-                    if (s < bestScore) { bestScore = s; bestMove = Move.IntSet(i, v) }
+                    if (s < bestScore) {
+                        bestScore = s
+                        bestMove = Move.IntSet(i, v)
+                    }
                     state.apply(Move.IntSet(i, cur))
                 }
             }

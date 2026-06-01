@@ -19,17 +19,24 @@ class KnapsackTest {
         // 3 items, binary selection. weights = [2, 3, 5], profits = [3, 4, 8].
         // capacity w ∈ [0, 5] forces at most one item w ≤ 5 — best is item 3 with profit 8.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
-                IntDomain(0, 5), IntDomain(0, 100),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 5),
+                IntDomain(0, 100),
             ),
-            factors = arrayOf<Factor>(Knapsack(
-                weights = intArrayOf(2, 3, 5),
-                profits = intArrayOf(3, 4, 8),
-                xs = intArrayOf(0, 1, 2),
-                w = 3, p = 4,
-            )),
+            factors = arrayOf<Factor>(
+                Knapsack(
+                    weights = intArrayOf(2, 3, 5),
+                    profits = intArrayOf(3, 4, 8),
+                    xs = intArrayOf(0, 1, 2),
+                    w = 3,
+                    p = 4,
+                )
+            ),
         )
         val r = BacktrackSolver(problem).minimize(
             LinearObjective(intCoefficients = doubleArrayOf(0.0, 0.0, 0.0, 0.0, -1.0)),
@@ -44,17 +51,24 @@ class KnapsackTest {
     fun `knapsack with all items + tight capacity gives Sat`() {
         // Force w = 5, p = 8 via singleton item picks (item 0 = 0, item 1 = 0, item 2 = 1).
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0, 0), IntDomain(0, 0), IntDomain(1, 1),
-                IntDomain(0, 10), IntDomain(0, 100),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(1, 1),
+                IntDomain(0, 10),
+                IntDomain(0, 100),
             ),
-            factors = arrayOf<Factor>(Knapsack(
-                weights = intArrayOf(2, 3, 5),
-                profits = intArrayOf(3, 4, 8),
-                xs = intArrayOf(0, 1, 2),
-                w = 3, p = 4,
-            )),
+            factors = arrayOf<Factor>(
+                Knapsack(
+                    weights = intArrayOf(2, 3, 5),
+                    profits = intArrayOf(3, 4, 8),
+                    xs = intArrayOf(0, 1, 2),
+                    w = 3,
+                    p = 4,
+                )
+            ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)

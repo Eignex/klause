@@ -12,10 +12,12 @@ class ClauseWatchedLitTest {
 
     @Test
     fun `is violated agrees with brute force over every assignment`() {
-
         val literals = intArrayOf(
-            Lit.make(0, true), Lit.make(1, false), Lit.make(2, true),
-            Lit.make(3, false), Lit.make(4, true),
+            Lit.make(0, true),
+            Lit.make(1, false),
+            Lit.make(2, true),
+            Lit.make(3, false),
+            Lit.make(4, true),
         )
         val clause = Clause(literals)
         val problem = Problem(5, 0, emptyArray(), listOf(clause))
@@ -30,10 +32,13 @@ class ClauseWatchedLitTest {
 
     @Test
     fun `watched literals survive long flip sequence`() {
-
         val literals = intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, false),
-            Lit.make(3, true), Lit.make(4, false), Lit.make(5, true),
+            Lit.make(0, true),
+            Lit.make(1, true),
+            Lit.make(2, false),
+            Lit.make(3, true),
+            Lit.make(4, false),
+            Lit.make(5, true),
         )
         val clause = Clause(literals)
         val problem = Problem(6, 0, emptyArray(), listOf(clause))

@@ -47,7 +47,10 @@ class Sort(
             if (ys[i] == intVar) newValue else state.assignment.intValue(ys[i])
         }
         var willViolate = false
-        for (i in ysVals.indices) if (ysVals[i] != xsVals[i]) { willViolate = true; break }
+        for (i in ysVals.indices) if (ysVals[i] != xsVals[i]) {
+            willViolate = true
+            break
+        }
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
@@ -96,7 +99,10 @@ class Sort(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // All-singleton sanity: when every operand is pinned, ys must equal sorted xs.
         var allSingleton = true
-        for (v in intVars) if (state.intDomains[v].min != state.intDomains[v].max) { allSingleton = false; break }
+        for (v in intVars) if (state.intDomains[v].min != state.intDomains[v].max) {
+            allSingleton = false
+            break
+        }
         if (allSingleton) {
             val xv = IntArray(xs.size) { state.intDomains[xs[it]].min }.also { it.sort() }
             for (i in ys.indices) {

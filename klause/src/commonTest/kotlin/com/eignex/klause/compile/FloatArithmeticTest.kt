@@ -172,8 +172,10 @@ class FloatArithmeticTest {
         for (s in samples) {
             val av = compiled.decode(schema.a, s)
             val bv = compiled.decode(schema.b, s)
-            assertTrue(2 * av + 3 * bv <= 5.0 + 0.8 + 1e-9,
-                "a=$av b=$bv violated 2a + 3b ≤ 5.0")
+            assertTrue(
+                2 * av + 3 * bv <= 5.0 + 0.8 + 1e-9,
+                "a=$av b=$bv violated 2a + 3b ≤ 5.0"
+            )
         }
     }
 

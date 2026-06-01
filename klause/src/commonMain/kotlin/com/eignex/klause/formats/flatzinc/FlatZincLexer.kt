@@ -4,12 +4,14 @@ package com.eignex.klause.formats.flatzinc
 internal sealed interface FznToken {
     val line: Int
     val col: Int
+
     /** Keywords get their own subtype for cleaner parser pattern matching. */
     data class Kw(val keyword: String, override val line: Int, override val col: Int) : FznToken
     data class Ident(val name: String, override val line: Int, override val col: Int) : FznToken
     data class IntLit(val value: Long, override val line: Int, override val col: Int) : FznToken
     data class FloatLit(val value: Double, override val line: Int, override val col: Int) : FznToken
     data class StringLit(val value: String, override val line: Int, override val col: Int) : FznToken
+
     /** Punctuation: `,`, `;`, `:`, `=`, `(`, `)`, `[`, `]`, `{`, `}`, `..`, `::`. */
     data class Punct(val symbol: String, override val line: Int, override val col: Int) : FznToken
     data class Eof(override val line: Int, override val col: Int) : FznToken
@@ -61,11 +63,13 @@ internal class FlatZincLexer(private val src: String) {
             c.isDigit() || (c == '-' && pos + 1 < src.length && (src[pos + 1].isDigit() || src[pos + 1] == '.')) ->
                 readNumber(startLine, startCol)
             c == '.' && pos + 1 < src.length && src[pos + 1] == '.' -> {
-                advance(); advance()
+                advance()
+                advance()
                 FznToken.Punct("..", startLine, startCol)
             }
             c == ':' && pos + 1 < src.length && src[pos + 1] == ':' -> {
-                advance(); advance()
+                advance()
+                advance()
                 FznToken.Punct("::", startLine, startCol)
             }
             c == '"' -> readString(startLine, startCol)
@@ -81,31 +85,46 @@ internal class FlatZincLexer(private val src: String) {
     private fun readIdentOrKeyword(startLine: Int, startCol: Int): FznToken {
         val sb = StringBuilder()
         while (pos < src.length && (src[pos].isLetterOrDigit() || src[pos] == '_')) {
-            sb.append(src[pos]); advance()
+            sb.append(src[pos])
+            advance()
         }
         val name = sb.toString()
-        return if (name in keywords) FznToken.Kw(name, startLine, startCol)
-        else FznToken.Ident(name, startLine, startCol)
+        return if (name in keywords) {
+            FznToken.Kw(name, startLine, startCol)
+        } else {
+            FznToken.Ident(name, startLine, startCol)
+        }
     }
 
     private fun readNumber(startLine: Int, startCol: Int): FznToken {
         val sb = StringBuilder()
-        if (src[pos] == '-') { sb.append('-'); advance() }
+        if (src[pos] == '-') {
+            sb.append('-')
+            advance()
+        }
         var sawDot = false
         var sawExp = false
         while (pos < src.length) {
             val ch = src[pos]
             when {
-                ch.isDigit() -> { sb.append(ch); advance() }
+                ch.isDigit() -> {
+                    sb.append(ch)
+                    advance()
+                }
                 ch == '.' && !sawDot && !sawExp -> {
                     // FlatZinc range token `..` — don't consume the dot if the next char is also `.`
                     if (pos + 1 < src.length && src[pos + 1] == '.') break
-                    sawDot = true; sb.append(ch); advance()
+                    sawDot = true
+                    sb.append(ch)
+                    advance()
                 }
                 (ch == 'e' || ch == 'E') && !sawExp -> {
-                    sawExp = true; sb.append(ch); advance()
+                    sawExp = true
+                    sb.append(ch)
+                    advance()
                     if (pos < src.length && (src[pos] == '+' || src[pos] == '-')) {
-                        sb.append(src[pos]); advance()
+                        sb.append(src[pos])
+                        advance()
                     }
                 }
                 else -> break
@@ -129,14 +148,21 @@ internal class FlatZincLexer(private val src: String) {
         while (pos < src.length && src[pos] != '"') {
             if (src[pos] == '\\' && pos + 1 < src.length) {
                 advance()
-                sb.append(when (src[pos]) {
-                    'n' -> '\n'; 't' -> '\t'; 'r' -> '\r'; '\\' -> '\\'; '"' -> '"'
-                    else -> src[pos]
-                })
+                sb.append(
+                    when (src[pos]) {
+                        'n' -> '\n'
+                        't' -> '\t'
+                        'r' -> '\r'
+                        '\\' -> '\\'
+                        '"' -> '"'
+                        else -> src[pos]
+                    }
+                )
                 advance()
             } else {
                 if (src[pos] == '\n') throw FlatZincParseException("unterminated string", startLine, startCol)
-                sb.append(src[pos]); advance()
+                sb.append(src[pos])
+                advance()
             }
         }
         if (pos >= src.length) throw FlatZincParseException("unterminated string", startLine, startCol)
@@ -159,7 +185,12 @@ internal class FlatZincLexer(private val src: String) {
     }
 
     private fun advance() {
-        if (src[pos] == '\n') { line++; col = 1 } else col++
+        if (src[pos] == '\n') {
+            line++
+            col = 1
+        } else {
+            col++
+        }
         pos++
     }
 }

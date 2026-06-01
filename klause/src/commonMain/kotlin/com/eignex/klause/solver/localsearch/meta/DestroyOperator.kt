@@ -147,7 +147,9 @@ fun interface DestroyOperator {
          * Falls back to [Random] when the session has no activity capture yet (first
          * iteration) or when no session was provided.
          */
-        fun activityBiased(session: LocalSearchSession?): DestroyOperator = DestroyOperator { rng, problem, incumbent, objective, fraction ->
+        fun activityBiased(
+            session: LocalSearchSession?
+        ): DestroyOperator = DestroyOperator { rng, problem, incumbent, objective, fraction ->
             val touches = session?.warmStateView?.activityTouches() ?: IntArray(0)
             if (touches.isEmpty()) return@DestroyOperator Random.destroy(rng, problem, incumbent, objective, fraction)
             val totalVars = problem.numBoolVars + problem.numIntVars
@@ -185,9 +187,12 @@ fun interface DestroyOperator {
             }
             if (globalLo > globalHi) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
             val span = globalHi - globalLo + 1
-            val start = if (span <= windowSize) globalLo
-                        else globalLo + rng.nextInt(span - windowSize + 1)
-            val end = start + windowSize  // exclusive
+            val start = if (span <= windowSize) {
+                globalLo
+            } else {
+                globalLo + rng.nextInt(span - windowSize + 1)
+            }
+            val end = start + windowSize // exclusive
             // Collect int vars whose current value lies in [start, end).
             val inWindow = com.eignex.klause.util.IntArrayList()
             for (i in 0 until n) {

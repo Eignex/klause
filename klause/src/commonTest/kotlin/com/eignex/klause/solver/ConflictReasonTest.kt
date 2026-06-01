@@ -1,12 +1,10 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.propagation.PropagationResult
-
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -18,7 +16,9 @@ class ConflictReasonTest {
     fun `constraint-only Unsat has empty conflict sets`() {
         // Two clauses (x), (¬x): infeasible without any input.
         val p = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
@@ -34,7 +34,9 @@ class ConflictReasonTest {
     fun `conflicting input pins surface in conflict set`() {
         // x0 ∨ x1, with x0 = x1 = false pinned → Unsat with both inputs in the conflict set.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val r = p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false, 2 to true)))
@@ -55,7 +57,8 @@ class ConflictReasonTest {
         // x ≤ 2 and x ≥ 8 over a single int var → Unsat from the constraints (no inputs).
         // Then add an input pin x=5 (still violates both) → still Unsat; the input is in the set.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 1,
+            numBoolVars = 0,
+            numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 10)),
             factors = arrayOf<Factor>(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
@@ -72,7 +75,8 @@ class ConflictReasonTest {
         // single factor, so instead use a Linear: x0 + x1 ≤ 1 (so 0+0 or 0+1 or 1+0 feasible),
         // pin x0 = 1 and x1 = 1 → Unsat. Both inputs jointly responsible.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
@@ -86,7 +90,9 @@ class ConflictReasonTest {
     fun `irrelevant assumption stays out of conflict set`() {
         // (x ∨ y), pin x=false y=false z=true. z is unrelated; conflict is {x, y}.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Cardinality.exactlyOne(intArrayOf(Lit.make(2, true))),

@@ -3,9 +3,7 @@ package com.eignex.klause.schema
 import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.SetSpec
 import com.eignex.klause.ast.eq
-import com.eignex.klause.ast.ge
 import com.eignex.klause.ast.iff
-import com.eignex.klause.ast.le
 import com.eignex.klause.compile.compile
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -186,6 +184,7 @@ class SetReifiedTest {
         val s by setVar(0..2)
         val x by intVar(0, 2)
         val flag by boolVar()
+
         // flag ↔ x ∈ s — i.e. flag tracks membership.
         val r by constraint { flag iff (x inSet s) }
     }
@@ -202,8 +201,11 @@ class SetReifiedTest {
             val sv = compiled.decode(schema.s, sample)
             val flag = compiled.decode(schema.flag, sample)
             val expected = xv in sv
-            assertEquals(expected, flag,
-                "reified mismatch: x=$xv s=$sv flag=$flag expected=$expected")
+            assertEquals(
+                expected,
+                flag,
+                "reified mismatch: x=$xv s=$sv flag=$flag expected=$expected"
+            )
         }
     }
 }
@@ -285,10 +287,15 @@ class SetBitBlastTest {
     }
 
     @Test fun `inSet bit-blasts`() = assertBitBlasts(MembershipSchema().compile())
+
     @Test fun `subsetOf bit-blasts`() = assertBitBlasts(SubsetSchema().compile())
+
     @Test fun `disjointFrom bit-blasts`() = assertBitBlasts(DisjointSchema().compile())
+
     @Test fun `union bit-blasts`() = assertBitBlasts(UnionSchema().compile())
+
     @Test fun `card bit-blasts`() = assertBitBlasts(CardSchema().compile())
+
     @Test fun `reified inSet bit-blasts`() = assertBitBlasts(ReifiedSchema().compile())
 
     private fun assertBitBlasts(compiled: com.eignex.klause.compile.CompiledProblem) {

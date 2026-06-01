@@ -10,15 +10,18 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class VariableObjectiveTest {
 
     @Test
     fun `Problem minimizeInt extension equals hand-built coefficient vector`() {
-        val problem = Problem(numBoolVars = 0, numIntVars = 5,
-            intDomains = Array(5) { IntDomain(0, 1) }, factors = emptyArray())
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 1) },
+            factors = emptyArray()
+        )
         val factory = problem.minimizeInt(intVar = 2)
         val handBuilt = LinearObjective(intCoefficients = doubleArrayOf(0.0, 0.0, 1.0, 0.0, 0.0))
         assertEquals(handBuilt, factory)
@@ -84,8 +87,12 @@ class VariableObjectiveTest {
 
     @Test
     fun `bounds checking on factories`() {
-        val intsOnly = Problem(numBoolVars = 0, numIntVars = 3,
-            intDomains = Array(3) { IntDomain(0, 1) }, factors = emptyArray())
+        val intsOnly = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(0, 1) },
+            factors = emptyArray()
+        )
         val boolsOnly = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         try {
             intsOnly.minimizeInt(intVar = 5)

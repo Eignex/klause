@@ -2,9 +2,9 @@ package com.eignex.klause.solver
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.test.assertFails
 
 class IntDomainTest {
 

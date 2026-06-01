@@ -8,7 +8,6 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class DiffnTest {
 
@@ -17,12 +16,17 @@ class DiffnTest {
         // Two 2x2 rectangles in a 3x3 grid → only configurations where they share a
         // corner-line; we just verify Sat exists.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(Diffn(
-                xs = intArrayOf(0, 2), ys = intArrayOf(1, 3),
-                widths = intArrayOf(2, 2), heights = intArrayOf(2, 2),
-            )),
+            factors = arrayOf<Factor>(
+                Diffn(
+                    xs = intArrayOf(0, 2),
+                    ys = intArrayOf(1, 3),
+                    widths = intArrayOf(2, 2),
+                    heights = intArrayOf(2, 2),
+                )
+            ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         // 2x2 + 2x2 in [0,1]x[0,1] positions only — actually no valid placement; expect Unsat.
@@ -37,12 +41,17 @@ class DiffnTest {
     fun `two unit squares pinned non-overlapping is Sat`() {
         // Rect 1 at (0,0) 1x1. Rect 2 at (1,0) 1x1. Disjoint.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 0)),
-            factors = arrayOf<Factor>(Diffn(
-                xs = intArrayOf(0, 2), ys = intArrayOf(1, 3),
-                widths = intArrayOf(1, 1), heights = intArrayOf(1, 1),
-            )),
+            factors = arrayOf<Factor>(
+                Diffn(
+                    xs = intArrayOf(0, 2),
+                    ys = intArrayOf(1, 3),
+                    widths = intArrayOf(1, 1),
+                    heights = intArrayOf(1, 1),
+                )
+            ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Sat>(r)
@@ -52,12 +61,17 @@ class DiffnTest {
     fun `overlapping pinned rectangles is Unsat`() {
         // Both rectangles pinned at (0, 0), 2x2 each → identical, overlap.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 4,
+            numBoolVars = 0,
+            numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 0) },
-            factors = arrayOf<Factor>(Diffn(
-                xs = intArrayOf(0, 2), ys = intArrayOf(1, 3),
-                widths = intArrayOf(2, 2), heights = intArrayOf(2, 2),
-            )),
+            factors = arrayOf<Factor>(
+                Diffn(
+                    xs = intArrayOf(0, 2),
+                    ys = intArrayOf(1, 3),
+                    widths = intArrayOf(2, 2),
+                    heights = intArrayOf(2, 2),
+                )
+            ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }

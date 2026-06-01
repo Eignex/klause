@@ -1,13 +1,11 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.solver.propagation.PropagationResult
-
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -19,7 +17,9 @@ class IncrementalSessionTest {
         // Pin x, propagate, snapshot. Pop. Repeat the same push. State must equal the
         // post-first-push state — confirms snapshot/restore is faithful.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
@@ -57,7 +57,9 @@ class IncrementalSessionTest {
         // (x ∨ y). Pin x=false (forces y=true), then attempt y=false → Unsat.
         // After Unsat return, decisionLevel must equal 1 (the failed push didn't stick).
         val p = Problem(
-            numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
@@ -77,7 +79,9 @@ class IncrementalSessionTest {
         // After a sequence of pinBool calls, the cumulative state should match what
         // problem.propagate would return for the same assumption set.
         val p = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
@@ -99,7 +103,8 @@ class IncrementalSessionTest {
     fun `int propagation incremental push`() {
         // x + y + z ≤ 2; pin x=1, then y=1; z must be tightened to ≤ 0.
         val p = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2)),
         )
@@ -130,7 +135,9 @@ class IncrementalSessionTest {
     fun `seed conflict returns Unsat with seed levels`() {
         // (x ∨ y) seeded with x=false y=false directly: conflict detected during seed.
         val p = Problem(
-            numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val s = PropagationSession(p)
@@ -167,7 +174,8 @@ class IncrementalSessionTest {
     fun `mixed bool-int incremental session`() {
         // Two factors: clause (b0 ∨ b1) and linear x + y ≤ 1 over int domains.
         val p = Problem(
-            numBoolVars = 2, numIntVars = 2,
+            numBoolVars = 2,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
@@ -176,8 +184,8 @@ class IncrementalSessionTest {
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)
-        s.pinBool(0, false)            // forces b1=true
-        s.pinInt(0, 1)                 // forces y ≤ 0 → tightens to {0}
+        s.pinBool(0, false) // forces b1=true
+        s.pinInt(0, 1) // forces y ≤ 0 → tightens to {0}
         val u = assertIs<PropagationResult.Unsat>(s.pinInt(1, 1)) // 1+1 > 1
         assertEquals(2, s.decisionLevel, "failed push must not stick")
         // The conflict came from levels involving the int pins (levels 2 and 3).
@@ -188,10 +196,19 @@ class IncrementalSessionTest {
     fun `exactlyOne chain solved by decisions`() {
         // exactly-one over 4 vars. Pin three to false → the fourth is implied true.
         val p = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(
-                Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true),
-            ))),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Cardinality.exactlyOne(
+                    intArrayOf(
+                        Lit.make(0, true),
+                        Lit.make(1, true),
+                        Lit.make(2, true),
+                        Lit.make(3, true),
+                    )
+                )
+            ),
         )
         val s = PropagationSession(p)
         s.seed(Assumptions.None)

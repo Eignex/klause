@@ -10,10 +10,13 @@ package com.eignex.klause.solver
 enum class TerminationReason {
     /** Solver-specific budget (maxFlips, maxDecisions, maxAttempts) hit. */
     BudgetExhausted,
+
     /** Wall-clock `timeoutMillis` elapsed. */
     Timeout,
+
     /** Cooperative [Cancellation] token tripped. */
     Cancelled,
+
     /**
      * Complete-backend search space fully explored — no further work to do — but the
      * verdict can't be expressed as Sat / Unsat / Optimal / Infeasible because some
@@ -46,6 +49,7 @@ sealed interface SampleResult {
     data class Found(val sample: Sample) : SampleResult {
         override val assignment: Sample get() = sample
     }
+
     /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
     data class Infeasible(val core: UnsatCore? = null) : SampleResult {
         override val assignment: Sample? = null
@@ -73,6 +77,7 @@ sealed interface SampleResult {
 sealed interface MinimizeResult {
     /** Underlying assignment if Optimal / BestFound, else `null`. */
     val assignment: Sample?
+
     /** Objective value at the [assignment] if any, else `null`. */
     val objectiveValue: Double?
 
@@ -89,6 +94,7 @@ sealed interface MinimizeResult {
         override val objective: Double,
         val reason: TerminationReason,
     ) : WithSample
+
     /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
     data class Infeasible(val core: UnsatCore? = null) : MinimizeResult {
         override val assignment: Sample? = null

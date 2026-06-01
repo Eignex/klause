@@ -123,8 +123,8 @@ internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
     val sum: IntExpr = if (perValue.size == 1) perValue[0] else IntSum(perValue)
     val op = when (expr.mode) {
         NValueMode.EQ -> IntCmpOp.EQ
-        NValueMode.AT_LEAST -> IntCmpOp.LE      // n ≤ |distinct|
-        NValueMode.AT_MOST -> IntCmpOp.GE       // n ≥ |distinct|
+        NValueMode.AT_LEAST -> IntCmpOp.LE // n ≤ |distinct|
+        NValueMode.AT_MOST -> IntCmpOp.GE // n ≥ |distinct|
     }
     return reifyIntCompare(IntCompare(expr.n, op, sum))
 }
@@ -161,7 +161,8 @@ internal fun Compiler.Build.reifyGccOpt(expr: GccExprOpt): Int {
 internal fun Compiler.Build.reifyDisjunctive(expr: DisjunctiveExpr): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (i in expr.starts.indices) for (j in i + 1 until expr.starts.size) {
-        val di = expr.durations[i]; val dj = expr.durations[j]
+        val di = expr.durations[i]
+        val dj = expr.durations[j]
         if (di == 0 || dj == 0) continue
         pieces += pairwiseNoOverlap(expr.starts[i], di, expr.starts[j], dj)
     }
@@ -172,7 +173,8 @@ internal fun Compiler.Build.reifyDisjunctive(expr: DisjunctiveExpr): Int {
 internal fun Compiler.Build.reifyDisjunctiveOpt(expr: DisjunctiveExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (i in expr.starts.indices) for (j in i + 1 until expr.starts.size) {
-        val di = expr.durations[i]; val dj = expr.durations[j]
+        val di = expr.durations[i]
+        val dj = expr.durations[j]
         if (di == 0 || dj == 0) continue
         val noOverlap = pairwiseNoOverlap(expr.starts[i], di, expr.starts[j], dj)
         pieces += Or(listOf(Not(expr.presents[i]), Not(expr.presents[j]), noOverlap))
@@ -224,8 +226,11 @@ internal fun Compiler.Build.reifyCircuit(expr: CircuitExpr): Int {
     //    pairwise-distinct, then enforce `pos[succ[i] - offset] = pos[i] + 1` whenever
     //    succ[i] != offset (the closing edge to node 0).
     val posVars: List<IntExpr> = (0 until n).map { i ->
-        if (i == 0) IntLit(0)
-        else IntRef(newAuxIntVar(IntDomain(1, n - 1)))
+        if (i == 0) {
+            IntLit(0)
+        } else {
+            IntRef(newAuxIntVar(IntDomain(1, n - 1)))
+        }
     }
     // 4. AllDifferent over the non-zero positions.
     val nonZeroPos: List<IntExpr> = posVars.drop(1)
@@ -320,8 +325,11 @@ private fun Compiler.Build.cumulativeTimeTabling(
                     IntCompare(IntSum(listOf(starts[i], IntLit(d))), IntCmpOp.GT, IntLit(t)),
                 ),
             )
-            val gated: BoolExpr = if (presents == null) runsAt
-                else And(listOf(presents[i], runsAt))
+            val gated: BoolExpr = if (presents == null) {
+                runsAt
+            } else {
+                And(listOf(presents[i], runsAt))
+            }
             // r * indicator. Scale via IntIfThenElse(gated, r, 0).
             terms += IntIfThenElse(gated, IntLit(r), IntLit(0))
         }

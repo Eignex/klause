@@ -17,7 +17,8 @@ class MaxSdHeuristicTest {
     @Test
     fun `MaxSd drops infeasible probe values just like Impact`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(2, 2)),
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
         )
@@ -39,37 +40,53 @@ class MaxSdHeuristicTest {
         // k=4 → [0..2]^2 (size 9). So MaxSd's first should be among {0,1,2} (largest
         // residual), Impact's first should be 4 (smallest residual).
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
-            factors = arrayOf<Factor>(com.eignex.klause.solver.factor.Linear(
-                coeffs = intArrayOf(1, 1, 1), vars = intArrayOf(0, 1, 2),
-                op = com.eignex.klause.solver.factor.LinearOp.LE, bound = 6,
-            )),
+            factors = arrayOf<Factor>(
+                com.eignex.klause.solver.factor.Linear(
+                    coeffs = intArrayOf(1, 1, 1),
+                    vars = intArrayOf(0, 1, 2),
+                    op = com.eignex.klause.solver.factor.LinearOp.LE,
+                    bound = 6,
+                )
+            ),
         )
         val s1 = PropagationSession(problem)
         val impactOrder = Impact().values(s1, VarRef.IntVar(0), Random(0L)).toList()
         val s2 = PropagationSession(problem)
         val maxSdOrder = MaxSd().values(s2, VarRef.IntVar(0), Random(0L)).toList()
-        assertEquals(impactOrder.size, maxSdOrder.size,
-            "both heuristics should yield the same set; got $impactOrder vs $maxSdOrder")
-        assertTrue(maxSdOrder.first() in setOf(0, 1, 2),
-            "MaxSd should prefer a v0 ∈ {0,1,2} (largest residual); got ${maxSdOrder.first()}")
-        assertEquals(4, impactOrder.first(),
-            "Impact should prefer v0 = 4 (smallest residual); got ${impactOrder.first()}")
+        assertEquals(
+            impactOrder.size,
+            maxSdOrder.size,
+            "both heuristics should yield the same set; got $impactOrder vs $maxSdOrder"
+        )
+        assertTrue(
+            maxSdOrder.first() in setOf(0, 1, 2),
+            "MaxSd should prefer a v0 ∈ {0,1,2} (largest residual); got ${maxSdOrder.first()}"
+        )
+        assertEquals(
+            4,
+            impactOrder.first(),
+            "Impact should prefer v0 = 4 (smallest residual); got ${impactOrder.first()}"
+        )
     }
 
     @Test
     fun `MaxSd finds a solution in the engine`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 5,
+            numBoolVars = 0,
+            numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 4) },
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(
-            variableHeuristic = SmallestDomain,
-            valueHeuristic = MaxSd(),
-            randomSeed = 0L,
-        ))
+        val r = BacktrackSolver(problem).solve(
+            BacktrackParams(
+                variableHeuristic = SmallestDomain,
+                valueHeuristic = MaxSd(),
+                randomSeed = 0L,
+            )
+        )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
     }
@@ -77,7 +94,8 @@ class MaxSdHeuristicTest {
     @Test
     fun `MaxSd restores trail level after probing`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 5)),
         )

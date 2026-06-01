@@ -188,8 +188,11 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
      *  so callers that need last-write-wins semantics (e.g. [search]) rely on the
      *  compiler picking the last matching entry in declaration order. */
     private fun replaceAt(name: String, entry: SchemaEntry) {
-        if (entries[name] == null) add(name, entry)
-        else add("${name}_${anonCounter++}", entry)
+        if (entries[name] == null) {
+            add(name, entry)
+        } else {
+            add("${name}_${anonCounter++}", entry)
+        }
     }
 
     /** Bulk form: register a list of constraints under one property name. Each

@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -12,11 +11,12 @@ class OccurrenceDedupTest {
 
     @Test
     fun `cardinality with same var twice dedups occurrence list`() {
-
-        val a = 0; val b = 1
+        val a = 0
+        val b = 1
         val factor = Cardinality(
             literals = intArrayOf(Lit.make(a, true), Lit.make(a, false), Lit.make(b, true)),
-            min = 1, max = 2,
+            min = 1,
+            max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val occA = problem.boolOccurrences[a]

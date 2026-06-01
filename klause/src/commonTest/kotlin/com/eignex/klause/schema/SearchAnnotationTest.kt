@@ -77,8 +77,10 @@ class SearchAnnotationTest {
             val x by intVar(0, 5)
             init {
                 search(variableStrategy = VarSearchStrategy.InputOrder)
-                search(variableStrategy = VarSearchStrategy.SmallestDomain,
-                       valueStrategy = ValSearchStrategy.Max)
+                search(
+                    variableStrategy = VarSearchStrategy.SmallestDomain,
+                    valueStrategy = ValSearchStrategy.Max
+                )
             }
         }
         val compiled = MultiSearch().compile()

@@ -1,15 +1,14 @@
 package com.eignex.klause.solver.strategy
 
-import com.eignex.klause.solver.localsearch.strategy.NoiseController
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.ast.atLeast
 import com.eignex.klause.ast.atMost
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.NoiseController
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -38,7 +37,10 @@ class AdaptiveStrategyTest {
         val afterBump = controller.level
         // A strict improvement decays the level back toward zero.
         controller.observe(9)
-        assertTrue(controller.level < afterBump, "expected decay after improvement, got ${controller.level} vs $afterBump")
+        assertTrue(
+            controller.level < afterBump,
+            "expected decay after improvement, got ${controller.level} vs $afterBump"
+        )
     }
 
     @Test
@@ -51,7 +53,10 @@ class AdaptiveStrategyTest {
         // Subsequent equal-cost observations would re-stall; the bound check is on a single decay.
         val before = controller.level
         for (cost in 99 downTo 80) controller.observe(cost.toLong())
-        assertTrue(controller.level < before, "level did not decay on strict improvements: $before -> ${controller.level}")
+        assertTrue(
+            controller.level < before,
+            "level did not decay on strict improvements: $before -> ${controller.level}"
+        )
         assertTrue(controller.level >= 0.5, "level escaped minLevel: ${controller.level}")
     }
 
@@ -65,8 +70,10 @@ class AdaptiveStrategyTest {
         for (cost in 20 downTo 5) controller.observe(cost.toLong())
         // After a clear downward trend the level should not have grown past the initial
         // value (cost stays below EWMA → "improving" most of the time).
-        assertTrue(controller.level <= 0.3,
-            "level should stay near baseline under steady improvement; got ${controller.level}")
+        assertTrue(
+            controller.level <= 0.3,
+            "level should stay near baseline under steady improvement; got ${controller.level}"
+        )
     }
 
     @Test
@@ -79,8 +86,10 @@ class AdaptiveStrategyTest {
         val baseline = controller.level
         // Now feed costs above the smoothed average — should accumulate stalls and bump.
         repeat(10) { controller.observe(20) }
-        assertTrue(controller.level > baseline,
-            "level should grow on sustained rise above smoothed avg; got $baseline -> ${controller.level}")
+        assertTrue(
+            controller.level > baseline,
+            "level should grow on sustained rise above smoothed avg; got $baseline -> ${controller.level}"
+        )
     }
 
     @Test

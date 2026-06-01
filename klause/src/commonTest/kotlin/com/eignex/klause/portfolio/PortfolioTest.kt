@@ -35,7 +35,9 @@ class PortfolioTest {
     fun `portfolio solve on unsat problem returns unsat`() = runTest {
         // x ∧ ¬x → trivially unsat
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
@@ -86,18 +88,24 @@ class PortfolioTest {
     fun `portfolio minimize returns the global best across workers`() = runTest {
         // minimize x + 2y subject to x + y >= 3, x ∈ [0..5], y ∈ [0..5]. Optimum = 3.
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 2,
+            numBoolVars = 0,
+            numIntVars = 2,
             intDomains = arrayOf(
                 com.eignex.klause.solver.IntDomain(0, 5),
                 com.eignex.klause.solver.IntDomain(0, 5),
             ),
-            factors = arrayOf<Factor>(com.eignex.klause.solver.factor.Linear(
-                coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1),
-                op = com.eignex.klause.solver.factor.LinearOp.GE, bound = 3,
-            )),
+            factors = arrayOf<Factor>(
+                com.eignex.klause.solver.factor.Linear(
+                    coeffs = intArrayOf(1, 1),
+                    vars = intArrayOf(0, 1),
+                    op = com.eignex.klause.solver.factor.LinearOp.GE,
+                    bound = 3,
+                )
+            ),
         )
         val obj = com.eignex.klause.solver.LinearObjective(
-            intCoefficients = doubleArrayOf(1.0, 2.0))
+            intCoefficients = doubleArrayOf(1.0, 2.0)
+        )
         val workers = List(3) { i -> BacktrackSolver(problem).session() }
         Portfolio(workers).use { p ->
             val r = p.minimize(obj, BacktrackParams(randomSeed = 0L)) { params, supplier ->

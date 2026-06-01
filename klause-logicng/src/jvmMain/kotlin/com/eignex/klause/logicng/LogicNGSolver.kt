@@ -5,8 +5,8 @@ import com.eignex.klause.cnf.CnfProblem
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
 import org.logicng.datastructures.Tristate
 import org.logicng.formulas.Formula
@@ -14,8 +14,8 @@ import org.logicng.formulas.FormulaFactory
 import org.logicng.formulas.Literal
 import org.logicng.solvers.MiniSat
 import org.logicng.solvers.SATSolver
-import org.logicng.datastructures.Assignment as LogicNGAssignment
 import kotlin.random.Random
+import org.logicng.datastructures.Assignment as LogicNGAssignment
 
 /**
  * [Solver] backed by LogicNG's MiniSat. The problem is bit-blasted to CNF once via
@@ -57,6 +57,7 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
      * a fresh random subset; after several consecutive failures, fall back to an
      * unpinned solve so the contract isn't violated by a hostile pin set.
      */
+    @Suppress("LoopWithTooManyJumpStatements")
     override fun samples(params: LogicNGParams): Sequence<Sample> = sequence {
         val rng = Random(params.randomSeed ?: System.nanoTime())
         var attempts = 0L
@@ -95,6 +96,7 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
         return if (satSolver.sat() == Tristate.TRUE) decode(satSolver.model()) else null
     }
 
+    @Suppress("LoopWithTooManyJumpStatements")
     override fun enumerate(params: LogicNGParams): Sequence<Sample> = sequence {
         val (factory, satSolver) = buildSolver()
         val window = ArrayDeque<Sample>()
@@ -133,6 +135,7 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
          *  but more retries when pins induce Unsat. 8 is a reasonable balance for the
          *  small-to-medium SAT instances combo's bandit hits. */
         const val RANDOM_PIN_COUNT_CAP: Int = 8
+
         /** Retries on an Unsat-from-random-pins hit before falling back to an unpinned solve. */
         const val RANDOM_PIN_RETRIES: Int = 5
     }

@@ -47,7 +47,6 @@ class OpbTest {
 
     @Test
     fun `parses min objective and folds negation constant`() {
-
         val text = """
             min: 2 x1 +3 ~x2 ;
             +1 x1 +1 x2 >= 1 ;

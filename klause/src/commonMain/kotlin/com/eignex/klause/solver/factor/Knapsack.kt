@@ -34,7 +34,8 @@ class Knapsack(
     private class State(var currentWeight: Int, var currentProfit: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        var ww = 0; var pp = 0
+        var ww = 0
+        var pp = 0
         for (i in xs.indices) {
             val v = state.assignment.intValue(xs[i])
             ww += weights[i] * v
@@ -89,7 +90,7 @@ class Knapsack(
         // For each xs[i], if w-var requires lower weight, propose decreasing xs[i] when
         // weights[i] > 0; symmetric for profit.
         val wTarget = state.assignment.intValue(w)
-        val wGap = wTarget - s.currentWeight  // positive: need more weight
+        val wGap = wTarget - s.currentWeight // positive: need more weight
         if (wGap != 0) {
             for (i in xs.indices) {
                 if (weights[i] == 0) continue
@@ -141,10 +142,22 @@ class Knapsack(
         val n = xs.size
         // Linear form: append the sum-variable with coefficient -1 so the equality reads
         // `Σ coeffs · vars = 0`.
-        val weightCoeffs = IntArray(n + 1).also { weights.copyInto(it); it[n] = -1 }
-        val profitCoeffs = IntArray(n + 1).also { profits.copyInto(it); it[n] = -1 }
-        val weightVars = IntArray(n + 1).also { xs.copyInto(it); it[n] = w }
-        val profitVars = IntArray(n + 1).also { xs.copyInto(it); it[n] = p }
+        val weightCoeffs = IntArray(n + 1).also {
+            weights.copyInto(it)
+            it[n] = -1
+        }
+        val profitCoeffs = IntArray(n + 1).also {
+            profits.copyInto(it)
+            it[n] = -1
+        }
+        val weightVars = IntArray(n + 1).also {
+            xs.copyInto(it)
+            it[n] = w
+        }
+        val profitVars = IntArray(n + 1).also {
+            xs.copyInto(it)
+            it[n] = p
+        }
         if (!propagateLinearBounds(state, weightCoeffs, weightVars, LinearOp.EQ, 0L)) return false
         if (!propagateLinearBounds(state, profitCoeffs, profitVars, LinearOp.EQ, 0L)) return false
         return true

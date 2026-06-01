@@ -1,7 +1,6 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.brute.BruteForceSolver
 
 /**
  * Marker for backend-specific solver params. Each solver backend ships its own data class
@@ -16,6 +15,7 @@ import com.eignex.klause.solver.brute.BruteForceSolver
  */
 interface SolverParams {
     fun withAssumptions(@Suppress("UNUSED_PARAMETER") assumptions: Assumptions): SolverParams = this
+
     /** Inject a cooperative cancellation token. Backends that support cancellation
      *  override to return a copy with the token wired in; others (LogicNG, Z3, Brute)
      *  default to no-op. */
@@ -41,6 +41,7 @@ sealed interface SolveResult {
         val assignment: Sample,
         override val stats: SolveStats = SolveStats.EMPTY,
     ) : SolveResult
+
     /**
      * Proven infeasible. [core] is an optional jointly-unsat subset of factor ids; backends
      * that compute one populate it (Z3 via tracked assertions), backends that don't leave
@@ -85,6 +86,7 @@ sealed interface SolveResult {
 interface Solver<P : SolverParams> {
     val problem: Problem
     fun solve(params: P): SolveResult
+
     /**
      * Default implementation drains [samples] for one yield. Wraps it in
      * [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
@@ -93,8 +95,11 @@ interface Solver<P : SolverParams> {
      */
     fun sample(params: P): SampleResult {
         val s = samples(params).firstOrNull()
-        return if (s != null) SampleResult.Found(s)
-        else SampleResult.Unknown(TerminationReason.BudgetExhausted)
+        return if (s != null) {
+            SampleResult.Found(s)
+        } else {
+            SampleResult.Unknown(TerminationReason.BudgetExhausted)
+        }
     }
     fun samples(params: P): Sequence<Sample>
     fun enumerate(params: P): Sequence<Sample>

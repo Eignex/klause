@@ -15,7 +15,9 @@ class BranchAndBoundTest {
     @Test
     fun `minimize finds the all-zeros assignment under a positive linear objective`() {
         val problem = Problem(
-            numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
@@ -27,7 +29,9 @@ class BranchAndBoundTest {
     @Test
     fun `minimize picks the cheapest int-var value under a positive coefficient`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(2, 9)),
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(2, 9)),
             factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
@@ -39,7 +43,9 @@ class BranchAndBoundTest {
     @Test
     fun `minimize picks the highest int-var value under a negative coefficient`() {
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 7)),
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 7)),
             factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(-1.0))
@@ -58,7 +64,9 @@ class BranchAndBoundTest {
         // (InputOrder + IndomainMin) so the demonstration is reproducible.
         val n = 16
         val problem = Problem(
-            numBoolVars = n, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = n,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
@@ -72,8 +80,11 @@ class BranchAndBoundTest {
             ),
         ).assignment
         assertNotNull(sample, "B&B should land at the optimum well inside a 200-decision budget")
-        for (i in 0 until n) assertEquals(false, sample.bools[i],
-            "B&B optimum is all-false; got ${sample.bools.toList()}")
+        for (i in 0 until n) assertEquals(
+            false,
+            sample.bools[i],
+            "B&B optimum is all-false; got ${sample.bools.toList()}"
+        )
     }
 
     @Test
@@ -89,7 +100,8 @@ class BranchAndBoundTest {
         val durations = intArrayOf(2, 2, 2)
         val factor = Disjunctive(starts = starts, durations = durations)
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 3,
+            numBoolVars = 0,
+            numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )

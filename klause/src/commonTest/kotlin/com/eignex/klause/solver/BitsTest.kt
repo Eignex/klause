@@ -10,7 +10,10 @@ class BitsTest {
     @Test
     fun `set and get round-trip across word boundaries`() {
         val b = Bits(130)
-        b.set(0); b.set(63); b.set(64); b.set(129)
+        b.set(0)
+        b.set(63)
+        b.set(64)
+        b.set(129)
         assertTrue(b.get(0))
         assertTrue(b.get(63))
         assertTrue(b.get(64))

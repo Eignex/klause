@@ -23,6 +23,7 @@ enum class VarKind { Bool, Int }
  */
 class PropagationSession(val problem: Problem) {
     private val state: PropagationState = PropagationState(problem, Assumptions.None)
+
     /** `levelStates[L]` is the [PropagationState.LevelMark] right after level [L]'s
      *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
      *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
@@ -104,12 +105,14 @@ class PropagationSession(val problem: Problem) {
         // Seed bool then int pins from the primitive sorted arrays. Iterating directly
         // (vs. forEachBool / forEachInt) lets us `return` the first Unsat without a
         // captured-flag dance.
-        val bk = assumptions.boolKeys; val bv = assumptions.boolValues
+        val bk = assumptions.boolKeys
+        val bv = assumptions.boolValues
         for (i in bk.indices) {
             val r = pushBool(bk[i], bv[i])
             if (r is PropagationResult.Unsat) return r
         }
-        val ik = assumptions.intKeys; val iv = assumptions.intValues
+        val ik = assumptions.intKeys
+        val iv = assumptions.intValues
         for (i in ik.indices) {
             val r = pushInt(ik[i], iv[i])
             if (r is PropagationResult.Unsat) return r
@@ -196,7 +199,8 @@ class PropagationSession(val problem: Problem) {
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
-        intPinnedSet[v] = true; intPinnedVal[v] = value
+        intPinnedSet[v] = true
+        intPinnedVal[v] = value
         trail.add(encInt(v))
         levelPush(state.mark())
         return impliedSince(base)
@@ -286,8 +290,12 @@ class PropagationSession(val problem: Problem) {
         val ints = LinkedHashMap<Int, Int>()
         for (i in 0 until trail.size) {
             val e = trail[i]
-            if (trailIsBool(e)) bools[e] = boolPinned[e] == 1
-            else { val iv = e - problem.numBoolVars; ints[iv] = intPinnedVal[iv] }
+            if (trailIsBool(e)) {
+                bools[e] = boolPinned[e] == 1
+            } else {
+                val iv = e - problem.numBoolVars
+                ints[iv] = intPinnedVal[iv]
+            }
         }
         return Assumptions(bools = bools, ints = ints)
     }
@@ -311,7 +319,8 @@ class PropagationSession(val problem: Problem) {
         for (v in 0 until problem.numBoolVars) {
             val b = state.boolValues[v] ?: continue
             if (boolPinned[v] != -1) continue
-            bKeys.add(v); bVals.add(b)
+            bKeys.add(v)
+            bVals.add(b)
         }
         val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
         val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
@@ -319,7 +328,8 @@ class PropagationSession(val problem: Problem) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
                 if (intPinnedSet[v]) continue
-                iKeys.add(v); iVals.add(d.min)
+                iKeys.add(v)
+                iVals.add(d.min)
             }
         }
         return PropagationResult.Implied(
@@ -350,28 +360,32 @@ class PropagationSession(val problem: Problem) {
         val bKeys = com.eignex.klause.util.IntArrayList()
         val bVals = ArrayList<Boolean>()
         if (bRaw.size > 0) {
-            val sorted = bRaw.toIntArray(); sorted.sort()
+            val sorted = bRaw.toIntArray()
+            sorted.sort()
             var prev = -1
             for (v in sorted) {
                 if (v == prev) continue
                 prev = v
-                if (boolPinned[v] != -1) continue        // decision var — excluded from implied
-                val b = state.boolValues[v] ?: continue   // must be determined
-                bKeys.add(v); bVals.add(b)
+                if (boolPinned[v] != -1) continue // decision var — excluded from implied
+                val b = state.boolValues[v] ?: continue // must be determined
+                bKeys.add(v)
+                bVals.add(b)
             }
         }
         val iKeys = com.eignex.klause.util.IntArrayList()
         val iVals = com.eignex.klause.util.IntArrayList()
         if (iRaw.size > 0) {
-            val sorted = iRaw.toIntArray(); sorted.sort()
+            val sorted = iRaw.toIntArray()
+            sorted.sort()
             var prev = -1
             for (v in sorted) {
                 if (v == prev) continue
                 prev = v
-                if (intPinnedSet[v]) continue             // decision var — excluded
+                if (intPinnedSet[v]) continue // decision var — excluded
                 val d = state.intDomains[v]
-                if (d.min != d.max) continue               // not yet determined
-                iKeys.add(v); iVals.add(d.min)
+                if (d.min != d.max) continue // not yet determined
+                iKeys.add(v)
+                iVals.add(d.min)
             }
         }
         return PropagationResult.Implied(

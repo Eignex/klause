@@ -16,10 +16,15 @@ class SortTest {
     fun `sort matches sorted xs`() {
         // xs pinned to (3, 1, 2); ys = sorted(xs) = (1, 2, 3).
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 6,
+            numBoolVars = 0,
+            numIntVars = 6,
             intDomains = arrayOf(
-                IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2),
-                IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9),
+                IntDomain(3, 3),
+                IntDomain(1, 1),
+                IntDomain(2, 2),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
             ),
             factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
         )
@@ -34,10 +39,15 @@ class SortTest {
     fun `sort with duplicates`() {
         // xs = (1, 2, 1) → ys = (1, 1, 2).
         val problem = Problem(
-            numBoolVars = 0, numIntVars = 6,
+            numBoolVars = 0,
+            numIntVars = 6,
             intDomains = arrayOf(
-                IntDomain(1, 1), IntDomain(2, 2), IntDomain(1, 1),
-                IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9),
+                IntDomain(1, 1),
+                IntDomain(2, 2),
+                IntDomain(1, 1),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
             ),
             factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
         )
