@@ -65,6 +65,14 @@ data class FloatSpec(
     val buckets: Int,
 ) : VarSpec {
     init { require(buckets >= 2) { "FloatSpec needs at least 2 buckets" } }
+
+    /** Real-value step between adjacent buckets: `(max - min) / (buckets - 1)`. The single
+     *  source of truth for the bucket-to-real affine map — decode and the float objectives
+     *  all route through it, and downstream consumers should too rather than re-deriving it. */
+    val scale: Double get() = (max - min) / (buckets - 1)
+
+    /** Decode bucket index [bucket] to its real value: `min + scale * bucket`. */
+    fun realValue(bucket: Int): Double = min + scale * bucket
 }
 
 /** Anything that can be coerced into a [BoolExpr] inside the constraint DSL. */
