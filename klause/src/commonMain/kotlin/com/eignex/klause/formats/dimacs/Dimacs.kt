@@ -87,7 +87,14 @@ object Dimacs {
      *
      * Relaxation bools occupy indices `[numOriginalBoolVars, problem.numBoolVars)`.
      */
-    data class WcnfProblem(val problem: Problem, val objective: LinearObjective, val numOriginalBoolVars: Int)
+    data class WcnfProblem(
+        /** The compiled solver problem. */
+        val problem: Problem,
+        /** The soft-clause objective. */
+        val objective: LinearObjective,
+        /** Number of original (non-relaxation) Boolean variables. */
+        val numOriginalBoolVars: Int,
+    )
 
     /**
      * Parse `.wcnf` (Weighted Partial MaxSAT). Header is `p wcnf <nvars> <nclauses> [<top>]`.

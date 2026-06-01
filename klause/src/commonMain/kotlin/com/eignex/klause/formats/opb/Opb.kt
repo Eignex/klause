@@ -16,7 +16,12 @@ import com.eignex.klause.solver.factor.PseudoBoolean
  * Negated literals (`~x_i`) become `Lit.make(i-1, positive = false)`. Integer
  * coefficients pass through unchanged into `PseudoBoolean.weights`.
  */
-data class OpbProblem(val problem: Problem, val objective: LinearObjective?)
+data class OpbProblem(
+    /** The compiled solver problem. */
+    val problem: Problem,
+    /** The objective, or null for a pure satisfaction instance. */
+    val objective: LinearObjective?,
+)
 
 /**
  * Parser for the OPB file format used by the Pseudo-Boolean Competition. Accepts the

@@ -519,4 +519,5 @@ private fun stringifyForOutput(v: OznValue): String = when (v) {
 
 private fun formatValue(v: OznValue): String = stringifyForShow(v)
 
+/** Raised when MiniZinc/Ozn expression evaluation fails. */
 class OznEvalException(message: String) : RuntimeException(message)

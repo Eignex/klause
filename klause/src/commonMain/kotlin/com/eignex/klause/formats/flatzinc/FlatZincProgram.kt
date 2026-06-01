@@ -12,7 +12,9 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
  * Build via [parseFlatZinc]; consume via [writeFlatZincSolution].
  */
 data class FlatZincProgram(
+    /** The compiled solver problem. */
     val problem: Problem,
+    /** The parsed solve directive. */
     val solve: SolveDirective,
     /** FlatZinc bool-var name → klause bool var id. */
     val boolVarsByName: Map<String, Int>,
@@ -71,10 +73,19 @@ data class FlatZincProgram(
 /** Bool-indicator decomposition of a `var set of E` declaration. Element values are stored
  *  in ascending order; [indicatorBoolIds] is parallel — `indicatorBoolIds[i]` is the bool
  *  var whose value tracks `elements[i] ∈ S`. */
-data class SetVarLayout(val name: String, val elements: IntArray, val indicatorBoolIds: IntArray) {
+data class SetVarLayout(
+    /** The set variable's name. */
+    val name: String,
+    /** Universe element values, ascending. */
+    val elements: IntArray,
+    /** Indicator bool ids parallel to [elements]. */
+    val indicatorBoolIds: IntArray,
+) {
     init {
         require(elements.size == indicatorBoolIds.size) { "SetVarLayout: parallel arrays of unequal length" }
     }
+
+    /** Number of universe elements. */
     val universeSize: Int get() = elements.size
 
     override fun equals(other: Any?): Boolean {
@@ -93,12 +104,36 @@ data class SetVarLayout(val name: String, val elements: IntArray, val indicatorB
 
 /** Top-level solve directive parsed from `solve satisfy ;` / `solve minimize x ;` etc. */
 sealed interface SolveDirective {
+    /** Find any feasible solution. */
     data object Satisfy : SolveDirective
-    data class Minimize(val objVar: String, val kind: ObjKind) : SolveDirective
-    data class Maximize(val objVar: String, val kind: ObjKind) : SolveDirective
+
+    /** Minimise [objVar]. */
+    data class Minimize(
+        /** Objective variable name. */
+        val objVar: String,
+        /** Kind of the objective variable. */
+        val kind: ObjKind,
+    ) : SolveDirective
+
+    /** Maximise [objVar]. */
+    data class Maximize(
+        /** Objective variable name. */
+        val objVar: String,
+        /** Kind of the objective variable. */
+        val kind: ObjKind,
+    ) : SolveDirective
 
     /** Distinguishes the var kind so the writer / solver can pick the right resolution path. */
-    enum class ObjKind { Bool, Int, Float }
+    enum class ObjKind {
+        /** Boolean objective. */
+        Bool,
+
+        /** Integer objective. */
+        Int,
+
+        /** Float (bucketed) objective. */
+        Float,
+    }
 }
 
 /**
@@ -106,7 +141,17 @@ sealed interface SolveDirective {
  * value for bucket `i` is `lo + i * (hi - lo) / (buckets - 1)`. Used by the writer to print
  * back the float value of a solved bucket index.
  */
-data class FloatBucketing(val varId: Int, val lo: Double, val hi: Double, val buckets: Int) {
+data class FloatBucketing(
+    /** Backing integer (bucket-index) variable id. */
+    val varId: Int,
+    /** Inclusive lower real bound. */
+    val lo: Double,
+    /** Inclusive upper real bound. */
+    val hi: Double,
+    /** Number of buckets. */
+    val buckets: Int,
+) {
+    /** Real value for [bucketIndex]. */
     fun valueOf(bucketIndex: Int): Double = if (buckets <= 1) {
         lo
     } else {
@@ -116,17 +161,28 @@ data class FloatBucketing(val varId: Int, val lo: Double, val hi: Double, val bu
 
 /** Captures arrays declared in the FlatZinc file (parameter or variable arrays). */
 sealed interface FlatZincArray {
+    /** The array's name. */
     val name: String
+
+    /** Number of elements. */
     val length: Int
 
     /** Parameter array: every element is a constant. */
     data class BoolParam(override val name: String, val values: BooleanArray) : FlatZincArray {
         override val length: Int get() = values.size
     }
-    data class IntParam(override val name: String, val values: IntArray) : FlatZincArray {
+    data class IntParam(
+        override val name: String,
+        /** The constant integer values. */
+        val values: IntArray,
+    ) : FlatZincArray {
         override val length: Int get() = values.size
     }
-    data class FloatParam(override val name: String, val values: DoubleArray) : FlatZincArray {
+    data class FloatParam(
+        override val name: String,
+        /** The constant float values. */
+        val values: DoubleArray,
+    ) : FlatZincArray {
         override val length: Int get() = values.size
     }
 
@@ -140,18 +196,33 @@ sealed interface FlatZincArray {
     /** Variable array: each element is a klause var id. `elementKind` says how to read it. */
     data class Vars(
         override val name: String,
+        /** klause variable ids per element. */
         val varIds: IntArray,
+        /** How to read each element. */
         val elementKind: ElementKind,
         /** For float arrays, per-element bucketing (parallel to [varIds]). */
         val floatBucketings: List<FloatBucketing>? = null,
     ) : FlatZincArray {
         override val length: Int get() = varIds.size
-        enum class ElementKind { Bool, Int, Float }
+        enum class ElementKind {
+            /** Boolean element. */
+            Bool,
+
+            /** Integer element. */
+            Int,
+
+            /** Float (bucketed) element. */
+            Float,
+        }
     }
 
     /** Array of set vars: each element is its own [SetVarLayout] (bool-indicator
      *  decomposition). `all_disjoint`, `set_partition_into`, etc. dispatch through this. */
-    data class SetVars(override val name: String, val layouts: List<SetVarLayout>) : FlatZincArray {
+    data class SetVars(
+        override val name: String,
+        /** Per-element set-var layouts. */
+        val layouts: List<SetVarLayout>,
+    ) : FlatZincArray {
         override val length: Int get() = layouts.size
     }
 }
@@ -162,11 +233,20 @@ sealed interface FlatZincArray {
  */
 sealed interface OutputItem {
     /** Quoted string from the output literal — emitted as-is. */
-    data class Literal(val text: String) : OutputItem
+    data class Literal(
+        /** The literal text, emitted as-is. */
+        val text: String,
+    ) : OutputItem
 
     /** `show(x)` for a scalar variable. The writer looks up `name` in the program's var maps. */
-    data class ShowVar(val name: String) : OutputItem
+    data class ShowVar(
+        /** Name of the variable to show. */
+        val name: String,
+    ) : OutputItem
 
     /** `show(arr)` for an array — writer formats as `[a, b, c, ...]`. */
-    data class ShowArray(val name: String) : OutputItem
+    data class ShowArray(
+        /** Name of the array to show. */
+        val name: String,
+    ) : OutputItem
 }

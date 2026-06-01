@@ -7,10 +7,20 @@ package com.eignex.klause.formats.smtlib
  * ingests; not a full SMT-LIB 2 reader (no quoted symbols, string literals, or `|...|`).
  */
 sealed interface SExpr {
-    data class Atom(val text: String) : SExpr
-    data class SList(val items: List<SExpr>) : SExpr
+    /** An atom (symbol, keyword, or literal token). */
+    data class Atom(
+        /** The raw token text. */
+        val text: String,
+    ) : SExpr
+
+    /** A parenthesised list of S-expressions. */
+    data class SList(
+        /** The contained S-expressions. */
+        val items: List<SExpr>,
+    ) : SExpr
 }
 
+/** Streaming reader that tokenises and parses SMT-LIB S-expressions from [src]. */
 class SExprReader(private val src: String) {
     private var pos = 0
 

@@ -502,4 +502,5 @@ internal class OznParser(private val tokens: List<OznToken>) {
     }
 }
 
+/** Raised when MiniZinc/Ozn parsing fails. */
 class OznParseException(message: String) : RuntimeException(message)

@@ -15,7 +15,12 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 class UnsupportedSmtException(msg: String) : RuntimeException("klause SMT-LIB QF_LIA: $msg")
 
 /** A parsed SMT-LIB instance lifted into klause's representation. */
-data class SmtLibProblem(val problem: Problem, val objective: LinearObjective?)
+data class SmtLibProblem(
+    /** The compiled solver problem. */
+    val problem: Problem,
+    /** The objective, or null for a pure satisfaction instance. */
+    val objective: LinearObjective?,
+)
 
 /**
  * Pragmatic SMT-LIB 2 **QF_LIA** ingest → klause [Problem]. Quantifier-free linear integer

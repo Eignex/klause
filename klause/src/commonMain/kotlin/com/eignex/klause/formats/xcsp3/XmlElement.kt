@@ -11,8 +11,11 @@ package com.eignex.klause.formats.xcsp3
  * that subset; anything richer raises during parse.
  */
 class XmlElement(
+    /** The element's tag name. */
     val tag: String,
+    /** Attributes by name. */
     val attributes: Map<String, String>,
+    /** Direct child elements. */
     val children: List<XmlElement>,
     private val directText: String,
 ) {
@@ -23,7 +26,10 @@ class XmlElement(
             directText + children.joinToString("") { it.textContent }
         }
 
+    /** Value of attribute [name], or empty string if absent. */
     fun attr(name: String): String = attributes[name] ?: ""
+
+    /** First direct child with the given [tag], or null. */
     fun child(tag: String): XmlElement? = children.firstOrNull { it.tag == tag }
 
     /**

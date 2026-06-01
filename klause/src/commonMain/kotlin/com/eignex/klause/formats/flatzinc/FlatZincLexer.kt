@@ -20,8 +20,13 @@ internal sealed interface FznToken {
 /**
  * Thrown when the lexer or parser hits malformed input. Carries `line:col` for diagnostics.
  */
-class FlatZincParseException(message: String, val sourceLine: Int, val sourceCol: Int) :
-    RuntimeException("$message (at $sourceLine:$sourceCol)")
+class FlatZincParseException(
+    message: String,
+    /** 1-based source line of the error. */
+    val sourceLine: Int,
+    /** 1-based source column of the error. */
+    val sourceCol: Int,
+) : RuntimeException("$message (at $sourceLine:$sourceCol)")
 
 /**
  * Hand-rolled tokenizer for FlatZinc. Stateful, single-pass. Skips whitespace and `%`

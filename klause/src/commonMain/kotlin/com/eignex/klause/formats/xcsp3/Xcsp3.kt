@@ -24,7 +24,12 @@ import com.eignex.klause.solver.factor.Table
 class UnsupportedXcsp3Exception(msg: String) : RuntimeException("klause XCSP3: $msg")
 
 /** A parsed XCSP3 instance lifted into klause's representation. */
-data class Xcsp3Problem(val problem: Problem, val objective: LinearObjective?)
+data class Xcsp3Problem(
+    /** The compiled solver problem. */
+    val problem: Problem,
+    /** The objective, or null for a pure satisfaction instance. */
+    val objective: LinearObjective?,
+)
 
 /**
  * Pragmatic XCSP3 ingest → klause [Problem]. Covers the common integer CSP/COP core:

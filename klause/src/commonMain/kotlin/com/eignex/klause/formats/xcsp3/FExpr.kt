@@ -7,11 +7,29 @@ package com.eignex.klause.formats.xcsp3
  * left to [Xcsp3].
  */
 sealed interface FExpr {
-    data class Num(val value: Int) : FExpr
-    data class Ref(val name: String) : FExpr
-    data class Call(val fn: String, val args: List<FExpr>) : FExpr
+    /** A numeric literal. */
+    data class Num(
+        /** The literal value. */
+        val value: Int,
+    ) : FExpr
 
+    /** A variable reference. */
+    data class Ref(
+        /** The referenced variable name. */
+        val name: String,
+    ) : FExpr
+
+    /** A function application. */
+    data class Call(
+        /** The function name. */
+        val fn: String,
+        /** The argument expressions. */
+        val args: List<FExpr>,
+    ) : FExpr
+
+    /** Parser for the XCSP3 functional-expression grammar. */
     companion object {
+        /** Parse [s] into an [FExpr] tree. */
         fun parse(s: String): FExpr = Parser(s).parseFull()
     }
 
