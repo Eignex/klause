@@ -75,7 +75,7 @@ object Xcsp3 {
 
                 "array" -> {
                     val id = e.attr("id")
-                    val size = Regex("""\[(\d+)]""").find(e.attr("size"))?.groupValues?.get(1)?.toInt()
+                    val size = Regex("""\[(\d+)\]""").find(e.attr("size"))?.groupValues?.get(1)?.toInt()
                         ?: throw UnsupportedXcsp3Exception("only 1-D arrays supported: ${e.attr("size")}")
                     val dom = parseDomain(e.textContent.trim())
                     for (i in 0 until size) addVar("$id[$i]", dom)
@@ -580,7 +580,7 @@ object Xcsp3 {
 
         companion object {
             private val REL = setOf("eq", "ne", "le", "lt", "ge", "gt")
-            private val RANGE_REF = Regex("""^(.+)\[(\d+)\.\.(\d+)]$""")
+            private val RANGE_REF = Regex("""^(.+)\[(\d+)\.\.(\d+)\]$""")
         }
     }
 }

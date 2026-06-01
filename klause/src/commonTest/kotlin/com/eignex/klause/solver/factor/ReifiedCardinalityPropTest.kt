@@ -41,14 +41,10 @@ class ReifiedCardinalityPropTest {
         )
         // Pin aux to false externally.
         val session = PropagationSession(problem)
-        val r = session.pinBool(3, false)
-        val implied = assertIs<PropagationResult.Implied>(r)
+        assertIs<PropagationResult.Implied>(session.pinBool(3, false))
         // Expect: v1 and v2 forced true (so count = 3 > max = 2).
         assertEquals(true, session.boolValue(1), "v1 should be forced true")
         assertEquals(true, session.boolValue(2), "v2 should be forced true")
-        // Silence unused warning.
-        @Suppress("UNUSED_VARIABLE")
-        val r = implied
     }
 
     @Test
@@ -73,13 +69,10 @@ class ReifiedCardinalityPropTest {
             ),
         )
         val session = PropagationSession(problem)
-        val r = session.pinBool(2, false)
-        val implied = assertIs<PropagationResult.Implied>(r)
+        assertIs<PropagationResult.Implied>(session.pinBool(2, false))
         // Expect v0 and v1 forced false.
         assertEquals(false, session.boolValue(0), "v0 should be forced false")
         assertEquals(false, session.boolValue(1), "v1 should be forced false")
-        @Suppress("UNUSED_VARIABLE")
-        val r = implied
     }
 
     @Test

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class XmlTest {
 
     @Test
-    fun `parses nested elements, attributes and text content`() {
+    fun `parses nested elements and attributes and text content`() {
         val root = parseXml(
             """<instance format="XCSP3" type="CSP">
                  <variables><var id="x"> 1..4 </var></variables>
@@ -41,7 +41,7 @@ class XmlTest {
     }
 
     @Test
-    fun `skips prolog, doctype and comments`() {
+    fun `skips prolog and doctype and comments`() {
         val root = parseXml(
             """<?xml version="1.0" encoding="UTF-8"?>
                <!DOCTYPE instance>

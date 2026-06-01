@@ -27,7 +27,7 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `parses 4-queens CSP (array + allDifferent + intension) and is SAT`() {
+    fun `parses 4-queens CSP with array allDifferent and intension and is SAT`() {
         val xml = """
             <instance format="XCSP3" type="CSP">
               <variables><array id="q" size="[4]"> 1..4 </array></variables>
@@ -46,7 +46,7 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `parses COP (sum constraint + maximize objective) and optimizes`() {
+    fun `parses COP with sum constraint and maximize objective and optimizes`() {
         val xml = """
             <instance format="XCSP3" type="COP">
               <variables>
@@ -66,7 +66,7 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `negative (conflicts) table lowers to a positive Table over the complement`() {
+    fun `negative conflicts table lowers to a positive Table over the complement`() {
         val xml = """
             <instance type="CSP">
               <variables><var id="a"> 1..2 </var><var id="b"> 1..2 </var></variables>
@@ -81,7 +81,7 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `boolean intension (or of relations) is reified and solved`() {
+    fun `boolean intension or of relations is reified and solved`() {
         val xml = """
             <instance type="CSP">
               <variables><var id="x"> 0..1 </var><var id="y"> 0..1 </var></variables>
@@ -210,7 +210,7 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `regular accepts exactly via the DFA (0-based symbols shifted)`() {
+    fun `regular accepts exactly via the DFA with 0-based symbols shifted`() {
         val xml = """
             <instance type="CSP">
               <variables><array id="w" size="[3]"> 0..1 </array></variables>
