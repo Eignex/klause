@@ -6,6 +6,7 @@ import com.eignex.klause.bench.metric.CompileAuditMetric
 import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.CoverageMetric
 import com.eignex.klause.bench.metric.ParityMetric
+import com.eignex.klause.bench.metric.SearchEffortMetric
 import com.eignex.klause.bench.metric.TimeMetric
 import com.eignex.klause.bench.metric.TuningMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
@@ -23,6 +24,7 @@ object MetricRunner {
             MetricKind.PARITY -> ParityMetric.run(BenchLoad.resolveRefs(refs), budget, reference ?: Backend.CHOCO)
             MetricKind.ANYTIME -> AnytimeMetric.run(BenchLoad.resolveRefs(refs), budget, reference ?: Backend.ORTOOLS)
             MetricKind.TUNING -> TuningMetric.run(BenchLoad.resolveRefs(refs), budget)
+            MetricKind.SEARCH -> SearchEffortMetric.run(BenchLoad.resolveRefs(refs), budget)
             MetricKind.COVERAGE -> CoverageMetric.run(refs)
             MetricKind.AUDIT -> CompileAuditMetric.run(refs)
             MetricKind.VERIFY, MetricKind.TIME, MetricKind.UNIFORMNESS, MetricKind.COMPLETENESS -> {
