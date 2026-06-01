@@ -81,20 +81,20 @@ class CampaignSchema : VariableSchema() {
 
 ### Variables
 
-- **intVar**: bounded integer with a contiguous starting domain.
+- `intVar`: bounded integer with a contiguous starting domain.
   Propagation can excise interior values during solving; storage switches
   to a bitset for narrow spans and a sorted hole list for wide ones.
-- **floatVar**: continuous-looking variable bucketed into a
+- `floatVar`: continuous-looking variable bucketed into a
   precision-controlled grid of integer buckets at compile time.
-- **boolVar**: declares a free Boolean variable. Comparisons and Boolean
+- `boolVar`: declares a free Boolean variable. Comparisons and Boolean
   operators on other variable kinds also produce Boolean-typed expressions
   implicitly, so most code never names a BoolVar directly.
-- **nominal**: picks one label from a fixed list, lowered internally to
+- `nominal`: picks one label from a fixed list, lowered internally to
   one-hot indicator bools with the standard exactly-one constraint.
-- **multiple and setVar**: set variables over a nominal universe or an int
+- `multiple` and `setVar`: set variables over a nominal universe or an int
   range respectively. Both lower to per-element indicator bools, with set
   operations dispatching through bulk bitset propagators.
-- **Optional**: optIntVar, optBoolVar, and the opt forms of nominal and
+- Optional: optIntVar, optBoolVar, and the opt forms of nominal and
   set vars return a (present, value) pair. The DSL routes constraints
   involving opt vars through reified or opt-aware lowerings so user code
   does not need to write the presence guards explicitly. By default an
@@ -106,60 +106,56 @@ class CampaignSchema : VariableSchema() {
 
 ### Constraints
 
-- **Boolean**: connectives (and, or, implies, iff, not, xor) over Boolean
+- Boolean: connectives (and, or, implies, iff, not, xor) over Boolean
   expressions, freely composable and reified into clauses behind the scenes.
-- **Nominal**: equality and inequality (eq, ne) against label literals or
+- Nominal: equality and inequality (eq, ne) against label literals or
   other nominals.
-- **Set**: membership (inSet), structural relations (subsetOf,
-  disjointFrom), and algebra (union, intersect, card). Mixed concrete-set
-  and set-var operands work uniformly.
-- **Optional**: constraints on optional variables follow relational
-  semantics: an undefined value in a Boolean context is false. Aggregating
-  constraints filter to the present subset, so most user code does not
-  need to mention presence explicitly.
-- **Integer arithmetic**: +, -, *, /, % over integer expressions and
-  constants. Division and modulo are Euclidean (matching SMT-LIB QF_LIA)
-  so the remainder is always non-negative. Multiplication works
-  variable-by-variable, not only by constants.
-- **Comparisons**: le, lt, ge, gt, eq, ne between arbitrary integer
-  expressions, returning a Boolean expression usable in any reified context.
-- **Counting**: atMost and atLeast bound the number of true bools;
-  cardinality and pseudoBoolean are the weighted versions. gcc enforces a
-  global cardinality vector. count counts occurrences of a single value.
-  among counts membership in a value set. nValue counts the number of
-  distinct values taken.
-- **Permutations and ordering**: allDifferent enforces pairwise
-  distinctness via Regin's GAC matching, allDifferentExcept excepts a
-  designated value set, and allEqual, inverse, sort, argSort cover the
-  standard array invariants. lexLeq and lexLt enforce lexicographic
-  ordering between two arrays; valuePrecede is a structural
-  symmetry-breaking primitive.
-- **Scheduling**: cumulative keeps every time point's resource usage under
-  the capacity; the propagator combines time-tabling with a Vilim
-  Theta-tree edge-finder. disjunctive is the unary special case. Opt-aware
-  variants accept a presents array so that absent tasks contribute no
-  resource use.
-- **Routing**: circuit constrains a successor array to form a single
-  Hamiltonian cycle, subcircuit allows nodes to sit outside the cycle as
-  fixed points, and path and tree enforce directed-path and
-  rooted-spanning-tree shapes.
-- **Packing**: binPacking assigns items to bins under a per-bin capacity,
-  knapsack is the classical 0-1 knapsack, and geost enforces
-  N-dimensional non-overlap via a sweep-line propagator.
-- **Network flow**: networkFlow enforces nodal flow conservation, and
+- Set: membership (inSet), structural relations (subsetOf, disjointFrom),
+  and algebra (union, intersect, card). Mixed concrete-set and set-var
+  operands work uniformly.
+- Optional: constraints on optional variables follow relational semantics:
+  an undefined value in a Boolean context is false. Aggregating constraints
+  filter to the present subset, so most user code does not need to mention
+  presence explicitly.
+- Integer arithmetic: +, -, *, /, % over integer expressions and constants.
+  Division and modulo are Euclidean (matching SMT-LIB QF_LIA) so the
+  remainder is always non-negative. Multiplication works variable-by-variable,
+  not only by constants.
+- Comparisons: le, lt, ge, gt, eq, ne between arbitrary integer expressions,
+  returning a Boolean expression usable in any reified context.
+- Counting: atMost and atLeast bound the number of true bools; cardinality
+  and pseudoBoolean are the weighted versions. gcc enforces a global
+  cardinality vector. count counts occurrences of a single value. among
+  counts membership in a value set. nValue counts the number of distinct
+  values taken.
+- Permutations and ordering: allDifferent enforces pairwise distinctness via
+  Regin's GAC matching, allDifferentExcept excepts a designated value set,
+  and allEqual, inverse, sort, argSort cover the standard array invariants.
+  lexLeq and lexLt enforce lexicographic ordering between two arrays;
+  valuePrecede is a structural symmetry-breaking primitive.
+- Scheduling: cumulative keeps every time point's resource usage under the
+  capacity; the propagator combines time-tabling with a Vilim Theta-tree
+  edge-finder. disjunctive is the unary special case. Opt-aware variants
+  accept a presents array so that absent tasks contribute no resource use.
+- Routing: circuit constrains a successor array to form a single Hamiltonian
+  cycle, subcircuit allows nodes to sit outside the cycle as fixed points,
+  and path and tree enforce directed-path and rooted-spanning-tree shapes.
+- Packing: binPacking assigns items to bins under a per-bin capacity,
+  knapsack is the classical 0-1 knapsack, and geost enforces N-dimensional
+  non-overlap via a sweep-line propagator.
+- Network flow: networkFlow enforces nodal flow conservation, and
   networkFlowCost adds per-unit-flow costs that aggregate into a cost
   variable suitable as an objective.
-- **Tabular**: table allows only tuples listed in the table and notTable
-  forbids them. regular accepts only the words a deterministic finite
-  automaton recognises; costRegular adds per-edge costs that sum into a
-  cost variable. mdd and costMdd are the multi-valued decision diagram
-  analogues, supporting much richer structure than a flat table at lower
-  memory cost.
-- **Integer expressions**: min, max, and abs give pointwise extrema and
-  absolute value. element indexes an array by a variable. member exposes
-  set membership as a Boolean. argMin and argMax return the index of the
-  smallest or largest entry. ifThenElse is an integer-valued conditional.
-- **Linking**: channel enforces that exactly one bool is true and the
+- Tabular: table allows only tuples listed in the table and notTable forbids
+  them. regular accepts only the words a deterministic finite automaton
+  recognises; costRegular adds per-edge costs that sum into a cost variable.
+  mdd and costMdd are the multi-valued decision diagram analogues, supporting
+  much richer structure than a flat table at lower memory cost.
+- Integer expressions: min, max, and abs give pointwise extrema and absolute
+  value. element indexes an array by a variable. member exposes set
+  membership as a Boolean. argMin and argMax return the index of the smallest
+  or largest entry. ifThenElse is an integer-valued conditional.
+- Linking: channel enforces that exactly one bool is true and the
   corresponding int is its index, the standard bridge between one-hot and
   indexed representations.
 
@@ -238,14 +234,14 @@ Use cases:
 
 `klause-bench` separates four orthogonal axes so you can control exactly what runs:
 
-- **format** — how an instance is encoded: DIMACS, OPB, JSON-Schema, FlatZinc,
+- format — how an instance is encoded: DIMACS, OPB, JSON-Schema, FlatZinc,
   MiniZinc, SMT-LIB QF_LIA, XCSP3, or built in-code.
-- **source** — where it comes from: vendored under `klause-bench/corpus/`, built
+- source — where it comes from: vendored under `klause-bench/corpus/`, built
   in Kotlin, or an external collection fetched on demand into a cache.
-- **solver** — klause's engines (local search, backtracking) plus in-process
+- solver — klause's engines (local search, backtracking) plus in-process
   reference adapters: `klause-choco` (Choco, complete) and `klause-ortools`
   (OR-Tools CP-SAT, anytime). No external solver binaries.
-- **metric** — time, sampling uniformness, enumeration completeness, cross-backend
+- metric — time, sampling uniformness, enumeration completeness, cross-backend
   verify, differential parity, and anytime optimization. The reference solver for parity
   and anytime is selectable (Choco or OR-Tools), per target or via
   `-Dklause.bench.parity.reference` / `-Dklause.bench.anytime.reference`.
