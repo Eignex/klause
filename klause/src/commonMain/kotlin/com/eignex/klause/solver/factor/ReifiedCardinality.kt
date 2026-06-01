@@ -13,7 +13,16 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
  * is the count of true literals, mirrored from [Cardinality].
  */
-class ReifiedCardinality(val auxBoolVar: Int, val literals: IntArray, val min: Int, val max: Int) : LocalSearchFactor {
+class ReifiedCardinality(
+    /** Reification literal: true iff the cardinality bound holds. */
+    val auxBoolVar: Int,
+    /** The literals being counted. */
+    val literals: IntArray,
+    /** Inclusive lower bound on the true count. */
+    val min: Int,
+    /** Inclusive upper bound on the true count. */
+    val max: Int,
+) : LocalSearchFactor {
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }

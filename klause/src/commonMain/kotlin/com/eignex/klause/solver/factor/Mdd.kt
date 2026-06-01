@@ -25,13 +25,21 @@ import com.eignex.klause.solver.propagation.PropagationState
  *    forward-backward reachable lattice.
  */
 class Mdd(
+    /** Sequence variable ids, one per layer. */
     val seq: IntArray,
+    /** Number of states in each layer (length `seq.size + 1`). */
     val numStatesPerLayer: IntArray,
+    /** Prefix-sum index into [transitions] per layer. */
     val layerStarts: IntArray,
+    /** Flat transition records; stride [recordStride]. */
     val transitions: IntArray,
+    /** Start state. */
     val initial: Int,
+    /** Accepting states at the final layer. */
     val accepting: IntArray,
+    /** Ints per transition record: 3 for plain MDD, 4 for cost MDD. */
     val recordStride: Int, // 3 for plain MDD, 4 for cost MDD
+    /** Cost variable id, or -1 for a plain (non-cost) MDD. */
     val cost: Int = -1,
 ) : LocalSearchFactor {
 

@@ -18,7 +18,14 @@ import com.eignex.klause.solver.propagation.PropagationState
  * all route to one factor. LS side counts pairwise violations and proposes nudge moves
  * on the offending vars.
  */
-class Monotone(val xs: IntArray, val direction: Direction, val strict: Boolean) : LocalSearchFactor {
+class Monotone(
+    /** The sequence variable ids. */
+    val xs: IntArray,
+    /** Increasing or decreasing. */
+    val direction: Direction,
+    /** When true the monotonicity is strict. */
+    val strict: Boolean,
+) : LocalSearchFactor {
 
     enum class Direction { Increasing, Decreasing }
 

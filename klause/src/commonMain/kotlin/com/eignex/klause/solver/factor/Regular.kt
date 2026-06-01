@@ -17,11 +17,17 @@ import com.eignex.klause.util.IntArrayList
  * acceptance.
  */
 class Regular(
+    /** Input symbol sequence variable ids. */
     val seq: IntArray,
+    /** Number of DFA states. */
     val numStates: Int,
+    /** Number of input symbols. */
     val alphabetSize: Int,
+    /** `numStates × alphabetSize` row-major transition table; 0 means no transition. */
     val transitions: IntArray,
+    /** Initial state. */
     val q0: Int,
+    /** Accepting states. */
     val accepting: IntArray,
 ) : LocalSearchFactor {
 

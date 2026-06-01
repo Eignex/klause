@@ -11,7 +11,18 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
  * is the current weighted sum, mirrored from [Linear].
  */
-class ReifiedLinear(val auxBoolVar: Int, val coeffs: IntArray, val vars: IntArray, val op: LinearOp, val bound: Int) :
+class ReifiedLinear(
+    /** Reification literal: true iff the linear relation holds. */
+    val auxBoolVar: Int,
+    /** Coefficients, parallel to [vars]. */
+    val coeffs: IntArray,
+    /** Integer variable ids, parallel to [coeffs]. */
+    val vars: IntArray,
+    /** Relation between the weighted sum and [bound]. */
+    val op: LinearOp,
+    /** Right-hand-side bound. */
+    val bound: Int,
+) :
     LocalSearchFactor {
 
     init {

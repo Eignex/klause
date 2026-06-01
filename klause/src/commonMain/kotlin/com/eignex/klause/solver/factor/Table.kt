@@ -16,7 +16,9 @@ import com.eignex.klause.solver.propagation.PropagationState
  * `table_bool` is supported via the same factor by channeling booleans to 0/1 ints upstream.
  */
 class Table(
+    /** The variable ids forming each candidate tuple. */
     val xs: IntArray,
+    /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
     val tuples: IntArray, // row-major; length must be a multiple of xs.size
 ) : LocalSearchFactor {
 

@@ -16,7 +16,16 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Propagation: pin-forcing channels — whenever `f[i]` becomes singleton with value `j`,
  * force `g[j']` to `i'` where the indices apply the offset; vice versa.
  */
-class Inverse(val f: IntArray, val g: IntArray, val fOffset: Int = 0, val gOffset: Int = 0) : LocalSearchFactor {
+class Inverse(
+    /** Forward mapping variable ids: `f[i]` is the image of `i`. */
+    val f: IntArray,
+    /** Inverse mapping variable ids: `g[j]` is the preimage of `j`. */
+    val g: IntArray,
+    /** Index offset for the [f] domain. */
+    val fOffset: Int = 0,
+    /** Index offset for the [g] domain. */
+    val gOffset: Int = 0,
+) : LocalSearchFactor {
 
     init {
         require(f.size == g.size) { "inverse: f and g must have equal length" }

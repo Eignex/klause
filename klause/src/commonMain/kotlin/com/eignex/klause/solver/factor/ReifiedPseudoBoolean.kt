@@ -13,10 +13,15 @@ import com.eignex.klause.solver.propagation.PropagationState
  * current weighted sum.
  */
 class ReifiedPseudoBoolean(
+    /** Reification literal: true iff the pseudo-Boolean relation holds. */
     val auxBoolVar: Int,
+    /** Weights, parallel to [literals]. */
     val weights: IntArray,
+    /** Boolean literals contributing their weight when true. */
     val literals: IntArray,
+    /** Relation between the weighted sum and [bound]. */
     val op: PbOp,
+    /** Right-hand-side bound. */
     val bound: Int,
 ) : LocalSearchFactor {
 

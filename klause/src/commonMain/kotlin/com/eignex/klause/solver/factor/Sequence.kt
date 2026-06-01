@@ -15,7 +15,17 @@ import com.eignex.klause.solver.propagation.PropagationState
  * keeps that structure explicit so a stronger native sequence propagator (regin-style flow
  * across overlapping windows) can replace the per-window bound check later.
  */
-class Sequence(val low: Int, val high: Int, val k: Int, val xs: IntArray, values: IntArray) : LocalSearchFactor {
+class Sequence(
+    /** Inclusive lower bound on the in-window count. */
+    val low: Int,
+    /** Inclusive upper bound on the in-window count. */
+    val high: Int,
+    /** Sliding-window width. */
+    val k: Int,
+    /** The sequence variable ids. */
+    val xs: IntArray,
+    values: IntArray,
+) : LocalSearchFactor {
 
     val values: IntArray = values.distinct().sorted().toIntArray()
 

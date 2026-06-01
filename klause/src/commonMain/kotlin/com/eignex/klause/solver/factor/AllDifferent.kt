@@ -19,8 +19,11 @@ import com.eignex.klause.util.IntArrayList
  * number of distinct values whose count is > 1; the factor is violated iff that's positive.
  */
 class AllDifferent(
+    /** Integer variable ids required to be pairwise distinct. */
     val vars: IntArray,
+    /** Minimum value across the shared value domain. */
     val domainMin: Int,
+    /** Number of values in the shared value domain. */
     val domainSize: Int,
     /** Per-position presence literals; empty for the non-opt fast path. When non-empty,
      *  only present positions are required pairwise-different, and Régin filtering treats

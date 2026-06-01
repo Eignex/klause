@@ -20,7 +20,14 @@ import com.eignex.klause.solver.propagation.PropagationState
  *
  * LS recomputes the relation on each query.
  */
-class LexLess(val xs: IntArray, val ys: IntArray, val strict: Boolean) : LocalSearchFactor {
+class LexLess(
+    /** Left vector variable ids. */
+    val xs: IntArray,
+    /** Right vector variable ids, parallel to [xs]. */
+    val ys: IntArray,
+    /** When true the relation is strict (`xs < ys`); otherwise `xs ≤ ys`. */
+    val strict: Boolean,
+) : LocalSearchFactor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys

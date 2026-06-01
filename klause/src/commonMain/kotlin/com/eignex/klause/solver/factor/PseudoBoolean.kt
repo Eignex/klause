@@ -13,7 +13,16 @@ import com.eignex.klause.util.IntArrayList
  * `Σ weights[i] * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
  * true, 0 when false). Payload at `intPayload[factorId]` is the current weighted sum.
  */
-class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp, val bound: Int) : LocalSearchFactor {
+class PseudoBoolean(
+    /** Weights, parallel to [literals]. */
+    val weights: IntArray,
+    /** Boolean literals contributing their weight when true. */
+    val literals: IntArray,
+    /** Relation between the weighted sum and [bound]. */
+    val op: PbOp,
+    /** Right-hand-side bound. */
+    val bound: Int,
+) : LocalSearchFactor {
 
     init {
         require(weights.size == literals.size) { "weights/literals length mismatch" }
