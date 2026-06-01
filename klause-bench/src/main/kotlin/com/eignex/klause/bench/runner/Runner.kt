@@ -13,6 +13,10 @@ data class ResolvedProblem(
     val ref: ProblemRef,
     val problem: Problem,
     val objective: Objective? = null,
+    /** Local-search-only objective: a functional (gradient-bearing) mirror of [objective] for
+     *  decomposed objectives, when the model provides one. Reference/complete backends use
+     *  [objective]; the LS engine prefers this. Null ⇒ fall back to [objective]. */
+    val lsObjective: Objective? = null,
 ) {
     val name: String get() = ref.name
 }

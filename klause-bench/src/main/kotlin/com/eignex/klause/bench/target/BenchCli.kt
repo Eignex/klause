@@ -7,6 +7,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.tools.CblsDiag
+import com.eignex.klause.bench.tools.LsConfigProbe
 import com.eignex.klause.bench.tools.MeasureBacktrack
 
 /**
@@ -19,7 +20,7 @@ import com.eignex.klause.bench.tools.MeasureBacktrack
  *    `per-family=N` `max=N` `seed=N` `reference=choco|ortools` `timeout=<ms>`.
  *  - `preview <metric> [filters…]` — print the instances a `run` would cover, without running.
  *  - `list` — targets + suites; `list <suite>` — problems in a suite.
- *  - `diag:backtrack` / `diag:cbls <name|fzn>` — diagnostics.
+ *  - `diag:backtrack` / `diag:cbls <name|fzn>` / `diag:lsconfig <fzn>` — diagnostics.
  *
  * Metric selection lives in the catalog; comparison selection lives in targets/filters — the
  * two stay independent.
@@ -33,6 +34,7 @@ object BenchCli {
             "preview" -> adHoc(args.drop(1), preview = true)
             "diag:backtrack" -> MeasureBacktrack.run()
             "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
+            "diag:lsconfig" -> LsConfigProbe.main(args.drop(1).toTypedArray())
             "coverage:xcsp3" -> com.eignex.klause.bench.tools.FormatCoverage.xcsp3()
             "coverage:smtlib" -> com.eignex.klause.bench.tools.FormatCoverage.smtlib()
             else -> runTarget(cmd)

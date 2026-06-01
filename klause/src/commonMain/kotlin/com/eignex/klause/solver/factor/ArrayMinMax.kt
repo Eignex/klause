@@ -50,14 +50,25 @@ class ArrayMinMax(
         return state.assignment.intValue(result) != s.bestValue
     }
 
+    /** Graded: how far `result` is from the true extremum across `xs`. Run through
+     *  [compressViolation] so a large gap can't dominate the global cost. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val s = state.refPayload[factorId] as State
+        return degreeFor(state.assignment.intValue(result), s.bestValue)
+    }
+
+    private fun degreeFor(resultValue: Int, best: Int): Int {
+        val d = resultValue.toLong() - best
+        return compressViolation(if (d < 0) -d else d)
+    }
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val wasViolated = state.assignment.intValue(result) != s.bestValue
+        val oldDeg = degreeFor(state.assignment.intValue(result), s.bestValue)
         // Simulate: compute new best with intVar holding newValue.
         val newBest = simulateBest(state, intVar, newValue)
         val newResult = if (intVar == result) newValue else state.assignment.intValue(result)
-        val willViolate = newResult != newBest
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return degreeFor(newResult, newBest) - oldDeg
     }
 
     private fun simulateBest(state: LocalSearchState, intVar: Int, newValue: Int): Int {
@@ -73,11 +84,14 @@ class ArrayMinMax(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val wasViolated = state.assignment.intValue(result) != s.bestValue
+        // Degree before the move: reconstruct the pre-move `result` value (the rest of the
+        // assignment is irrelevant — `bestValue` still holds the pre-move extremum).
+        val resultNow = state.assignment.intValue(result)
+        val oldResult = if (intVar == result) oldValue else resultNow
+        val oldDeg = degreeFor(oldResult, s.bestValue)
         // Recompute best from scratch — payload is just a single int, no incremental ds.
         s.bestValue = computeBest(state)
-        val nowViolated = state.assignment.intValue(result) != s.bestValue
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        return degreeFor(resultNow, s.bestValue) - oldDeg
     }
 
     /** Repair: snap `result` to the current best xs value (the most reliable single move),
