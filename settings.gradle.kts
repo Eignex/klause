@@ -7,4 +7,4 @@ pluginManagement {
     }
 }
 
-include(":klause", ":klause-logicng", ":klause-smt", ":klause-choco", ":klause-ortools", ":klause-bench", ":klause-fzn-cli")
+include(":klause", ":klause-logicng", ":klause-smt", ":klause-choco", ":klause-ortools", ":klause-bench", ":klause-fzn-cli", ":klause-xcsp-cli")

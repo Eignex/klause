@@ -1,9 +1,9 @@
-package com.eignex.klause.bench.format.smtlib
+package com.eignex.klause.formats.smtlib
 
 /**
  * Minimal S-expression model + reader for SMT-LIB scripts. An [SExpr] is either an [Atom]
  * (symbol or numeral token) or a [SList] (parenthesised sequence). Comments (`;` to
- * end-of-line) and whitespace are skipped. Sufficient for the QF_LIA subset the bench
+ * end-of-line) and whitespace are skipped. Sufficient for the QF_LIA subset this front-end
  * ingests; not a full SMT-LIB 2 reader (no quoted symbols, string literals, or `|...|`).
  */
 sealed interface SExpr {
