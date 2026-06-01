@@ -506,7 +506,7 @@ object SmtLibQfLia {
             combined.entries.removeAll { it.value == 0 }
             val bound = b.constant - a.constant
             val vars = combined.keys.toIntArray()
-            return Triple(vars, IntArray(vars.size) { combined[vars[it]]!! }, bound)
+            return Triple(vars, IntArray(vars.size) { combined.getValue(vars[it]) }, bound)
         }
 
         // --- arithmetic relations ---
@@ -580,7 +580,7 @@ object SmtLibQfLia {
                 else -> throw UnsupportedSmtException("relation '$op'")
             }
             val vars = combined.keys.toIntArray()
-            val coeffs = IntArray(vars.size) { combined[vars[it]]!! }
+            val coeffs = IntArray(vars.size) { combined.getValue(vars[it]) }
             return Rel(vars, coeffs, linOp, bound)
         }
 

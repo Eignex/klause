@@ -68,7 +68,7 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
         return result.assignment
     }
 
-    override fun toString(): String = "InnerLsRepair($label${flipsOverride?.let { ", flips=$it" } ?: ""})"
+    override fun toString(): String = "InnerLsRepair($label${flipsOverride?.let { ", flips=$it" }.orEmpty()})"
 }
 
 /**
@@ -262,7 +262,7 @@ internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIter
                 }
             }
             if (bestMove == null || bestScore >= baseline) break
-            state.apply(bestMove!!)
+            state.apply(bestMove)
             iter++
         }
         return state.assignment.snapshot()

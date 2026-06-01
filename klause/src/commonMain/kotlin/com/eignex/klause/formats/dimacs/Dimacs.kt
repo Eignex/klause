@@ -138,7 +138,7 @@ object Dimacs {
             } else {
                 weight = tokens[0].toLongOrNull()
                     ?: error("Unparseable wcnf weight: '${tokens[0]}'")
-                isHard = top != null && weight >= top!!
+                isHard = top != null && weight >= top
                 litStart = 1
             }
             val lits = mutableListOf<Int>()

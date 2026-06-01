@@ -113,7 +113,7 @@ class Among(
                 // Pick any in-domain non-matching value.
                 var pick: Int? = null
                 d.forEach { if (pick == null && it != curX && !matches(it)) pick = it }
-                if (pick != null) sink.addChannelingIntSet(state, x, pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, x, pick)
             } else if (!isMatch && needIncrease) {
                 // Pick the closest in-domain matching value.
                 var pick: Int? = null
@@ -123,7 +123,7 @@ class Among(
                         break
                     }
                 }
-                if (pick != null) sink.addChannelingIntSet(state, x, pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, x, pick)
             }
         }
     }

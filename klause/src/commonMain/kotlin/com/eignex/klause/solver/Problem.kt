@@ -500,7 +500,7 @@ class Problem(
     fun propagate(assumptions: Assumptions = Assumptions.None): PropagationResult {
         val state = PropagationState(this, assumptions)
         if (!state.seeded) {
-            val lvls = state.conflictLevels ?: emptySet()
+            val lvls = state.conflictLevels.orEmpty()
             // Seed contradiction — no factor invocation was the trigger, so the factor
             // set stays empty (the assumption pair was the load-bearing input).
             return PropagationResult.Unsat(

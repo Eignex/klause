@@ -238,7 +238,7 @@ class NValue(
                 val d = state.problem.intDomains[xs[i]]
                 var pick: Int? = null
                 d.forEach { if (pick == null && it != cur && (s.counts[it] ?: 0) == 0) pick = it }
-                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick)
             }
         }
         if (needDecrease) {
@@ -250,7 +250,7 @@ class NValue(
                 val d = state.problem.intDomains[xs[i]]
                 var pick: Int? = null
                 d.forEach { if (pick == null && it != cur && (s.counts[it] ?: 0) > 0) pick = it }
-                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick!!)
+                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick)
             }
         }
     }

@@ -820,7 +820,7 @@ internal class FlatZincCompiler(
                     allocBool(name) /* pin via Clause below */
                     factors.add(
                         Clause(
-                            intArrayOf(Lit.make(boolVars[name]!!, e.value)),
+                            intArrayOf(Lit.make(boolVars.getValue(name), e.value)),
                         ),
                     )
                 }
@@ -848,7 +848,7 @@ internal class FlatZincCompiler(
                 allocBool(pinName)
                 factors.add(
                     Clause(
-                        intArrayOf(Lit.make(boolVars[pinName]!!, p.value)),
+                        intArrayOf(Lit.make(boolVars.getValue(pinName), p.value)),
                     ),
                 )
             }

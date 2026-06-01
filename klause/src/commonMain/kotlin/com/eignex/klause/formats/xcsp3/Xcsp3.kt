@@ -293,7 +293,7 @@ object Xcsp3 {
             if (node.fn == "lt") bound -= 1
             if (node.fn == "gt") bound += 1
             val vars = combined.keys.toIntArray()
-            return Linear(IntArray(vars.size) { combined[vars[it]]!! }, vars, op, bound)
+            return Linear(IntArray(vars.size) { combined.getValue(vars[it]) }, vars, op, bound)
         }
 
         // --- count / element / channel / regular / cumulative / circuit / lex ---

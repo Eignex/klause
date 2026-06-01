@@ -421,7 +421,7 @@ class LocalSearchSolver(
             // else use the satisfy-mode strategy. CBLS (when unified) scores by
             // weightedNetDelta only at cost>0, which gives it equivalent feasibility-fight
             // behavior to ProbSat plus better multi-flip handling.
-            val move = if (unified) descentStrategy!!.pickMove(state) else strategy.pickMove(state)
+            val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
                 restartPolicy.restart(state, bestSample ?: bestCostSnap)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)

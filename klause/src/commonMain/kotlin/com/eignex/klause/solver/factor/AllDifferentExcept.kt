@@ -176,7 +176,7 @@ class AllDifferentExcept(
         val varAdj = Array(n) { i ->
             val d = state.intDomains[xs[i]]
             val out = ArrayList<Int>()
-            d.forEach { vv -> if (vv !in exceptSet) out += valueIndex[vv]!! }
+            d.forEach { vv -> if (vv !in exceptSet) out += valueIndex.getValue(vv) }
             out.toIntArray()
         }
         val mayEscape = BooleanArray(n) { i ->

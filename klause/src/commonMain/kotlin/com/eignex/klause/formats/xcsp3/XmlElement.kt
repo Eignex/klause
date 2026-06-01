@@ -27,7 +27,7 @@ class XmlElement(
         }
 
     /** Value of attribute [name], or empty string if absent. */
-    fun attr(name: String): String = attributes[name] ?: ""
+    fun attr(name: String): String = attributes[name].orEmpty()
 
     /** First direct child with the given [tag], or null. */
     fun child(tag: String): XmlElement? = children.firstOrNull { it.tag == tag }

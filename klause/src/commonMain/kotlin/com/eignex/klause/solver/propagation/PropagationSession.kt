@@ -192,7 +192,7 @@ class PropagationSession(
         val want = if (value) 1 else 0
         if (boolPinned[v] == want) return PropagationResult.Implied.Empty
         val base = state.undoTop
-        if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
+        if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels.orEmpty())
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         boolPinned[v] = want
@@ -204,7 +204,7 @@ class PropagationSession(
     private fun pushInt(v: Int, value: Int): PropagationResult {
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.Empty
         val base = state.undoTop
-        if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: emptySet())
+        if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels.orEmpty())
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         intPinnedSet[v] = true
