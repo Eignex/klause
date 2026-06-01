@@ -62,16 +62,18 @@ object MiniZincFormat : ProblemFormat {
     override val inProcess = false
 }
 
-/** Net-new ingest, phase 3. */
+/** XCSP3 ingest (pragmatic integer CSP/COP subset → klause Problem). */
 object Xcsp3Format : ProblemFormat {
     override val format = Format.XCSP3
-    override val inProcess = false
+    override val inProcess = true
+    override fun ingest(file: File) = com.eignex.klause.bench.format.xcsp3.Xcsp3.parse(file.readText())
 }
 
-/** Net-new ingest, phase 3. */
+/** SMT-LIB QF_LIA ingest (pragmatic subset → klause Problem). */
 object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB_QF_LIA
-    override val inProcess = false
+    override val inProcess = true
+    override fun ingest(file: File) = com.eignex.klause.bench.format.smtlib.SmtLibQfLia.parse(file.readText())
 }
 
 object Formats {
