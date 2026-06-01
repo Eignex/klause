@@ -1358,38 +1358,27 @@ internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Bo
     factors.add(Element(idx = idx, result = result, arr = arr, arrIsVars = varArray, indexOffset = 1))
 }
 
+/**
+ * `array_bool_element(idx, arr, result)` / `array_var_bool_element(...)`:
+ * `result = arr[idx]` with 1-based indexing over Booleans. Routes through the native int
+ * [Element] factor by channeling the Boolean operands to `[0,1]` ints — so bool element
+ * gets the same graded violation + direct repair as int element (issue #45), instead of the
+ * old per-index reified-linear + indicator-clause decomposition (issue #37).
+ */
 internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: Boolean) {
     require(c.args.size == 3)
     val idx = resolveIntVar(c.args[0])
     val resultLit = resolveBoolLit(c.args[2])
-    val resultVar = Lit.variable(resultLit)
-    val len: Int = if (varArray) {
-        val arr = evalBoolVarArray(c.args[1])
-        for (i in 1..arr.size) {
-            val idxMatch = allocBool("__belem_${idx}_${i}_idx")
-            factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
-            // idxMatch → (result ↔ arr[i-1]): two binary clauses.
-            val arrLit = arr[i-1]
-            val arrVar = Lit.variable(arrLit)
-            factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, false), Lit.make(arrVar, true))))
-            factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, true), Lit.make(arrVar, false))))
-        }
-        arr.size
+    val resultInt = channelBoolsToInts(intArrayOf(resultLit), "belem_res")[0]
+    if (varArray) {
+        val arrLits = evalBoolVarArray(c.args[1])
+        val arr = channelBoolsToInts(arrLits, "belem")
+        factors.add(Element(idx = idx, result = resultInt, arr = arr, arrIsVars = true, indexOffset = 1))
     } else {
         val arrConst = evalBoolConstArray(c.args[1])
-        for (i in 1..arrConst.size) {
-            val idxMatch = allocBool("__belem_${idx}_${i}_idx")
-            factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
-            if (arrConst[i-1]) {
-                factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, true))))
-            } else {
-                factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, false))))
-            }
-        }
-        arrConst.size
+        val arr = IntArray(arrConst.size) { if (arrConst[it]) 1 else 0 }
+        factors.add(Element(idx = idx, result = resultInt, arr = arr, arrIsVars = false, indexOffset = 1))
     }
-    factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.GE, 1))
-    factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.LE, len))
 }
 
 internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
