@@ -40,7 +40,7 @@ object Opb {
         }
 
         val factors = mutableListOf<Factor>()
-        var objWeights = mutableMapOf<Int, Double>()
+        val objWeights = mutableMapOf<Int, Double>()
         var objConstant = 0.0
         var hasObjective = false
         var numVars = 0

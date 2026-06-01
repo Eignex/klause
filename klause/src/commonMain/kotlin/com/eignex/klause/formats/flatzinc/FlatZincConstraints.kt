@@ -46,6 +46,7 @@ import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.util.bsearch
 import kotlin.math.abs
+import kotlin.math.round
 import kotlin.math.roundToLong
 import com.eignex.klause.solver.factor.Sequence as SequenceFactor
 
@@ -756,7 +757,6 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
         else -> Unit
     }
     val varSide = if (a is FloatRef.Var) a.bk else (b as FloatRef.Var).bk
-    val otherSide = if (a is FloatRef.Var) b else a
     val sign = if (a is FloatRef.Var) 1.0 else -1.0 // coefficient on the var-side arg
     val constPart = if (a is FloatRef.Var) {
         if (b is FloatRef.Const) b.value else 0.0
@@ -808,11 +808,6 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
  * bucket granularity (sound since `floatScale` is the smallest representable diff).
  */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
-    val rewritten = FznConstraint(
-        name = if (reified) "float_lin_le_reif" else "float_lin_le",
-        args = c.args,
-        annotations = c.annotations,
-    )
     val coefs = evalFloatConstArray(c.args[0])
     val varRefs = evalFloatVarArray(c.args[1])
     val bound = evalFloatConst(c.args[2])
@@ -851,14 +846,6 @@ internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: B
  */
 internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
     require(c.args.size == 3)
-    val a = resolveFloatVarOrConst(c.args[0])
-    val b = resolveFloatVarOrConst(c.args[1])
-    val out = resolveFloatVarOrConst(c.args[2])
-    // Inequality direction: c ≤ a, c ≤ b (min) or c ≥ a, c ≥ b (max).
-    val cmpOp = if (max) LinearOp.LE else LinearOp.LE // reused, sign flips via emit
-    // Build synthetic float_lin_le or float_lin_ge by reusing emitFloatBinaryCmp's
-    // two-var path. For max we negate by swapping argument order.
-    val ineqOp = if (max) LinearOp.LE else LinearOp.LE
     val argA = c.args[0]
     val argB = c.args[1]
     val argC = c.args[2]
@@ -933,7 +920,7 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
                 0
             } else {
                 ((vc - cBk.lo) / stepC).let {
-                    val rounded = kotlin.math.round(it).toInt()
+                    val rounded = round(it).toInt()
                     if (abs(it - rounded) > tolerance) return@let -1
                     rounded
                 }
@@ -2748,7 +2735,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                 // S can't have elem: case is (0, T_has). T_has=0 → b[i]=b[i+1]; T_has=1 → b[i]=(xmax<elem).
                 // Implications guarded by tHas/¬tHas:
                 // (¬tHas → b[i]=b[i+1]): (tHas ∨ ¬b[i] ∨ b[i+1]) ∧ (tHas ∨ b[i] ∨ ¬b[i+1])
-                factors.add(Clause(intArrayOf(tHas!!, nbi, bn)))
+                factors.add(Clause(intArrayOf(requireNotNull(tHas), nbi, bn)))
                 factors.add(Clause(intArrayOf(tHas, bi, nbn)))
                 // (tHas → b[i]=xmaxLess): (¬tHas ∨ ¬b[i] ∨ xmaxLessLit) ∧ (¬tHas ∨ b[i] ∨ ¬xmaxLessLit)
                 factors.add(Clause(intArrayOf(emptyLit.negate(tHas), nbi, xmaxLessLit)))

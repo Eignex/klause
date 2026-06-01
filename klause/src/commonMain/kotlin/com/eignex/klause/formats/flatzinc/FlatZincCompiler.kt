@@ -353,7 +353,7 @@ internal class FlatZincCompiler(
                 is FznType.FloatRange -> {
                     val v = allocFloat(elemName, t.lo, t.hi)
                     varIds[i] = v
-                    bucketings!!.add(floatVars.getValue(elemName))
+                    requireNotNull(bucketings).add(floatVars.getValue(elemName))
                 }
 
                 FznType.IntAny, FznType.FloatAny -> failHere("array `$name`: unbounded element type")

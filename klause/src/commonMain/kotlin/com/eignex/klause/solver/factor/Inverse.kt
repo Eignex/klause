@@ -35,9 +35,6 @@ class Inverse(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = f + g
 
-    /** "i" in f's index space corresponds to position `i - fOffset` (0-based). */
-    private fun fIndexToG(j: Int): Int = j - gOffset
-    private fun gIndexToF(i: Int): Int = i - fOffset
     private fun fValueToGIndex(j: Int): Int = j - gOffset
     private fun gValueToFIndex(i: Int): Int = i - fOffset
 

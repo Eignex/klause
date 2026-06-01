@@ -828,8 +828,8 @@ object BitBlaster {
             if (cv != null) {
                 b.addClause(intArrayOf(b.unsignedEq(count, intActualUnsigned(b, cv[k], intBits, intMin))))
             } else {
-                b.addClause(intArrayOf(b.constantGeq(count, f.countLow!![k])))
-                b.addClause(intArrayOf(b.constantLeq(count, f.countHigh!![k])))
+                b.addClause(intArrayOf(b.constantGeq(count, requireNotNull(f.countLow)[k])))
+                b.addClause(intArrayOf(b.constantLeq(count, requireNotNull(f.countHigh)[k])))
             }
         }
         if (f.closed) {
@@ -1277,10 +1277,14 @@ object BitBlaster {
             when (f.mode) {
                 BinPacking.Mode.UniformCapacity -> b.addClause(intArrayOf(b.constantLeq(load, f.uniformCapacity)))
 
-                BinPacking.Mode.PerBinCapacity -> b.addClause(intArrayOf(b.constantLeq(load, f.capacities!![bIdx])))
+                BinPacking.Mode.PerBinCapacity -> b.addClause(
+                    intArrayOf(b.constantLeq(load, requireNotNull(f.capacities)[bIdx])),
+                )
 
                 BinPacking.Mode.LoadVars -> b.addClause(
-                    intArrayOf(b.unsignedEq(load, intActualUnsigned(b, f.loadVars!![bIdx], intBits, intMin))),
+                    intArrayOf(
+                        b.unsignedEq(load, intActualUnsigned(b, requireNotNull(f.loadVars)[bIdx], intBits, intMin)),
+                    ),
                 )
             }
         }

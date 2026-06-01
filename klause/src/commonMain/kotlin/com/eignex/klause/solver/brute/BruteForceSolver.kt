@@ -265,6 +265,8 @@ class BruteForceSolver(override val problem: Problem) :
                 dims.add(Dim(DimKind.INT, i, problem.intDomains[i].size.toLong()))
             }
             val chunks = ArrayList<Chunk>()
+
+            @Suppress("DoubleMutabilityForCollection") // reassigned each expansion step
             var current = ArrayList<Dim>()
             var currentSize = 1L
             for (dim in dims) {

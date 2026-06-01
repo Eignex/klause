@@ -124,7 +124,8 @@ internal class Alns(
             randomSeed = null,
         )
 
-        for (iter in 0 until maxIterations) {
+        var iter = 0
+        while (iter < maxIterations) {
             if (params.cancellation()) break
             val destroyIdx = destroyBandit.choose()
             val repairIdx = repairBandit.choose()
@@ -175,6 +176,7 @@ internal class Alns(
                 incumbent = repaired
                 incumbentObj = repairedObj
             }
+            iter++
         }
         // ALNS is incomplete — every successful run returns BestFound, never Optimal.
         return MinimizeResult.BestFound(

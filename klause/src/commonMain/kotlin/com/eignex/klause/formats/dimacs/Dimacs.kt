@@ -34,6 +34,8 @@ object Dimacs {
     fun parse(text: String): Problem {
         var numVars = -1
         val clauses = mutableListOf<Clause>()
+
+        @Suppress("DoubleMutabilityForCollection") // reset to a new list per clause
         var current: MutableList<Int>? = null
         for (rawLine in text.lineSequence()) {
             val line = rawLine.trim()

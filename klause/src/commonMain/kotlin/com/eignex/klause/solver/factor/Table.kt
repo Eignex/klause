@@ -183,7 +183,7 @@ class Table(
                 for (col in 0 until arity) {
                     val v = tuples[row * arity + col]
                     val off = v - lo[col]
-                    val bits = supportBits[col]!!
+                    val bits = requireNotNull(supportBits[col])
                     bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
                 }
                 i++
@@ -192,7 +192,7 @@ class Table(
         if (s.numValid == 0) return false
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
-            val bits = supportBits[col]!!
+            val bits = requireNotNull(supportBits[col])
             // First / last set bit ⇒ tightened bounds.
             var firstSet = -1
             for (w in bits.indices) {

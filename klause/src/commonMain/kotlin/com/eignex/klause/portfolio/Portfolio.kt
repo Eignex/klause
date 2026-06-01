@@ -241,7 +241,7 @@ internal class Portfolio<P : SolverParams>(
             launch {
                 // Capture the worker coroutine's Job and bridge its cancellation state
                 // into the (non-suspending) Cancellation predicate the engine checks.
-                val job = coroutineContext[Job]!!
+                val job = requireNotNull(coroutineContext[Job])
 
                 @Suppress("UNCHECKED_CAST")
                 val workerParams = params.withCancellation { !job.isActive } as P

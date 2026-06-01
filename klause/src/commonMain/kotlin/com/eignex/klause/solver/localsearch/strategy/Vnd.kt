@@ -108,7 +108,7 @@ class Vnd(
             if (raw.isEmpty()) return emptyList()
             if (raw.size <= candidatesPerLevel) return raw.toList()
             val out = ArrayList<Move>(candidatesPerLevel)
-            for (i in 0 until candidatesPerLevel) out.add(raw[state.rng.nextInt(raw.size)])
+            repeat(candidatesPerLevel) { out.add(raw[state.rng.nextInt(raw.size)]) }
             return out
         }
         val out = ArrayList<Move>(candidatesPerLevel)

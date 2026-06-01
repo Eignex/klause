@@ -136,16 +136,16 @@ object Xcsp3 {
         }
 
         private fun sum(e: XmlElement) {
-            val vars = refList(e.child("list")!!.textContent).toIntArray()
+            val vars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
             val coeffs = parseInts(e.child("coeffs")?.textContent) ?: IntArray(vars.size) { 1 }
-            val (op, k) = condition(e.child("condition")!!.textContent.trim())
+            val (op, k) = condition(requireNotNull(e.child("condition")).textContent.trim())
             factors.add(Linear(coeffs, vars, op, k))
         }
 
         // --- extension (positive supports / negative conflicts) ---
 
         private fun extension(e: XmlElement) {
-            val vars = refList(e.child("list")!!.textContent).toIntArray()
+            val vars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
             val supports = e.child("supports")?.textContent?.trim()
             val conflicts = e.child("conflicts")?.textContent?.trim()
             when {
@@ -299,18 +299,18 @@ object Xcsp3 {
         // --- count / element / channel / regular / cumulative / circuit / lex ---
 
         private fun count(e: XmlElement) {
-            val vars = refList(e.child("list")!!.textContent).toIntArray()
+            val vars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
             val values = parseInts(e.child("values")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("count: only constant <values> supported")
             if (values.size != 1) throw UnsupportedXcsp3Exception("count: only a single value supported")
-            val (op, k) = condition(e.child("condition")!!.textContent.trim())
+            val (op, k) = condition(requireNotNull(e.child("condition")).textContent.trim())
             val cnt = newAuxVar(0, vars.size)
             factors.add(Count(xs = vars, v = values[0], op = Count.Op.Eq, n = cnt))
             factors.add(Linear(intArrayOf(1), intArrayOf(cnt), op, k))
         }
 
         private fun element(e: XmlElement) {
-            val arr = refList(e.child("list")!!.textContent).toIntArray()
+            val arr = refList(requireNotNull(e.child("list")).textContent).toIntArray()
             val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
             val idx = singleTermVar(
                 e.child("index")?.textContent
@@ -343,12 +343,14 @@ object Xcsp3 {
         }
 
         private fun regular(e: XmlElement) {
-            val seqVars = refList(e.child("list")!!.textContent).toIntArray()
-            val start = e.child("start")!!.textContent.trim()
-            val finals = e.child("final")!!.textContent.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            val seqVars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
+            val start = requireNotNull(e.child("start")).textContent.trim()
+            val finals = requireNotNull(
+                e.child("final"),
+            ).textContent.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
             data class Tr(val src: String, val sym: Int, val dst: String)
             val trs = Regex("""\(\s*([\w]+)\s*,\s*(-?\d+)\s*,\s*([\w]+)\s*\)""")
-                .findAll(e.child("transitions")!!.textContent)
+                .findAll(requireNotNull(e.child("transitions")).textContent)
                 .map { Tr(it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3]) }.toList()
             if (trs.isEmpty()) throw UnsupportedXcsp3Exception("regular: no transitions")
 
@@ -394,12 +396,12 @@ object Xcsp3 {
 
         @Suppress("ThrowsCount") // one guarded throw per unsupported cumulative shape
         private fun cumulative(e: XmlElement) {
-            val starts = refList(e.child("origins")!!.textContent).toIntArray()
+            val starts = refList(requireNotNull(e.child("origins")).textContent).toIntArray()
             val durations = parseInts(e.child("lengths")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("cumulative: only constant <lengths> supported")
             val resources = parseInts(e.child("heights")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("cumulative: only constant <heights> supported")
-            val (op, cap) = condition(e.child("condition")!!.textContent.trim())
+            val (op, cap) = condition(requireNotNull(e.child("condition")).textContent.trim())
             if (op != LinearOp.LE) {
                 throw UnsupportedXcsp3Exception(
                     "cumulative: only (le, capacity) conditions supported",

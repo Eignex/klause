@@ -196,8 +196,7 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
             // Pick up the last `__search*` annotation in declaration order — schemas may
             // re-declare to refine an inherited choice.
             val searchAnnotation = def.entries.entries
-                .filter { it.value is SearchAnnotation }
-                .lastOrNull()?.value as? SearchAnnotation
+                .lastOrNull { it.value is SearchAnnotation }?.value as? SearchAnnotation
             return CompiledProblem(
                 problem = Problem(
                     numBoolVars = numBoolVars,

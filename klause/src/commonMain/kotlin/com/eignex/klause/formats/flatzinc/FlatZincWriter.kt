@@ -98,7 +98,7 @@ private fun renderArray(program: FlatZincProgram, sample: Sample, name: String):
                     FlatZincArray.Vars.ElementKind.Int -> sb.append(sample.ints[arr.varIds[i]])
 
                     FlatZincArray.Vars.ElementKind.Float -> {
-                        val b = arr.floatBucketings!![i]
+                        val b = requireNotNull(arr.floatBucketings)[i]
                         sb.append(b.valueOf(sample.ints[arr.varIds[i]]))
                     }
                 }

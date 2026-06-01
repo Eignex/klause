@@ -509,7 +509,7 @@ internal fun Compiler.Build.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmp
             IntCmpOp.LT, IntCmpOp.GT -> error("LT/GT should have been normalized away")
         }
         if (!holds) {
-            throw IllegalStateException(
+            error(
                 "Constraint reduces to a constant-false comparison ($op against $bound) " +
                     "and is unsatisfiable as written.",
             )

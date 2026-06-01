@@ -43,14 +43,14 @@ internal class FunctionalObjective internal constructor(
     }
 
     /** One functional definition `out = f(inputs)`. */
-    sealed class Node {
-        abstract val out: Int
-        abstract fun compute(valOf: (Int) -> Long): Long
+    sealed interface Node {
+        val out: Int
+        fun compute(valOf: (Int) -> Long): Long
     }
-    class Abs(override val out: Int, val a: Operand) : Node() {
+    class Abs(override val out: Int, val a: Operand) : Node {
         override fun compute(valOf: (Int) -> Long): Long = abs(a.value(valOf))
     }
-    class Extreme(override val out: Int, val ins: Array<Operand>, val max: Boolean) : Node() {
+    class Extreme(override val out: Int, val ins: Array<Operand>, val max: Boolean) : Node {
         override fun compute(valOf: (Int) -> Long): Long {
             var acc = ins[0].value(valOf)
             for (k in 1 until ins.size) {
@@ -60,17 +60,17 @@ internal class FunctionalObjective internal constructor(
             return acc
         }
     }
-    class Times(override val out: Int, val a: Operand, val b: Operand) : Node() {
+    class Times(override val out: Int, val a: Operand, val b: Operand) : Node {
         override fun compute(valOf: (Int) -> Long): Long = a.value(valOf) * b.value(valOf)
     }
-    class Plus(override val out: Int, val a: Operand, val b: Operand) : Node() {
+    class Plus(override val out: Int, val a: Operand, val b: Operand) : Node {
         override fun compute(valOf: (Int) -> Long): Long = a.value(valOf) + b.value(valOf)
     }
 
     /** Linear definition `outCoeff·out + Σ coeffs[k]·ins[k] = c`  ⇒  `out = (c − Σ …)/outCoeff`.
      *  The compiler guarantees integrality of the quotient (it's a real defines_var output). */
     class Lin(override val out: Int, val outCoeff: Long, val coeffs: LongArray, val ins: Array<Operand>, val c: Long) :
-        Node() {
+        Node {
         override fun compute(valOf: (Int) -> Long): Long {
             var rhs = c
             for (k in ins.indices) rhs -= coeffs[k] * ins[k].value(valOf)

@@ -40,7 +40,7 @@ class PropagationSession(
      *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
     private var levelStates: Array<PropagationState.LevelMark?> = arrayOfNulls(8)
     private var levelTop: Int = 0
-    private fun levelLast(): PropagationState.LevelMark = levelStates[levelTop - 1]!!
+    private fun levelLast(): PropagationState.LevelMark = requireNotNull(levelStates[levelTop - 1])
     private fun levelPush(m: PropagationState.LevelMark) {
         if (levelTop == levelStates.size) levelStates = levelStates.copyOf(levelStates.size * 2)
         levelStates[levelTop++] = m
@@ -109,7 +109,7 @@ class PropagationSession(
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
-        state.undoTo(levelStates[0]!!)
+        state.undoTo(requireNotNull(levelStates[0]))
         if (levelTop > 1) levelTruncateAfterRoot()
         clearPins()
 

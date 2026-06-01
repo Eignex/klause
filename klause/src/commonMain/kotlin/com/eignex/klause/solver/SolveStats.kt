@@ -105,14 +105,14 @@ internal class SolveStatsSink(val backend: String) {
         if (count == 1L) {
             propagations.update(1.0)
         } else {
-            for (i in 0 until count) propagations.update(1.0)
+            repeat(count.toInt()) { propagations.update(1.0) }
         }
     }
     fun observeLearn(count: Long = 1L) {
         if (count == 1L) {
             learnedClauses.update(1.0)
         } else {
-            for (i in 0 until count) learnedClauses.update(1.0)
+            repeat(count.toInt()) { learnedClauses.update(1.0) }
         }
     }
 

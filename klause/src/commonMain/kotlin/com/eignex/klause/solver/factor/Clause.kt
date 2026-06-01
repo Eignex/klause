@@ -413,18 +413,6 @@ class Clause(val literals: IntArray) : LocalSearchFactor {
         return Lit.evaluate(lit, pre)
     }
 
-    /** True iff at least one literal would be true if [boolVar] were flipped. Pre-flip path
-     *  used by [deltaIfBoolFlipped]; the assignment hasn't been mutated yet. */
-    private fun anyLitTrueAfterFlip(state: LocalSearchState, boolVar: Int): Boolean {
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            val pre = state.assignment.boolValue(v)
-            val post = if (v == boolVar) !pre else pre
-            if (Lit.evaluate(lit, post)) return true
-        }
-        return false
-    }
-
     /** Find a literal index (other than [exclude1] and [exclude2]) currently evaluating true. */
     private fun findTrueLitExcept(state: LocalSearchState, exclude1: Int, exclude2: Int): Int {
         for (i in literals.indices) {

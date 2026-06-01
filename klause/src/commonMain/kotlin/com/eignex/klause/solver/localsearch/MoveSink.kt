@@ -20,6 +20,8 @@ import com.eignex.klause.solver.Move
 class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private var lane: LongArray = LongArray(INITIAL_CAPACITY)
     private var laneSize: Int = 0
+
+    @Suppress("DoubleMutabilityForCollection") // lazily allocated on first compound move
     private var compounds: ArrayList<Move.Compound>? = null
     private var cachedList: List<Move>? = null
 

@@ -183,7 +183,7 @@ class MinCostFlow(
         }
         // Residual supply at each node after saturating lower bounds.
         // residual`n` = balance`n` - (in_lb - out_lb). If positive, node has supply to send.
-        val w = weight!!
+        val w = requireNotNull(weight)
         // Cost from lower-bound saturation.
         var fixedCost = 0L
         for (a in 0 until m) fixedCost += w[a].toLong() * lb[a]

@@ -343,6 +343,7 @@ fun gccOpt(
  * Generalised `alldifferent_except`: pairs of distinct positions must take different values
  * unless one of them takes a value in [except]. `except.isEmpty()` collapses to [allDifferent].
  */
+@Suppress("SpreadOperator") // forwards a list to the vararg allDifferent
 fun allDifferentExcept(xs: List<IntTerm>, except: Set<Int>): BoolExpr {
     require(xs.size >= 2) { "allDifferentExcept: need at least two terms" }
     if (except.isEmpty()) return allDifferent(*xs.toTypedArray())

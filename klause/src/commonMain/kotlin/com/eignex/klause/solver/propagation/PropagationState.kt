@@ -192,6 +192,7 @@ class PropagationState(
     internal var currentLevel: Int = 0
 
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
+    @Suppress("DoubleMutabilityForCollection") // lazily allocated on conflict
     internal var conflictLevels: MutableSet<Int>? = null
 
     /** Per-var record of which factor most recently *forced* the value. `-1` means "set by a
@@ -226,6 +227,7 @@ class PropagationState(
      * narrowing). [extractConflictFactors] BFSes from this seed via the reason arrays to
      * produce the full propagation-graph core.
      */
+    @Suppress("DoubleMutabilityForCollection") // lazily allocated on conflict
     internal var conflictSeedFactors: MutableSet<Int>? = null
 
     /** Var whose pinned value was contradicted by a decision-level pin attempt (i.e.
@@ -1241,6 +1243,7 @@ class PropagationState(
      *  present (Table / Mdd factors); the common no-payload case shares [emptyPayloads] and
      *  never allocates per push. */
     fun mark(): LevelMark {
+        @Suppress("DoubleMutabilityForCollection") // lazily allocated when a snapshot is taken
         var payloads: HashMap<Int, SnapshottablePayload>? = null
         for (i in _refPayload.indices) {
             val p = _refPayload[i]
@@ -1280,7 +1283,7 @@ class PropagationState(
 
                 else -> { // int change — restore the full recorded prior int-var state
                     val v = undoVar[i]
-                    intDomains[v] = undoDomain[i]!!
+                    intDomains[v] = requireNotNull(undoDomain[i])
                     intLevel[v] = undoLevel[i]
                     intMinReason[v] = undoMinReason[i]
                     intMaxReason[v] = undoMaxReason[i]
@@ -1440,7 +1443,7 @@ class PropagationState(
         // The literal that just became false is the one whose polarity opposes the pin.
         // boolValues[v] is non-null here (the var was added to dirtyBools only after a
         // successful pin); read it directly.
-        val falseLit = Lit.make(v, !boolValues[v]!!)
+        val falseLit = Lit.make(v, !requireNotNull(boolValues[v]))
         val watchers = boolWatchersByLit[falseLit]
         for (i in 0 until watchers.size) propEnq(watchers[i])
     }

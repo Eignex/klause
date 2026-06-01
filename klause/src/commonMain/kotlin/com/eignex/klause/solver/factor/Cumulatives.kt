@@ -597,8 +597,8 @@ class Cumulatives(
             // Mandatory-profile events.
             val events = ArrayList<IntArray>()
             for (i in members) {
-                val d = fixedDur(state, i)!!
-                val r = fixedRes(state, i)!!
+                val d = requireNotNull(fixedDur(state, i))
+                val r = requireNotNull(fixedRes(state, i))
                 val dom = state.intDomains[starts[i]]
                 val lst = dom.max
                 val ect = dom.min + d
@@ -630,8 +630,8 @@ class Cumulatives(
             }
             // Tighten each member's start against overloading placements.
             for (i in members) {
-                val d = fixedDur(state, i)!!
-                val r = fixedRes(state, i)!!
+                val d = requireNotNull(fixedDur(state, i))
+                val r = requireNotNull(fixedRes(state, i))
                 val v = starts[i]
                 val dom = state.intDomains[v]
                 if (dom.min == dom.max) continue
@@ -720,14 +720,14 @@ class Cumulatives(
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val k = fixedMachineIdx(state, i)
-            val d = fixedDur(state, i)!!
-            val r = fixedRes(state, i)!!
+            val d = requireNotNull(fixedDur(state, i))
+            val r = requireNotNull(fixedRes(state, i))
             if (d <= 0 || r <= 0) continue
             val s = state.intDomains[starts[i]].min
             for (t in (s - lo) until (s - lo + d)) usage[k * horizon + t] += r
         }
         for (k in 0 until machineCount) {
-            val cap = fixedBound(state, k)!!
+            val cap = requireNotNull(fixedBound(state, k))
             for (t in 0 until horizon) {
                 val u = usage[k * horizon + t]
                 if (u > 0 && u < cap) return false

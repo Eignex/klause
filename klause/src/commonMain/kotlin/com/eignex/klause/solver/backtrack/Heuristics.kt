@@ -226,7 +226,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         ensureSized(problem.numBoolVars, problem.numIntVars)
-        val h = heap!!
+        val h = requireNotNull(heap)
         pickSkipBuffer.clear()
         var result: VarRef? = null
         while (h.size > 0) {
@@ -379,7 +379,7 @@ internal class DomWdeg : VariableHeuristic {
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         ensureInitialized(session.problem)
         return pickByActivityWithDomDivider(
-            heap = heap!!,
+            heap = requireNotNull(heap),
             session = session,
             numBool = numBoolCached,
             skip = pickSkipBuffer,
@@ -577,7 +577,7 @@ internal class ActivityBasedSearch(
         val problem = session.problem
         ensureSized(problem.numBoolVars, problem.numIntVars)
         return pickByActivityWithDomDivider(
-            heap = heap!!,
+            heap = requireNotNull(heap),
             session = session,
             numBool = numBoolCached,
             skip = pickSkipBuffer,

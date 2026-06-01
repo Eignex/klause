@@ -402,20 +402,6 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /**
-     * Literal Block Distance: the number of *distinct decision levels* spanned by the
-     * learned clause's literals. Glauert-style "glue" measure popularised by Audemard &
-     * Simon's Glucose — a tighter predictor of long-term clause usefulness than raw
-     * length or activity. Forgetting policies typically keep clauses with LBD ≤ 2
-     * forever ("glue clauses") and drop high-LBD clauses first.
-     */
-    private fun lbdOf(learned: IntArrayList): Int {
-        if (learned.size == 0) return 0
-        val seenLevels = HashSet<Int>(learned.size)
-        for (i in 0 until learned.size) seenLevels.add(levelOf(Lit.variable(learned[i])))
-        return seenLevels.size
-    }
-
-    /**
      * Backjump target: the second-highest decision level among the learned literals'
      * variables. The asserting literal (UIP) sits at [currentLevel]; we want to pop back
      * to the level just past the next-highest, so the learned clause becomes unit (only

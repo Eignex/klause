@@ -36,7 +36,7 @@ const val DEFAULT_FLOAT_BUCKETS: Int = 1024
  * Constraint delegates evaluate their build lambda *during class initialization*, so any
  * handle referenced inside `constraint { ... }` must be declared earlier in the class.
  */
-abstract class VariableSchema : Schema<SchemaEntry>() {
+open class VariableSchema : Schema<SchemaEntry>() {
 
     protected fun boolVar() = register(BoolSpec) { BoolHandle(it) }
 

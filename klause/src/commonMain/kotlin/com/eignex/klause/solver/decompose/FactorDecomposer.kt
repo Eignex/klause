@@ -597,10 +597,10 @@ internal object FactorDecomposer {
                     out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, f.uniformCapacity))
 
                 BinPacking.Mode.PerBinCapacity ->
-                    out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, f.capacities!![k]))
+                    out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, requireNotNull(f.capacities)[k]))
 
                 BinPacking.Mode.LoadVars -> {
-                    val loadVar = f.loadVars!![k]
+                    val loadVar = requireNotNull(f.loadVars)[k]
                     val dom = ctx.intDomainOf(loadVar)
                     for (v in dom.min..dom.max) {
                         val sumEqV = ctx.freshBool()
@@ -1351,7 +1351,7 @@ internal object FactorDecomposer {
             if (inSize > 0) {
                 val vars = IntArray(inSize + 1)
                 val coeffs = IntArray(inSize + 1)
-                for ((idx, e) in inArcs[v].withIndex()) {
+                for ((idx, _) in inArcs[v].withIndex()) {
                     // bool-as-int via reified aux  bAux ↔ (edgePresent[e] = 1); fold via
                     // PseudoBoolean instead: Σ bool − inDeg = 0 ⇒ PB with lits = edge
                     // present positives weight 1, plus an aux equality for inDeg.

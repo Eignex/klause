@@ -89,10 +89,10 @@ class BinPacking(
         return when (mode) {
             Mode.UniformCapacity -> s.loads.any { it > uniformCapacity }
 
-            Mode.PerBinCapacity -> s.loads.indices.any { s.loads[it] > capacities!![it] }
+            Mode.PerBinCapacity -> s.loads.indices.any { s.loads[it] > requireNotNull(capacities)[it] }
 
             Mode.LoadVars -> s.loads.indices.any {
-                state.assignment.intValue(loadVars!![it]) != s.loads[it]
+                state.assignment.intValue(requireNotNull(loadVars)[it]) != s.loads[it]
             }
         }
     }
@@ -112,10 +112,10 @@ class BinPacking(
         val willViolate = when (mode) {
             Mode.UniformCapacity -> sim.any { it > uniformCapacity }
 
-            Mode.PerBinCapacity -> sim.indices.any { sim[it] > capacities!![it] }
+            Mode.PerBinCapacity -> sim.indices.any { sim[it] > requireNotNull(capacities)[it] }
 
             Mode.LoadVars -> sim.indices.any {
-                val lv = loadVars!![it]
+                val lv = requireNotNull(loadVars)[it]
                 val v = if (lv == intVar) newValue else state.assignment.intValue(lv)
                 v != sim[it]
             }
@@ -140,10 +140,10 @@ class BinPacking(
             when (mode) {
                 Mode.UniformCapacity -> sim.any { it > uniformCapacity }
 
-                Mode.PerBinCapacity -> sim.indices.any { sim[it] > capacities!![it] }
+                Mode.PerBinCapacity -> sim.indices.any { sim[it] > requireNotNull(capacities)[it] }
 
                 Mode.LoadVars -> sim.indices.any {
-                    val lv = loadVars!![it]
+                    val lv = requireNotNull(loadVars)[it]
                     val v = if (lv == intVar) oldValue else state.assignment.intValue(lv)
                     v != sim[it]
                 }
@@ -185,13 +185,13 @@ class BinPacking(
             }
 
             Mode.PerBinCapacity -> for (k in 0 until numBins) {
-                if (definiteLoads[k] > capacities!![k]) return false
+                if (definiteLoads[k] > requireNotNull(capacities)[k]) return false
             }
 
             Mode.LoadVars -> {
                 val ant = state.composeIntVarAtomAntecedents(bins)
                 for (k in 0 until numBins) {
-                    if (!state.tightenIntMin(loadVars!![k], definiteLoads[k], ant)) return false
+                    if (!state.tightenIntMin(requireNotNull(loadVars)[k], definiteLoads[k], ant)) return false
                     if (!state.tightenIntMax(loadVars[k], possibleLoads[k], ant)) return false
                 }
             }
@@ -215,7 +215,7 @@ class BinPacking(
         val s = state.refPayload[factorId] as State
         if (mode == Mode.LoadVars) {
             for (k in 0 until numBins) {
-                val lv = loadVars!![k]
+                val lv = requireNotNull(loadVars)[k]
                 val cur = state.assignment.intValue(lv)
                 if (cur != s.loads[k] && s.loads[k] in state.problem.intDomains[lv]) {
                     sink.addChannelingIntSet(state, lv, s.loads[k])
@@ -225,7 +225,7 @@ class BinPacking(
         // Per-bin capacities (called repeatedly below).
         fun capOf(k: Int): Int = when (mode) {
             Mode.UniformCapacity -> uniformCapacity
-            Mode.PerBinCapacity -> capacities!![k]
+            Mode.PerBinCapacity -> requireNotNull(capacities)[k]
             Mode.LoadVars -> Int.MAX_VALUE
         }
         for (b in 0 until numBins) {

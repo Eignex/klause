@@ -78,7 +78,7 @@ internal class NoiseGreedy(val noise: Double = 0.5, private val controller: Nois
         val n = controller?.also { it.observe(state.cost) }?.level ?: noise
         if (state.rng.nextDouble() < n) return moves[state.rng.nextInt(moves.size)]
         // Greedy on the shaped break score; under no shaping this is the raw break score.
-        return state.greedyPickByShapedBreak(moves)!!
+        return requireNotNull(state.greedyPickByShapedBreak(moves))
     }
 }
 

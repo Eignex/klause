@@ -318,7 +318,6 @@ class ReifiedLinear(
         val newHolds = holds(newSum)
         if (oldHolds == newHolds) return // aux contribution unchanged
         val aux = state.assignment.boolValue(auxBoolVar)
-        val oldViolated = aux != oldHolds
         val newViolated = aux != newHolds
         // oldViolated != newViolated, so the aux's contribution swaps break↔make.
         if (newViolated) {

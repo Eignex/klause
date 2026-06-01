@@ -56,7 +56,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         //   par T : id = expr ;     (or T : id = expr — `par` is implicit)
         //   array [1..N] of var T : id ... ;
         //   bool : id = expr ;      (parameter form)
-        val startTok = peek()
         var isVar = false
         if (matchKw("var")) {
             isVar = true

@@ -478,7 +478,7 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
     // Subtour elimination via single-commodity flow rooted at source. Allocate flow
     // variables on each arc, capped by edge_present; source has supply = #present_nodes - 1,
     // sink has demand of the same magnitude (we let it be n − 1 worst-case; slack absorbs).
-    val flowVars = IntArray(m) { allocAuxBoundedInt(0, n).let { intVarOf(it.name) } }
+    val flowVars = IntArray(m) { allocAuxBoundedInt(0, n).let { aux -> intVarOf(aux.name) } }
     // flow ≤ n · edge_present[e]   →  flow − n · ep ≤ 0.
     for (e in 0 until m) {
         assertExpr(Implies(Not(edgeP[e]), IntCompare(IntRef(intVarNameById(flowVars[e])), IntCmpOp.EQ, IntLit(0))))
@@ -566,7 +566,7 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
 
     // Acyclicity via topological-rank vars: rank[root] = 0; for every selected edge (u→v),
     // rank[v] > rank[u].
-    val rank = IntArray(n) { allocAuxBoundedInt(0, n).let { intVarOf(it.name) } }
+    val rank = IntArray(n) { allocAuxBoundedInt(0, n).let { aux -> intVarOf(aux.name) } }
     for (v in 0 until n) {
         val isRoot = IntCompare(expr.root, IntCmpOp.EQ, IntLit(v + off))
         assertExpr(Implies(isRoot, IntCompare(IntRef(intVarNameById(rank[v])), IntCmpOp.EQ, IntLit(0))))
@@ -845,8 +845,6 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
 
 /** Look up the var-name for an int var id. */
 internal fun Compiler.Build.intVarNameById(id: Int): String = intVarIdByName.entries.first { it.value == id }.key
-
-private fun Compiler.Build.intVarNameByIdLookup(id: Int): String = intVarNameById(id)
 
 /**
  * Materialise `name = Σ bools[i] (cast to int)` as a fresh int var (range [0, k]) plus a

@@ -94,7 +94,7 @@ class GlobalCardinality(
                 if (state.assignment.intValue(countVars[k]) != s.counts[k]) return true
             } else {
                 val cnt = s.counts[k]
-                if (cnt < countLow!![k] || cnt > countHigh!![k]) return true
+                if (cnt < requireNotNull(countLow)[k] || cnt > requireNotNull(countHigh)[k]) return true
             }
         }
         // Closed variant: every present xs[i] must be in cover.
@@ -135,7 +135,12 @@ class GlobalCardinality(
                 }
                 if (expected != simCounts[k]) return true
             } else {
-                if (simCounts[k] < countLow!![k] || simCounts[k] > countHigh!![k]) return true
+                if (simCounts[k] < requireNotNull(
+                        countLow,
+                    )[k] || simCounts[k] > requireNotNull(countHigh)[k]
+                ) {
+                    return true
+                }
             }
         }
         if (closed) {
@@ -216,7 +221,12 @@ class GlobalCardinality(
             if (countVars != null) {
                 if (state.assignment.intValue(countVars[k]) != simCounts[k]) return true
             } else {
-                if (simCounts[k] < countLow!![k] || simCounts[k] > countHigh!![k]) return true
+                if (simCounts[k] < requireNotNull(
+                        countLow,
+                    )[k] || simCounts[k] > requireNotNull(countHigh)[k]
+                ) {
+                    return true
+                }
             }
         }
         if (closed) {
@@ -285,8 +295,8 @@ class GlobalCardinality(
                 if (!state.tightenIntMin(countVars[k], definite[k], gccAntecedents)) return false
                 if (!state.tightenIntMax(countVars[k], possible[k], gccAntecedents)) return false
             } else {
-                if (countLow!![k] > possible[k]) return false
-                if (countHigh!![k] < definite[k]) return false
+                if (requireNotNull(countLow)[k] > possible[k]) return false
+                if (requireNotNull(countHigh)[k] < definite[k]) return false
             }
         }
 
@@ -299,14 +309,14 @@ class GlobalCardinality(
                 lo[k] = cd.min
                 hi[k] = cd.max
             } else {
-                lo[k] = countLow!![k]
-                hi[k] = countHigh!![k]
+                lo[k] = requireNotNull(countLow)[k]
+                hi[k] = requireNotNull(countHigh)[k]
             }
         }
 
         // Detect whether any xᵢ has an out-of-cover value reachable (drives "other" arc).
         val hasOtherVar = BooleanArray(n)
-        var anyOther = !closed && run {
+        val anyOther = !closed && run {
             var any = false
             for (i in 0 until n) {
                 val d = state.intDomains[effectiveXs[i]]
@@ -431,11 +441,6 @@ class GlobalCardinality(
         }
         return true
     }
-
-    /** Per-bound atom-lit antecedents over every `xs` var — sound for any flow-based
-     *  prune / tighten (every var's bounds shaped the network). Minimization can collapse
-     *  redundant per-bound facts; resolution through 1UIP is finer than a bool-lit union. */
-    private fun composeGccAntecedents(state: PropagationState): IntArray? = state.composeIntVarAtomAntecedents(xs)
 
     /**
      * Minimal Edmonds-Karp max-flow over an integer-capacity graph stored as parallel
@@ -603,7 +608,7 @@ class GlobalCardinality(
                 if (cnt == target) continue
                 needIncrease = cnt < target
             } else {
-                if (cnt in countLow!![k]..countHigh!![k]) continue
+                if (cnt in requireNotNull(countLow)[k]..requireNotNull(countHigh)[k]) continue
                 needIncrease = cnt < countLow[k]
                 target = if (needIncrease) countLow[k] else countHigh[k]
             }
