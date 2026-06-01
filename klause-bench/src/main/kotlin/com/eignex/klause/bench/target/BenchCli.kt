@@ -1,53 +1,105 @@
 package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.Catalog
-import com.eignex.klause.bench.metric.AnytimeMetric
-import com.eignex.klause.bench.metric.CompileAuditMetric
-import com.eignex.klause.bench.metric.CompletenessMetric
-import com.eignex.klause.bench.metric.CoverageMetric
-import com.eignex.klause.bench.metric.ParityMetric
-import com.eignex.klause.bench.metric.TimeMetric
-import com.eignex.klause.bench.metric.TuningMetric
-import com.eignex.klause.bench.metric.UniformnessMetric
+import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
+import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.tools.CblsDiag
+import com.eignex.klause.bench.tools.MeasureBacktrack
 
 /**
- * Single entry point for the bench. `./gradlew :klause-bench:bench --args="<target-id>"`.
+ * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
  *
- * One generic runner resolves a [Target]'s suites, gates them through the cross-backend
- * [com.eignex.klause.bench.metric.Verifier], then dispatches to the target's metric. This
- * replaces the former one-Gradle-task-per-bench layout; problem selection lives in the
- * catalog, comparison selection lives in [Targets].
+ * Commands:
+ *  - `<target-id>` — run a predefined [Target] (see `list`).
+ *  - `run <metric> [filters…]` — ad-hoc: run any metric over any selection, no predefined
+ *    target needed. Filters: `suite=a,b` `category=SAT,OPT` `tag=…` `name=<glob>`
+ *    `per-family=N` `max=N` `seed=N` `reference=choco|ortools` `timeout=<ms>`.
+ *  - `preview <metric> [filters…]` — print the instances a `run` would cover, without running.
+ *  - `list` — targets + suites; `list <suite>` — problems in a suite.
+ *  - `diag:backtrack` / `diag:cbls <name|fzn>` — diagnostics.
  *
- * `--args="list"` prints the available targets and catalog suites.
+ * Metric selection lives in the catalog; comparison selection lives in targets/filters — the
+ * two stay independent.
  */
 object BenchCli {
     @JvmStatic
     fun main(args: Array<String>) {
-        val cmd = args.firstOrNull()
-        if (cmd == null || cmd == "list" || cmd == "--list" || cmd == "help" || cmd == "--help") {
-            printListing()
+        when (val cmd = args.firstOrNull() ?: "list") {
+            "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
+            "run" -> adHoc(args.drop(1), preview = false)
+            "preview" -> adHoc(args.drop(1), preview = true)
+            "diag:backtrack" -> MeasureBacktrack.run()
+            "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
+            else -> runTarget(cmd)
+        }
+    }
+
+    private fun runTarget(id: String) {
+        val target = Targets.get(id)
+        println("=== target '${target.id}' — ${target.description} ===")
+        MetricRunner.run(target.metric, Catalog.problems(*target.suiteIds.toTypedArray()), target.budget, target.reference)
+    }
+
+    private fun adHoc(args: List<String>, preview: Boolean) {
+        val metricName = args.firstOrNull() ?: error("usage: ${if (preview) "preview" else "run"} <metric> [filters…]")
+        val metric = parseMetric(metricName)
+        val f = args.drop(1).filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val refs = select(f)
+        if (refs.isEmpty()) { println("(no problems matched the selection)"); return }
+
+        if (preview) {
+            println("=== preview: $metricName over ${refs.size} instance(s) ===")
+            refs.forEach { println("  ${it.name}  [${it.format}/${it.category}]") }
             return
         }
-        val target = Targets.get(cmd)
-        println("=== target '${target.id}' — ${target.description} ===")
-        when (target.metric) {
-            MetricKind.PARITY -> ParityMetric.run(BenchLoad.resolve(target.suiteIds), target.budget, target.reference ?: Backend.CHOCO)
-            MetricKind.ANYTIME -> AnytimeMetric.run(BenchLoad.resolve(target.suiteIds), target.budget, target.reference ?: Backend.ORTOOLS)
-            MetricKind.COVERAGE -> CoverageMetric.run(com.eignex.klause.bench.catalog.Catalog.problems(*target.suiteIds.toTypedArray()))
-            MetricKind.AUDIT -> CompileAuditMetric.run(com.eignex.klause.bench.catalog.Catalog.problems(*target.suiteIds.toTypedArray()))
-            MetricKind.TUNING -> TuningMetric.run(BenchLoad.resolve(target.suiteIds), target.budget)
-            else -> {
-                val corpus = BenchLoad.loadAndVerify(target.suiteIds)
-                when (target.metric) {
-                    MetricKind.VERIFY -> println("\nverification passed for ${corpus.verifyEntries.size} entries")
-                    MetricKind.TIME -> TimeMetric.run(corpus.benchEntries)
-                    MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
-                    MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
-                    MetricKind.PARITY, MetricKind.ANYTIME, MetricKind.COVERAGE, MetricKind.AUDIT, MetricKind.TUNING -> error("unreachable")
-                }
-            }
+        val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
+        val reference = f["reference"]?.let { Backend.valueOf(it.uppercase().replace("-", "")) }
+        println("=== run: $metricName over ${refs.size} instance(s) ===")
+        MetricRunner.run(metric, refs, budget, reference)
+    }
+
+    /** Build the selection from filters: suites (static-only unless named) → category/tag/name
+     *  filter → family-aware caps/sampling. */
+    private fun select(f: Map<String, String>): List<ProblemRef> {
+        var refs: List<ProblemRef> = f["suite"]?.split(",")?.flatMap { Catalog.suite(it.trim()).problems }
+            ?: Catalog.suites.flatMap { it.problems }
+        f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
+            refs = refs.filter { it.category in cats }
         }
+        f["tag"]?.split(",")?.map { it.trim() }?.toSet()?.let { tags -> refs = refs.filter { it.tags.any { t -> t in tags } } }
+        f["name"]?.let { g -> refs = refs.filter { matches(g, it.name) } }
+        val sel = CorpusSelection.Selection(
+            perFamily = f["per-family"]?.toIntOrNull(),
+            maxInstances = f["max"]?.toIntOrNull(),
+            sampleSeed = f["seed"]?.toLongOrNull(),
+        )
+        return CorpusSelection.applySelectionBy(refs, sel) { it.name.substringBefore('/') }
+    }
+
+    private fun matches(pattern: String, name: String): Boolean =
+        if ('*' in pattern) Regex("^" + Regex.escape(pattern).replace("\\*", ".*") + "$").containsMatchIn(name)
+        else name.contains(pattern)
+
+    private fun parseMetric(name: String): MetricKind = when (name.lowercase()) {
+        "time" -> MetricKind.TIME
+        "uniformness", "uniform" -> MetricKind.UNIFORMNESS
+        "completeness", "complete" -> MetricKind.COMPLETENESS
+        "verify" -> MetricKind.VERIFY
+        "parity" -> MetricKind.PARITY
+        "anytime" -> MetricKind.ANYTIME
+        "coverage" -> MetricKind.COVERAGE
+        "audit" -> MetricKind.AUDIT
+        "tuning", "tune" -> MetricKind.TUNING
+        else -> error("unknown metric '$name' (have ${MetricKind.entries.map { it.name.lowercase() }})")
+    }
+
+    private fun listProblems(suite: String) {
+        val s = Catalog.suite(suite)
+        println("=== suite '${s.id}' — ${s.problems.size} problems ===")
+        s.problems.forEach { println("  ${it.name.padEnd(28)} [${it.format}/${it.category}] expected=${it.expected}") }
     }
 
     private fun printListing() {
@@ -56,6 +108,19 @@ object BenchCli {
         println("\nSuites:")
         for (s in Catalog.suites) println("  ${s.id.padEnd(20)} ${s.problems.size} problems — ${s.description}")
         for (d in Catalog.dynamicSuites) println("  ${d.id.padEnd(20)} (discovered) — ${d.description}")
-        println("\nUsage: bench <target-id>")
+        println("\nMetrics (for `run`/`preview`): ${MetricKind.entries.joinToString(", ") { it.name.lowercase() }}")
+        println(
+            """
+            |
+            |Usage:
+            |  bench <target-id>                     run a predefined target
+            |  bench run <metric> [filters…]         ad-hoc: any metric over any selection
+            |  bench preview <metric> [filters…]     show what a run would cover
+            |  bench list [<suite>]                  list targets+suites, or problems in a suite
+            |  bench diag:backtrack | diag:cbls <x>  diagnostics
+            |
+            |Filters: suite=a,b category=SAT,OPTIMIZATION tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools timeout=<ms>
+            """.trimMargin()
+        )
     }
 }

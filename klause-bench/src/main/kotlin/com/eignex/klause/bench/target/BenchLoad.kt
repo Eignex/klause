@@ -28,14 +28,19 @@ object BenchLoad {
     fun resolve(suiteIds: List<String>): List<ResolvedProblem> =
         Catalog.problems(*suiteIds.toTypedArray()).map { Runners.resolve(it) }
 
-    fun loadAndVerify(suiteIds: List<String>, quiet: Boolean = false): LoadedCorpus {
-        val refs: List<ProblemRef> = Catalog.problems(*suiteIds.toTypedArray())
-            .filter { InProcessRunner.supports(it) }
-        val resolved = refs.map { InProcessRunner.resolve(it) }
+    fun loadAndVerify(suiteIds: List<String>, quiet: Boolean = false): LoadedCorpus =
+        loadAndVerifyRefs(Catalog.problems(*suiteIds.toTypedArray()), quiet)
+
+    /** Resolve every ref with the appropriate runner (no verify gate). */
+    fun resolveRefs(refs: List<ProblemRef>): List<ResolvedProblem> = refs.map { Runners.resolve(it) }
+
+    fun loadAndVerifyRefs(refs: List<ProblemRef>, quiet: Boolean = false): LoadedCorpus {
+        val inProcess: List<ProblemRef> = refs.filter { InProcessRunner.supports(it) }
+        val resolved = inProcess.map { InProcessRunner.resolve(it) }
         val benchEntries = resolved.filter { it.ref.expected.expectsSat }
 
         if (!quiet) {
-            println("=== verification (${resolved.size} entries from ${suiteIds.joinToString()}) ===")
+            println("=== verification (${resolved.size} in-process entries) ===")
         }
         var disagreements = 0
         for (entry in resolved) {
