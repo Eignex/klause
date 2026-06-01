@@ -51,7 +51,6 @@ abstract class PathTreeBase(
         Array(numNodes) { acc[it].toIntArray() }
     }
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

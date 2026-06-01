@@ -23,8 +23,6 @@ class Member(val xs: IntArray, val y: Int) : LocalSearchFactor {
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + intArrayOf(y)
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val yv = state.assignment.intValue(y)
         for (x in xs) if (state.assignment.intValue(x) == yv) return false

@@ -25,8 +25,6 @@ class SymmetricAllDifferent(val xs: IntArray, val indexOffset: Int = 0) : LocalS
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val seen = HashSet<Int>()
         for (i in xs.indices) {

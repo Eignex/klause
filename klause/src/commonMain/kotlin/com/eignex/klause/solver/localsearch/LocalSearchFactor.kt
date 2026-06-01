@@ -13,8 +13,9 @@ import com.eignex.klause.solver.Factor
  * unchecked under the assumption that any problem given to it has only LS-capable factors.
  */
 interface LocalSearchFactor : Factor {
-    /** Build this factor's payload from the current assignment. Called once per restart. */
-    fun initialize(state: LocalSearchState, factorId: Int)
+    /** Build this factor's payload from the current assignment. Called once per restart.
+     *  Default no-op for stateless factors that maintain no payload. */
+    fun initialize(state: LocalSearchState, factorId: Int) {}
 
     fun isViolated(state: LocalSearchState, factorId: Int): Boolean
 

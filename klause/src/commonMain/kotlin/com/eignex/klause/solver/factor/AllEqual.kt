@@ -22,8 +22,6 @@ class AllEqual(val xs: IntArray) : LocalSearchFactor {
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val v0 = state.assignment.intValue(xs[0])
         for (i in 1 until xs.size) if (state.assignment.intValue(xs[i]) != v0) return true

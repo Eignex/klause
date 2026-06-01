@@ -47,8 +47,6 @@ class Regular(
         return transitions[(state - 1) * alphabetSize + (symbol - 1)]
     }
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !accepts(state)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {

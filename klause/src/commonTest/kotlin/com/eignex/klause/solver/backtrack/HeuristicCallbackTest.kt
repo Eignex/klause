@@ -44,9 +44,9 @@ class HeuristicCallbackTest {
         override fun onRestart() {
             restartCount++
         }
-        override fun onCommit(varRef: VarRef, value: Int) {}
-        override fun onConflict(varRef: VarRef, value: Int) {}
-        override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
+        override fun onCommit(varRef: VarRef, value: Int) { /* not exercised by this test */ }
+        override fun onConflict(varRef: VarRef, value: Int) { /* not exercised by this test */ }
+        override fun onSolution(snapshot: com.eignex.klause.solver.Sample) { /* not exercised by this test */ }
     }
 
     @Test

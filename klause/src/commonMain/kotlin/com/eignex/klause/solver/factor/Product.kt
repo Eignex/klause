@@ -19,8 +19,6 @@ class Product(val a: Int, val b: Int, val result: Int) : LocalSearchFactor {
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = intArrayOf(a, b, result)
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)

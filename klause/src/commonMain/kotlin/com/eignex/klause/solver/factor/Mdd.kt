@@ -47,8 +47,6 @@ class Mdd(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !pathExists(state, -1, 0)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {

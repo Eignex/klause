@@ -23,8 +23,6 @@ class Sort(val xs: IntArray, val ys: IntArray) : LocalSearchFactor {
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val xsVals = IntArray(xs.size) { state.assignment.intValue(xs[it]) }.toSortedArray()
         val ysVals = IntArray(ys.size) { state.assignment.intValue(ys[it]) }

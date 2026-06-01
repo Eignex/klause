@@ -49,8 +49,6 @@ class SetBitsetSubset(val leftBools: IntArray, val rightBools: IntArray) : Local
     }
     override val intVars: IntArray = EmptyIntArray
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         for (i in leftBools.indices) {
             val lb = leftBools[i]
@@ -179,8 +177,6 @@ class SetBitsetDisjoint(val leftBools: IntArray, val rightBools: IntArray) : Loc
     }
     override val intVars: IntArray = EmptyIntArray
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         for (i in leftBools.indices) {
             val lb = leftBools[i]
@@ -278,8 +274,6 @@ class SetBitsetEq(val leftBools: IntArray, val rightBools: IntArray) : LocalSear
         out
     }
     override val intVars: IntArray = EmptyIntArray
-
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         for (i in leftBools.indices) {

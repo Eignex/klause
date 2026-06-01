@@ -40,8 +40,6 @@ class Table(
         override fun snapshotCopy(): Str2State = Str2State(validTuples.copyOf(), numValid)
     }
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         for (row in 0 until numTuples) {
             var match = true

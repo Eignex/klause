@@ -51,18 +51,13 @@ class AllDifferentDslTest {
             LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 9)).take(20).toList()
         assertTrue(samples.isNotEmpty())
-        var sawFlagSet = false
         for (s in samples) {
             val flag = compiled.decode(schema.flag, s)
             if (!flag) continue
-            sawFlagSet = true
             val av = compiled.decode(schema.a, s)
             val bv = compiled.decode(schema.b, s)
             val cv = compiled.decode(schema.c, s)
             assertTrue(setOf(av, bv, cv).size == 3, "flag set but a=$av b=$bv c=$cv")
-        }
-
-        if (!sawFlagSet) {
         }
     }
 }

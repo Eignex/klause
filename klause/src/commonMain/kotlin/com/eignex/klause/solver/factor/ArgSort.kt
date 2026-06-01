@@ -26,8 +26,6 @@ class ArgSort(val values: IntArray, val perm: IntArray, val permOffset: Int = 0)
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = values + perm
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {}
-
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val n = perm.size
         val permVals = IntArray(n) { state.assignment.intValue(perm[it]) - permOffset }
