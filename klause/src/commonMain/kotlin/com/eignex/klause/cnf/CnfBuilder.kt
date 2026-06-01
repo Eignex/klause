@@ -23,6 +23,48 @@ class CnfBuilder {
 
     fun addClause(lits: IntArray) { _clauses.add(lits) }
 
+    // ---- Gate hash-consing -------------------------------------------------------------
+    // Structurally-identical Tseitin gates share one aux var + definition. Bit-blasted
+    // arithmetic re-derives the same sub-gates constantly (every comparator XNORs the same
+    // bit pairs, every AllDifferent pair compares the same vars), so consing the primitive
+    // gates collapses the duplication — and because equality/adder results are themselves
+    // built from these gates over identical inputs, the sharing propagates all the way up
+    // (`unsignedEq(a, b)` called twice returns the same literal). Keys are canonical: AND/OR
+    // dedup + sort their inputs; XOR strips operand polarity (tracking output parity) and
+    // sorts; MAJ3 sorts. The aux↔gate definition is global, so reusing a cached literal in a
+    // new context is always sound.
+
+    private class GateKey(val op: Int, val operands: IntArray) {
+        override fun equals(other: Any?): Boolean =
+            other is GateKey && other.op == op && other.operands.contentEquals(operands)
+        override fun hashCode(): Int = op * 31 + operands.contentHashCode()
+    }
+
+    private val gateCache = HashMap<GateKey, Int>()
+
+    private companion object {
+        const val OP_AND = 0
+        const val OP_OR = 1
+        const val OP_XOR = 2
+        const val OP_MAJ = 3
+    }
+
+    /** Sort + drop exact-duplicate literals. */
+    private fun sortDedup(a: IntArray): IntArray {
+        if (a.size <= 1) return a
+        val s = a.copyOf(); s.sort()
+        var w = 0
+        for (i in s.indices) if (w == 0 || s[i] != s[w - 1]) s[w++] = s[i]
+        return if (w == s.size) s else s.copyOf(w)
+    }
+
+    /** True if a sorted literal array contains some `l` and `¬l` (they're adjacent — a
+     *  positive literal `v shl 1` and its negation `(v shl 1) or 1` differ only in bit 0). */
+    private fun hasComplementaryPair(sorted: IntArray): Boolean {
+        for (i in 0 until sorted.size - 1) if (sorted[i] xor sorted[i + 1] == 1) return true
+        return false
+    }
+
     fun falseLit(): Int {
         if (_falseLit == -1) {
             val v = newVar()
@@ -39,47 +81,77 @@ class CnfBuilder {
         return _trueLit
     }
 
-    /** Fresh literal `aux` such that `aux ↔ AND(inputs)`. */
+    /** Literal `aux` such that `aux ↔ AND(inputs)`. Hash-consed. */
     fun tseitinAnd(inputs: IntArray): Int {
         if (inputs.size == 1) return inputs[0]
         if (inputs.isEmpty()) return trueLit()
+        val canon = sortDedup(inputs)
+        if (canon.size == 1) return canon[0]
+        if (hasComplementaryPair(canon)) return falseLit()
+        val key = GateKey(OP_AND, canon)
+        gateCache[key]?.let { return it }
         val aux = Lit.make(newVar(), positive = true)
-        for (l in inputs) addClause(intArrayOf(Lit.negate(aux), l))
-        val big = IntArray(inputs.size + 1)
+        for (l in canon) addClause(intArrayOf(Lit.negate(aux), l))
+        val big = IntArray(canon.size + 1)
         big[0] = aux
-        for (i in inputs.indices) big[i + 1] = Lit.negate(inputs[i])
+        for (i in canon.indices) big[i + 1] = Lit.negate(canon[i])
         addClause(big)
+        gateCache[key] = aux
         return aux
     }
 
-    /** Fresh literal `aux` such that `aux ↔ OR(inputs)`. */
+    /** Literal `aux` such that `aux ↔ OR(inputs)`. Hash-consed. */
     fun tseitinOr(inputs: IntArray): Int {
         if (inputs.size == 1) return inputs[0]
         if (inputs.isEmpty()) return falseLit()
+        val canon = sortDedup(inputs)
+        if (canon.size == 1) return canon[0]
+        if (hasComplementaryPair(canon)) return trueLit()
+        val key = GateKey(OP_OR, canon)
+        gateCache[key]?.let { return it }
         val aux = Lit.make(newVar(), positive = true)
-        for (l in inputs) addClause(intArrayOf(Lit.negate(l), aux))
-        val big = IntArray(inputs.size + 1)
+        for (l in canon) addClause(intArrayOf(Lit.negate(l), aux))
+        val big = IntArray(canon.size + 1)
         big[0] = Lit.negate(aux)
-        for (i in inputs.indices) big[i + 1] = inputs[i]
+        for (i in canon.indices) big[i + 1] = canon[i]
         addClause(big)
+        gateCache[key] = aux
         return aux
     }
 
-    /** Fresh literal `aux` such that `aux ↔ a XOR b`. Four clauses. */
+    /** Literal `aux` such that `aux ↔ a XOR b`. Hash-consed: operand polarities are stripped
+     *  (XOR is invariant under flipping both, and `¬a ⊕ b = ¬(a ⊕ b)`), so the cache keys on
+     *  the underlying variables and the output is re-negated for an odd number of negated
+     *  operands. Four clauses on a miss. */
     fun tseitinXor(a: Int, b: Int): Int {
-        val aux = Lit.make(newVar(), positive = true)
-        addClause(intArrayOf(Lit.negate(aux), a, b))
-        addClause(intArrayOf(Lit.negate(aux), Lit.negate(a), Lit.negate(b)))
-        addClause(intArrayOf(aux, Lit.negate(a), b))
-        addClause(intArrayOf(aux, a, Lit.negate(b)))
-        return aux
+        var parity = 0
+        var x = a; var y = b
+        if (!Lit.isPositive(x)) { parity = parity xor 1; x = Lit.negate(x) }
+        if (!Lit.isPositive(y)) { parity = parity xor 1; y = Lit.negate(y) }
+        if (x == y) return if (parity == 1) trueLit() else falseLit() // a⊕a=0, ¬a⊕a=1
+        val lo = if (x <= y) x else y
+        val hi = if (x <= y) y else x
+        val key = GateKey(OP_XOR, intArrayOf(lo, hi))
+        val base = gateCache[key] ?: run {
+            val aux = Lit.make(newVar(), positive = true)
+            addClause(intArrayOf(Lit.negate(aux), lo, hi))
+            addClause(intArrayOf(Lit.negate(aux), Lit.negate(lo), Lit.negate(hi)))
+            addClause(intArrayOf(aux, Lit.negate(lo), hi))
+            addClause(intArrayOf(aux, lo, Lit.negate(hi)))
+            gateCache[key] = aux
+            aux
+        }
+        return if (parity == 1) Lit.negate(base) else base
     }
 
     /** `aux ↔ a XOR b XOR c`. Used as the sum bit of a full adder. */
     fun tseitinXor3(a: Int, b: Int, c: Int): Int = tseitinXor(tseitinXor(a, b), c)
 
-    /** `aux ↔ majority(a, b, c)`. Used as the carry bit of a full adder. Six clauses. */
+    /** `aux ↔ majority(a, b, c)`. Carry bit of a full adder. Hash-consed (sorted operands). */
     fun tseitinMaj3(a: Int, b: Int, c: Int): Int {
+        val ops = intArrayOf(a, b, c); ops.sort()
+        val key = GateKey(OP_MAJ, ops)
+        gateCache[key]?.let { return it }
         val aux = Lit.make(newVar(), positive = true)
         addClause(intArrayOf(Lit.negate(aux), a, b))
         addClause(intArrayOf(Lit.negate(aux), a, c))
@@ -87,6 +159,7 @@ class CnfBuilder {
         addClause(intArrayOf(aux, Lit.negate(a), Lit.negate(b)))
         addClause(intArrayOf(aux, Lit.negate(a), Lit.negate(c)))
         addClause(intArrayOf(aux, Lit.negate(b), Lit.negate(c)))
+        gateCache[key] = aux
         return aux
     }
 
