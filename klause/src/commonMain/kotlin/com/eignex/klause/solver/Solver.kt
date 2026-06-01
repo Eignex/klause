@@ -38,7 +38,11 @@ sealed interface SolveResult {
      *  backends that haven't opted in; populated by backends that have. */
     val stats: SolveStats
 
-    data class Sat(val assignment: Sample, override val stats: SolveStats = SolveStats.EMPTY) : SolveResult
+    data class Sat(
+        /** The satisfying assignment. */
+        val assignment: Sample,
+        override val stats: SolveStats = SolveStats.EMPTY,
+    ) : SolveResult
 
     /**
      * Proven infeasible. [core] is an optional jointly-unsat subset of factor ids; backends
@@ -60,7 +64,11 @@ sealed interface SolveResult {
          */
         val assumptionCore: Assumptions? = null,
     ) : SolveResult
-    data class Unknown(val reason: TerminationReason, override val stats: SolveStats = SolveStats.EMPTY) : SolveResult
+    data class Unknown(
+        /** Why the result is indeterminate (e.g. timeout). */
+        val reason: TerminationReason,
+        override val stats: SolveStats = SolveStats.EMPTY,
+    ) : SolveResult
 }
 
 /**
@@ -81,6 +89,7 @@ sealed interface SolveResult {
 interface Solver<P : SolverParams> {
     /** The problem this solver operates on. */
     val problem: Problem
+
     /** Solve the problem once and return a [SolveResult]. */
     fun solve(params: P): SolveResult
 
@@ -98,8 +107,10 @@ interface Solver<P : SolverParams> {
             SampleResult.Unknown(TerminationReason.BudgetExhausted)
         }
     }
+
     /** Lazily draw diverse samples. */
     fun samples(params: P): Sequence<Sample>
+
     /** Lazily enumerate distinct models. */
     fun enumerate(params: P): Sequence<Sample>
 

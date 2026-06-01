@@ -38,10 +38,12 @@ class Assumptions internal constructor(
      *  ascending. Disjoint from [intKeys]. Used by SAC-at-root to record bound deductions
      *  that aren't yet singletons. */
     val intMinKeys: IntArray = IntArray(0),
+    /** Lower-bound values aligned with [intMinKeys]. */
     val intMinValues: IntArray = IntArray(0),
     /** Int var ids with an additional `≤ maxValue` upper-bound tightening (no exact pin),
      *  ascending. Disjoint from [intKeys]. */
     val intMaxKeys: IntArray = IntArray(0),
+    /** Upper-bound values aligned with [intMaxKeys]. */
     val intMaxValues: IntArray = IntArray(0),
     /** Interior holes: parallel `(varId, value)` rows, lexicographically sorted by
      *  `(varId, value)`. Each row encodes `v ≠ value` for that var. Disjoint from
@@ -49,14 +51,23 @@ class Assumptions internal constructor(
      *  bounds). Used by SAC-at-root to record value-level deductions that fall between
      *  bound shifts. */
     val intHoleVarIds: IntArray = IntArray(0),
+    /** Forbidden values aligned with [intHoleVarIds]. */
     val intHoleValues: IntArray = IntArray(0),
 ) {
 
+    /** True iff no bool or int variable is pinned. */
     val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
+
+    /** Number of pinned Boolean variables. */
     val numBools: Int get() = boolKeys.size
+
+    /** Number of exactly-pinned integer variables. */
     val numInts: Int get() = intKeys.size
 
+    /** True iff Boolean variable [id] is pinned. */
     fun isFrozenBool(id: Int): Boolean = boolKeys.binarySearchInt(id) >= 0
+
+    /** True iff integer variable [id] is pinned to an exact value. */
     fun isFrozenInt(id: Int): Boolean = intKeys.binarySearchInt(id) >= 0
 
     /** Pinned value for bool [id], or `null` if it isn't an assumption. */
@@ -83,14 +94,17 @@ class Assumptions internal constructor(
         return if (idx >= 0) intMaxValues[idx] else null
     }
 
+    /** Invoke [action] for each lower-bound tightening `(id, value)`. */
     inline fun forEachIntMin(action: (id: Int, value: Int) -> Unit) {
         for (i in intMinKeys.indices) action(intMinKeys[i], intMinValues[i])
     }
 
+    /** Invoke [action] for each upper-bound tightening `(id, value)`. */
     inline fun forEachIntMax(action: (id: Int, value: Int) -> Unit) {
         for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
     }
 
+    /** Invoke [action] for each interior hole `(id, forbiddenValue)`. */
     inline fun forEachIntHole(action: (id: Int, value: Int) -> Unit) {
         for (i in intHoleVarIds.indices) action(intHoleVarIds[i], intHoleValues[i])
     }
@@ -480,7 +494,9 @@ class Assumptions internal constructor(
         append("})")
     }
 
+    /** Shared [Assumptions] instances and builders. */
     companion object {
+        /** The empty assumption set (nothing pinned). */
         val None: Assumptions =
             Assumptions(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
 

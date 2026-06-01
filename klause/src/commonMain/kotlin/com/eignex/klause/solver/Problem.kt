@@ -117,6 +117,7 @@ class Problem(
 
     /** Factor ids mentioning each Boolean variable, indexed by bool var id. */
     val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
+
     /** Factor ids mentioning each integer variable, indexed by int var id. */
     val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }
 

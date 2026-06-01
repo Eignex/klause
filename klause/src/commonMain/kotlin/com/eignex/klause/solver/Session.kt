@@ -24,6 +24,7 @@ package com.eignex.klause.solver
 interface Session<P : SolverParams> : AutoCloseable {
     /** The backing solver. */
     val solver: Solver<P>
+
     /** The problem being solved. */
     val problem: Problem get() = solver.problem
 
@@ -52,8 +53,10 @@ interface Session<P : SolverParams> : AutoCloseable {
             SampleResult.Unknown(TerminationReason.BudgetExhausted)
         }
     }
+
     /** Lazily draw diverse samples under the current assumptions. */
     fun samples(params: P): Sequence<Sample>
+
     /** Lazily enumerate distinct models under the current assumptions. */
     fun enumerate(params: P): Sequence<Sample>
 

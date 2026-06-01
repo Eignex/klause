@@ -16,20 +16,33 @@ import com.eignex.klause.solver.propagation.PropagationSession
  */
 sealed interface SatisfyResult {
     /** Satisfiable, carrying a model. */
-    data class Sat(val sample: Sample) : SatisfyResult
+    data class Sat(
+        /** The satisfying assignment. */
+        val sample: Sample,
+    ) : SatisfyResult
 
     /** Subset of the input assumptions that's jointly infeasible against the problem's
      *  hard constraints. Sound (always unsat) but not necessarily minimal. For
      *  backends that can't extract a sub-core (LogicNG, Z3 without tracked assertions,
      *  local-search) this is the full input [Assumptions] verbatim. */
-    data class UnsatUnderAssumptions(val core: Assumptions) : SatisfyResult
+    data class UnsatUnderAssumptions(
+        /** The assumption subset that caused infeasibility. */
+        val core: Assumptions,
+    ) : SatisfyResult
 
     /** Problem is unsat even with the assumptions dropped — the assumption layer is
      *  irrelevant. Distinct from [UnsatUnderAssumptions] so the MaxSAT loop can short-
      *  circuit instead of relaxing a fictitious core. */
-    data class GloballyUnsat(val core: UnsatCore? = null) : SatisfyResult
+    data class GloballyUnsat(
+        /** The unsat core, when one is available. */
+        val core: UnsatCore? = null,
+    ) : SatisfyResult
+
     /** Indeterminate result (e.g. timeout). */
-    data class Unknown(val reason: TerminationReason) : SatisfyResult
+    data class Unknown(
+        /** Why the result is indeterminate. */
+        val reason: TerminationReason,
+    ) : SatisfyResult
 }
 
 /**

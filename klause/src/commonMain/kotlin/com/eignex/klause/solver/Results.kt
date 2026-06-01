@@ -47,7 +47,10 @@ sealed interface SampleResult {
     val assignment: Sample?
 
     /** A feasible solution was found. */
-    data class Found(val sample: Sample) : SampleResult {
+    data class Found(
+        /** The feasible assignment found. */
+        val sample: Sample,
+    ) : SampleResult {
         override val assignment: Sample get() = sample
     }
 
@@ -55,8 +58,12 @@ sealed interface SampleResult {
     data class Infeasible(val core: UnsatCore? = null) : SampleResult {
         override val assignment: Sample? = null
     }
+
     /** Search ended without a definitive answer. */
-    data class Unknown(val reason: TerminationReason) : SampleResult {
+    data class Unknown(
+        /** Why sampling ended without a definitive answer. */
+        val reason: TerminationReason,
+    ) : SampleResult {
         override val assignment: Sample? = null
     }
 }
@@ -87,15 +94,23 @@ sealed interface MinimizeResult {
     sealed interface WithSample : MinimizeResult {
         /** The solution assignment. */
         val sample: Sample
+
         /** Objective value of [sample]. */
         val objective: Double
         override val assignment: Sample get() = sample
         override val objectiveValue: Double get() = objective
     }
+
     /** A proven-optimal solution. */
     data class Optimal(override val sample: Sample, override val objective: Double) : WithSample
+
     /** Best solution found before the search stopped. */
-    data class BestFound(override val sample: Sample, override val objective: Double, val reason: TerminationReason) :
+    data class BestFound(
+        override val sample: Sample,
+        override val objective: Double,
+        /** Why the search stopped before proving optimality. */
+        val reason: TerminationReason,
+    ) :
         WithSample
 
     /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
@@ -103,8 +118,12 @@ sealed interface MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null
     }
+
     /** Optimisation ended without a definitive answer. */
-    data class Unknown(val reason: TerminationReason) : MinimizeResult {
+    data class Unknown(
+        /** Why optimisation ended without a definitive answer. */
+        val reason: TerminationReason,
+    ) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null
     }

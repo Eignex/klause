@@ -20,16 +20,17 @@ data class FloatInterval(
         require(lo.isFinite() && hi.isFinite()) {
             "FloatInterval bounds must be finite, got [$lo, $hi]"
         }
-        /** Interval width, `hi - lo`. */
         require(lo <= hi) {
-            /** True iff the interval is a single point. */
             "FloatInterval requires lo ≤ hi, got [$lo, $hi]"
         }
-    /** True iff [v] lies in `[lo, hi]`. */
     }
 
+    /** Interval width, `hi - lo`. */
     val width: Double get() = hi - lo
+
+    /** True iff the interval is a single point. */
     val isSingleton: Boolean get() = lo == hi
 
+    /** True iff [v] lies in `[lo, hi]`. */
     operator fun contains(v: Double): Boolean = v in lo..hi
 }

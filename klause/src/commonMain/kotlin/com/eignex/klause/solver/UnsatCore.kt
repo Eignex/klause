@@ -13,24 +13,27 @@ package com.eignex.klause.solver
  * Backends that don't compute cores leave the result-type's `core` field as `null`.
  */
 data class UnsatCore(
-    /** Number of factors in the core. */
     /** Ids of the factors forming the core. */
     val factorIds: IntArray,
 ) {
+    /** Number of factors in the core. */
     val size: Int get() = factorIds.size
+
+    /** True iff the core is empty. */
     val isEmpty: Boolean get() = factorIds.isEmpty()
 
     override fun equals(other: Any?): Boolean = other is UnsatCore && factorIds.contentEquals(other.factorIds)
 
     override fun hashCode(): Int = factorIds.contentHashCode()
 
-    /** The empty core. */
     override fun toString(): String = "UnsatCore(${factorIds.joinToString(",")})"
 
+    /** Factory for [UnsatCore]. */
     companion object {
+        /** The empty core. */
         val Empty: UnsatCore = UnsatCore(IntArray(0))
 
-        /** Builder that sorts + dedups in one pass. */
+        /** Build a core from factor [ids], sorting and de-duplicating in one pass. */
         fun of(ids: IntArray): UnsatCore {
             if (ids.isEmpty()) return Empty
             val sorted = ids.copyOf().also { it.sort() }
@@ -38,10 +41,10 @@ data class UnsatCore(
             for (r in 1 until sorted.size) {
                 if (sorted[r] != sorted[r - 1]) sorted[w++] = sorted[r]
             }
-            /** Build a core from factor [ids]. */
             return UnsatCore(if (w == sorted.size) sorted else sorted.copyOf(w))
         }
 
+        /** Build a core from a collection of factor [ids]. */
         fun of(ids: Collection<Int>): UnsatCore = of(ids.toIntArray())
     }
 }

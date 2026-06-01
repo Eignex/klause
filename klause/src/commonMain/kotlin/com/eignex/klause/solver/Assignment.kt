@@ -13,30 +13,31 @@ class Assignment(
     /** Number of integer variables. */
     val numIntVars: Int,
 ) {
-    /** Set Boolean variable [varId] to [value]. */
     private val bits: Bits = Bits(numBoolVars)
     private val ints: IntArray = IntArray(numIntVars)
 
+    /** Current value of Boolean variable [varId]. */
     fun boolValue(varId: Int): Boolean = bits.get(varId)
-/** Flip Boolean variable [varId]'s current value. */
 
+    /** Set Boolean variable [varId] to [value]. */
     fun setBool(varId: Int, value: Boolean) {
         if (value) bits.set(varId) else bits.clear(varId)
     }
-/** Current value of integer variable [varId]. */
 
+    /** Flip Boolean variable [varId]'s current value. */
     fun flipBool(varId: Int) {
-        /** Set integer variable [varId] to [value]. */
         if (bits.get(varId)) bits.clear(varId) else bits.set(varId)
     }
 
+    /** Current value of integer variable [varId]. */
     fun intValue(varId: Int): Int = ints[varId]
-/** Randomise every variable within its domain. */
 
+    /** Set integer variable [varId] to [value]. */
     fun setInt(varId: Int, value: Int) {
         ints[varId] = value
     }
 
+    /** Randomise every variable uniformly within its domain. */
     fun randomize(rng: Random, intDomains: Array<IntDomain>) {
         // Direct word fill — much faster than a per-var coin flip via bits.set / clear.
         val ws = bits.words
@@ -44,12 +45,12 @@ class Assignment(
         val tail = numBoolVars and 63
         if (tail != 0) ws[ws.size - 1] = ws[ws.size - 1] and ((1L shl tail) - 1L)
         for (i in 0 until numIntVars) {
-            /** Capture the current assignment as an immutable [Sample]. */
             val d = intDomains[i]
             ints[i] = d.valueAt(rng.nextInt(d.size)) // sparse-aware uniform pick
         }
     }
 
+    /** Capture the current assignment as an immutable [Sample]. */
     fun snapshot(): Sample = Sample(
         bools = BooleanArray(numBoolVars) { bits.get(it) },
         ints = ints.copyOf(),
