@@ -5,8 +5,6 @@ import com.eignex.klause.bench.report.EnvInfo
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.report.markdown
 import com.eignex.klause.bench.runner.MiniZincRunner
-import com.eignex.klause.bench.source.CorpusFetcher
-import java.io.File
 import java.time.Instant
 import kotlinx.serialization.Serializable
 
@@ -41,7 +39,7 @@ data class CoverageResults(
 object CoverageMetric {
     fun run(refs: List<ProblemRef>) {
         val runner = MiniZincRunner()
-        val nativeSet = loadNativePredicateSet()
+        val nativeSet = FznPredicates.nativeSet
         println()
         println("=== native-predicate coverage (klause native vs MiniZinc-decomposed; push toward 100%) ===")
         val rows = refs.mapNotNull { ref -> row(ref, runner, nativeSet) }
@@ -70,7 +68,7 @@ object CoverageMetric {
 
     private fun row(ref: ProblemRef, runner: MiniZincRunner, nativeSet: Set<String>): CoverageRow? {
         val fzn = runCatching { runner.compileFzn(ref) }.getOrNull() ?: return null
-        val counts = parseFznPredicates(fzn)
+        val counts = FznPredicates.counts(fzn)
         val native = counts.filterKeys { it in nativeSet }
         val decomposed = counts.filterKeys { it !in nativeSet }
         val nativeCount = native.values.sum()
@@ -78,34 +76,5 @@ object CoverageMetric {
         val total = nativeCount + decomposedCount
         return CoverageRow(ref.name, nativeCount, decomposedCount,
             if (total == 0) 1.0 else nativeCount.toDouble() / total, decomposed)
-    }
-
-    private val constraintHead = Regex("""^\s*constraint\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(""")
-
-    private fun parseFznPredicates(fznFile: File): Map<String, Int> {
-        val counts = mutableMapOf<String, Int>()
-        fznFile.useLines { lines ->
-            for (line in lines) constraintHead.find(line)?.let { counts.merge(it.groupValues[1], 1) { a, _ -> a + 1 } }
-        }
-        return counts
-    }
-
-    /** Predicates klause handles natively: redefinitions.mzn declarations + the names the
-     *  klause-fzn-cli parser dispatches on (read from FlatZincConstraints.kt source). */
-    private fun loadNativePredicateSet(): Set<String> {
-        val root = CorpusFetcher.workspaceRoot()
-        val redef = File(root, "klause-mzn-lib/share/minizinc/klause/redefinitions.mzn")
-        val predicateDecl = Regex("""^\s*predicate\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(""")
-        val fromRedef = buildSet {
-            if (redef.isFile) redef.useLines { ls -> ls.forEach { l -> predicateDecl.find(l)?.let { add(it.groupValues[1]) } } }
-        }
-        val constraintsKt = File(root, "klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincConstraints.kt")
-        val nameLit = Regex("""\"([A-Za-z_][A-Za-z0-9_]*)\"""")
-        val fromParser = buildSet {
-            if (constraintsKt.isFile) constraintsKt.useLines { ls ->
-                for (l in ls) if ("->" in l) for (m in nameLit.findAll(l)) if (m.groupValues[1].length > 2) add(m.groupValues[1])
-            }
-        }
-        return fromRedef + fromParser
     }
 }
