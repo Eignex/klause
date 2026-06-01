@@ -119,6 +119,11 @@ internal class FlatZincCompiler(
             defaultBacktrackParams = compileSearchAnnotation(),
             enumLabelsByVar = enumLabelsByVar.toMap(),
             setVarsByName = setVarsByName.toMap(),
+            lsObjective = when (solveDirective) {
+                is SolveDirective.Minimize -> buildFunctionalObjective(solveDirective.objVar, minimize = true)
+                is SolveDirective.Maximize -> buildFunctionalObjective(solveDirective.objVar, minimize = false)
+                else -> null
+            },
         )
     }
 

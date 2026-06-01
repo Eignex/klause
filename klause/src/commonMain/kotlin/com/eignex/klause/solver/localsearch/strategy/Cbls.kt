@@ -309,7 +309,34 @@ class Cbls(
                     if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
                 }
             }
+            is com.eignex.klause.solver.FunctionalObjective -> {
+                // Decomposed objective: its gradient lives in deltaIfApplied, not in per-var
+                // coefficients, so we can't pick a direction a priori. Seed *geometric* steps
+                // (±1, ±2, ±4, …, plus the domain endpoints) on each decision (leaf) variable
+                // and let the move scoring (which folds in the functional objective delta) keep
+                // the best. Pure ±1 descends a wide-domain coordinate objective far too slowly;
+                // geometric steps let the search jump while still refining at unit resolution.
+                for (v in obj.leafVars) {
+                    val cur = state.assignment.intValue(v)
+                    val d = state.problem.intDomains[v]
+                    var step = 1
+                    while (step <= OBJ_SEED_MAX_STEP) {
+                        val up = cur + step; val down = cur - step
+                        if (up <= d.max) sink.addChannelingIntSet(state, v, up)
+                        if (down >= d.min) sink.addChannelingIntSet(state, v, down)
+                        if (up > d.max && down < d.min) break
+                        step = step shl 1
+                    }
+                    if (cur != d.min) sink.addChannelingIntSet(state, v, d.min)
+                    if (cur != d.max) sink.addChannelingIntSet(state, v, d.max)
+                }
+            }
             else -> { /* no per-var direction without inspecting the objective shape */ }
         }
+    }
+
+    private companion object {
+        /** Largest geometric step seeded per leaf var during functional-objective descent. */
+        const val OBJ_SEED_MAX_STEP = 4096
     }
 }

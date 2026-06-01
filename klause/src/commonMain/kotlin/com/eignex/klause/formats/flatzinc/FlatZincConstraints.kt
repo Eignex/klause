@@ -19,6 +19,7 @@ import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Diffn
+import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Regular
@@ -30,6 +31,8 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Cumulatives
+import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -147,6 +150,9 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "circuit", "fzn_circuit", "klause_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit", "klause_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
+    "cumulatives", "fzn_cumulatives" -> emitCumulatives(c)
+    "sliding_sum", "fzn_sliding_sum" -> emitSlidingSum(c)
+    "fzn_geost_nonoverlap_k", "geost_nonoverlap_k" -> emitGeostNonoverlapK(c)
     "disjunctive", "fzn_disjunctive",
     "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c)
 
@@ -1146,6 +1152,70 @@ internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
     ))
 }
 
+/**
+ * `fzn_cumulatives(s, d, r, m, b, upper, min_m)` — multi-machine cumulative. Each task `i`
+ * runs on machine `m[i]` (a var); per-machine bound `b[k]` is a capacity (`upper`) or a
+ * minimum-load floor. Routes to the native graded [Cumulatives] factor. Durations, resources,
+ * and bounds may each be constants or vars (resolved live at solve time).
+ */
+internal fun FlatZincCompiler.emitCumulatives(c: FznConstraint) {
+    require(c.args.size == 7) { "cumulatives expects 7 args (s,d,r,m,b,upper,min_m), got ${c.args.size}" }
+    val starts = evalIntVarArray(c.args[0])
+    val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
+    val (resources, resourceVars) = resolveIntArrayConstOrVars(c.args[2])
+    val machines = evalIntVarArray(c.args[3])
+    val (bounds, boundVars) = resolveIntArrayConstOrVars(c.args[4])
+    val upper = evalBoolConst(c.args[5])
+    val minMachine = evalIntConst(c.args[6]).toInt()
+    factors.add(Cumulatives(
+        starts = starts,
+        durations = durations,
+        resources = resources,
+        machines = machines,
+        bounds = bounds,
+        upper = upper,
+        minMachine = minMachine,
+        durationVars = durationVars,
+        resourceVars = resourceVars,
+        boundVars = boundVars,
+    ))
+}
+
+/**
+ * `fzn_sliding_sum(low, up, seq, vs)` — every length-`seq` window of `vs` sums into
+ * `[low, up]`. Routes to the native graded [SlidingSum] factor.
+ */
+internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
+    require(c.args.size == 4) { "sliding_sum expects 4 args (low,up,seq,vs), got ${c.args.size}" }
+    val low = evalIntConst(c.args[0]).toInt()
+    val up = evalIntConst(c.args[1]).toInt()
+    val seq = evalIntConst(c.args[2]).toInt()
+    val vs = evalIntVarArray(c.args[3])
+    factors.add(SlidingSum(low = low, up = up, seq = seq, vs = vs))
+}
+
+/**
+ * `fzn_geost_nonoverlap_k(x1, w1, x2, w2)` — the k-dimensional pairwise non-overlap primitive
+ * that `geost` decomposes into (two boxes must be disjoint on at least one axis). Routes to a
+ * 2-object [Geost] factor (graded overlap-volume violation + separation repair) instead of the
+ * `exists`-over-clauses decomposition (issue #43). General `fzn_geost` lowers to many of these,
+ * so each pair gets the native graded gradient.
+ */
+internal fun FlatZincCompiler.emitGeostNonoverlapK(c: FznConstraint) {
+    require(c.args.size == 4) { "geost_nonoverlap_k expects 4 args (x1,w1,x2,w2), got ${c.args.size}" }
+    val x1 = evalIntVarArray(c.args[0])
+    val w1 = evalIntConstArray(c.args[1])
+    val x2 = evalIntVarArray(c.args[2])
+    val w2 = evalIntConstArray(c.args[3])
+    val k = x1.size
+    require(w1.size == k && x2.size == k && w2.size == k) { "geost_nonoverlap_k: dimension mismatch" }
+    factors.add(Geost(
+        numDims = k, numObjects = 2,
+        origin = x1 + x2,
+        length = w1 + w2,
+    ))
+}
+
 /** `disjunctive(starts, durations)` / `disjunctive_strict(...)`. Durations may be var. */
 internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
     require(c.args.size == 2) { "disjunctive expects 2 args, got ${c.args.size}" }
@@ -1358,38 +1428,27 @@ internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Bo
     factors.add(Element(idx = idx, result = result, arr = arr, arrIsVars = varArray, indexOffset = 1))
 }
 
+/**
+ * `array_bool_element(idx, arr, result)` / `array_var_bool_element(...)`:
+ * `result = arr[idx]` with 1-based indexing over Booleans. Routes through the native int
+ * [Element] factor by channeling the Boolean operands to `[0,1]` ints — so bool element
+ * gets the same graded violation + direct repair as int element (issue #45), instead of the
+ * old per-index reified-linear + indicator-clause decomposition (issue #37).
+ */
 internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: Boolean) {
     require(c.args.size == 3)
     val idx = resolveIntVar(c.args[0])
     val resultLit = resolveBoolLit(c.args[2])
-    val resultVar = Lit.variable(resultLit)
-    val len: Int = if (varArray) {
-        val arr = evalBoolVarArray(c.args[1])
-        for (i in 1..arr.size) {
-            val idxMatch = allocBool("__belem_${idx}_${i}_idx")
-            factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
-            // idxMatch → (result ↔ arr[i-1]): two binary clauses.
-            val arrLit = arr[i-1]
-            val arrVar = Lit.variable(arrLit)
-            factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, false), Lit.make(arrVar, true))))
-            factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, true), Lit.make(arrVar, false))))
-        }
-        arr.size
+    val resultInt = channelBoolsToInts(intArrayOf(resultLit), "belem_res")[0]
+    if (varArray) {
+        val arrLits = evalBoolVarArray(c.args[1])
+        val arr = channelBoolsToInts(arrLits, "belem")
+        factors.add(Element(idx = idx, result = resultInt, arr = arr, arrIsVars = true, indexOffset = 1))
     } else {
         val arrConst = evalBoolConstArray(c.args[1])
-        for (i in 1..arrConst.size) {
-            val idxMatch = allocBool("__belem_${idx}_${i}_idx")
-            factors.add(ReifiedLinear(idxMatch, intArrayOf(1), intArrayOf(idx), LinearOp.EQ, i))
-            if (arrConst[i-1]) {
-                factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, true))))
-            } else {
-                factors.add(Clause(intArrayOf(Lit.make(idxMatch, false), Lit.make(resultVar, false))))
-            }
-        }
-        arrConst.size
+        val arr = IntArray(arrConst.size) { if (arrConst[it]) 1 else 0 }
+        factors.add(Element(idx = idx, result = resultInt, arr = arr, arrIsVars = false, indexOffset = 1))
     }
-    factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.GE, 1))
-    factors.add(Linear(intArrayOf(1), intArrayOf(idx), LinearOp.LE, len))
 }
 
 internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {

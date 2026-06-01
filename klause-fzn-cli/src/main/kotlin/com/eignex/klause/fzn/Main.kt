@@ -109,7 +109,7 @@ private fun defaultBacktrackParams(program: FlatZincProgram): BacktrackParams =
 private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
     val base = program.defaultBacktrackParams ?: defaultBacktrackParams(program)
     val params = base.copy(randomSeed = opts.randomSeed ?: base.randomSeed)
-    runGeneric(BacktrackSolver(program.problem), params, program, opts)
+    runGeneric(BacktrackSolver(program.problem), params, program, opts, complete = true)
 }
 
 private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
@@ -149,7 +149,7 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
         costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = 1.0),
         cancellation = cancellation,
     )
-    runGeneric(solver, cblsParams, program, opts)
+    runGeneric(solver, cblsParams, program, opts, complete = false)
 }
 
 private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {
@@ -157,25 +157,33 @@ private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {
         randomSeed = opts.randomSeed,
         timeoutMillis = opts.timeLimitMs,
     )
-    runGeneric(LogicNGSolver(program.problem), params, program, opts)
+    runGeneric(LogicNGSolver(program.problem), params, program, opts, complete = true)
 }
 
 private fun runWithBrute(program: FlatZincProgram, opts: Options) {
     val params = BruteForceParams(randomSeed = opts.randomSeed)
-    runGeneric(BruteForceSolver(program.problem), params, program, opts)
+    runGeneric(BruteForceSolver(program.problem), params, program, opts, complete = true)
 }
 
-/** Unified per-engine entry: dispatches between satisfy and optimize on the solve goal. */
+/**
+ * Unified per-engine entry: dispatches between satisfy and optimize on the solve goal.
+ *
+ * [complete] is true only for solvers that exhaustively search (backtrack, brute, LogicNG):
+ * for them, an enumeration that ends without a solution *proves* unsatisfiability. The local-
+ * search backend is incomplete — it exhausts a flip/restart budget, never the solution space —
+ * so a fruitless run is `UNKNOWN`, never `UNSATISFIABLE`.
+ */
 private fun <P : SolverParams> runGeneric(
     solver: Solver<P>,
     params: P,
     program: FlatZincProgram,
     opts: Options,
+    complete: Boolean,
 ) {
     when (val solve = program.solve) {
-        is SolveDirective.Satisfy -> runSatisfy(solver, params, program, opts)
+        is SolveDirective.Satisfy -> runSatisfy(solver, params, program, opts, complete)
         is SolveDirective.Minimize, is SolveDirective.Maximize ->
-            runOptimize(solver, params, program, solve, opts)
+            runOptimize(solver, params, program, solve, opts, complete)
     }
 }
 
@@ -184,6 +192,7 @@ private fun <P : SolverParams> runSatisfy(
     params: P,
     program: FlatZincProgram,
     opts: Options,
+    complete: Boolean,
 ) {
     val applier = loadOznApplier(opts)
     val limit = if (opts.allSolutions) opts.solutionCap ?: Long.MAX_VALUE else 1L
@@ -201,7 +210,9 @@ private fun <P : SolverParams> runSatisfy(
     }
 
     if (produced == 0L) {
-        println("=====UNSATISFIABLE=====")
+        // No solution found: only a complete search proves unsatisfiability; an incomplete
+        // (local-search) run that emptied its budget can only report UNKNOWN.
+        println(if (complete) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
     }
@@ -213,6 +224,7 @@ private fun <P : SolverParams> runOptimize(
     program: FlatZincProgram,
     solve: SolveDirective,
     opts: Options,
+    complete: Boolean,
 ) {
     val (objName, maximize) = when (solve) {
         is SolveDirective.Minimize -> solve.objVar to false
@@ -225,13 +237,19 @@ private fun <P : SolverParams> runOptimize(
     val optimizer = solver as? Optimizer<P>
     if (optimizer == null) {
         // No native optimization: fall back to streaming linear-search-over-enumerate.
-        runOptimizeViaEnumerate(solver, params, program, objVarId, maximize, opts)
+        runOptimizeViaEnumerate(solver, params, program, objVarId, maximize, opts, complete)
         return
     }
     val applier = loadOznApplier(opts)
     // Streaming branch-and-bound: yield each improving incumbent, then a terminal verdict.
-    val objective = if (maximize) program.problem.maximizeInt(objVarId)
-                    else program.problem.minimizeInt(objVarId)
+    val linear = if (maximize) program.problem.maximizeInt(objVarId)
+                 else program.problem.minimizeInt(objVarId)
+    // Local search descends a *decomposed* objective only with a per-move gradient to the
+    // decision vars; use the functional objective (cone of `defines_var` aux vars) when the
+    // model provides one. Complete backends keep the LinearObjective (needed for bounding).
+    val objective: com.eignex.klause.solver.Objective =
+        if (solver is com.eignex.klause.solver.localsearch.LocalSearchSolver) (program.lsObjective ?: linear)
+        else linear
     var produced = 0
     for (step in optimizer.improvements(objective, params)) {
         when (step) {
@@ -268,6 +286,7 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     objVarId: Int,
     maximize: Boolean,
     opts: Options,
+    complete: Boolean,
 ) {
     val applier = loadOznApplier(opts)
     var best: Sample? = null
@@ -284,8 +303,10 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
         }
     }
     if (best == null) {
-        if (deadline != null && System.currentTimeMillis() > deadline) println("=====UNKNOWN=====")
-        else println("=====UNSATISFIABLE=====")
+        // Nothing feasible found. A complete search that ran to completion proves
+        // unsatisfiability; a deadline hit or an incomplete (LS) budget exhaustion is UNKNOWN.
+        val timedOut = deadline != null && System.currentTimeMillis() > deadline
+        println(if (complete && !timedOut) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
     }
