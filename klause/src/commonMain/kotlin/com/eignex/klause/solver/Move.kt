@@ -6,10 +6,18 @@ package com.eignex.klause.solver
  */
 sealed interface Move {
     /** Flip a Boolean variable's current value. */
-    data class BoolFlip(val varId: Int) : Move
+    data class BoolFlip(
+        /** Boolean variable id to flip. */
+        val varId: Int,
+    ) : Move
 
     /** Set an integer variable to [newValue]. */
-    data class IntSet(val varId: Int, val newValue: Int) : Move
+    data class IntSet(
+        /** Integer variable id to set. */
+        val varId: Int,
+        /** New value to assign. */
+        val newValue: Int,
+    ) : Move
 
     /**
      * Two or more single-variable moves applied as one transition. The engine commits
@@ -22,7 +30,10 @@ sealed interface Move {
      * primitives. Constructed via [com.eignex.klause.solver.localsearch.MoveSink.addCompound];
      * a Compound is tabu if *any* part is tabu (conservative).
      */
-    data class Compound(val parts: List<Move>) : Move {
+    data class Compound(
+        /** The single-variable moves applied together, in order. */
+        val parts: List<Move>,
+    ) : Move {
         init {
             require(parts.size >= 2) { "Compound move needs at least 2 parts, got ${parts.size}" }
             require(parts.all { it !is Compound }) { "Compound move cannot nest another Compound" }

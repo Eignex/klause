@@ -18,10 +18,15 @@ import com.eignex.klause.solver.propagation.PropagationState
  * can solve over reals natively (currently Z3). All other backends ignore it.
  */
 class Problem(
+    /** Number of Boolean variables; ids occupy `[0, numBoolVars)`. */
     val numBoolVars: Int,
+    /** Number of integer variables; ids occupy `[0, numIntVars)`. */
     val numIntVars: Int,
+    /** Domain (bounds) of each integer variable, indexed by int var id. */
     val intDomains: Array<IntDomain>,
+    /** The constraints over the variables. */
     val factors: Array<Factor>,
+    /** Optional real-valued sidecar for native-float backends; ignored by others. */
     val floatMetadata: FloatMetadata? = null,
     /**
      * Opt-in failed-literal probing at bake time. When `true`, every free bool variable is
