@@ -11,7 +11,14 @@ import com.eignex.klause.solver.propagation.PropagationState
  * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
-class Cardinality(val literals: IntArray, val min: Int, val max: Int) : LocalSearchFactor {
+class Cardinality(
+    /** The literals being counted. */
+    val literals: IntArray,
+    /** Inclusive lower bound on the number of true literals. */
+    val min: Int,
+    /** Inclusive upper bound on the number of true literals. */
+    val max: Int,
+) : LocalSearchFactor {
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }

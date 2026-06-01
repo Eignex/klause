@@ -18,17 +18,35 @@ import com.eignex.klause.solver.propagation.PropagationState
  * [binOffset] is the value `bins[i]` takes for bin 0 — typically `1` for MZN 1-based.
  */
 class BinPacking(
+    /** Bin-assignment variable id per item. */
     val bins: IntArray,
+    /** Item weights, parallel to [bins]. */
     val weights: IntArray,
+    /** Which capacity/load variant this factor enforces. */
     val mode: Mode,
+    /** Shared capacity for [Mode.UniformCapacity]. */
     val uniformCapacity: Int = 0,
+    /** Per-bin capacities for [Mode.PerBinCapacity]. */
     val capacities: IntArray? = null,
+    /** Per-bin load variable ids for [Mode.LoadVars]. */
     val loadVars: IntArray? = null,
+    /** Number of bins. */
     val numBins: Int,
+    /** Value `bins[i]` takes for bin 0 (typically 1 for 1-based MiniZinc). */
     val binOffset: Int = 1,
 ) : LocalSearchFactor {
 
-    enum class Mode { UniformCapacity, PerBinCapacity, LoadVars }
+    /** Which bin-packing capacity/load variant a [BinPacking] enforces. */
+    enum class Mode {
+        /** Single shared capacity ([uniformCapacity]) for every bin. */
+        UniformCapacity,
+
+        /** Per-bin capacities ([capacities]). */
+        PerBinCapacity,
+
+        /** Per-bin load variables ([loadVars]). */
+        LoadVars,
+    }
 
     init {
         require(bins.size == weights.size) { "bin_packing: bins/weights size mismatch" }

@@ -22,13 +22,21 @@ import com.eignex.klause.solver.propagation.PropagationState
  *    current min (and symmetric on the upper-bound run).
  */
 class MinCostFlow(
+    /** Total number of nodes. */
     val numNodes: Int,
+    /** Tail node of each arc, parallel to [arcTo]. */
     val arcFrom: IntArray,
+    /** Head node of each arc, parallel to [arcFrom]. */
     val arcTo: IntArray,
+    /** Per-node supply (positive) / demand (negative) / transit (0). */
     val balance: IntArray,
+    /** Flow variable id per arc. */
     val flow: IntArray,
+    /** Per-arc unit cost, or null when there is no cost term. */
     val weight: IntArray?,
+    /** Total-cost variable id, or -1 when no cost variable. */
     val cost: Int, // -1 when no cost variable
+    /** Integer representing node 0 (0 native, 1 for FlatZinc). */
     val nodeOffset: Int = 0,
 ) : LocalSearchFactor {
 

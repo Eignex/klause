@@ -19,14 +19,27 @@ import com.eignex.klause.solver.propagation.PropagationState
  * `fzn_atleast_nvalues`, `fzn_atmost_nvalues`) lower to the same factor type.
  */
 class NValue(
+    /** Integer variable id holding the distinct-value count target. */
     val n: Int,
+    /** Integer variable ids whose distinct values are counted. */
     val xs: IntArray,
+    /** How [n] relates to the actual distinct-value count. */
     val mode: Mode = Mode.Eq,
     /** Per-index presence literals; empty for the non-opt fast path. */
     val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
-    enum class Mode { Eq, AtLeast, AtMost }
+    /** How an `nvalue` constraint's target relates to the actual distinct-value count. */
+    enum class Mode {
+        /** Distinct count equals [n]. */
+        Eq,
+
+        /** Distinct count is at least [n]. */
+        AtLeast,
+
+        /** Distinct count is at most [n]. */
+        AtMost,
+    }
 
     init {
         require(xs.isNotEmpty()) { "nvalue: empty xs" }

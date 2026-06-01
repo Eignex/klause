@@ -31,7 +31,12 @@ private const val SET_BITSET_MAX_PROPOSALS = 8
 
 /** `leftBools ⊆ rightBools`: for each universe position `i`, enforce
  *  `leftBools[i] → rightBools[i]`. A `rightBools[i] == -1` pin forces `leftBools[i] = false`. */
-class SetBitsetSubset(val leftBools: IntArray, val rightBools: IntArray) : LocalSearchFactor {
+class SetBitsetSubset(
+    /** Indicator bool ids of the candidate subset. */
+    val leftBools: IntArray,
+    /** Indicator bool ids of the candidate superset, parallel to [leftBools]. */
+    val rightBools: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(leftBools.size == rightBools.size) { "SetBitsetSubset: parallel arrays must have equal length" }
@@ -153,7 +158,12 @@ class SetBitsetSubset(val leftBools: IntArray, val rightBools: IntArray) : Local
 
 /** `leftBools ∩ rightBools = ∅`: for each universe position `i` where both `leftBools[i]`
  *  and `rightBools[i]` are non-negative, enforce `¬(leftBools[i] ∧ rightBools[i])`. */
-class SetBitsetDisjoint(val leftBools: IntArray, val rightBools: IntArray) : LocalSearchFactor {
+class SetBitsetDisjoint(
+    /** Indicator bool ids of the left set. */
+    val leftBools: IntArray,
+    /** Indicator bool ids of the right set, parallel to [leftBools]. */
+    val rightBools: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(leftBools.size == rightBools.size) { "SetBitsetDisjoint: parallel arrays must have equal length" }
@@ -257,7 +267,12 @@ class SetBitsetDisjoint(val leftBools: IntArray, val rightBools: IntArray) : Loc
 }
 
 /** `leftBools = rightBools`: bidirectional subset over the unified universe. */
-class SetBitsetEq(val leftBools: IntArray, val rightBools: IntArray) : LocalSearchFactor {
+class SetBitsetEq(
+    /** Indicator bool ids of the left set. */
+    val leftBools: IntArray,
+    /** Indicator bool ids of the right set, parallel to [leftBools]. */
+    val rightBools: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(leftBools.size == rightBools.size) { "SetBitsetEq: parallel arrays must have equal length" }
