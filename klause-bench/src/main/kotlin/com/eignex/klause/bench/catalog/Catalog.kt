@@ -111,15 +111,30 @@ data class ProblemRef(
 /** A named, described collection of [ProblemRef]s. */
 data class Suite(val id: String, val description: String, val problems: List<ProblemRef>)
 
-/** The registry. [suites] is assembled in [Suites]; lookups are by id / category / tag. */
+/**
+ * A suite whose problems are *discovered* on demand (e.g. an external corpus selected from a
+ * fetched cache) rather than listed statically. The [provider] is invoked only when the suite
+ * is actually resolved — listing shows [id]/[description] without triggering a fetch.
+ */
+data class DynamicSuite(val id: String, val description: String, val provider: () -> List<ProblemRef>)
+
+/** The registry. Static [suites] + [dynamicSuites] are assembled in [Suites]; lookups are by
+ *  id / category / tag. */
 object Catalog {
     val suites: List<Suite> get() = Suites.all
+    val dynamicSuites: List<DynamicSuite> get() = Suites.dynamic
 
-    fun suite(id: String): Suite =
-        suites.firstOrNull { it.id == id } ?: error("no such suite: $id (have ${suites.map { it.id }})")
+    /** All suite ids (static + dynamic), for listings and selection. */
+    val suiteIds: List<String> get() = suites.map { it.id } + dynamicSuites.map { it.id }
+
+    fun suite(id: String): Suite {
+        suites.firstOrNull { it.id == id }?.let { return it }
+        dynamicSuites.firstOrNull { it.id == id }?.let { return Suite(it.id, it.description, it.provider()) }
+        error("no such suite: $id (have $suiteIds)")
+    }
 
     fun problems(vararg suiteIds: String): List<ProblemRef> =
-        (if (suiteIds.isEmpty()) suites else suiteIds.map { suite(it) }).flatMap { it.problems }
+        (if (suiteIds.isEmpty()) suites.map { it.id } else suiteIds.toList()).flatMap { suite(it).problems }
 
     fun byCategory(category: Category): List<ProblemRef> =
         suites.flatMap { it.problems }.filter { it.category == category }

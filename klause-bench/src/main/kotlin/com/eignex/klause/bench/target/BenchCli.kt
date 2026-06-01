@@ -49,6 +49,7 @@ object BenchCli {
         for (t in Targets.all) println("  ${t.id.padEnd(20)} ${t.description}")
         println("\nSuites:")
         for (s in Catalog.suites) println("  ${s.id.padEnd(20)} ${s.problems.size} problems — ${s.description}")
+        for (d in Catalog.dynamicSuites) println("  ${d.id.padEnd(20)} (discovered) — ${d.description}")
         println("\nUsage: bench <target-id>")
     }
 }
