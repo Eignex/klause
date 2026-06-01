@@ -10,14 +10,22 @@ package com.eignex.klause.solver
  * and currently LocalSearch / Backtrack via a lowering pass) approximate this interval
  * with finite resolution and may produce solutions within rounding error of the bound.
  */
-data class FloatInterval(val lo: Double, val hi: Double) {
+data class FloatInterval(
+    /** Inclusive lower bound. */
+    val lo: Double,
+    /** Inclusive upper bound. */
+    val hi: Double,
+) {
     init {
         require(lo.isFinite() && hi.isFinite()) {
             "FloatInterval bounds must be finite, got [$lo, $hi]"
         }
+        /** Interval width, `hi - lo`. */
         require(lo <= hi) {
+            /** True iff the interval is a single point. */
             "FloatInterval requires lo ≤ hi, got [$lo, $hi]"
         }
+    /** True iff [v] lies in `[lo, hi]`. */
     }
 
     val width: Double get() = hi - lo

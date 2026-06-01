@@ -22,7 +22,9 @@ package com.eignex.klause.solver
  * Subclasses can override to add real cross-call state.
  */
 interface Session<P : SolverParams> : AutoCloseable {
+    /** The backing solver. */
     val solver: Solver<P>
+    /** The problem being solved. */
     val problem: Problem get() = solver.problem
 
     /** Current depth of the assumption stack. */
@@ -36,6 +38,7 @@ interface Session<P : SolverParams> : AutoCloseable {
     /** Undo the most recent [push]. Throws if the stack is empty. */
     fun pop()
 
+    /** Solve once under the current assumption stack. */
     fun solve(params: P): SolveResult
 
     /** Default implementation drains [samples] for one yield. Wraps it in
@@ -49,7 +52,9 @@ interface Session<P : SolverParams> : AutoCloseable {
             SampleResult.Unknown(TerminationReason.BudgetExhausted)
         }
     }
+    /** Lazily draw diverse samples under the current assumptions. */
     fun samples(params: P): Sequence<Sample>
+    /** Lazily enumerate distinct models under the current assumptions. */
     fun enumerate(params: P): Sequence<Sample>
 
     /**

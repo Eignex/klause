@@ -15,6 +15,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
  * each [UnsatUnderAssumptions.core].
  */
 sealed interface SatisfyResult {
+    /** Satisfiable, carrying a model. */
     data class Sat(val sample: Sample) : SatisfyResult
 
     /** Subset of the input assumptions that's jointly infeasible against the problem's
@@ -27,6 +28,7 @@ sealed interface SatisfyResult {
      *  irrelevant. Distinct from [UnsatUnderAssumptions] so the MaxSAT loop can short-
      *  circuit instead of relaxing a fictitious core. */
     data class GloballyUnsat(val core: UnsatCore? = null) : SatisfyResult
+    /** Indeterminate result (e.g. timeout). */
     data class Unknown(val reason: TerminationReason) : SatisfyResult
 }
 

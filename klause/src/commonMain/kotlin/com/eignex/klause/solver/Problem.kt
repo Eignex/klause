@@ -115,7 +115,9 @@ class Problem(
         probeSeed = probeSeed,
     )
 
+    /** Factor ids mentioning each Boolean variable, indexed by bool var id. */
     val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
+    /** Factor ids mentioning each integer variable, indexed by int var id. */
     val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }
 
     /**
@@ -143,6 +145,7 @@ class Problem(
         }
     }
 
+    /** Total number of factors. */
     val numFactors: Int get() = factors.size
 
     /**

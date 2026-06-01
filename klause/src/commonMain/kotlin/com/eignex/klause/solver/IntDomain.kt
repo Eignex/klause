@@ -73,6 +73,7 @@ class IntDomain private constructor(
         return max - min + 1 - (holes?.size ?: 0)
     }
 
+    /** True iff [value] lies in the domain. */
     operator fun contains(value: Int): Boolean {
         if (value < min || value > max) return false
         val bs = bitset
@@ -84,6 +85,7 @@ class IntDomain private constructor(
         return holes.binarySearchInt(value) < 0
     }
 
+    /** Nearest in-domain value to [value]. */
     fun clamp(value: Int): Int = if (value < min) {
         min
     } else if (value > max) {
@@ -192,6 +194,7 @@ class IntDomain private constructor(
         return IntDomain(m, max, newHoles, null, 0)
     }
 
+    /** Copy of the domain with its max tightened to at most [newMax]. */
     fun withMaxAtMost(newMax: Int): IntDomain {
         if (newMax >= max) return this
         check(newMax >= min) { "withMaxAtMost($newMax) empties domain [$min..$max]" }
@@ -328,6 +331,7 @@ class IntDomain private constructor(
         else -> "IntDomain($min..$max)"
     }
 
+    /** Factory helpers for [IntDomain]. */
     companion object {
         /** Span threshold (inclusive) below which interior exclusions on a contiguous
          *  domain transition to bitset storage instead of holes. 256 ⇒ ≤ 4 longs of

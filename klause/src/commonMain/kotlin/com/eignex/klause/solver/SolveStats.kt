@@ -44,6 +44,7 @@ data class SolveStats(
     val wallMs: Long = 0L,
     val timedOut: Boolean = false,
 ) {
+    /** Shared empty/default [SolveStats] instances. */
     companion object {
         internal val ZERO_COUNT: SumResult = SumResult(sum = 0.0)
         internal val NO_MAX: MaxResult = MaxResult(Double.NEGATIVE_INFINITY)

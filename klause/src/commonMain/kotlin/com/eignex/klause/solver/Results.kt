@@ -46,6 +46,7 @@ sealed interface SampleResult {
      *  sealed type when the distinction matters. */
     val assignment: Sample?
 
+    /** A feasible solution was found. */
     data class Found(val sample: Sample) : SampleResult {
         override val assignment: Sample get() = sample
     }
@@ -54,6 +55,7 @@ sealed interface SampleResult {
     data class Infeasible(val core: UnsatCore? = null) : SampleResult {
         override val assignment: Sample? = null
     }
+    /** Search ended without a definitive answer. */
     data class Unknown(val reason: TerminationReason) : SampleResult {
         override val assignment: Sample? = null
     }
@@ -83,12 +85,16 @@ sealed interface MinimizeResult {
 
     /** Common shape for verdicts that carry an assignment. */
     sealed interface WithSample : MinimizeResult {
+        /** The solution assignment. */
         val sample: Sample
+        /** Objective value of [sample]. */
         val objective: Double
         override val assignment: Sample get() = sample
         override val objectiveValue: Double get() = objective
     }
+    /** A proven-optimal solution. */
     data class Optimal(override val sample: Sample, override val objective: Double) : WithSample
+    /** Best solution found before the search stopped. */
     data class BestFound(override val sample: Sample, override val objective: Double, val reason: TerminationReason) :
         WithSample
 
@@ -97,6 +103,7 @@ sealed interface MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null
     }
+    /** Optimisation ended without a definitive answer. */
     data class Unknown(val reason: TerminationReason) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null

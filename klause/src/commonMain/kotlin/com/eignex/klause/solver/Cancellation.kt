@@ -33,6 +33,7 @@ import kotlin.time.TimeSource
  * stream).
  */
 fun interface Cancellation {
+    /** True iff cancellation has been requested. */
     fun isCancelled(): Boolean
 
     /** Makes the token callable as `cancellation()` — natural shorthand for a
@@ -46,6 +47,7 @@ fun interface Cancellation {
      *  exhausted" two-key escapes that shouldn't fire on either alone. */
     infix fun and(other: Cancellation): Cancellation = Cancellation { this.isCancelled() && other.isCancelled() }
 
+    /** Standard [Cancellation] tokens. */
     companion object {
         /** Default token: never cancels. */
         val Never: Cancellation = Cancellation { false }

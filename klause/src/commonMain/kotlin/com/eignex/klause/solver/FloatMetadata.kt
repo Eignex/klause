@@ -22,9 +22,13 @@ package com.eignex.klause.solver
  * backend continues to work unchanged.
  */
 data class FloatMetadata(
+    /** Real domain per float variable. */
     val intervals: Array<FloatInterval>,
+    /** Bucket count per float variable. */
     val bucketCounts: IntArray,
+    /** Backing integer var id per float variable. */
     val intVarByFloatVar: IntArray,
+    /** Original real-valued linear constraints. */
     val constraints: List<RealLinearConstraint>,
 ) {
     init {
@@ -34,6 +38,7 @@ data class FloatMetadata(
         }
     }
 
+    /** Number of float variables. */
     val numFloatVars: Int get() = intervals.size
 
     override fun equals(other: Any?): Boolean {
@@ -62,9 +67,13 @@ data class FloatMetadata(
  * of these at lowering time.
  */
 data class RealLinearConstraint(
+    /** Real coefficients, parallel to [floatVarIds]. */
     val coeffs: DoubleArray,
+    /** Float variable ids, parallel to [coeffs]. */
     val floatVarIds: IntArray,
+    /** Comparison relating the weighted sum to [bound]. */
     val op: com.eignex.klause.solver.factor.LinearOp,
+    /** Right-hand-side bound. */
     val bound: Double,
 ) {
     init {

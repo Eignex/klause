@@ -9,6 +9,7 @@ package com.eignex.klause.solver
  * either fall back to the generic [evaluate] or refuse to optimise other subtypes.
  */
 interface Objective {
+    /** Objective value of [sample]; lower is better. */
     fun evaluate(sample: Sample): Double
 }
 
@@ -30,6 +31,7 @@ interface Objective {
  * default unshaped path is faster than apply/evaluate/revert per scored move.
  */
 interface IncrementalObjective : Objective {
+    /** Change in objective if [move] were applied to [assignment]. */
     fun deltaIfApplied(assignment: Assignment, move: Move): Double
 }
 

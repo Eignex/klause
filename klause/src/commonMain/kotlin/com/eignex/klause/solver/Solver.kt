@@ -14,6 +14,7 @@ import com.eignex.klause.solver.backtrack.BacktrackSolver
  * BacktrackParams) override to return a copy with the merged pins applied.
  */
 interface SolverParams {
+    /** Return a copy of these params with [assumptions] applied. */
     fun withAssumptions(@Suppress("UNUSED_PARAMETER") assumptions: Assumptions): SolverParams = this
 
     /** Inject a cooperative cancellation token. Backends that support cancellation
@@ -78,7 +79,9 @@ sealed interface SolveResult {
  *    an alias for [samples] and may yield duplicates.
  */
 interface Solver<P : SolverParams> {
+    /** The problem this solver operates on. */
     val problem: Problem
+    /** Solve the problem once and return a [SolveResult]. */
     fun solve(params: P): SolveResult
 
     /**
@@ -95,7 +98,9 @@ interface Solver<P : SolverParams> {
             SampleResult.Unknown(TerminationReason.BudgetExhausted)
         }
     }
+    /** Lazily draw diverse samples. */
     fun samples(params: P): Sequence<Sample>
+    /** Lazily enumerate distinct models. */
     fun enumerate(params: P): Sequence<Sample>
 
     /**

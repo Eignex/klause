@@ -12,7 +12,11 @@ package com.eignex.klause.solver
  *
  * Backends that don't compute cores leave the result-type's `core` field as `null`.
  */
-data class UnsatCore(val factorIds: IntArray) {
+data class UnsatCore(
+    /** Number of factors in the core. */
+    /** Ids of the factors forming the core. */
+    val factorIds: IntArray,
+) {
     val size: Int get() = factorIds.size
     val isEmpty: Boolean get() = factorIds.isEmpty()
 
@@ -20,6 +24,7 @@ data class UnsatCore(val factorIds: IntArray) {
 
     override fun hashCode(): Int = factorIds.contentHashCode()
 
+    /** The empty core. */
     override fun toString(): String = "UnsatCore(${factorIds.joinToString(",")})"
 
     companion object {
@@ -33,6 +38,7 @@ data class UnsatCore(val factorIds: IntArray) {
             for (r in 1 until sorted.size) {
                 if (sorted[r] != sorted[r - 1]) sorted[w++] = sorted[r]
             }
+            /** Build a core from factor [ids]. */
             return UnsatCore(if (w == sorted.size) sorted else sorted.copyOf(w))
         }
 
