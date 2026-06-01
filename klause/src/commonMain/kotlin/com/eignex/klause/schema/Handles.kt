@@ -151,15 +151,25 @@ class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>
     internal constructor(handle: FloatHandle, coeff: Double, offset: Double) :
         this(if (coeff == 0.0) emptyMap() else mapOf(handle to coeff), offset)
 
+    /** `this + d`. */
     operator fun plus(d: Double): FloatExpr = FloatExpr(terms, offset + d)
+
+    /** `this - d`. */
     operator fun minus(d: Double): FloatExpr = FloatExpr(terms, offset - d)
+
+    /** `c · this`. */
     operator fun times(c: Int): FloatExpr = times(c.toDouble())
+
+    /** `c · this`. */
     operator fun times(c: Double): FloatExpr {
         if (c == 0.0) return FloatExpr(emptyMap(), 0.0)
         return FloatExpr(terms.mapValues { it.value * c }, offset * c)
     }
+
+    /** `-this`. */
     operator fun unaryMinus(): FloatExpr = times(-1.0)
 
+    /** `this + other`, merging coefficient maps. */
     operator fun plus(other: FloatExpr): FloatExpr {
         val merged = LinkedHashMap<FloatHandle, Double>(terms)
         for ((h, c) in other.terms) {
@@ -168,13 +178,25 @@ class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>
         }
         return FloatExpr(merged, offset + other.offset)
     }
+    /** `this - other`. */
     operator fun minus(other: FloatExpr): FloatExpr = this + (-other)
 
+    /** `this ≤ threshold`. */
     infix fun le(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LE)
+
+    /** `this < threshold`. */
     infix fun lt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LT)
+
+    /** `this ≥ threshold`. */
     infix fun ge(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GE)
+
+    /** `this > threshold`. */
     infix fun gt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GT)
+
+    /** `this = threshold`. */
     infix fun eq(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.EQ)
+
+    /** `this ≠ threshold`. */
     infix fun ne(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.NE)
 
     /** Expression-vs-expression comparison: rewrite `lhs OP rhs` as `(lhs - rhs) OP 0`. */

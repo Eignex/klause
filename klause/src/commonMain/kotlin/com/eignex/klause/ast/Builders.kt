@@ -1,25 +1,31 @@
 package com.eignex.klause.ast
 
+/** Minimum of [xs] (at least one argument). */
 fun min(vararg xs: IntTerm): IntExpr {
     require(xs.isNotEmpty()) { "min(): need at least one argument" }
     return IntMin(xs.map { it.toIntExpr() })
 }
 
+/** Maximum of [xs] (at least one argument). */
 fun max(vararg xs: IntTerm): IntExpr {
     require(xs.isNotEmpty()) { "max(): need at least one argument" }
     return IntMax(xs.map { it.toIntExpr() })
 }
 
+/** Absolute value of [x]. */
 fun abs(x: IntTerm): IntExpr = IntAbs(x.toIntExpr())
 
+/** `if cond then thenE else elseE` as an integer expression. */
 fun ifThenElse(cond: BoolTerm, thenE: IntTerm, elseE: IntTerm): IntExpr =
     IntIfThenElse(cond.toExpr(), thenE.toIntExpr(), elseE.toIntExpr())
 
+/** `items[index]` — array element selection (items must be non-empty). */
 fun element(index: IntTerm, items: List<IntTerm>): IntExpr {
     require(items.isNotEmpty()) { "element(): items must not be empty" }
     return IntElement(index.toIntExpr(), items.map { it.toIntExpr() })
 }
 
+/** All of [xs] take pairwise-distinct values (with a pigeonhole UNSAT guard on bare handles). */
 fun allDifferent(vararg xs: IntTerm): BoolExpr {
     require(xs.size >= 2) { "allDifferent(): need at least two terms" }
     // Pigeonhole guard: if all operands are bare schema handles, check that the union of their
@@ -73,10 +79,13 @@ fun pseudoBoolean(weights: List<Int>, lits: List<BoolTerm>, op: PbOp, bound: Int
     return PseudoBooleanExpr(weights, lits.map { it.toExpr() }, op, bound)
 }
 
+/** Pseudo-Boolean `Σ wᵢ·lᵢ ≤ k`. */
 fun pbAtMost(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr = pseudoBoolean(weights, lits, PbOp.LE, k)
 
+/** Pseudo-Boolean `Σ wᵢ·lᵢ ≥ k`. */
 fun pbAtLeast(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr = pseudoBoolean(weights, lits, PbOp.GE, k)
 
+/** Pseudo-Boolean `Σ wᵢ·lᵢ = k`. */
 fun pbExactly(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr = pseudoBoolean(weights, lits, PbOp.EQ, k)
 
 /**
@@ -263,9 +272,11 @@ fun disjunctiveOpt(starts: List<IntTerm>, durations: List<Int>, presents: List<B
 fun countEqOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
     countOptCommon(xs, v, n, presents, CountOp.EQ)
 
+/** Presence-gated count `n ≠ #{i : xs[i] = v ∧ present[i]}`. */
 fun countNeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
     countOptCommon(xs, v, n, presents, CountOp.NE)
 
+/** Presence-gated count `n ≤ #{i : xs[i] = v ∧ present[i]}`. */
 fun countLeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
     countOptCommon(xs, v, n, presents, CountOp.LE)
 
