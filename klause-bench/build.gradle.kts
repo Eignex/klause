@@ -248,6 +248,22 @@ tasks.register<JavaExec>("runMeasureBacktrack") {
     }
 }
 
+tasks.register<JavaExec>("runLsConfigProbe") {
+    group = "verification"
+    description = "Probe time-to-feasible per (strategy, restart) config on one FZN — tests whether VND/ILS large-move workers close the feasibility misses vs the tuned CBLS default."
+    notCompatibleWithConfigurationCache(
+        "doFirst reads gradle.startParameter.systemPropertiesArgs at execution time",
+    )
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.parity.LsConfigProbeMain")
+    doFirst {
+        for ((k, v) in System.getProperties()) {
+            val key = k.toString()
+            if (key.startsWith("klause.lsprobe.")) systemProperty(key, v.toString())
+        }
+    }
+}
+
 tasks.register<JavaExec>("runCblsDiag") {
     group = "verification"
     description = "Diagnose CBLS feasibility plateaus: cost trajectory + violated-class histogram + flat-gradient fraction."
