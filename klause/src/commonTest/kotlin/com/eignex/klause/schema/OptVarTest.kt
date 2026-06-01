@@ -1,7 +1,7 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.BoolSpec
 import com.eignex.klause.ast.IntSpec
+import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.allDifferentOpt
@@ -42,7 +42,9 @@ class OptDeclaratorTest {
         assertEquals(2, entries.size)
         // Presence bool registered first under the synthetic name.
         assertEquals("x__present", entries[0].key)
-        assertTrue(entries[0].value is BoolSpec)
+        val presence = entries[0].value
+        assertTrue(presence is PresenceSpec)
+        assertEquals("x", presence.valueName)
         assertEquals("x", entries[1].key)
         assertTrue(entries[1].value is IntSpec)
     }
