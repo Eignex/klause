@@ -5,7 +5,13 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
-enum class VarKind { Bool, Int }
+enum class VarKind {
+    /** A Boolean variable. */
+    Bool,
+
+    /** An integer variable. */
+    Int,
+}
 
 /**
  * Stateful propagator with a decision trail. Push pins via [pinBool] / [pinInt]; each push
@@ -21,7 +27,10 @@ enum class VarKind { Bool, Int }
  *
  * Not thread-safe. One consumer per session.
  */
-class PropagationSession(val problem: Problem) {
+class PropagationSession(
+    /** The problem being propagated. */
+    val problem: Problem,
+) {
     private val state: PropagationState = PropagationState(problem, Assumptions.None)
 
     /** `levelStates[L]` is the [PropagationState.LevelMark] right after level [L]'s

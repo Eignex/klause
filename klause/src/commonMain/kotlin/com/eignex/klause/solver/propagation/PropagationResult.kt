@@ -31,55 +31,73 @@ sealed interface PropagationResult {
          *  from [intKeys]; ascending. Populated by bound-SAC and any future propagation
          *  that wants to expose non-singleton deductions. */
         val intMinKeys: IntArray = IntArray(0),
+        /** Lower-bound values aligned with [intMinKeys]. */
         val intMinValues: IntArray = IntArray(0),
+        /** Int var ids whose upper bound was tightened, ascending. */
         val intMaxKeys: IntArray = IntArray(0),
+        /** Upper-bound values aligned with [intMaxKeys]. */
         val intMaxValues: IntArray = IntArray(0),
         /** Interior holes: parallel `(varId, value)` rows in lex order. Each row
          *  encodes `v ≠ value`, with `value` strictly between v's current min and max. */
         val intHoleVarIds: IntArray = IntArray(0),
+        /** Forbidden values aligned with [intHoleVarIds]. */
         val intHoleValues: IntArray = IntArray(0),
     ) : PropagationResult {
 
+        /** True iff nothing was forced. */
         val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
+
+        /** Number of forced Boolean variables. */
         val numBools: Int get() = boolKeys.size
+
+        /** Number of forced (singleton) integer variables. */
         val numInts: Int get() = intKeys.size
 
+        /** Forced value for bool [id], or null if not implied. */
         fun boolValueOrNull(id: Int): Boolean? {
             val idx = boolKeys.binarySearchInt(id)
             return if (idx >= 0) boolValues[idx] else null
         }
 
+        /** Forced value for int [id], or null if not implied. */
         fun intValueOrNull(id: Int): Int? {
             val idx = intKeys.binarySearchInt(id)
             return if (idx >= 0) intValues[idx] else null
         }
 
+        /** Tightened lower bound for int [id], or null if none. */
         fun intMinOrNullCompat(id: Int): Int? {
             val idx = intMinKeys.binarySearchInt(id)
             return if (idx >= 0) intMinValues[idx] else null
         }
 
+        /** Tightened upper bound for int [id], or null if none. */
         fun intMaxOrNullCompat(id: Int): Int? {
             val idx = intMaxKeys.binarySearchInt(id)
             return if (idx >= 0) intMaxValues[idx] else null
         }
 
+        /** Invoke [action] for each lower-bound tightening `(id, value)`. */
         inline fun forEachIntMin(action: (id: Int, value: Int) -> Unit) {
             for (i in intMinKeys.indices) action(intMinKeys[i], intMinValues[i])
         }
 
+        /** Invoke [action] for each upper-bound tightening `(id, value)`. */
         inline fun forEachIntMax(action: (id: Int, value: Int) -> Unit) {
             for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
         }
 
+        /** Invoke [action] for each interior hole `(id, forbiddenValue)`. */
         inline fun forEachIntHole(action: (id: Int, value: Int) -> Unit) {
             for (i in intHoleVarIds.indices) action(intHoleVarIds[i], intHoleValues[i])
         }
 
+        /** Invoke [action] for each forced Boolean `(id, value)`. */
         inline fun forEachBool(action: (id: Int, value: Boolean) -> Unit) {
             for (i in boolKeys.indices) action(boolKeys[i], boolValues[i])
         }
 
+        /** Invoke [action] for each forced integer `(id, value)`. */
         inline fun forEachInt(action: (id: Int, value: Int) -> Unit) {
             for (i in intKeys.indices) action(intKeys[i], intValues[i])
         }
@@ -156,7 +174,9 @@ sealed interface PropagationResult {
             append("})")
         }
 
+        /** Shared [PropagationResult] instances. */
         companion object {
+            /** The empty implied set (nothing forced). */
             val Empty: Implied = Implied(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor

@@ -22,7 +22,11 @@ import com.eignex.klause.util.IntArrayList
  *  `tightenIntMin` / `tightenIntMax` / `setInt` as before. The driver sets [currentLevel]
  *  to the inherited level before each factor invocation; mutators read it.
  */
-class PropagationState(val problem: Problem, assumptions: Assumptions) {
+class PropagationState(
+    /** The problem being propagated. */
+    val problem: Problem,
+    assumptions: Assumptions,
+) {
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
      *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than the old `Array<Boolean?>`
@@ -34,9 +38,16 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
      *  `state.boolValues[v] = x`. Reads `null` when unassigned. Write `null` clears the
      *  assigned bit. The backing storage is the parallel-Bits pair above. */
     inner class BoolView {
+        /** Number of Boolean variables. */
         val size: Int get() = problem.numBoolVars
+
+        /** Valid Boolean variable id range. */
         val indices: IntRange get() = 0 until problem.numBoolVars
+
+        /** Current value of bool [v], or null if unassigned. */
         operator fun get(v: Int): Boolean? = if (boolAssigned.get(v)) boolValueBits.get(v) else null
+
+        /** Assign bool [v] to [value], or null to unassign. */
         operator fun set(v: Int, value: Boolean?) {
             if (value == null) {
                 boolAssigned.clear(v)
@@ -46,6 +57,8 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
             boolAssigned.set(v)
         }
     }
+
+    /** Read/write view over the current Boolean assignment. */
     val boolValues: BoolView = BoolView()
 
     /** Per-int current domain (copy of [Problem.intDomains], narrowed as propagation proceeds). */
@@ -239,6 +252,8 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
     private val _refPayload: ArrayList<Any?> = ArrayList<Any?>(problem.numFactors).apply {
         repeat(problem.numFactors) { add(null) }
     }
+
+    /** Per-factor mutable payload slots (reference-typed). */
     val refPayload: MutableList<Any?> get() = _refPayload
 
     /** Learned clauses accumulated during search (LCG-style nogoods produced by
@@ -248,6 +263,8 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
      *  clauses. Survives [restore] (clauses are facts about the original problem, not
      *  trail state); pruned by [forgetLearnedClauses]. */
     private val _learnedClauses: ArrayList<com.eignex.klause.solver.factor.Clause> = ArrayList()
+
+    /** Clauses learned during conflict analysis. */
     val learnedClauses: List<com.eignex.klause.solver.factor.Clause> get() = _learnedClauses
 
     /** LBD (Literal Block Distance) per learned clause, parallel to [_learnedClauses].
@@ -493,9 +510,15 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
     /** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
     fun atomLitGe(intVar: Int, threshold: Int): Int =
         com.eignex.klause.solver.Lit.make(atomVarGe(intVar, threshold), true)
+
+    /** Literal for the bound atom `intVar ≤ threshold`. */
     fun atomLitLe(intVar: Int, threshold: Int): Int =
         com.eignex.klause.solver.Lit.make(atomVarLe(intVar, threshold), true)
+
+    /** Literal for the value atom `intVar = value`. */
     fun atomLitEq(intVar: Int, value: Int): Int = com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), true)
+
+    /** Literal for the value atom `intVar ≠ value`. */
     fun atomLitNe(intVar: Int, value: Int): Int = com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), false)
 
     /** True iff [v] is an atom-id (past the bool var space). Used by the conflict
@@ -869,6 +892,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
         return setIntImpl(v, value, null)
     }
 
+    /** Force bool [v] to [value]; returns false on conflict. */
     fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value, antecedents = null)
 
     /** Variant that records [antecedents] — the literals whose truth values implied this
@@ -876,15 +900,25 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
      *  `null` (the default no-arg form) when the factor doesn't track antecedents — that's
      *  fine, the analyzer just treats this pin as a leaf in the implication graph. */
     fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean = pinBoolImpl(v, value, antecedents)
+
+    /** Raise int [v]'s lower bound to [lo]; returns false on conflict. */
     fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo, null)
 
     /** Variant that records [antecedents] — bool literals (false in the current state)
      *  whose collective truth forced this lower-bound tightening. Used by the conflict
      *  analyzer to walk the implication graph backwards through int-domain factors. */
     fun tightenIntMin(v: Int, lo: Int, antecedents: IntArray?): Boolean = tightenIntMinImpl(v, lo, antecedents)
+
+    /** Lower int [v]'s upper bound to [hi]; returns false on conflict. */
     fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi, null)
+
+    /** As [tightenIntMax] with explicit conflict [antecedents]. */
     fun tightenIntMax(v: Int, hi: Int, antecedents: IntArray?): Boolean = tightenIntMaxImpl(v, hi, antecedents)
+
+    /** Pin int [v] to [value]; returns false on conflict. */
     fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value, null)
+
+    /** As [setInt] with explicit conflict [antecedents]. */
     fun setInt(v: Int, value: Int, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
 
     /** Punch a hole in [v]'s domain at [value]. Returns `true` on success (including the
@@ -893,6 +927,8 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
      *  bound-tighten by one; when it's interior, it transitions the domain to sparse
      *  representation. */
     fun excludeIntValue(v: Int, value: Int): Boolean = excludeIntValueImpl(v, value, null)
+
+    /** Forbid [value] for int [v]; returns false on conflict. */
     fun excludeIntValue(v: Int, value: Int, antecedents: IntArray?): Boolean =
         excludeIntValueImpl(v, value, antecedents)
 
@@ -1179,6 +1215,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
      *  maintains level-sensitive incremental state (e.g. STR2 Table's sparse set of valid
      *  tuples) implements this to get correct backtrack behavior. */
     interface SnapshottablePayload {
+        /** Deep-copy this payload for trail snapshotting. */
         fun snapshotCopy(): SnapshottablePayload
     }
 
