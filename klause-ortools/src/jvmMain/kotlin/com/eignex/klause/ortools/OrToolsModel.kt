@@ -5,29 +5,64 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.AllDifferentExcept
+import com.eignex.klause.solver.factor.AllDifferentExceptZero
+import com.eignex.klause.solver.factor.AllEqual
+import com.eignex.klause.solver.factor.Among
+import com.eignex.klause.solver.factor.ArgMinMax
+import com.eignex.klause.solver.factor.ArrayMinMax
+import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Count
+import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Diffn
+import com.eignex.klause.solver.factor.Element
+import com.eignex.klause.solver.factor.Geost
+import com.eignex.klause.solver.factor.GlobalCardinality
+import com.eignex.klause.solver.factor.Inverse
+import com.eignex.klause.solver.factor.Knapsack
+import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Mdd
+import com.eignex.klause.solver.factor.Member
+import com.eignex.klause.solver.factor.Monotone
+import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Sequence
+import com.eignex.klause.solver.factor.SetBitsetDisjoint
+import com.eignex.klause.solver.factor.SetBitsetEq
+import com.eignex.klause.solver.factor.SetBitsetSubset
+import com.eignex.klause.solver.factor.Sort
+import com.eignex.klause.solver.factor.Subcircuit
+import com.eignex.klause.solver.factor.SymmetricAllDifferent
+import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import com.google.ortools.Loader
 import com.google.ortools.sat.BoolVar
 import com.google.ortools.sat.CpModel
 import com.google.ortools.sat.IntVar
+import com.google.ortools.sat.IntervalVar
 import com.google.ortools.sat.LinearArgument
 import com.google.ortools.sat.LinearExpr
 import com.google.ortools.sat.Literal
 import com.google.ortools.util.Domain
 
 /**
- * Translates a klause [Problem] into an OR-Tools CP-SAT [CpModel]. Covers the same core
- * factor set as the Choco adapter; unsupported factors raise [UnsupportedFactorException] so
- * a missing translation is loud rather than silently dropping a constraint.
+ * Translates a klause [Problem] into an OR-Tools CP-SAT [CpModel]. As a correctness /
+ * comparison reference, each factor maps to its native CP-SAT global constraint where one
+ * exists (AllDifferent, Element, Inverse, Circuit, Cumulative, NoOverlap2D, Automaton,
+ * Table, Min/Max) and to a faithful reified decomposition otherwise. Unsupported factors
+ * raise [UnsupportedFactorException] so a missing translation is loud rather than silently
+ * dropping a constraint.
  *
  * Reified linear / pseudo-Boolean factors are full-reified by enforcing the constraint under
  * `aux` and its operator-complement under `not(aux)` (CP-SAT half-reification via
@@ -42,14 +77,41 @@ class OrToolsModel private constructor(
     val boolVars: Array<BoolVar>,
     val intVars: Array<IntVar>,
 ) {
+    private var auxCtr = 0
+    private fun freshBool(): BoolVar = model.newBoolVar("aux_b${auxCtr++}")
+
     private fun lit(lit: Int): Literal =
         boolVars[Lit.variable(lit)].let { if (Lit.isPositive(lit)) it else it.not() }
 
     private fun litArgs(lits: IntArray): Array<LinearArgument> = Array(lits.size) { lit(lits[it]) as LinearArgument }
-
     private fun intArgs(ids: IntArray): Array<LinearArgument> = Array(ids.size) { intVars[ids[it]] as LinearArgument }
-
     private fun IntArray.longs(): LongArray = LongArray(size) { this[it].toLong() }
+
+    /** Fresh literal `b ⟺ (x = value)`. */
+    private fun reifyEq(x: LinearArgument, value: Int): Literal {
+        val b = freshBool()
+        model.addEquality(x, value.toLong()).onlyEnforceIf(b)
+        model.addDifferent(x, value.toLong()).onlyEnforceIf(b.not())
+        return b
+    }
+
+    /** Fresh literal `b ⟺ (a = c)`. */
+    private fun reifyEqVar(a: LinearArgument, c: LinearArgument): Literal {
+        val b = freshBool()
+        model.addEquality(a, c).onlyEnforceIf(b)
+        model.addDifferent(a, c).onlyEnforceIf(b.not())
+        return b
+    }
+
+    /** Fresh literal `b ⟺ (x ∈ values)`. */
+    private fun reifyInValues(x: LinearArgument, values: IntArray): Literal {
+        val b = freshBool()
+        val expr = LinearExpr.term(x, 1)
+        val d = Domain.fromValues(values.longs())
+        model.addLinearExpressionInDomain(expr, d).onlyEnforceIf(b)
+        model.addLinearExpressionInDomain(expr, d.complement()).onlyEnforceIf(b.not())
+        return b
+    }
 
     private fun postFactor(f: Factor) {
         when (f) {
@@ -61,8 +123,6 @@ class OrToolsModel private constructor(
             is Linear -> postLinearDomain(LinearExpr.weightedSum(intArgs(f.vars), f.coeffs.longs()), domainFor(f.op, f.bound))
             is PseudoBoolean -> postLinearDomain(LinearExpr.weightedSum(litArgs(f.literals), f.weights.longs()), domainFor(f.op, f.bound))
             is Xor -> {
-                // Parity over (possibly negated) literals: count of true literals must have
-                // parity == targetParity. Encode as sum-in-allowed-values.
                 val sum = LinearExpr.sum(litArgs(f.literals))
                 val allowed = (0..f.literals.size).filter { it % 2 == (f.targetParity and 1) }.map { it.toLong() }.toLongArray()
                 model.addLinearExpressionInDomain(sum, Domain.fromValues(allowed))
@@ -74,14 +134,383 @@ class OrToolsModel private constructor(
             is ReifiedPseudoBoolean -> reifyPb(
                 LinearExpr.weightedSum(litArgs(f.literals), f.weights.longs()), f.op, f.bound, boolVars[f.auxBoolVar])
             is ReifiedCardinality -> {
-                // aux ⇔ (min ≤ Σ literals ≤ max).
                 val sum = LinearExpr.sum(litArgs(f.literals))
                 val d = Domain(f.min.toLong(), f.max.toLong())
                 val aux = boolVars[f.auxBoolVar]
                 model.addLinearExpressionInDomain(sum, d).onlyEnforceIf(aux)
                 model.addLinearExpressionInDomain(sum, d.complement()).onlyEnforceIf(aux.not())
             }
+
+            // ---- expanded coverage ----
+            is AllEqual -> for (i in 1 until f.xs.size) model.addEquality(intVars[f.xs[i]], intVars[f.xs[0]])
+            is AllDifferentExceptZero -> postDistinctExcept(f.xs, intArrayOf(0))
+            is AllDifferentExcept -> postDistinctExcept(f.xs, f.except)
+            is Among -> model.addEquality(intVars[f.n], LinearExpr.sum(Array(f.xs.size) { reifyInValues(intVars[f.xs[it]], f.values) as LinearArgument }))
+            is Member -> postMember(f)
+            is Count -> postCount(f)
+            is Element -> postElement(f)
+            is Inverse -> postChannel(f.f, f.g, f.fOffset, f.gOffset)
+            is SymmetricAllDifferent -> postChannel(f.xs, f.xs, f.indexOffset, f.indexOffset)
+            is LexLess -> postLexLess(f)
+            is Monotone -> postMonotone(f)
+            is NValue -> postNValue(f)
+            is GlobalCardinality -> postGcc(f)
+            is Table -> {
+                val tc = model.addAllowedAssignments(intArgs(f.xs))
+                for (r in 0 until f.numTuples) tc.addTuple(IntArray(f.arity) { c -> f.tuples[r * f.arity + c] })
+            }
+            is ValuePrecede -> postValuePrecede(f)
+            is ArrayMinMax ->
+                if (f.max) model.addMaxEquality(intVars[f.result], Array(f.xs.size) { intVars[f.xs[it]] })
+                else model.addMinEquality(intVars[f.result], Array(f.xs.size) { intVars[f.xs[it]] })
+            is ArgMinMax -> postArgMinMax(f)
+            is Knapsack -> {
+                model.addEquality(intVars[f.w], LinearExpr.weightedSum(intArgs(f.xs), f.weights.longs()))
+                model.addEquality(intVars[f.p], LinearExpr.weightedSum(intArgs(f.xs), f.profits.longs()))
+            }
+            is Cumulative -> postCumulative(f)
+            is Diffn -> postDiffn(f)
+            is BinPacking -> postBinPacking(f)
+            is Sort -> postSort(f)
+            is Sequence -> postSequence(f)
+            is Regular -> postRegular(f)
+            is Circuit -> postCircuit(f)
+            is Subcircuit -> postSubcircuit(f)
+            is Geost -> postGeost(f)
+            is Mdd -> postMdd(f)
+            is SetBitsetSubset -> postSetSubset(f.leftBools, f.rightBools)
+            is SetBitsetDisjoint -> postSetDisjoint(f.leftBools, f.rightBools)
+            is SetBitsetEq -> postSetEq(f.leftBools, f.rightBools)
+
             else -> throw UnsupportedFactorException(f)
+        }
+    }
+
+    private fun postDistinctExcept(xs: IntArray, except: IntArray) {
+        for (i in xs.indices) for (j in i + 1 until xs.size) {
+            // (xi = xj) ⇒ (xi ∈ except): equal pairs are only allowed on exempt values.
+            val eq = reifyEqVar(intVars[xs[i]], intVars[xs[j]])
+            val inExc = reifyInValues(intVars[xs[i]], except)
+            model.addImplication(eq, inExc)
+        }
+    }
+
+    private fun postMember(f: Member) {
+        // y equals at least one xs[i].
+        val picks = Array(f.xs.size) {
+            val b = freshBool()
+            model.addEquality(intVars[f.y], intVars[f.xs[it]]).onlyEnforceIf(b)
+            b as Literal
+        }
+        model.addBoolOr(picks)
+    }
+
+    private fun postCount(f: Count) {
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        val matches = Array(f.xs.size) { reifyEq(intVars[f.xs[it]], f.v) as LinearArgument }
+        val sum = LinearExpr.sum(matches)
+        val n = f.n.toLong()
+        when (f.op) {
+            Count.Op.Eq -> model.addEquality(sum, n)
+            Count.Op.Ne -> model.addDifferent(sum, n)
+            Count.Op.Le -> model.addLessOrEqual(sum, n)
+            Count.Op.Lt -> model.addLessOrEqual(sum, n - 1)
+            Count.Op.Ge -> model.addGreaterOrEqual(sum, n)
+            Count.Op.Gt -> model.addGreaterOrEqual(sum, n + 1)
+        }
+    }
+
+    private fun postElement(f: Element) {
+        // CP-SAT element is 0-based with no offset; shift the index expression.
+        val idxExpr = LinearExpr.affine(intVars[f.idx], 1L, -f.indexOffset.toLong())
+        if (f.arrIsVars) model.addElement(idxExpr, intArgs(f.arr), intVars[f.result])
+        else model.addElement(idxExpr, f.arr.longs(), intVars[f.result])
+    }
+
+    /** `f[i] = j+fOff ⟺ g[j] = i+gOff` for all i, j (Inverse / SymmetricAllDifferent). */
+    private fun postChannel(fArr: IntArray, gArr: IntArray, fOff: Int, gOff: Int) {
+        if (fOff == 0 && gOff == 0 && fArr.size == gArr.size) {
+            model.addInverse(Array(fArr.size) { intVars[fArr[it]] }, Array(gArr.size) { intVars[gArr[it]] })
+            return
+        }
+        for (i in fArr.indices) for (j in gArr.indices) {
+            val a = reifyEq(intVars[fArr[i]], j + fOff)
+            val b = reifyEq(intVars[gArr[j]], i + gOff)
+            model.addImplication(a, b)
+            model.addImplication(b, a)
+        }
+    }
+
+    private fun postLexLess(f: LexLess) {
+        val n = minOf(f.xs.size, f.ys.size)
+        val eq = Array(n) { reifyEqVar(intVars[f.xs[it]], intVars[f.ys[it]]) }
+        for (i in 0 until n) {
+            // Under "all earlier positions equal", require xs[i] <= ys[i]; the first strict
+            // difference then decides the order.
+            val c = model.addLessOrEqual(intVars[f.xs[i]], intVars[f.ys[i]])
+            if (i > 0) c.onlyEnforceIf(Array(i) { eq[it] })
+        }
+        if (f.strict) model.addBoolOr(Array(n) { eq[it].not() })
+    }
+
+    private fun postMonotone(f: Monotone) {
+        for (i in 0 until f.xs.size - 1) {
+            val a = intVars[f.xs[i]]; val b = intVars[f.xs[i + 1]]
+            when (f.direction) {
+                Monotone.Direction.Increasing -> if (f.strict) model.addLessThan(a, b) else model.addLessOrEqual(a, b)
+                Monotone.Direction.Decreasing -> if (f.strict) model.addGreaterThan(a, b) else model.addGreaterOrEqual(a, b)
+            }
+        }
+    }
+
+    private fun unionValues(ids: IntArray): IntArray {
+        val s = sortedSetOf<Int>()
+        for (id in ids) problem.intDomains[id].forEach { s.add(it) }
+        return s.toIntArray()
+    }
+
+    private fun postNValue(f: NValue) {
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        val presentLits = ArrayList<LinearArgument>()
+        for (v in unionValues(f.xs)) {
+            val eqs = Array(f.xs.size) { reifyEq(intVars[f.xs[it]], v) }
+            val present = freshBool()
+            model.addBoolOr(eqs).onlyEnforceIf(present)          // present ⇒ some xi = v
+            for (e in eqs) model.addImplication(e, present)      // some xi = v ⇒ present
+            presentLits.add(present)
+        }
+        val distinct = LinearExpr.sum(presentLits.toTypedArray())
+        when (f.mode) {
+            NValue.Mode.Eq -> model.addEquality(intVars[f.n], distinct)
+            NValue.Mode.AtLeast -> model.addLessOrEqual(intVars[f.n], distinct)
+            NValue.Mode.AtMost -> model.addGreaterOrEqual(intVars[f.n], distinct)
+        }
+    }
+
+    private fun postGcc(f: GlobalCardinality) {
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        val countVars = f.countVars
+        val countLow = f.countLow
+        val countHigh = f.countHigh
+        for (k in f.cover.indices) {
+            val matches = Array(f.xs.size) { reifyEq(intVars[f.xs[it]], f.cover[k]) as LinearArgument }
+            val cnt = LinearExpr.sum(matches)
+            when {
+                countVars != null -> model.addEquality(intVars[countVars[k]], cnt)
+                countLow != null && countHigh != null ->
+                    model.addLinearConstraint(cnt, countLow[k].toLong(), countHigh[k].toLong())
+            }
+        }
+        if (f.closed) {
+            val d = Domain.fromValues(f.cover.longs())
+            for (x in f.xs) model.addLinearExpressionInDomain(LinearExpr.term(intVars[x], 1), d)
+        }
+    }
+
+    private fun postValuePrecede(f: ValuePrecede) {
+        // seen[i] = "value s appeared before position i". seen[0] = false.
+        var seen: Literal = freshBool().also { model.addEquality(it, 0) }
+        for (i in f.xs.indices) {
+            val eqT = reifyEq(intVars[f.xs[i]], f.t)
+            model.addImplication(eqT, seen)                       // xs[i]=t ⇒ s already seen
+            val eqS = reifyEq(intVars[f.xs[i]], f.s)
+            val next = freshBool()
+            model.addImplication(seen, next)
+            model.addImplication(eqS, next)
+            model.addBoolOr(arrayOf(seen, eqS, next.not()))       // next ⇒ (seen ∨ xs[i]=s)
+            seen = next
+        }
+    }
+
+    private fun postArgMinMax(f: ArgMinMax) {
+        val isArg = Array(f.xs.size) { freshBool() }
+        model.addExactlyOne(Array(f.xs.size) { isArg[it] as Literal })
+        for (p in f.xs.indices) {
+            model.addEquality(intVars[f.idx], (p + f.indexOffset).toLong()).onlyEnforceIf(isArg[p])
+            for (i in f.xs.indices) if (i != p) {
+                val c = if (f.max) model.addGreaterOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
+                else model.addLessOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
+                c.onlyEnforceIf(isArg[p])
+            }
+            for (i in 0 until p) {                                 // strict over earlier — lowest-index tie-break
+                val c = if (f.max) model.addGreaterThan(intVars[f.xs[p]], intVars[f.xs[i]])
+                else model.addLessThan(intVars[f.xs[p]], intVars[f.xs[i]])
+                c.onlyEnforceIf(isArg[p])
+            }
+        }
+    }
+
+    private fun postCumulative(f: Cumulative) {
+        val cc = model.addCumulative(f.capacity.toLong())
+        for (i in f.starts.indices) {
+            val start = intVars[f.starts[i]]
+            val dur = intVars[f.durations[i]]
+            val sd = problem.intDomains[f.starts[i]]
+            val dd = problem.intDomains[f.durations[i]]
+            val end = model.newIntVar((sd.min + dd.min).toLong(), (sd.max + dd.max).toLong(), "end$i")
+            val interval = model.newIntervalVar(start, dur, end, "task$i")
+            cc.addDemand(interval, intVars[f.resources[i]])
+        }
+    }
+
+    private fun postDiffn(f: Diffn) {
+        val no = model.addNoOverlap2D()
+        val widthVars = f.widthVars
+        val heightVars = f.heightVars
+        for (i in f.xs.indices) {
+            val xInt = rectInterval(f.xs[i], widthVars?.get(i), f.widths.getOrElse(i) { 0 }, "x$i")
+            val yInt = rectInterval(f.ys[i], heightVars?.get(i), f.heights.getOrElse(i) { 0 }, "y$i")
+            no.addRectangle(xInt, yInt)
+        }
+    }
+
+    /** Build an interval `[origin, origin+size)` where size is a var (if [sizeVarId]≠null)
+     *  or the constant [sizeConst]. */
+    private fun rectInterval(originId: Int, sizeVarId: Int?, sizeConst: Int, name: String): IntervalVar {
+        val origin = intVars[originId]
+        val od = problem.intDomains[originId]
+        return if (sizeVarId != null) {
+            val size = intVars[sizeVarId]
+            val sd = problem.intDomains[sizeVarId]
+            val end = model.newIntVar((od.min + sd.min).toLong(), (od.max + sd.max).toLong(), "${name}e")
+            model.newIntervalVar(origin, size, end, name)
+        } else {
+            val end = model.newIntVar((od.min + sizeConst).toLong(), (od.max + sizeConst).toLong(), "${name}e")
+            model.newIntervalVar(origin, LinearExpr.constant(sizeConst.toLong()), end, name)
+        }
+    }
+
+    private fun postBinPacking(f: BinPacking) {
+        for (b in 0 until f.numBins) {
+            val picks = Array(f.bins.size) { reifyEq(intVars[f.bins[it]], b + f.binOffset) as LinearArgument }
+            val load = LinearExpr.weightedSum(picks, f.weights.longs())
+            when (f.mode) {
+                BinPacking.Mode.LoadVars -> model.addEquality(intVars[f.loadVars!![b]], load)
+                BinPacking.Mode.UniformCapacity -> model.addLessOrEqual(load, f.uniformCapacity.toLong())
+                BinPacking.Mode.PerBinCapacity -> model.addLessOrEqual(load, f.capacities!![b].toLong())
+            }
+        }
+    }
+
+    private fun postSort(f: Sort) {
+        for (i in 0 until f.ys.size - 1) model.addLessOrEqual(intVars[f.ys[i]], intVars[f.ys[i + 1]])
+        for (v in unionValues(f.xs + f.ys)) {
+            val cx = LinearExpr.sum(Array(f.xs.size) { reifyEq(intVars[f.xs[it]], v) as LinearArgument })
+            val cy = LinearExpr.sum(Array(f.ys.size) { reifyEq(intVars[f.ys[it]], v) as LinearArgument })
+            model.addEquality(cx, cy)
+        }
+    }
+
+    private fun postSequence(f: Sequence) {
+        for (start in 0..f.xs.size - f.k) {
+            val inWin = Array(f.k) { reifyInValues(intVars[f.xs[start + it]], f.values) as LinearArgument }
+            val cnt = LinearExpr.sum(inWin)
+            model.addLinearConstraint(cnt, f.low.toLong(), f.high.toLong())
+        }
+    }
+
+    private fun postRegular(f: Regular) {
+        // CP-SAT automaton: state ids and labels are arbitrary longs; klause states are
+        // 1-based with a 0 "dead" sentinel and symbol == seq value.
+        val ac = model.addAutomaton(intArgs(f.seq), f.q0.toLong(), f.accepting.longs())
+        for (st in 1..f.numStates) for (sym in 1..f.alphabetSize) {
+            val target = f.transitions[(st - 1) * f.alphabetSize + (sym - 1)]
+            if (target != 0) ac.addTransition(st, target, sym.toLong())
+        }
+    }
+
+    private fun postCircuit(f: Circuit) {
+        val n = f.succ.size
+        val cc = model.addCircuit()
+        for (i in 0 until n) {
+            if (n >= 2) model.addDifferent(intVars[f.succ[i]], i.toLong())  // no self-loop
+            problem.intDomains[f.succ[i]].forEach { j ->
+                if (j in 0 until n && j != i) cc.addArc(i, j, reifyEq(intVars[f.succ[i]], j))
+            }
+        }
+    }
+
+    private fun postSubcircuit(f: Subcircuit) {
+        // Like Circuit but self-loop arcs are kept: succ[i] = i marks node i excluded, and
+        // CP-SAT's circuit constraint treats a true self-loop literal as "node not in cycle".
+        val n = f.succ.size
+        val cc = model.addCircuit()
+        for (i in 0 until n) {
+            problem.intDomains[f.succ[i]].forEach { j ->
+                if (j in 0 until n) cc.addArc(i, j, reifyEq(intVars[f.succ[i]], j))
+            }
+        }
+    }
+
+    private fun postGeost(f: Geost) {
+        for (i in 0 until f.numObjects) for (j in i + 1 until f.numObjects) {
+            val seps = ArrayList<Literal>()
+            for (d in 0 until f.numDims) {
+                val oi = intVars[f.origin[i * f.numDims + d]]; val oj = intVars[f.origin[j * f.numDims + d]]
+                val si = f.length[i * f.numDims + d]; val sj = f.length[j * f.numDims + d]
+                val a = freshBool(); model.addLessOrEqual(LinearExpr.affine(oi, 1L, si.toLong()), oj).onlyEnforceIf(a)
+                val b = freshBool(); model.addLessOrEqual(LinearExpr.affine(oj, 1L, sj.toLong()), oi).onlyEnforceIf(b)
+                seps.add(a); seps.add(b)
+            }
+            model.addBoolOr(seps.toTypedArray())
+        }
+    }
+
+    private fun postMdd(f: Mdd) {
+        val n = f.seq.size
+        val states = sortedSetOf(f.initial)
+        f.accepting.forEach { states.add(it) }
+        var p = 0
+        while (p < f.transitions.size) { states.add(f.transitions[p]); states.add(f.transitions[p + 2]); p += f.recordStride }
+        val lo = states.first().toLong(); val hi = states.last().toLong()
+        val q = Array(n + 1) { model.newIntVar(lo, hi, "mddq$it") }
+        model.addEquality(q[0], f.initial.toLong())
+        val cost4 = f.recordStride == 4
+        val wVars = if (cost4) ArrayList<LinearArgument>(n) else null
+        var wLo = 0; var wHi = 0
+        if (cost4) { var r = 0; while (r < f.transitions.size) { val w = f.transitions[r + 3]; if (w < wLo) wLo = w; if (w > wHi) wHi = w; r += f.recordStride } }
+        for (i in 0 until n) {
+            val cols: Array<LinearArgument> =
+                if (cost4) {
+                    val w = model.newIntVar(wLo.toLong(), wHi.toLong(), "mddw$i")
+                    wVars!!.add(w)
+                    arrayOf(q[i], intVars[f.seq[i]], q[i + 1], w)
+                } else arrayOf(q[i], intVars[f.seq[i]], q[i + 1])
+            val tc = model.addAllowedAssignments(cols)
+            var row = f.layerStarts[i]
+            while (row < f.layerStarts[i + 1]) {
+                tc.addTuple(if (cost4) intArrayOf(f.transitions[row], f.transitions[row + 1], f.transitions[row + 2], f.transitions[row + 3])
+                            else intArrayOf(f.transitions[row], f.transitions[row + 1], f.transitions[row + 2]))
+                row += f.recordStride
+            }
+        }
+        model.addLinearExpressionInDomain(LinearExpr.term(q[n], 1), Domain.fromValues(f.accepting.longs()))
+        if (f.cost >= 0 && wVars != null) model.addEquality(intVars[f.cost], LinearExpr.sum(wVars.toTypedArray()))
+    }
+
+    private fun postSetSubset(left: IntArray, right: IntArray) {
+        for (i in left.indices) {
+            val l = left[i]; val r = right[i]
+            if (l < 0) continue
+            if (r < 0) model.addEquality(boolVars[l], 0) else model.addImplication(boolVars[l], boolVars[r])
+        }
+    }
+
+    private fun postSetDisjoint(left: IntArray, right: IntArray) {
+        for (i in left.indices) {
+            val l = left[i]; val r = right[i]
+            if (l >= 0 && r >= 0) model.addImplication(boolVars[l], boolVars[r].not())
+        }
+    }
+
+    private fun postSetEq(left: IntArray, right: IntArray) {
+        for (i in left.indices) {
+            val l = left[i]; val r = right[i]
+            when {
+                l >= 0 && r >= 0 -> model.addEquality(boolVars[l], boolVars[r])
+                l >= 0 -> model.addEquality(boolVars[l], 0)
+                r >= 0 -> model.addEquality(boolVars[r], 0)
+            }
         }
     }
 
