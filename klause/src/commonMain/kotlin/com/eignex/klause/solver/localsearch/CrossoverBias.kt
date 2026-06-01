@@ -21,6 +21,7 @@ sealed interface CrossoverBias {
         override fun probParentA(parentAObjective: Double, parentBObjective: Double): Double = 0.5
     }
 
+    /** Crossover biased toward the better-objective parent. */
     data class BetterBiased(
         /** Bias strength toward the better parent, in `[0, 0.5]`. */
         val rate: Double = 0.2,

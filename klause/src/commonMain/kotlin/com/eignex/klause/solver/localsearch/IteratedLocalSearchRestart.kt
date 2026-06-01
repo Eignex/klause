@@ -75,6 +75,7 @@ class IteratedLocalSearchRestart(
     /** Read-only view for tests / diagnostics. */
     val incumbents: List<Incumbent> get() = population
 
+    /** A population incumbent: an assignment and its objective. */
     data class Incumbent(
         /** The incumbent assignment. */
         val sample: Sample,

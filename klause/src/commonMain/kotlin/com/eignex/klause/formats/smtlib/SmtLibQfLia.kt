@@ -47,6 +47,7 @@ data class SmtLibProblem(
  * raise [UnsupportedSmtException] rather than silently mis-encoding.
  */
 object SmtLibQfLia {
+    /** Parse SMT-LIB QF_LIA [text] into an [SmtLibProblem]. */
     fun parse(text: String, intBound: Int = 100_000, strictBounds: Boolean = false): SmtLibProblem {
         val b = Builder(intBound, strictBounds)
         for (cmd in SExprReader(text).readAll()) b.command(cmd)

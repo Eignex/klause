@@ -51,6 +51,7 @@ data class Xcsp3Problem(
  * [negTableCap] bounds the domain cartesian product enumerated when lowering a negative table.
  */
 object Xcsp3 {
+    /** Parse XCSP3 [text] into an [Xcsp3Problem]. */
     fun parse(text: String, negTableCap: Long = 1_000_000L): Xcsp3Problem = Builder(negTableCap).run {
         val root = parseXml(text)
         root.child("variables")?.let { vs -> vs.children.forEach { declareVar(it) } }

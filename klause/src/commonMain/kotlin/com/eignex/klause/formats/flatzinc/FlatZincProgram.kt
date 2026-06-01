@@ -168,9 +168,15 @@ sealed interface FlatZincArray {
     val length: Int
 
     /** Parameter array: every element is a constant. */
-    data class BoolParam(override val name: String, val values: BooleanArray) : FlatZincArray {
+    data class BoolParam(
+        override val name: String,
+        /** The constant Boolean values. */
+        val values: BooleanArray,
+    ) : FlatZincArray {
         override val length: Int get() = values.size
     }
+
+    /** Integer parameter array. */
     data class IntParam(
         override val name: String,
         /** The constant integer values. */
@@ -178,6 +184,8 @@ sealed interface FlatZincArray {
     ) : FlatZincArray {
         override val length: Int get() = values.size
     }
+
+    /** Float parameter array. */
     data class FloatParam(
         override val name: String,
         /** The constant float values. */
@@ -189,7 +197,11 @@ sealed interface FlatZincArray {
     /** Parameter array of set-of-int constants. Each `values[i]` is a sorted int array
      *  giving the elements of the i-th set. Read by `array_set_element` to materialise
      *  the per-universe-element selection mask. */
-    data class IntSetParam(override val name: String, val values: List<IntArray>) : FlatZincArray {
+    data class IntSetParam(
+        override val name: String,
+        /** Each element is the sorted int elements of one set. */
+        val values: List<IntArray>,
+    ) : FlatZincArray {
         override val length: Int get() = values.size
     }
 
@@ -204,6 +216,8 @@ sealed interface FlatZincArray {
         val floatBucketings: List<FloatBucketing>? = null,
     ) : FlatZincArray {
         override val length: Int get() = varIds.size
+
+        /** Element kind of a variable array. */
         enum class ElementKind {
             /** Boolean element. */
             Bool,

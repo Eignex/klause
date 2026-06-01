@@ -30,6 +30,7 @@ object Dimacs {
         return sb.toString()
     }
 
+    /** Parse DIMACS CNF/WCNF [text] into a [Problem]. */
     fun parse(text: String): Problem {
         var numVars = -1
         val clauses = mutableListOf<Clause>()

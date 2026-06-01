@@ -28,7 +28,10 @@ interface RestartPolicy {
 }
 
 /** Full random restart at a fixed flip cadence. */
-class FixedCadenceRestart(val maxFlipsBeforeRestart: Int = 10_000) : RestartPolicy {
+class FixedCadenceRestart(
+    /** Number of flips between full random restarts. */
+    val maxFlipsBeforeRestart: Int = 10_000,
+) : RestartPolicy {
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= maxFlipsBeforeRestart
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
 }

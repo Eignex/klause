@@ -74,6 +74,7 @@ sealed interface ViolationPenalty {
         override fun of(violationCount: Long): Double = violationCount.toDouble()
     }
 
+    /** Violation penalty capped at a maximum contribution. */
     data class Saturating(
         /** Maximum penalty any single violation count contributes. */
         val cap: Double,

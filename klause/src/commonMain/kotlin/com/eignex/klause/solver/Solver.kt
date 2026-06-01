@@ -38,6 +38,7 @@ sealed interface SolveResult {
      *  backends that haven't opted in; populated by backends that have. */
     val stats: SolveStats
 
+    /** Satisfiable, carrying a model. */
     data class Sat(
         /** The satisfying assignment. */
         val assignment: Sample,
@@ -64,6 +65,8 @@ sealed interface SolveResult {
          */
         val assumptionCore: Assumptions? = null,
     ) : SolveResult
+
+    /** Indeterminate (e.g. timeout or budget exhaustion). */
     data class Unknown(
         /** Why the result is indeterminate (e.g. timeout). */
         val reason: TerminationReason,

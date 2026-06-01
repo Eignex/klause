@@ -30,6 +30,7 @@ data class OpbProblem(
  */
 object Opb {
 
+    /** Parse OPB [text] into an [OpbProblem]. */
     fun parse(text: String): OpbProblem {
         val tokens = mutableListOf<String>()
         for (rawLine in text.lineSequence()) {
