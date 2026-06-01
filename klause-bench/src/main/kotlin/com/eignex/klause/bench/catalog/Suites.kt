@@ -32,6 +32,38 @@ object Suites {
         listOf(handwrittenCore, dimacsCore, opbCore, schemaCore, flatzincCore, smtlibCore, xcsp3Core, mznSmoke, satlibUf20)
     }
 
+    /** Discovered-on-demand suites over fetched external corpora. The provider runs the
+     *  [com.eignex.klause.bench.source.CorpusSelection] machinery (per-family caps / sampling
+     *  via `-Dklause.bench.select.*`) and fetches the collection on first resolve. */
+    val dynamic: List<DynamicSuite> by lazy {
+        listOf(
+            DynamicSuite("mzn-bench", "MiniZinc Challenge benchmarks (fetched; 1/family by default)") {
+                com.eignex.klause.bench.source.CorpusSelection.select(
+                    ExternalCollections.minizincBenchmarks,
+                    com.eignex.klause.bench.source.CorpusSelection.Layout.MznChallenge(),
+                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.OPTIMIZATION,
+                )
+            },
+            DynamicSuite("libminizinc-tests", "libminizinc compiler test suite (fetched; 1/family by default)") {
+                com.eignex.klause.bench.source.CorpusSelection.select(
+                    ExternalCollections.libminizincTests,
+                    com.eignex.klause.bench.source.CorpusSelection.Layout.FlatMzn("tests/spec/unit"),
+                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.CSP,
+                )
+            },
+            DynamicSuite("hakank", "hakank MiniZinc collection (fetched, sparse minizinc/; 1/family by default)") {
+                com.eignex.klause.bench.source.CorpusSelection.select(
+                    ExternalCollections.hakank,
+                    com.eignex.klause.bench.source.CorpusSelection.Layout.FlatMzn("minizinc"),
+                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.CSP,
+                )
+            },
+        )
+    }
+
     // --- In-code SAT/CSP (ported from the former Portfolio) ---
 
     private val handwrittenCore = suite("handwritten-core", "Small hand-built SAT/CSP instances") {
