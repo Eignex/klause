@@ -29,7 +29,7 @@ import com.eignex.klause.solver.factor.Xor
 object Suites {
 
     val all: List<Suite> by lazy {
-        listOf(handwrittenCore, dimacsCore, opbCore, schemaCore, flatzincCore, mznSmoke, satlibUf20)
+        listOf(handwrittenCore, dimacsCore, opbCore, schemaCore, flatzincCore, smtlibCore, xcsp3Core, mznSmoke, satlibUf20)
     }
 
     // --- In-code SAT/CSP (ported from the former Portfolio) ---
@@ -202,6 +202,18 @@ object Suites {
         vendored("cardinality", Category.CSP, Expected.Sat)
         vendored("permutation4", Category.CSP, Expected.Sat)
         vendored("small-linear", Category.CSP, Expected.Sat)
+    }
+
+    private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA instances") {
+        format = Format.SMTLIB_QF_LIA; license = "internal"
+        vendored("lia-basic", Category.CSP, Expected.Sat)
+        vendored("lia-opt", Category.OPTIMIZATION, Expected.Opt(7))
+    }
+
+    private val xcsp3Core = suite("xcsp3-core", "Curated XCSP3 integer CSP/COP instances") {
+        format = Format.XCSP3; license = "internal"
+        vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
+        vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
     }
 
     // --- In-tree MiniZinc smoke set (referenced from klause-mzn-lib/test-models/) ---

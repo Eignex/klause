@@ -34,6 +34,8 @@ object Targets {
         Target("mzn-parity-smoke", "Differential parity (klause vs Choco) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY),
         Target("satlib-parity", "Differential parity (klause vs Choco) over the auto-fetched SATLIB sample", listOf("satlib-uf20"), MetricKind.PARITY),
         Target("mzn-anytime", "Anytime optimization (klause-LS vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.ANYTIME, Budget(timeoutMillis = 5_000)),
+        Target("smtlib-parity", "Differential parity (klause vs Choco) over the SMT-LIB QF_LIA set", listOf("smtlib-core"), MetricKind.PARITY),
+        Target("xcsp3-parity", "Differential parity (klause vs Choco) over the XCSP3 set", listOf("xcsp3-core"), MetricKind.PARITY),
     )
 
     fun get(id: String): Target =

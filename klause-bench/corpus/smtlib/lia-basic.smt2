@@ -1,0 +1,12 @@
+; Self-authored QF_LIA smoke instance (satisfaction). License: internal.
+(set-logic QF_LIA)
+(declare-const x Int)
+(declare-const y Int)
+(declare-const z Int)
+(assert (>= x 0))
+(assert (>= y 0))
+(assert (>= z 0))
+(assert (<= (+ x y z) 12))
+(assert (or (>= x 5) (>= y 5)))
+(assert (= (- x y) 1))
+(check-sat)

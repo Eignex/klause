@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Self-authored XCSP3 smoke instance. License: internal. -->
+<!-- 4-queens as XCSP3: q[i] in 1..4, columns/diagonals all-different. -->
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="q" size="[4]"> 1..4 </array>
+  </variables>
+  <constraints>
+    <allDifferent> q[] </allDifferent>
+    <intension> ne(add(q[0],0), add(q[1],1)) </intension>
+    <intension> ne(add(q[0],0), add(q[2],2)) </intension>
+    <intension> ne(add(q[0],0), add(q[3],3)) </intension>
+    <intension> ne(add(q[1],0), add(q[2],1)) </intension>
+    <intension> ne(add(q[1],0), add(q[3],2)) </intension>
+    <intension> ne(add(q[2],0), add(q[3],1)) </intension>
+    <intension> ne(sub(q[0],0), sub(q[1],1)) </intension>
+    <intension> ne(sub(q[0],0), sub(q[2],2)) </intension>
+    <intension> ne(sub(q[0],0), sub(q[3],3)) </intension>
+    <intension> ne(sub(q[1],0), sub(q[2],1)) </intension>
+    <intension> ne(sub(q[1],0), sub(q[3],2)) </intension>
+    <intension> ne(sub(q[2],0), sub(q[3],1)) </intension>
+  </constraints>
+</instance>
