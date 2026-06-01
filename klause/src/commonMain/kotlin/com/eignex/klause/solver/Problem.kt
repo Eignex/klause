@@ -281,7 +281,7 @@ class Problem(
                 val sa = scores[a]
                 val sb = scores[b]
                 if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
-            }
+            },
         )
         return IntArray(numIntVars) { boxed[it] }
     }
@@ -398,10 +398,7 @@ class Problem(
     }
 
     /** Union two [Implied]s by replaying everything from [b] into the [a] base. */
-    private fun mergeImplied(
-        a: PropagationResult.Implied,
-        b: PropagationResult.Implied,
-    ): PropagationResult.Implied {
+    private fun mergeImplied(a: PropagationResult.Implied, b: PropagationResult.Implied): PropagationResult.Implied {
         val bools = HashMap(a.bools)
         b.forEachBool { k, v -> bools[k] = v }
         val ints = HashMap(a.ints)

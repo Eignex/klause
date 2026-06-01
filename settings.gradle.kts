@@ -2,6 +2,7 @@ rootProject.name = "klause"
 
 pluginManagement {
     repositories {
+        mavenLocal()
         mavenCentral()
         gradlePluginPortal()
     }

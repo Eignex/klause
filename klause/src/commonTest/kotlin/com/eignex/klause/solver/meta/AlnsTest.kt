@@ -49,7 +49,7 @@ class AlnsTest {
             numBoolVars = 8,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(fA, fB)
+            factors = arrayOf<Factor>(fA, fB),
         )
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
@@ -70,7 +70,7 @@ class AlnsTest {
             numBoolVars = 8,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(fA, fB)
+            factors = arrayOf<Factor>(fA, fB),
         )
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
         val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
@@ -99,7 +99,7 @@ class AlnsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -124,7 +124,7 @@ class AlnsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -156,7 +156,7 @@ class AlnsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -187,7 +187,7 @@ class AlnsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -242,7 +242,7 @@ class AlnsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -276,7 +276,7 @@ class AlnsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -288,12 +288,12 @@ class AlnsTest {
             destroyBandit = MultiArmedBandit(
                 DestroyOperator.Defaults.size,
                 policy = BetaBernoulliTS(),
-                random = Random(1)
+                random = Random(1),
             ),
             repairBandit = MultiArmedBandit(
                 RepairOperator.Defaults.size,
                 policy = BetaBernoulliTS(),
-                random = Random(2)
+                random = Random(2),
             ),
             // BetaBernoulliTS expects rewards in [0, 1]; normalize from the (3, 1, 0) ALNS defaults.
             newBestReward = 1.0,
@@ -312,7 +312,7 @@ class AlnsTest {
             numBoolVars = 1,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true))))
+            factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true)))),
         )
         val objective = LinearObjective(boolWeights = doubleArrayOf(1.0))
         val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }

@@ -36,10 +36,7 @@ class Table(
      *  `[0, numValid)` is live (still feasible). On push the engine clones via
      *  [snapshotCopy]; on pop the cloned state is restored, so [numValid] correctly
      *  reflects the level we backjumped to. */
-    private class Str2State(
-        val validTuples: IntArray,
-        var numValid: Int,
-    ) : PropagationState.SnapshottablePayload {
+    private class Str2State(val validTuples: IntArray, var numValid: Int) : PropagationState.SnapshottablePayload {
         override fun snapshotCopy(): Str2State = Str2State(validTuples.copyOf(), numValid)
     }
 

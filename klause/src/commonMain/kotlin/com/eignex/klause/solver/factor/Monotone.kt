@@ -18,11 +18,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * all route to one factor. LS side counts pairwise violations and proposes nudge moves
  * on the offending vars.
  */
-class Monotone(
-    val xs: IntArray,
-    val direction: Direction,
-    val strict: Boolean,
-) : LocalSearchFactor {
+class Monotone(val xs: IntArray, val direction: Direction, val strict: Boolean) : LocalSearchFactor {
 
     enum class Direction { Increasing, Decreasing }
 
@@ -128,6 +124,7 @@ class Monotone(
      * chain in O(n) when domains are intervals; for sparse domains the same calls preserve
      * holes via the engine's `withMinAtLeast` / `withMaxAtMost`.
      */
+
     /** Bound-only conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
@@ -147,6 +144,7 @@ class Monotone(
                     if (!state.tightenIntMax(xs[i], hi, ant)) return false
                 }
             }
+
             Direction.Decreasing -> {
                 for (i in 0 until xs.size - 1) {
                     val hi = state.intDomains[xs[i]].max - bump
@@ -179,6 +177,7 @@ class Monotone(
                     val targetRight = if (strict) a + 1 else a
                     if (targetRight in db) sink.addChannelingIntSet(state, xs[i + 1], targetRight)
                 }
+
                 Direction.Decreasing -> {
                     val targetLeft = if (strict) b + 1 else b
                     if (targetLeft in da) sink.addChannelingIntSet(state, xs[i], targetLeft)

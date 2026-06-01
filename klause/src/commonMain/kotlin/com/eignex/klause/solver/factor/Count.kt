@@ -156,6 +156,7 @@ class Count(
      * A var is a definite-matcher when its *entire* domain satisfies the predicate; a
      * possible-matcher when *some* of its domain does.
      */
+
     /** Bound-only conflict reason: cite bound atoms of every participating var. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
@@ -224,14 +225,19 @@ class Count(
     /** Pick an in-domain value that matches the predicate; returns null if impossible. */
     private fun pickMatching(d: com.eignex.klause.solver.IntDomain, avoid: Int): Int? = when (op) {
         Op.Eq -> if (v in d && v != avoid) v else null
+
         Op.Ne -> {
             var pick: Int? = null
             d.forEach { if (it != v && it != avoid && pick == null) pick = it }
             pick
         }
+
         Op.Le -> if (d.min <= v) d.min.takeIf { it != avoid } ?: d.min else null
+
         Op.Lt -> if (d.min < v) d.min.takeIf { it != avoid } ?: d.min else null
+
         Op.Ge -> if (d.max >= v) d.max.takeIf { it != avoid } ?: d.max else null
+
         Op.Gt -> if (d.max > v) d.max.takeIf { it != avoid } ?: d.max else null
     }
 
@@ -242,10 +248,15 @@ class Count(
             d.forEach { if (it != v && it != avoid && pick == null) pick = it }
             pick
         }
+
         Op.Ne -> if (v in d && v != avoid) v else null
+
         Op.Le -> if (d.max > v) d.max.takeIf { it != avoid } ?: d.max else null
+
         Op.Lt -> if (d.max >= v) d.max.takeIf { it != avoid } ?: d.max else null
+
         Op.Ge -> if (d.min < v) d.min.takeIf { it != avoid } ?: d.min else null
+
         Op.Gt -> if (d.min <= v) d.min.takeIf { it != avoid } ?: d.min else null
     }
 

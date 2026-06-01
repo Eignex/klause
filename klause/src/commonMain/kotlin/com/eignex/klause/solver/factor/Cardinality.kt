@@ -11,11 +11,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
-class Cardinality(
-    val literals: IntArray,
-    val min: Int,
-    val max: Int,
-) : LocalSearchFactor {
+class Cardinality(val literals: IntArray, val min: Int, val max: Int) : LocalSearchFactor {
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
@@ -137,12 +133,11 @@ class Cardinality(
         out
     }
 
-    override fun propagate(state: PropagationState, factorId: Int): Boolean =
-        if (initialBoolWatchers != null) {
-            propagateWatched(state, factorId)
-        } else {
-            propagateScanning(state)
-        }
+    override fun propagate(state: PropagationState, factorId: Int): Boolean = if (initialBoolWatchers != null) {
+        propagateWatched(state, factorId)
+    } else {
+        propagateScanning(state)
+    }
 
     /**
      * Clause-form nogood when [propagate] returns false. Two failure modes:
@@ -249,8 +244,11 @@ class Cardinality(
         }
         if (atMostWatchSize > 0 &&
             !propagateAtMostSide(
-                state, factorId, watches, atLeastWatchSize,
-                atLeastWatchSize + atMostWatchSize
+                state,
+                factorId,
+                watches,
+                atLeastWatchSize,
+                atLeastWatchSize + atMostWatchSize,
             )
         ) {
             return false
@@ -299,19 +297,14 @@ class Cardinality(
             state.moveBoolWatcher(
                 factorId,
                 Lit.negate(literals[watches[i]]),
-                Lit.negate(literals[rep])
+                Lit.negate(literals[rep]),
             )
             watches[i] = rep
         }
         return true
     }
 
-    private fun findNonFalseOutside(
-        state: PropagationState,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-    ): Int {
+    private fun findNonFalseOutside(state: PropagationState, watches: IntArray, start: Int, end: Int): Int {
         outer@ for (i in literals.indices) {
             for (w in start until end) if (watches[w] == i) continue@outer
             if (!litFalseAt(state, i)) return i
@@ -319,12 +312,7 @@ class Cardinality(
         return -1
     }
 
-    private fun findNonTrueOutside(
-        state: PropagationState,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-    ): Int {
+    private fun findNonTrueOutside(state: PropagationState, watches: IntArray, start: Int, end: Int): Int {
         outer@ for (i in literals.indices) {
             for (w in start until end) if (watches[w] == i) continue@outer
             if (!litTrueAt(state, i)) return i
@@ -452,7 +440,9 @@ class Cardinality(
             }
             if (wantIncrease && netChange > 0) {
                 sink.addBoolFlip(v)
-            } else if (!wantIncrease && netChange < 0) sink.addBoolFlip(v)
+            } else if (!wantIncrease && netChange < 0) {
+                sink.addBoolFlip(v)
+            }
         }
     }
 
@@ -490,13 +480,15 @@ class Cardinality(
         // cardinality constraints; clip to a budget.
         val total = nT * nF
         if (total <= PAIR_PROPOSAL_CAP) {
-            for (i in 0 until nT) for (j in 0 until nF) {
-                sink.addCompound(
-                    listOf(
-                        com.eignex.klause.solver.Move.BoolFlip(trueLits[i]),
-                        com.eignex.klause.solver.Move.BoolFlip(falseLits[j]),
+            for (i in 0 until nT) {
+                for (j in 0 until nF) {
+                    sink.addCompound(
+                        listOf(
+                            com.eignex.klause.solver.Move.BoolFlip(trueLits[i]),
+                            com.eignex.klause.solver.Move.BoolFlip(falseLits[j]),
+                        ),
                     )
-                )
+                }
             }
         } else {
             val rng = state.rng
@@ -507,7 +499,7 @@ class Cardinality(
                     listOf(
                         com.eignex.klause.solver.Move.BoolFlip(a),
                         com.eignex.klause.solver.Move.BoolFlip(b),
-                    )
+                    ),
                 )
             }
         }
@@ -533,11 +525,7 @@ class Cardinality(
      *  when both pre- and post-flip counts sit strictly inside the `[min + maxAbsSigned,
      *  max - maxAbsSigned]` interior — in that region no further flip can move `n` outside
      *  `[min, max]`, so every var's contribution is 0 in both pre and post states. */
-    override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState,
-        factorId: Int,
-        flippedVar: Int,
-    ) {
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val signedFlipped = signedOccurrencesByVar[flippedVar]
         if (signedFlipped == 0) return
         val newN = state.intPayload[factorId]
@@ -579,14 +567,11 @@ class Cardinality(
     }
 
     companion object {
-        fun atMostOne(literals: IntArray): Cardinality =
-            Cardinality(literals, min = 0, max = 1)
+        fun atMostOne(literals: IntArray): Cardinality = Cardinality(literals, min = 0, max = 1)
 
-        fun atLeastOne(literals: IntArray): Cardinality =
-            Cardinality(literals, min = 1, max = literals.size)
+        fun atLeastOne(literals: IntArray): Cardinality = Cardinality(literals, min = 1, max = literals.size)
 
-        fun exactlyOne(literals: IntArray): Cardinality =
-            Cardinality(literals, min = 1, max = 1)
+        fun exactlyOne(literals: IntArray): Cardinality = Cardinality(literals, min = 1, max = 1)
 
         /** Cap on (true-lit, false-lit) swap-pair proposals in [proposeStructuredMoves].
          *  Bounds per-step cost; structured moves are scored by objective delta in the

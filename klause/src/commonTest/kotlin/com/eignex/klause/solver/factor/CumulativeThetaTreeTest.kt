@@ -185,7 +185,7 @@ class CumulativeThetaTreeTest {
             assertEquals(
                 expected,
                 got,
-                "mismatch: n=$n cap=$capacity ests=${ests.toList()} e=${energies.toList()} active=${active.toList()}"
+                "mismatch: n=$n cap=$capacity ests=${ests.toList()} e=${energies.toList()} active=${active.toList()}",
             )
 
             val expectedE = (0 until n).filter { active[it] }.sumOf { energies[it] }

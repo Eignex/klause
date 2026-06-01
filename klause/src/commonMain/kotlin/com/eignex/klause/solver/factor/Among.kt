@@ -14,11 +14,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * MiniZinc usage `|S|` is small (a handful of "good" values among many), so the constant
  * factor matters less than the structure being explicit.
  */
-class Among(
-    val n: Int,
-    val xs: IntArray,
-    values: IntArray,
-) : LocalSearchFactor {
+class Among(val n: Int, val xs: IntArray, values: IntArray) : LocalSearchFactor {
 
     /** Sorted, deduplicated value set. */
     val values: IntArray = values.distinct().sorted().toIntArray()
@@ -115,9 +111,11 @@ class Among(
             } else if (!isMatch && needIncrease) {
                 // Pick the closest in-domain matching value.
                 var pick: Int? = null
-                for (vv in values) if (vv in d && vv != curX) {
-                    pick = vv
-                    break
+                for (vv in values) {
+                    if (vv in d && vv != curX) {
+                        pick = vv
+                        break
+                    }
                 }
                 if (pick != null) sink.addChannelingIntSet(state, x, pick!!)
             }

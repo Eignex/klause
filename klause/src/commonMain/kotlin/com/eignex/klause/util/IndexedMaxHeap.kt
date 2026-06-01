@@ -53,7 +53,11 @@ class IndexedMaxHeap(val capacity: Int) {
         if (p < 0) return
         val old = keys[id]
         keys[id] = newKey
-        if (newKey > old) siftUp(p) else if (newKey < old) siftDown(p)
+        if (newKey > old) {
+            siftUp(p)
+        } else if (newKey < old) {
+            siftDown(p)
+        }
     }
 
     /** Remove the id with the largest current key and return it. Returns -1 if empty. */

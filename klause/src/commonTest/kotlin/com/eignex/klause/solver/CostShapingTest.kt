@@ -141,6 +141,7 @@ class CostShapingTest {
                         1 -> score(assignment.boolValue(0), !assignment.boolValue(1))
                         else -> before
                     }
+
                     else -> before
                 }
                 return after - before
@@ -184,7 +185,7 @@ class CostShapingTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))

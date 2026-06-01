@@ -34,7 +34,7 @@ class SampleLoopTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         return Problem(4, 0, emptyArray(), listOf(factor))
     }

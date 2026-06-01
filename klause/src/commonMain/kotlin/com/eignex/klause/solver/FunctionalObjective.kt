@@ -69,13 +69,8 @@ class FunctionalObjective internal constructor(
 
     /** Linear definition `outCoeff·out + Σ coeffs[k]·ins[k] = c`  ⇒  `out = (c − Σ …)/outCoeff`.
      *  The compiler guarantees integrality of the quotient (it's a real defines_var output). */
-    class Lin(
-        override val out: Int,
-        val outCoeff: Long,
-        val coeffs: LongArray,
-        val ins: Array<Operand>,
-        val c: Long,
-    ) : Node() {
+    class Lin(override val out: Int, val outCoeff: Long, val coeffs: LongArray, val ins: Array<Operand>, val c: Long) :
+        Node() {
         override fun compute(valOf: (Int) -> Long): Long {
             var rhs = c
             for (k in ins.indices) rhs -= coeffs[k] * ins[k].value(valOf)
@@ -92,8 +87,7 @@ class FunctionalObjective internal constructor(
         return if (minimize) v else -v
     }
 
-    override fun evaluate(sample: Sample): Double =
-        objValue { id -> sample.ints[id].toLong() }.toDouble()
+    override fun evaluate(sample: Sample): Double = objValue { id -> sample.ints[id].toLong() }.toDouble()
 
     override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
         val moved = HashMap<Int, Long>()
@@ -107,7 +101,10 @@ class FunctionalObjective internal constructor(
     private fun collectIntMoves(move: Move, into: HashMap<Int, Long>) {
         when (move) {
             is Move.IntSet -> into[move.varId] = move.newValue.toLong()
-            is Move.BoolFlip -> {} // bool moves don't change int-cone leaf values
+
+            is Move.BoolFlip -> {}
+
+            // bool moves don't change int-cone leaf values
             is Move.Compound -> for (p in move.parts) collectIntMoves(p, into)
         }
     }

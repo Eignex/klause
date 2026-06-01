@@ -29,10 +29,7 @@ import com.eignex.klause.ast.SetUnion
  * [SetDiff] / [SetLiteral]) return a [SetExpr] tree that the compiler materialises into
  * fresh indicator bools at lowering time.
  */
-class IntSetHandle(
-    val name: String,
-    val universe: List<Int>,
-) : SetTerm {
+class IntSetHandle(val name: String, val universe: List<Int>) : SetTerm {
     override fun toSetExpr(): SetExpr = SetRef(name)
 }
 
@@ -41,10 +38,7 @@ class IntSetHandle(
  * schema-construction time; the decoder returns a [Set]<String> of the labels currently
  * indicated.
  */
-class NominalSetHandle(
-    val name: String,
-    val labels: List<String>,
-) : SetTerm {
+class NominalSetHandle(val name: String, val labels: List<String>) : SetTerm {
     override fun toSetExpr(): SetExpr = SetRef(name)
 }
 
@@ -86,32 +80,25 @@ infix fun IntTerm.inSet(s: SetTerm): BoolExpr = SetIn(this.toIntExpr(), s.toSetE
 infix fun String.inSet(s: SetTerm): BoolExpr = SetNominalIn(this, s.toSetExpr())
 
 /** `S ⊆ T`. */
-infix fun SetTerm.subsetOf(other: SetTerm): BoolExpr =
-    SetSubsetOf(this.toSetExpr(), other.toSetExpr())
+infix fun SetTerm.subsetOf(other: SetTerm): BoolExpr = SetSubsetOf(this.toSetExpr(), other.toSetExpr())
 
 /** `S ∩ T = ∅`. */
-infix fun SetTerm.disjointFrom(other: SetTerm): BoolExpr =
-    SetDisjoint(this.toSetExpr(), other.toSetExpr())
+infix fun SetTerm.disjointFrom(other: SetTerm): BoolExpr = SetDisjoint(this.toSetExpr(), other.toSetExpr())
 
 /** `S = T`. */
-infix fun SetTerm.eq(other: SetTerm): BoolExpr =
-    SetEq(this.toSetExpr(), other.toSetExpr())
+infix fun SetTerm.eq(other: SetTerm): BoolExpr = SetEq(this.toSetExpr(), other.toSetExpr())
 
 /** `S ≠ T`. */
-infix fun SetTerm.ne(other: SetTerm): BoolExpr =
-    Not(SetEq(this.toSetExpr(), other.toSetExpr()))
+infix fun SetTerm.ne(other: SetTerm): BoolExpr = Not(SetEq(this.toSetExpr(), other.toSetExpr()))
 
 /** `S ∪ T`. Returns a set expression — usually consumed by [eq] / [subsetOf] / [card]. */
-infix fun SetTerm.union(other: SetTerm): SetExpr =
-    SetUnion(this.toSetExpr(), other.toSetExpr())
+infix fun SetTerm.union(other: SetTerm): SetExpr = SetUnion(this.toSetExpr(), other.toSetExpr())
 
 /** `S ∩ T`. Returns a set expression. */
-infix fun SetTerm.intersect(other: SetTerm): SetExpr =
-    SetIntersect(this.toSetExpr(), other.toSetExpr())
+infix fun SetTerm.intersect(other: SetTerm): SetExpr = SetIntersect(this.toSetExpr(), other.toSetExpr())
 
 /** `S ∖ T` — set difference. Returns a set expression. */
-infix fun SetTerm.diff(other: SetTerm): SetExpr =
-    SetDiff(this.toSetExpr(), other.toSetExpr())
+infix fun SetTerm.diff(other: SetTerm): SetExpr = SetDiff(this.toSetExpr(), other.toSetExpr())
 
 /** Cardinality `|S|`. */
 fun card(s: SetTerm): IntExpr = SetCard(s.toSetExpr())

@@ -57,10 +57,7 @@ data class RepairContext(
  * `params.maxFlips` — useful for differentiating "quick probe" from "deep investment"
  * variants the ALNS bandit can choose between.
  */
-class InnerLsRepair(
-    val label: String = "standard",
-    val flipsOverride: Long? = null,
-) : RepairOperator {
+class InnerLsRepair(val label: String = "standard", val flipsOverride: Long? = null) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val params = if (flipsOverride != null) context.params.copy(maxFlips = flipsOverride) else context.params
         val merged = params.withAssumptions(context.pinAssumptions)
@@ -92,9 +89,7 @@ class InnerLsRepair(
  * infeasible candidates are scored `+∞` and greedy stays inside the feasible region
  * whenever it can.
  */
-class GreedyConstructionRepair(
-    val intDomainSampleCap: Int = 20,
-) : RepairOperator {
+class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
@@ -103,9 +98,7 @@ class GreedyConstructionRepair(
         state.recompute()
 
         val shaping = context.params.costShaping
-        fun currentScore(): Double {
-            return shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
-        }
+        fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
 
         val boolOrder = context.freed.bools.copyOf().also { it.shuffle(context.rng) }
         for (b in boolOrder) {
@@ -159,9 +152,7 @@ class GreedyConstructionRepair(
  * has dramatically different costs, regret typically reaches a feasible incumbent in fewer
  * inner LS rounds.
  */
-class RegretRepair(
-    val intDomainSampleCap: Int = 20,
-) : RepairOperator {
+class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
@@ -198,7 +189,9 @@ class RegretRepair(
                     second = bestScore
                     bestScore = s
                     best = v
-                } else if (s < second) second = s
+                } else if (s < second) {
+                    second = s
+                }
                 state.apply(Move.IntSet(i, cur))
             }
             val regret = if (second == Double.POSITIVE_INFINITY) 0.0 else second - bestScore
@@ -226,10 +219,7 @@ class RegretRepair(
  * objective surface near the incumbent is smooth — the bandit learns when best-improving
  * outperforms stochastic LS.
  */
-class BestImprovingRepair(
-    val intDomainSampleCap: Int = 20,
-    val maxIterations: Int = 100,
-) : RepairOperator {
+class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIterations: Int = 100) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)

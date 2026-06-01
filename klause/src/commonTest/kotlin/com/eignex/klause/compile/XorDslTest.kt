@@ -38,7 +38,7 @@ class XorDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(10).toList()
         assertTrue(samples.isNotEmpty())
@@ -60,7 +60,7 @@ class XorDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 19)).take(10).toList()
         assertTrue(samples.isNotEmpty())
@@ -83,7 +83,7 @@ class XorDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 23)).take(20).toList()
         for (s in samples) {

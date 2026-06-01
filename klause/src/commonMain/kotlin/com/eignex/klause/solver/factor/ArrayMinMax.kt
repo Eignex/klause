@@ -14,11 +14,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * a payload holding the index of the current best operand and its value, with a fallback
  * full scan when the best slot changes.
  */
-class ArrayMinMax(
-    val result: Int,
-    val xs: IntArray,
-    val max: Boolean,
-) : LocalSearchFactor {
+class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : LocalSearchFactor {
 
     init {
         require(xs.isNotEmpty()) { "ArrayMinMax needs at least one operand" }
@@ -79,7 +75,9 @@ class ArrayMinMax(
             if (!init) {
                 best = current
                 init = true
-            } else if (cmp(current, best)) best = current
+            } else if (cmp(current, best)) {
+                best = current
+            }
         }
         return best
     }
@@ -152,7 +150,7 @@ class ArrayMinMax(
             if (!state.tightenIntMin(
                     result,
                     loBound,
-                    state.composeIntVarAtomAntecedents(intArrayOf(loVar))
+                    state.composeIntVarAtomAntecedents(intArrayOf(loVar)),
                 )
             ) {
                 return false
@@ -178,7 +176,7 @@ class ArrayMinMax(
             if (!state.tightenIntMax(
                     result,
                     hiBound,
-                    state.composeIntVarAtomAntecedents(intArrayOf(hiVar))
+                    state.composeIntVarAtomAntecedents(intArrayOf(hiVar)),
                 )
             ) {
                 return false

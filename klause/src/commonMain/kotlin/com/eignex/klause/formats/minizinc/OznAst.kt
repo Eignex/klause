@@ -15,11 +15,7 @@ package com.eignex.klause.formats.minizinc
  * Evaluated by [OznEvaluator] against a binding map produced by the FZN solver.
  */
 internal sealed interface OznItem {
-    data class VarDecl(
-        val name: String,
-        val type: OznType,
-        val initializer: OznExpr?,
-    ) : OznItem
+    data class VarDecl(val name: String, val type: OznType, val initializer: OznExpr?) : OznItem
     data class Output(val items: List<OznExpr>) : OznItem
 }
 
@@ -53,11 +49,7 @@ internal sealed interface OznExpr {
     data class SetLit(val elements: List<OznExpr>) : OznExpr
 
     /** `[ body | i in r1, j in r2 where cond ]` or the `{ ... }` set form. */
-    data class Comprehension(
-        val body: OznExpr,
-        val generators: List<Generator>,
-        val isSet: Boolean,
-    ) : OznExpr
+    data class Comprehension(val body: OznExpr, val generators: List<Generator>, val isSet: Boolean) : OznExpr
     data class Generator(val names: List<String>, val source: OznExpr, val where: OznExpr?)
 
     /** Built-in function call: `show(x)`, `array2d(r1, r2, xs)`, `bool2int(b)`, etc. */

@@ -49,18 +49,18 @@ class LocalSearchStateRecomputeTest {
                 assertEquals(
                     sibling.cost,
                     state.cost,
-                    "${case.name} seed=$seed: cost drifted from recompute"
+                    "${case.name} seed=$seed: cost drifted from recompute",
                 )
                 assertEquals(
                     sibling.violated.toIntArray().sortedArray().toList(),
                     state.violated.toIntArray().sortedArray().toList(),
-                    "${case.name} seed=$seed: violated set drifted"
+                    "${case.name} seed=$seed: violated set drifted",
                 )
                 for (fid in 0 until case.problem.numFactors) {
                     assertEquals(
                         sibling.intPayload[fid],
                         state.intPayload[fid],
-                        "${case.name} seed=$seed: intPayload[$fid] drifted"
+                        "${case.name} seed=$seed: intPayload[$fid] drifted",
                     )
                     val fa = case.problem.factors[fid] as LocalSearchFactor
                     assertEquals(
@@ -86,7 +86,7 @@ class LocalSearchStateRecomputeTest {
                 for (fid in state.violated.toIntArray()) {
                     assertTrue(
                         fid in 0 until case.problem.numFactors,
-                        "${case.name}: violated set contains out-of-range $fid"
+                        "${case.name}: violated set contains out-of-range $fid",
                     )
                 }
             }
@@ -177,7 +177,7 @@ class LocalSearchStateRecomputeTest {
         )
         return Case(
             "mixedReified",
-            Problem(numBoolVars = 6, numIntVars = 2, intDomains = intDomains, factors = factors)
+            Problem(numBoolVars = 6, numIntVars = 2, intDomains = intDomains, factors = factors),
         )
     }
 

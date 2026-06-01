@@ -100,8 +100,11 @@ internal object SmtTranslator {
         val intFormulas = Array(problem.numIntVars) { i -> imgr.makeVariable("i$i") }
         val meta = problem.floatMetadata
         val realFormulas =
-            if (meta == null) emptyArray()
-            else Array(meta.numFloatVars) { i -> rmgr.makeVariable("r$i") }
+            if (meta == null) {
+                emptyArray()
+            } else {
+                Array(meta.numFloatVars) { i -> rmgr.makeVariable("r$i") }
+            }
 
         val encoding = SmtEncoding(fm, boolFormulas, intFormulas, realFormulas)
         val auxiliary = ArrayList<BooleanFormula>()
@@ -109,19 +112,23 @@ internal object SmtTranslator {
         // Int-domain bounds — auxiliary, never load-bearing in user-facing unsat cores.
         for (i in 0 until problem.numIntVars) {
             val d = problem.intDomains[i]
-            auxiliary.add(bmgr.and(
-                imgr.greaterOrEquals(intFormulas[i], imgr.makeNumber(d.min.toLong())),
-                imgr.lessOrEquals(intFormulas[i], imgr.makeNumber(d.max.toLong())),
-            ))
+            auxiliary.add(
+                bmgr.and(
+                    imgr.greaterOrEquals(intFormulas[i], imgr.makeNumber(d.min.toLong())),
+                    imgr.lessOrEquals(intFormulas[i], imgr.makeNumber(d.max.toLong())),
+                ),
+            )
         }
         // Native-real domain constraints + bucket linkage — auxiliary.
         if (meta != null) {
             for (i in 0 until meta.numFloatVars) {
                 val ivl = meta.intervals[i]
-                auxiliary.add(bmgr.and(
-                    rmgr.greaterOrEquals(realFormulas[i], rmgr.makeNumber(ivl.lo)),
-                    rmgr.lessOrEquals(realFormulas[i], rmgr.makeNumber(ivl.hi)),
-                ))
+                auxiliary.add(
+                    bmgr.and(
+                        rmgr.greaterOrEquals(realFormulas[i], rmgr.makeNumber(ivl.lo)),
+                        rmgr.lessOrEquals(realFormulas[i], rmgr.makeNumber(ivl.hi)),
+                    ),
+                )
                 val buckets = meta.bucketCounts[i]
                 val step = if (buckets > 1) (ivl.hi - ivl.lo) / (buckets - 1) else 0.0
                 val intVar = intFormulas[meta.intVarByFloatVar[i]]
@@ -184,11 +191,11 @@ internal object SmtTranslator {
             if (values.isEmpty()) bmgr.makeFalse() else bmgr.or(values.map { eqN(x, it) })
 
         /** Strict less-than `a < b` (no native strict op): `¬(a ≥ b)`. */
-        private fun lt(a: IntegerFormula, b: IntegerFormula): BooleanFormula =
-            bmgr.not(imgr.greaterOrEquals(a, b))
+        private fun lt(a: IntegerFormula, b: IntegerFormula): BooleanFormula = bmgr.not(imgr.greaterOrEquals(a, b))
 
         fun translateFactor(factor: Factor): BooleanFormula = when (factor) {
             is Clause -> bmgr.or(factor.literals.map { litFormula(it) })
+
             is Cardinality -> {
                 val sum = sumOfLitInts(factor.literals)
                 bmgr.and(
@@ -196,27 +203,42 @@ internal object SmtTranslator {
                     imgr.lessOrEquals(sum, num(factor.max)),
                 )
             }
+
             is Linear -> opLinear(weightedIntSum(factor.coeffs, factor.vars), factor.op, factor.bound)
+
             is PseudoBoolean -> opPb(weightedLitSum(factor.weights, factor.literals), factor.op, factor.bound)
+
             is Xor -> {
                 var acc: BooleanFormula = bmgr.makeFalse()
                 for (lit in factor.literals) acc = bmgr.xor(acc, litFormula(lit))
                 if (factor.targetParity == 1) acc else bmgr.not(acc)
             }
+
             is AllDifferent -> imgr.distinct(factor.vars.map { iv(it) })
+
             is Product -> imgr.equal(iv(factor.result), imgr.multiply(iv(factor.a), iv(factor.b)))
+
             is ReifiedLinear ->
-                bmgr.equivalence(e.boolFormulas[factor.auxBoolVar],
-                    opLinear(weightedIntSum(factor.coeffs, factor.vars), factor.op, factor.bound))
+                bmgr.equivalence(
+                    e.boolFormulas[factor.auxBoolVar],
+                    opLinear(weightedIntSum(factor.coeffs, factor.vars), factor.op, factor.bound),
+                )
+
             is ReifiedPseudoBoolean ->
-                bmgr.equivalence(e.boolFormulas[factor.auxBoolVar],
-                    opPb(weightedLitSum(factor.weights, factor.literals), factor.op, factor.bound))
+                bmgr.equivalence(
+                    e.boolFormulas[factor.auxBoolVar],
+                    opPb(weightedLitSum(factor.weights, factor.literals), factor.op, factor.bound),
+                )
+
             is ReifiedCardinality -> {
                 val sum = sumOfLitInts(factor.literals)
-                bmgr.equivalence(e.boolFormulas[factor.auxBoolVar], bmgr.and(
-                    imgr.greaterOrEquals(sum, num(factor.min)),
-                    imgr.lessOrEquals(sum, num(factor.max)),
-                ))
+                bmgr.equivalence(
+                    e.boolFormulas[factor.auxBoolVar],
+                    bmgr.and(
+                        imgr.greaterOrEquals(sum, num(factor.min)),
+                        imgr.lessOrEquals(sum, num(factor.max)),
+                    ),
+                )
             }
 
             // ---- expanded coverage ----
@@ -224,38 +246,74 @@ internal object SmtTranslator {
                 val first = iv(factor.xs[0])
                 bmgr.and(factor.xs.drop(1).map { eqV(first, iv(it)) })
             }
+
             is AllDifferentExceptZero -> distinctExcept(factor.xs, intArrayOf(0))
+
             is AllDifferentExcept -> distinctExcept(factor.xs, factor.except)
+
             is Member -> bmgr.or(factor.xs.map { eqV(iv(factor.y), iv(it)) })
+
             is Among -> eqV(iv(factor.n), imgr.sum(factor.xs.map { oneIf(inValues(iv(it), factor.values)) }))
+
             is Count -> translateCount(factor)
+
             is Element -> translateElement(factor)
+
             is Inverse -> channel(factor.f, factor.g, factor.fOffset, factor.gOffset)
+
             is SymmetricAllDifferent -> channel(factor.xs, factor.xs, factor.indexOffset, factor.indexOffset)
+
             is LexLess -> lexLess(factor.xs, factor.ys, factor.strict)
+
             is Monotone -> monotone(factor)
+
             is NValue -> translateNValue(factor)
+
             is GlobalCardinality -> translateGcc(factor)
+
             is Table -> translateTable(factor)
+
             is ValuePrecede -> valuePrecede(factor)
+
             is ArrayMinMax -> arrayMinMax(factor)
+
             is ArgMinMax -> argMinMax(factor)
+
             is Knapsack -> bmgr.and(
-                eqV(iv(factor.w), imgr.sum(factor.xs.indices.map { imgr.multiply(num(factor.weights[it]), iv(factor.xs[it])) })),
-                eqV(iv(factor.p), imgr.sum(factor.xs.indices.map { imgr.multiply(num(factor.profits[it]), iv(factor.xs[it])) })),
+                eqV(
+                    iv(factor.w),
+                    imgr.sum(factor.xs.indices.map { imgr.multiply(num(factor.weights[it]), iv(factor.xs[it])) }),
+                ),
+                eqV(
+                    iv(factor.p),
+                    imgr.sum(factor.xs.indices.map { imgr.multiply(num(factor.profits[it]), iv(factor.xs[it])) }),
+                ),
             )
+
             is Cumulative -> cumulative(factor)
+
             is Diffn -> diffn(factor)
+
             is BinPacking -> binPacking(factor)
+
             is Sort -> sort(factor)
+
             is Sequence -> sequence(factor)
+
             is Regular -> regular(factor)
+
             is Circuit -> circuit(factor)
+
             is Subcircuit -> subcircuit(factor)
+
             is Geost -> geost(factor)
+
             is Mdd -> mdd(factor)
+
             is SetBitsetSubset -> setSubset(factor.leftBools, factor.rightBools)
+
             is SetBitsetDisjoint -> setDisjoint(factor.leftBools, factor.rightBools)
+
             is SetBitsetEq -> setEq(factor.leftBools, factor.rightBools)
 
             else -> error("SmtTranslator: unsupported factor type ${factor::class.simpleName}")
@@ -264,12 +322,16 @@ internal object SmtTranslator {
         /** `distinct` over [xs] except that any pair where one side ∈ [except] is exempt. */
         private fun distinctExcept(xs: IntArray, except: IntArray): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
-            for (i in xs.indices) for (j in i + 1 until xs.size) {
-                conj.add(bmgr.or(
-                    inValues(iv(xs[i]), except),
-                    inValues(iv(xs[j]), except),
-                    bmgr.not(eqV(iv(xs[i]), iv(xs[j]))),
-                ))
+            for (i in xs.indices) {
+                for (j in i + 1 until xs.size) {
+                    conj.add(
+                        bmgr.or(
+                            inValues(iv(xs[i]), except),
+                            inValues(iv(xs[j]), except),
+                            bmgr.not(eqV(iv(xs[i]), iv(xs[j]))),
+                        ),
+                    )
+                }
             }
             return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
         }
@@ -278,8 +340,11 @@ internal object SmtTranslator {
             // #{i : xs[i] = v} ⟨op⟩ n. Presence-aware when per-index literals are supplied.
             val terms = f.xs.indices.map { idx ->
                 val matches = eqN(iv(f.xs[idx]), f.v)
-                if (f.presents.isEmpty()) oneIf(matches)
-                else oneIf(bmgr.and(litFormula(f.presents[idx]), matches))
+                if (f.presents.isEmpty()) {
+                    oneIf(matches)
+                } else {
+                    oneIf(bmgr.and(litFormula(f.presents[idx]), matches))
+                }
             }
             val cnt = imgr.sum(terms)
             val n = num(f.n)
@@ -305,8 +370,10 @@ internal object SmtTranslator {
         /** `f[i] = j+fOff ⟺ g[j] = i+gOff` for all i, j — channels [f] and [g] (Inverse). */
         private fun channel(f: IntArray, g: IntArray, fOff: Int, gOff: Int): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
-            for (i in f.indices) for (j in g.indices) {
-                conj.add(bmgr.equivalence(eqN(iv(f[i]), j + fOff), eqN(iv(g[j]), i + gOff)))
+            for (i in f.indices) {
+                for (j in g.indices) {
+                    conj.add(bmgr.equivalence(eqN(iv(f[i]), j + fOff), eqN(iv(g[j]), i + gOff)))
+                }
             }
             return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
         }
@@ -327,11 +394,14 @@ internal object SmtTranslator {
         private fun monotone(f: Monotone): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
             for (i in 0 until f.xs.size - 1) {
-                val a = iv(f.xs[i]); val b = iv(f.xs[i + 1])
-                conj.add(when (f.direction) {
-                    Monotone.Direction.Increasing -> if (f.strict) lt(a, b) else imgr.lessOrEquals(a, b)
-                    Monotone.Direction.Decreasing -> if (f.strict) lt(b, a) else imgr.greaterOrEquals(a, b)
-                })
+                val a = iv(f.xs[i])
+                val b = iv(f.xs[i + 1])
+                conj.add(
+                    when (f.direction) {
+                        Monotone.Direction.Increasing -> if (f.strict) lt(a, b) else imgr.lessOrEquals(a, b)
+                        Monotone.Direction.Decreasing -> if (f.strict) lt(b, a) else imgr.greaterOrEquals(a, b)
+                    },
+                )
             }
             return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
         }
@@ -339,8 +409,11 @@ internal object SmtTranslator {
         private fun translateNValue(f: NValue): BooleanFormula {
             // distinct-count = Σ_i [xs[i] is the first occurrence of its value].
             val terms = f.xs.indices.map { i ->
-                val firstOcc = if (i == 0) bmgr.makeTrue()
-                else bmgr.and((0 until i).map { j -> bmgr.not(eqV(iv(f.xs[i]), iv(f.xs[j]))) })
+                val firstOcc = if (i == 0) {
+                    bmgr.makeTrue()
+                } else {
+                    bmgr.and((0 until i).map { j -> bmgr.not(eqV(iv(f.xs[i]), iv(f.xs[j]))) })
+                }
                 oneIf(firstOcc)
             }
             val distinct = imgr.sum(terms)
@@ -360,10 +433,13 @@ internal object SmtTranslator {
                 val cnt = imgr.sum(f.xs.map { oneIf(eqN(iv(it), f.cover[k])) })
                 when {
                     countVars != null -> conj.add(imgr.equal(iv(countVars[k]), cnt))
-                    countLow != null && countHigh != null -> conj.add(bmgr.and(
-                        imgr.greaterOrEquals(cnt, num(countLow[k])),
-                        imgr.lessOrEquals(cnt, num(countHigh[k])),
-                    ))
+
+                    countLow != null && countHigh != null -> conj.add(
+                        bmgr.and(
+                            imgr.greaterOrEquals(cnt, num(countLow[k])),
+                            imgr.lessOrEquals(cnt, num(countHigh[k])),
+                        ),
+                    )
                 }
             }
             if (f.closed) for (x in f.xs) conj.add(inValues(iv(x), f.cover))
@@ -416,11 +492,14 @@ internal object SmtTranslator {
             // running at start_i ≤ capacity.
             val conj = f.starts.indices.map { i ->
                 val si = iv(f.starts[i])
-                val load = imgr.sum(f.starts.indices.map { j ->
-                    val sj = iv(f.starts[j]); val dj = iv(f.durations[j])
-                    val running = bmgr.and(imgr.lessOrEquals(sj, si), lt(si, imgr.add(sj, dj)))
-                    bmgr.ifThenElse(running, iv(f.resources[j]), num(0))
-                })
+                val load = imgr.sum(
+                    f.starts.indices.map { j ->
+                        val sj = iv(f.starts[j])
+                        val dj = iv(f.durations[j])
+                        val running = bmgr.and(imgr.lessOrEquals(sj, si), lt(si, imgr.add(sj, dj)))
+                        bmgr.ifThenElse(running, iv(f.resources[j]), num(0))
+                    },
+                )
                 imgr.lessOrEquals(load, num(f.capacity))
             }
             return bmgr.and(conj)
@@ -432,13 +511,17 @@ internal object SmtTranslator {
             fun w(i: Int): IntegerFormula = if (widthVars != null) iv(widthVars[i]) else num(f.widths[i])
             fun h(i: Int): IntegerFormula = if (heightVars != null) iv(heightVars[i]) else num(f.heights[i])
             val conj = ArrayList<BooleanFormula>()
-            for (i in f.xs.indices) for (j in i + 1 until f.xs.size) {
-                conj.add(bmgr.or(
-                    imgr.lessOrEquals(imgr.add(iv(f.xs[i]), w(i)), iv(f.xs[j])),
-                    imgr.lessOrEquals(imgr.add(iv(f.xs[j]), w(j)), iv(f.xs[i])),
-                    imgr.lessOrEquals(imgr.add(iv(f.ys[i]), h(i)), iv(f.ys[j])),
-                    imgr.lessOrEquals(imgr.add(iv(f.ys[j]), h(j)), iv(f.ys[i])),
-                ))
+            for (i in f.xs.indices) {
+                for (j in i + 1 until f.xs.size) {
+                    conj.add(
+                        bmgr.or(
+                            imgr.lessOrEquals(imgr.add(iv(f.xs[i]), w(i)), iv(f.xs[j])),
+                            imgr.lessOrEquals(imgr.add(iv(f.xs[j]), w(j)), iv(f.xs[i])),
+                            imgr.lessOrEquals(imgr.add(iv(f.ys[i]), h(i)), iv(f.ys[j])),
+                            imgr.lessOrEquals(imgr.add(iv(f.ys[j]), h(j)), iv(f.ys[i])),
+                        ),
+                    )
+                }
             }
             return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
         }
@@ -446,9 +529,11 @@ internal object SmtTranslator {
         private fun binPacking(f: BinPacking): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
             for (b in 0 until f.numBins) {
-                val load = imgr.sum(f.bins.indices.map { i ->
-                    bmgr.ifThenElse(eqN(iv(f.bins[i]), b + f.binOffset), num(f.weights[i]), num(0))
-                })
+                val load = imgr.sum(
+                    f.bins.indices.map { i ->
+                        bmgr.ifThenElse(eqN(iv(f.bins[i]), b + f.binOffset), num(f.weights[i]), num(0))
+                    },
+                )
                 when (f.mode) {
                     BinPacking.Mode.LoadVars -> conj.add(imgr.equal(iv(f.loadVars!![b]), load))
                     BinPacking.Mode.UniformCapacity -> conj.add(imgr.lessOrEquals(load, num(f.uniformCapacity)))
@@ -492,10 +577,12 @@ internal object SmtTranslator {
             conj.add(eqN(q[0], f.q0))
             for (i in 0 until n) {
                 val steps = ArrayList<BooleanFormula>()
-                for (st in 1..f.numStates) for (sym in 1..f.alphabetSize) {
-                    val target = f.transitions[(st - 1) * f.alphabetSize + (sym - 1)]
-                    if (target == 0) continue
-                    steps.add(bmgr.and(eqN(q[i], st), eqN(iv(f.seq[i]), sym), eqN(q[i + 1], target)))
+                for (st in 1..f.numStates) {
+                    for (sym in 1..f.alphabetSize) {
+                        val target = f.transitions[(st - 1) * f.alphabetSize + (sym - 1)]
+                        if (target == 0) continue
+                        steps.add(bmgr.and(eqN(q[i], st), eqN(iv(f.seq[i]), sym), eqN(q[i + 1], target)))
+                    }
                 }
                 conj.add(if (steps.isEmpty()) bmgr.makeFalse() else bmgr.or(steps))
             }
@@ -517,8 +604,10 @@ internal object SmtTranslator {
                 conj.add(imgr.greaterOrEquals(order[i], num(0)))
                 conj.add(imgr.lessOrEquals(order[i], num(n - 1)))
             }
-            for (i in 0 until n) for (j in 1 until n) {
-                conj.add(bmgr.implication(eqN(iv(f.succ[i]), j), imgr.equal(order[j], imgr.add(order[i], num(1)))))
+            for (i in 0 until n) {
+                for (j in 1 until n) {
+                    conj.add(bmgr.implication(eqN(iv(f.succ[i]), j), imgr.equal(order[j], imgr.add(order[i], num(1)))))
+                }
             }
             return bmgr.and(conj)
         }
@@ -548,10 +637,14 @@ internal object SmtTranslator {
             val anyRoot = bmgr.or((0 until n).map { isRoot[it] })
             for (i in 0 until n) {
                 conj.add(bmgr.implication(incl[i], anyRoot))
-                conj.add(bmgr.implication(bmgr.and(incl[i], bmgr.not(isRoot[i])), imgr.greaterOrEquals(order[i], num(1))))
-                for (j in 0 until n) if (j != i) {
-                    val cond = bmgr.and(incl[i], eqN(iv(f.succ[i]), j), bmgr.not(isRoot[j]))
-                    conj.add(bmgr.implication(cond, imgr.equal(order[j], imgr.add(order[i], num(1)))))
+                conj.add(
+                    bmgr.implication(bmgr.and(incl[i], bmgr.not(isRoot[i])), imgr.greaterOrEquals(order[i], num(1))),
+                )
+                for (j in 0 until n) {
+                    if (j != i) {
+                        val cond = bmgr.and(incl[i], eqN(iv(f.succ[i]), j), bmgr.not(isRoot[j]))
+                        conj.add(bmgr.implication(cond, imgr.equal(order[j], imgr.add(order[i], num(1)))))
+                    }
                 }
             }
             return bmgr.and(conj)
@@ -560,15 +653,19 @@ internal object SmtTranslator {
         private fun geost(f: Geost): BooleanFormula {
             // Axis-aligned boxes pairwise separated in at least one dimension.
             val conj = ArrayList<BooleanFormula>()
-            for (i in 0 until f.numObjects) for (j in i + 1 until f.numObjects) {
-                val opts = ArrayList<BooleanFormula>()
-                for (d in 0 until f.numDims) {
-                    val oi = iv(f.origin[i * f.numDims + d]); val oj = iv(f.origin[j * f.numDims + d])
-                    val si = f.length[i * f.numDims + d]; val sj = f.length[j * f.numDims + d]
-                    opts.add(imgr.lessOrEquals(imgr.add(oi, num(si)), oj))
-                    opts.add(imgr.lessOrEquals(imgr.add(oj, num(sj)), oi))
+            for (i in 0 until f.numObjects) {
+                for (j in i + 1 until f.numObjects) {
+                    val opts = ArrayList<BooleanFormula>()
+                    for (d in 0 until f.numDims) {
+                        val oi = iv(f.origin[i * f.numDims + d])
+                        val oj = iv(f.origin[j * f.numDims + d])
+                        val si = f.length[i * f.numDims + d]
+                        val sj = f.length[j * f.numDims + d]
+                        opts.add(imgr.lessOrEquals(imgr.add(oi, num(si)), oj))
+                        opts.add(imgr.lessOrEquals(imgr.add(oj, num(sj)), oi))
+                    }
+                    conj.add(bmgr.or(opts))
                 }
-                conj.add(bmgr.or(opts))
             }
             return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
         }
@@ -605,7 +702,8 @@ internal object SmtTranslator {
         private fun setSubset(left: IntArray, right: IntArray): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
             for (i in left.indices) {
-                val l = left[i]; val r = right[i]
+                val l = left[i]
+                val r = right[i]
                 if (l < 0) continue
                 conj.add(if (r < 0) bmgr.not(bvar(l)) else bmgr.implication(bvar(l), bvar(r)))
             }
@@ -615,7 +713,8 @@ internal object SmtTranslator {
         private fun setDisjoint(left: IntArray, right: IntArray): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
             for (i in left.indices) {
-                val l = left[i]; val r = right[i]
+                val l = left[i]
+                val r = right[i]
                 if (l >= 0 && r >= 0) conj.add(bmgr.or(bmgr.not(bvar(l)), bmgr.not(bvar(r))))
             }
             return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
@@ -624,7 +723,8 @@ internal object SmtTranslator {
         private fun setEq(left: IntArray, right: IntArray): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
             for (i in left.indices) {
-                val l = left[i]; val r = right[i]
+                val l = left[i]
+                val r = right[i]
                 when {
                     l >= 0 && r >= 0 -> conj.add(bmgr.equivalence(bvar(l), bvar(r)))
                     l >= 0 -> conj.add(bmgr.not(bvar(l)))

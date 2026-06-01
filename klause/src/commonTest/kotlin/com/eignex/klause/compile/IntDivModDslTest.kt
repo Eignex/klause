@@ -27,7 +27,7 @@ class IntDivModDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 27)).take(15).toList()
         assertTrue(samples.isNotEmpty())
@@ -51,7 +51,7 @@ class IntDivModDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 41)).take(15).toList()
         assertTrue(samples.isNotEmpty())
@@ -86,7 +86,7 @@ class IntDivModDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 61)).take(10).toList()
         assertTrue(samples.isNotEmpty())
@@ -112,7 +112,7 @@ class IntDivModDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 71)).take(10).toList()
         assertTrue(samples.isNotEmpty())
@@ -122,7 +122,7 @@ class IntDivModDslTest {
             val dv = compiled.decode(schema.d, s)
             assertTrue(
                 (nv to dv) in expectedPairs,
-                "n=$nv d=$dv not in expected Euclidean q=-2 pairs $expectedPairs"
+                "n=$nv d=$dv not in expected Euclidean q=-2 pairs $expectedPairs",
             )
         }
     }
@@ -140,7 +140,7 @@ class IntDivModDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 47)).take(5).toList()
         assertTrue(samples.isNotEmpty())

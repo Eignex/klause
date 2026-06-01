@@ -73,14 +73,11 @@ fun pseudoBoolean(weights: List<Int>, lits: List<BoolTerm>, op: PbOp, bound: Int
     return PseudoBooleanExpr(weights, lits.map { it.toExpr() }, op, bound)
 }
 
-fun pbAtMost(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr =
-    pseudoBoolean(weights, lits, PbOp.LE, k)
+fun pbAtMost(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr = pseudoBoolean(weights, lits, PbOp.LE, k)
 
-fun pbAtLeast(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr =
-    pseudoBoolean(weights, lits, PbOp.GE, k)
+fun pbAtLeast(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr = pseudoBoolean(weights, lits, PbOp.GE, k)
 
-fun pbExactly(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr =
-    pseudoBoolean(weights, lits, PbOp.EQ, k)
+fun pbExactly(weights: List<Int>, lits: List<BoolTerm>, k: Int): BoolExpr = pseudoBoolean(weights, lits, PbOp.EQ, k)
 
 /**
  * Extensional positive table: `vars` must equal one of the listed `allowed` tuples.
@@ -190,12 +187,7 @@ fun subcircuit(succ: List<IntTerm>, valueOffset: Int = 0): BoolExpr {
  * Cumulative scheduling constraint: `Σ {resources[i] : starts[i] ≤ t < starts[i] + durations[i]} ≤ capacity`
  * at every integer time point `t`. Durations / resources / capacity are constants.
  */
-fun cumulative(
-    starts: List<IntTerm>,
-    durations: List<Int>,
-    resources: List<Int>,
-    capacity: Int,
-): BoolExpr {
+fun cumulative(starts: List<IntTerm>, durations: List<Int>, resources: List<Int>, capacity: Int): BoolExpr {
     require(starts.size == durations.size && starts.size == resources.size) {
         "cumulative(): starts/durations/resources must have the same length"
     }
@@ -256,11 +248,7 @@ fun cumulativeOpt(
 }
 
 /** Disjunctive with presence-gated tasks. Absent tasks impose no no-overlap obligation. */
-fun disjunctiveOpt(
-    starts: List<IntTerm>,
-    durations: List<Int>,
-    presents: List<BoolTerm>,
-): BoolExpr {
+fun disjunctiveOpt(starts: List<IntTerm>, durations: List<Int>, presents: List<BoolTerm>): BoolExpr {
     require(starts.size == durations.size && starts.size == presents.size) {
         "disjunctiveOpt: starts/durations/presents must have the same length"
     }
@@ -281,13 +269,7 @@ fun countNeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>):
 fun countLeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
     countOptCommon(xs, v, n, presents, CountOp.LE)
 
-private fun countOptCommon(
-    xs: List<IntTerm>,
-    v: Int,
-    n: IntTerm,
-    presents: List<BoolTerm>,
-    op: CountOp,
-): BoolExpr {
+private fun countOptCommon(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>, op: CountOp): BoolExpr {
     require(xs.isNotEmpty()) { "countOpt: xs must be non-empty" }
     require(presents.size == xs.size) { "countOpt: presents must match xs arity" }
     return CountExprOpt(
@@ -300,12 +282,7 @@ private fun countOptCommon(
 }
 
 /** Number of distinct values among the presence-gated subset of xs. */
-fun nValueOpt(
-    n: IntTerm,
-    xs: List<IntTerm>,
-    presents: List<BoolTerm>,
-    mode: NValueMode = NValueMode.EQ,
-): BoolExpr {
+fun nValueOpt(n: IntTerm, xs: List<IntTerm>, presents: List<BoolTerm>, mode: NValueMode = NValueMode.EQ): BoolExpr {
     require(xs.isNotEmpty()) { "nValueOpt: xs must be non-empty" }
     require(presents.size == xs.size) { "nValueOpt: presents must match xs arity" }
     return NValueExprOpt(
@@ -459,11 +436,7 @@ fun networkFlowCost(
  * `geost(numDims, origins, sizes)` — N-dimensional non-overlapping axis-aligned boxes.
  * `origins` is row-major `[numObjects × numDims]`; `sizes` matches.
  */
-fun geost(
-    numDims: Int,
-    origins: List<IntTerm>,
-    sizes: List<Int>,
-): BoolExpr {
+fun geost(numDims: Int, origins: List<IntTerm>, sizes: List<Int>): BoolExpr {
     require(numDims >= 1) { "geost: numDims must be ≥ 1" }
     require(origins.size == sizes.size) { "geost: origins and sizes length mismatch" }
     require(origins.size % numDims == 0) { "geost: origins length must be a multiple of numDims" }

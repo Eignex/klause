@@ -56,7 +56,7 @@ object MoveSetOracle {
                 if (requireImprovement) {
                     assertTrue(
                         delta <= 0,
-                        "$label: proposed move $move worsens violation (delta=$delta) on iter=$iter"
+                        "$label: proposed move $move worsens violation (delta=$delta) on iter=$iter",
                     )
                 }
             }
@@ -69,7 +69,7 @@ object MoveSetOracle {
                     proposedImproves,
                     "$label: brute found ${improvingNeighbors.size} improving 1-step move(s) " +
                         "(e.g. ${improvingNeighbors.first()}) but proposed set $proposed contains none. " +
-                        "Iter=$iter, bools=${snapshotBools(state, problem)}, ints=${snapshotInts(state, problem)}"
+                        "Iter=$iter, bools=${snapshotBools(state, problem)}, ints=${snapshotInts(state, problem)}",
                 )
             }
         }
@@ -86,24 +86,26 @@ object MoveSetOracle {
             is Move.BoolFlip -> {
                 assertTrue(
                     move.varId in factor.boolVars,
-                    "$label: proposed BoolFlip(${move.varId}) on var not in boolVars ${factor.boolVars.toList()}"
+                    "$label: proposed BoolFlip(${move.varId}) on var not in boolVars ${factor.boolVars.toList()}",
                 )
             }
+
             is Move.IntSet -> {
                 assertTrue(
                     move.varId in factor.intVars,
-                    "$label: proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}"
+                    "$label: proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}",
                 )
                 val d = problem.intDomains[move.varId]
                 assertTrue(
                     move.newValue in d,
-                    "$label: proposed IntSet target ${move.newValue} out of domain $d"
+                    "$label: proposed IntSet target ${move.newValue} out of domain $d",
                 )
                 assertTrue(
                     move.newValue != state.assignment.intValue(move.varId),
-                    "$label: proposed no-op IntSet at ${move.newValue}"
+                    "$label: proposed no-op IntSet at ${move.newValue}",
                 )
             }
+
             is Move.Compound -> {
                 for (part in move.parts) assertLegal(part, problem, state, factor, label)
             }
@@ -112,12 +114,7 @@ object MoveSetOracle {
 
     /** Returns the delta in this factor's violation status when [move] is applied to a fresh
      *  copy of [state]. Does not mutate [state]. */
-    private fun applyAndReport(
-        problem: Problem,
-        state: LocalSearchState,
-        factor: LocalSearchFactor,
-        move: Move,
-    ): Int {
+    private fun applyAndReport(problem: Problem, state: LocalSearchState, factor: LocalSearchFactor, move: Move): Int {
         val before = if (factor.isViolated(state, 0)) 1 else 0
         val sibling = LocalSearchState(problem, Random(0))
         copyAssignment(state, sibling)
@@ -127,11 +124,7 @@ object MoveSetOracle {
         return after - before
     }
 
-    private fun bruteImproving(
-        problem: Problem,
-        state: LocalSearchState,
-        factor: LocalSearchFactor,
-    ): List<Move> {
+    private fun bruteImproving(problem: Problem, state: LocalSearchState, factor: LocalSearchFactor): List<Move> {
         val out = ArrayList<Move>()
         for (b in factor.boolVars) {
             val move = Move.BoolFlip(b)

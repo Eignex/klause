@@ -22,7 +22,7 @@ class ProductConvergenceTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 4)).take(8).toList()
         assertTrue(samples.isNotEmpty())

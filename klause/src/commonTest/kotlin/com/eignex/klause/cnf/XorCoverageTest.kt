@@ -25,7 +25,7 @@ class XorCoverageTest {
             assertEquals(
                 expected,
                 SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask parity=$parity expected=$expected"
+                "mask=$mask parity=$parity expected=$expected",
             )
         }
     }
@@ -47,7 +47,7 @@ class XorCoverageTest {
             assertEquals(
                 expected,
                 SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask parity=$parity expected=$expected"
+                "mask=$mask parity=$parity expected=$expected",
             )
         }
     }

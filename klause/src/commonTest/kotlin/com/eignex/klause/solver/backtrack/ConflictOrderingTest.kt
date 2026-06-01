@@ -80,7 +80,7 @@ class ConflictOrderingTest {
         val picked = cos.pick(session, Random(0L))
         assertTrue(
             picked == VarRef.IntVar(0) || picked == VarRef.IntVar(2),
-            "should pick a stamped conflict-graph var; got $picked"
+            "should pick a stamped conflict-graph var; got $picked",
         )
     }
 
@@ -97,7 +97,7 @@ class ConflictOrderingTest {
                 variableHeuristic = ConflictOrdering(DomWdeg()),
                 valueHeuristic = IndomainMin,
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())

@@ -42,7 +42,7 @@ class InverseTest {
                     g = intArrayOf(3, 4, 5),
                     fOffset = 1,
                     gOffset = 1,
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))

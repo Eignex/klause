@@ -255,7 +255,7 @@ class CumulativeTest {
         assertEquals(
             3,
             result.intMinOrNullCompat(2),
-            "edge-finding should push C's start min from 0 to 3"
+            "edge-finding should push C's start min from 0 to 3",
         )
     }
 

@@ -40,13 +40,11 @@ fun interface Cancellation {
     operator fun invoke(): Boolean = isCancelled()
 
     /** Cancel when either side cancels. Short-circuit on the receiver. */
-    infix fun or(other: Cancellation): Cancellation =
-        Cancellation { this.isCancelled() || other.isCancelled() }
+    infix fun or(other: Cancellation): Cancellation = Cancellation { this.isCancelled() || other.isCancelled() }
 
     /** Cancel only when both sides cancel — useful for "user requested AND budget
      *  exhausted" two-key escapes that shouldn't fire on either alone. */
-    infix fun and(other: Cancellation): Cancellation =
-        Cancellation { this.isCancelled() && other.isCancelled() }
+    infix fun and(other: Cancellation): Cancellation = Cancellation { this.isCancelled() && other.isCancelled() }
 
     companion object {
         /** Default token: never cancels. */

@@ -86,15 +86,13 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
              *  assumption-core extraction path in [com.eignex.klause.solver.satisfyUnderAssumptions]. */
             val decisionLevels: IntArray,
         ) : AnalysisResult {
-            override fun equals(other: Any?): Boolean =
-                other is Learned &&
-                    literals.contentEquals(other.literals) &&
-                    backjumpLevel == other.backjumpLevel &&
-                    lbd == other.lbd &&
-                    decisionLevels.contentEquals(other.decisionLevels)
-            override fun hashCode(): Int =
-                31 * (31 * (31 * literals.contentHashCode() + backjumpLevel) + lbd) +
-                    decisionLevels.contentHashCode()
+            override fun equals(other: Any?): Boolean = other is Learned &&
+                literals.contentEquals(other.literals) &&
+                backjumpLevel == other.backjumpLevel &&
+                lbd == other.lbd &&
+                decisionLevels.contentEquals(other.decisionLevels)
+            override fun hashCode(): Int = 31 * (31 * (31 * literals.contentHashCode() + backjumpLevel) + lbd) +
+                decisionLevels.contentHashCode()
             override fun toString(): String =
                 "Learned(literals=${literals.toList()}, backjumpLevel=$backjumpLevel, lbd=$lbd, levels=${decisionLevels.toList()})"
         }
@@ -315,11 +313,7 @@ class ConflictAnalyzer internal constructor(private val state: PropagationState)
      * depth is bounded by the size of the implication graph reached, but the cache
      * keeps the total work linear.
      */
-    private fun isRedundant(
-        v: Int,
-        inClause: BooleanArray,
-        cache: HashMap<Int, Boolean>,
-    ): Boolean {
+    private fun isRedundant(v: Int, inClause: BooleanArray, cache: HashMap<Int, Boolean>): Boolean {
         cache[v]?.let { return it }
         val antecedents = antecedentsOf(v) ?: run {
             cache[v] = false

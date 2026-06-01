@@ -41,11 +41,11 @@ class LocalSearchSessionTest {
                 maxFlips = Long.MAX_VALUE,
                 maxInstructions = 5L,
                 randomSeed = 0L,
-            )
+            ),
         )
         assertTrue(
             tight is SolveResult.Sat || tight is SolveResult.Unknown,
-            "tight maxInstructions must terminate cleanly, got $tight"
+            "tight maxInstructions must terminate cleanly, got $tight",
         )
     }
 
@@ -123,14 +123,14 @@ class LocalSearchSessionTest {
         val firstWatermark = session.warmStateView.bestCostSeen()
         assertTrue(
             firstWatermark < Int.MAX_VALUE,
-            "expected watermark after first call, got $firstWatermark"
+            "expected watermark after first call, got $firstWatermark",
         )
 
         session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L)).assignment
         val secondWatermark = session.warmStateView.bestCostSeen()
         assertTrue(
             secondWatermark <= firstWatermark,
-            "watermark must monotone-decrease: $firstWatermark -> $secondWatermark"
+            "watermark must monotone-decrease: $firstWatermark -> $secondWatermark",
         )
     }
 
@@ -145,7 +145,7 @@ class LocalSearchSessionTest {
         assertEquals(
             Long.MAX_VALUE,
             session.warmStateView.bestCostSeen(),
-            "reset should restore the bestCost watermark to its empty default"
+            "reset should restore the bestCost watermark to its empty default",
         )
     }
 
@@ -164,7 +164,7 @@ class LocalSearchSessionTest {
         assertTrue(bumpOnlyPeak > 1.0, "bump-only run should grow weights, got peak=$bumpOnlyPeak")
         assertTrue(
             smoothedPeak < bumpOnlyPeak,
-            "smoothing should bound growth: smoothed=$smoothedPeak vs bump-only=$bumpOnlyPeak"
+            "smoothing should bound growth: smoothed=$smoothedPeak vs bump-only=$bumpOnlyPeak",
         )
     }
 

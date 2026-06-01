@@ -31,8 +31,7 @@ import kotlin.test.assertTrue
  */
 class GapFactorLogicNgTest {
 
-    private fun solve(problem: Problem): SolveResult =
-        LogicNGSolver(problem).solve(LogicNGParams(randomSeed = 0L))
+    private fun solve(problem: Problem): SolveResult = LogicNGSolver(problem).solve(LogicNGParams(randomSeed = 0L))
 
     @Test
     fun `circuit is satisfiable and forms a single hamiltonian cycle`() {
@@ -43,7 +42,7 @@ class GapFactorLogicNgTest {
             Array(n) { IntDomain(0, n - 1) },
             arrayOf<Factor>(
                 Circuit(succ = IntArray(n) { it }),
-            )
+            ),
         )
         val result = solve(problem)
         val sat = assertIs<SolveResult.Sat>(result, "circuit should be satisfiable")
@@ -75,7 +74,7 @@ class GapFactorLogicNgTest {
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 3),
                 Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 2),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem), "two disjoint 2-cycles must be UNSAT for circuit")
     }
@@ -93,7 +92,7 @@ class GapFactorLogicNgTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2),
-            )
+            ),
         )
         assertIs<SolveResult.Sat>(solve(problem), "all-excluded subcircuit should be satisfiable")
     }
@@ -113,7 +112,7 @@ class GapFactorLogicNgTest {
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2),
                 Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 3),
-            )
+            ),
         )
         assertIs<SolveResult.Sat>(solve(problem), "single included 2-cycle with exclusions should be SAT")
     }
@@ -132,7 +131,7 @@ class GapFactorLogicNgTest {
                 eq(1, 3),
                 eq(2, 1),
                 eq(3, 2),
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(solve(problem))
         assertEquals(1, sat.assignment.ints[0], "arg_min should select position 1")
@@ -150,7 +149,7 @@ class GapFactorLogicNgTest {
                 eq(2, 1),
                 eq(3, 2),
                 eq(0, 0), // claim position 0 (value 3) is the min — false
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -169,10 +168,10 @@ class GapFactorLogicNgTest {
                     alphabetSize = 2,
                     transitions = intArrayOf(1, 2, 2, 1),
                     q0 = 1,
-                    accepting = intArrayOf(1)
+                    accepting = intArrayOf(1),
                 ),
                 eq(0, 2),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -190,11 +189,11 @@ class GapFactorLogicNgTest {
                     alphabetSize = 2,
                     transitions = intArrayOf(1, 2, 2, 1),
                     q0 = 1,
-                    accepting = intArrayOf(1)
+                    accepting = intArrayOf(1),
                 ),
                 eq(0, 2),
                 eq(1, 2), // two 2s ⇒ back to accepting state 1
-            )
+            ),
         )
         assertIs<SolveResult.Sat>(solve(problem))
     }
@@ -214,7 +213,7 @@ class GapFactorLogicNgTest {
                 eq(3, 0),
                 eq(4, 1),
                 eq(5, 2),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -231,7 +230,7 @@ class GapFactorLogicNgTest {
                 eq(1, 2),
                 eq(2, 1),
                 eq(3, 2), // xs == ys
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -247,7 +246,7 @@ class GapFactorLogicNgTest {
                 Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1),
                 eq(0, 1),
                 eq(1, 7),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -262,7 +261,7 @@ class GapFactorLogicNgTest {
                 Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 2, 2, 1)),
                 eq(0, 0),
                 eq(1, 1), // (0,1) is not a listed tuple
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -276,7 +275,7 @@ class GapFactorLogicNgTest {
             arrayOf<Factor>(
                 ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2)),
                 eq(0, 2), // t at position 0 with no earlier s
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -291,7 +290,7 @@ class GapFactorLogicNgTest {
                 AllEqual(intArrayOf(0, 1, 2)),
                 eq(0, 0),
                 eq(1, 1),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -310,12 +309,12 @@ class GapFactorLogicNgTest {
                     mode = BinPacking.Mode.UniformCapacity,
                     uniformCapacity = 2,
                     numBins = 2,
-                    binOffset = 1
+                    binOffset = 1,
                 ),
                 eq(0, 1),
                 eq(1, 1),
                 eq(2, 1),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
     }
@@ -333,11 +332,11 @@ class GapFactorLogicNgTest {
                     starts = intArrayOf(0, 1),
                     durations = intArrayOf(2, 2),
                     resources = intArrayOf(1, 1),
-                    capacity = 1
+                    capacity = 1,
                 ),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(solve(problem), "over-capacity overlap must be UNSAT")
     }

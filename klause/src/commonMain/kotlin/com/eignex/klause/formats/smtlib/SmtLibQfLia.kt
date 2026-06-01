@@ -60,8 +60,10 @@ object SmtLibQfLia {
         private var trueLit: Int = -1
 
         // --- let environment: a stack of scopes; each binding compiled once and cached. ---
-        private class Binding(val isBool: Boolean) { var lin: LinTerm? = null
-            var lit: Int? = null }
+        private class Binding(val isBool: Boolean) {
+            var lin: LinTerm? = null
+            var lit: Int? = null
+        }
         private val scopes = ArrayDeque<HashMap<String, Binding>>()
         private fun lookup(name: String): Binding? {
             for (i in scopes.indices.reversed()) scopes[i][name]?.let { return it }
@@ -194,7 +196,7 @@ object SmtLibQfLia {
                 if (upper) {
                     val b = floorDiv(
                         rhs,
-                        ct
+                        ct,
                     )
                     if (b < hi[tv]) {
                         hi[tv] = b
@@ -203,7 +205,7 @@ object SmtLibQfLia {
                 } else {
                     val b = ceilDiv(
                         rhs,
-                        ct
+                        ct,
                     )
                     if (b > lo[tv]) {
                         lo[tv] = b
@@ -214,7 +216,7 @@ object SmtLibQfLia {
                 if (upper) {
                     val b = ceilDiv(
                         rhs,
-                        ct
+                        ct,
                     )
                     if (b > lo[tv]) {
                         lo[tv] = b
@@ -223,7 +225,7 @@ object SmtLibQfLia {
                 } else {
                     val b = floorDiv(
                         rhs,
-                        ct
+                        ct,
                     )
                     if (b < hi[tv]) {
                         hi[tv] = b
@@ -241,8 +243,11 @@ object SmtLibQfLia {
             val h = (t.items[0] as? SExpr.Atom)?.text ?: return
             when (h) {
                 "and" -> t.items.drop(1).forEach { collectConjunctiveRelations(it, out) }
+
                 "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t)) {
-                    try { out.add(relationToLinear(t)) } catch (_: UnsupportedSmtException) { }
+                    try {
+                        out.add(relationToLinear(t))
+                    } catch (_: UnsupportedSmtException) { }
                 }
             }
         }
@@ -258,18 +263,22 @@ object SmtLibQfLia {
                         args.forEach { assert(it) }
                         return
                     }
+
                     "<=", "<", ">=", ">" -> {
                         factors.add(hardLinear(t))
                         return
                     }
+
                     "=" -> if (isArithmeticRelation(t) && args.size == 2) {
                         factors.add(hardLinear(t))
                         return
                     }
+
                     "distinct" -> {
                         assertDistinct(args)
                         return
                     }
+
                     "let" -> {
                         withLet(args[0]) { assert(args[1]) }
                         return
@@ -279,38 +288,51 @@ object SmtLibQfLia {
             forceTrue(compileBool(t))
         }
 
-        private fun forceTrue(lit: Int) { factors.add(Clause(intArrayOf(lit))) }
+        private fun forceTrue(lit: Int) {
+            factors.add(Clause(intArrayOf(lit)))
+        }
 
         // --- boolean term → literal (klause Lit) ---
 
         private fun compileBool(t: SExpr): Int = when (t) {
             is SExpr.Atom -> when (t.text) {
                 "true" -> trueLiteral()
+
                 "false" -> Lit.negate(trueLiteral())
+
                 else -> lookup(t.text)?.let { boolBinding(t.text, it) }
                     ?: Lit.make(boolNames[t.text] ?: throw UnsupportedSmtException("unknown bool '${t.text}'"), true)
             }
+
             is SExpr.SList -> {
                 val h = (t.items[0] as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("bad term")
                 val args = t.items.drop(1)
                 when (h) {
                     "not" -> Lit.negate(compileBool(args[0]))
+
                     "and" -> tseitinAnd(args.map { compileBool(it) })
+
                     "or" -> tseitinOr(args.map { compileBool(it) })
+
                     "xor" -> args.map { compileBool(it) }.reduce { a, b -> Lit.negate(tseitinIff(a, b)) }
+
                     "=>" -> args.dropLast(1).foldRight(compileBool(args.last())) { a, acc ->
                         tseitinOr(listOf(Lit.negate(compileBool(a)), acc))
                     }
+
                     "<=", "<", ">=", ">" -> reifyRelation(t)
+
                     "distinct" -> compileDistinct(args)
+
                     "ite" -> tseitinIte(compileBool(args[0]), compileBool(args[1]), compileBool(args[2]))
+
                     "=" -> if (isArithmeticRelation(t)) {
                         if (args.size == 2) {
                             reifyRelation(t)
                         } else {
                             val ts = args.map {
                                 linearTerm(
-                                    it
+                                    it,
                                 )
                             }
                             tseitinAnd((1 until ts.size).map { reifyEq(ts[0], ts[it]) })
@@ -318,11 +340,13 @@ object SmtLibQfLia {
                     } else {
                         args.map {
                             compileBool(
-                                it
+                                it,
                             )
                         }.let { ls -> tseitinAnd((1 until ls.size).map { tseitinIff(ls[0], ls[it]) }) }
                     }
+
                     "let" -> withLet(args[0]) { compileBool(args[1]) }
+
                     else -> throw UnsupportedSmtException("unsupported boolean op '$h'")
                 }
             }
@@ -382,7 +406,11 @@ object SmtLibQfLia {
                 scope[name] = b
             }
             scopes.addLast(scope)
-            try { return body() } finally { scopes.removeLast() }
+            try {
+                return body()
+            } finally {
+                scopes.removeLast()
+            }
         }
 
         /** Syntactic sort classifier for a term (Bool vs Int result). */
@@ -390,6 +418,7 @@ object SmtLibQfLia {
             is SExpr.Atom ->
                 t.text == "true" || t.text == "false" ||
                     t.text in boolNames || (lookup(t.text)?.isBool == true)
+
             is SExpr.SList -> when ((t.items[0] as? SExpr.Atom)?.text) {
                 "and", "or", "not", "=>", "xor", "=", "distinct", "<", "<=", ">", ">=" -> true
                 "+", "-", "*", "to_real", "to_int" -> false
@@ -435,7 +464,13 @@ object SmtLibQfLia {
             factors.add(Clause(intArrayOf(Lit.negate(wlit), lit)))
             factors.add(Clause(intArrayOf(wlit, Lit.negate(lit))))
             factors.add(
-                ReifiedLinear(auxBoolVar = w, coeffs = intArrayOf(1), vars = intArrayOf(z), op = LinearOp.EQ, bound = 1)
+                ReifiedLinear(
+                    auxBoolVar = w,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(z),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
             )
             return LinTerm(mapOf(z to 1), 0)
         }
@@ -475,7 +510,14 @@ object SmtLibQfLia {
             return when (arg) {
                 is SExpr.Atom -> arg.text.toIntOrNull() != null || intNames.containsKey(arg.text) ||
                     (lookup(arg.text)?.isBool == false)
-                is SExpr.SList -> (arg.items.firstOrNull() as? SExpr.Atom)?.text in setOf("+", "-", "*", "to_real", "to_int")
+
+                is SExpr.SList -> (arg.items.firstOrNull() as? SExpr.Atom)?.text in setOf(
+                    "+",
+                    "-",
+                    "*",
+                    "to_real",
+                    "to_int",
+                )
             }
         }
 
@@ -498,7 +540,7 @@ object SmtLibQfLia {
             val op = (t.items[0] as SExpr.Atom).text
             if (t.items.size != 3) {
                 throw UnsupportedSmtException(
-                    "$op with ${t.items.size - 1} operands not supported as a single linear relation"
+                    "$op with ${t.items.size - 1} operands not supported as a single linear relation",
                 )
             }
             val lhs = linearTerm(t.items[1])
@@ -510,17 +552,23 @@ object SmtLibQfLia {
             var bound = -constDiff
             val linOp = when (op) {
                 "<=" -> LinearOp.LE
+
                 ">=" -> LinearOp.GE
+
                 "=" -> LinearOp.EQ
+
                 "distinct" -> LinearOp.NE
+
                 "<" -> {
                     bound -= 1
                     LinearOp.LE
                 }
+
                 ">" -> {
                     bound += 1
                     LinearOp.GE
                 }
+
                 else -> throw UnsupportedSmtException("relation '$op'")
             }
             val vars = combined.keys.toIntArray()
@@ -540,23 +588,33 @@ object SmtLibQfLia {
                 val n = t.text.toIntOrNull()
                 when {
                     n != null -> LinTerm(emptyMap(), n)
+
                     isRealLiteral(
-                        t.text
+                        t.text,
                     ) -> throw UnsupportedSmtException("real literal '${t.text}' (QF_LIA is integer-only)")
+
                     else -> lookup(t.text)?.let { intBinding(t.text, it) }
-                        ?: LinTerm(mapOf((intNames[t.text] ?: throw UnsupportedSmtException("unknown int var '${t.text}'")) to 1), 0)
+                        ?: LinTerm(
+                            mapOf(
+                                (intNames[t.text] ?: throw UnsupportedSmtException("unknown int var '${t.text}'")) to 1,
+                            ),
+                            0,
+                        )
                 }
             }
+
             is SExpr.SList -> {
                 val h = (t.items[0] as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("bad int term")
                 val args = t.items.drop(1)
                 when (h) {
                     "+" -> args.map { linearTerm(it) }.reduce(::add)
+
                     "-" -> if (args.size == 1) {
                         scale(linearTerm(args[0]), -1)
                     } else {
                         args.drop(1).fold(linearTerm(args[0])) { acc, e -> add(acc, scale(linearTerm(e), -1)) }
                     }
+
                     "*" -> {
                         val parts = args.map { linearTerm(it) }
                         val nonConst = parts.filter { it.coeffs.isNotEmpty() }
@@ -564,9 +622,14 @@ object SmtLibQfLia {
                         val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
                         if (nonConst.isEmpty()) LinTerm(emptyMap(), k) else scale(nonConst[0], k)
                     }
-                    "to_real", "to_int" -> linearTerm(args[0]) // identity over the integer domain
+
+                    "to_real", "to_int" -> linearTerm(args[0])
+
+                    // identity over the integer domain
                     "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$h'")
+
                     "let" -> withLet(args[0]) { linearTerm(args[1]) }
+
                     else -> throw UnsupportedSmtException("unsupported int op '$h'")
                 }
             }
@@ -586,8 +649,7 @@ object SmtLibQfLia {
             return LinTerm(m, a.constant + b.constant)
         }
 
-        private fun scale(a: LinTerm, k: Int): LinTerm =
-            LinTerm(a.coeffs.mapValues { it.value * k }, a.constant * k)
+        private fun scale(a: LinTerm, k: Int): LinTerm = LinTerm(a.coeffs.mapValues { it.value * k }, a.constant * k)
 
         private fun linearObjective(t: SExpr, negate: Boolean): LinearObjective {
             val lt = linearTerm(t)
@@ -595,7 +657,7 @@ object SmtLibQfLia {
             for ((v, c) in lt.coeffs) coeffs[v] = (if (negate) -c else c).toDouble()
             return LinearObjective(
                 intCoefficients = coeffs,
-                constant = (if (negate) -lt.constant else lt.constant).toDouble()
+                constant = (if (negate) -lt.constant else lt.constant).toDouble(),
             )
         }
 

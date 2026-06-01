@@ -19,32 +19,34 @@ class MultiplyTest {
             intVarBits = emptyArray(),
             intVarMin = IntArray(0),
         )
-        for (av in 0..7) for (bv in 0..7) {
-            val expected = av * bv
-            val pins = IntArray(2 * (a.size + b.size))
-            var p = 0
-            for (i in a.indices) {
-                pins[p++] = Lit.variable(a[i])
-                pins[p++] = (av shr i) and 1
-            }
-            for (i in b.indices) {
-                pins[p++] = Lit.variable(b[i])
-                pins[p++] = (bv shr i) and 1
-            }
+        for (av in 0..7) {
+            for (bv in 0..7) {
+                val expected = av * bv
+                val pins = IntArray(2 * (a.size + b.size))
+                var p = 0
+                for (i in a.indices) {
+                    pins[p++] = Lit.variable(a[i])
+                    pins[p++] = (av shr i) and 1
+                }
+                for (i in b.indices) {
+                    pins[p++] = Lit.variable(b[i])
+                    pins[p++] = (bv shr i) and 1
+                }
 
-            for (i in product.indices) {
-                val want = (expected shr i) and 1
-                val variant = pins.copyOf(pins.size + 2)
-                variant[pins.size] = Lit.variable(product[i])
-                variant[pins.size + 1] = want
-                val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, variant)
-                assertEquals(true, sat, "av=$av bv=$bv bit=$i should permit product[$i]=$want")
+                for (i in product.indices) {
+                    val want = (expected shr i) and 1
+                    val variant = pins.copyOf(pins.size + 2)
+                    variant[pins.size] = Lit.variable(product[i])
+                    variant[pins.size + 1] = want
+                    val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, variant)
+                    assertEquals(true, sat, "av=$av bv=$bv bit=$i should permit product[$i]=$want")
 
-                val opposite = pins.copyOf(pins.size + 2)
-                opposite[pins.size] = Lit.variable(product[i])
-                opposite[pins.size + 1] = 1 - want
-                val unsat = SatCheck.isSat(cnf.numVars, cnf.clauses, opposite)
-                assertEquals(false, unsat, "av=$av bv=$bv bit=$i wrong value should be infeasible")
+                    val opposite = pins.copyOf(pins.size + 2)
+                    opposite[pins.size] = Lit.variable(product[i])
+                    opposite[pins.size + 1] = 1 - want
+                    val unsat = SatCheck.isSat(cnf.numVars, cnf.clauses, opposite)
+                    assertEquals(false, unsat, "av=$av bv=$bv bit=$i wrong value should be infeasible")
+                }
             }
         }
     }

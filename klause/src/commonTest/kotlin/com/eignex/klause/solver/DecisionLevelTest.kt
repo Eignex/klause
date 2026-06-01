@@ -158,7 +158,7 @@ class DecisionLevelTest {
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val u = assertIs<PropagationResult.Unsat>(
-            p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false)))
+            p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false))),
         )
         // Both seed pins are responsible — both at levels {1, 2}.
         assertEquals(setOf(1, 2), u.conflictLevels)

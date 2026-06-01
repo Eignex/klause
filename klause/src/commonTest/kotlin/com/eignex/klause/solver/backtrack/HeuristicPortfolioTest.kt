@@ -27,14 +27,14 @@ class HeuristicPortfolioTest {
             listOf(
                 HeuristicPortfolio.Arm("input+min", InputOrder, IndomainMin),
                 HeuristicPortfolio.Arm("smallest+random", SmallestDomain, IndomainRandom),
-            )
+            ),
         )
         val r = BacktrackSolver(simpleAllDifferent(5)).solve(
             BacktrackParams(
                 variableHeuristic = portfolio.variableHeuristic,
                 valueHeuristic = portfolio.valueHeuristic,
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
@@ -47,7 +47,7 @@ class HeuristicPortfolioTest {
                 HeuristicPortfolio.Arm("a", InputOrder, IndomainMin),
                 HeuristicPortfolio.Arm("b", SmallestDomain, IndomainMax),
                 HeuristicPortfolio.Arm("c", RandomVariable, IndomainRandom),
-            )
+            ),
         )
         val visited = HashSet<Int>()
         visited.add(portfolio.currentArmIndex)
@@ -59,7 +59,7 @@ class HeuristicPortfolioTest {
         }
         assertTrue(
             visited.size >= 2,
-            "UCB1 should have explored at least 2 arms across 20 restarts; got ${visited.size}"
+            "UCB1 should have explored at least 2 arms across 20 restarts; got ${visited.size}",
         )
     }
 
@@ -92,7 +92,7 @@ class HeuristicPortfolioTest {
         portfolio.variableHeuristic.onConflict(VarRef.IntVar(0))
         portfolio.variableHeuristic.onConflict(VarRef.IntVar(1))
         portfolio.variableHeuristic.onSolution(
-            com.eignex.klause.solver.Sample(BooleanArray(0), intArrayOf(0))
+            com.eignex.klause.solver.Sample(BooleanArray(0), intArrayOf(0)),
         )
         portfolio.variableHeuristic.onRestart()
         assertEquals(2, lastStats!!.conflicts)

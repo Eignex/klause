@@ -51,7 +51,7 @@ class CompileTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(40).toList()
         assertEquals(5, samples.toSet().size, "All 5 feasible solutions should be reached")
@@ -60,7 +60,7 @@ class CompileTest {
             val premium = compiled.decode(schema.premium, s)
             assertTrue(
                 !(type == "a" && premium),
-                "Constraint violated: type=$type premium=$premium"
+                "Constraint violated: type=$type premium=$premium",
             )
         }
     }
@@ -94,7 +94,7 @@ class CompileTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
         assertEquals(15, samples.size)
@@ -105,7 +105,7 @@ class CompileTest {
             if (type == "a") {
                 assertTrue(
                     budget <= 2000,
-                    "type=a should have budget≤2000 but was $budget"
+                    "type=a should have budget≤2000 but was $budget",
                 )
             }
         }
@@ -121,7 +121,7 @@ class CompileTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
 
         val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 99)).take(40).toList()

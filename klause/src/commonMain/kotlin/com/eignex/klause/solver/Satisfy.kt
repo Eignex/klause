@@ -52,6 +52,7 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     @Suppress("UNCHECKED_CAST")
     return when (val r = solve(merged as P)) {
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
+
         is SolveResult.Unsat ->
             if (assumptions.isEmpty) {
                 SatisfyResult.GloballyUnsat(r.core)
@@ -63,6 +64,7 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
                 }
                 SatisfyResult.UnsatUnderAssumptions(core)
             }
+
         is SolveResult.Unknown -> SatisfyResult.Unknown(r.reason)
     }
 }
@@ -100,7 +102,7 @@ private fun satisfyUnderAssumptionsBacktrack(
     val seedResult = session.seed(assumptions)
     if (seedResult is PropagationResult.Unsat) {
         return SatisfyResult.UnsatUnderAssumptions(
-            projectSeedConflictToAssumptions(assumptions, seedResult.conflictLevels)
+            projectSeedConflictToAssumptions(assumptions, seedResult.conflictLevels),
         )
     }
     // Seed cleanly applied — defer to the engine's normal solve path for the DFS phase.
@@ -111,6 +113,7 @@ private fun satisfyUnderAssumptionsBacktrack(
     val merged = params.withAssumptions(assumptions)
     return when (val r = solver.solve(merged)) {
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
+
         is SolveResult.Unsat -> {
             val engineCore = r.assumptionCore
             val core = when {
@@ -120,6 +123,7 @@ private fun satisfyUnderAssumptionsBacktrack(
             }
             SatisfyResult.UnsatUnderAssumptions(core)
         }
+
         is SolveResult.Unknown -> SatisfyResult.Unknown(r.reason)
     }
 }
@@ -136,11 +140,7 @@ private fun satisfyUnderAssumptionsBacktrack(
  * solve calls in exchange for tighter cores (typically off-line MUS extraction; OLL/RC2
  * loops should leave it off and rely on the seed-time projection alone).
  */
-private fun <P : SolverParams> deletionMinimize(
-    solver: Solver<P>,
-    assumptions: Assumptions,
-    params: P,
-): Assumptions {
+private fun <P : SolverParams> deletionMinimize(solver: Solver<P>, assumptions: Assumptions, params: P): Assumptions {
     // Walk both bool and int pins. We iterate over snapshots of the key arrays so the
     // working `current` can shrink as we discover removable pins.
     var current = assumptions
@@ -209,10 +209,7 @@ private fun Assumptions.dropInt(id: Int): Assumptions {
  * deductions that conflictLevels somehow surfaces) are dropped, matching the contract
  * that the returned [Assumptions] is a subset of the input.
  */
-internal fun projectSeedConflictToAssumptions(
-    input: Assumptions,
-    conflictLevels: Set<Int>,
-): Assumptions {
+internal fun projectSeedConflictToAssumptions(input: Assumptions, conflictLevels: Set<Int>): Assumptions {
     val nb = input.boolKeys.size
     val ni = input.intKeys.size
     val boolHit = BooleanArray(nb)
@@ -221,7 +218,9 @@ internal fun projectSeedConflictToAssumptions(
         val idx = lvl - 1
         if (idx in 0 until nb) {
             boolHit[idx] = true
-        } else if (idx in nb until nb + ni) intHit[idx - nb] = true
+        } else if (idx in nb until nb + ni) {
+            intHit[idx - nb] = true
+        }
     }
     var bc = 0
     for (h in boolHit) if (h) bc++
@@ -235,18 +234,22 @@ internal fun projectSeedConflictToAssumptions(
     val bk = IntArray(bc)
     val bv = BooleanArray(bc)
     var w = 0
-    for (i in 0 until nb) if (boolHit[i]) {
-        bk[w] = input.boolKeys[i]
-        bv[w] = input.boolValues[i]
-        w++
+    for (i in 0 until nb) {
+        if (boolHit[i]) {
+            bk[w] = input.boolKeys[i]
+            bv[w] = input.boolValues[i]
+            w++
+        }
     }
     val ik = IntArray(ic)
     val iv = IntArray(ic)
     w = 0
-    for (i in 0 until ni) if (intHit[i]) {
-        ik[w] = input.intKeys[i]
-        iv[w] = input.intValues[i]
-        w++
+    for (i in 0 until ni) {
+        if (intHit[i]) {
+            ik[w] = input.intKeys[i]
+            iv[w] = input.intValues[i]
+            w++
+        }
     }
     return Assumptions(bk, bv, ik, iv)
 }

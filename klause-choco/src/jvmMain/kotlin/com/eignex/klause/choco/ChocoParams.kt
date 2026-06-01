@@ -12,7 +12,4 @@ import com.eignex.klause.solver.SolverParams
  * are intentionally minimal — assumptions/cancellation fall back to the [SolverParams]
  * no-op defaults.
  */
-data class ChocoParams(
-    val timeoutMillis: Long? = null,
-    val maxModels: Long = Long.MAX_VALUE,
-) : SolverParams
+data class ChocoParams(val timeoutMillis: Long? = null, val maxModels: Long = Long.MAX_VALUE) : SolverParams

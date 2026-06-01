@@ -64,7 +64,8 @@ data class BruteForceParams(
  * for stochastic / SMT-based optimisation backends on small problems.
  */
 class BruteForceSolver(override val problem: Problem) :
-    Solver<BruteForceParams>, Optimizer<BruteForceParams> {
+    Solver<BruteForceParams>,
+    Optimizer<BruteForceParams> {
 
     private val chunks: List<Chunk> = buildChunks(problem)
 
@@ -199,6 +200,7 @@ class BruteForceSolver(override val problem: Problem) :
             remaining /= dim.radix
             when (dim.kind) {
                 DimKind.BOOL -> state.assignment.setBool(dim.varId, digit == 1)
+
                 DimKind.INT -> state.assignment.setInt(
                     dim.varId,
                     problem.intDomains[dim.varId].min + digit,

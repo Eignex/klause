@@ -9,8 +9,7 @@ import kotlin.test.assertEquals
 
 class CardinalityCoverageTest {
 
-    private fun isSat(cnf: CnfProblem, fixed: IntArray): Boolean =
-        SatCheck.isSat(cnf.numVars, cnf.clauses, fixed)
+    private fun isSat(cnf: CnfProblem, fixed: IntArray): Boolean = SatCheck.isSat(cnf.numVars, cnf.clauses, fixed)
 
     private fun pinBool(cnf: CnfProblem, originalVar: Int, value: Boolean): IntArray =
         intArrayOf(cnf.boolVarToCnfVar[originalVar], if (value) 1 else 0)
@@ -75,18 +74,20 @@ class CardinalityCoverageTest {
         val factor = ReifiedCardinality(auxBoolVar = 0, literals = lits, min = 1, max = 2)
         val problem = Problem(5, 0, emptyArray(), listOf(factor))
         val cnf = BitBlaster.compile(problem)
-        for (mask in 0..15) for (auxV in 0..1) {
-            val count = mask.countOneBits()
-            val want = count in 1..2
-            val expectedSat = (auxV == 1) == want
-            val pins = IntArray(10)
-            pins[0] = cnf.boolVarToCnfVar[0]
-            pins[1] = auxV
-            for (i in 0..3) {
-                pins[(i + 1) * 2] = cnf.boolVarToCnfVar[i + 1]
-                pins[(i + 1) * 2 + 1] = (mask shr i) and 1
+        for (mask in 0..15) {
+            for (auxV in 0..1) {
+                val count = mask.countOneBits()
+                val want = count in 1..2
+                val expectedSat = (auxV == 1) == want
+                val pins = IntArray(10)
+                pins[0] = cnf.boolVarToCnfVar[0]
+                pins[1] = auxV
+                for (i in 0..3) {
+                    pins[(i + 1) * 2] = cnf.boolVarToCnfVar[i + 1]
+                    pins[(i + 1) * 2 + 1] = (mask shr i) and 1
+                }
+                assertEquals(expectedSat, isSat(cnf, pins), "aux=$auxV mask=$mask count=$count")
             }
-            assertEquals(expectedSat, isSat(cnf, pins), "aux=$auxV mask=$mask count=$count")
         }
     }
 }

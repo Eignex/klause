@@ -35,9 +35,11 @@ class BinPacking(
         require(numBins >= 1) { "bin_packing: numBins ≥ 1" }
         when (mode) {
             Mode.UniformCapacity -> { /* uniformCapacity used */ }
+
             Mode.PerBinCapacity -> require(capacities != null && capacities.size == numBins) {
                 "bin_packing_capa: capacities[$numBins] required"
             }
+
             Mode.LoadVars -> require(loadVars != null && loadVars.size == numBins) {
                 "bin_packing_load: loadVars[$numBins] required"
             }
@@ -66,7 +68,9 @@ class BinPacking(
         val s = state.refPayload[factorId] as State
         return when (mode) {
             Mode.UniformCapacity -> s.loads.any { it > uniformCapacity }
+
             Mode.PerBinCapacity -> s.loads.indices.any { s.loads[it] > capacities!![it] }
+
             Mode.LoadVars -> s.loads.indices.any {
                 state.assignment.intValue(loadVars!![it]) != s.loads[it]
             }
@@ -87,7 +91,9 @@ class BinPacking(
         }
         val willViolate = when (mode) {
             Mode.UniformCapacity -> sim.any { it > uniformCapacity }
+
             Mode.PerBinCapacity -> sim.indices.any { sim[it] > capacities!![it] }
+
             Mode.LoadVars -> sim.indices.any {
                 val lv = loadVars!![it]
                 val v = if (lv == intVar) newValue else state.assignment.intValue(lv)
@@ -113,7 +119,9 @@ class BinPacking(
             }
             when (mode) {
                 Mode.UniformCapacity -> sim.any { it > uniformCapacity }
+
                 Mode.PerBinCapacity -> sim.indices.any { sim[it] > capacities!![it] }
+
                 Mode.LoadVars -> sim.indices.any {
                     val lv = loadVars!![it]
                     val v = if (lv == intVar) oldValue else state.assignment.intValue(lv)
@@ -155,9 +163,11 @@ class BinPacking(
             Mode.UniformCapacity -> for (k in 0 until numBins) {
                 if (definiteLoads[k] > uniformCapacity) return false
             }
+
             Mode.PerBinCapacity -> for (k in 0 until numBins) {
                 if (definiteLoads[k] > capacities!![k]) return false
             }
+
             Mode.LoadVars -> {
                 val ant = state.composeIntVarAtomAntecedents(bins)
                 for (k in 0 until numBins) {
@@ -262,7 +272,7 @@ class BinPacking(
                         listOf(
                             com.eignex.klause.solver.Move.IntSet(binVarI, targetForI),
                             com.eignex.klause.solver.Move.IntSet(bins[j], targetForJ),
-                        )
+                        ),
                     )
                     if (++swapsAdded >= MAX_SWAPS_PER_ITEM) break
                 }

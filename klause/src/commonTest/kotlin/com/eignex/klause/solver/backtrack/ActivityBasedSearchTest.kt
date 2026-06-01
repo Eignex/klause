@@ -25,7 +25,7 @@ class ActivityBasedSearchTest {
                 variableHeuristic = ActivityBasedSearch(),
                 valueHeuristic = IndomainMin,
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
@@ -54,7 +54,7 @@ class ActivityBasedSearchTest {
         assertEquals(
             VarRef.IntVar(2),
             picked,
-            "ABS should prefer the var with bumped activity"
+            "ABS should prefer the var with bumped activity",
         )
     }
 
@@ -82,7 +82,7 @@ class ActivityBasedSearchTest {
         assertEquals(
             VarRef.IntVar(1),
             picked,
-            "recent bumps should outweigh older ones via implicit decay"
+            "recent bumps should outweigh older ones via implicit decay",
         )
     }
 

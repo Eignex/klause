@@ -72,10 +72,10 @@ object Dimacs {
             numIntVars = 0,
             intDomains = emptyArray(),
             factors = Array<Factor>(
-                clauses.size
+                clauses.size,
             ) {
                 clauses[it]
-            }
+            },
         )
     }
 
@@ -87,11 +87,7 @@ object Dimacs {
      *
      * Relaxation bools occupy indices `[numOriginalBoolVars, problem.numBoolVars)`.
      */
-    data class WcnfProblem(
-        val problem: Problem,
-        val objective: LinearObjective,
-        val numOriginalBoolVars: Int,
-    )
+    data class WcnfProblem(val problem: Problem, val objective: LinearObjective, val numOriginalBoolVars: Int)
 
     /**
      * Parse `.wcnf` (Weighted Partial MaxSAT). Header is `p wcnf <nvars> <nclauses> [<top>]`.

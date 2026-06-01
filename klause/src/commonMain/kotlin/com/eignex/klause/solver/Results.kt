@@ -89,11 +89,8 @@ sealed interface MinimizeResult {
         override val objectiveValue: Double get() = objective
     }
     data class Optimal(override val sample: Sample, override val objective: Double) : WithSample
-    data class BestFound(
-        override val sample: Sample,
-        override val objective: Double,
-        val reason: TerminationReason,
-    ) : WithSample
+    data class BestFound(override val sample: Sample, override val objective: Double, val reason: TerminationReason) :
+        WithSample
 
     /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
     data class Infeasible(val core: UnsatCore? = null) : MinimizeResult {

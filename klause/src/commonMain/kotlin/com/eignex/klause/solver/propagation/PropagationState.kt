@@ -22,10 +22,7 @@ import com.eignex.klause.util.IntArrayList
  *  `tightenIntMin` / `tightenIntMax` / `setInt` as before. The driver sets [currentLevel]
  *  to the inherited level before each factor invocation; mutators read it.
  */
-class PropagationState(
-    val problem: Problem,
-    assumptions: Assumptions,
-) {
+class PropagationState(val problem: Problem, assumptions: Assumptions) {
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
      *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than the old `Array<Boolean?>`
@@ -39,8 +36,7 @@ class PropagationState(
     inner class BoolView {
         val size: Int get() = problem.numBoolVars
         val indices: IntRange get() = 0 until problem.numBoolVars
-        operator fun get(v: Int): Boolean? =
-            if (boolAssigned.get(v)) boolValueBits.get(v) else null
+        operator fun get(v: Int): Boolean? = if (boolAssigned.get(v)) boolValueBits.get(v) else null
         operator fun set(v: Int, value: Boolean?) {
             if (value == null) {
                 boolAssigned.clear(v)
@@ -146,7 +142,7 @@ class PropagationState(
                     (d.min.toLong() - Int.MIN_VALUE.toLong())
                 if (seen.add(key)) {
                     out.add(
-                        com.eignex.klause.solver.Lit.make(atomVarGe(v, d.min), false)
+                        com.eignex.klause.solver.Lit.make(atomVarGe(v, d.min), false),
                     )
                 }
             }
@@ -155,7 +151,7 @@ class PropagationState(
                     (d.max.toLong() - Int.MIN_VALUE.toLong())
                 if (seen.add(key)) {
                     out.add(
-                        com.eignex.klause.solver.Lit.make(atomVarLe(v, d.max), false)
+                        com.eignex.klause.solver.Lit.make(atomVarLe(v, d.max), false),
                     )
                 }
             }
@@ -237,6 +233,7 @@ class PropagationState(
      * by re-validating on each fire. Carrying them across pops keeps work amortised
      * without the snapshot copying that level-aware state needs.
      */
+
     /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
      *  alongside the learned-clause registry without copying the full array. */
     private val _refPayload: ArrayList<Any?> = ArrayList<Any?>(problem.numFactors).apply {
@@ -264,12 +261,11 @@ class PropagationState(
 
     /** Unified factor accessor; routes static factor ids to [Problem.factors] and learned
      *  factor ids (≥ `problem.numFactors`) to [learnedClauses]. */
-    fun factorAt(fid: Int): com.eignex.klause.solver.Factor =
-        if (fid < problem.numFactors) {
-            problem.factors[fid]
-        } else {
-            _learnedClauses[fid - problem.numFactors]
-        }
+    fun factorAt(fid: Int): com.eignex.klause.solver.Factor = if (fid < problem.numFactors) {
+        problem.factors[fid]
+    } else {
+        _learnedClauses[fid - problem.numFactors]
+    }
 
     /**
      * Register a learned clause and return its assigned factor id. Performs four things:
@@ -326,10 +322,12 @@ class PropagationState(
         // every kept entry slides down to its new position; tail beyond newCount is
         // trimmed at the end.
         var w = 0
-        for (i in 0 until n) if (remap[i] >= 0) {
-            _learnedClauses[w] = _learnedClauses[i]
-            _learnedLbd[w] = _learnedLbd[i]
-            w++
+        for (i in 0 until n) {
+            if (remap[i] >= 0) {
+                _learnedClauses[w] = _learnedClauses[i]
+                _learnedLbd[w] = _learnedLbd[i]
+                w++
+            }
         }
         while (_learnedClauses.size > newCount) _learnedClauses.removeAt(_learnedClauses.size - 1)
         _learnedLbd.truncateTo(newCount)
@@ -338,9 +336,11 @@ class PropagationState(
         // at indices [0, problem.numFactors) untouched.
         val refBase = problem.numFactors
         var rw = refBase
-        for (i in 0 until n) if (remap[i] >= 0) {
-            _refPayload[rw] = _refPayload[refBase + i]
-            rw++
+        for (i in 0 until n) {
+            if (remap[i] >= 0) {
+                _refPayload[rw] = _refPayload[refBase + i]
+                rw++
+            }
         }
         while (_refPayload.size > rw) _refPayload.removeAt(_refPayload.size - 1)
 
@@ -495,10 +495,8 @@ class PropagationState(
         com.eignex.klause.solver.Lit.make(atomVarGe(intVar, threshold), true)
     fun atomLitLe(intVar: Int, threshold: Int): Int =
         com.eignex.klause.solver.Lit.make(atomVarLe(intVar, threshold), true)
-    fun atomLitEq(intVar: Int, value: Int): Int =
-        com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), true)
-    fun atomLitNe(intVar: Int, value: Int): Int =
-        com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), false)
+    fun atomLitEq(intVar: Int, value: Int): Int = com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), true)
+    fun atomLitNe(intVar: Int, value: Int): Int = com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), false)
 
     /** True iff [v] is an atom-id (past the bool var space). Used by the conflict
      *  analyzer to dispatch between bool-trail and atom-table lookups. */
@@ -549,17 +547,20 @@ class PropagationState(
             } else {
                 tightenIntMaxImpl(intVar, k - 1, antecedents) // [v ≥ k] false → v ≤ k-1
             }
+
             1 -> if (pos) {
                 tightenIntMaxImpl(intVar, k, antecedents) // [v ≤ k] true → v.max ≤ k
             } else {
                 tightenIntMinImpl(intVar, k + 1, antecedents) // [v ≤ k] false → v ≥ k+1
             }
+
             2 -> if (pos) {
                 tightenIntMinImpl(intVar, k, antecedents) && // [v = k] true → v = k
                     tightenIntMaxImpl(intVar, k, antecedents)
             } else {
                 excludeIntValueImpl(intVar, k, antecedents) // [v = k] false → v ≠ k
             }
+
             else -> error("unknown atom kind")
         }
     }
@@ -582,7 +583,9 @@ class PropagationState(
             atomLevel.add(intLevel[intVar])
             atomAntecedents[id] = when (kind) {
                 0 -> intMinAntecedents[intVar]
+
                 1 -> intMaxAntecedents[intVar]
+
                 2 -> {
                     // Eq atom at alloc: true (singleton {k}) cited by both bounds; false
                     // (k below min or above max) cited by the side that excludes it; hole
@@ -598,6 +601,7 @@ class PropagationState(
                         }
                     }
                 }
+
                 else -> null
             }
         }
@@ -615,16 +619,23 @@ class PropagationState(
                 d.max < k -> false
                 else -> null
             }
+
             1 -> when {
                 d.max <= k -> true
                 d.min > k -> false
                 else -> null
             }
+
             2 -> when {
-                d.min == d.max && d.min == k -> true // singleton {k} → eq true
-                k !in d -> false // k absent → eq false
+                d.min == d.max && d.min == k -> true
+
+                // singleton {k} → eq true
+                k !in d -> false
+
+                // k absent → eq false
                 else -> null
             }
+
             else -> error("unknown atom kind")
         }
     }
@@ -864,18 +875,15 @@ class PropagationState(
      *  pin. Lets the conflict analyzer reconstruct the propagation chain backwards. Pass
      *  `null` (the default no-arg form) when the factor doesn't track antecedents — that's
      *  fine, the analyzer just treats this pin as a leaf in the implication graph. */
-    fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean =
-        pinBoolImpl(v, value, antecedents)
+    fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean = pinBoolImpl(v, value, antecedents)
     fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo, null)
 
     /** Variant that records [antecedents] — bool literals (false in the current state)
      *  whose collective truth forced this lower-bound tightening. Used by the conflict
      *  analyzer to walk the implication graph backwards through int-domain factors. */
-    fun tightenIntMin(v: Int, lo: Int, antecedents: IntArray?): Boolean =
-        tightenIntMinImpl(v, lo, antecedents)
+    fun tightenIntMin(v: Int, lo: Int, antecedents: IntArray?): Boolean = tightenIntMinImpl(v, lo, antecedents)
     fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi, null)
-    fun tightenIntMax(v: Int, hi: Int, antecedents: IntArray?): Boolean =
-        tightenIntMaxImpl(v, hi, antecedents)
+    fun tightenIntMax(v: Int, hi: Int, antecedents: IntArray?): Boolean = tightenIntMaxImpl(v, hi, antecedents)
     fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value, null)
     fun setInt(v: Int, value: Int, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
 
@@ -1165,6 +1173,7 @@ class PropagationState(
     // Mark / undo for [PropagationSession]. A pop rewinds to a prior fixpoint by replaying
     // the undo log (above) rather than re-propagating. The caller only ever marks / undoes
     // between propagation cycles (i.e. when dirty queues are empty).
+
     /** Opt-in marker for [refPayload] entries that need to participate in mark / undo.
      *  By default refPayload drifts across push/pop (Clause-watcher style); a factor that
      *  maintains level-sensitive incremental state (e.g. STR2 Table's sparse set of valid
@@ -1230,6 +1239,7 @@ class PropagationState(
                     boolReason[v] = -1
                     boolAntecedents[v] = null
                 }
+
                 else -> { // int change — restore the full recorded prior int-var state
                     val v = undoVar[i]
                     intDomains[v] = undoDomain[i]!!

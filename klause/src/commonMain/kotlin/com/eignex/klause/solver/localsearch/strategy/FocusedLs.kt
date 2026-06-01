@@ -52,7 +52,9 @@ class FocusedLs(
 
     private fun confChanged(state: LocalSearchState, move: Move): Boolean = when (move) {
         is Move.BoolFlip -> state.boolConfChange[move.varId]
+
         is Move.IntSet -> state.intConfChange[move.varId]
+
         // Compound counts as conf-changed iff *all* parts are — every affected var must have
         // moved since its last touch for the move to be eligible.
         is Move.Compound -> move.parts.all { confChanged(state, it) }
@@ -70,10 +72,7 @@ sealed interface MoveSelection {
  * the smallest shaped break score (ties broken uniformly). When [controller] is non-null the
  * noise level is steered adaptively, overriding [noise].
  */
-class NoiseGreedy(
-    val noise: Double = 0.5,
-    private val controller: NoiseController? = null,
-) : MoveSelection {
+class NoiseGreedy(val noise: Double = 0.5, private val controller: NoiseController? = null) : MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         val n = controller?.also { it.observe(state.cost) }?.level ?: noise
         if (state.rng.nextDouble() < n) return moves[state.rng.nextInt(moves.size)]
@@ -89,11 +88,8 @@ class NoiseGreedy(
  * When [controller] is non-null, `cb` is steered toward `cb·(1 - level·0.5)`: it flattens the
  * distribution (more diversification) during stalls and sharpens on improvement.
  */
-class ProbSatWeighted(
-    val cb: Double = 2.06,
-    val eps: Double = 1.0,
-    private val controller: NoiseController? = null,
-) : MoveSelection {
+class ProbSatWeighted(val cb: Double = 2.06, val eps: Double = 1.0, private val controller: NoiseController? = null) :
+    MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         if (moves.size == 1) return moves[0]
         val cbNow = controller?.let {

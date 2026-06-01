@@ -39,14 +39,16 @@ class CumulativesTest {
         val starts = listOf("s1", "s2", "s3", "s4").map { sat.assignment.ints[program.intVarsByName[it]!!] }
         val machines = listOf("m1", "m2", "m3", "m4").map { sat.assignment.ints[program.intVarsByName[it]!!] }
         // Verify: no two tasks on the same machine overlap (each occupies [start, start+2)).
-        for (i in 0 until 4) for (j in i + 1 until 4) {
-            if (machines[i] != machines[j]) continue
-            val overlap = starts[i] < starts[j] + 2 && starts[j] < starts[i] + 2
-            assertTrue(
-                !overlap,
-                "tasks $i and $j share machine ${machines[i]} and overlap " +
-                    "(starts ${starts[i]}, ${starts[j]})",
-            )
+        for (i in 0 until 4) {
+            for (j in i + 1 until 4) {
+                if (machines[i] != machines[j]) continue
+                val overlap = starts[i] < starts[j] + 2 && starts[j] < starts[i] + 2
+                assertTrue(
+                    !overlap,
+                    "tasks $i and $j share machine ${machines[i]} and overlap " +
+                        "(starts ${starts[i]}, ${starts[j]})",
+                )
+            }
         }
     }
 }

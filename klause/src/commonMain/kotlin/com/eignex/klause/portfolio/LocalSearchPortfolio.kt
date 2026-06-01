@@ -133,10 +133,7 @@ data class LocalSearchWorkerConfig(
  * instances over private [LocalSearchSolver]s — they share the [Problem] but not
  * mutable state, so cross-worker contention is bounded by the atomic publishes.
  */
-class LocalSearchPortfolio(
-    val problem: Problem,
-    val configs: List<LocalSearchWorkerConfig>,
-) {
+class LocalSearchPortfolio(val problem: Problem, val configs: List<LocalSearchWorkerConfig>) {
     init {
         require(configs.isNotEmpty()) { "Need at least one worker config" }
     }

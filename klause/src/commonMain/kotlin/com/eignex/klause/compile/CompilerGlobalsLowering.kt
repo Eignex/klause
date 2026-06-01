@@ -76,14 +76,16 @@ internal fun Compiler.Build.decomposeAllDifferentExcept(expr: AllDifferentExcept
             Or(except.map { e -> IntCompare(xs[idx], IntCmpOp.EQ, IntLit(e)) })
         }
     }
-    for (i in xs.indices) for (j in i + 1 until xs.size) {
-        clauses += Or(
-            listOf(
-                inExcept(i),
-                inExcept(j),
-                IntCompare(xs[i], IntCmpOp.NE, xs[j]),
+    for (i in xs.indices) {
+        for (j in i + 1 until xs.size) {
+            clauses += Or(
+                listOf(
+                    inExcept(i),
+                    inExcept(j),
+                    IntCompare(xs[i], IntCmpOp.NE, xs[j]),
+                ),
             )
-        )
+        }
     }
     return if (clauses.size == 1) clauses[0] else And(clauses)
 }
@@ -120,12 +122,11 @@ internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
     val values = expr.values
     val off = expr.permOffset
 
-    fun permIndex(i: Int): IntExpr =
-        if (off == 0) {
-            perm[i]
-        } else {
-            IntSum(listOf(perm[i], IntLit(-off)))
-        }
+    fun permIndex(i: Int): IntExpr = if (off == 0) {
+        perm[i]
+    } else {
+        IntSum(listOf(perm[i], IntLit(-off)))
+    }
 
     // Each consecutive pair must be ascending in value, with ties broken by index.
     val clauses = mutableListOf<BoolExpr>()
@@ -139,9 +140,9 @@ internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
                     listOf(
                         IntCompare(a, IntCmpOp.EQ, b),
                         IntCompare(perm[i], IntCmpOp.LT, perm[i + 1]),
-                    )
+                    ),
                 ),
-            )
+            ),
         )
     }
     // perm is a permutation of [off, off+n−1]: allDifferent + each in range.
@@ -222,7 +223,13 @@ internal fun Compiler.Build.decomposeNetworkFlow(expr: NetworkFlowExpr): BoolExp
         val terms = mutableListOf<IntExpr>()
         for (a in inArcs[n]) terms += expr.flow[a]
         for (a in outArcs[n]) terms += IntScale(-1, expr.flow[a])
-        val lhs = if (terms.isEmpty()) IntLit(0) else if (terms.size == 1) terms[0] else IntSum(terms)
+        val lhs = if (terms.isEmpty()) {
+            IntLit(0)
+        } else if (terms.size == 1) {
+            terms[0]
+        } else {
+            IntSum(terms)
+        }
         clauses += IntCompare(lhs, IntCmpOp.EQ, IntLit(expr.balance[n]))
     }
     return if (clauses.size == 1) clauses[0] else And(clauses)
@@ -237,7 +244,7 @@ internal fun Compiler.Build.decomposeNetworkFlowCost(expr: NetworkFlowCostExpr):
             balance = expr.balance,
             flow = expr.flow,
             nodeOffset = expr.nodeOffset,
-        )
+        ),
     )
     // cost = Σ weight[a] · flow[a].
     val terms = mutableListOf<IntExpr>()
@@ -245,7 +252,13 @@ internal fun Compiler.Build.decomposeNetworkFlowCost(expr: NetworkFlowCostExpr):
         terms += if (expr.weight[a] == 1) expr.flow[a] else IntScale(expr.weight[a], expr.flow[a])
     }
     terms += IntScale(-1, expr.cost)
-    val lhs = if (terms.isEmpty()) IntLit(0) else if (terms.size == 1) terms[0] else IntSum(terms)
+    val lhs = if (terms.isEmpty()) {
+        IntLit(0)
+    } else if (terms.size == 1) {
+        terms[0]
+    } else {
+        IntSum(terms)
+    }
     val costEq = IntCompare(lhs, IntCmpOp.EQ, IntLit(0))
     return And(listOf(balanceClauses, costEq))
 }
@@ -279,26 +292,28 @@ internal fun Compiler.Build.decomposeGeost(expr: GeostExpr): BoolExpr {
     // For each pair (i, j), at least one separating axis: in some dim k,
     //   origin[i,k] + size[i,k] ≤ origin[j,k]  ∨  origin[j,k] + size[j,k] ≤ origin[i,k].
     val pairs = mutableListOf<BoolExpr>()
-    for (i in 0 until n) for (j in i + 1 until n) {
-        val perDim = mutableListOf<BoolExpr>()
-        for (k in 0 until d) {
-            val oi = expr.origin[i * d + k]
-            val oj = expr.origin[j * d + k]
-            val si = expr.length[i * d + k]
-            val sj = expr.length[j * d + k]
-            // origin[i] + si ≤ origin[j]  ⟺  origin[i] − origin[j] ≤ −si.
-            perDim += IntCompare(
-                IntSum(listOf(oi, IntScale(-1, oj))),
-                IntCmpOp.LE,
-                IntLit(-si),
-            )
-            perDim += IntCompare(
-                IntSum(listOf(oj, IntScale(-1, oi))),
-                IntCmpOp.LE,
-                IntLit(-sj),
-            )
+    for (i in 0 until n) {
+        for (j in i + 1 until n) {
+            val perDim = mutableListOf<BoolExpr>()
+            for (k in 0 until d) {
+                val oi = expr.origin[i * d + k]
+                val oj = expr.origin[j * d + k]
+                val si = expr.length[i * d + k]
+                val sj = expr.length[j * d + k]
+                // origin[i] + si ≤ origin[j]  ⟺  origin[i] − origin[j] ≤ −si.
+                perDim += IntCompare(
+                    IntSum(listOf(oi, IntScale(-1, oj))),
+                    IntCmpOp.LE,
+                    IntLit(-si),
+                )
+                perDim += IntCompare(
+                    IntSum(listOf(oj, IntScale(-1, oi))),
+                    IntCmpOp.LE,
+                    IntLit(-sj),
+                )
+            }
+            pairs += Or(perDim)
         }
-        pairs += Or(perDim)
     }
     return if (pairs.isEmpty()) {
         IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
@@ -369,8 +384,12 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
     val inDeg = IntArray(n) { -1 }
     val outDeg = IntArray(n) { -1 }
     for (v in 0 until n) {
-        inDeg[v] = intVarOf(materializeIntFromSumOfBools("__path_in_${v}_${factors.size}", inArcs[v].map { edgeP[it] }).name)
-        outDeg[v] = intVarOf(materializeIntFromSumOfBools("__path_out_${v}_${factors.size}", outArcs[v].map { edgeP[it] }).name)
+        inDeg[v] = intVarOf(
+            materializeIntFromSumOfBools("__path_in_${v}_${factors.size}", inArcs[v].map { edgeP[it] }).name,
+        )
+        outDeg[v] = intVarOf(
+            materializeIntFromSumOfBools("__path_out_${v}_${factors.size}", outArcs[v].map { edgeP[it] }).name,
+        )
     }
 
     // Source ↔ in_deg = 0 ∧ out_deg = 1 ∧ present;
@@ -393,9 +412,9 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
                     listOf(
                         IntCompare(inV, IntCmpOp.EQ, IntLit(0)),
                         IntCompare(outV, IntCmpOp.EQ, IntLit(0)),
-                    )
-                )
-            )
+                    ),
+                ),
+            ),
         )
         // (present ∧ is_source) → in_deg = 0 ∧ out_deg = 1.
         assertExpr(
@@ -405,9 +424,9 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
                     listOf(
                         IntCompare(inV, IntCmpOp.EQ, IntLit(0)),
                         IntCompare(outV, IntCmpOp.EQ, IntLit(1)),
-                    )
-                )
-            )
+                    ),
+                ),
+            ),
         )
         // (present ∧ is_sink) → in_deg = 1 ∧ out_deg = 0.
         assertExpr(
@@ -417,9 +436,9 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
                     listOf(
                         IntCompare(inV, IntCmpOp.EQ, IntLit(1)),
                         IntCompare(outV, IntCmpOp.EQ, IntLit(0)),
-                    )
-                )
-            )
+                    ),
+                ),
+            ),
         )
         // (present ∧ ¬is_source ∧ ¬is_sink) → in_deg = 1 ∧ out_deg = 1.
         assertExpr(
@@ -429,9 +448,9 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
                     listOf(
                         IntCompare(inV, IntCmpOp.EQ, IntLit(1)),
                         IntCompare(outV, IntCmpOp.EQ, IntLit(1)),
-                    )
-                )
-            )
+                    ),
+                ),
+            ),
         )
         // Source and sink must be present.
         assertExpr(Implies(isSource, present))
@@ -509,10 +528,10 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
     }
     val inDeg =
         IntArray(
-            n
+            n,
         ) { v ->
             intVarOf(
-                materializeIntFromSumOfBools("__tree_in_${v}_${factors.size}", inArcs[v].map { edgeP[it] }).name
+                materializeIntFromSumOfBools("__tree_in_${v}_${factors.size}", inArcs[v].map { edgeP[it] }).name,
             )
         }
 
@@ -554,7 +573,7 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
             Implies(
                 edgeP[e],
                 IntCompare(IntSum(listOf(rv, IntScale(-1, ru))), IntCmpOp.GE, IntLit(1)),
-            )
+            ),
         )
     }
 }
@@ -573,7 +592,7 @@ internal fun Compiler.Build.assertMddNative(
     initial: Int,
     accepting: List<Int>,
     recordStride: Int,
-    costRef: IntRef? = null
+    costRef: IntRef? = null,
 ): Boolean {
     val lifted = seqExpr.map { lift(it) }
     if (lifted.all { it is IntRef }) {
@@ -602,7 +621,7 @@ internal fun Compiler.Build.assertMdd(expr: MddExpr) {
             expr.transitions,
             expr.initial,
             expr.accepting,
-            recordStride = 3
+            recordStride = 3,
         )
     ) {
         assertMddDecomposed(expr)
@@ -646,7 +665,7 @@ internal fun Compiler.Build.assertMddDecomposed(expr: MddExpr) {
                 TableConstraint(
                     terms = listOf(stateRefs[i], expr.seq[i], stateRefs[i + 1]),
                     tuples = tuples,
-                )
+                ),
             )
         }
     }
@@ -655,8 +674,14 @@ internal fun Compiler.Build.assertMddDecomposed(expr: MddExpr) {
 internal fun Compiler.Build.assertCostMdd(expr: CostMddExpr) {
     val liftedCost = lift(expr.cost)
     if (liftedCost is IntRef && assertMddNative(
-            expr.seq, expr.numStatesPerLayer, expr.layerStarts, expr.transitions,
-            expr.initial, expr.accepting, recordStride = 4, costRef = liftedCost,
+            expr.seq,
+            expr.numStatesPerLayer,
+            expr.layerStarts,
+            expr.transitions,
+            expr.initial,
+            expr.accepting,
+            recordStride = 4,
+            costRef = liftedCost,
         )
     ) {
         assertCostMddDecomposed(expr)
@@ -697,8 +722,10 @@ internal fun Compiler.Build.assertCostMddDecomposed(expr: CostMddExpr) {
         var k = start
         while (k < end) {
             tuples += listOf(
-                expr.transitions[k], expr.transitions[k + 1],
-                expr.transitions[k + 2], expr.transitions[k + 3],
+                expr.transitions[k],
+                expr.transitions[k + 1],
+                expr.transitions[k + 2],
+                expr.transitions[k + 3],
             )
             k += 4
         }
@@ -710,7 +737,7 @@ internal fun Compiler.Build.assertCostMddDecomposed(expr: CostMddExpr) {
             TableConstraint(
                 terms = listOf(stateRefs[i], expr.seq[i], stateRefs[i + 1], wRef),
                 tuples = tuples,
-            )
+            ),
         )
     }
     // cost = Σ w[i].
@@ -732,13 +759,15 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
     if (liftedSeq.all { it is IntRef } && liftedCost is IntRef) {
         // Build a single layer's transition rows then replicate per layer.
         val baseRows = mutableListOf<Int>()
-        for (q in 0 until Q) for (s in 0 until S) {
-            val dst = expr.transitions[q * S + s]
-            if (dst == 0) continue
-            baseRows += q
-            baseRows += s + off
-            baseRows += dst - 1
-            baseRows += expr.weights[q * S + s]
+        for (q in 0 until Q) {
+            for (s in 0 until S) {
+                val dst = expr.transitions[q * S + s]
+                if (dst == 0) continue
+                baseRows += q
+                baseRows += s + off
+                baseRows += dst - 1
+                baseRows += expr.weights[q * S + s]
+            }
         }
         if (baseRows.isNotEmpty()) {
             val flatTrans = ArrayList<Int>()
@@ -773,10 +802,12 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
 
     // Build the transition table as tuples (src, sym, dst, weight) — same shape across layers.
     val tuples = mutableListOf<List<Int>>()
-    for (q in 0 until Q) for (s in 0 until S) {
-        val dst = expr.transitions[q * S + s]
-        if (dst == 0) continue // 0 means no transition (matches FlatZinc's `regular` convention)
-        tuples += listOf(q, s + off, dst - 1, expr.weights[q * S + s])
+    for (q in 0 until Q) {
+        for (s in 0 until S) {
+            val dst = expr.transitions[q * S + s]
+            if (dst == 0) continue // 0 means no transition (matches FlatZinc's `regular` convention)
+            tuples += listOf(q, s + off, dst - 1, expr.weights[q * S + s])
+        }
     }
     val wLo = tuples.minOfOrNull { it[3] } ?: 0
     val wHi = tuples.maxOfOrNull { it[3] } ?: 0
@@ -791,7 +822,7 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
             TableConstraint(
                 terms = listOf(stateRefs[i], expr.seq[i], stateRefs[i + 1], wRef),
                 tuples = tuples,
-            )
+            ),
         )
     }
     val sumTerms = mutableListOf<IntExpr>()
@@ -805,9 +836,7 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
 // ----------------------------------------------------------------------------
 
 /** Look up the var-name for an int var id. */
-internal fun Compiler.Build.intVarNameById(id: Int): String {
-    return intVarIdByName.entries.first { it.value == id }.key
-}
+internal fun Compiler.Build.intVarNameById(id: Int): String = intVarIdByName.entries.first { it.value == id }.key
 
 private fun Compiler.Build.intVarNameByIdLookup(id: Int): String = intVarNameById(id)
 

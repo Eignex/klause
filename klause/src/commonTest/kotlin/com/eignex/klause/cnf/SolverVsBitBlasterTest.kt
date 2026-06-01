@@ -33,7 +33,7 @@ class SolverVsBitBlasterTest {
             val pins = pinSampleIntoCnf(cnf, case.problem, sample)
             assertTrue(
                 SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "${case.name}: solver sample is UNSAT under bit-blasted CNF"
+                "${case.name}: solver sample is UNSAT under bit-blasted CNF",
             )
         }
     }
@@ -44,7 +44,7 @@ class SolverVsBitBlasterTest {
             val cnf = BitBlaster.compile(case.problem)
             assertTrue(
                 !SatCheck.isSat(cnf.numVars, cnf.clauses, IntArray(0)),
-                "${case.name}: expected UNSAT under bit-blast but oracle says SAT"
+                "${case.name}: expected UNSAT under bit-blast but oracle says SAT",
             )
             val solver = LocalSearchSolver(case.problem)
 
@@ -65,7 +65,7 @@ class SolverVsBitBlasterTest {
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
                     Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
                     Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
-                )
+                ),
             ),
         ),
 
@@ -79,10 +79,10 @@ class SolverVsBitBlasterTest {
                     Cardinality(
                         intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
                         min = 2,
-                        max = 3
+                        max = 3,
                     ),
                     Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), targetParity = 1),
-                )
+                ),
             ),
         ),
 
@@ -99,13 +99,13 @@ class SolverVsBitBlasterTest {
                             Lit.make(0, true),
                             Lit.make(1, true),
                             Lit.make(2, true),
-                            Lit.make(3, true)
+                            Lit.make(3, true),
                         ),
                         op = PbOp.LE,
                         bound = 3,
                     ),
                     Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-                )
+                ),
             ),
         ),
 
@@ -116,13 +116,13 @@ class SolverVsBitBlasterTest {
                 numIntVars = 2,
                 intDomains = arrayOf(
                     IntDomain(0, 3),
-                    IntDomain(0, 3)
+                    IntDomain(0, 3),
                 ),
                 factors = arrayOf<Factor>(
                     Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, 4),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
-                )
+                ),
             ),
         ),
 
@@ -134,11 +134,11 @@ class SolverVsBitBlasterTest {
                 intDomains = arrayOf(
                     IntDomain(0, 2),
                     IntDomain(0, 2),
-                    IntDomain(0, 2)
+                    IntDomain(0, 2),
                 ),
                 factors = arrayOf<Factor>(
                     AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3),
-                )
+                ),
             ),
         ),
 
@@ -151,7 +151,7 @@ class SolverVsBitBlasterTest {
                 factors = arrayOf<Factor>(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-                )
+                ),
             ),
         ),
     )
@@ -167,7 +167,7 @@ class SolverVsBitBlasterTest {
                 factors = arrayOf<Factor>(
                     Clause(intArrayOf(Lit.make(0, true))),
                     Clause(intArrayOf(Lit.make(0, false))),
-                )
+                ),
             ),
         ),
 
@@ -180,7 +180,7 @@ class SolverVsBitBlasterTest {
                 factors = arrayOf<Factor>(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
-                )
+                ),
             ),
         ),
 
@@ -192,11 +192,11 @@ class SolverVsBitBlasterTest {
                 intDomains = arrayOf(
                     IntDomain(0, 1),
                     IntDomain(0, 1),
-                    IntDomain(0, 1)
+                    IntDomain(0, 1),
                 ),
                 factors = arrayOf<Factor>(
                     AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2),
-                )
+                ),
             ),
         ),
     )

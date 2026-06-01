@@ -63,21 +63,28 @@ class OznApplier(oznSource: String) {
 
     private fun arrayBindingFrom(arr: FlatZincArray, sample: Sample): OznValue = when (arr) {
         is FlatZincArray.BoolParam -> OznValue.ArrayV(arr.values.map { OznValue.BoolV(it) })
+
         is FlatZincArray.IntParam -> OznValue.ArrayV(arr.values.map { OznValue.IntV(it.toLong()) })
+
         is FlatZincArray.FloatParam -> OznValue.ArrayV(arr.values.map { OznValue.FloatV(it) })
+
         is FlatZincArray.IntSetParam -> OznValue.ArrayV(arr.values.map { OznValue.SetV(it) })
+
         is FlatZincArray.SetVars -> OznValue.ArrayV(arr.layouts.map { setBindingFrom(it, sample) })
+
         is FlatZincArray.Vars -> OznValue.ArrayV(
             arr.varIds.mapIndexed { idx, v ->
                 when (arr.elementKind) {
                     FlatZincArray.Vars.ElementKind.Bool -> OznValue.BoolV(sample.bools[v])
+
                     FlatZincArray.Vars.ElementKind.Int -> OznValue.IntV(sample.ints[v].toLong())
+
                     FlatZincArray.Vars.ElementKind.Float -> {
                         val b = arr.floatBucketings!![idx]
                         OznValue.FloatV(b.valueOf(sample.ints[v]))
                     }
                 }
-            }
+            },
         )
     }
 }

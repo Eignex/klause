@@ -20,7 +20,7 @@ class VariableObjectiveTest {
             numBoolVars = 0,
             numIntVars = 5,
             intDomains = Array(5) { IntDomain(0, 1) },
-            factors = emptyArray()
+            factors = emptyArray(),
         )
         val factory = problem.minimizeInt(intVar = 2)
         val handBuilt = LinearObjective(intCoefficients = doubleArrayOf(0.0, 0.0, 1.0, 0.0, 0.0))
@@ -91,7 +91,7 @@ class VariableObjectiveTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = Array(3) { IntDomain(0, 1) },
-            factors = emptyArray()
+            factors = emptyArray(),
         )
         val boolsOnly = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         try {

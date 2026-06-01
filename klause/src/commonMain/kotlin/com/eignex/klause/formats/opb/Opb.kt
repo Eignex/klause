@@ -106,7 +106,7 @@ object Opb {
             numBoolVars = numVars,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = factors.toTypedArray()
+            factors = factors.toTypedArray(),
         )
         return OpbProblem(problem, objective)
     }

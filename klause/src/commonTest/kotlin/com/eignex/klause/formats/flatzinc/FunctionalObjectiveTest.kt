@@ -56,7 +56,7 @@ class FunctionalObjectiveTest {
                 (after - before),
                 predicted,
                 1e-9,
-                "delta mismatch: before=$before after=$after predicted=$predicted move=$move"
+                "delta mismatch: before=$before after=$after predicted=$predicted move=$move",
             )
             // True objective at this assignment = |a-b|+|a-c| (minimize → positive).
             val a = state.assignment.intValue(aId)
@@ -66,7 +66,7 @@ class FunctionalObjectiveTest {
                 (kotlin.math.abs(a - b) + kotlin.math.abs(a - cc)).toDouble(),
                 after,
                 1e-9,
-                "evaluate != true objective"
+                "evaluate != true objective",
             )
         }
     }

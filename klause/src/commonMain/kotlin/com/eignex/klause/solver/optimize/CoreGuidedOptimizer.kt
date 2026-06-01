@@ -50,18 +50,17 @@ class CoreGuidedOptimizer(val baseProblem: Problem) {
      * `Lit.make(varId, positive = false)` penalises it being true.
      */
     data class Soft(val lit: Int, val weight: Long = 1L) {
-        init { require(weight > 0) { "Soft weight must be positive, was $weight" } }
+        init {
+            require(weight > 0) { "Soft weight must be positive, was $weight" }
+        }
     }
 
     sealed interface Result {
         val sample: Sample?
         val lowerBound: Long
         val coresFound: Int
-        data class Optimal(
-            override val sample: Sample,
-            override val lowerBound: Long,
-            override val coresFound: Int,
-        ) : Result
+        data class Optimal(override val sample: Sample, override val lowerBound: Long, override val coresFound: Int) :
+            Result
         data class Infeasible(override val coresFound: Int) : Result {
             override val sample: Sample? = null
             override val lowerBound: Long = 0L
@@ -101,17 +100,15 @@ class CoreGuidedOptimizer(val baseProblem: Problem) {
             val arr = IntArray(size)
             arr[0] = origLit
             var i = 1
-            if (!spent) { arr[i++] = Lit.make(initialSelector, positive = true) }
+            if (!spent) {
+                arr[i++] = Lit.make(initialSelector, positive = true)
+            }
             for (j in 0 until extraBlockers.size) arr[i++] = Lit.make(extraBlockers[j], positive = true)
             return Clause(arr)
         }
     }
 
-    fun minimize(
-        softs: List<Soft>,
-        params: BacktrackParams = BacktrackParams(),
-        stratify: Boolean = true,
-    ): Result {
+    fun minimize(softs: List<Soft>, params: BacktrackParams = BacktrackParams(), stratify: Boolean = true): Result {
         if (softs.isEmpty()) {
             return when (val r = BacktrackSolver(baseProblem).solve(params)) {
                 is SolveResult.Sat -> Result.Optimal(r.assignment, 0L, 0)
@@ -152,8 +149,11 @@ class CoreGuidedOptimizer(val baseProblem: Problem) {
                     if (strata.isEmpty()) return Result.Optimal(r.sample, lb, cores)
                     threshold = strata.removeFirst()
                 }
+
                 is SatisfyResult.GloballyUnsat -> return Result.Infeasible(cores)
+
                 is SatisfyResult.Unknown -> return Result.Unknown(r.reason, cores, lb)
+
                 is SatisfyResult.UnsatUnderAssumptions -> {
                     cores++
                     val coreSoftIdx = projectCoreToSofts(workings, activeIdx, r.core)
@@ -259,11 +259,7 @@ class CoreGuidedOptimizer(val baseProblem: Problem) {
         return Assumptions(bools = bools)
     }
 
-    private fun projectCoreToSofts(
-        workings: List<Working>,
-        activeIdx: IntArray,
-        core: Assumptions,
-    ): IntArray {
+    private fun projectCoreToSofts(workings: List<Working>, activeIdx: IntArray, core: Assumptions): IntArray {
         val out = IntArrayList()
         for (i in activeIdx) {
             val w = workings[i]

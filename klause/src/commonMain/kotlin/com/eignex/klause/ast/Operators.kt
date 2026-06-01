@@ -28,11 +28,9 @@ operator fun BoolTerm.not(): BoolExpr = when (val e = toExpr()) {
     else -> Not(e)
 }
 
-fun atMost(k: Int, vararg terms: BoolTerm): BoolExpr =
-    AtMost(terms.map { it.toExpr() }, k)
+fun atMost(k: Int, vararg terms: BoolTerm): BoolExpr = AtMost(terms.map { it.toExpr() }, k)
 
-fun atLeast(k: Int, vararg terms: BoolTerm): BoolExpr =
-    AtLeast(terms.map { it.toExpr() }, k)
+fun atLeast(k: Int, vararg terms: BoolTerm): BoolExpr = AtLeast(terms.map { it.toExpr() }, k)
 
 fun cardinality(min: Int, max: Int, vararg terms: BoolTerm): BoolExpr =
     CardinalityExpr(terms.map { it.toExpr() }, min, max)

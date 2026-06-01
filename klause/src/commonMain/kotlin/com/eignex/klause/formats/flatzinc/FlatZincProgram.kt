@@ -71,11 +71,7 @@ data class FlatZincProgram(
 /** Bool-indicator decomposition of a `var set of E` declaration. Element values are stored
  *  in ascending order; [indicatorBoolIds] is parallel — `indicatorBoolIds[i]` is the bool
  *  var whose value tracks `elements[i] ∈ S`. */
-data class SetVarLayout(
-    val name: String,
-    val elements: IntArray,
-    val indicatorBoolIds: IntArray,
-) {
+data class SetVarLayout(val name: String, val elements: IntArray, val indicatorBoolIds: IntArray) {
     init {
         require(elements.size == indicatorBoolIds.size) { "SetVarLayout: parallel arrays of unequal length" }
     }
@@ -110,18 +106,12 @@ sealed interface SolveDirective {
  * value for bucket `i` is `lo + i * (hi - lo) / (buckets - 1)`. Used by the writer to print
  * back the float value of a solved bucket index.
  */
-data class FloatBucketing(
-    val varId: Int,
-    val lo: Double,
-    val hi: Double,
-    val buckets: Int,
-) {
-    fun valueOf(bucketIndex: Int): Double =
-        if (buckets <= 1) {
-            lo
-        } else {
-            lo + bucketIndex * (hi - lo) / (buckets - 1)
-        }
+data class FloatBucketing(val varId: Int, val lo: Double, val hi: Double, val buckets: Int) {
+    fun valueOf(bucketIndex: Int): Double = if (buckets <= 1) {
+        lo
+    } else {
+        lo + bucketIndex * (hi - lo) / (buckets - 1)
+    }
 }
 
 /** Captures arrays declared in the FlatZinc file (parameter or variable arrays). */
@@ -161,10 +151,7 @@ sealed interface FlatZincArray {
 
     /** Array of set vars: each element is its own [SetVarLayout] (bool-indicator
      *  decomposition). `all_disjoint`, `set_partition_into`, etc. dispatch through this. */
-    data class SetVars(
-        override val name: String,
-        val layouts: List<SetVarLayout>,
-    ) : FlatZincArray {
+    data class SetVars(override val name: String, val layouts: List<SetVarLayout>) : FlatZincArray {
         override val length: Int get() = layouts.size
     }
 }

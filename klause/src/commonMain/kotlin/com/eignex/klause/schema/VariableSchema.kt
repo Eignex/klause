@@ -44,8 +44,7 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
         register(NominalSpec(ls)) { NominalHandle(it, ls) }
     }
 
-    protected fun intVar(min: Int, max: Int) =
-        register(IntSpec(min, max)) { IntHandle(it, min, max) }
+    protected fun intVar(min: Int, max: Int) = register(IntSpec(min, max)) { IntHandle(it, min, max) }
 
     protected fun floatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
         register(FloatSpec(min, max, buckets)) { FloatHandle(it, min, max, buckets) }
@@ -198,7 +197,10 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
     /** Bulk form: register a list of constraints under one property name. Each
      *  element gets its own [NamedConstraint] entry, keyed `<prop>[0]`, `<prop>[1]`, … */
     protected fun constraints(build: () -> List<BoolExpr>) =
-        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, List<NamedConstraint>>> { thisRef, prop ->
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, List<NamedConstraint>>> {
+                thisRef,
+                prop,
+            ->
             val ncs = build().map { NamedConstraint(it) }
             ncs.forEachIndexed { i, nc -> thisRef.add("${prop.name}[$i]", nc) }
             ReadOnlyProperty { _, _ -> ncs }

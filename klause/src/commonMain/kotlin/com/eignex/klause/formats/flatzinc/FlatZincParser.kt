@@ -60,7 +60,9 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         var isVar = false
         if (matchKw("var")) {
             isVar = true
-        } else if (matchKw("par")) isVar = false
+        } else if (matchKw("par")) {
+            isVar = false
+        }
         // `array [1..N] of (var)? T` — handle.
         val type: FznType = parseType()
         expect(":", "expected `:` in variable declaration")
@@ -115,20 +117,24 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                     advance()
                     FznType.Bool
                 }
+
                 "int" -> {
                     advance()
                     FznType.IntAny
                 }
+
                 "float" -> {
                     advance()
                     FznType.FloatAny
                 }
+
                 "set" -> {
                     advance()
                     expectKw("of")
                     val element = parseScalarType()
                     FznType.SetOfInt(element)
                 }
+
                 else -> failHere("unexpected type keyword '${tok.keyword}'")
             }
         }
@@ -213,18 +219,21 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                 expect(";", "expected `;`")
                 FznSolve.Satisfy(anns)
             }
+
             "minimize" -> {
                 advance()
                 val obj = parseExpr()
                 expect(";", "expected `;`")
                 FznSolve.Minimize(anns, obj)
             }
+
             "maximize" -> {
                 advance()
                 val obj = parseExpr()
                 expect(";", "expected `;`")
                 FznSolve.Maximize(anns, obj)
             }
+
             else -> failHere("unexpected solve goal '${tok.keyword}'")
         }
     }
@@ -252,12 +261,15 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                     advance()
                     FznExpr.BoolLit(true)
                 }
+
                 "false" -> {
                     advance()
                     FznExpr.BoolLit(false)
                 }
+
                 else -> failHere("unexpected keyword '${tok.keyword}' in expression")
             }
+
             is FznToken.IntLit -> {
                 val lo = tok.value
                 advance()
@@ -269,14 +281,17 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                     FznExpr.IntLit(lo)
                 }
             }
+
             is FznToken.FloatLit -> {
                 advance()
                 FznExpr.FloatLit(tok.value)
             }
+
             is FznToken.StringLit -> {
                 advance()
                 FznExpr.StringLit(tok.value)
             }
+
             is FznToken.Ident -> {
                 val name = tok.name
                 advance()
@@ -299,11 +314,13 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                     FznExpr.Ident(name)
                 }
             }
+
             is FznToken.Punct -> when (tok.symbol) {
                 "[" -> parseArrayLit()
                 "{" -> parseIntSetLit()
                 else -> failHere("unexpected '${tok.symbol}' in expression")
             }
+
             is FznToken.Eof -> failHere("unexpected end of file in expression")
         }
     }
@@ -376,10 +393,12 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                 advance()
                 t.value
             }
+
             is FznToken.IntLit -> {
                 advance()
                 t.value.toDouble()
             }
+
             else -> failHere("expected float literal")
         }
     }

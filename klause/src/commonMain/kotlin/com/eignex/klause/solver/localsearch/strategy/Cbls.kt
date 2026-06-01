@@ -321,6 +321,7 @@ class Cbls(
                     if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
                 }
             }
+
             is com.eignex.klause.solver.FunctionalObjective -> {
                 // Decomposed objective: its gradient lives in deltaIfApplied, not in per-var
                 // coefficients, so we can't pick a direction a priori. Seed *geometric* steps
@@ -344,6 +345,7 @@ class Cbls(
                     if (cur != d.max) sink.addChannelingIntSet(state, v, d.max)
                 }
             }
+
             else -> { /* no per-var direction without inspecting the objective shape */ }
         }
     }

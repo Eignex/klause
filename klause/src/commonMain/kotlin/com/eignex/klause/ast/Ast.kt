@@ -64,7 +64,9 @@ data class FloatSpec(
     /** Number of uniformly-spaced values the interval is discretised into (≥ 2). */
     val buckets: Int,
 ) : VarSpec {
-    init { require(buckets >= 2) { "FloatSpec needs at least 2 buckets" } }
+    init {
+        require(buckets >= 2) { "FloatSpec needs at least 2 buckets" }
+    }
 
     /** Real-value step between adjacent buckets: `(max - min) / (buckets - 1)`. The single
      *  source of truth for the bucket-to-real affine map — decode and the float objectives
@@ -122,7 +124,9 @@ data class And(
     /** Conjuncts; must be non-empty. */
     val children: List<BoolExpr>,
 ) : BoolExpr {
-    init { require(children.isNotEmpty()) { "And must have at least one child" } }
+    init {
+        require(children.isNotEmpty()) { "And must have at least one child" }
+    }
 }
 
 /** Disjunction of [children] (at least one). */
@@ -132,7 +136,9 @@ data class Or(
     /** Disjuncts; must be non-empty. */
     val children: List<BoolExpr>,
 ) : BoolExpr {
-    init { require(children.isNotEmpty()) { "Or must have at least one child" } }
+    init {
+        require(children.isNotEmpty()) { "Or must have at least one child" }
+    }
 }
 
 /** Material implication `left → right`. */
@@ -232,7 +238,9 @@ data class IntSum(
     /** Summands; must be non-empty. */
     val children: List<IntExpr>,
 ) : IntExpr {
-    init { require(children.isNotEmpty()) { "IntSum must have at least one child" } }
+    init {
+        require(children.isNotEmpty()) { "IntSum must have at least one child" }
+    }
 }
 
 /** Minimum of [children]. */
@@ -242,7 +250,9 @@ data class IntMin(
     /** Operands; must be non-empty. */
     val children: List<IntExpr>,
 ) : IntExpr {
-    init { require(children.isNotEmpty()) { "IntMin must have at least one child" } }
+    init {
+        require(children.isNotEmpty()) { "IntMin must have at least one child" }
+    }
 }
 
 /** Maximum of [children]. */
@@ -252,7 +262,9 @@ data class IntMax(
     /** Operands; must be non-empty. */
     val children: List<IntExpr>,
 ) : IntExpr {
-    init { require(children.isNotEmpty()) { "IntMax must have at least one child" } }
+    init {
+        require(children.isNotEmpty()) { "IntMax must have at least one child" }
+    }
 }
 
 /** Absolute value of [child]. */
@@ -284,7 +296,9 @@ data class IntElement(
     /** The indexable items; must be non-empty. */
     val items: List<IntExpr>,
 ) : IntExpr {
-    init { require(items.isNotEmpty()) { "IntElement must have at least one item" } }
+    init {
+        require(items.isNotEmpty()) { "IntElement must have at least one item" }
+    }
 }
 
 /** `left * right`. */
@@ -404,7 +418,9 @@ data class AllDifferent(
     /** The terms required to be pairwise distinct. */
     val terms: List<IntExpr>,
 ) : BoolExpr {
-    init { require(terms.size >= 2) { "AllDifferent needs at least two terms" } }
+    init {
+        require(terms.size >= 2) { "AllDifferent needs at least two terms" }
+    }
 }
 
 /**
@@ -713,7 +729,9 @@ data class CircuitExpr(
     /** Integer representing node 0 (0 native, 1 for FlatZinc). */
     val valueOffset: Int = 0,
 ) : BoolExpr {
-    init { require(succ.size >= 2) { "Circuit needs at least two nodes" } }
+    init {
+        require(succ.size >= 2) { "Circuit needs at least two nodes" }
+    }
 }
 
 /**
@@ -728,7 +746,9 @@ data class SubcircuitExpr(
     /** Integer representing node 0 (0 native, 1 for FlatZinc). */
     val valueOffset: Int = 0,
 ) : BoolExpr {
-    init { require(succ.isNotEmpty()) { "Subcircuit needs at least one node" } }
+    init {
+        require(succ.isNotEmpty()) { "Subcircuit needs at least one node" }
+    }
 }
 
 /**
@@ -824,7 +844,9 @@ data class XorExpr(
     /** The Boolean expressions whose parity must be odd. */
     val children: List<BoolExpr>,
 ) : BoolExpr {
-    init { require(children.isNotEmpty()) { "XorExpr needs at least one child" } }
+    init {
+        require(children.isNotEmpty()) { "XorExpr needs at least one child" }
+    }
 }
 
 /** Pseudo-Boolean constraint `Σ weights[k]·lits[k] ⟨op⟩ bound`. */
@@ -865,7 +887,9 @@ data class SetSpec(
     /** The (fixed, not necessarily contiguous) integer universe the set draws from. */
     val universe: List<Int>,
 ) : VarSpec {
-    init { require(universe.isNotEmpty()) { "SetSpec needs a non-empty universe" } }
+    init {
+        require(universe.isNotEmpty()) { "SetSpec needs a non-empty universe" }
+    }
 }
 
 /** Set variable over a nominal universe of [labels]. Internally lowers to an indicator
@@ -877,7 +901,9 @@ data class MultipleSpec(
     /** The nominal label universe the set draws from. */
     val labels: List<String>,
 ) : VarSpec {
-    init { require(labels.isNotEmpty()) { "MultipleSpec needs at least one label" } }
+    init {
+        require(labels.isNotEmpty()) { "MultipleSpec needs at least one label" }
+    }
 }
 
 /** Anything that can be coerced into a [SetExpr] inside the constraint DSL — the

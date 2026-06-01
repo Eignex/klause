@@ -35,11 +35,11 @@ sealed interface CostShaping {
     }
 
     /** `violationPenalty(violationCount) + lambda * objective`. */
-    data class Linear(
-        val lambda: Double = 1.0,
-        val violationPenalty: ViolationPenalty = ViolationPenalty.Identity,
-    ) : CostShaping {
-        init { require(lambda >= 0) { "lambda must be non-negative, got $lambda" } }
+    data class Linear(val lambda: Double = 1.0, val violationPenalty: ViolationPenalty = ViolationPenalty.Identity) :
+        CostShaping {
+        init {
+            require(lambda >= 0) { "lambda must be non-negative, got $lambda" }
+        }
         override fun shape(violationCount: Long, objective: Double): Double =
             violationPenalty.of(violationCount) + lambda * objective
         override val feasibilityGated: Boolean = false
@@ -51,13 +51,11 @@ sealed interface CostShaping {
 
         /** Linear blend with a cap on the violation contribution (one violation can't
          *  dominate). Useful when individual violations are cheap relative to objective. */
-        fun saturating(lambda: Double, cap: Double): CostShaping =
-            Linear(lambda, ViolationPenalty.Saturating(cap))
+        fun saturating(lambda: Double, cap: Double): CostShaping = Linear(lambda, ViolationPenalty.Saturating(cap))
 
         /** Linear blend with square-root scaling on violations. Sub-linear: each extra
          *  violation contributes less than the previous one. */
-        fun sqrtViolation(lambda: Double): CostShaping =
-            Linear(lambda, ViolationPenalty.SquareRoot)
+        fun sqrtViolation(lambda: Double): CostShaping = Linear(lambda, ViolationPenalty.SquareRoot)
     }
 }
 
@@ -69,7 +67,9 @@ sealed interface ViolationPenalty {
     }
 
     data class Saturating(val cap: Double) : ViolationPenalty {
-        init { require(cap >= 0) { "cap must be non-negative, got $cap" } }
+        init {
+            require(cap >= 0) { "cap must be non-negative, got $cap" }
+        }
         override fun of(violationCount: Long): Double = min(violationCount.toDouble(), cap)
     }
 

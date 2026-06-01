@@ -25,7 +25,7 @@ class LocalSearchImprovementsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -44,13 +44,13 @@ class LocalSearchImprovementsTest {
             val bf = assertIs<MinimizeResult.BestFound>(m)
             assertTrue(
                 bf.objective < prev,
-                "improvements must strictly decrease; ${bf.objective} after $prev"
+                "improvements must strictly decrease; ${bf.objective} after $prev",
             )
             prev = bf.objective
         }
         assertTrue(
             termBest.objective <= prev,
-            "terminal yield's objective must match the last intermediate or be no worse"
+            "terminal yield's objective must match the last intermediate or be no worse",
         )
         // On this small instance the LS engine should reach the optimum (3.0) inside the
         // budget.
@@ -65,7 +65,7 @@ class LocalSearchImprovementsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 1.0, 1.0, 1.0))
@@ -87,7 +87,7 @@ class LocalSearchImprovementsTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 1.0, 1.0, 1.0))

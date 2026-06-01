@@ -28,7 +28,7 @@ class PseudoBooleanCoverageTest {
             assertEquals(
                 expected,
                 SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask sum=$sum expected=$expected"
+                "mask=$mask sum=$sum expected=$expected",
             )
         }
     }
@@ -52,7 +52,7 @@ class PseudoBooleanCoverageTest {
             assertEquals(
                 expected,
                 SatCheck.isSat(cnf.numVars, cnf.clauses, pins),
-                "mask=$mask sum=$sum expected=$expected"
+                "mask=$mask sum=$sum expected=$expected",
             )
         }
     }

@@ -68,8 +68,8 @@ class FloatHandle(
     val min: Double,
     /** Inclusive upper real bound. */
     val max: Double,
-    @Deprecated("Bucketing is now a per-backend solve-time concern; this parameter is ignored.")
     /** Deprecated, ignored bucket count kept for source compatibility. */
+    @Deprecated("Bucketing is now a per-backend solve-time concern; this parameter is ignored.")
     val buckets: Int = 0,
 ) {
 
@@ -146,10 +146,7 @@ operator fun Double.times(expr: FloatExpr): FloatExpr = expr * this
  * against a Double or another [FloatExpr] lower to a [FloatLinearConstraint] AST node,
  * which the compiler turns into a [com.eignex.klause.solver.factor.FloatLinear] factor.
  */
-class FloatExpr internal constructor(
-    private val terms: Map<FloatHandle, Double>,
-    private val offset: Double,
-) {
+class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>, private val offset: Double) {
 
     internal constructor(handle: FloatHandle, coeff: Double, offset: Double) :
         this(if (coeff == 0.0) emptyMap() else mapOf(handle to coeff), offset)
@@ -210,10 +207,9 @@ class FloatExpr internal constructor(
     }
 
     /** `0 = 0` for true and `0 ≠ 0` for false; the compiler's affine pass folds these. */
-    private fun constantBool(value: Boolean): BoolExpr =
-        if (value) {
-            IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
-        } else {
-            IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
-        }
+    private fun constantBool(value: Boolean): BoolExpr = if (value) {
+        IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
+    } else {
+        IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
+    }
 }

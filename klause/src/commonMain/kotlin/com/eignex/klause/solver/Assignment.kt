@@ -7,10 +7,7 @@ import kotlin.random.Random
  * `numIntVars` integer variables (a plain [IntArray]). Bool and int variables live in separate
  * id spaces; a factor that touches both kinds names them through `boolVars` / `intVars` arrays.
  */
-class Assignment(
-    val numBoolVars: Int,
-    val numIntVars: Int,
-) {
+class Assignment(val numBoolVars: Int, val numIntVars: Int) {
     private val bits: Bits = Bits(numBoolVars)
     private val ints: IntArray = IntArray(numIntVars)
 

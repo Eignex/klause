@@ -18,17 +18,23 @@ class OptPinTest {
 
     private class AbsentIntZero : VariableSchema() {
         val x by optIntVar(min = 0, max = 5)
-        init { constraint(Not(x.present.toExpr())) } // force absent
+        init {
+            constraint(Not(x.present.toExpr()))
+        } // force absent
     }
 
     private class AbsentIntClamped : VariableSchema() {
         val x by optIntVar(min = 2, max = 7) // 0 ∉ domain → clamp to min = 2
-        init { constraint(Not(x.present.toExpr())) }
+        init {
+            constraint(Not(x.present.toExpr()))
+        }
     }
 
     private class AbsentBool : VariableSchema() {
         val b by optBoolVar()
-        init { constraint(Not(b.present.toExpr())) }
+        init {
+            constraint(Not(b.present.toExpr()))
+        }
     }
 
     private fun firstFeasible(compiled: CompiledProblem): com.eignex.klause.solver.Sample {

@@ -88,40 +88,72 @@ object FactorDecomposer {
      *  calling decompose to avoid pointless lookups. */
     fun decompose(f: Factor, ctx: DecompositionContext): List<Factor>? = when (f) {
         is AllEqual -> decomposeAllEqual(f)
+
         is AllDifferentExceptZero -> decomposeAllDifferentExceptZero(f, ctx)
+
         is AllDifferentExcept -> decomposeAllDifferentExcept(f, ctx)
+
         is Monotone -> decomposeMonotone(f)
+
         is ValuePrecede -> decomposeValuePrecede(f, ctx)
+
         is Member -> decomposeMember(f, ctx)
+
         is Among -> decomposeAmong(f, ctx)
+
         is Count -> decomposeCount(f, ctx)
+
         is NValue -> decomposeNValue(f, ctx)
+
         is SymmetricAllDifferent -> decomposeSymmetricAllDifferent(f, ctx)
+
         is GlobalCardinality -> decomposeGlobalCardinality(f, ctx)
+
         // Tier 3: arithmetic
         is Knapsack -> decomposeKnapsack(f)
+
         is ArrayMinMax -> decomposeArrayMinMax(f, ctx)
+
         is ArgMinMax -> decomposeArgMinMax(f, ctx)
+
         is BinPacking -> decomposeBinPacking(f, ctx)
+
         is MinCostFlow -> decomposeMinCostFlow(f)
+
         // Tier 4: comparison / connectivity / misc
         is Inverse -> decomposeInverse(f, ctx)
+
         is LexLess -> decomposeLexLess(f, ctx)
+
         is Sequence -> decomposeSequence(f, ctx)
+
         // Tier 4 (automaton + geometry)
         is Table -> decomposeTable(f, ctx)
+
         is Regular -> decomposeRegular(f, ctx)
+
         is Mdd -> decomposeMdd(f, ctx)
+
         is Disjunctive -> decomposeDisjunctive(f, ctx)
+
         is Diffn -> decomposeDiffn(f, ctx)
+
         is Geost -> decomposeGeost(f, ctx)
+
         is Cumulative -> decomposeCumulative(f, ctx)
+
         is Circuit -> decomposeCircuit(f, ctx)
+
         is Subcircuit -> decomposeSubcircuit(f, ctx)
+
         is Sort -> decomposeSort(f, ctx)
+
         is ArgSort -> decomposeArgSort(f, ctx)
+
         is Path -> decomposePath(f, ctx)
+
         is Tree -> decomposeTree(f, ctx)
+
         else -> null
     }
 
@@ -138,6 +170,7 @@ object FactorDecomposer {
         is com.eignex.klause.solver.factor.ReifiedCardinality,
         is com.eignex.klause.solver.factor.ReifiedPseudoBoolean,
         -> true
+
         else -> false
     }
 
@@ -163,9 +196,8 @@ object FactorDecomposer {
     }
 
     /** `all_different_except_zero(xs)` is the singleton-`{0}` exception case. */
-    private fun decomposeAllDifferentExceptZero(f: AllDifferentExceptZero, ctx: DecompositionContext): List<Factor> {
-        return decomposeGatedPairwiseNE(f.xs, intArrayOf(0), ctx)
-    }
+    private fun decomposeAllDifferentExceptZero(f: AllDifferentExceptZero, ctx: DecompositionContext): List<Factor> =
+        decomposeGatedPairwiseNE(f.xs, intArrayOf(0), ctx)
 
     /** Shared gated-pairwise-NE encoding used by AllDifferentExcept and
      *  AllDifferentExceptZero. For each var an aux "is in except" bool is reified
@@ -197,8 +229,8 @@ object FactorDecomposer {
                             Lit.make(inExcept[i], true),
                             Lit.make(inExcept[j], true),
                             Lit.make(neAux, true),
-                        )
-                    )
+                        ),
+                    ),
                 )
             }
         }
@@ -224,7 +256,7 @@ object FactorDecomposer {
                     vars = intArrayOf(a, b),
                     op = LinearOp.GE,
                     bound = if (strict) 1 else 0,
-                )
+                ),
             )
         }
         return out
@@ -334,10 +366,15 @@ object FactorDecomposer {
         val xn = f.xs.size
         val (lo, hi) = when (f.op) {
             Count.Op.Eq -> f.n to f.n
+
             Count.Op.Le -> 0 to f.n
+
             Count.Op.Lt -> 0 to (f.n - 1)
+
             Count.Op.Ge -> f.n to xn
+
             Count.Op.Gt -> (f.n + 1) to xn
+
             Count.Op.Ne -> {
                 // PbOp doesn't carry NE; split into the disjunction
                 // `(Σ ≤ n−1) ∨ (Σ ≥ n+1)` via two reified cardinalities + a clause.
@@ -557,8 +594,10 @@ object FactorDecomposer {
             when (f.mode) {
                 BinPacking.Mode.UniformCapacity ->
                     out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, f.uniformCapacity))
+
                 BinPacking.Mode.PerBinCapacity ->
                     out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, f.capacities!![k]))
+
                 BinPacking.Mode.LoadVars -> {
                     val loadVar = f.loadVars!![k]
                     val dom = ctx.intDomainOf(loadVar)
@@ -686,8 +725,8 @@ object FactorDecomposer {
             out.add(Clause(intArrayOf(Lit.make(prefixEq[i + 1], false), Lit.make(eq[i], true))))
             out.add(
                 Clause(
-                    intArrayOf(Lit.make(prefixEq[i + 1], true), Lit.make(prefixEq[i], false), Lit.make(eq[i], false))
-                )
+                    intArrayOf(Lit.make(prefixEq[i + 1], true), Lit.make(prefixEq[i], false), Lit.make(eq[i], false)),
+                ),
             )
         }
         // win_i ↔ prefixEq[i] ∧ lt[i].
@@ -845,8 +884,13 @@ object FactorDecomposer {
                 out.add(Clause(intArrayOf(Lit.make(fires, false), Lit.make(a3, true))))
                 out.add(
                     Clause(
-                        intArrayOf(Lit.make(fires, true), Lit.make(a1, false), Lit.make(a2, false), Lit.make(a3, false))
-                    )
+                        intArrayOf(
+                            Lit.make(fires, true),
+                            Lit.make(a1, false),
+                            Lit.make(a2, false),
+                            Lit.make(a3, false),
+                        ),
+                    ),
                 )
                 if (f.recordStride == 4) {
                     allFires.add(Lit.make(fires, true))
@@ -895,8 +939,8 @@ object FactorDecomposer {
                         intArrayOf(1, -1),
                         intArrayOf(f.starts[i], f.starts[j]),
                         LinearOp.LE,
-                        -f.durations[i]
-                    )
+                        -f.durations[i],
+                    ),
                 )
                 val aji = ctx.freshBool()
                 out.add(
@@ -905,8 +949,8 @@ object FactorDecomposer {
                         intArrayOf(1, -1),
                         intArrayOf(f.starts[j], f.starts[i]),
                         LinearOp.LE,
-                        -f.durations[j]
-                    )
+                        -f.durations[j],
+                    ),
                 )
                 // Non-opt: at least one separation holds. Opt-aware: if either is absent
                 // the pair is vacuous, so add ¬present_i ∨ ¬present_j to the disjunction.
@@ -920,8 +964,8 @@ object FactorDecomposer {
                                 Lit.make(aji, true),
                                 Lit.negate(f.presents[i]),
                                 Lit.negate(f.presents[j]),
-                            )
-                        )
+                            ),
+                        ),
                     )
                 }
             }
@@ -960,7 +1004,7 @@ object FactorDecomposer {
                 out.add(ReifiedLinear(ay, intArrayOf(1, -1), intArrayOf(f.ys[i], f.ys[j]), opX, yAdj))
                 out.add(ReifiedLinear(by, intArrayOf(1, -1), intArrayOf(f.ys[j], f.ys[i]), opX, yAdjRev))
                 out.add(
-                    Clause(intArrayOf(Lit.make(ax, true), Lit.make(bx, true), Lit.make(ay, true), Lit.make(by, true)))
+                    Clause(intArrayOf(Lit.make(ax, true), Lit.make(bx, true), Lit.make(ay, true), Lit.make(by, true))),
                 )
             }
         }
@@ -1063,8 +1107,8 @@ object FactorDecomposer {
                         intArrayOf(1, -1),
                         intArrayOf(f.starts[i], f.starts[j]),
                         LinearOp.LE,
-                        f.durations[j] - 1
-                    )
+                        f.durations[j] - 1,
+                    ),
                 )
                 val both = ctx.freshBool()
                 out.add(Clause(intArrayOf(Lit.make(both, false), Lit.make(ge, true))))
@@ -1164,8 +1208,8 @@ object FactorDecomposer {
                             Lit.make(inCycle[i], false),
                             Lit.make(inCycle[j], false),
                             Lit.make(diff, true),
-                        )
-                    )
+                        ),
+                    ),
                 )
             }
         }
@@ -1380,9 +1424,9 @@ object FactorDecomposer {
                         Lit.make(present, false),
                         Lit.make(isSource, true),
                         Lit.make(isSink, true),
-                        Lit.make(inEq1, true)
-                    )
-                )
+                        Lit.make(inEq1, true),
+                    ),
+                ),
             )
             out.add(
                 Clause(
@@ -1390,9 +1434,9 @@ object FactorDecomposer {
                         Lit.make(present, false),
                         Lit.make(isSource, true),
                         Lit.make(isSink, true),
-                        Lit.make(outEq1, true)
-                    )
-                )
+                        Lit.make(outEq1, true),
+                    ),
+                ),
             )
             // source → present; sink → present.
             out.add(Clause(intArrayOf(Lit.make(isSource, false), Lit.make(present, true))))
@@ -1559,11 +1603,13 @@ object FactorDecomposer {
                     @Suppress("UNUSED_VARIABLE")
                     val _t = auxCount
                 }
+
                 f.countLow != null || f.countHigh != null -> {
                     val low = f.countLow?.get(ci) ?: 0
                     val high = f.countHigh?.get(ci) ?: f.xs.size
                     out.add(Cardinality(eqLits, min = low, max = high))
                 }
+
                 else -> {
                     // No count constraint expressed for this cover value — skip.
                 }

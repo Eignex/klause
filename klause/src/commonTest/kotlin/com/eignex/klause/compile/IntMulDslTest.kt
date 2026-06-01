@@ -36,7 +36,7 @@ class IntMulDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 19)).take(15).toList()
         assertTrue(samples.isNotEmpty())

@@ -98,7 +98,7 @@ class ReifiedGlobalTest {
         val cnf = BitBlaster.compile(compiled.problem)
         assertTrue(
             cnf.clauses.isNotEmpty(),
-            "BitBlaster should accept the reified cumulative decomposition"
+            "BitBlaster should accept the reified cumulative decomposition",
         )
     }
 

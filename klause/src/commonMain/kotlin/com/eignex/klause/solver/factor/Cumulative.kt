@@ -134,12 +134,7 @@ class Cumulative(
 
     /** LS-side payload. Owns the usage timeline, the running overage, and the cached
      *  capacity (so capacity-var changes can recompute overage in one O(horizon) scan). */
-    private class LsState(
-        val tLow: Int,
-        val usage: IntArray,
-        var overage: Int,
-        var cap: Int,
-    )
+    private class LsState(val tLow: Int, val usage: IntArray, var overage: Int, var cap: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val tLow = computeTLow(state)
@@ -167,8 +162,7 @@ class Cumulative(
         state.intPayload[factorId] = ov
     }
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        state.intPayload[factorId] > 0
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val ls = state.refPayload[factorId] as LsState
@@ -177,6 +171,7 @@ class Cumulative(
         if (oldVal == newValue) return 0
         val delta = when {
             intVar == capacityVar -> capacityDelta(ls, newValue)
+
             else -> {
                 val sp = startPos[intVar]
                 if (sp != null) {
@@ -237,6 +232,7 @@ class Cumulative(
         if (oldValue == newValue) return 0
         when {
             intVar == capacityVar -> applyCapacityDelta(ls, newValue)
+
             else -> {
                 val sp = startPos[intVar]
                 if (sp != null) {
@@ -523,6 +519,7 @@ class Cumulative(
      * (not to the horizon length), so the propagator stays cheap even on RCPSP instances
      * with planning horizons in the tens of thousands.
      */
+
     /** Conflict reason: starts-bound atoms of every task. Cumulative is bound-only
      *  (sweep-line time-tabling tightens start mins/maxes, never excludes interior
      *  start values), so citing the current bound atoms of every task captures the
@@ -642,7 +639,7 @@ class Cumulative(
             while (newMin <= state.intDomains[v].max) {
                 if (overloadsAt(
                         segFrom, segTo, segLevel, segCount,
-                        newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI
+                        newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI,
                     )
                 ) {
                     newMin++
@@ -657,7 +654,7 @@ class Cumulative(
             while (newMax >= state.intDomains[v].min) {
                 if (overloadsAt(
                         segFrom, segTo, segLevel, segCount,
-                        newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI
+                        newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI,
                     )
                 ) {
                     newMax--
@@ -847,12 +844,7 @@ class Cumulative(
      *  task whose start sits in the peak task's domain (and vice versa) and the combined
      *  swap doesn't push usage above capacity at a new slot. Capped at [MAX_SWAPS] to
      *  bound the proposal-set size. */
-    private fun emitFeasibleSwaps(
-        state: LocalSearchState,
-        ls: LsState,
-        peakTasks: IntArray,
-        sink: MoveSink,
-    ) {
+    private fun emitFeasibleSwaps(state: LocalSearchState, ls: LsState, peakTasks: IntArray, sink: MoveSink) {
         var swapsAdded = 0
         for (i in peakTasks) {
             if (swapsAdded >= MAX_SWAPS) break
@@ -877,7 +869,7 @@ class Cumulative(
                     listOf(
                         com.eignex.klause.solver.Move.IntSet(iV, jCur),
                         com.eignex.klause.solver.Move.IntSet(jV, iCur),
-                    )
+                    ),
                 )
                 swapsAdded++
             }

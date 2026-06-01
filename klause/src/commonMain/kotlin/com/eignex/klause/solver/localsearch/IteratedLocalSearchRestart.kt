@@ -75,8 +75,7 @@ class IteratedLocalSearchRestart(
 
     data class Incumbent(val sample: Sample, val objective: Double)
 
-    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
-        stepsSinceLastRestart >= maxFlipsBeforeRestart
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= maxFlipsBeforeRestart
 
     override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
         val worstObjective = if (population.size < populationSize) {
@@ -178,11 +177,15 @@ class IteratedLocalSearchRestart(
                 }
             }
         }
-        for (i in bools.indices) if (!boolSet[i]) {
-            bools[i] = if (rng.nextDouble() < probA) a.bools[i] else b.bools[i]
+        for (i in bools.indices) {
+            if (!boolSet[i]) {
+                bools[i] = if (rng.nextDouble() < probA) a.bools[i] else b.bools[i]
+            }
         }
-        for (i in ints.indices) if (!intSet[i]) {
-            ints[i] = if (rng.nextDouble() < probA) a.ints[i] else b.ints[i]
+        for (i in ints.indices) {
+            if (!intSet[i]) {
+                ints[i] = if (rng.nextDouble() < probA) a.ints[i] else b.ints[i]
+            }
         }
         return Sample(bools, ints)
     }

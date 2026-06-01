@@ -71,8 +71,7 @@ interface Factor {
      * [defaultBoolPinsConflictReason] — suppressed when int decisions are on the
      * trail (full LCG int-bound literals would be needed for that case).
      */
-    fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        defaultBoolPinsConflictReason(state)
+    fun conflictReason(state: PropagationState, factorId: Int): IntArray? = defaultBoolPinsConflictReason(state)
 }
 
 /**

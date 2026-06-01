@@ -80,8 +80,7 @@ class Disjunctive(
         durationVars = durationVars,
     )
 
-    override fun initialize(state: LocalSearchState, factorId: Int) =
-        cumulativeBacking.initialize(state, factorId)
+    override fun initialize(state: LocalSearchState, factorId: Int) = cumulativeBacking.initialize(state, factorId)
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         cumulativeBacking.isViolated(state, factorId)
@@ -193,7 +192,14 @@ class Disjunctive(
                 }
             }
             if (newMax < state.intDomains[v].min) return false
-            if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, state.composeIntVarAtomAntecedents(starts))) return false
+            if (newMax != state.intDomains[v].max && !state.tightenIntMax(
+                    v,
+                    newMax,
+                    state.composeIntVarAtomAntecedents(starts),
+                )
+            ) {
+                return false
+            }
         }
         return true
     }

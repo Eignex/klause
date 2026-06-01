@@ -120,7 +120,7 @@ class SmtLibQfLiaTest {
     @Test
     fun `to_real and to_int are identity over ints`() {
         val p = SmtLibQfLia.parse(
-            "(declare-const x Int) (assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)"
+            "(declare-const x Int) (assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)",
         ).problem
         assertEquals(5, p.intDomains[0].min)
         assertEquals(5, p.intDomains[0].max)

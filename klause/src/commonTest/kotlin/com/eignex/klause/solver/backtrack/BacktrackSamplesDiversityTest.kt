@@ -23,7 +23,7 @@ class BacktrackSamplesDiversityTest {
         val distinctTrueIndices = results.map { it.bools.indexOfFirst { b -> b } }.toSet()
         assertTrue(
             distinctTrueIndices.size >= 3,
-            "expected diverse samples; got only ${distinctTrueIndices.size} distinct true-vars: $distinctTrueIndices"
+            "expected diverse samples; got only ${distinctTrueIndices.size} distinct true-vars: $distinctTrueIndices",
         )
     }
 
@@ -36,7 +36,7 @@ class BacktrackSamplesDiversityTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val models = BacktrackSolver(problem)

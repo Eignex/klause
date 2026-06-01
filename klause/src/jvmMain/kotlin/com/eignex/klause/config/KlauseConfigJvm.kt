@@ -15,12 +15,10 @@ package com.eignex.klause.config
  * should call it instead of reading `System.getenv` directly.
  */
 fun klauseConfigFromEnv(base: KlauseConfig = KlauseConfig.current): KlauseConfig {
-    fun raw(prop: String, env: String): String? =
-        System.getProperty(prop) ?: System.getenv(env)
+    fun raw(prop: String, env: String): String? = System.getProperty(prop) ?: System.getenv(env)
     fun bool(prop: String, env: String, default: Boolean): Boolean =
         raw(prop, env)?.let { it.trim().lowercase() !in FALSEY } ?: default
-    fun int(prop: String, env: String, default: Int): Int =
-        raw(prop, env)?.trim()?.toIntOrNull() ?: default
+    fun int(prop: String, env: String, default: Int): Int = raw(prop, env)?.trim()?.toIntOrNull() ?: default
     return base.copy(
         pinAbsentOptVars = bool("klause.pinAbsentOpt", "KLAUSE_PIN_ABSENT_OPT", base.pinAbsentOptVars),
         unboundedIntLo = int("klause.fzn.unboundedIntLo", "KLAUSE_FZN_UNBOUNDED_INT_LO", base.unboundedIntLo),
@@ -30,7 +28,6 @@ fun klauseConfigFromEnv(base: KlauseConfig = KlauseConfig.current): KlauseConfig
 
 /** Load core config from env/system properties and install it into [KlauseConfig.current].
  *  Call once at application startup before compiling. Returns the installed config. */
-fun installKlauseConfigFromEnv(): KlauseConfig =
-    klauseConfigFromEnv().also { KlauseConfig.current = it }
+fun installKlauseConfigFromEnv(): KlauseConfig = klauseConfigFromEnv().also { KlauseConfig.current = it }
 
 private val FALSEY = setOf("0", "false", "off", "no")

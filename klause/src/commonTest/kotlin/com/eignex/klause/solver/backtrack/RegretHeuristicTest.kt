@@ -90,7 +90,7 @@ class RegretHeuristicTest {
                     vars = intArrayOf(0, 1),
                     op = LinearOp.GE,
                     bound = 3,
-                )
+                ),
             ),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
@@ -100,7 +100,7 @@ class RegretHeuristicTest {
                 variableHeuristic = MaxRegret(obj),
                 valueHeuristic = IndomainBest(obj),
                 randomSeed = 0L,
-            )
+            ),
         )
         val opt = assertIs<MinimizeResult.Optimal>(r)
         assertEquals(3.0, opt.objectiveValue)

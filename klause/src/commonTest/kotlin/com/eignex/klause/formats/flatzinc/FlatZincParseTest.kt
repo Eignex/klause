@@ -53,7 +53,7 @@ class FlatZincParseTest {
             solve minimize cost;
         """.trimIndent()
         val program = parseFlatZinc(
-            src.replace("int_lin_ge", "int_lin_le").replace("[1]", "[-1]").replace(", 3", ", -3")
+            src.replace("int_lin_ge", "int_lin_le").replace("[1]", "[-1]").replace(", 3", ", -3"),
         )
         // FlatZinc has no `int_lin_ge` natively; encoded as negated LE.
         val solve = assertIs<SolveDirective.Minimize>(program.solve)

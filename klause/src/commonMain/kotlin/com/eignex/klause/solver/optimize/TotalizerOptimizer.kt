@@ -47,7 +47,9 @@ class TotalizerOptimizer(val baseProblem: Problem) {
 
     /** Weighted soft literal: cost [weight] (positive integer) if [lit] ends up false. */
     data class WeightedSoft(val lit: Int, val weight: Long) {
-        init { require(weight > 0) { "weight must be positive, was $weight" } }
+        init {
+            require(weight > 0) { "weight must be positive, was $weight" }
+        }
     }
 
     sealed interface Result {
@@ -95,7 +97,7 @@ class TotalizerOptimizer(val baseProblem: Problem) {
                     literals = selectorLits,
                     min = k,
                     max = n,
-                )
+                ),
             )
         }
         val problem = Problem(
@@ -118,8 +120,11 @@ class TotalizerOptimizer(val baseProblem: Problem) {
             }
             when (val r = solver.satisfyUnderAssumptions(assumptions, params)) {
                 is SatisfyResult.Sat -> return Result.Optimal(r.sample, lb)
+
                 is SatisfyResult.GloballyUnsat -> return Result.Infeasible()
+
                 is SatisfyResult.Unknown -> return Result.Unknown(r.reason, lb)
+
                 is SatisfyResult.UnsatUnderAssumptions -> {
                     // Core says "more than `lb` softs must be relaxed" — bump and retry.
                     lb++
@@ -144,10 +149,7 @@ class TotalizerOptimizer(val baseProblem: Problem) {
      * Fu-Malik / RC2 path in [CoreGuidedOptimizer], which pays per-core rather than per
      * threshold value.
      */
-    fun minimizeWeighted(
-        softs: List<WeightedSoft>,
-        params: BacktrackParams = BacktrackParams(),
-    ): Result {
+    fun minimizeWeighted(softs: List<WeightedSoft>, params: BacktrackParams = BacktrackParams()): Result {
         if (softs.isEmpty()) {
             return when (val r = BacktrackSolver(baseProblem).solve(params)) {
                 is SolveResult.Sat -> Result.Optimal(r.assignment, 0L)
@@ -181,7 +183,7 @@ class TotalizerOptimizer(val baseProblem: Problem) {
                     literals = selectorLits,
                     op = PbOp.GE,
                     bound = k,
-                )
+                ),
             )
         }
         val problem = Problem(
@@ -210,8 +212,11 @@ class TotalizerOptimizer(val baseProblem: Problem) {
             )
             when (val r = solver.satisfyUnderAssumptions(assumptions, params)) {
                 is SatisfyResult.Sat -> return Result.Optimal(r.sample, lb)
+
                 is SatisfyResult.GloballyUnsat -> return Result.Infeasible()
+
                 is SatisfyResult.Unknown -> return Result.Unknown(r.reason, lb)
+
                 is SatisfyResult.UnsatUnderAssumptions -> {
                     // Project the assumption core back to soft indices.
                     val coreSofts = projectCoreToSofts(r.core, selectorToSoft)

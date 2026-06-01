@@ -16,12 +16,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Propagation: pin-forcing channels — whenever `f[i]` becomes singleton with value `j`,
  * force `g[j']` to `i'` where the indices apply the offset; vice versa.
  */
-class Inverse(
-    val f: IntArray,
-    val g: IntArray,
-    val fOffset: Int = 0,
-    val gOffset: Int = 0,
-) : LocalSearchFactor {
+class Inverse(val f: IntArray, val g: IntArray, val fOffset: Int = 0, val gOffset: Int = 0) : LocalSearchFactor {
 
     init {
         require(f.size == g.size) { "inverse: f and g must have equal length" }
@@ -152,6 +147,7 @@ class Inverse(
      * derivable from `f[i]=j ⇔ g[j]=i`; the only stronger reasoning would be matching-
      * based (Hall sets), which inverse's bijection structure rarely needs in practice.
      */
+
     /** Hole-aware conflict reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, intVars)

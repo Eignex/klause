@@ -99,36 +99,67 @@ object BitBlaster {
         for (factor in problem.factors) {
             when (factor) {
                 is Clause -> emitClause(b, factor.literals, boolMap)
+
                 is Cardinality -> emitCardinality(b, factor, boolMap)
+
                 is Linear -> emitLinear(b, factor, intBits, intMin, problem)
+
                 is Product -> emitProduct(b, factor, intBits, intMin, problem)
+
                 is PseudoBoolean -> emitPseudoBoolean(b, factor, boolMap)
+
                 is ReifiedLinear -> emitReifiedLinear(b, factor, boolMap, intBits, intMin)
+
                 is ReifiedCardinality -> emitReifiedCardinality(b, factor, boolMap)
+
                 is ReifiedPseudoBoolean -> emitReifiedPseudoBoolean(b, factor, boolMap)
+
                 is Xor -> emitXor(b, factor, boolMap)
+
                 is AllDifferentFactor -> emitAllDifferent(b, factor, intBits, intMin, boolMap)
+
                 is AllDifferentExceptZero -> emitAllDifferentExcept(b, factor.xs, intArrayOf(0), intBits, intMin)
+
                 is AllDifferentExcept -> emitAllDifferentExcept(b, factor.xs, factor.except, intBits, intMin)
+
                 is MinCostFlow -> emitMinCostFlow(b, factor, intBits, intMin, problem)
+
                 is Geost -> emitGeost(b, factor, intBits, intMin, problem)
+
                 is Disjunctive -> emitDisjunctive(b, factor, intBits, intMin, boolMap)
+
                 is Cumulative -> emitCumulative(b, factor, intBits, intMin, boolMap, problem)
+
                 is Count -> emitCount(b, factor, intBits, intMin, boolMap)
+
                 is NValue -> emitNValue(b, factor, intBits, intMin, boolMap, problem)
+
                 is GlobalCardinality -> emitGlobalCardinality(b, factor, intBits, intMin, boolMap)
+
                 is Circuit -> emitCircuit(b, factor.succ, intBits, intMin, problem, sub = false)
+
                 is Subcircuit -> emitCircuit(b, factor.succ, intBits, intMin, problem, sub = true)
+
                 is SetBitsetSubset -> emitSetBitsetSubset(b, factor, boolMap)
+
                 is SetBitsetDisjoint -> emitSetBitsetDisjoint(b, factor, boolMap)
+
                 is SetBitsetEq -> emitSetBitsetEq(b, factor, boolMap)
+
                 is AllEqual -> emitAllEqual(b, factor, intBits, intMin)
+
                 is Member -> emitMember(b, factor, intBits, intMin)
+
                 is Among -> emitAmong(b, factor, intBits, intMin)
+
                 is Monotone -> emitMonotone(b, factor, intBits, intMin)
+
                 is LexLess -> emitLexLess(b, factor, intBits, intMin)
+
                 is ValuePrecede -> emitValuePrecede(b, factor, intBits, intMin)
+
                 is Element -> emitElement(b, factor, intBits, intMin)
+
                 is Inverse -> emitInverse(
                     b,
                     factor.f,
@@ -137,8 +168,9 @@ object BitBlaster {
                     factor.gOffset,
                     intBits,
                     intMin,
-                    problem
+                    problem,
                 )
+
                 is SymmetricAllDifferent -> emitInverse(
                     b,
                     factor.xs,
@@ -147,29 +179,41 @@ object BitBlaster {
                     factor.indexOffset,
                     intBits,
                     intMin,
-                    problem
+                    problem,
                 )
+
                 is Sort -> emitSort(b, factor, intBits, intMin, problem)
+
                 is ArrayMinMax -> emitArrayMinMax(b, factor, intBits, intMin)
+
                 is ArgMinMax -> emitArgMinMax(b, factor, intBits, intMin)
+
                 is Diffn -> emitDiffn(b, factor, intBits, intMin)
+
                 is BinPacking -> emitBinPacking(b, factor, intBits, intMin)
+
                 is Knapsack -> emitKnapsack(b, factor, intBits, intMin)
+
                 is Table -> emitTable(b, factor, intBits, intMin)
+
                 is Sequence -> emitSequence(b, factor, intBits, intMin)
+
                 is Regular -> emitRegular(b, factor, intBits, intMin)
+
                 is com.eignex.klause.solver.factor.ArgSort,
                 is com.eignex.klause.solver.factor.Path,
                 is com.eignex.klause.solver.factor.Tree,
-                is com.eignex.klause.solver.factor.Mdd -> {
+                is com.eignex.klause.solver.factor.Mdd,
+                -> {
                     // Propagation-only native factors. The compile lowering pairs them with
                     // primitive constraints (Linear / Clause / Table / AllDifferent / Iff)
                     // that BitBlaster handles directly, so it's safe to skip the factor
                     // itself. See CompilerGlobalsLowering — each `assertX` emits the
                     // decomposition factors alongside the native one.
                 }
+
                 else -> throw UnsupportedOperationException(
-                    "BitBlaster cannot lower factor type ${factor::class.simpleName}"
+                    "BitBlaster cannot lower factor type ${factor::class.simpleName}",
                 )
             }
         }
@@ -221,8 +265,10 @@ object BitBlaster {
             return
         }
         if (k == 1 && n <= 4) {
-            for (i in 0 until n) for (j in i + 1 until n) {
-                b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(lits[j])))
+            for (i in 0 until n) {
+                for (j in i + 1 until n) {
+                    b.addClause(intArrayOf(Lit.negate(lits[i]), Lit.negate(lits[j])))
+                }
             }
             return
         }
@@ -259,25 +305,27 @@ object BitBlaster {
         //   `¬present_i ∨ ¬present_j ∨ ¬eq(i, j)`.
         // The non-opt case (empty presents) still emits the bare unit clause.
         val hasPresents = f.presents.isNotEmpty()
-        for (i in f.vars.indices) for (j in i + 1 until f.vars.size) {
-            val a = f.vars[i]
-            val c = f.vars[j]
-            val aMin = intMin[a]
-            val cMin = intMin[c]
-            val aLits = bitsToLits(intBits[a])
-            val cLits = bitsToLits(intBits[c])
-            val base = minOf(aMin, cMin)
-            val aShifted = if (aMin == base) aLits else b.rippleAdd(aLits, constantLits(b, (aMin - base).toLong()))
-            val cShifted = if (cMin == base) cLits else b.rippleAdd(cLits, constantLits(b, (cMin - base).toLong()))
-            val notEq = Lit.negate(b.unsignedEq(aShifted, cShifted))
-            if (!hasPresents) {
-                b.addClause(intArrayOf(notEq))
-            } else {
-                val pi = f.presents[i]
-                val pj = f.presents[j]
-                val cnfPi = Lit.make(boolMap[Lit.variable(pi)], Lit.isPositive(pi))
-                val cnfPj = Lit.make(boolMap[Lit.variable(pj)], Lit.isPositive(pj))
-                b.addClause(intArrayOf(Lit.negate(cnfPi), Lit.negate(cnfPj), notEq))
+        for (i in f.vars.indices) {
+            for (j in i + 1 until f.vars.size) {
+                val a = f.vars[i]
+                val c = f.vars[j]
+                val aMin = intMin[a]
+                val cMin = intMin[c]
+                val aLits = bitsToLits(intBits[a])
+                val cLits = bitsToLits(intBits[c])
+                val base = minOf(aMin, cMin)
+                val aShifted = if (aMin == base) aLits else b.rippleAdd(aLits, constantLits(b, (aMin - base).toLong()))
+                val cShifted = if (cMin == base) cLits else b.rippleAdd(cLits, constantLits(b, (cMin - base).toLong()))
+                val notEq = Lit.negate(b.unsignedEq(aShifted, cShifted))
+                if (!hasPresents) {
+                    b.addClause(intArrayOf(notEq))
+                } else {
+                    val pi = f.presents[i]
+                    val pj = f.presents[j]
+                    val cnfPi = Lit.make(boolMap[Lit.variable(pi)], Lit.isPositive(pi))
+                    val cnfPj = Lit.make(boolMap[Lit.variable(pj)], Lit.isPositive(pj))
+                    b.addClause(intArrayOf(Lit.negate(cnfPi), Lit.negate(cnfPj), notEq))
+                }
             }
         }
     }
@@ -325,18 +373,20 @@ object BitBlaster {
             }
         }
         // Pairwise NE gated by inExc_i ∨ inExc_j.
-        for (i in xs.indices) for (j in i + 1 until xs.size) {
-            val a = xs[i]
-            val c = xs[j]
-            val aMin = intMin[a]
-            val cMin = intMin[c]
-            val aLits = bitsToLits(intBits[a])
-            val cLits = bitsToLits(intBits[c])
-            val base = minOf(aMin, cMin)
-            val aShifted = if (aMin == base) aLits else b.rippleAdd(aLits, constantLits(b, (aMin - base).toLong()))
-            val cShifted = if (cMin == base) cLits else b.rippleAdd(cLits, constantLits(b, (cMin - base).toLong()))
-            val notEq = Lit.negate(b.unsignedEq(aShifted, cShifted))
-            b.addClause(intArrayOf(inExc[i], inExc[j], notEq))
+        for (i in xs.indices) {
+            for (j in i + 1 until xs.size) {
+                val a = xs[i]
+                val c = xs[j]
+                val aMin = intMin[a]
+                val cMin = intMin[c]
+                val aLits = bitsToLits(intBits[a])
+                val cLits = bitsToLits(intBits[c])
+                val base = minOf(aMin, cMin)
+                val aShifted = if (aMin == base) aLits else b.rippleAdd(aLits, constantLits(b, (aMin - base).toLong()))
+                val cShifted = if (cMin == base) cLits else b.rippleAdd(cLits, constantLits(b, (cMin - base).toLong()))
+                val notEq = Lit.negate(b.unsignedEq(aShifted, cShifted))
+                b.addClause(intArrayOf(inExc[i], inExc[j], notEq))
+            }
         }
     }
 
@@ -401,13 +451,7 @@ object BitBlaster {
         }
     }
 
-    private fun emitProduct(
-        b: CnfBuilder,
-        f: Product,
-        intBits: Array<IntArray>,
-        intMin: IntArray,
-        problem: Problem,
-    ) {
+    private fun emitProduct(b: CnfBuilder, f: Product, intBits: Array<IntArray>, intMin: IntArray, problem: Problem) {
         val aMin = intMin[f.a]
         val bMin = intMin[f.b]
         val rMin = intMin[f.result]
@@ -519,7 +563,7 @@ object BitBlaster {
                 Linear(coeffs.toIntArray(), vars.toIntArray(), LinearOp.EQ, f.balance[n]),
                 intBits,
                 intMin,
-                problem
+                problem,
             )
         }
         if (f.cost >= 0 && f.weight != null) {
@@ -530,28 +574,40 @@ object BitBlaster {
     }
 
     /** Bitblast [Geost] as pairwise Or-of-LE separation across dimensions. */
-    private fun emitGeost(
-        b: CnfBuilder,
-        f: Geost,
-        intBits: Array<IntArray>,
-        intMin: IntArray,
-        problem: Problem,
-    ) {
+    private fun emitGeost(b: CnfBuilder, f: Geost, intBits: Array<IntArray>, intMin: IntArray, problem: Problem) {
         val d = f.numDims
         val n = f.numObjects
-        for (i in 0 until n) for (j in i + 1 until n) {
-            val clauseLits = mutableListOf<Int>()
-            for (k in 0 until d) {
-                val oi = f.origin[i * d + k]
-                val oj = f.origin[j * d + k]
-                val si = f.length[i * d + k]
-                val sj = f.length[j * d + k]
-                // origin[i] − origin[j] ≤ −si.
-                clauseLits += buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(oi, oj), LinearOp.LE, -si, intBits, intMin)
-                // origin[j] − origin[i] ≤ −sj.
-                clauseLits += buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(oj, oi), LinearOp.LE, -sj, intBits, intMin)
+        for (i in 0 until n) {
+            for (j in i + 1 until n) {
+                val clauseLits = mutableListOf<Int>()
+                for (k in 0 until d) {
+                    val oi = f.origin[i * d + k]
+                    val oj = f.origin[j * d + k]
+                    val si = f.length[i * d + k]
+                    val sj = f.length[j * d + k]
+                    // origin[i] − origin[j] ≤ −si.
+                    clauseLits += buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(oi, oj),
+                        LinearOp.LE,
+                        -si,
+                        intBits,
+                        intMin,
+                    )
+                    // origin[j] − origin[i] ≤ −sj.
+                    clauseLits += buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(oj, oi),
+                        LinearOp.LE,
+                        -sj,
+                        intBits,
+                        intMin,
+                    )
+                }
+                b.addClause(clauseLits.toIntArray())
             }
-            b.addClause(clauseLits.toIntArray())
         }
     }
 
@@ -566,18 +622,11 @@ object BitBlaster {
     ): Int = buildLinearComparator(b, intArrayOf(1), intArrayOf(v), op, bound, intBits, intMin)
 
     /** Comparator literal for `a ⟨op⟩ c` between two int vars. */
-    private fun cmp2(
-        b: CnfBuilder,
-        a: Int,
-        c: Int,
-        op: LinearOp,
-        intBits: Array<IntArray>,
-        intMin: IntArray,
-    ): Int = buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(a, c), op, 0, intBits, intMin)
+    private fun cmp2(b: CnfBuilder, a: Int, c: Int, op: LinearOp, intBits: Array<IntArray>, intMin: IntArray): Int =
+        buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(a, c), op, 0, intBits, intMin)
 
     /** Remap a [Problem]-space Boolean literal into a CNF literal. */
-    private fun presLit(boolMap: IntArray, lit: Int): Int =
-        Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
+    private fun presLit(boolMap: IntArray, lit: Int): Int = Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
 
     /** Unsigned bit-vector for the *actual* value of int var [v] (`min + offset`). Requires a
      *  non-negative domain min — used only for count-style vars (counts, nvalue n). */
@@ -607,40 +656,42 @@ object BitBlaster {
     ) {
         require(f.durationVars.isEmpty()) { "BitBlaster: variable-duration Disjunctive unsupported" }
         val hasPresents = f.presents.isNotEmpty()
-        for (i in f.starts.indices) for (j in i + 1 until f.starts.size) {
-            val di = f.durations[i]
-            val dj = f.durations[j]
-            if (di == 0 || dj == 0) continue
-            // start_i + d_i ≤ start_j  ∨  start_j + d_j ≤ start_i
-            val le1 = buildLinearComparator(
-                b,
-                intArrayOf(1, -1),
-                intArrayOf(f.starts[i], f.starts[j]),
-                LinearOp.LE,
-                -di,
-                intBits,
-                intMin
-            )
-            val le2 = buildLinearComparator(
-                b,
-                intArrayOf(1, -1),
-                intArrayOf(f.starts[j], f.starts[i]),
-                LinearOp.LE,
-                -dj,
-                intBits,
-                intMin
-            )
-            val noOverlap = b.tseitinOr(intArrayOf(le1, le2))
-            if (!hasPresents) {
-                b.addClause(intArrayOf(noOverlap))
-            } else {
-                b.addClause(
-                    intArrayOf(
-                        Lit.negate(presLit(boolMap, f.presents[i])),
-                        Lit.negate(presLit(boolMap, f.presents[j])),
-                        noOverlap
-                    )
+        for (i in f.starts.indices) {
+            for (j in i + 1 until f.starts.size) {
+                val di = f.durations[i]
+                val dj = f.durations[j]
+                if (di == 0 || dj == 0) continue
+                // start_i + d_i ≤ start_j  ∨  start_j + d_j ≤ start_i
+                val le1 = buildLinearComparator(
+                    b,
+                    intArrayOf(1, -1),
+                    intArrayOf(f.starts[i], f.starts[j]),
+                    LinearOp.LE,
+                    -di,
+                    intBits,
+                    intMin,
                 )
+                val le2 = buildLinearComparator(
+                    b,
+                    intArrayOf(1, -1),
+                    intArrayOf(f.starts[j], f.starts[i]),
+                    LinearOp.LE,
+                    -dj,
+                    intBits,
+                    intMin,
+                )
+                val noOverlap = b.tseitinOr(intArrayOf(le1, le2))
+                if (!hasPresents) {
+                    b.addClause(intArrayOf(noOverlap))
+                } else {
+                    b.addClause(
+                        intArrayOf(
+                            Lit.negate(presLit(boolMap, f.presents[i])),
+                            Lit.negate(presLit(boolMap, f.presents[j])),
+                            noOverlap,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -691,13 +742,7 @@ object BitBlaster {
     }
 
     /** Count: `n = #{i : xs[i] ⟨op⟩ v}` over a (possibly presence-gated) subset. */
-    private fun emitCount(
-        b: CnfBuilder,
-        f: Count,
-        intBits: Array<IntArray>,
-        intMin: IntArray,
-        boolMap: IntArray,
-    ) {
+    private fun emitCount(b: CnfBuilder, f: Count, intBits: Array<IntArray>, intMin: IntArray, boolMap: IntArray) {
         val hasPresents = f.presents.isNotEmpty()
         val indicators = f.xs.indices.map { i ->
             val lit = when (f.op) {
@@ -736,7 +781,10 @@ object BitBlaster {
         val nActual = intActualUnsigned(b, f.n, intBits, intMin)
         val lit = when (f.mode) {
             NValue.Mode.Eq -> b.unsignedEq(distinct, nActual)
-            NValue.Mode.AtLeast -> b.unsignedLeq(nActual, distinct) // n ≤ distinct
+
+            NValue.Mode.AtLeast -> b.unsignedLeq(nActual, distinct)
+
+            // n ≤ distinct
             NValue.Mode.AtMost -> b.unsignedLeq(distinct, nActual) // n ≥ distinct
         }
         b.addClause(intArrayOf(lit))
@@ -812,8 +860,10 @@ object BitBlaster {
             b.addClause(intArrayOf(cmp1(b, succ[i], LinearOp.GE, 0, intBits, intMin)))
         }
         // AllDifferent over succ — the assignment is a permutation.
-        for (i in 0 until n) for (j in i + 1 until n) {
-            b.addClause(intArrayOf(cmp2(b, succ[i], succ[j], LinearOp.NE, intBits, intMin)))
+        for (i in 0 until n) {
+            for (j in i + 1 until n) {
+                b.addClause(intArrayOf(cmp2(b, succ[i], succ[j], LinearOp.NE, intBits, intMin)))
+            }
         }
         if (!sub && n >= 2) {
             for (i in 0 until n) b.addClause(intArrayOf(cmp1(b, succ[i], LinearOp.NE, i, intBits, intMin)))
@@ -833,8 +883,10 @@ object BitBlaster {
             }
         }
         if (!sub) {
-            for (k in 1 until n) for (l in k + 1 until n) {
-                b.addClause(intArrayOf(Lit.negate(b.unsignedEq(pos[k], pos[l]))))
+            for (k in 1 until n) {
+                for (l in k + 1 until n) {
+                    b.addClause(intArrayOf(Lit.negate(b.unsignedEq(pos[k], pos[l]))))
+                }
             }
         }
         for (i in 0 until n) {
@@ -904,8 +956,11 @@ object BitBlaster {
             val rb = f.rightBools[i]
             when {
                 lb < 0 && rb < 0 -> Unit
+
                 lb < 0 -> b.addClause(intArrayOf(Lit.make(boolMap[rb], positive = false)))
+
                 rb < 0 -> b.addClause(intArrayOf(Lit.make(boolMap[lb], positive = false)))
+
                 else -> {
                     val l = Lit.make(boolMap[lb], positive = true)
                     val r = Lit.make(boolMap[rb], positive = true)
@@ -966,8 +1021,9 @@ object BitBlaster {
                         LinearOp.LE,
                         if (f.strict) -1 else 0,
                         intBits,
-                        intMin
+                        intMin,
                     )
+
                 Monotone.Direction.Decreasing ->
                     buildLinearComparator(
                         b,
@@ -976,7 +1032,7 @@ object BitBlaster {
                         LinearOp.GE,
                         if (f.strict) 1 else 0,
                         intBits,
-                        intMin
+                        intMin,
                     )
             }
             b.addClause(intArrayOf(lit))
@@ -998,8 +1054,12 @@ object BitBlaster {
         // Prefix-equal term: xs == ys on the first m positions.
         val allEqM = if (m == 0) b.trueLit() else b.tseitinAnd(eqs)
         val includeAllEq = when {
-            nx < ny -> true // xs is a proper prefix ⇒ strictly less
-            nx == ny -> !f.strict // equal vectors satisfy ≤ only
+            nx < ny -> true
+
+            // xs is a proper prefix ⇒ strictly less
+            nx == ny -> !f.strict
+
+            // equal vectors satisfy ≤ only
             else -> false // ys is a proper prefix ⇒ xs > ys
         }
         if (includeAllEq) disj += allEqM
@@ -1108,13 +1168,29 @@ object BitBlaster {
                 conj += if (f.max) {
                     ltLit(b, f.xs[j], f.xs[p], intBits, intMin)
                 } else {
-                    buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(f.xs[j], f.xs[p]), LinearOp.GE, 1, intBits, intMin)
+                    buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.xs[j], f.xs[p]),
+                        LinearOp.GE,
+                        1,
+                        intBits,
+                        intMin,
+                    )
                 }
             }
             for (j in p + 1 until n) {
                 // later positions no better
                 conj += if (f.max) {
-                    buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(f.xs[p], f.xs[j]), LinearOp.GE, 0, intBits, intMin)
+                    buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.xs[p], f.xs[j]),
+                        LinearOp.GE,
+                        0,
+                        intBits,
+                        intMin,
+                    )
                 } else {
                     leLit(b, f.xs[p], f.xs[j], intBits, intMin)
                 }
@@ -1128,51 +1204,53 @@ object BitBlaster {
     private fun emitDiffn(b: CnfBuilder, f: Diffn, intBits: Array<IntArray>, intMin: IntArray) {
         require(f.widthVars == null && f.heightVars == null) { "BitBlaster: variable-size Diffn unsupported" }
         val n = f.xs.size
-        for (i in 0 until n) for (j in i + 1 until n) {
-            val wi = f.widths[i]
-            val wj = f.widths[j]
-            val hi = f.heights[i]
-            val hj = f.heights[j]
-            if (f.nonStrict && (wi == 0 || hi == 0 || wj == 0 || hj == 0)) continue
-            val clause = intArrayOf(
-                buildLinearComparator(
-                    b,
-                    intArrayOf(1, -1),
-                    intArrayOf(f.xs[i], f.xs[j]),
-                    LinearOp.LE,
-                    -wi,
-                    intBits,
-                    intMin
-                ),
-                buildLinearComparator(
-                    b,
-                    intArrayOf(1, -1),
-                    intArrayOf(f.xs[j], f.xs[i]),
-                    LinearOp.LE,
-                    -wj,
-                    intBits,
-                    intMin
-                ),
-                buildLinearComparator(
-                    b,
-                    intArrayOf(1, -1),
-                    intArrayOf(f.ys[i], f.ys[j]),
-                    LinearOp.LE,
-                    -hi,
-                    intBits,
-                    intMin
-                ),
-                buildLinearComparator(
-                    b,
-                    intArrayOf(1, -1),
-                    intArrayOf(f.ys[j], f.ys[i]),
-                    LinearOp.LE,
-                    -hj,
-                    intBits,
-                    intMin
-                ),
-            )
-            b.addClause(clause)
+        for (i in 0 until n) {
+            for (j in i + 1 until n) {
+                val wi = f.widths[i]
+                val wj = f.widths[j]
+                val hi = f.heights[i]
+                val hj = f.heights[j]
+                if (f.nonStrict && (wi == 0 || hi == 0 || wj == 0 || hj == 0)) continue
+                val clause = intArrayOf(
+                    buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.xs[i], f.xs[j]),
+                        LinearOp.LE,
+                        -wi,
+                        intBits,
+                        intMin,
+                    ),
+                    buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.xs[j], f.xs[i]),
+                        LinearOp.LE,
+                        -wj,
+                        intBits,
+                        intMin,
+                    ),
+                    buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.ys[i], f.ys[j]),
+                        LinearOp.LE,
+                        -hi,
+                        intBits,
+                        intMin,
+                    ),
+                    buildLinearComparator(
+                        b,
+                        intArrayOf(1, -1),
+                        intArrayOf(f.ys[j], f.ys[i]),
+                        LinearOp.LE,
+                        -hj,
+                        intBits,
+                        intMin,
+                    ),
+                )
+                b.addClause(clause)
+            }
         }
     }
 
@@ -1189,9 +1267,11 @@ object BitBlaster {
             val load = if (terms.isEmpty()) intArrayOf(b.falseLit()) else sumAll(b, terms)
             when (f.mode) {
                 BinPacking.Mode.UniformCapacity -> b.addClause(intArrayOf(b.constantLeq(load, f.uniformCapacity)))
+
                 BinPacking.Mode.PerBinCapacity -> b.addClause(intArrayOf(b.constantLeq(load, f.capacities!![bIdx])))
+
                 BinPacking.Mode.LoadVars -> b.addClause(
-                    intArrayOf(b.unsignedEq(load, intActualUnsigned(b, f.loadVars!![bIdx], intBits, intMin)))
+                    intArrayOf(b.unsignedEq(load, intActualUnsigned(b, f.loadVars!![bIdx], intBits, intMin))),
                 )
             }
         }
@@ -1248,9 +1328,13 @@ object BitBlaster {
             b.addClause(intArrayOf(cmp1(b, f.seq[t], LinearOp.LE, s, intBits, intMin)))
             for (qp in 1..q) {
                 val disj = mutableListOf<Int>()
-                for (qq in 1..q) for (sym in 1..s) {
-                    if (f.transitions[(qq - 1) * s + (sym - 1)] == qp) {
-                        disj += b.tseitinAnd(intArrayOf(active[t][qq], cmp1(b, f.seq[t], LinearOp.EQ, sym, intBits, intMin)))
+                for (qq in 1..q) {
+                    for (sym in 1..s) {
+                        if (f.transitions[(qq - 1) * s + (sym - 1)] == qp) {
+                            disj += b.tseitinAnd(
+                                intArrayOf(active[t][qq], cmp1(b, f.seq[t], LinearOp.EQ, sym, intBits, intMin)),
+                            )
+                        }
                     }
                 }
                 active[t + 1][qp] = if (disj.isEmpty()) b.falseLit() else b.tseitinOr(disj.toIntArray())
@@ -1271,7 +1355,10 @@ object BitBlaster {
                     b.addClause(IntArray(0))
                     return
                 }
-                LinearOp.NE -> if (!inDomain) return // trivially true
+
+                LinearOp.NE -> if (!inDomain) return
+
+                // trivially true
                 else -> Unit
             }
         }
@@ -1382,6 +1469,5 @@ object BitBlaster {
         return out
     }
 
-    private fun bitWidth(value: Int): Int =
-        if (value <= 0) 1 else 32 - value.countLeadingZeroBits()
+    private fun bitWidth(value: Int): Int = if (value <= 0) 1 else 32 - value.countLeadingZeroBits()
 }

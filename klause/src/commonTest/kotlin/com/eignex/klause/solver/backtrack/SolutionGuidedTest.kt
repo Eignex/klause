@@ -92,7 +92,7 @@ class SolutionGuidedTest {
                 variableHeuristic = SmallestDomain,
                 valueHeuristic = SolutionGuided(IndomainMin),
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..3).toSet(), sat.assignment.ints.toSet())
@@ -105,7 +105,9 @@ class SolutionGuidedTest {
         val spy = object : ValueHeuristic {
             override fun values(session: PropagationSession, varRef: VarRef, rng: Random) =
                 IndomainMin.values(session, varRef, rng)
-            override fun onSolution(snapshot: Sample) { recorded.add(snapshot) }
+            override fun onSolution(snapshot: Sample) {
+                recorded.add(snapshot)
+            }
         }
         val problem = Problem(
             numBoolVars = 0,
@@ -117,7 +119,7 @@ class SolutionGuidedTest {
             BacktrackParams(
                 valueHeuristic = spy,
                 randomSeed = 0L,
-            )
+            ),
         ).toList()
         assertTrue(recorded.isNotEmpty(), "spy should have received at least one onSolution call")
         assertEquals(4, recorded.size, "expected 4 SAT leaves (2^2); got ${recorded.size}")

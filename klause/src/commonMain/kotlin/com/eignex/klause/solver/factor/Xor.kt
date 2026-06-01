@@ -13,10 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * parity (0 or 1). Each Boolean flip toggles the parity exactly once per occurrence of that var
  * in the literal list.
  */
-class Xor(
-    val literals: IntArray,
-    val targetParity: Int,
-) : LocalSearchFactor {
+class Xor(val literals: IntArray, val targetParity: Int) : LocalSearchFactor {
 
     init {
         require(literals.isNotEmpty()) { "Xor needs at least one literal" }
@@ -82,7 +79,9 @@ class Xor(
             val b = state.boolValues[v]
             if (b == null) {
                 unassigned.add(v)
-            } else if (Lit.evaluate(lit, b)) pinnedParity = pinnedParity xor 1
+            } else if (Lit.evaluate(lit, b)) {
+                pinnedParity = pinnedParity xor 1
+            }
         }
         // Only variables with odd-count occurrences ("effective") affect parity.
         var effective = -1
@@ -110,9 +109,12 @@ class Xor(
         return when {
             parityIfTrue == targetParity && parityIfFalse != targetParity ->
                 state.pinBool(v, true, parityAntecedents(state, excludeVar = v))
+
             parityIfFalse == targetParity && parityIfTrue != targetParity ->
                 state.pinBool(v, false, parityAntecedents(state, excludeVar = v))
+
             parityIfTrue != targetParity && parityIfFalse != targetParity -> false
+
             else -> true // both work (shouldn't happen when var has odd parity contribution)
         }
     }
@@ -125,9 +127,8 @@ class Xor(
      * vars. Blocks re-exploring the exact dead-end assignment; subsequent propagations
      * of the same XOR will still re-derive parity inferences from new pin paths.
      */
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        return parityAntecedents(state, excludeVar = -1)
-    }
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        parityAntecedents(state, excludeVar = -1)
 
     /** Collect one currently-false literal per pinned variable (excluding [excludeVar]).
      *  Each entry is the literal whose value is false under the current assignment for
@@ -164,11 +165,7 @@ class Xor(
     /** O(arity) — but typically the loop body is one branch. The parity model collapses
      *  to: if the flipped var's parity contribution is 0, nothing changed; otherwise
      *  violation flips and every parity-contributing var swaps break↔make. */
-    override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState,
-        factorId: Int,
-        flippedVar: Int,
-    ) {
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         if (parityByVar.coeffOf(flippedVar) == 0) return
         val newParity = state.intPayload[factorId]
         val nowViolated = newParity != targetParity

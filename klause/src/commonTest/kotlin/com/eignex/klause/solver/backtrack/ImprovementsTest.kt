@@ -32,7 +32,7 @@ class ImprovementsTest {
                 randomSeed = 0L,
                 variableHeuristic = InputOrder,
                 valueHeuristic = IndomainMax,
-            )
+            ),
         ).toList()
         // Last yield is the terminal verdict.
         val terminal = seq.last()

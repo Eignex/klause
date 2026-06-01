@@ -118,10 +118,13 @@ class Cumulatives(
 
     /** Per-timepoint penalty for a usage level against a machine bound. Capacity overflow
      *  (upper) or coverage shortfall (lower, only where the machine is in use). */
-    private fun penalty(usage: Int, bound: Int): Int =
-        if (upper) {
-            max(0, usage - bound)
-        } else if (usage > 0) max(0, bound - usage) else 0
+    private fun penalty(usage: Int, bound: Int): Int = if (upper) {
+        max(0, usage - bound)
+    } else if (usage > 0) {
+        max(0, bound - usage)
+    } else {
+        0
+    }
 
     /** Dense per-machine timeline plus the running raw violation. */
     private class LsState(
@@ -259,13 +262,7 @@ class Cumulatives(
         return compressViolation(ls.rawV) - before
     }
 
-    private fun applyIntSetRaw(
-        state: LocalSearchState,
-        ls: LsState,
-        intVar: Int,
-        oldValue: Int,
-        newValue: Int,
-    ) {
+    private fun applyIntSetRaw(state: LocalSearchState, ls: LsState, intVar: Int, oldValue: Int, newValue: Int) {
         startPos[intVar]?.let { i ->
             if (!present(state, i)) return
             val idx = machineIdx(state.assignment.intValue(machines[i]))
@@ -345,8 +342,7 @@ class Cumulatives(
     // ---- Raw-violation arithmetic ----------------------------------------------------
 
     /** `compress(raw + delta) − compress(raw)`. */
-    private fun degreeDelta(raw: Long, delta: Long): Int =
-        compressViolation(raw + delta) - compressViolation(raw)
+    private fun degreeDelta(raw: Long, delta: Long): Int = compressViolation(raw + delta) - compressViolation(raw)
 
     /** Penalty Δ of a single cell `(k, absT)` receiving [amount], reading current usage. */
     private fun cellDelta(ls: LsState, k: Int, cap: Int, absT: Int, amount: Int): Long {
@@ -427,7 +423,12 @@ class Cumulatives(
 
     private fun computeTLow(state: LocalSearchState): Int {
         var lo = Int.MAX_VALUE
-        for (i in 0 until n) lo = min(lo, min(state.problem.intDomains[starts[i]].min, state.assignment.intValue(starts[i])))
+        for (i in 0 until n) {
+            lo = min(
+                lo,
+                min(state.problem.intDomains[starts[i]].min, state.assignment.intValue(starts[i])),
+            )
+        }
         return if (lo == Int.MAX_VALUE) 0 else lo
     }
 
@@ -621,7 +622,9 @@ class Cumulatives(
                 }
                 level += ev[1]
                 cursor = t
-                if (idx == events.size - 1 || events[idx + 1][0] != t) { if (level > cap) return false }
+                if (idx == events.size - 1 || events[idx + 1][0] != t) {
+                    if (level > cap) return false
+                }
             }
             // Tighten each member's start against overloading placements.
             for (i in members) {
@@ -640,13 +643,17 @@ class Cumulatives(
                 var newMin = dom.min
                 while (newMin <= state.intDomains[v].max &&
                     overloadsAt(segFrom, segTo, segLevel, segCount, newMin, newMin + d, r, cap, owns, lstI, ectI)
-                    ) newMin++
+                ) {
+                    newMin++
+                }
                 if (newMin > state.intDomains[v].max) return false
                 if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
                 var newMax = state.intDomains[v].max
                 while (newMax >= state.intDomains[v].min &&
                     overloadsAt(segFrom, segTo, segLevel, segCount, newMax, newMax + d, r, cap, owns, lstI, ectI)
-                    ) newMax--
+                ) {
+                    newMax--
+                }
                 if (newMax < state.intDomains[v].min) return false
                 if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
             }

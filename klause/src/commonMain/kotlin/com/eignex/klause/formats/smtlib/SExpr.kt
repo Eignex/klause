@@ -62,7 +62,11 @@ class SExprReader(private val src: String) {
             val c = src[pos]
             when {
                 c.isWhitespace() -> pos++
-                c == ';' -> { while (pos < src.length && src[pos] != '\n') pos++ }
+
+                c == ';' -> {
+                    while (pos < src.length && src[pos] != '\n') pos++
+                }
+
                 else -> return
             }
         }

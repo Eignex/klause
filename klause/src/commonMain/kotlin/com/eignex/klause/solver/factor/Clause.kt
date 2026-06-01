@@ -19,11 +19,11 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Tautologies (a variable appearing as both `+v` and `-v`) are detected at construction; we
  * pick those two indices as the watches and the clause is permanently satisfied.
  */
-class Clause(
-    val literals: IntArray,
-) : LocalSearchFactor {
+class Clause(val literals: IntArray) : LocalSearchFactor {
 
-    init { require(literals.isNotEmpty()) { "Clause must have at least one literal" } }
+    init {
+        require(literals.isNotEmpty()) { "Clause must have at least one literal" }
+    }
 
     override val boolVars: IntArray = run {
         val seen = LinkedHashSet<Int>()
@@ -73,16 +73,17 @@ class Clause(
     private var pureBoolMemo: Boolean? = null
 
     /** True iff every literal is a plain bool var (variable id `< numBoolVars`), memoised. */
-    fun allLiteralsBool(numBoolVars: Int): Boolean =
-        pureBoolMemo ?: run {
-            var allBool = true
-            for (lit in literals) if (Lit.variable(lit) >= numBoolVars) {
+    fun allLiteralsBool(numBoolVars: Int): Boolean = pureBoolMemo ?: run {
+        var allBool = true
+        for (lit in literals) {
+            if (Lit.variable(lit) >= numBoolVars) {
                 allBool = false
                 break
             }
-            pureBoolMemo = allBool
-            allBool
         }
+        pureBoolMemo = allBool
+        allBool
+    }
 
     private class Watches(var w1: Int, var w2: Int)
 
@@ -97,7 +98,9 @@ class Clause(
                 trueCount++
                 if (first == -1) {
                     first = i
-                } else if (second == -1) second = i
+                } else if (second == -1) {
+                    second = i
+                }
             }
         }
         if (first == -1) {
@@ -139,12 +142,15 @@ class Clause(
             // Both watches true: at most one of them is the flipped literal; the other
             // stays true regardless.
             w1True && w2True -> false
+
             // Only w1 is currently true. Flipping a non-watch leaves w1 alone — still
             // satisfied. Flipping `w.w1` (== `li`) sends w1 false; we then need to
             // know whether any other literal happens to be true (weak invariant
             // permits true non-watch literals when at least one watch is true).
             w1True -> if (li != w.w1) false else !anyOtherLitTrue(state, li)
+
             w2True -> if (li != w.w2) false else !anyOtherLitTrue(state, li)
+
             // Currently violated: every literal is false (this is the strong half of
             // the invariant — when both watches are false, no literal is true, since
             // applyBoolFlip would have rewatched otherwise). Flipping literals[li]
@@ -220,11 +226,7 @@ class Clause(
      *   - `2→1`: the remaining true literal becomes critical and gains a break.
      *
      *  Transitions 2↔3, 3↔4, ... touch no break/make state. */
-    override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState,
-        factorId: Int,
-        flippedVar: Int,
-    ) {
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val li = litIndexByVar[flippedVar]
         if (li < 0) return // flippedVar isn't in this clause (shouldn't happen via occurrence list)
         val newCount = state.intPayload[factorId]
@@ -238,6 +240,7 @@ class Clause(
                 for (v in boolVars) state.boolMakeCount[v]--
                 state.boolBreakCount[flippedVar]++
             }
+
             oldCount == 1 && newCount == 0 -> {
                 // Critically sat → violated. The pre-flip critical was the flipped var's
                 // lit (since that's the lit that went true→false). Drop its break; add
@@ -245,6 +248,7 @@ class Clause(
                 state.boolBreakCount[flippedVar]--
                 for (v in boolVars) state.boolMakeCount[v]++
             }
+
             oldCount == 1 && newCount == 2 -> {
                 // Old critical (the other true lit) is no longer critical.
                 val oldCriticalIdx = findTrueLitExceptIndex(state, li)
@@ -252,6 +256,7 @@ class Clause(
                     state.boolBreakCount[Lit.variable(literals[oldCriticalIdx])]--
                 }
             }
+
             oldCount == 2 && newCount == 1 -> {
                 // The remaining true lit becomes critical.
                 val newCriticalIdx = findTrueLitExceptIndex(state, li)
@@ -343,12 +348,15 @@ class Clause(
         val w1False = litFalse(state, watches[1])
         return when {
             w0False && w1False -> false
+
             // Unit propagation: pin the unassigned watch with antecedents = every other
             // literal in the clause (all of which are now false). At conflict-analysis
             // time the analyzer uses these to walk the implication graph back from this
             // pin.
             w0False -> pinUnit(state, watches[1])
+
             w1False -> pinUnit(state, watches[0])
+
             else -> true
         }
     }
@@ -369,11 +377,9 @@ class Clause(
         return state.pinLit(unitLit, antecedents)
     }
 
-    private fun litTrue(state: PropagationState, idx: Int): Boolean =
-        state.litTrue(literals[idx])
+    private fun litTrue(state: PropagationState, idx: Int): Boolean = state.litTrue(literals[idx])
 
-    private fun litFalse(state: PropagationState, idx: Int): Boolean =
-        state.litFalse(literals[idx])
+    private fun litFalse(state: PropagationState, idx: Int): Boolean = state.litFalse(literals[idx])
 
     private fun findNonFalseLitExcept(state: PropagationState, excludeA: Int, excludeB: Int): Int {
         for (i in literals.indices) {
@@ -425,4 +431,5 @@ class Clause(
             if (litTrue(state, i)) return i
         }
         return -1
-    } }
+    }
+}

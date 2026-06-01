@@ -55,21 +55,22 @@ class Diffn(
         if (xs[i] == ov) nv else s.assignment.intValue(xs[i])
     private fun ry(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int =
         if (ys[i] == ov) nv else s.assignment.intValue(ys[i])
-    private fun rw(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int =
-        if (widthVars == null) widths[i] else if (widthVars[i] == ov) nv else s.assignment.intValue(widthVars[i])
-    private fun rh(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int =
-        if (heightVars == null) heights[i] else if (heightVars[i] == ov) nv else s.assignment.intValue(heightVars[i])
+    private fun rw(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int = if (widthVars == null) {
+        widths[i]
+    } else if (widthVars[i] == ov) {
+        nv
+    } else {
+        s.assignment.intValue(widthVars[i])
+    }
+    private fun rh(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int = if (heightVars == null) {
+        heights[i]
+    } else if (heightVars[i] == ov) {
+        nv
+    } else {
+        s.assignment.intValue(heightVars[i])
+    }
 
-    private fun overlaps(
-        x1: Int,
-        y1: Int,
-        w1: Int,
-        h1: Int,
-        x2: Int,
-        y2: Int,
-        w2: Int,
-        h2: Int,
-    ): Boolean {
+    private fun overlaps(x1: Int, y1: Int, w1: Int, h1: Int, x2: Int, y2: Int, w2: Int, h2: Int): Boolean {
         if (nonStrict && (w1 == 0 || h1 == 0 || w2 == 0 || h2 == 0)) return false
         val xOverlap = !(x1 + w1 <= x2 || x2 + w2 <= x1)
         val yOverlap = !(y1 + h1 <= y2 || y2 + h2 <= y1)
@@ -93,7 +94,7 @@ class Diffn(
                         rx(state, j, ov, nv),
                         ry(state, j, ov, nv),
                         rw(state, j, ov, nv),
-                        rh(state, j, ov, nv)
+                        rh(state, j, ov, nv),
                     )
                 ) {
                     bad++
@@ -261,7 +262,7 @@ class Diffn(
                         listOf(
                             com.eignex.klause.solver.Move.IntSet(xs[i], nx),
                             com.eignex.klause.solver.Move.IntSet(ys[i], ny),
-                        )
+                        ),
                     )
                 }
                 proposeDiagonal(leftI, downI)
@@ -277,7 +278,7 @@ class Diffn(
                             com.eignex.klause.solver.Move.IntSet(ys[i], yj),
                             com.eignex.klause.solver.Move.IntSet(xs[j], xi),
                             com.eignex.klause.solver.Move.IntSet(ys[j], yi),
-                        )
+                        ),
                     )
                 }
             }

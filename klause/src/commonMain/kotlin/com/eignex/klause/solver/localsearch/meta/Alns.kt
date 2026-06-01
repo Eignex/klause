@@ -163,8 +163,8 @@ class Alns(
                     incumbentObj,
                     repairedObj,
                     accept,
-                    isNewBest
-                )
+                    isNewBest,
+                ),
             )
 
             if (isNewBest) {

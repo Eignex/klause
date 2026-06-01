@@ -47,6 +47,7 @@ fun interface DestroyOperator {
                         contribs[problem.numBoolVars + i] = abs(objective.intCoefficients[i] * incumbent.ints[i])
                     }
                 }
+
                 else -> {
                     // Fall back to random for non-linear objectives — full single-flip evaluation
                     // would be O(totalVars) objective evaluations per destroy call.
@@ -147,18 +148,25 @@ fun interface DestroyOperator {
          * Falls back to [Random] when the session has no activity capture yet (first
          * iteration) or when no session was provided.
          */
-        fun activityBiased(
-            session: LocalSearchSession?
-        ): DestroyOperator = DestroyOperator { rng, problem, incumbent, objective, fraction ->
-            val touches = session?.warmStateView?.activityTouches() ?: IntArray(0)
-            if (touches.isEmpty()) return@DestroyOperator Random.destroy(rng, problem, incumbent, objective, fraction)
-            val totalVars = problem.numBoolVars + problem.numIntVars
-            val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
-            // Sort vars descending by touch count (more touched = higher activity); take top k.
-            val indexed = IntArray(touches.size) { it }
-            val sorted = indexed.sortedByDescending { touches[it] }.take(k)
-            split(sorted, problem.numBoolVars)
-        }
+        fun activityBiased(session: LocalSearchSession?): DestroyOperator =
+            DestroyOperator { rng, problem, incumbent, objective, fraction ->
+                val touches = session?.warmStateView?.activityTouches() ?: IntArray(0)
+                if (touches.isEmpty()) {
+                    return@DestroyOperator Random.destroy(
+                        rng,
+                        problem,
+                        incumbent,
+                        objective,
+                        fraction,
+                    )
+                }
+                val totalVars = problem.numBoolVars + problem.numIntVars
+                val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
+                // Sort vars descending by touch count (more touched = higher activity); take top k.
+                val indexed = IntArray(touches.size) { it }
+                val sorted = indexed.sortedByDescending { touches[it] }.take(k)
+                split(sorted, problem.numBoolVars)
+            }
 
         /** Default operator palette: random + worst-objective + adjacency-related. Three
          *  operators gives the bandit a non-trivial menu to learn from; callers can add

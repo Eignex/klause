@@ -49,10 +49,7 @@ internal class OznEvaluator(items: List<OznItem>) {
 
     /** Frame the evaluator carries around: top-level bindings + a comprehension /
      *  let-binding scope stack. Lookups consult the local scope first, then bindings. */
-    private inner class Context(
-        val bindings: Map<String, OznValue>,
-        val locals: HashMap<String, OznValue>,
-    )
+    private inner class Context(val bindings: Map<String, OznValue>, val locals: HashMap<String, OznValue>)
 
     private fun resolveDecl(decl: OznItem.VarDecl, ctx: Context): OznValue? {
         // Initializer wins; else look in the FZN bindings.
@@ -62,23 +59,35 @@ internal class OznEvaluator(items: List<OznItem>) {
 
     private fun resolveIdent(name: String, ctx: Context): OznValue {
         ctx.locals[name]?.let { return it }
-        decls[name]?.let { return resolveDecl(it, ctx) ?: error("decl `$name` has no value (no initializer, not in bindings)") }
+        decls[name]?.let {
+            return resolveDecl(
+                it,
+                ctx,
+            ) ?: error("decl `$name` has no value (no initializer, not in bindings)")
+        }
         ctx.bindings[name]?.let { return it }
         throw OznEvalException("unresolved identifier `$name`")
     }
 
     private fun eval(e: OznExpr, ctx: Context): OznValue = when (e) {
         is OznExpr.IntLit -> OznValue.IntV(e.value)
+
         is OznExpr.FloatLit -> OznValue.FloatV(e.value)
+
         is OznExpr.BoolLit -> OznValue.BoolV(e.value)
+
         is OznExpr.StringLit -> OznValue.StringV(e.value)
+
         is OznExpr.Ident -> resolveIdent(e.name, ctx)
+
         is OznExpr.Range -> {
             val lo = (eval(e.lo, ctx) as OznValue.IntV).value.toInt()
             val hi = (eval(e.hi, ctx) as OznValue.IntV).value.toInt()
             OznValue.RangeV(lo, hi)
         }
+
         is OznExpr.ArrayLit -> OznValue.ArrayV(e.elements.map { eval(it, ctx) })
+
         is OznExpr.SetLit -> {
             // Sets in MZN-output are MZN sets — print as { a, b, c }. Internally hold
             // the unioned integer values (only ints supported in output context today).
@@ -92,11 +101,17 @@ internal class OznEvaluator(items: List<OznItem>) {
             }
             OznValue.SetV(vals.distinct().sorted().toIntArray())
         }
+
         is OznExpr.Comprehension -> evalComprehension(e, ctx)
+
         is OznExpr.Call -> evalCall(e, ctx)
+
         is OznExpr.Subscript -> evalSubscript(e, ctx)
+
         is OznExpr.Unary -> evalUnary(e, ctx)
+
         is OznExpr.Binary -> evalBinary(e, ctx)
+
         is OznExpr.If -> {
             var taken: OznValue? = null
             for ((cond, body) in e.branches) {
@@ -107,6 +122,7 @@ internal class OznEvaluator(items: List<OznItem>) {
             }
             taken ?: eval(e.elseExpr, ctx)
         }
+
         is OznExpr.Let -> {
             // Local frame: each decl's initializer (or binding) shadows. Sequential.
             val saved = ctx.locals.toMap()
@@ -135,7 +151,9 @@ internal class OznEvaluator(items: List<OznItem>) {
             val src = eval(gen.source, ctx)
             val values: List<Int> = when (src) {
                 is OznValue.RangeV -> (src.lo..src.hi).toList()
+
                 is OznValue.SetV -> src.values.toList()
+
                 is OznValue.ArrayV -> {
                     // Iterate by element (rare but legal for `i in array`).
                     src.elements.forEachIndexed { _, v ->
@@ -145,6 +163,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                     }
                     return
                 }
+
                 else -> throw OznEvalException("comprehension source is not iterable: $src")
             }
             // For multi-binding generators (`i, j in 1..n`), MZN gives the Cartesian
@@ -185,18 +204,24 @@ internal class OznEvaluator(items: List<OznItem>) {
         return when (c.name) {
             "show", "showInt", "showFloat", "show_int", "show_float",
             "format", "format_justify_string", "showDzn", "show_dzn", "show2dDzn",
-            "showJSON", "show_json" ->
+            "showJSON", "show_json",
+            ->
                 OznValue.StringV(stringifyForShow(args.last()))
+
             // `fix(x)` strips var-ness in MZN — for output evaluation it's an identity
             // function: the value is already fully concrete here.
             "fix" -> args[0]
+
             "show2d" -> OznValue.StringV(stringify2d(args[0]))
+
             "show3d" -> OznValue.StringV(stringify3d(args[0]))
+
             "array1d" -> {
                 // array1d(range, xs): flatten xs into a 1D MZN array indexed by `range`.
                 val xs = args.last() as OznValue.ArrayV
                 OznValue.ArrayV(xs.elements)
             }
+
             "array2d" -> {
                 val xs = args.last() as OznValue.ArrayV
                 val r1 = args[0] as OznValue.RangeV
@@ -208,29 +233,37 @@ internal class OznEvaluator(items: List<OznItem>) {
                 }
                 OznValue.Array2dV(xs.elements, r1, r2)
             }
+
             "array3d" -> {
                 val xs = args.last() as OznValue.ArrayV
                 OznValue.Array3dV(
                     xs.elements,
                     args[0] as OznValue.RangeV,
                     args[1] as OznValue.RangeV,
-                    args[2] as OznValue.RangeV
+                    args[2] as OznValue.RangeV,
                 )
             }
+
             "array4d", "array5d", "array6d" -> {
                 // Higher-dim arrays — stringify as a flat MZN array. Display fidelity is
                 // a stretch goal; for output rendering, treat them as 1D.
                 args.last() as OznValue.ArrayV
             }
+
             "bool2int" -> OznValue.IntV(if ((args[0] as OznValue.BoolV).value) 1 else 0)
+
             "int2float" -> OznValue.FloatV((args[0] as OznValue.IntV).value.toDouble())
+
             "abs" -> when (val v = args[0]) {
                 is OznValue.IntV -> OznValue.IntV(if (v.value < 0) -v.value else v.value)
                 is OznValue.FloatV -> OznValue.FloatV(kotlin.math.abs(v.value))
                 else -> throw OznEvalException("abs: unsupported arg $v")
             }
+
             "min" -> reduceNumeric(args, takeMin = true)
+
             "max" -> reduceNumeric(args, takeMin = false)
+
             "sum" -> {
                 val list = when (val a = args[0]) {
                     is OznValue.ArrayV -> a.elements
@@ -246,6 +279,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                     OznValue.IntV(list.sumOf { (it as OznValue.IntV).value })
                 }
             }
+
             "product" -> {
                 val list = (args[0] as OznValue.ArrayV).elements
                 if (list.isEmpty()) {
@@ -254,6 +288,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                     list.fold(OznValue.IntV(1) as OznValue) { acc, v ->
                         when {
                             acc is OznValue.IntV && v is OznValue.IntV -> OznValue.IntV(acc.value * v.value)
+
                             else -> {
                                 val a = (acc as? OznValue.IntV)?.value?.toDouble() ?: (acc as OznValue.FloatV).value
                                 val b = (v as? OznValue.IntV)?.value?.toDouble() ?: (v as OznValue.FloatV).value
@@ -263,15 +298,18 @@ internal class OznEvaluator(items: List<OznItem>) {
                     }
                 }
             }
+
             "concat" -> {
                 val list = (args[0] as OznValue.ArrayV).elements
                 OznValue.StringV(list.joinToString("") { (it as OznValue.StringV).value })
             }
+
             "join" -> {
                 val sep = (args[0] as OznValue.StringV).value
                 val list = (args[1] as OznValue.ArrayV).elements
                 OznValue.StringV(list.joinToString(sep) { stringifyForShow(it) })
             }
+
             else -> throw OznEvalException("unknown function `${c.name}` in .ozn output")
         }
     }
@@ -309,17 +347,20 @@ internal class OznEvaluator(items: List<OznItem>) {
         val idx = e.indices.map { (eval(it, ctx) as OznValue.IntV).value.toInt() }
         return when (tgt) {
             is OznValue.ArrayV -> tgt.elements[idx.first() - 1]
+
             is OznValue.Array2dV -> {
                 val i = idx[0] - tgt.r1.lo
                 val j = idx[1] - tgt.r2.lo
                 tgt.elements[i * tgt.r2.size + j]
             }
+
             is OznValue.Array3dV -> {
                 val i = idx[0] - tgt.r1.lo
                 val j = idx[1] - tgt.r2.lo
                 val k = idx[2] - tgt.r3.lo
                 tgt.elements[i * tgt.r2.size * tgt.r3.size + j * tgt.r3.size + k]
             }
+
             else -> throw OznEvalException("subscript on non-array: $tgt")
         }
     }
@@ -332,8 +373,11 @@ internal class OznEvaluator(items: List<OznItem>) {
                 is OznValue.FloatV -> OznValue.FloatV(-v.value)
                 else -> throw OznEvalException("unary -: $v")
             }
+
             "+" -> v
+
             "not" -> OznValue.BoolV(!(v as OznValue.BoolV).value)
+
             else -> throw OznEvalException("unary `${e.op}`")
         }
     }
@@ -415,32 +459,31 @@ internal sealed interface OznValue {
         override fun hashCode(): Int = values.contentHashCode()
     }
     data class ArrayV(val elements: List<OznValue>) : OznValue
-    data class Array2dV(
-        val elements: List<OznValue>,
-        val r1: RangeV,
-        val r2: RangeV,
-    ) : OznValue
-    data class Array3dV(
-        val elements: List<OznValue>,
-        val r1: RangeV,
-        val r2: RangeV,
-        val r3: RangeV,
-    ) : OznValue
+    data class Array2dV(val elements: List<OznValue>, val r1: RangeV, val r2: RangeV) : OznValue
+    data class Array3dV(val elements: List<OznValue>, val r1: RangeV, val r2: RangeV, val r3: RangeV) : OznValue
 }
 
 /** Render a value as it appears inside `show()` — MZN's textual form. */
 private fun stringifyForShow(v: OznValue): String = when (v) {
     is OznValue.IntV -> v.value.toString()
+
     is OznValue.FloatV -> {
         // MZN prints floats with `.0` when integral, like `3.0`, else default.
         if (v.value == v.value.toLong().toDouble()) "${v.value.toLong()}.0" else v.value.toString()
     }
+
     is OznValue.BoolV -> v.value.toString()
+
     is OznValue.StringV -> v.value
+
     is OznValue.RangeV -> "${v.lo}..${v.hi}"
+
     is OznValue.SetV -> v.values.joinToString(", ", "{", "}")
+
     is OznValue.ArrayV -> v.elements.joinToString(", ", "[", "]") { stringifyForShow(it) }
+
     is OznValue.Array2dV -> stringify2d(v)
+
     is OznValue.Array3dV -> stringify3d(v)
 }
 

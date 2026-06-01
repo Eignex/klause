@@ -73,23 +73,30 @@ private fun renderArray(program: FlatZincProgram, sample: Sample, name: String):
     val sb = StringBuilder("[")
     when (arr) {
         is FlatZincArray.BoolParam -> arr.values.joinTo(sb, ", ") { it.toString() }
+
         is FlatZincArray.IntParam -> arr.values.joinTo(sb, ", ") { it.toString() }
+
         is FlatZincArray.FloatParam -> arr.values.joinTo(sb, ", ") { it.toString() }
+
         is FlatZincArray.IntSetParam -> arr.values.joinTo(sb, ", ") { row ->
             row.joinToString(", ", "{", "}") { it.toString() }
         }
+
         is FlatZincArray.SetVars -> {
             for ((i, layout) in arr.layouts.withIndex()) {
                 if (i > 0) sb.append(", ")
                 sb.append(renderSet(sample, layout))
             }
         }
+
         is FlatZincArray.Vars -> {
             for (i in arr.varIds.indices) {
                 if (i > 0) sb.append(", ")
                 when (arr.elementKind) {
                     FlatZincArray.Vars.ElementKind.Bool -> sb.append(sample.bools[arr.varIds[i]])
+
                     FlatZincArray.Vars.ElementKind.Int -> sb.append(sample.ints[arr.varIds[i]])
+
                     FlatZincArray.Vars.ElementKind.Float -> {
                         val b = arr.floatBucketings!![i]
                         sb.append(b.valueOf(sample.ints[arr.varIds[i]]))

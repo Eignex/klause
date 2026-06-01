@@ -25,7 +25,7 @@ class OrToolsSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            )
+            ),
         )
         val r = OrToolsSolver(p).solve(OrToolsParams())
         assertTrue(r is SolveResult.Sat)
@@ -41,7 +41,7 @@ class OrToolsSolverTest {
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),
-            )
+            ),
         )
         assertTrue(OrToolsSolver(p).solve(OrToolsParams()) is SolveResult.Unsat)
     }
@@ -52,7 +52,7 @@ class OrToolsSolverTest {
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2))
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
         val improvements = OrToolsSolver(p).improvements(obj, OrToolsParams()).toList()
@@ -68,7 +68,7 @@ class OrToolsSolverTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3))
+            factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
         assertEquals(6, OrToolsSolver(p).enumerate(OrToolsParams()).toList().size)
     }

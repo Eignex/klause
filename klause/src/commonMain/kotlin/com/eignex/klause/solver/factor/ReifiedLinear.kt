@@ -11,13 +11,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
  * is the current weighted sum, mirrored from [Linear].
  */
-class ReifiedLinear(
-    val auxBoolVar: Int,
-    val coeffs: IntArray,
-    val vars: IntArray,
-    val op: LinearOp,
-    val bound: Int,
-) : LocalSearchFactor {
+class ReifiedLinear(val auxBoolVar: Int, val coeffs: IntArray, val vars: IntArray, val op: LinearOp, val bound: Int) :
+    LocalSearchFactor {
 
     init {
         require(coeffs.size == vars.size) { "coeffs/vars length mismatch" }
@@ -54,7 +49,10 @@ class ReifiedLinear(
         val h = holds(sum)
         return when {
             aux == h -> 0
-            aux -> residual(sum) // indicator wants it to hold; grade by how far off
+
+            aux -> residual(sum)
+
+            // indicator wants it to hold; grade by how far off
             else -> 1 // indicator wants it false but it holds; flip the aux
         }
     }
@@ -62,12 +60,17 @@ class ReifiedLinear(
     /** Distance the sum must move to satisfy the comparison, given it currently does not —
      *  run through [compressViolation] so far-off reified linears don't dominate the cost. */
     private fun residual(sum: Int): Int = when (op) {
-        LinearOp.LE -> compressViolation(sum.toLong() - bound) // sum > bound
-        LinearOp.GE -> compressViolation(bound.toLong() - sum) // sum < bound
+        LinearOp.LE -> compressViolation(sum.toLong() - bound)
+
+        // sum > bound
+        LinearOp.GE -> compressViolation(bound.toLong() - sum)
+
+        // sum < bound
         LinearOp.EQ -> {
             val d = sum.toLong() - bound
             compressViolation(if (d < 0) -d else d)
         }
+
         LinearOp.NE -> 1 // sum == bound; one step off
     }
 
@@ -146,17 +149,20 @@ class ReifiedLinear(
                     vars,
                     LinearOp.GE,
                     bnd + 1,
-                    extraLit = auxAntecedent
+                    extraLit = auxAntecedent,
                 )
+
                 LinearOp.GE -> propagateLinearBounds(
                     state,
                     coeffs,
                     vars,
                     LinearOp.LE,
                     bnd - 1,
-                    extraLit = auxAntecedent
+                    extraLit = auxAntecedent,
                 )
+
                 LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, extraLit = auxAntecedent)
+
                 LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, extraLit = auxAntecedent)
             }
         }
@@ -169,8 +175,7 @@ class ReifiedLinear(
      * through 1UIP / self-subsuming minimization with finer granularity than the older
      * bool-lit union would have given.
      */
-    private fun composeAuxAntecedents(state: PropagationState): IntArray? =
-        state.composeIntVarAtomAntecedents(vars)
+    private fun composeAuxAntecedents(state: PropagationState): IntArray? = state.composeIntVarAtomAntecedents(vars)
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
@@ -227,25 +232,33 @@ class ReifiedLinear(
         val targetEq = numerator / coeff
         return when (op) {
             LinearOp.EQ -> when {
-                wantHolds && numerator % coeff != 0 -> null // no integer satisfies coeff·v = numerator
+                wantHolds && numerator % coeff != 0 -> null
+
+                // no integer satisfies coeff·v = numerator
                 wantHolds -> targetEq
+
                 else -> targetEq + 1
             }
+
             LinearOp.LE -> if (wantHolds) {
                 if (coeff > 0) floorDiv(numerator, coeff) else ceilDiv(numerator, coeff)
             } else {
                 if (coeff > 0) floorDiv(numerator, coeff) + 1 else ceilDiv(numerator, coeff) - 1
             }
+
             LinearOp.GE -> if (wantHolds) {
                 if (coeff > 0) ceilDiv(numerator, coeff) else floorDiv(numerator, coeff)
             } else {
                 if (coeff > 0) ceilDiv(numerator, coeff) - 1 else floorDiv(numerator, coeff) + 1
             }
+
             LinearOp.NE -> when {
                 // wantHolds (sum ≠ bound): bump var to either side of the equality value.
                 wantHolds -> if (numerator % coeff == 0) targetEq + 1 else null
+
                 // !wantHolds (sum == bound): only feasible if numerator divisible by coeff.
                 numerator % coeff == 0 -> targetEq
+
                 else -> null
             }
         }
@@ -268,11 +281,7 @@ class ReifiedLinear(
     /** [boolVars] contains only [auxBoolVar], so a bool flip is always an aux flip. Flipping
      *  aux always toggles violation (sum unchanged), so the aux's own contribution simply
      *  swaps between break and make. */
-    override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState,
-        factorId: Int,
-        flippedVar: Int,
-    ) {
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val nowViolated = state.assignment.boolValue(auxBoolVar) != holds(state.intPayload[factorId])
         if (nowViolated) {
             state.boolBreakCount[auxBoolVar]--
@@ -287,12 +296,7 @@ class ReifiedLinear(
 
     /** Aux's break/make contribution depends only on `holds(sum)` and `aux`. An int set
      *  may flip `holds`, in which case the aux's contribution swaps; otherwise no change. */
-    override fun updateIntBreakMakeForIntSet(
-        state: LocalSearchState,
-        factorId: Int,
-        intVar: Int,
-        oldValue: Int,
-    ) {
+    override fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {
         val newSum = state.intPayload[factorId]
         val coeff = coeffOf(intVar)
         val newValue = state.assignment.intValue(intVar)

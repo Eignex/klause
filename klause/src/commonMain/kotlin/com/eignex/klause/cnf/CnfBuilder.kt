@@ -21,7 +21,9 @@ class CnfBuilder {
 
     fun newVar(): Int = _numVars++
 
-    fun addClause(lits: IntArray) { _clauses.add(lits) }
+    fun addClause(lits: IntArray) {
+        _clauses.add(lits)
+    }
 
     // ---- Gate hash-consing -------------------------------------------------------------
     // Structurally-identical Tseitin gates share one aux var + definition. Bit-blasted

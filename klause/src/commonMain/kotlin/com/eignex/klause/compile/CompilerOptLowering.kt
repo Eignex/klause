@@ -52,8 +52,7 @@ import com.eignex.klause.solver.IntDomain
 
 /** Build a 0/1-valued IntExpr equal to 1 iff [cond] holds, 0 otherwise. The downstream
  *  affine-lift turns this into an aux int + reified equalities. */
-private fun indicatorInt(cond: BoolExpr): IntExpr =
-    IntIfThenElse(cond, IntLit(1), IntLit(0))
+private fun indicatorInt(cond: BoolExpr): IntExpr = IntIfThenElse(cond, IntLit(1), IntLit(0))
 
 /** Match predicate `x ⟨op⟩ v`. Mirrors the Count factor's matches() over an arbitrary
  *  IntExpr (not just a var ref) so callers can pass already-lifted expressions. */
@@ -69,8 +68,10 @@ private fun matchesPred(x: IntExpr, op: CountOp, v: Int): BoolExpr = when (op) {
 /** `b ↔ AllDifferent(terms)` (non-opt). Pairwise NE conjuncted via Tseitin. */
 internal fun Compiler.Build.reifyAllDifferent(terms: List<IntExpr>): Int {
     val pairs = mutableListOf<BoolExpr>()
-    for (i in terms.indices) for (j in i + 1 until terms.size) {
-        pairs += IntCompare(terms[i], IntCmpOp.NE, terms[j])
+    for (i in terms.indices) {
+        for (j in i + 1 until terms.size) {
+            pairs += IntCompare(terms[i], IntCmpOp.NE, terms[j])
+        }
     }
     return tseitinAnd(pairs)
 }
@@ -78,15 +79,17 @@ internal fun Compiler.Build.reifyAllDifferent(terms: List<IntExpr>): Int {
 /** `b ↔ AllDifferentOpt`. Each pair guarded by both presence bits. */
 internal fun Compiler.Build.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
     val pairs = mutableListOf<BoolExpr>()
-    for (i in expr.terms.indices) for (j in i + 1 until expr.terms.size) {
-        // (p_i ∧ p_j) → x_i ≠ x_j  ≡  ¬p_i ∨ ¬p_j ∨ x_i ≠ x_j.
-        pairs += Or(
-            listOf(
-                Not(expr.presents[i]),
-                Not(expr.presents[j]),
-                IntCompare(expr.terms[i], IntCmpOp.NE, expr.terms[j]),
-            ),
-        )
+    for (i in expr.terms.indices) {
+        for (j in i + 1 until expr.terms.size) {
+            // (p_i ∧ p_j) → x_i ≠ x_j  ≡  ¬p_i ∨ ¬p_j ∨ x_i ≠ x_j.
+            pairs += Or(
+                listOf(
+                    Not(expr.presents[i]),
+                    Not(expr.presents[j]),
+                    IntCompare(expr.terms[i], IntCmpOp.NE, expr.terms[j]),
+                ),
+            )
+        }
     }
     return tseitinAnd(pairs)
 }
@@ -123,7 +126,10 @@ internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
     val sum: IntExpr = if (perValue.size == 1) perValue[0] else IntSum(perValue)
     val op = when (expr.mode) {
         NValueMode.EQ -> IntCmpOp.EQ
-        NValueMode.AT_LEAST -> IntCmpOp.LE // n ≤ |distinct|
+
+        NValueMode.AT_LEAST -> IntCmpOp.LE
+
+        // n ≤ |distinct|
         NValueMode.AT_MOST -> IntCmpOp.GE // n ≥ |distinct|
     }
     return reifyIntCompare(IntCompare(expr.n, op, sum))
@@ -160,11 +166,13 @@ internal fun Compiler.Build.reifyGccOpt(expr: GccExprOpt): Int {
 /** `b ↔ disjunctive(starts, durations)` (non-opt). Pairwise non-overlap via reified Or. */
 internal fun Compiler.Build.reifyDisjunctive(expr: DisjunctiveExpr): Int {
     val pieces = mutableListOf<BoolExpr>()
-    for (i in expr.starts.indices) for (j in i + 1 until expr.starts.size) {
-        val di = expr.durations[i]
-        val dj = expr.durations[j]
-        if (di == 0 || dj == 0) continue
-        pieces += pairwiseNoOverlap(expr.starts[i], di, expr.starts[j], dj)
+    for (i in expr.starts.indices) {
+        for (j in i + 1 until expr.starts.size) {
+            val di = expr.durations[i]
+            val dj = expr.durations[j]
+            if (di == 0 || dj == 0) continue
+            pieces += pairwiseNoOverlap(expr.starts[i], di, expr.starts[j], dj)
+        }
     }
     return if (pieces.isEmpty()) trueLit() else tseitinAnd(pieces)
 }
@@ -172,12 +180,14 @@ internal fun Compiler.Build.reifyDisjunctive(expr: DisjunctiveExpr): Int {
 /** `b ↔ disjunctiveOpt(...)`. Each pair gated by both presence bits. */
 internal fun Compiler.Build.reifyDisjunctiveOpt(expr: DisjunctiveExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
-    for (i in expr.starts.indices) for (j in i + 1 until expr.starts.size) {
-        val di = expr.durations[i]
-        val dj = expr.durations[j]
-        if (di == 0 || dj == 0) continue
-        val noOverlap = pairwiseNoOverlap(expr.starts[i], di, expr.starts[j], dj)
-        pieces += Or(listOf(Not(expr.presents[i]), Not(expr.presents[j]), noOverlap))
+    for (i in expr.starts.indices) {
+        for (j in i + 1 until expr.starts.size) {
+            val di = expr.durations[i]
+            val dj = expr.durations[j]
+            if (di == 0 || dj == 0) continue
+            val noOverlap = pairwiseNoOverlap(expr.starts[i], di, expr.starts[j], dj)
+            pieces += Or(listOf(Not(expr.presents[i]), Not(expr.presents[j]), noOverlap))
+        }
     }
     return if (pieces.isEmpty()) trueLit() else tseitinAnd(pieces)
 }
@@ -287,8 +297,10 @@ internal fun Compiler.Build.reifySubcircuit(expr: SubcircuitExpr): Int {
 private fun allDiffAsAnd(terms: List<IntExpr>): BoolExpr {
     if (terms.size < 2) return IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
     val pairs = mutableListOf<BoolExpr>()
-    for (i in terms.indices) for (j in i + 1 until terms.size) {
-        pairs += IntCompare(terms[i], IntCmpOp.NE, terms[j])
+    for (i in terms.indices) {
+        for (j in i + 1 until terms.size) {
+            pairs += IntCompare(terms[i], IntCmpOp.NE, terms[j])
+        }
     }
     return if (pairs.size == 1) pairs[0] else And(pairs)
 }

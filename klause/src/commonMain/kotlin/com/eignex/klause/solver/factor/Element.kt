@@ -24,13 +24,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * snap `result` to the selected element, snap the selected element to `result`, or re-point
  * `idx` at a position whose value already equals `result`.
  */
-class Element(
-    val idx: Int,
-    val result: Int,
-    val arr: IntArray,
-    val arrIsVars: Boolean,
-    val indexOffset: Int = 1,
-) : LocalSearchFactor {
+class Element(val idx: Int, val result: Int, val arr: IntArray, val arrIsVars: Boolean, val indexOffset: Int = 1) :
+    LocalSearchFactor {
 
     init {
         require(arr.isNotEmpty()) { "element: empty array" }

@@ -174,10 +174,7 @@ object LargestDomain : VariableHeuristic {
  * Defaults follow MiniSAT: `decay = 0.95`. Lower decay (e.g., 0.8) makes the heuristic more
  * aggressive about following recent conflicts; higher (e.g., 0.99) is more conservative.
  */
-class Vsids(
-    private val decay: Double = 0.95,
-    private val rescaleThreshold: Double = 1e100,
-) : VariableHeuristic {
+class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Double = 1e100) : VariableHeuristic {
 
     init {
         require(decay in 0.5..0.999) { "VSIDS decay must be in 0.5..0.999, got $decay" }
@@ -687,6 +684,7 @@ class ConflictOrdering(private val base: VariableHeuristic) : VariableHeuristic 
                 growBool(varRef.varId)
                 boolStamp[varRef.varId] = counter
             }
+
             is VarRef.IntVar -> {
                 growInt(varRef.varId)
                 intStamp[varRef.varId] = counter
@@ -765,20 +763,18 @@ class MaxRegret(
 
 /** Smallest value first (a.k.a. `indomain_min`). For bools: `false` then `true`. */
 object IndomainMin : ValueHeuristic {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
-        when (varRef) {
-            is VarRef.Bool -> sequenceOf(0, 1)
-            is VarRef.IntVar -> domainValuesAscending(session.intDomain(varRef.varId))
-        }
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(0, 1)
+        is VarRef.IntVar -> domainValuesAscending(session.intDomain(varRef.varId))
+    }
 }
 
 /** Largest value first (`indomain_max`). For bools: `true` then `false`. */
 object IndomainMax : ValueHeuristic {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
-        when (varRef) {
-            is VarRef.Bool -> sequenceOf(1, 0)
-            is VarRef.IntVar -> domainValuesDescending(session.intDomain(varRef.varId))
-        }
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(1, 0)
+        is VarRef.IntVar -> domainValuesDescending(session.intDomain(varRef.varId))
+    }
 }
 
 /**
@@ -786,41 +782,41 @@ object IndomainMax : ValueHeuristic {
  * Useful when the SAT distribution clusters around the middle of the domain.
  */
 object IndomainMiddle : ValueHeuristic {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
-        when (varRef) {
-            is VarRef.Bool -> sequenceOf(0, 1)
-            is VarRef.IntVar -> {
-                val d = session.intDomain(varRef.varId)
-                // Use the sparse-aware `valueAt` to land on the actual middle value
-                // (skipping holes) and then walk outward, filtering with `in d` so the
-                // sequence never yields a hole.
-                val mid = d.valueAt(d.size / 2)
-                sequence {
-                    yield(mid)
-                    var off = 1
-                    while (mid - off >= d.min || mid + off <= d.max) {
-                        if (mid + off <= d.max && (mid + off) in d) yield(mid + off)
-                        if (mid - off >= d.min && (mid - off) in d) yield(mid - off)
-                        off++
-                    }
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(0, 1)
+
+        is VarRef.IntVar -> {
+            val d = session.intDomain(varRef.varId)
+            // Use the sparse-aware `valueAt` to land on the actual middle value
+            // (skipping holes) and then walk outward, filtering with `in d` so the
+            // sequence never yields a hole.
+            val mid = d.valueAt(d.size / 2)
+            sequence {
+                yield(mid)
+                var off = 1
+                while (mid - off >= d.min || mid + off <= d.max) {
+                    if (mid + off <= d.max && (mid + off) in d) yield(mid + off)
+                    if (mid - off >= d.min && (mid - off) in d) yield(mid - off)
+                    off++
                 }
             }
         }
+    }
 }
 
 /** Uniformly random shuffle of the domain (`indomain_random`). */
 object IndomainRandom : ValueHeuristic {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
-        when (varRef) {
-            is VarRef.Bool -> if (rng.nextBoolean()) sequenceOf(1, 0) else sequenceOf(0, 1)
-            is VarRef.IntVar -> {
-                val d = session.intDomain(varRef.varId)
-                // Materialise the actual non-hole values via valueAt, shuffle, return.
-                val list = IntArray(d.size) { d.valueAt(it) }.toMutableList()
-                list.shuffle(rng)
-                list.asSequence()
-            }
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> if (rng.nextBoolean()) sequenceOf(1, 0) else sequenceOf(0, 1)
+
+        is VarRef.IntVar -> {
+            val d = session.intDomain(varRef.varId)
+            // Materialise the actual non-hole values via valueAt, shuffle, return.
+            val list = IntArray(d.size) { d.valueAt(it) }.toMutableList()
+            list.shuffle(rng)
+            list.asSequence()
         }
+    }
 }
 
 /**
@@ -828,14 +824,14 @@ object IndomainRandom : ValueHeuristic {
  * current domain. Sparse-aware via the `in d` membership check.
  */
 class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
-        when (varRef) {
-            is VarRef.Bool -> allowedValues.asSequence().filter { it == 0 || it == 1 }
-            is VarRef.IntVar -> {
-                val d = session.intDomain(varRef.varId)
-                allowedValues.asSequence().filter { it in d }
-            }
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> allowedValues.asSequence().filter { it == 0 || it == 1 }
+
+        is VarRef.IntVar -> {
+            val d = session.intDomain(varRef.varId)
+            allowedValues.asSequence().filter { it in d }
         }
+    }
 }
 
 /**
@@ -859,9 +855,7 @@ class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic {
  * does more work. Use Impact when reasoning power per node matters, e.g. structured CSPs
  * with strong global propagators.
  */
-class Impact(
-    private val maxProbes: Int = 32,
-) : ValueHeuristic {
+class Impact(private val maxProbes: Int = 32) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
         probeAndOrder(session, varRef, rng, maxProbes, ascending = true)
 }
@@ -887,9 +881,7 @@ class Impact(
  *    where the solution manifold is "fat" near correct subtrees; Impact wins on
  *    pruning-heavy first-fail problems.
  */
-class MaxSd(
-    private val maxProbes: Int = 32,
-) : ValueHeuristic {
+class MaxSd(private val maxProbes: Int = 32) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
         probeAndOrder(session, varRef, rng, maxProbes, ascending = false)
 }
@@ -913,6 +905,7 @@ private fun probeAndOrder(
 ): Sequence<Int> {
     val candidates: IntArray = when (varRef) {
         is VarRef.Bool -> intArrayOf(0, 1)
+
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
             if (d.size <= maxProbes) {
@@ -986,26 +979,30 @@ private fun logRemainingDomainProduct(session: PropagationSession): Double {
  * early. For a satisfiability problem, falls through to [IndomainMin] (every coefficient
  * is zero so ascending order is preserved).
  */
-class IndomainBest(
-    private val objective: com.eignex.klause.solver.LinearObjective,
-) : ValueHeuristic {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
-        when (varRef) {
-            is VarRef.Bool -> {
-                val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0.0
-                // false contributes 0; true contributes w. Lower-contribution-first.
-                if (w >= 0.0) sequenceOf(0, 1) else sequenceOf(1, 0)
+class IndomainBest(private val objective: com.eignex.klause.solver.LinearObjective) : ValueHeuristic {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> {
+            val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0.0
+            // false contributes 0; true contributes w. Lower-contribution-first.
+            if (w >= 0.0) sequenceOf(0, 1) else sequenceOf(1, 0)
+        }
+
+        is VarRef.IntVar -> {
+            val c = if (varRef.varId <
+                objective.intCoefficients.size
+            ) {
+                objective.intCoefficients[varRef.varId]
+            } else {
+                0.0
             }
-            is VarRef.IntVar -> {
-                val c = if (varRef.varId < objective.intCoefficients.size) objective.intCoefficients[varRef.varId] else 0.0
-                val d = session.intDomain(varRef.varId)
-                if (c >= 0.0) {
-                    sequence { d.forEach { yield(it) } }
-                } else {
-                    sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }
-                }
+            val d = session.intDomain(varRef.varId)
+            if (c >= 0.0) {
+                sequence { d.forEach { yield(it) } }
+            } else {
+                sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }
             }
         }
+    }
 }
 
 /**
@@ -1039,6 +1036,7 @@ class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic {
         if (savedBools == null || savedInts == null) return base.values(session, varRef, rng)
         val saved: Int = when (varRef) {
             is VarRef.Bool -> if (varRef.varId < savedBools.size && savedBools[varRef.varId]) 1 else 0
+
             is VarRef.IntVar -> {
                 if (varRef.varId >= savedInts.size) return base.values(session, varRef, rng)
                 savedInts[varRef.varId]
@@ -1047,6 +1045,7 @@ class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic {
         val savedFeasible = when (varRef) {
             // Bool: saved is always 0 or 1 — feasible iff the var is still unpinned.
             is VarRef.Bool -> session.boolValue(varRef.varId) == null
+
             is VarRef.IntVar -> saved in session.intDomain(varRef.varId)
         }
         return if (savedFeasible) {
@@ -1073,9 +1072,8 @@ private fun domainValuesAscending(d: com.eignex.klause.solver.IntDomain): Sequen
     sequence { d.forEach { yield(it) } }
 
 /** Descending sequence; same skip-holes semantics. */
-private fun domainValuesDescending(d: com.eignex.klause.solver.IntDomain): Sequence<Int> =
-    sequence {
-        // Backwards walk: iterate from max down to min, skip holes via membership check.
-        // For sparse domains this is O((max - min) + holes); for contiguous it's O(span).
-        for (v in d.max downTo d.min) if (v in d) yield(v)
-    }
+private fun domainValuesDescending(d: com.eignex.klause.solver.IntDomain): Sequence<Int> = sequence {
+    // Backwards walk: iterate from max down to min, skip holes via membership check.
+    // For sparse domains this is O((max - min) + holes); for contiguous it's O(span).
+    for (v in d.max downTo d.min) if (v in d) yield(v)
+}

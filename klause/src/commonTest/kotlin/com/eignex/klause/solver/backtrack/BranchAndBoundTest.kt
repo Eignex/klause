@@ -80,11 +80,13 @@ class BranchAndBoundTest {
             ),
         ).assignment
         assertNotNull(sample, "B&B should land at the optimum well inside a 200-decision budget")
-        for (i in 0 until n) assertEquals(
-            false,
-            sample.bools[i],
-            "B&B optimum is all-false; got ${sample.bools.toList()}"
-        )
+        for (i in 0 until n) {
+            assertEquals(
+                false,
+                sample.bools[i],
+                "B&B optimum is all-false; got ${sample.bools.toList()}",
+            )
+        }
     }
 
     @Test

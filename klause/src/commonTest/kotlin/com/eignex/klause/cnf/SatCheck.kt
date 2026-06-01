@@ -82,6 +82,7 @@ internal object SatCheck {
                 if (satisfied) continue
                 when (unitCount) {
                     0 -> return false
+
                     1 -> {
                         val v = Lit.variable(unitLit)
                         assign[v] = if (Lit.isPositive(unitLit)) 1 else -1

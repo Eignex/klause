@@ -74,7 +74,9 @@ class SolveStatsSink(val backend: String) {
     private var endElapsedMs: Long? = null
     var timedOut: Boolean = false
 
-    fun start() { startMark = kotlin.time.TimeSource.Monotonic.markNow() }
+    fun start() {
+        startMark = kotlin.time.TimeSource.Monotonic.markNow()
+    }
     fun stop() {
         val mark = startMark ?: return
         endElapsedMs = mark.elapsedNow().inWholeMilliseconds
@@ -88,8 +90,12 @@ class SolveStatsSink(val backend: String) {
         depthMean.update(depth.toDouble())
     }
 
-    fun observeFail() { fails.update(1.0) }
-    fun observeRestart() { restarts.update(1.0) }
+    fun observeFail() {
+        fails.update(1.0)
+    }
+    fun observeRestart() {
+        restarts.update(1.0)
+    }
     fun observePropagation(count: Long = 1L) {
         // CountStat is unweighted-count-per-call; for batched propagation events pass count
         // > 1 by looping or by switching this field to SumStat later. For now batch-as-one.

@@ -59,7 +59,7 @@ class CardinalityDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(8).toList()
         assertTrue(samples.isNotEmpty())
@@ -69,7 +69,7 @@ class CardinalityDslTest {
             if (flagSet) {
                 assertTrue(
                     truthCount in 2..3,
-                    "flag set should force count∈[2,3], got $truthCount"
+                    "flag set should force count∈[2,3], got $truthCount",
                 )
             }
         }
@@ -89,7 +89,7 @@ class CardinalityDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 19)).take(20).toList()
         assertTrue(samples.isNotEmpty())

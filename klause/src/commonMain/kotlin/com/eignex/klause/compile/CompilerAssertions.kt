@@ -61,60 +61,97 @@ import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
 internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
     when (expr) {
         is And -> for (c in expr.children) assertExpr(c)
+
         is Implies -> assertExpr(Or(listOf(negate(expr.left), expr.right)))
+
         is Iff -> {
             assertExpr(Implies(expr.left, expr.right))
             assertExpr(Implies(expr.right, expr.left))
         }
+
         is Or -> {
             val lits = IntArray(expr.children.size)
             for (i in expr.children.indices) lits[i] = lowerToLit(expr.children[i])
             factors += Clause(lits)
         }
+
         is AtMost -> {
             val lits = lowerAllBool(expr.children)
             factors += Cardinality(lits, 0, expr.k)
         }
+
         is AtLeast -> {
             val lits = lowerAllBool(expr.children)
             factors += Cardinality(lits, expr.k, lits.size)
         }
+
         is CardinalityExpr -> {
             val lits = lowerAllBool(expr.children)
             factors += Cardinality(lits, expr.min, expr.max)
         }
+
         is Not, is BoolRef, is NominalEq -> {
             factors += Clause(intArrayOf(lowerToLit(expr)))
         }
+
         is IntCompare -> assertIntCompare(expr)
+
         is com.eignex.klause.ast.FloatLinearConstraint -> assertFloatLinear(expr)
+
         is AllDifferent -> assertAllDifferent(expr.terms)
+
         is com.eignex.klause.ast.AllDifferentExceptExpr -> assertAllDifferentExcept(expr)
+
         is com.eignex.klause.ast.ArgSortExpr -> assertArgSort(expr)
+
         is com.eignex.klause.ast.NetworkFlowExpr -> assertNetworkFlow(expr)
+
         is com.eignex.klause.ast.NetworkFlowCostExpr -> assertNetworkFlowCost(expr)
+
         is com.eignex.klause.ast.GeostExpr -> assertGeost(expr)
+
         is com.eignex.klause.ast.PathExpr -> assertPath(expr)
+
         is com.eignex.klause.ast.TreeExpr -> assertTree(expr)
+
         is com.eignex.klause.ast.MddExpr -> assertMdd(expr)
+
         is com.eignex.klause.ast.CostMddExpr -> assertCostMdd(expr)
+
         is com.eignex.klause.ast.CostRegularExpr -> assertCostRegular(expr)
+
         is CircuitExpr -> assertCircuit(expr.succ, expr.valueOffset, sub = false)
+
         is SubcircuitExpr -> assertCircuit(expr.succ, expr.valueOffset, sub = true)
+
         is CumulativeExpr -> assertCumulative(expr)
+
         is DisjunctiveExpr -> assertDisjunctive(expr)
+
         is AllDifferentOpt -> assertAllDifferentOpt(expr)
+
         is CumulativeExprOpt -> assertCumulativeOpt(expr)
+
         is DisjunctiveExprOpt -> assertDisjunctiveOpt(expr)
+
         is CountExprOpt -> assertCountOpt(expr)
+
         is NValueExprOpt -> assertNValueOpt(expr)
+
         is GccExprOpt -> assertGccOpt(expr)
+
         is com.eignex.klause.ast.SetIn -> assertSetIn(expr)
+
         is com.eignex.klause.ast.SetNominalIn -> assertSetNominalIn(expr)
+
         is com.eignex.klause.ast.SetSubsetOf -> assertSetSubsetOf(expr)
+
         is com.eignex.klause.ast.SetDisjoint -> assertSetDisjoint(expr)
+
         is com.eignex.klause.ast.SetEq -> assertSetEq(expr)
+
         is TableConstraint -> assertExpr(expandTable(expr))
+
         is PseudoBooleanExpr -> {
             val lits = lowerAllBool(expr.lits)
             factors += PseudoBoolean(
@@ -124,6 +161,7 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
                 bound = expr.bound,
             )
         }
+
         is XorExpr -> {
             val lits = lowerAllBool(expr.children)
             factors += Xor(lits, targetParity = 1)
@@ -137,7 +175,7 @@ internal fun Compiler.Build.expandTable(t: TableConstraint): BoolExpr {
         And(
             lifted.indices.map { i ->
                 IntCompare(lifted[i], IntCmpOp.EQ, IntLit(tup[i]))
-            }
+            },
         )
     }
     return if (t.negative) {
@@ -170,10 +208,15 @@ internal fun Compiler.Build.assertFloatLinear(c: com.eignex.klause.ast.FloatLine
     }
     val realOp = when (c.op) {
         com.eignex.klause.ast.IntCmpOp.LE,
-        com.eignex.klause.ast.IntCmpOp.LT -> com.eignex.klause.solver.factor.LinearOp.LE
+        com.eignex.klause.ast.IntCmpOp.LT,
+        -> com.eignex.klause.solver.factor.LinearOp.LE
+
         com.eignex.klause.ast.IntCmpOp.GE,
-        com.eignex.klause.ast.IntCmpOp.GT -> com.eignex.klause.solver.factor.LinearOp.GE
+        com.eignex.klause.ast.IntCmpOp.GT,
+        -> com.eignex.klause.solver.factor.LinearOp.GE
+
         com.eignex.klause.ast.IntCmpOp.EQ -> com.eignex.klause.solver.factor.LinearOp.EQ
+
         com.eignex.klause.ast.IntCmpOp.NE -> com.eignex.klause.solver.factor.LinearOp.NE
     }
     floatMetaConstraints += com.eignex.klause.solver.RealLinearConstraint(
@@ -222,8 +265,10 @@ internal fun Compiler.Build.assertAllDifferent(terms: List<IntExpr>) {
             return
         }
     }
-    for (i in lifted.indices) for (j in i + 1 until lifted.size) {
-        assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]))
+    for (i in lifted.indices) {
+        for (j in i + 1 until lifted.size) {
+            assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]))
+        }
     }
 }
 
@@ -303,13 +348,15 @@ internal fun Compiler.Build.assertAllDifferentOpt(expr: AllDifferentOpt) {
         }
     }
     // Pairwise fallback: `(present_i ∧ present_j) → (x_i ≠ x_j)`.
-    for (i in lifted.indices) for (j in i + 1 until lifted.size) {
-        val ne = IntCompare(lifted[i], IntCmpOp.NE, lifted[j])
-        val guarded = Implies(
-            And(listOf(boolFromLit(presentLits[i]), boolFromLit(presentLits[j]))),
-            ne,
-        )
-        assertExpr(guarded)
+    for (i in lifted.indices) {
+        for (j in i + 1 until lifted.size) {
+            val ne = IntCompare(lifted[i], IntCmpOp.NE, lifted[j])
+            val guarded = Implies(
+                And(listOf(boolFromLit(presentLits[i]), boolFromLit(presentLits[j]))),
+                ne,
+            )
+            assertExpr(guarded)
+        }
     }
 }
 
@@ -434,11 +481,7 @@ internal fun Compiler.Build.assertIntCompare(expr: IntCompare) {
     emitTopLevelCmp(coeffs, op, bound)
 }
 
-internal fun Compiler.Build.emitTopLevelCmp(
-    coeffs: Map<String, Int>,
-    op: IntCmpOp,
-    bound: Int,
-) {
+internal fun Compiler.Build.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmpOp, bound: Int) {
     if (coeffs.isEmpty()) {
         // 0 op bound: trivially true or false at compile time.
         val holds = when (op) {
@@ -451,7 +494,7 @@ internal fun Compiler.Build.emitTopLevelCmp(
         if (!holds) {
             throw IllegalStateException(
                 "Constraint reduces to a constant-false comparison ($op against $bound) " +
-                    "and is unsatisfiable as written."
+                    "and is unsatisfiable as written.",
             )
         }
         return
@@ -464,24 +507,23 @@ internal fun Compiler.Build.emitTopLevelCmp(
     val (varIds, coeffArr) = coeffsToArrays(coeffs)
     when (op) {
         IntCmpOp.LE -> factors += Linear(coeffArr, varIds, LinearOp.LE, bound)
+
         IntCmpOp.GE -> factors += Linear(coeffArr, varIds, LinearOp.GE, bound)
+
         IntCmpOp.EQ -> factors += Linear(coeffArr, varIds, LinearOp.EQ, bound)
+
         IntCmpOp.NE -> {
             // Reify equality and negate: aux ↔ Σ = bound; assert ¬aux.
             val aux = newBoolVar()
             factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, bound)
             factors += Clause(intArrayOf(Lit.make(aux, positive = false)))
         }
+
         IntCmpOp.LT, IntCmpOp.GT -> error("LT/GT should have been normalized away")
     }
 }
 
-internal fun Compiler.Build.emitSingleVar(
-    name: String,
-    coeff: Int,
-    op: IntCmpOp,
-    bound: Int,
-) {
+internal fun Compiler.Build.emitSingleVar(name: String, coeff: Int, op: IntCmpOp, bound: Int) {
     // Σ c x ⟨op⟩ b reduces to x ⟨op'⟩ b/c (assuming exact division). Avoid the division
     // by lowering through the Linear factor when c isn't ±1.
     if (coeff == 1) {
@@ -505,11 +547,7 @@ internal fun Compiler.Build.emitSingleVar(
     factors += Linear(intArrayOf(coeff), intArrayOf(varId), op.toLinearOp(), bound)
 }
 
-internal fun Compiler.Build.emitSingleVarCanonical(
-    name: String,
-    op: IntCmpOp,
-    bound: Int,
-) {
+internal fun Compiler.Build.emitSingleVarCanonical(name: String, op: IntCmpOp, bound: Int) {
     val v = intVarOf(name)
     factors += Linear(intArrayOf(1), intArrayOf(v), op.toLinearOp(), bound)
 }

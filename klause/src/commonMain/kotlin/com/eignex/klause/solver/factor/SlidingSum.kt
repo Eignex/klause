@@ -21,12 +21,7 @@ import kotlin.math.min
  * Propagation does per-window linear bound reasoning (`vs[j] ≥ low − Σ_{k≠j} max(vs[k])` and
  * the dual), which at a complete assignment becomes an exact window-sum leaf check.
  */
-class SlidingSum(
-    val low: Int,
-    val up: Int,
-    val seq: Int,
-    val vs: IntArray,
-) : LocalSearchFactor {
+class SlidingSum(val low: Int, val up: Int, val seq: Int, val vs: IntArray) : LocalSearchFactor {
 
     init {
         require(seq >= 1) { "sliding_sum: seq must be ≥ 1, got $seq" }

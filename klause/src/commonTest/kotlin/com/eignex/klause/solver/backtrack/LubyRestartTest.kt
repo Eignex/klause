@@ -22,7 +22,7 @@ class LubyRestartTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val params = BacktrackParams(
@@ -45,7 +45,7 @@ class LubyRestartTest {
             numBoolVars = n,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyArray()
+            factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
         val result = BacktrackSolver(problem).minimize(
@@ -77,7 +77,7 @@ class LubyRestartTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = emptyArray()
+            factors = emptyArray(),
         )
         val params = BacktrackParams(
             randomSeed = 0L,
@@ -105,7 +105,7 @@ class LubyRestartTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val params = BacktrackParams(
@@ -129,7 +129,7 @@ class LubyRestartTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val samples = BacktrackSolver(problem).enumerate(
@@ -138,7 +138,7 @@ class LubyRestartTest {
                 phaseSaving = true,
                 variableHeuristic = InputOrder,
                 valueHeuristic = IndomainMin,
-            )
+            ),
         ).toList()
         assertEquals(4, samples.size)
         // Each is exactly-one-true.

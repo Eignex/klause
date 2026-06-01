@@ -21,13 +21,13 @@ class LogicNGSessionTest {
                 Lit.make(0, true),
                 Lit.make(1, true),
                 Lit.make(2, true),
-            )
+            ),
         )
         return Problem(
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(factor)
+            factors = arrayOf<Factor>(factor),
         )
     }
 
@@ -100,7 +100,7 @@ class LogicNGSessionTest {
         val r2 = session.solve(LogicNGParams(assumptions = Assumptions(bools = mapOf(1 to true))))
         assertTrue(
             r1 is SolveResult.Sat && r2 is SolveResult.Sat,
-            "both pinned solves should be SAT; got $r1 and $r2"
+            "both pinned solves should be SAT; got $r1 and $r2",
         )
         assertEquals(true, (r1 as SolveResult.Sat).assignment.bools[0])
         assertEquals(true, (r2 as SolveResult.Sat).assignment.bools[1])

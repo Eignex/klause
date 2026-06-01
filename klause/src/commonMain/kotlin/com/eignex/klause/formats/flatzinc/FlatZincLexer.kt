@@ -20,11 +20,8 @@ internal sealed interface FznToken {
 /**
  * Thrown when the lexer or parser hits malformed input. Carries `line:col` for diagnostics.
  */
-class FlatZincParseException(
-    message: String,
-    val sourceLine: Int,
-    val sourceCol: Int,
-) : RuntimeException("$message (at $sourceLine:$sourceCol)")
+class FlatZincParseException(message: String, val sourceLine: Int, val sourceCol: Int) :
+    RuntimeException("$message (at $sourceLine:$sourceCol)")
 
 /**
  * Hand-rolled tokenizer for FlatZinc. Stateful, single-pass. Skips whitespace and `%`
@@ -60,24 +57,30 @@ internal class FlatZincLexer(private val src: String) {
         val c = src[pos]
         return when {
             c.isLetter() || c == '_' -> readIdentOrKeyword(startLine, startCol)
+
             c.isDigit() || (c == '-' && pos + 1 < src.length && (src[pos + 1].isDigit() || src[pos + 1] == '.')) ->
                 readNumber(startLine, startCol)
+
             c == '.' && pos + 1 < src.length && src[pos + 1] == '.' -> {
                 advance()
                 advance()
                 FznToken.Punct("..", startLine, startCol)
             }
+
             c == ':' && pos + 1 < src.length && src[pos + 1] == ':' -> {
                 advance()
                 advance()
                 FznToken.Punct("::", startLine, startCol)
             }
+
             c == '"' -> readString(startLine, startCol)
+
             c == ',' || c == ';' || c == ':' || c == '=' ||
                 c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' -> {
                 advance()
                 FznToken.Punct(c.toString(), startLine, startCol)
             }
+
             else -> throw FlatZincParseException("unexpected character '${src[pos]}'", line, col)
         }
     }
@@ -111,6 +114,7 @@ internal class FlatZincLexer(private val src: String) {
                     sb.append(ch)
                     advance()
                 }
+
                 ch == '.' && !sawDot && !sawExp -> {
                     // FlatZinc range token `..` — don't consume the dot if the next char is also `.`
                     if (pos + 1 < src.length && src[pos + 1] == '.') break
@@ -118,6 +122,7 @@ internal class FlatZincLexer(private val src: String) {
                     sb.append(ch)
                     advance()
                 }
+
                 (ch == 'e' || ch == 'E') && !sawExp -> {
                     sawExp = true
                     sb.append(ch)
@@ -127,6 +132,7 @@ internal class FlatZincLexer(private val src: String) {
                         advance()
                     }
                 }
+
                 else -> break
             }
         }
@@ -156,7 +162,7 @@ internal class FlatZincLexer(private val src: String) {
                         '\\' -> '\\'
                         '"' -> '"'
                         else -> src[pos]
-                    }
+                    },
                 )
                 advance()
             } else {
@@ -175,10 +181,13 @@ internal class FlatZincLexer(private val src: String) {
             val ch = src[pos]
             when {
                 ch == ' ' || ch == '\t' || ch == '\r' -> advance()
+
                 ch == '\n' -> advance()
+
                 ch == '%' -> {
                     while (pos < src.length && src[pos] != '\n') advance()
                 }
+
                 else -> return
             }
         }

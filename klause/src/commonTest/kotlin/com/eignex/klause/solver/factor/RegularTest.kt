@@ -30,7 +30,7 @@ class RegularTest {
                     transitions = intArrayOf(1, 2, 1, 2),
                     q0 = 1,
                     accepting = intArrayOf(2),
-                )
+                ),
             ),
         )
         // Every accepted string must end in 2.
@@ -54,7 +54,7 @@ class RegularTest {
                     transitions = intArrayOf(1, 2, 1, 2),
                     q0 = 1,
                     accepting = intArrayOf(2),
-                )
+                ),
             ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))

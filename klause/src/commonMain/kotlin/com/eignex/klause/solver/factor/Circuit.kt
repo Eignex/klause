@@ -44,7 +44,9 @@ import kotlin.math.abs
  */
 class Circuit(val succ: IntArray) : LocalSearchFactor {
 
-    init { require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" } }
+    init {
+        require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }
+    }
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = succ
@@ -58,15 +60,13 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         state.intPayload[factorId] = computeCost(state, replaceAt = -1, replaceWith = 0)
     }
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        state.intPayload[factorId] > 0
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
 
     /** Graded violation: the [computeCost] distance to a single Hamiltonian cycle
      *  (`|numCycles−1| + unreached-nodes + self-loops + out-of-bounds`). Exposing this magnitude
      *  — rather than a binary flag — gives CBLS a gradient that rewards moves merging cycles
      *  and reaching more nodes, the signal successor-encoded routing (e.g. cvrp) needs. */
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        state.intPayload[factorId]
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = state.intPayload[factorId]
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val pos = positionOfVar[intVar] ?: return 0

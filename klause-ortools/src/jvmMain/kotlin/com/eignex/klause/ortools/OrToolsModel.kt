@@ -71,8 +71,7 @@ import com.google.ortools.util.Domain
 class UnsupportedFactorException(
     /** The klause factor that has no OR-Tools translation. */
     val factor: Factor,
-) :
-    RuntimeException("klause-ortools: unsupported factor ${factor::class.simpleName}")
+) : RuntimeException("klause-ortools: unsupported factor ${factor::class.simpleName}")
 
 /**
  * A klause [Problem] translated into a ready-to-solve OR-Tools [CpModel], built via [build].
@@ -90,8 +89,7 @@ class OrToolsModel private constructor(
     private var auxCtr = 0
     private fun freshBool(): BoolVar = model.newBoolVar("aux_b${auxCtr++}")
 
-    private fun lit(lit: Int): Literal =
-        boolVars[Lit.variable(lit)].let { if (Lit.isPositive(lit)) it else it.not() }
+    private fun lit(lit: Int): Literal = boolVars[Lit.variable(lit)].let { if (Lit.isPositive(lit)) it else it.not() }
 
     private fun litArgs(lits: IntArray): Array<LinearArgument> = Array(lits.size) { lit(lits[it]) as LinearArgument }
     private fun intArgs(ids: IntArray): Array<LinearArgument> = Array(ids.size) { intVars[ids[it]] as LinearArgument }
@@ -126,18 +124,22 @@ class OrToolsModel private constructor(
     private fun postFactor(f: Factor) {
         when (f) {
             is Clause -> model.addBoolOr(Array(f.literals.size) { lit(f.literals[it]) })
+
             is Cardinality -> {
                 val sum = LinearExpr.sum(litArgs(f.literals))
                 model.addLinearConstraint(sum, f.min.toLong(), f.max.toLong())
             }
+
             is Linear -> postLinearDomain(
                 LinearExpr.weightedSum(intArgs(f.vars), f.coeffs.longs()),
-                domainFor(f.op, f.bound)
+                domainFor(f.op, f.bound),
             )
+
             is PseudoBoolean -> postLinearDomain(
                 LinearExpr.weightedSum(litArgs(f.literals), f.weights.longs()),
-                domainFor(f.op, f.bound)
+                domainFor(f.op, f.bound),
             )
+
             is Xor -> {
                 val sum = LinearExpr.sum(litArgs(f.literals))
                 val allowed = (0..f.literals.size)
@@ -146,20 +148,25 @@ class OrToolsModel private constructor(
                     .toLongArray()
                 model.addLinearExpressionInDomain(sum, Domain.fromValues(allowed))
             }
+
             is AllDifferent -> model.addAllDifferent(Array(f.vars.size) { intVars[f.vars[it]] })
+
             is Product -> model.addMultiplicationEquality(intVars[f.result], intVars[f.a], intVars[f.b])
+
             is ReifiedLinear -> reifyLinear(
                 LinearExpr.weightedSum(intArgs(f.vars), f.coeffs.longs()),
                 f.op,
                 f.bound,
-                boolVars[f.auxBoolVar]
+                boolVars[f.auxBoolVar],
             )
+
             is ReifiedPseudoBoolean -> reifyPb(
                 LinearExpr.weightedSum(litArgs(f.literals), f.weights.longs()),
                 f.op,
                 f.bound,
-                boolVars[f.auxBoolVar]
+                boolVars[f.auxBoolVar],
             )
+
             is ReifiedCardinality -> {
                 val sum = LinearExpr.sum(litArgs(f.literals))
                 val d = Domain(f.min.toLong(), f.max.toLong())
@@ -170,53 +177,83 @@ class OrToolsModel private constructor(
 
             // ---- expanded coverage ----
             is AllEqual -> for (i in 1 until f.xs.size) model.addEquality(intVars[f.xs[i]], intVars[f.xs[0]])
+
             is AllDifferentExceptZero -> postDistinctExcept(f.xs, intArrayOf(0))
+
             is AllDifferentExcept -> postDistinctExcept(f.xs, f.except)
+
             is Among -> model.addEquality(
                 intVars[f.n],
                 LinearExpr.sum(
                     Array(f.xs.size) {
                         reifyInValues(intVars[f.xs[it]], f.values) as LinearArgument
-                    }
-                )
+                    },
+                ),
             )
+
             is Member -> postMember(f)
+
             is Count -> postCount(f)
+
             is Element -> postElement(f)
+
             is Inverse -> postChannel(f.f, f.g, f.fOffset, f.gOffset)
+
             is SymmetricAllDifferent -> postChannel(f.xs, f.xs, f.indexOffset, f.indexOffset)
+
             is LexLess -> postLexLess(f)
+
             is Monotone -> postMonotone(f)
+
             is NValue -> postNValue(f)
+
             is GlobalCardinality -> postGcc(f)
+
             is Table -> {
                 val tc = model.addAllowedAssignments(intArgs(f.xs))
                 for (r in 0 until f.numTuples) tc.addTuple(IntArray(f.arity) { c -> f.tuples[r * f.arity + c] })
             }
+
             is ValuePrecede -> postValuePrecede(f)
+
             is ArrayMinMax ->
                 if (f.max) {
                     model.addMaxEquality(intVars[f.result], Array(f.xs.size) { intVars[f.xs[it]] })
                 } else {
                     model.addMinEquality(intVars[f.result], Array(f.xs.size) { intVars[f.xs[it]] })
                 }
+
             is ArgMinMax -> postArgMinMax(f)
+
             is Knapsack -> {
                 model.addEquality(intVars[f.w], LinearExpr.weightedSum(intArgs(f.xs), f.weights.longs()))
                 model.addEquality(intVars[f.p], LinearExpr.weightedSum(intArgs(f.xs), f.profits.longs()))
             }
+
             is Cumulative -> postCumulative(f)
+
             is Diffn -> postDiffn(f)
+
             is BinPacking -> postBinPacking(f)
+
             is Sort -> postSort(f)
+
             is Sequence -> postSequence(f)
+
             is Regular -> postRegular(f)
+
             is Circuit -> postCircuit(f)
+
             is Subcircuit -> postSubcircuit(f)
+
             is Geost -> postGeost(f)
+
             is Mdd -> postMdd(f)
+
             is SetBitsetSubset -> postSetSubset(f.leftBools, f.rightBools)
+
             is SetBitsetDisjoint -> postSetDisjoint(f.leftBools, f.rightBools)
+
             is SetBitsetEq -> postSetEq(f.leftBools, f.rightBools)
 
             else -> throw UnsupportedFactorException(f)
@@ -224,11 +261,13 @@ class OrToolsModel private constructor(
     }
 
     private fun postDistinctExcept(xs: IntArray, except: IntArray) {
-        for (i in xs.indices) for (j in i + 1 until xs.size) {
-            // (xi = xj) ⇒ (xi ∈ except): equal pairs are only allowed on exempt values.
-            val eq = reifyEqVar(intVars[xs[i]], intVars[xs[j]])
-            val inExc = reifyInValues(intVars[xs[i]], except)
-            model.addImplication(eq, inExc)
+        for (i in xs.indices) {
+            for (j in i + 1 until xs.size) {
+                // (xi = xj) ⇒ (xi ∈ except): equal pairs are only allowed on exempt values.
+                val eq = reifyEqVar(intVars[xs[i]], intVars[xs[j]])
+                val inExc = reifyInValues(intVars[xs[i]], except)
+                model.addImplication(eq, inExc)
+            }
         }
     }
 
@@ -273,11 +312,13 @@ class OrToolsModel private constructor(
             model.addInverse(Array(fArr.size) { intVars[fArr[it]] }, Array(gArr.size) { intVars[gArr[it]] })
             return
         }
-        for (i in fArr.indices) for (j in gArr.indices) {
-            val a = reifyEq(intVars[fArr[i]], j + fOff)
-            val b = reifyEq(intVars[gArr[j]], i + gOff)
-            model.addImplication(a, b)
-            model.addImplication(b, a)
+        for (i in fArr.indices) {
+            for (j in gArr.indices) {
+                val a = reifyEq(intVars[fArr[i]], j + fOff)
+                val b = reifyEq(intVars[gArr[j]], i + gOff)
+                model.addImplication(a, b)
+                model.addImplication(b, a)
+            }
         }
     }
 
@@ -299,10 +340,11 @@ class OrToolsModel private constructor(
             val b = intVars[f.xs[i + 1]]
             when (f.direction) {
                 Monotone.Direction.Increasing -> if (f.strict) model.addLessThan(a, b) else model.addLessOrEqual(a, b)
+
                 Monotone.Direction.Decreasing -> if (f.strict) {
                     model.addGreaterThan(
                         a,
-                        b
+                        b,
                     )
                 } else {
                     model.addGreaterOrEqual(a, b)
@@ -345,6 +387,7 @@ class OrToolsModel private constructor(
             val cnt = LinearExpr.sum(matches)
             when {
                 countVars != null -> model.addEquality(intVars[countVars[k]], cnt)
+
                 countLow != null && countHigh != null ->
                     model.addLinearConstraint(cnt, countLow[k].toLong(), countHigh[k].toLong())
             }
@@ -375,13 +418,15 @@ class OrToolsModel private constructor(
         model.addExactlyOne(Array(f.xs.size) { isArg[it] as Literal })
         for (p in f.xs.indices) {
             model.addEquality(intVars[f.idx], (p + f.indexOffset).toLong()).onlyEnforceIf(isArg[p])
-            for (i in f.xs.indices) if (i != p) {
-                val c = if (f.max) {
-                    model.addGreaterOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
-                } else {
-                    model.addLessOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
+            for (i in f.xs.indices) {
+                if (i != p) {
+                    val c = if (f.max) {
+                        model.addGreaterOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
+                    } else {
+                        model.addLessOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
+                    }
+                    c.onlyEnforceIf(isArg[p])
                 }
-                c.onlyEnforceIf(isArg[p])
             }
             for (i in 0 until p) { // strict over earlier — lowest-index tie-break
                 val c = if (f.max) {
@@ -467,9 +512,11 @@ class OrToolsModel private constructor(
         // CP-SAT automaton: state ids and labels are arbitrary longs; klause states are
         // 1-based with a 0 "dead" sentinel and symbol == seq value.
         val ac = model.addAutomaton(intArgs(f.seq), f.q0.toLong(), f.accepting.longs())
-        for (st in 1..f.numStates) for (sym in 1..f.alphabetSize) {
-            val target = f.transitions[(st - 1) * f.alphabetSize + (sym - 1)]
-            if (target != 0) ac.addTransition(st, target, sym.toLong())
+        for (st in 1..f.numStates) {
+            for (sym in 1..f.alphabetSize) {
+                val target = f.transitions[(st - 1) * f.alphabetSize + (sym - 1)]
+                if (target != 0) ac.addTransition(st, target, sym.toLong())
+            }
         }
     }
 
@@ -497,21 +544,23 @@ class OrToolsModel private constructor(
     }
 
     private fun postGeost(f: Geost) {
-        for (i in 0 until f.numObjects) for (j in i + 1 until f.numObjects) {
-            val seps = ArrayList<Literal>()
-            for (d in 0 until f.numDims) {
-                val oi = intVars[f.origin[i * f.numDims + d]]
-                val oj = intVars[f.origin[j * f.numDims + d]]
-                val si = f.length[i * f.numDims + d]
-                val sj = f.length[j * f.numDims + d]
-                val a = freshBool()
-                model.addLessOrEqual(LinearExpr.affine(oi, 1L, si.toLong()), oj).onlyEnforceIf(a)
-                val b = freshBool()
-                model.addLessOrEqual(LinearExpr.affine(oj, 1L, sj.toLong()), oi).onlyEnforceIf(b)
-                seps.add(a)
-                seps.add(b)
+        for (i in 0 until f.numObjects) {
+            for (j in i + 1 until f.numObjects) {
+                val seps = ArrayList<Literal>()
+                for (d in 0 until f.numDims) {
+                    val oi = intVars[f.origin[i * f.numDims + d]]
+                    val oj = intVars[f.origin[j * f.numDims + d]]
+                    val si = f.length[i * f.numDims + d]
+                    val sj = f.length[j * f.numDims + d]
+                    val a = freshBool()
+                    model.addLessOrEqual(LinearExpr.affine(oi, 1L, si.toLong()), oj).onlyEnforceIf(a)
+                    val b = freshBool()
+                    model.addLessOrEqual(LinearExpr.affine(oj, 1L, sj.toLong()), oi).onlyEnforceIf(b)
+                    seps.add(a)
+                    seps.add(b)
+                }
+                model.addBoolOr(seps.toTypedArray())
             }
-            model.addBoolOr(seps.toTypedArray())
         }
     }
 
@@ -560,11 +609,11 @@ class OrToolsModel private constructor(
                             f.transitions[row],
                             f.transitions[row + 1],
                             f.transitions[row + 2],
-                            f.transitions[row + 3]
+                            f.transitions[row + 3],
                         )
                     } else {
                         intArrayOf(f.transitions[row], f.transitions[row + 1], f.transitions[row + 2])
-                    }
+                    },
                 )
                 row += f.recordStride
             }

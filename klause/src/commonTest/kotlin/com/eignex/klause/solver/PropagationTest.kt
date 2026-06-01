@@ -23,13 +23,12 @@ import kotlin.test.fail
 
 class PropagationTest {
 
-    private fun boolProblem(numBoolVars: Int, vararg clauses: IntArray): Problem =
-        Problem(
-            numBoolVars = numBoolVars,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = clauses.map { Clause(it) },
-        )
+    private fun boolProblem(numBoolVars: Int, vararg clauses: IntArray): Problem = Problem(
+        numBoolVars = numBoolVars,
+        numIntVars = 0,
+        intDomains = emptyArray(),
+        factors = clauses.map { Clause(it) },
+    )
 
     private fun lit(v: Int, pos: Boolean) = Lit.make(v, pos)
 
@@ -128,8 +127,8 @@ class PropagationTest {
                 arrayOf(IntDomain(0, 10)),
                 listOf(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
-                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)
-                )
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+                ),
             )
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to 3), r.ints)
@@ -144,8 +143,8 @@ class PropagationTest {
                 arrayOf(IntDomain(0, 10)),
                 listOf(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)
-                )
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
+                ),
             )
         assertIs<PropagationResult.Unsat>(p.propagate())
     }
@@ -160,8 +159,8 @@ class PropagationTest {
                 arrayOf(IntDomain(5, 10)),
                 listOf(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 5),
-                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 6)
-                )
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 6),
+                ),
             )
         val r = implied(p.propagate())
         assertEquals(mapOf(0 to 6), r.ints)
@@ -184,7 +183,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(0, true), lit(1, true), lit(2, true)),
                     min = 0,
                     max = 1,
-                )
+                ),
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
@@ -202,7 +201,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(0, true), lit(1, true)),
                     min = 1,
                     max = 2,
-                )
+                ),
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to false))))
@@ -220,7 +219,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(0, true), lit(1, true), lit(2, true)),
                     min = 0,
                     max = 1,
-                )
+                ),
             ),
         )
         assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(0 to true, 1 to true))))
@@ -278,7 +277,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(1, true), lit(2, true)),
                     min = 0,
                     max = 1,
-                )
+                ),
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(1 to true, 2 to true))))
@@ -362,7 +361,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(0, true), lit(1, true), lit(2, true)),
                     op = PbOp.LE,
                     bound = 2,
-                )
+                ),
             ),
         )
         val r = implied(p.propagate())
@@ -382,7 +381,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(0, true), lit(1, true)),
                     op = PbOp.GE,
                     bound = 5,
-                )
+                ),
             ),
         )
         assertIs<PropagationResult.Unsat>(p.propagate(Assumptions(bools = mapOf(1 to false))))
@@ -401,7 +400,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(0, true), lit(1, true)),
                     op = PbOp.EQ,
                     bound = 5,
-                )
+                ),
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
@@ -446,7 +445,7 @@ class PropagationTest {
                     vars = intArrayOf(0, 1),
                     op = LinearOp.LE,
                     bound = 5,
-                )
+                ),
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
@@ -492,7 +491,7 @@ class PropagationTest {
                     literals = intArrayOf(lit(1, true), lit(2, true)),
                     op = PbOp.GE,
                     bound = 20,
-                )
+                ),
             ),
         )
         val r = implied(p.propagate())
@@ -509,7 +508,7 @@ class PropagationTest {
             intDomains = arrayOf(IntDomain(2, 3), IntDomain(4, 5), IntDomain(-100, 100)),
             factors = arrayOf<Factor>(
                 Product(a = 0, b = 1, result = 2),
-                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 8)
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 8),
             ),
         )
         val r = implied(p.propagate())

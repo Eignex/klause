@@ -37,10 +37,7 @@ sealed interface SolveResult {
      *  backends that haven't opted in; populated by backends that have. */
     val stats: SolveStats
 
-    data class Sat(
-        val assignment: Sample,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : SolveResult
+    data class Sat(val assignment: Sample, override val stats: SolveStats = SolveStats.EMPTY) : SolveResult
 
     /**
      * Proven infeasible. [core] is an optional jointly-unsat subset of factor ids; backends
@@ -62,10 +59,7 @@ sealed interface SolveResult {
          */
         val assumptionCore: Assumptions? = null,
     ) : SolveResult
-    data class Unknown(
-        val reason: TerminationReason,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : SolveResult
+    data class Unknown(val reason: TerminationReason, override val stats: SolveStats = SolveStats.EMPTY) : SolveResult
 }
 
 /**

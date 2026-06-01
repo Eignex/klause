@@ -38,8 +38,7 @@ interface LocalSearchFactor : Factor {
      * with this method silently desyncs the cost. Degrees should be clamped to a sane range
      * to avoid `Int` overflow when summed across the factor set.
      */
-    fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        if (isViolated(state, factorId)) 1 else 0
+    fun violationDegree(state: LocalSearchState, factorId: Int): Int = if (isViolated(state, factorId)) 1 else 0
 
     /**
      * Δ in this factor's [violationDegree] if the given move were applied, computed without
@@ -127,10 +126,5 @@ interface LocalSearchFactor : Factor {
      *  after this factor's own [applyIntSet] has run. Only invoked when
      *  [maintainsIntBreakMakeIncrementallyForIntSet] is true. Net adjustment must equal
      *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
-    fun updateIntBreakMakeForIntSet(
-        state: LocalSearchState,
-        factorId: Int,
-        intVar: Int,
-        oldValue: Int,
-    ) {}
+    fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {}
 }

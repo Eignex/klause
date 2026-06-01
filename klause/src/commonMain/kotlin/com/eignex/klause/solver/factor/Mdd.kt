@@ -165,10 +165,8 @@ class Mdd(
      *  variable's IntDomain reference is unchanged, the previous fixpoint still holds and
      *  the full sweep is skipped. Backtrack-safe via [PropagationState.SnapshottablePayload]:
      *  on push the engine clones the array, on pop the prior level's refs are restored. */
-    private class MddState(
-        val cachedSeq: Array<IntDomain?>,
-        var cachedCost: IntDomain?,
-    ) : PropagationState.SnapshottablePayload {
+    private class MddState(val cachedSeq: Array<IntDomain?>, var cachedCost: IntDomain?) :
+        PropagationState.SnapshottablePayload {
         override fun snapshotCopy(): MddState = MddState(cachedSeq.copyOf(), cachedCost)
     }
 
@@ -182,9 +180,11 @@ class Mdd(
             fresh
         }
         var changed = false
-        for (i in 0 until n) if (payload.cachedSeq[i] !== state.intDomains[seq[i]]) {
-            changed = true
-            break
+        for (i in 0 until n) {
+            if (payload.cachedSeq[i] !== state.intDomains[seq[i]]) {
+                changed = true
+                break
+            }
         }
         if (!changed && cost >= 0 && payload.cachedCost !== state.intDomains[cost]) changed = true
         if (!changed && payload.cachedSeq[0] != null) return true

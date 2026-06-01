@@ -21,14 +21,13 @@ import com.eignex.klause.solver.backtrack.VariableHeuristic
  * recognises (`FlatZincCompiler.mapVariableStrategy` / `mapValueStrategy`), so MiniZinc
  * users and Kotlin schema users get matched semantics.
  */
-internal fun searchAnnotationToParams(ann: SearchAnnotation): BacktrackParams =
-    BacktrackParams(
-        variableHeuristic = mapVarStrategy(ann.variableStrategy),
-        valueHeuristic = mapValStrategy(ann.valueStrategy),
-        phaseSaving = ann.phaseSaving,
-        lubyRestartBase = ann.lubyRestartBase,
-        maxDecisions = ann.maxDecisions,
-    )
+internal fun searchAnnotationToParams(ann: SearchAnnotation): BacktrackParams = BacktrackParams(
+    variableHeuristic = mapVarStrategy(ann.variableStrategy),
+    valueHeuristic = mapValStrategy(ann.valueStrategy),
+    phaseSaving = ann.phaseSaving,
+    lubyRestartBase = ann.lubyRestartBase,
+    maxDecisions = ann.maxDecisions,
+)
 
 private fun mapVarStrategy(s: VarSearchStrategy): VariableHeuristic = when (s) {
     VarSearchStrategy.Default -> RandomVariable

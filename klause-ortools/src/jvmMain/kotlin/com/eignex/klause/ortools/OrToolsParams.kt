@@ -13,8 +13,5 @@ import com.eignex.klause.solver.SolverParams
  * via [OrToolsSolver.improvements], which the bench's anytime metric compares against
  * klause-LS. Assumptions/cancellation fall back to the [SolverParams] no-op defaults.
  */
-data class OrToolsParams(
-    val timeoutMillis: Long? = null,
-    val workers: Int = 0,
-    val maxModels: Long = Long.MAX_VALUE,
-) : SolverParams
+data class OrToolsParams(val timeoutMillis: Long? = null, val workers: Int = 0, val maxModels: Long = Long.MAX_VALUE) :
+    SolverParams

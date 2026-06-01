@@ -217,12 +217,14 @@ class FactorPropertyTest {
                 to FactorEnv(numBoolVars = 3),
             Cardinality(
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-                min = 1, max = 2,
+                min = 1,
+                max = 2,
             ) to FactorEnv(numBoolVars = 3),
             PseudoBoolean(
                 weights = intArrayOf(3, -2, 5),
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-                op = PbOp.LE, bound = 4,
+                op = PbOp.LE,
+                bound = 4,
             ) to FactorEnv(numBoolVars = 3),
             Xor(
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
@@ -231,7 +233,8 @@ class FactorPropertyTest {
             Linear(
                 coeffs = intArrayOf(1, 2),
                 vars = intArrayOf(0, 1),
-                op = LinearOp.LE, bound = 3,
+                op = LinearOp.LE,
+                bound = 3,
             ) to FactorEnv(intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5))),
             Product(a = 0, b = 1, result = 2) to FactorEnv(
                 intDomains = arrayOf(IntDomain(-2, 2), IntDomain(-2, 2), IntDomain(-4, 4)),
@@ -251,18 +254,21 @@ class FactorPropertyTest {
                 auxBoolVar = 0,
                 coeffs = intArrayOf(2, -1),
                 vars = intArrayOf(0, 1),
-                op = LinearOp.LE, bound = 3,
+                op = LinearOp.LE,
+                bound = 3,
             ) to FactorEnv(numBoolVars = 1, intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-2, 3))),
             ReifiedPseudoBoolean(
                 auxBoolVar = 0,
                 weights = intArrayOf(2, 1, 3),
                 literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, false)),
-                op = PbOp.LE, bound = 3,
+                op = PbOp.LE,
+                bound = 3,
             ) to FactorEnv(numBoolVars = 4),
             ReifiedCardinality(
                 auxBoolVar = 0,
                 literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-                min = 1, max = 2,
+                min = 1,
+                max = 2,
             ) to FactorEnv(numBoolVars = 4),
             reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 1) to
                 FactorEnv(numBoolVars = 1, intDomains = arrayOf(IntDomain(-2, 3))),
@@ -272,10 +278,7 @@ class FactorPropertyTest {
         }
     }
 
-    private data class FactorEnv(
-        val numBoolVars: Int = 0,
-        val intDomains: Array<IntDomain> = emptyArray(),
-    )
+    private data class FactorEnv(val numBoolVars: Int = 0, val intDomains: Array<IntDomain> = emptyArray())
 
     private fun checkRepairValidity(factor: LocalSearchFactor, env: FactorEnv) {
         val problem = Problem(env.numBoolVars, env.intDomains.size, env.intDomains, listOf(factor))
@@ -293,24 +296,26 @@ class FactorPropertyTest {
                     is Move.BoolFlip -> {
                         assertTrue(
                             move.varId in factor.boolVars,
-                            "${factor::class.simpleName} proposed flip of var ${move.varId} not in boolVars ${factor.boolVars.toList()}"
+                            "${factor::class.simpleName} proposed flip of var ${move.varId} not in boolVars ${factor.boolVars.toList()}",
                         )
                     }
+
                     is Move.IntSet -> {
                         assertTrue(
                             move.varId in factor.intVars,
-                            "${factor::class.simpleName} proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}"
+                            "${factor::class.simpleName} proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}",
                         )
                         val d = problem.intDomains[move.varId]
                         assertTrue(
                             move.newValue in d.min..d.max,
-                            "${factor::class.simpleName} proposed IntSet target ${move.newValue} out of domain $d"
+                            "${factor::class.simpleName} proposed IntSet target ${move.newValue} out of domain $d",
                         )
                         assertTrue(
                             move.newValue != state.assignment.intValue(move.varId),
-                            "${factor::class.simpleName} proposed no-op IntSet at ${move.newValue}"
+                            "${factor::class.simpleName} proposed no-op IntSet at ${move.newValue}",
                         )
                     }
+
                     is Move.Compound -> { /* no factor proposes Compound today; covered by CompoundMoveTest */ }
                 }
 
@@ -322,7 +327,7 @@ class FactorPropertyTest {
                 val after = sibling.cost
                 assertTrue(
                     after <= before,
-                    "${factor::class.simpleName} repair $move increased cost $before → $after"
+                    "${factor::class.simpleName} repair $move increased cost $before → $after",
                 )
             }
         }
@@ -359,17 +364,17 @@ class FactorPropertyTest {
             assertEquals(
                 predicted,
                 observedDelta,
-                "${factor::class.simpleName}: predicted Δ != observed Δ on iter=$i move=$move"
+                "${factor::class.simpleName}: predicted Δ != observed Δ on iter=$i move=$move",
             )
             assertEquals(
                 costBefore + predicted,
                 state.cost,
-                "${factor::class.simpleName}: cost drift after $move on iter=$i"
+                "${factor::class.simpleName}: cost drift after $move on iter=$i",
             )
             assertEquals(
                 violatedAfter,
                 state.violated.contains(0),
-                "${factor::class.simpleName}: violated set drift after $move on iter=$i"
+                "${factor::class.simpleName}: violated set drift after $move on iter=$i",
             )
 
             val sibling = LocalSearchState(problem, Random(seed.toLong()))
@@ -378,17 +383,17 @@ class FactorPropertyTest {
             assertEquals(
                 sibling.intPayload[0],
                 state.intPayload[0],
-                "${factor::class.simpleName}: intPayload drift after $move on iter=$i"
+                "${factor::class.simpleName}: intPayload drift after $move on iter=$i",
             )
             assertEquals(
                 sibling.cost,
                 state.cost,
-                "${factor::class.simpleName}: cost drift vs recompute on iter=$i"
+                "${factor::class.simpleName}: cost drift vs recompute on iter=$i",
             )
             assertEquals(
                 sibling.violated.contains(0),
                 state.violated.contains(0),
-                "${factor::class.simpleName}: violation drift vs recompute on iter=$i"
+                "${factor::class.simpleName}: violation drift vs recompute on iter=$i",
             )
 
             if (i > 0 && i % 30 == 0) {

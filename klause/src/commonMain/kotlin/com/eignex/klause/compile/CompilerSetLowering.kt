@@ -47,10 +47,7 @@ private const val BITSET_UNIVERSE_THRESHOLD: Int = 64
  * either by looking up an existing set var via [Compiler.Build.materializeSet] or by
  * synthesising aux indicators for `union` / `intersect` / `diff` / set literals.
  */
-class SetLayout(
-    val universe: IntArray,
-    val indicatorBoolIds: IntArray,
-) {
+class SetLayout(val universe: IntArray, val indicatorBoolIds: IntArray) {
     init {
         require(universe.size == indicatorBoolIds.size) {
             "SetLayout parallel arrays must have equal length"
@@ -75,6 +72,7 @@ class SetLayout(
 internal fun Compiler.Build.materializeSet(expr: SetExpr): SetLayout = when (expr) {
     is SetRef -> setLayouts[expr.name]
         ?: error("Unknown set variable '${expr.name}'")
+
     is SetLiteral -> {
         // Constant set: allocate indicator-shaped layout with each indicator pinned to its
         // constant value via a unit clause. The downstream lowering doesn't care that the
@@ -86,6 +84,7 @@ internal fun Compiler.Build.materializeSet(expr: SetExpr): SetLayout = when (exp
         for (id in ids) factors += Clause(intArrayOf(Lit.make(id, positive = true)))
         SetLayout(sorted.toIntArray(), ids)
     }
+
     is SetNominalLiteral -> {
         // The compiler can't resolve nominal labels without knowing which nominal-set var
         // they're being compared against. We require [SetNominalLiteral] only appear as
@@ -95,6 +94,7 @@ internal fun Compiler.Build.materializeSet(expr: SetExpr): SetLayout = when (exp
         // don't support — surface a clear error instead of silently fabricating a layout.
         error("nominal set literal cannot be materialised without a nominal-set var operand on the other side")
     }
+
     is SetUnion -> {
         val l = materializeSet(expr.left)
         val r = materializeSet(expr.right)
@@ -127,6 +127,7 @@ internal fun Compiler.Build.materializeSet(expr: SetExpr): SetLayout = when (exp
         }
         SetLayout(universe, ids)
     }
+
     is SetIntersect -> {
         val l = materializeSet(expr.left)
         val r = materializeSet(expr.right)
@@ -154,6 +155,7 @@ internal fun Compiler.Build.materializeSet(expr: SetExpr): SetLayout = when (exp
         }
         SetLayout(universe, ids)
     }
+
     is SetDiff -> {
         val l = materializeSet(expr.left)
         val r = materializeSet(expr.right)
@@ -211,7 +213,7 @@ internal fun Compiler.Build.assertSetIn(expr: SetIn) {
             listOf(
                 IntCompare(expr.elem, IntCmpOp.EQ, IntLit(e)),
                 indicatorBoolExpr(bId),
-            )
+            ),
         )
     }
     val expanded = if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.Or(pieces)
@@ -221,7 +223,9 @@ internal fun Compiler.Build.assertSetIn(expr: SetIn) {
 internal fun Compiler.Build.assertSetNominalIn(expr: SetNominalIn) {
     val set = materializeSet(expr.set)
     val setName = setRefName(expr.set)
-        ?: error("set membership of label '${expr.label}' requires a nominal-set var on the right, not a compound expression")
+        ?: error(
+            "set membership of label '${expr.label}' requires a nominal-set var on the right, not a compound expression",
+        )
     val labels = setLabelOrder[setName]
         ?: error("set '$setName' is an integer-universe set; use `intVar inSet $setName` instead")
     val idx = labels.indexOf(expr.label)
@@ -310,9 +314,11 @@ internal fun Compiler.Build.assertSetEq(expr: SetEq) {
                 factors += Clause(intArrayOf(Lit.negate(ll), rl))
                 factors += Clause(intArrayOf(Lit.negate(rl), ll))
             }
+
             li >= 0 -> {
                 factors += Clause(intArrayOf(Lit.negate(Lit.make(l.indicatorBoolIds[li], positive = true))))
             }
+
             ri >= 0 -> {
                 factors += Clause(intArrayOf(Lit.negate(Lit.make(r.indicatorBoolIds[ri], positive = true))))
             }
@@ -332,7 +338,7 @@ internal fun Compiler.Build.reifySetIn(expr: SetIn): Int {
             listOf(
                 IntCompare(expr.elem, IntCmpOp.EQ, IntLit(set.universe[i])),
                 indicatorBoolExpr(set.indicatorBoolIds[i]),
-            )
+            ),
         )
     }
     return lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.Or(pieces))
@@ -398,8 +404,11 @@ internal fun Compiler.Build.reifySetEq(expr: SetEq): Int {
                 indicatorBoolExpr(l.indicatorBoolIds[li]),
                 indicatorBoolExpr(r.indicatorBoolIds[ri]),
             )
+
             li >= 0 -> com.eignex.klause.ast.Not(indicatorBoolExpr(l.indicatorBoolIds[li]))
+
             ri >= 0 -> com.eignex.klause.ast.Not(indicatorBoolExpr(r.indicatorBoolIds[ri]))
+
             else -> error("impossible")
         }
     }
@@ -427,7 +436,11 @@ internal fun Compiler.Build.liftSetCard(expr: SetCard): IntRef {
         val auxBool = newBoolVar()
         // auxBool ↔ (id = 1)
         factors += com.eignex.klause.solver.factor.ReifiedLinear(
-            auxBool, intArrayOf(1), intArrayOf(id), LinearOp.EQ, 1,
+            auxBool,
+            intArrayOf(1),
+            intArrayOf(id),
+            LinearOp.EQ,
+            1,
         )
         // auxBool ↔ indicator[i]: two clauses.
         val auxLit = Lit.make(auxBool, positive = true)

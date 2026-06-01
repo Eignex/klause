@@ -100,11 +100,11 @@ class PortfolioTest {
                     vars = intArrayOf(0, 1),
                     op = com.eignex.klause.solver.factor.LinearOp.GE,
                     bound = 3,
-                )
+                ),
             ),
         )
         val obj = com.eignex.klause.solver.LinearObjective(
-            intCoefficients = doubleArrayOf(1.0, 2.0)
+            intCoefficients = doubleArrayOf(1.0, 2.0),
         )
         val workers = List(3) { i -> BacktrackSolver(problem).session() }
         Portfolio(workers).use { p ->

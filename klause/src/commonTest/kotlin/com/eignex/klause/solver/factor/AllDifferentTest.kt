@@ -128,7 +128,7 @@ class AllDifferentTest {
         val occupantSet = intSets.map { it.varId }.toSet()
         assertTrue(
             occupantSet.size == 1 && (occupantSet.contains(0) || occupantSet.contains(1)),
-            "candidates should pin one occupant, got $occupantSet"
+            "candidates should pin one occupant, got $occupantSet",
         )
         val targetSet = intSets.map { it.newValue }.toSet()
         assertTrue(targetSet.size == intSets.size, "duplicate targets: $intSets")
@@ -165,11 +165,11 @@ class AllDifferentTest {
             assertTrue(a.varId != b.varId, "swap should target distinct vars")
             assertTrue(
                 a.newValue == state.assignment.intValue(b.varId),
-                "swap part 0 takes part 1's old value"
+                "swap part 0 takes part 1's old value",
             )
             assertTrue(
                 b.newValue == state.assignment.intValue(a.varId),
-                "swap part 1 takes part 0's old value"
+                "swap part 1 takes part 0's old value",
             )
         }
     }
@@ -195,12 +195,12 @@ class AllDifferentTest {
         kotlin.test.assertEquals(
             4,
             v3Domain.min,
-            "v3's min should be tightened to 4 (Hall set [1,3] forbids 2,3 for v3); got $v3Domain"
+            "v3's min should be tightened to 4 (Hall set [1,3] forbids 2,3 for v3); got $v3Domain",
         )
         kotlin.test.assertEquals(
             5,
             v3Domain.max,
-            "v3's max should remain 5; got $v3Domain"
+            "v3's max should remain 5; got $v3Domain",
         )
     }
 
@@ -216,7 +216,7 @@ class AllDifferentTest {
         val baked = problem.baked
         assertTrue(
             baked is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
-            "expected bake-time Unsat from Hall pigeonhole; got $baked"
+            "expected bake-time Unsat from Hall pigeonhole; got $baked",
         )
     }
 
@@ -328,7 +328,7 @@ class AllDifferentTest {
         assertFails {
             LocalSearchSolver(
                 problem,
-                restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50)
+                restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50),
             ).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
         }
     }

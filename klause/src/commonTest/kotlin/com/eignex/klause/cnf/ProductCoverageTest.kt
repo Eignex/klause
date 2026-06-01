@@ -19,18 +19,22 @@ class ProductCoverageTest {
             factors = arrayOf<Factor>(factor),
         )
         val cnf = BitBlaster.compile(problem)
-        for (av in 0..3) for (bv in 0..3) for (rv in 0..3) {
-            val expected = (av * bv == rv)
-            val pins = mutableListOf<Int>()
-            for ((idx, value) in listOf(av, bv, rv).withIndex()) {
-                val bits = cnf.intVarBits[idx]
-                for (i in bits.indices) {
-                    pins += bits[i]
-                    pins += (value shr i) and 1
+        for (av in 0..3) {
+            for (bv in 0..3) {
+                for (rv in 0..3) {
+                    val expected = (av * bv == rv)
+                    val pins = mutableListOf<Int>()
+                    for ((idx, value) in listOf(av, bv, rv).withIndex()) {
+                        val bits = cnf.intVarBits[idx]
+                        for (i in bits.indices) {
+                            pins += bits[i]
+                            pins += (value shr i) and 1
+                        }
+                    }
+                    val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
+                    assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
                 }
             }
-            val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
-            assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
         }
     }
 }

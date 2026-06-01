@@ -56,20 +56,35 @@ import com.eignex.klause.solver.factor.Sequence as SequenceFactor
 internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name) {
     // Bool-only constraints
     "bool_clause" -> emitBoolClause(c)
+
     "bool_eq" -> emitBoolEq(c, negate = false)
+
     "bool_not" -> emitBoolEq(c, negate = true)
+
     "bool_xor" -> emitBoolXor(c)
+
     "array_bool_or" -> emitArrayBoolOr(c)
+
     "array_bool_and" -> emitArrayBoolAnd(c)
+
     "array_bool_xor" -> emitArrayBoolXor(c)
+
     "bool2int" -> emitBool2Int(c)
+
     "bool_and", "bool_and_reif" -> emitBoolAndOr(c, and = true)
+
     "bool_or", "bool_or_reif" -> emitBoolAndOr(c, and = false)
+
     "bool_xor_reif" -> emitBoolXorReif(c)
+
     "bool_le" -> emitBoolCmp(c, lt = false, reified = false)
+
     "bool_lt" -> emitBoolCmp(c, lt = true, reified = false)
+
     "bool_eq_reif" -> emitBoolCmpReif(c, eq = true, le = false, lt = false)
+
     "bool_le_reif" -> emitBoolCmpReif(c, eq = false, le = true, lt = false)
+
     "bool_lt_reif" -> emitBoolCmpReif(c, eq = false, le = false, lt = true)
 
     // Int comparisons (binary)
@@ -77,10 +92,12 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     // Reified int comparisons.
     "int_eq_reif", "int_ne_reif", "int_le_reif", "int_lt_reif",
-    "int_ge_reif", "int_gt_reif" -> emitIntCmpReif(c)
+    "int_ge_reif", "int_gt_reif",
+    -> emitIntCmpReif(c)
 
     // Int linear
     "int_lin_le", "int_lin_eq", "int_lin_ne" -> emitIntLinear(c, reified = false)
+
     "int_lin_le_reif", "int_lin_eq_reif", "int_lin_ne_reif" -> emitIntLinear(c, reified = true)
 
     // Bool linear / PB (encoded as int_lin with 0/1 coefs in FlatZinc emitters)
@@ -88,6 +105,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     // Float linear (translated through bucket indices)
     "float_lin_le", "float_lin_eq", "float_lin_ne" -> emitFloatLinear(c, reified = false)
+
     "float_lin_le_reif", "float_lin_eq_reif", "float_lin_ne_reif" -> emitFloatLinear(c, reified = true)
 
     // int↔float coercion: bind the int var to the float var's bucket index.
@@ -97,166 +115,273 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // via Linear / ReifiedLinear / Table factors. See [emitFloatBinaryCmp] for the
     // binary cmp path and [emitFloatMinMax] / [emitFloatTimes] for the rest.
     "float_eq" -> emitFloatBinaryCmp(c, op = LinearOp.EQ, strict = false, reified = false)
+
     "float_eq_reif" -> emitFloatBinaryCmp(c, op = LinearOp.EQ, strict = false, reified = true)
+
     "float_le" -> emitFloatBinaryCmp(c, op = LinearOp.LE, strict = false, reified = false)
+
     "float_le_reif" -> emitFloatBinaryCmp(c, op = LinearOp.LE, strict = false, reified = true)
+
     "float_lt" -> emitFloatBinaryCmp(c, op = LinearOp.LE, strict = true, reified = false)
+
     "float_lt_reif" -> emitFloatBinaryCmp(c, op = LinearOp.LE, strict = true, reified = true)
+
     "float_ne" -> emitFloatBinaryCmp(c, op = LinearOp.NE, strict = false, reified = false)
+
     "float_ne_reif" -> emitFloatBinaryCmp(c, op = LinearOp.NE, strict = false, reified = true)
+
     "float_lin_lt" -> emitFloatLinearStrict(c, reified = false)
+
     "float_lin_lt_reif" -> emitFloatLinearStrict(c, reified = true)
+
     "float_min" -> emitFloatMinMax(c, max = false)
+
     "float_max" -> emitFloatMinMax(c, max = true)
+
     "float_times" -> emitFloatTimes(c)
+
     // float_div(a, b, c) ⇔ float_times(b, c, a):  a = b · c.
     "float_div" -> emitFloatTimes(
         FznConstraint(
             name = "float_times",
             args = listOf(c.args[1], c.args[2], c.args[0]),
             annotations = c.annotations,
-        )
+        ),
     )
 
     // Global
     "all_different_int", "klause_all_different_int" -> emitAllDifferent(c)
+
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
+
     "alldifferent_except", "fzn_alldifferent_except" -> emitAllDifferentExcept(c)
+
     "all_equal_int", "fzn_all_equal_int", "klause_all_equal_int" -> emitAllEqual(c)
+
     "member_int", "fzn_member_int", "klause_member_int" -> emitMember(c)
+
     "sort", "fzn_sort", "klause_sort" -> emitSort(c)
+
     "arg_sort_int", "fzn_arg_sort_int", "klause_arg_sort_int", "arg_sort" -> emitArgSort(c)
+
     "symmetric_all_different", "fzn_symmetric_all_different", "klause_symmetric_all_different" -> emitSymmetricAllDifferent(
-        c
+        c,
     )
+
     "inverse", "fzn_inverse", "klause_inverse" -> emitInverse(c, withOffsets = false)
+
     "inverse_offsets", "fzn_inverse_offsets" -> emitInverse(c, withOffsets = true)
+
     "nvalue", "fzn_nvalue", "klause_nvalue" -> emitNValue(c, NValue.Mode.Eq)
+
     "atleast_nvalues", "fzn_atleast_nvalues" -> emitNValue(c, NValue.Mode.AtLeast)
+
     "atmost_nvalues", "fzn_atmost_nvalues" -> emitNValue(c, NValue.Mode.AtMost)
+
     "lex_less_int", "fzn_lex_less_int", "klause_lex_less_int" -> emitLexLess(c, strict = true)
+
     "lex_lesseq_int", "fzn_lex_lesseq_int", "klause_lex_lesseq_int" -> emitLexLess(c, strict = false)
+
     "arg_max_int", "fzn_arg_max_int" -> emitArgMinMax(c, max = true)
+
     "arg_min_int", "fzn_arg_min_int" -> emitArgMinMax(c, max = false)
+
     "value_precede_int", "fzn_value_precede_int", "klause_value_precede_int" -> emitValuePrecede(c)
+
     "value_precede_chain_int", "fzn_value_precede_chain_int", "klause_value_precede_chain_int" -> emitValuePrecedeChain(
-        c
+        c,
     )
+
     "sequence", "fzn_sequence" -> emitSequence(c)
+
     "knapsack", "fzn_knapsack", "klause_knapsack" -> emitKnapsack(c)
+
     "bin_packing", "fzn_bin_packing", "klause_bin_packing" -> emitBinPacking(c, BinPacking.Mode.UniformCapacity)
+
     "bin_packing_capa", "fzn_bin_packing_capa", "klause_bin_packing_capa" -> emitBinPacking(
         c,
-        BinPacking.Mode.PerBinCapacity
+        BinPacking.Mode.PerBinCapacity,
     )
+
     "bin_packing_load", "fzn_bin_packing_load", "klause_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
+
     "diffn", "fzn_diffn", "klause_diffn" -> emitDiffn(c, nonStrict = false)
+
     "diffn_nonstrict", "fzn_diffn_nonstrict", "klause_diffn_nonstrict" -> emitDiffn(c, nonStrict = true)
+
     "table_int", "fzn_table_int", "klause_table_int" -> emitTable(c)
+
     "regular", "fzn_regular", "klause_regular" -> emitRegular(c)
+
     "mdd", "fzn_mdd", "klause_mdd" -> emitMdd(c)
+
     "circuit", "fzn_circuit", "klause_circuit" -> emitCircuit(c, sub = false)
+
     "subcircuit", "fzn_subcircuit", "klause_subcircuit" -> emitCircuit(c, sub = true)
+
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
+
     "cumulatives", "fzn_cumulatives" -> emitCumulatives(c)
+
     "sliding_sum", "fzn_sliding_sum" -> emitSlidingSum(c)
+
     "fzn_geost_nonoverlap_k", "geost_nonoverlap_k" -> emitGeostNonoverlapK(c)
+
     "disjunctive", "fzn_disjunctive",
-    "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c)
+    "disjunctive_strict", "fzn_disjunctive_strict",
+    -> emitDisjunctive(c)
 
     // Arithmetic
     "int_times" -> emitIntTimes(c)
+
     "int_plus" -> emitIntPlus(c)
+
     "int_minus" -> emitIntMinus(c)
+
     "int_abs" -> emitIntAbs(c)
+
     "int_max" -> emitIntMaxMin(c, max = true)
+
     "int_min" -> emitIntMaxMin(c, max = false)
+
     "int_div" -> emitIntDiv(c)
+
     "int_mod" -> emitIntMod(c)
 
     // Array element
     "array_int_element" -> emitArrayIntElement(c, varArray = false)
+
     "array_var_int_element" -> emitArrayIntElement(c, varArray = true)
+
     "array_bool_element" -> emitArrayBoolElement(c, varArray = false)
+
     "array_var_bool_element" -> emitArrayBoolElement(c, varArray = true)
 
     // Counting
     "at_least_int" -> emitAtLeast(c)
+
     "at_most_int" -> emitAtMost(c)
+
     "count_eq", "fzn_count_eq" -> emitCountOp(c, Count.Op.Eq)
+
     "count_neq", "fzn_count_neq" -> emitCountOp(c, Count.Op.Ne)
+
     "count_le", "fzn_count_leq", "count_leq" -> emitCountOp(c, Count.Op.Le)
+
     "count_lt", "fzn_count_lt" -> emitCountOp(c, Count.Op.Lt)
+
     "count_ge", "fzn_count_geq", "count_geq" -> emitCountOp(c, Count.Op.Ge)
+
     "count_gt", "fzn_count_gt" -> emitCountOp(c, Count.Op.Gt)
+
     "among", "fzn_among", "klause_among" -> emitAmong(c)
+
     "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, lowUp = false, closed = false)
+
     "global_cardinality_closed", "fzn_global_cardinality_closed" -> emitGcc(c, lowUp = false, closed = true)
+
     "global_cardinality_low_up", "fzn_global_cardinality_low_up" -> emitGcc(c, lowUp = true, closed = false)
+
     "global_cardinality_low_up_closed", "fzn_global_cardinality_low_up_closed" -> emitGcc(
         c,
         lowUp = true,
-        closed = true
+        closed = true,
     )
+
     "distribute", "fzn_distribute" -> emitDistribute(c)
 
     // Ordering
     "increasing_int", "fzn_increasing_int", "klause_increasing_int" -> emitMonotone(c, ascending = true, strict = false)
+
     "decreasing_int", "fzn_decreasing_int" -> emitMonotone(c, ascending = false, strict = false)
+
     "strictly_increasing_int", "fzn_strictly_increasing_int", "klause_strictly_increasing_int" -> emitMonotone(
         c,
         ascending = true,
-        strict = true
+        strict = true,
     )
+
     "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, ascending = false, strict = true)
 
     // Array min/max
     "array_int_maximum", "fzn_array_int_maximum",
-    "maximum_int", "fzn_maximum_int" -> emitArrayMinMax(c, max = true)
+    "maximum_int", "fzn_maximum_int",
+    -> emitArrayMinMax(c, max = true)
+
     "array_int_minimum", "fzn_array_int_minimum",
-    "minimum_int", "fzn_minimum_int" -> emitArrayMinMax(c, max = false)
+    "minimum_int", "fzn_minimum_int",
+    -> emitArrayMinMax(c, max = false)
+
     "exactly_int", "fzn_exactly_int" -> emitExactly(c)
 
     // Bool variants of int globals — channel each bool lit to a 0/1 int and reuse the
     // existing int factor. Channels are allocated lazily per constraint; the engine
     // handles deduplication via standard propagation.
     "increasing_bool", "fzn_increasing_bool" -> emitMonotoneBool(c, ascending = true, strict = false)
+
     "decreasing_bool", "fzn_decreasing_bool" -> emitMonotoneBool(c, ascending = false, strict = false)
+
     "strictly_increasing_bool", "fzn_strictly_increasing_bool" -> emitMonotoneBool(c, ascending = true, strict = true)
+
     "strictly_decreasing_bool", "fzn_strictly_decreasing_bool" -> emitMonotoneBool(c, ascending = false, strict = true)
+
     "lex_less_bool", "fzn_lex_less_bool" -> emitLexLessBool(c, strict = true)
+
     "lex_lesseq_bool", "fzn_lex_lesseq_bool" -> emitLexLessBool(c, strict = false)
+
     "arg_max_bool", "fzn_arg_max_bool" -> emitArgMinMaxBool(c, max = true)
+
     "arg_min_bool", "fzn_arg_min_bool" -> emitArgMinMaxBool(c, max = false)
+
     "table_bool", "fzn_table_bool" -> emitTableBool(c)
 
     // MZN Challenge LS-track conventions: when [FlatZincCompiler.forLocalSearch] is set,
     // both annotations drop entirely; otherwise they assert their bool arg is true so the
     // wrapped constraint is enforced as the CP solver expects.
     "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
-    "redundant_constraint", "fzn_redundant_constraint" -> emitAnnotationConstraint(c)
+    "redundant_constraint", "fzn_redundant_constraint",
+    -> emitAnnotationConstraint(c)
 
     // Set predicates: bool-indicator decomposition. Each `var set of E` materialises as one
     // bool per universe element; set algebra becomes bool algebra over those indicators.
     "set_in", "fzn_set_in" -> emitSetIn(c, reified = false)
+
     "set_in_reif", "fzn_set_in_reif" -> emitSetIn(c, reified = true)
+
     "set_subset", "fzn_set_subset" -> emitSetSubset(c, reified = false)
+
     "set_subset_reif", "fzn_set_subset_reif" -> emitSetSubset(c, reified = true)
+
     "set_eq", "fzn_set_eq" -> emitSetEq(c, reified = false)
+
     "set_eq_reif", "fzn_set_eq_reif" -> emitSetEq(c, reified = true)
+
     "set_le", "fzn_set_le" -> emitSetLex(c, strict = false, reified = false)
+
     "set_le_reif", "fzn_set_le_reif" -> emitSetLex(c, strict = false, reified = true)
+
     "set_lt", "fzn_set_lt" -> emitSetLex(c, strict = true, reified = false)
+
     "set_lt_reif", "fzn_set_lt_reif" -> emitSetLex(c, strict = true, reified = true)
+
     "array_set_element", "fzn_array_set_element" -> emitArraySetElement(c, varArray = false)
+
     "array_var_set_element", "fzn_array_var_set_element" -> emitArraySetElement(c, varArray = true)
+
     "set_ne", "fzn_set_ne" -> emitSetNe(c, reified = false)
+
     "set_ne_reif", "fzn_set_ne_reif" -> emitSetNe(c, reified = true)
+
     "set_card", "fzn_set_card" -> emitSetCard(c)
+
     "set_union", "fzn_set_union" -> emitSetUnion(c)
+
     "set_intersect", "fzn_set_intersect" -> emitSetIntersect(c)
+
     "set_diff", "fzn_set_diff" -> emitSetDiff(c)
+
     "all_disjoint", "fzn_all_disjoint" -> emitAllDisjoint(c)
+
     "set_partition_into", "fzn_set_partition_into" -> emitSetPartitionInto(c)
 
     else -> failHere("unsupported FlatZinc builtin `${c.name}`")
@@ -272,10 +397,12 @@ internal fun FlatZincCompiler.emitBoolClause(c: FznConstraint) {
 
 internal fun FlatZincCompiler.evalBoolVarArrayNegated(e: FznExpr): IntArray = when (e) {
     is FznExpr.ArrayLit -> IntArray(e.elements.size) { Lit.negate(resolveBoolLit(e.elements[it])) }
+
     is FznExpr.Ident -> when (val arr = arrays[e.name]) {
         is FlatZincArray.Vars -> IntArray(arr.varIds.size) { Lit.make(arr.varIds[it], false) }
         else -> failHere("`${e.name}` is not a bool var array")
     }
+
     else -> failHere("expected bool var array, got ${e::class.simpleName}")
 }
 
@@ -374,6 +501,7 @@ internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, eq: Boolean, le:
             // r ↔ (a = b) ⇔ ¬(a ⊕ b). Equivalent to bool_xor(a, b, ¬r).
             factors.add(Xor(intArrayOf(a, b, Lit.negate(r)), targetParity = 0))
         }
+
         le -> {
             // r ↔ (a → b) ⇔ r ↔ (¬a ∨ b).
             // (¬r ∨ ¬a ∨ b), (r ∨ a), (r ∨ ¬b)
@@ -381,6 +509,7 @@ internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, eq: Boolean, le:
             factors.add(Clause(intArrayOf(r, a)))
             factors.add(Clause(intArrayOf(r, Lit.negate(b))))
         }
+
         lt -> {
             // r ↔ (¬a ∧ b).
             // r → ¬a:  (¬r ∨ ¬a)
@@ -409,8 +538,8 @@ internal fun FlatZincCompiler.emitBool2Int(c: FznConstraint) {
             coeffs = intArrayOf(1),
             vars = intArrayOf(x),
             op = LinearOp.EQ,
-            bound = targetBound
-        )
+            bound = targetBound,
+        ),
     )
 }
 
@@ -420,20 +549,26 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
     val b = resolveIntVarOrConst(c.args[1])
     val op = when (c.name) {
         "int_le" -> LinearOp.LE
+
         "int_lt" -> {
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), LinearOp.LE, -1 - b.offset))
             return
         }
+
         "int_eq" -> LinearOp.EQ
+
         "int_ne" -> LinearOp.NE
+
         "int_ge" -> {
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), LinearOp.GE, -b.offset))
             return
         }
+
         "int_gt" -> {
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), LinearOp.GE, 1 - b.offset))
             return
         }
+
         else -> failHere("unhandled int cmp ${c.name}")
     }
     factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), op, -b.offset))
@@ -447,6 +582,7 @@ internal fun FlatZincCompiler.resolveIntVarOrConst(e: FznExpr): IntVarRef = when
         val v = resolveIntVar(e)
         IntVarRef(v, 0)
     }
+
     else -> IntVarRef(resolveIntVar(e), 0)
 }
 
@@ -551,7 +687,7 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
             intArrayOf(xInt, yBk.varId),
             LinearOp.EQ,
             bound.toInt(),
-        )
+        ),
     )
 }
 
@@ -562,10 +698,13 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
  */
 private fun FlatZincCompiler.resolveFloatVarOrConst(e: FznExpr): FloatRef = when (e) {
     is FznExpr.FloatLit -> FloatRef.Const(e.value)
+
     is FznExpr.IntLit -> FloatRef.Const(e.value.toDouble())
+
     is FznExpr.Ident -> floatVars[e.name]?.let { FloatRef.Var(it) }
         ?: (params[e.name] as? FlatZincCompiler.ParamValue.Float)?.let { FloatRef.Const(it.value) }
         ?: failHere("`${e.name}` is not a float var or float param")
+
     else -> failHere("expected float var or float constant, got ${e::class.simpleName}")
 }
 
@@ -581,12 +720,7 @@ private sealed interface FloatRef {
  * [emitFloatLinear] by synthesising the equivalent `float_lin_*` constraint so the same
  * bucket-scaling logic runs in one place.
  */
-internal fun FlatZincCompiler.emitFloatBinaryCmp(
-    c: FznConstraint,
-    op: LinearOp,
-    strict: Boolean,
-    reified: Boolean,
-) {
+internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp, strict: Boolean, reified: Boolean) {
     require(c.args.size == if (reified) 3 else 2)
     val a = resolveFloatVarOrConst(c.args[0])
     val b = resolveFloatVarOrConst(c.args[1])
@@ -603,15 +737,16 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
                         intArrayOf(
-                            if (holds) r else com.eignex.klause.solver.Lit.negate(r)
-                        )
-                    )
+                            if (holds) r else com.eignex.klause.solver.Lit.negate(r),
+                        ),
+                    ),
                 )
             } else if (!holds) {
                 factors.add(com.eignex.klause.solver.factor.Clause(IntArray(0)))
             }
             return
         }
+
         else -> Unit
     }
     val varSide = if (a is FloatRef.Var) a.bk else (b as FloatRef.Var).bk
@@ -652,8 +787,8 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(
                 coeffs,
                 vars,
                 finalOp,
-                finalBound.toInt()
-            )
+                finalBound.toInt(),
+            ),
         )
     } else {
         factors.add(Linear(coeffs, vars, finalOp, finalBound.toInt()))
@@ -694,8 +829,8 @@ internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: B
                 scaledCoeffs,
                 vars,
                 LinearOp.LE,
-                scaledBound.toInt()
-            )
+                scaledBound.toInt(),
+            ),
         )
     } else {
         factors.add(Linear(scaledCoeffs, vars, LinearOp.LE, scaledBound.toInt()))
@@ -750,8 +885,8 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
             intArrayOf(
                 com.eignex.klause.solver.Lit.make(auxA, true),
                 com.eignex.klause.solver.Lit.make(auxB, true),
-            )
-        )
+            ),
+        ),
     )
 }
 
@@ -810,8 +945,8 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     factors.add(
         com.eignex.klause.solver.factor.Table(
             intArrayOf(a.varId, b.varId, cBk.varId),
-            rows.toIntArray()
-        )
+            rows.toIntArray(),
+        ),
     )
 }
 
@@ -821,12 +956,15 @@ internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing
             ?: failHere("float var array: expected identifier element")
         floatVars[name] ?: failHere("`$name` is not a float var")
     }
+
     is FznExpr.Ident -> when (val arr = arrays[e.name]) {
         is FlatZincArray.Vars ->
             arr.floatBucketings
                 ?: failHere("`${e.name}` is not a float var array")
+
         else -> failHere("`${e.name}` is not a float var array")
     }
+
     else -> failHere("expected float var array, got ${e::class.simpleName}")
 }
 
@@ -938,8 +1076,10 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
     }
     val labels: List<IntArray> = when (val la = c.args[5]) {
         is FznExpr.ArrayLit -> la.elements.map(::setOfExpr)
+
         is FznExpr.Ident -> (arrays[la.name] as? FlatZincArray.IntSetParam)?.values
             ?: failHere("mdd: `${la.name}` is not a set-of-int parameter array")
+
         else -> failHere("mdd: unsupported label arg ${la::class.simpleName}")
     }
     val numLayers = n + 1
@@ -953,7 +1093,9 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
         if (lyr in 0 until n) {
             localIdx[node - 1] = countPerLayer[lyr]
             countPerLayer[lyr]++
-        } else if (lyr == n) localIdx[node - 1] = 0 // a node explicitly at terminal level
+        } else if (lyr == n) {
+            localIdx[node - 1] = 0 // a node explicitly at terminal level
+        }
     }
     // Bucket transitions by layer, then flatten with layerStarts.
     val perLayer = Array(numLayers) { ArrayList<Int>() }
@@ -986,7 +1128,7 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
             initial = 0,
             accepting = intArrayOf(0),
             recordStride = 3,
-        )
+        ),
     )
 }
 
@@ -1021,7 +1163,7 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
             widthVars = wVars,
             heightVars = hVars,
             nonStrict = nonStrict,
-        )
+        ),
     )
 }
 
@@ -1045,11 +1187,13 @@ internal fun FlatZincCompiler.emitBinPacking(c: FznConstraint, mode: BinPacking.
             bins = evalIntVarArray(c.args[1])
             weights = evalIntConstArray(c.args[2])
         }
+
         BinPacking.Mode.PerBinCapacity -> {
             caps = evalIntConstArray(c.args[0])
             bins = evalIntVarArray(c.args[1])
             weights = evalIntConstArray(c.args[2])
         }
+
         BinPacking.Mode.LoadVars -> {
             loads = evalIntVarArray(c.args[0])
             bins = evalIntVarArray(c.args[1])
@@ -1077,7 +1221,7 @@ internal fun FlatZincCompiler.emitBinPacking(c: FznConstraint, mode: BinPacking.
             loadVars = loads,
             numBins = numBins,
             binOffset = offset,
-        )
+        ),
     )
 }
 
@@ -1223,7 +1367,7 @@ internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
                     vars = intArrayOf(srcIds[i], auxId),
                     op = LinearOp.EQ,
                     bound = offset,
-                )
+                ),
             )
             auxId
         }
@@ -1252,7 +1396,7 @@ internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
             durationVars = durationVars,
             resourceVars = resourceVars,
             capacityVar = capacityVar,
-        )
+        ),
     )
 }
 
@@ -1283,7 +1427,7 @@ internal fun FlatZincCompiler.emitCumulatives(c: FznConstraint) {
             durationVars = durationVars,
             resourceVars = resourceVars,
             boundVars = boundVars,
-        )
+        ),
     )
 }
 
@@ -1321,7 +1465,7 @@ internal fun FlatZincCompiler.emitGeostNonoverlapK(c: FznConstraint) {
             numObjects = 2,
             origin = x1 + x2,
             length = w1 + w2,
-        )
+        ),
     )
 }
 
@@ -1361,7 +1505,7 @@ internal fun FlatZincCompiler.emitIntTimes(c: FznConstraint) {
             a = resolveIntVar(c.args[0]),
             b = resolveIntVar(c.args[1]),
             result = resolveIntVar(c.args[2]),
-        )
+        ),
     )
 }
 
@@ -1481,7 +1625,7 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             vars = intArrayOf(prod, rem, a),
             op = com.eignex.klause.solver.factor.LinearOp.EQ,
             bound = 0,
-        )
+        ),
     )
     // |rem| < |b|: encode as rem < |b| AND -rem < |b|, where |b| via aux.
     // Simpler equivalent: rem ≤ |b| - 1 and rem ≥ -|b| + 1. We channel |b| via int_abs.
@@ -1492,16 +1636,16 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1, -1),
             intArrayOf(b, absB),
             com.eignex.klause.solver.factor.LinearOp.LE,
-            0
-        )
+            0,
+        ),
     )
     factors.add(
         com.eignex.klause.solver.factor.Linear(
             intArrayOf(-1, -1),
             intArrayOf(b, absB),
             com.eignex.klause.solver.factor.LinearOp.LE,
-            0
-        )
+            0,
+        ),
     )
     val absBpa = allocBool("__div_absb_pa_${a}_$b")
     val absBpb = allocBool("__div_absb_pb_${a}_$b")
@@ -1511,8 +1655,8 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1, -1),
             intArrayOf(absB, b),
             com.eignex.klause.solver.factor.LinearOp.EQ,
-            0
-        )
+            0,
+        ),
     )
     factors.add(
         com.eignex.klause.solver.factor.ReifiedLinear(
@@ -1520,13 +1664,13 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1, 1),
             intArrayOf(absB, b),
             com.eignex.klause.solver.factor.LinearOp.EQ,
-            0
-        )
+            0,
+        ),
     )
     factors.add(
         com.eignex.klause.solver.factor.Clause(
-            intArrayOf(Lit.make(absBpa, true), Lit.make(absBpb, true))
-        )
+            intArrayOf(Lit.make(absBpa, true), Lit.make(absBpb, true)),
+        ),
     )
     // rem ≤ absB - 1: rem - absB ≤ -1.
     factors.add(
@@ -1534,8 +1678,8 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1, -1),
             intArrayOf(rem, absB),
             com.eignex.klause.solver.factor.LinearOp.LE,
-            -1
-        )
+            -1,
+        ),
     )
     // rem ≥ -absB + 1: -rem - absB ≤ -1.
     factors.add(
@@ -1543,8 +1687,8 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(-1, -1),
             intArrayOf(rem, absB),
             com.eignex.klause.solver.factor.LinearOp.LE,
-            -1
-        )
+            -1,
+        ),
     )
     // Truncated semantics: sign(rem) = sign(a) when rem != 0.
     //   rem > 0 → a ≥ 0;  rem < 0 → a ≤ 0;  rem = 0 → no constraint.
@@ -1559,8 +1703,8 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1),
             intArrayOf(rem),
             com.eignex.klause.solver.factor.LinearOp.GE,
-            1
-        )
+            1,
+        ),
     )
     factors.add(
         com.eignex.klause.solver.factor.ReifiedLinear(
@@ -1568,8 +1712,8 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1),
             intArrayOf(rem),
             com.eignex.klause.solver.factor.LinearOp.LE,
-            -1
-        )
+            -1,
+        ),
     )
     val aNonNeg = allocBool("__div_apos_${a}_$b")
     val aNonPos = allocBool("__div_aneg_${a}_$b")
@@ -1579,8 +1723,8 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1),
             intArrayOf(a),
             com.eignex.klause.solver.factor.LinearOp.GE,
-            0
-        )
+            0,
+        ),
     )
     factors.add(
         com.eignex.klause.solver.factor.ReifiedLinear(
@@ -1588,20 +1732,20 @@ internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remV
             intArrayOf(1),
             intArrayOf(a),
             com.eignex.klause.solver.factor.LinearOp.LE,
-            0
-        )
+            0,
+        ),
     )
     // remPos → aNonNeg:  ¬remPos ∨ aNonNeg
     factors.add(
         com.eignex.klause.solver.factor.Clause(
-            intArrayOf(Lit.make(remPos, false), Lit.make(aNonNeg, true))
-        )
+            intArrayOf(Lit.make(remPos, false), Lit.make(aNonNeg, true)),
+        ),
     )
     // remNeg → aNonPos:  ¬remNeg ∨ aNonPos
     factors.add(
         com.eignex.klause.solver.factor.Clause(
-            intArrayOf(Lit.make(remNeg, false), Lit.make(aNonPos, true))
-        )
+            intArrayOf(Lit.make(remNeg, false), Lit.make(aNonPos, true)),
+        ),
     )
 }
 
@@ -1653,11 +1797,19 @@ internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
     val vars = intArrayOf(a, b)
     val (op, bound) = when (c.name) {
         "int_eq_reif" -> LinearOp.EQ to 0
+
         "int_ne_reif" -> LinearOp.NE to 0
+
         "int_le_reif" -> LinearOp.LE to 0
-        "int_lt_reif" -> LinearOp.LE to -1 // a < b  ⇔  a - b ≤ -1
+
+        "int_lt_reif" -> LinearOp.LE to -1
+
+        // a < b  ⇔  a - b ≤ -1
         "int_ge_reif" -> LinearOp.GE to 0
-        "int_gt_reif" -> LinearOp.GE to 1 // a > b  ⇔  a - b ≥ 1
+
+        "int_gt_reif" -> LinearOp.GE to 1
+
+        // a > b  ⇔  a - b ≥ 1
         else -> failHere("unhandled reified int cmp `${c.name}`")
     }
     factors.add(ReifiedLinear(r, coeffs, vars, op, bound))
@@ -1684,29 +1836,28 @@ internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
 
 /** `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
  *  ordering, lowered to a single [Monotone] factor. */
+
 /**
  * Channel a bool literal array into a parallel int-var array with domain [0, 1] each.
  * Adds a ReifiedLinear per literal that ties `lit ↔ (channel = 1)`. Returns the new int
  * var ids in the same order. Used by the bool-variant dispatches that reuse int factors.
  */
-internal fun FlatZincCompiler.channelBoolsToInts(lits: IntArray, tag: String): IntArray {
-    return IntArray(lits.size) { i ->
-        val ch = allocInt("__chan_${tag}_$i", 0, 1)
-        // lit ↔ (ch = 1): ReifiedLinear with auxBoolVar = variable of lit, polarity-aware.
-        // For a positive literal: aux = lit's var directly.
-        // For a negative literal: lit = ¬b, so b ↔ (ch = 0) which is the same as ¬b ↔ (ch = 1).
-        val (auxVar, useNegatedTarget) = Lit.variable(lits[i]) to !Lit.isPositive(lits[i])
-        factors.add(
-            ReifiedLinear(
-                auxBoolVar = auxVar,
-                coeffs = intArrayOf(1),
-                vars = intArrayOf(ch),
-                op = LinearOp.EQ,
-                bound = if (useNegatedTarget) 0 else 1,
-            )
-        )
-        ch
-    }
+internal fun FlatZincCompiler.channelBoolsToInts(lits: IntArray, tag: String): IntArray = IntArray(lits.size) { i ->
+    val ch = allocInt("__chan_${tag}_$i", 0, 1)
+    // lit ↔ (ch = 1): ReifiedLinear with auxBoolVar = variable of lit, polarity-aware.
+    // For a positive literal: aux = lit's var directly.
+    // For a negative literal: lit = ¬b, so b ↔ (ch = 0) which is the same as ¬b ↔ (ch = 1).
+    val (auxVar, useNegatedTarget) = Lit.variable(lits[i]) to !Lit.isPositive(lits[i])
+    factors.add(
+        ReifiedLinear(
+            auxBoolVar = auxVar,
+            coeffs = intArrayOf(1),
+            vars = intArrayOf(ch),
+            op = LinearOp.EQ,
+            bound = if (useNegatedTarget) 0 else 1,
+        ),
+    )
+    ch
 }
 
 internal fun FlatZincCompiler.emitMonotoneBool(c: FznConstraint, ascending: Boolean, strict: Boolean) {
@@ -1859,7 +2010,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: 
                 countLow = lo,
                 countHigh = up,
                 closed = closed,
-            )
+            ),
         )
     } else {
         // MZN allows the `counts` argument to be either an int-var array (the standard
@@ -1875,7 +2026,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: 
                     countLow = countsAsConst,
                     countHigh = countsAsConst,
                     closed = closed,
-                )
+                ),
             )
             return
         }
@@ -1886,7 +2037,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: 
                 cover = cover,
                 countVars = countVars,
                 closed = closed,
-            )
+            ),
         )
     }
 }
@@ -1909,13 +2060,16 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
     val setLit = c.args[2]
     val values: IntArray = when (setLit) {
         is FznExpr.IntSetLit -> IntArray(setLit.values.size) { setLit.values[it].toInt() }
+
         is FznExpr.IntRangeLit -> IntArray((setLit.hi - setLit.lo + 1).toInt()) { (setLit.lo + it).toInt() }
+
         is FznExpr.Ident -> {
             val p = params[setLit.name] ?: failHere("undefined parameter `${setLit.name}` in among")
             (p as? FlatZincCompiler.ParamValue.IntSet)?.values?.let { vs ->
                 IntArray(vs.size) { vs[it].toInt() }
             } ?: failHere("`${setLit.name}` is not an int-set parameter")
         }
+
         else -> failHere("among: expected set literal or parameter, got ${setLit::class.simpleName}")
     }
     factors.add(Among(n, xs, values))
@@ -1960,7 +2114,7 @@ internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
                     vars = intArrayOf(id),
                     op = LinearOp.EQ,
                     bound = 1,
-                )
+                ),
             )
             id
         }
@@ -1996,15 +2150,18 @@ internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout = when (e)
         val members = resolveSetLiteral(e)
         materialisePinnedSetLayout("__set_param_${e.name}", members)
     }
+
     is FznExpr.ArrayAccess -> {
         val arr = arrays[e.name] as? FlatZincArray.SetVars
             ?: failHere("`${e.name}` is not a set var array")
         arr.layouts[e.index - 1]
     }
+
     is FznExpr.IntSetLit, is FznExpr.IntRangeLit -> {
         val members = resolveSetLiteral(e)
         materialisePinnedSetLayout("__set_lit_${setVarsByName.size}", members)
     }
+
     else -> failHere("expected a set var reference, got ${e::class.simpleName}")
 }
 
@@ -2029,7 +2186,9 @@ private fun FlatZincCompiler.materialisePinnedSetLayout(name: String, members: I
 /** Resolve a set-literal expression to its element list (sorted ascending). */
 internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e) {
     is FznExpr.IntSetLit -> e.values.map { it.toInt() }.toIntArray().also { it.sort() }
+
     is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
+
     is FznExpr.Ident -> {
         // Parameter set: resolve via params map.
         val pv = params[e.name] ?: failHere("undefined set parameter `${e.name}`")
@@ -2038,6 +2197,7 @@ internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e)
             else -> failHere("`${e.name}` is not a set parameter")
         }
     }
+
     else -> failHere("expected a set literal, got ${e::class.simpleName}")
 }
 
@@ -2103,7 +2263,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
                 vars = intArrayOf(xVar),
                 op = LinearOp.EQ,
                 bound = v,
-            )
+            ),
         )
         membershipLits += Lit.make(chan, true)
     }
@@ -2129,7 +2289,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
             literals = membershipLits.toIntArray(),
             min = 1,
             max = membershipLits.size,
-        )
+        ),
     )
     // Lit.variable strips polarity; if r is negated, flip the reification by swapping
     // the cardinality bound (atLeastOne ↔ exactlyZero on a negated reification).
@@ -2145,7 +2305,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
                 literals = membershipLits.toIntArray(),
                 min = 0,
                 max = 0,
-            )
+            ),
         )
     }
 }
@@ -2171,13 +2331,7 @@ private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, r
     }
 }
 
-private fun FlatZincCompiler.emitSetInVarInt(
-    xVar: Int,
-    xLo: Int,
-    xHi: Int,
-    layout: SetVarLayout,
-    rExpr: FznExpr?,
-) {
+private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layout: SetVarLayout, rExpr: FznExpr?) {
     val membershipLits = ArrayList<Int>()
     for (v in xLo..xHi) {
         // chanᵥ ↔ (x = v) via int_lin_eq_reif([1], [x], v, chanᵥ).
@@ -2189,7 +2343,7 @@ private fun FlatZincCompiler.emitSetInVarInt(
                 vars = intArrayOf(xVar),
                 op = LinearOp.EQ,
                 bound = v,
-            )
+            ),
         )
         val setIdx = layout.elements.bsearch(v)
         if (rExpr == null) {
@@ -2204,8 +2358,8 @@ private fun FlatZincCompiler.emitSetInVarInt(
                         intArrayOf(
                             Lit.make(chan, false),
                             Lit.make(layout.indicatorBoolIds[setIdx], true),
-                        )
-                    )
+                        ),
+                    ),
                 )
             }
         } else {
@@ -2386,7 +2540,9 @@ internal fun FlatZincCompiler.resolveSetVarArray(e: FznExpr): List<SetVarLayout>
         is FlatZincArray.SetVars -> a.layouts
         else -> failHere("`${e.name}` is not an array of set vars")
     }
+
     is FznExpr.ArrayLit -> e.elements.map { resolveSetVar(it) }
+
     else -> failHere("expected an array of set vars, got ${e::class.simpleName}")
 }
 
@@ -2450,8 +2606,8 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(ch),
                     op = LinearOp.EQ,
-                    bound = elem
-                )
+                    bound = elem,
+                ),
             )
             // For "ind=false ⇒ ch=lo", allocate negation aux.
             val negInd = allocBool("__setlex_${label}_neg_${set.name}_${elem}_${factors.size}")
@@ -2460,16 +2616,16 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                     intArrayOf(
                         com.eignex.klause.solver.Lit.make(ind, true),
                         com.eignex.klause.solver.Lit.make(negInd, true),
-                    )
-                )
+                    ),
+                ),
             )
             factors.add(
                 com.eignex.klause.solver.factor.Clause(
                     intArrayOf(
                         com.eignex.klause.solver.Lit.make(ind, false),
                         com.eignex.klause.solver.Lit.make(negInd, false),
-                    )
-                )
+                    ),
+                ),
             )
             factors.add(
                 ReifiedLinear(
@@ -2477,8 +2633,8 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(ch),
                     op = LinearOp.EQ,
-                    bound = lo
-                )
+                    bound = lo,
+                ),
             )
         }
         val maxVar = allocInt("__setlex_${label}max_${set.name}_${factors.size}", lo, hi)
@@ -2513,33 +2669,36 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                 // Neither set has the element: b[last] = true trivially.
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.make(b[last], true))))
             }
+
             sHas == null -> {
                 // S can't have it: implication is vacuously true → b[last] = true.
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.make(b[last], true))))
             }
+
             tHas == null -> {
                 // T can't have it: b[last] = ¬S_has.
                 // b ↔ ¬s_has: (b ∨ s_has) ∧ (¬b ∨ ¬s_has)
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.make(b[last], true), sHas)))
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.make(b[last], false), emptyLit.negate(sHas))
-                    )
+                        intArrayOf(emptyLit.make(b[last], false), emptyLit.negate(sHas)),
+                    ),
                 )
             }
+
             else -> {
                 // b ↔ (¬s_has ∨ t_has):
                 // (¬b ∨ ¬s_has ∨ t_has) ∧ (b ∨ s_has) ∧ (b ∨ ¬t_has)
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.make(b[last], false), emptyLit.negate(sHas), tHas)
-                    )
+                        intArrayOf(emptyLit.make(b[last], false), emptyLit.negate(sHas), tHas),
+                    ),
                 )
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.make(b[last], true), sHas)))
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.make(b[last], true), emptyLit.negate(tHas))
-                    )
+                        intArrayOf(emptyLit.make(b[last], true), emptyLit.negate(tHas)),
+                    ),
                 )
             }
         }
@@ -2577,6 +2736,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(nbi, bn)))
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(bi, nbn)))
             }
+
             sHas == null -> {
                 // S can't have elem: case is (0, T_has). T_has=0 → b[i]=b[i+1]; T_has=1 → b[i]=(xmax<elem).
                 // Implications guarded by tHas/¬tHas:
@@ -2587,23 +2747,25 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(tHas), nbi, xmaxLessLit)))
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.negate(tHas), bi, emptyLit.negate(xmaxLessLit))
-                    )
+                        intArrayOf(emptyLit.negate(tHas), bi, emptyLit.negate(xmaxLessLit)),
+                    ),
                 )
             }
+
             tHas == null -> {
                 // T can't have elem: case is (S_has, 0). S_has=0 → b[i]=b[i+1]; S_has=1 → b[i]=(ymax>elem).
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(sHas, nbi, bn)))
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(sHas, bi, nbn)))
                 factors.add(
-                    com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(sHas), nbi, ymaxGreaterLit))
+                    com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(sHas), nbi, ymaxGreaterLit)),
                 )
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.negate(sHas), bi, emptyLit.negate(ymaxGreaterLit))
-                    )
+                        intArrayOf(emptyLit.negate(sHas), bi, emptyLit.negate(ymaxGreaterLit)),
+                    ),
                 )
             }
+
             else -> {
                 // Both indicators exist. Four sub-cases by (S_has, T_has):
                 // (0,0): both absent → b[i]=b[i+1]  | guard: ¬S ∧ ¬T
@@ -2615,32 +2777,34 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                 factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(sHas, tHas, bi, nbn)))
                 // (¬S ∧ T) → (b[i] ↔ xmaxLess):
                 factors.add(
-                    com.eignex.klause.solver.factor.Clause(intArrayOf(sHas, emptyLit.negate(tHas), nbi, xmaxLessLit))
+                    com.eignex.klause.solver.factor.Clause(intArrayOf(sHas, emptyLit.negate(tHas), nbi, xmaxLessLit)),
                 )
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(sHas, emptyLit.negate(tHas), bi, emptyLit.negate(xmaxLessLit))
-                    )
+                        intArrayOf(sHas, emptyLit.negate(tHas), bi, emptyLit.negate(xmaxLessLit)),
+                    ),
                 )
                 // (S ∧ ¬T) → (b[i] ↔ ymaxGreater):
                 factors.add(
-                    com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(sHas), tHas, nbi, ymaxGreaterLit))
+                    com.eignex.klause.solver.factor.Clause(
+                        intArrayOf(emptyLit.negate(sHas), tHas, nbi, ymaxGreaterLit),
+                    ),
                 )
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.negate(sHas), tHas, bi, emptyLit.negate(ymaxGreaterLit))
-                    )
+                        intArrayOf(emptyLit.negate(sHas), tHas, bi, emptyLit.negate(ymaxGreaterLit)),
+                    ),
                 )
                 // (S ∧ T) → (b[i] ↔ b[i+1]):
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.negate(sHas), emptyLit.negate(tHas), nbi, bn)
-                    )
+                        intArrayOf(emptyLit.negate(sHas), emptyLit.negate(tHas), nbi, bn),
+                    ),
                 )
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(emptyLit.negate(sHas), emptyLit.negate(tHas), bi, nbn)
-                    )
+                        intArrayOf(emptyLit.negate(sHas), emptyLit.negate(tHas), bi, nbn),
+                    ),
                 )
             }
         }
@@ -2655,7 +2819,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
         // r ↔ verdict
         factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(r, emptyLit.make(verdict, false))))
         factors.add(
-            com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(r), emptyLit.make(verdict, true)))
+            com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(r), emptyLit.make(verdict, true))),
         )
     } else {
         // Strict variants: combine verdict with set-inequality.
@@ -2666,24 +2830,24 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
         // (¬strict ∨ verdict) ∧ (¬strict ∨ ¬eq) ∧ (strict ∨ ¬verdict ∨ eq)
         factors.add(
             com.eignex.klause.solver.factor.Clause(
-                intArrayOf(emptyLit.make(strictAux, false), emptyLit.make(verdict, true))
-            )
+                intArrayOf(emptyLit.make(strictAux, false), emptyLit.make(verdict, true)),
+            ),
         )
         factors.add(
             com.eignex.klause.solver.factor.Clause(
-                intArrayOf(emptyLit.make(strictAux, false), emptyLit.make(eqAux, false))
-            )
+                intArrayOf(emptyLit.make(strictAux, false), emptyLit.make(eqAux, false)),
+            ),
         )
         factors.add(
             com.eignex.klause.solver.factor.Clause(
-                intArrayOf(emptyLit.make(strictAux, true), emptyLit.make(verdict, false), emptyLit.make(eqAux, true))
-            )
+                intArrayOf(emptyLit.make(strictAux, true), emptyLit.make(verdict, false), emptyLit.make(eqAux, true)),
+            ),
         )
         if (reified) {
             val r = resolveBoolLit(c.args[2])
             factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(r, emptyLit.make(strictAux, false))))
             factors.add(
-                com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(r), emptyLit.make(strictAux, true)))
+                com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.negate(r), emptyLit.make(strictAux, true))),
             )
         } else {
             factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(emptyLit.make(strictAux, true))))
@@ -2726,8 +2890,8 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
                     intArrayOf(1),
                     intArrayOf(x),
                     LinearOp.EQ,
-                    vi
-                )
+                    vi,
+                ),
             )
             // For each universe element of z, channel through ySet.
             for (zi in z.elements.indices) {
@@ -2741,8 +2905,8 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
                             intArrayOf(
                                 com.eignex.klause.solver.Lit.make(xEqAux, false),
                                 com.eignex.klause.solver.Lit.make(zBit, false),
-                            )
-                        )
+                            ),
+                        ),
                     )
                 } else {
                     val yBit = ySet.indicatorBoolIds[yIdxInSet]
@@ -2754,8 +2918,8 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
                                 com.eignex.klause.solver.Lit.make(xEqAux, false),
                                 com.eignex.klause.solver.Lit.make(zBit, false),
                                 com.eignex.klause.solver.Lit.make(yBit, true),
-                            )
-                        )
+                            ),
+                        ),
                     )
                     factors.add(
                         com.eignex.klause.solver.factor.Clause(
@@ -2763,8 +2927,8 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
                                 com.eignex.klause.solver.Lit.make(xEqAux, false),
                                 com.eignex.klause.solver.Lit.make(zBit, true),
                                 com.eignex.klause.solver.Lit.make(yBit, false),
-                            )
-                        )
+                            ),
+                        ),
                     )
                 }
             }
@@ -2797,21 +2961,23 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
                         intArrayOf(
-                            com.eignex.klause.solver.Lit.make(zBit, false)
-                        )
-                    )
+                            com.eignex.klause.solver.Lit.make(zBit, false),
+                        ),
+                    ),
                 )
             }
+
             pick.size == rows.size -> {
                 // Every x value gives z containing k → force z.ind[k] = true.
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
                         intArrayOf(
-                            com.eignex.klause.solver.Lit.make(zBit, true)
-                        )
-                    )
+                            com.eignex.klause.solver.Lit.make(zBit, true),
+                        ),
+                    ),
                 )
             }
+
             else -> {
                 // Reified disjunction: zBit ↔ ⋁ (x = pick[j]) for j.
                 // For each pick value, alloc a reified bool xEq_v ↔ (x = v).
@@ -2825,17 +2991,17 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
                 // (¬zBit ∨ ⋁ orLits) ∧ for each orLit: (zBit ∨ ¬orLit)
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(com.eignex.klause.solver.Lit.make(zBit, false)) + orLits
-                    )
+                        intArrayOf(com.eignex.klause.solver.Lit.make(zBit, false)) + orLits,
+                    ),
                 )
                 for (orLit in orLits) {
                     factors.add(
                         com.eignex.klause.solver.factor.Clause(
                             intArrayOf(
                                 com.eignex.klause.solver.Lit.make(zBit, true),
-                                com.eignex.klause.solver.Lit.negate(orLit)
-                            )
-                        )
+                                com.eignex.klause.solver.Lit.negate(orLit),
+                            ),
+                        ),
                     )
                 }
             }
@@ -2849,20 +3015,22 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
 internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
     require(c.args.size == 1)
     val sets = resolveSetVarArray(c.args[0])
-    for (i in sets.indices) for (j in i + 1 until sets.size) {
-        val a = sets[i]
-        val b = sets[j]
-        for (ai in a.elements.indices) {
-            val bi = b.elements.bsearch(a.elements[ai])
-            if (bi >= 0) {
-                factors.add(
-                    Clause(
-                        intArrayOf(
-                            Lit.make(a.indicatorBoolIds[ai], false),
-                            Lit.make(b.indicatorBoolIds[bi], false),
-                        )
+    for (i in sets.indices) {
+        for (j in i + 1 until sets.size) {
+            val a = sets[i]
+            val b = sets[j]
+            for (ai in a.elements.indices) {
+                val bi = b.elements.bsearch(a.elements[ai])
+                if (bi >= 0) {
+                    factors.add(
+                        Clause(
+                            intArrayOf(
+                                Lit.make(a.indicatorBoolIds[ai], false),
+                                Lit.make(b.indicatorBoolIds[bi], false),
+                            ),
+                        ),
                     )
-                )
+                }
             }
         }
     }
@@ -2982,10 +3150,11 @@ internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
                     coeffs,
                     lits,
                     com.eignex.klause.ast.PbOp.EQ,
-                    nExpr.value.toInt()
-                )
+                    nExpr.value.toInt(),
+                ),
             )
         }
+
         is FznExpr.Ident -> {
             // Σ Sᵢ = nVar → int_lin_eq([1...1, -1], [indicator channel ints..., nVar], 0).
             // We channel each bool indicator to a 0/1 int, then post the linear.
@@ -2999,7 +3168,7 @@ internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
                         vars = intArrayOf(ch),
                         op = LinearOp.EQ,
                         bound = 1,
-                    )
+                    ),
                 )
                 ch
             }
@@ -3007,6 +3176,7 @@ internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
             val vars = IntArray(channels.size + 1) { if (it < channels.size) channels[it] else nVar }
             factors.add(Linear(coefs, vars, LinearOp.EQ, 0))
         }
+
         else -> failHere("set_card: second arg must be int var or constant, got ${nExpr::class.simpleName}")
     }
 }
@@ -3032,17 +3202,20 @@ internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
                 factors.add(Clause(intArrayOf(Lit.make(tBit, false), Lit.make(uBit, true))))
                 factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(sBit, true), Lit.make(tBit, true))))
             }
+
             sIdx >= 0 -> {
                 // Uᵢ ↔ Sᵢ
                 val sBit = s.indicatorBoolIds[sIdx]
                 factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(uBit, true))))
                 factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(uBit, false))))
             }
+
             tIdx >= 0 -> {
                 val tBit = t.indicatorBoolIds[tIdx]
                 factors.add(Clause(intArrayOf(Lit.make(tBit, false), Lit.make(uBit, true))))
                 factors.add(Clause(intArrayOf(Lit.make(tBit, true), Lit.make(uBit, false))))
             }
+
             else -> {
                 // Element only in U's universe — neither S nor T can contribute, so Uᵢ = false.
                 factors.add(Clause(intArrayOf(Lit.make(uBit, false))))

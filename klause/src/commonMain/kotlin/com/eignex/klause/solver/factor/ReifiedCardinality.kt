@@ -13,12 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
  * is the count of true literals, mirrored from [Cardinality].
  */
-class ReifiedCardinality(
-    val auxBoolVar: Int,
-    val literals: IntArray,
-    val min: Int,
-    val max: Int,
-) : LocalSearchFactor {
+class ReifiedCardinality(val auxBoolVar: Int, val literals: IntArray, val min: Int, val max: Int) : LocalSearchFactor {
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
@@ -198,6 +193,7 @@ class ReifiedCardinality(
                     }
                 }
             }
+
             !upBranchFeasible && downBranchFeasible -> {
                 // Must stay below min. Allowed at most `min - trueCount - 1` extra trues —
                 // when that cap is zero, force every unassigned literal false.
@@ -254,11 +250,7 @@ class ReifiedCardinality(
 
     /** Recover the pre-flip count and aux value from the now-committed state, then walk
      *  each touched variable once applying the change in its break/make contribution. */
-    override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState,
-        factorId: Int,
-        flippedVar: Int,
-    ) {
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val newN = state.intPayload[factorId]
         val newAux = state.assignment.boolValue(auxBoolVar)
         val oldAux: Boolean

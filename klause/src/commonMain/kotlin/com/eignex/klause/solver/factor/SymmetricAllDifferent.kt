@@ -16,10 +16,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Propagation: all-different singleton-conflict detection inherited from `AllDifferent`,
  * plus a self-inverse check on singletons.
  */
-class SymmetricAllDifferent(
-    val xs: IntArray,
-    val indexOffset: Int = 0,
-) : LocalSearchFactor {
+class SymmetricAllDifferent(val xs: IntArray, val indexOffset: Int = 0) : LocalSearchFactor {
 
     init {
         require(xs.isNotEmpty()) { "symmetric_all_different: empty xs" }

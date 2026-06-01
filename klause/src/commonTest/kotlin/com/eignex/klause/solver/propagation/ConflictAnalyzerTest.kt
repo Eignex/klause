@@ -46,12 +46,12 @@ class ConflictAnalyzerTest {
         assertEquals(
             setOf(Lit.make(0, false)),
             learned.literals.toSet(),
-            "learned clause should be [¬a], got ${learned.literals.toList()}"
+            "learned clause should be [¬a], got ${learned.literals.toList()}",
         )
         assertEquals(
             0,
             learned.backjumpLevel,
-            "single-level conflict over a single decision should backjump to level 0"
+            "single-level conflict over a single decision should backjump to level 0",
         )
     }
 
@@ -89,12 +89,12 @@ class ConflictAnalyzerTest {
         assertEquals(
             setOf(Lit.make(0, false), Lit.make(1, false)),
             learned.literals.toSet(),
-            "1UIP learned clause should be [¬a, ¬b], got ${learned.literals.toList()}"
+            "1UIP learned clause should be [¬a, ¬b], got ${learned.literals.toList()}",
         )
         assertEquals(
             1,
             learned.backjumpLevel,
-            "backjump should target level 1 (the only lower-level variable's level)"
+            "backjump should target level 1 (the only lower-level variable's level)",
         )
     }
 
@@ -159,14 +159,14 @@ class ConflictAnalyzerTest {
             BacktrackParams(
                 variableHeuristic = InputOrder,
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         val a = sat.assignment.bools[0]
         val b = sat.assignment.bools[1]
         assertTrue(
             !(a && b),
-            "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b"
+            "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b",
         )
     }
 
@@ -202,7 +202,7 @@ class ConflictAnalyzerTest {
         for ((i, c) in clauses.withIndex()) {
             assertTrue(
                 c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by $s"
+                "clause $i not satisfied by $s",
             )
         }
     }
@@ -251,7 +251,7 @@ class ConflictAnalyzerTest {
                 maxLearnedClauses = 0,
                 lbdGlueThreshold = 2,
                 randomSeed = 7L,
-            )
+            ),
         )
         // Correctness must survive forgetting — every original clause must still be
         // satisfied. (The bound enforces forgetting actually runs.)
@@ -267,7 +267,7 @@ class ConflictAnalyzerTest {
         for ((i, c) in clauses.withIndex()) {
             assertTrue(
                 c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by ${s.toList()}"
+                "clause $i not satisfied by ${s.toList()}",
             )
         }
     }
@@ -297,25 +297,25 @@ class ConflictAnalyzerTest {
         assertEquals(3, state.learnedClauses.size)
         assertTrue(
             state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
-            "c1 should be in ¬b watcher list before forget"
+            "c1 should be in ¬b watcher list before forget",
         )
 
         state.forgetLearnedClauses { _, lbd -> lbd <= 1 }
         assertEquals(
             2,
             state.learnedClauses.size,
-            "expected 2 clauses kept after dropping the high-LBD one"
+            "expected 2 clauses kept after dropping the high-LBD one",
         )
         assertEquals(c0, state.learnedClauses[0])
         assertEquals(c2, state.learnedClauses[1])
         assertTrue(
             !state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
-            "watcher entry for the dropped clause should be removed"
+            "watcher entry for the dropped clause should be removed",
         )
         val newFid2 = baseFid + 1
         assertTrue(
             state.boolWatchersByLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
-            "c2 should be findable at its new fid ($newFid2) via its watch literal"
+            "c2 should be findable at its new fid ($newFid2) via its watch literal",
         )
     }
 
@@ -362,12 +362,12 @@ class ConflictAnalyzerTest {
             setOf(Lit.make(0, false)),
             learned.literals.toSet(),
             "minimization should drop ¬b and ¬c (both implied by ¬a via the chain), " +
-                "leaving just [¬a]; got ${learned.literals.toList()}"
+                "leaving just [¬a]; got ${learned.literals.toList()}",
         )
         assertEquals(
             0,
             learned.backjumpLevel,
-            "unit-clause learning forces backjump to level 0"
+            "unit-clause learning forces backjump to level 0",
         )
         assertEquals(1, learned.lbd, "minimized to single literal → LBD = 1")
     }
@@ -401,7 +401,7 @@ class ConflictAnalyzerTest {
         for ((i, c) in clauses.withIndex()) {
             assertTrue(
                 c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by ${s.toList()}"
+                "clause $i not satisfied by ${s.toList()}",
             )
         }
     }

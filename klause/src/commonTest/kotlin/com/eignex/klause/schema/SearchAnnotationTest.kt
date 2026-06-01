@@ -79,7 +79,7 @@ class SearchAnnotationTest {
                 search(variableStrategy = VarSearchStrategy.InputOrder)
                 search(
                     variableStrategy = VarSearchStrategy.SmallestDomain,
-                    valueStrategy = ValSearchStrategy.Max
+                    valueStrategy = ValSearchStrategy.Max,
                 )
             }
         }

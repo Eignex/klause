@@ -87,19 +87,18 @@ sealed interface PropagationResult {
         /** Reinterpret this implied set as an [com.eignex.klause.solver.Assumptions].
          *  Both share the same key-sorted parallel-array layout, so the conversion is
          *  three [copyOf] calls (one per primitive array) — no rebuild, no boxing. */
-        fun toAssumptions(): com.eignex.klause.solver.Assumptions =
-            com.eignex.klause.solver.Assumptions(
-                boolKeys = boolKeys.copyOf(),
-                boolValues = boolValues.copyOf(),
-                intKeys = intKeys.copyOf(),
-                intValues = intValues.copyOf(),
-                intMinKeys = intMinKeys.copyOf(),
-                intMinValues = intMinValues.copyOf(),
-                intMaxKeys = intMaxKeys.copyOf(),
-                intMaxValues = intMaxValues.copyOf(),
-                intHoleVarIds = intHoleVarIds.copyOf(),
-                intHoleValues = intHoleValues.copyOf(),
-            )
+        fun toAssumptions(): com.eignex.klause.solver.Assumptions = com.eignex.klause.solver.Assumptions(
+            boolKeys = boolKeys.copyOf(),
+            boolValues = boolValues.copyOf(),
+            intKeys = intKeys.copyOf(),
+            intValues = intValues.copyOf(),
+            intMinKeys = intMinKeys.copyOf(),
+            intMinValues = intMinValues.copyOf(),
+            intMaxKeys = intMaxKeys.copyOf(),
+            intMaxValues = intMaxValues.copyOf(),
+            intHoleVarIds = intHoleVarIds.copyOf(),
+            intHoleValues = intHoleValues.copyOf(),
+        )
 
         /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
          *  failed-literal probing in `Problem` and by tests; hot paths should use
@@ -185,7 +184,7 @@ sealed interface PropagationResult {
                 return Implied(
                     bKeys, bVals, iKeys, iVals,
                     intMinKeys, intMinValues, intMaxKeys, intMaxValues,
-                    intHoleVarIds, intHoleValues
+                    intHoleVarIds, intHoleValues,
                 )
             }
         }

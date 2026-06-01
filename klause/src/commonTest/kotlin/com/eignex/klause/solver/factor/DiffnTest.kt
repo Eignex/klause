@@ -25,7 +25,7 @@ class DiffnTest {
                     ys = intArrayOf(1, 3),
                     widths = intArrayOf(2, 2),
                     heights = intArrayOf(2, 2),
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -50,7 +50,7 @@ class DiffnTest {
                     ys = intArrayOf(1, 3),
                     widths = intArrayOf(1, 1),
                     heights = intArrayOf(1, 1),
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -70,7 +70,7 @@ class DiffnTest {
                     ys = intArrayOf(1, 3),
                     widths = intArrayOf(2, 2),
                     heights = intArrayOf(2, 2),
-                )
+                ),
             ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))

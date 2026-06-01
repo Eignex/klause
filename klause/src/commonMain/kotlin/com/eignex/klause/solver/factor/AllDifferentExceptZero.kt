@@ -14,9 +14,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Decomposed propagation: detect singleton conflicts on non-zero values (two vars pinned
  * to the same non-zero value → fail). LS counts pairs of equal non-zero values.
  */
-class AllDifferentExceptZero(
-    val xs: IntArray,
-) : LocalSearchFactor {
+class AllDifferentExceptZero(val xs: IntArray) : LocalSearchFactor {
 
     init {
         require(xs.size >= 2) { "AllDifferentExceptZero needs at least two variables" }

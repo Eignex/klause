@@ -121,7 +121,7 @@ class PropagationSessionTest {
                 Lit.make(0, true),
                 Lit.make(1, true),
                 Lit.make(2, true),
-            )
+            ),
         )
         val p = Problem(3, 0, emptyArray(), listOf(factor))
         val s = PropagationSession(p)

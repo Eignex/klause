@@ -49,7 +49,9 @@ import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.skema.SchemaDef
 
-class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current) {
+class Compiler(
+    private val config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current,
+) {
 
     fun compile(def: SchemaDef<SchemaEntry>): CompiledProblem = Build(config).run(def)
 
@@ -91,7 +93,9 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
             for ((name, entry) in def.entries) {
                 when (entry) {
                     is BoolSpec -> boolVarIdByName[name] = newBoolVar()
+
                     is com.eignex.klause.ast.PresenceSpec -> boolVarIdByName[name] = newBoolVar()
+
                     is NominalSpec -> {
                         val ids = LinkedHashMap<String, Int>()
                         for (label in entry.labels) ids[label] = newBoolVar()
@@ -101,7 +105,9 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                         for (id in ids.values) lits[i++] = Lit.make(id, positive = true)
                         factors += Cardinality.exactlyOne(lits)
                     }
+
                     is IntSpec -> intVarIdByName[name] = newIntVar(IntDomain(entry.min, entry.max))
+
                     is com.eignex.klause.ast.SetSpec -> {
                         // Allocate one indicator bool per universe element. Universe is
                         // already deduplicated and sorted by [setVar]'s declarator.
@@ -109,6 +115,7 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                         val indicators = IntArray(universe.size) { newBoolVar() }
                         setLayouts[name] = SetLayout(universe, indicators)
                     }
+
                     is com.eignex.klause.ast.MultipleSpec -> {
                         // Nominal universe: indicators are typed against labels, but the
                         // encoding is the same — one bool per label. We synthesise a
@@ -120,6 +127,7 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                         setLayouts[name] = SetLayout(universe, indicators)
                         setLabelOrder[name] = labels
                     }
+
                     is FloatSpec -> {
                         // Floats are bucketed inline so [Problem.factors] stays pure int+bool.
                         // The original real-valued view (interval, bucket count, int-var
@@ -134,7 +142,10 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                         floatMetaIntVarIds += intId
                         floatMetaBuckets += entry.buckets
                     }
-                    is NamedConstraint -> {} // handled in a second pass once all vars are registered
+
+                    is NamedConstraint -> {}
+
+                    // handled in a second pass once all vars are registered
                     is com.eignex.klause.ast.SearchAnnotation -> {} // picked up at the end of compile()
                 }
             }
@@ -205,10 +216,12 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                         val default = 0.coerceIn(d.min, d.max)
                         assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(default))))
                     }
+
                     nominalIndicators.containsKey(base) -> {
                         val firstLabel = nominalIndicators.getValue(base).keys.first()
                         assertExpr(Implies(absent, NominalEq(base, firstLabel)))
                     }
+
                     boolVarIdByName.containsKey(base) -> {
                         assertExpr(Implies(absent, Not(BoolRef(base))))
                     }
@@ -235,21 +248,29 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                 val id = boolVarIdByName[expr.name] ?: error("Unknown Boolean variable '${expr.name}'")
                 Lit.make(id, positive = !expr.negated)
             }
+
             is NominalEq -> {
                 val map = nominalIndicators[expr.name] ?: error("Unknown nominal '${expr.name}'")
                 val id = map[expr.label] ?: error("Label '${expr.label}' not in nominal '${expr.name}'")
                 Lit.make(id, positive = true)
             }
+
             is Not -> Lit.negate(lowerToLit(expr.child))
+
             is And -> tseitinAnd(expr.children)
+
             is Or -> tseitinOr(expr.children)
+
             is Implies -> tseitinOr(listOf(negate(expr.left), expr.right))
+
             is Iff -> {
                 val l = lowerToLit(expr.left)
                 val r = lowerToLit(expr.right)
                 tseitinIff(l, r)
             }
+
             is IntCompare -> reifyIntCompare(expr)
+
             is com.eignex.klause.ast.FloatLinearConstraint -> {
                 // Reified float-linear: introduce an aux bool, assert one factor per
                 // truth side. Today we have FloatLinear but not ReifiedFloatLinear, so
@@ -257,47 +278,79 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                 // but not yet as a sub-expression. Tracked as a follow-up.
                 error(
                     "FloatLinearConstraint at non-top-level position is not yet supported; " +
-                        "ReifiedFloatLinear factor still TODO."
+                        "ReifiedFloatLinear factor still TODO.",
                 )
             }
+
             is AtMost -> reifyCardinality(expr.children, 0, expr.k)
+
             is AtLeast -> reifyCardinality(expr.children, expr.k, expr.children.size)
+
             is CardinalityExpr -> reifyCardinality(expr.children, expr.min, expr.max)
+
             is AllDifferent -> reifyAllDifferent(expr.terms.map { lift(it) })
+
             is com.eignex.klause.ast.AllDifferentExceptExpr -> lowerToLit(decomposeAllDifferentExcept(expr))
+
             is com.eignex.klause.ast.ArgSortExpr -> lowerToLit(decomposeArgSort(expr))
+
             is com.eignex.klause.ast.NetworkFlowExpr -> lowerToLit(decomposeNetworkFlow(expr))
+
             is com.eignex.klause.ast.NetworkFlowCostExpr -> lowerToLit(decomposeNetworkFlowCost(expr))
+
             is com.eignex.klause.ast.GeostExpr -> lowerToLit(decomposeGeost(expr))
+
             is com.eignex.klause.ast.PathExpr -> error("path: reified context not supported (use at top-level)")
+
             is com.eignex.klause.ast.TreeExpr -> error("tree: reified context not supported (use at top-level)")
+
             is com.eignex.klause.ast.MddExpr -> error("mdd: reified context not supported (use at top-level)")
+
             is com.eignex.klause.ast.CostMddExpr -> error("cost_mdd: reified context not supported (use at top-level)")
+
             is com.eignex.klause.ast.CostRegularExpr -> error(
-                "cost_regular: reified context not supported (use at top-level)"
+                "cost_regular: reified context not supported (use at top-level)",
             )
+
             is CircuitExpr -> reifyCircuit(expr)
+
             is SubcircuitExpr -> reifySubcircuit(expr)
+
             is CumulativeExpr -> reifyCumulative(expr)
+
             is DisjunctiveExpr -> reifyDisjunctive(expr)
+
             is AllDifferentOpt -> reifyAllDifferentOpt(expr)
+
             is CumulativeExprOpt -> reifyCumulativeOpt(expr)
+
             is DisjunctiveExprOpt -> reifyDisjunctiveOpt(expr)
+
             is CountExprOpt -> reifyCountOpt(expr)
+
             is NValueExprOpt -> reifyNValueOpt(expr)
+
             is GccExprOpt -> reifyGccOpt(expr)
+
             is com.eignex.klause.ast.SetIn -> reifySetIn(expr)
+
             is com.eignex.klause.ast.SetNominalIn -> reifySetNominalIn(expr)
+
             is com.eignex.klause.ast.SetSubsetOf -> reifySetSubsetOf(expr)
+
             is com.eignex.klause.ast.SetDisjoint -> reifySetDisjoint(expr)
+
             is com.eignex.klause.ast.SetEq -> reifySetEq(expr)
+
             is TableConstraint -> lowerToLit(expandTable(expr))
+
             is PseudoBooleanExpr -> {
                 val lits = lowerAllBool(expr.lits)
                 val aux = newBoolVar()
                 factors += ReifiedPseudoBoolean(aux, expr.weights.toIntArray(), lits, expr.op, expr.bound)
                 Lit.make(aux, positive = true)
             }
+
             is XorExpr -> {
                 // aux ↔ xor(c1, …, cn)  ⟺  xor(aux, c1, …, cn) has even parity.
                 val childLits = lowerAllBool(expr.children)
@@ -343,12 +396,16 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
             val aux = newBoolVar()
             val linOp = when (finalOp) {
                 IntCmpOp.LE -> LinearOp.LE
+
                 IntCmpOp.GE -> LinearOp.GE
+
                 IntCmpOp.EQ -> LinearOp.EQ
+
                 IntCmpOp.NE -> {
                     factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, finalBound)
                     return Lit.make(aux, positive = false)
                 }
+
                 IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
             }
             factors += ReifiedLinear(aux, coeffArr, varIds, linOp, finalBound)
@@ -359,6 +416,7 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
             // Normalize so the var has unit coefficient when possible; else fall back to ReifiedLinear.
             val (effectiveOp, effectiveBound) = when (coeff) {
                 1 -> op to bound
+
                 -1 -> {
                     val flipped = when (op) {
                         IntCmpOp.LE -> IntCmpOp.GE
@@ -369,17 +427,22 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
                     }
                     flipped to -bound
                 }
+
                 else -> {
                     val varId = intVarOf(name)
                     val aux = newBoolVar()
                     val linOp = when (op) {
                         IntCmpOp.LE -> LinearOp.LE
+
                         IntCmpOp.GE -> LinearOp.GE
+
                         IntCmpOp.EQ -> LinearOp.EQ
+
                         IntCmpOp.NE -> {
                             factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), LinearOp.EQ, bound)
                             return Lit.make(aux, positive = false)
                         }
+
                         IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
                     }
                     factors += ReifiedLinear(aux, intArrayOf(coeff), intArrayOf(varId), linOp, bound)
@@ -445,8 +508,7 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
             else -> op to bound
         }
 
-        fun intVarOf(name: String): Int =
-            intVarIdByName[name] ?: error("Unknown int/float variable '$name'")
+        fun intVarOf(name: String): Int = intVarIdByName[name] ?: error("Unknown int/float variable '$name'")
 
         internal fun trueLit(): Int {
             val v = newBoolVar()

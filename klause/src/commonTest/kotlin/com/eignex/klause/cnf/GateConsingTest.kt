@@ -63,7 +63,7 @@ class GateConsingTest {
         single.unsignedLeq(s, t)
         assertTrue(
             b.numVars < single.numVars * 2,
-            "50 identical comparators (${b.numVars} vars) should be near one (${single.numVars} vars)"
+            "50 identical comparators (${b.numVars} vars) should be near one (${single.numVars} vars)",
         )
     }
 }

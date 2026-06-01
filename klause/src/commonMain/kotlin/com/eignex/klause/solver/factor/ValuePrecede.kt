@@ -18,11 +18,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * propagation lets BacktrackSolver find correct models because the singleton check
  * fires at every leaf attempt.
  */
-class ValuePrecede(
-    val s: Int,
-    val t: Int,
-    val xs: IntArray,
-) : LocalSearchFactor {
+class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : LocalSearchFactor {
 
     init {
         require(xs.isNotEmpty()) { "value_precede: empty xs" }
@@ -80,11 +76,8 @@ class ValuePrecede(
 
     private fun satisfied(state: LocalSearchState): Boolean = walk { state.assignment.intValue(it) }
 
-    private fun satisfiedWithOverride(
-        state: LocalSearchState,
-        intVar: Int,
-        override: Int,
-    ): Boolean = walk { x -> if (x == intVar) override else state.assignment.intValue(x) }
+    private fun satisfiedWithOverride(state: LocalSearchState, intVar: Int, override: Int): Boolean =
+        walk { x -> if (x == intVar) override else state.assignment.intValue(x) }
 
     private inline fun walk(getValue: (Int) -> Int): Boolean {
         for (x in xs) {

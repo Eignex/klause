@@ -81,11 +81,11 @@ class LexLessTest {
         val intSets = sink.list.filterIsInstance<com.eignex.klause.solver.Move.IntSet>()
         assertTrue(
             intSets.any { it.varId == 0 && it.newValue == 1 },
-            "expected IntSet(xs[0]=1) in $intSets"
+            "expected IntSet(xs[0]=1) in $intSets",
         )
         assertTrue(
             intSets.any { it.varId == 2 && it.newValue == 4 },
-            "expected IntSet(ys[0]=4) in $intSets"
+            "expected IntSet(ys[0]=4) in $intSets",
         )
     }
 

@@ -1,7 +1,7 @@
 package com.eignex.klause.smt
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -14,11 +14,17 @@ import kotlin.test.assertTrue
 class SmtSessionTest {
 
     private fun exactlyOneOfThree(): Problem {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+            ),
+        )
         return Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
     }
@@ -57,11 +63,13 @@ class SmtSessionTest {
     @Test
     fun `samples respects call-site assumptions`() {
         SmtSolver(exactlyOneOfThree()).session().use { s ->
-            val samples = s.samples(SmtParams(
-                maxModels = 5,
-                randomSeed = 42L,
-                assumptions = Assumptions(bools = mapOf(2 to true)),
-            )).toList()
+            val samples = s.samples(
+                SmtParams(
+                    maxModels = 5,
+                    randomSeed = 42L,
+                    assumptions = Assumptions(bools = mapOf(2 to true)),
+                ),
+            ).toList()
             assertTrue(samples.isNotEmpty())
             for (sample in samples) {
                 assertEquals(true, sample.bools[2])

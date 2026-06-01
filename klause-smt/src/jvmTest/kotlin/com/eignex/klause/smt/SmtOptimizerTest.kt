@@ -20,11 +20,17 @@ class SmtOptimizerTest {
      */
     @Test
     fun `smtinterpol throws on minimize (no optimization support)`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(
-            Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
-        ))
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(
+                Lit.make(0, true),
+                Lit.make(1, true),
+                Lit.make(2, true),
+            ),
+        )
         val problem = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0))
@@ -41,7 +47,9 @@ class SmtOptimizerTest {
     @Test
     fun `non-linear objective rejected`() {
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(),
         )
         val objective = object : com.eignex.klause.solver.Objective {
@@ -60,8 +68,12 @@ class SmtOptimizerTest {
      */
     @Test
     fun `optimizer interface visible on smt solver`() {
-        val problem = Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf<Factor>())
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(),
+        )
         val opt: com.eignex.klause.solver.Optimizer<SmtParams> = SmtSolver(problem)
         assertNotNull(opt)
         // Calling minimize on an empty problem with SMTInterpol still throws on opt env.

@@ -60,8 +60,10 @@ internal class OznParser(private val tokens: List<OznToken>) {
                 while (depth > 0 && peek().kind != OznTokenKind.EOF) {
                     val t = advance()
                     if (t.kind == OznTokenKind.PUNCT) {
-                        when (t.text) { "(" -> depth++
-                            ")" -> depth-- }
+                        when (t.text) {
+                            "(" -> depth++
+                            ")" -> depth--
+                        }
                     }
                 }
             }
@@ -103,14 +105,17 @@ internal class OznParser(private val tokens: List<OznToken>) {
                 advance()
                 OznType.Int
             }
+
             peekKeyword("bool") -> {
                 advance()
                 OznType.Bool
             }
+
             peekKeyword("float") -> {
                 advance()
                 OznType.Float
             }
+
             else -> {
                 // Could be a range / domain: parse an expression and treat as int domain.
                 // .ozn doesn't really emit domain-typed names; tolerate `1..n` style.
@@ -264,18 +269,22 @@ internal class OznParser(private val tokens: List<OznToken>) {
                 advance()
                 OznExpr.IntLit(t.text.toLong())
             }
+
             OznTokenKind.FLOAT -> {
                 advance()
                 OznExpr.FloatLit(t.text.toDouble())
             }
+
             OznTokenKind.BOOL -> {
                 advance()
                 OznExpr.BoolLit(t.text == "true")
             }
+
             OznTokenKind.STRING -> {
                 advance()
                 OznExpr.StringLit(t.text)
             }
+
             OznTokenKind.IDENT, OznTokenKind.KEYWORD -> {
                 val name = advance().text
                 // Function call?
@@ -287,6 +296,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
                 }
                 OznExpr.Ident(name)
             }
+
             OznTokenKind.PUNCT -> when (t.text) {
                 "(" -> {
                     advance()
@@ -294,10 +304,14 @@ internal class OznParser(private val tokens: List<OznToken>) {
                     expectPunct(")")
                     e
                 }
+
                 "[" -> parseArrayOrComprehension()
+
                 "{" -> parseSetOrComprehension()
+
                 else -> throw OznParseException("unexpected token `${t.text}` at line ${t.line}")
             }
+
             OznTokenKind.EOF -> throw OznParseException("unexpected EOF")
         }
     }
@@ -347,7 +361,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
                     OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(n.toLong())),
                     OznExpr.Range(OznExpr.IntLit(1), OznExpr.IntLit(m.toLong())),
                     OznExpr.ArrayLit(flat),
-                )
+                ),
             )
         }
         val first = parseExpr()

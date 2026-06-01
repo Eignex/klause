@@ -84,7 +84,7 @@ class CancellationTest {
         assertTrue(elapsed < 2_000, "backtrack solve should respond to cancel within ~20ms; took ${elapsed}ms")
         assertTrue(
             r is SolveResult.Sat || r is SolveResult.Unknown,
-            "expected Sat or Unknown (cancelled), got $r"
+            "expected Sat or Unknown (cancelled), got $r",
         )
     }
 

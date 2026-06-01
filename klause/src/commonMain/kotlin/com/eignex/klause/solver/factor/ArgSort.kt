@@ -16,11 +16,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  *  - When all [perm] entries are pinned, verify sorted-ness directly and propagate
  *    bound-tightenings from [values] back to the ordering implied by perm.
  */
-class ArgSort(
-    val values: IntArray,
-    val perm: IntArray,
-    val permOffset: Int = 0,
-) : LocalSearchFactor {
+class ArgSort(val values: IntArray, val perm: IntArray, val permOffset: Int = 0) : LocalSearchFactor {
 
     init {
         require(values.size == perm.size) { "ArgSort: values and perm length mismatch" }
@@ -111,7 +107,7 @@ class ArgSort(
                 Comparator { a, b ->
                     val c = valuesNow[a].compareTo(valuesNow[b])
                     if (c != 0) c else a.compareTo(b)
-                }
+                },
             )
         }
         for (i in 0 until n) {
@@ -193,9 +189,11 @@ class ArgSort(
 
         // Pin-based sorted check (only fires when perm is fully assigned).
         var allPinned = true
-        for (p in perm) if (state.intDomains[p].min != state.intDomains[p].max) {
-            allPinned = false
-            break
+        for (p in perm) {
+            if (state.intDomains[p].min != state.intDomains[p].max) {
+                allPinned = false
+                break
+            }
         }
         if (allPinned) {
             val pv = IntArray(n) { state.intDomains[perm[it]].min - permOffset }

@@ -24,7 +24,7 @@ import org.logicng.datastructures.Assignment as LogicNGAssignment
  *
  *  - [solve] — single SAT call; returns [SolveResult.Sat], [SolveResult.Unsat], or
  *    [SolveResult.Unknown] (timeout).
- *  - [sample] — *with replacement*. A fresh solver is built per draw so duplicate models
+ *  - [samples] — *with replacement*. A fresh solver is built per draw so duplicate models
  *    can recur across iterations.
  *  - [enumerate] — *without replacement*. A single solver runs through models, with a
  *    blocking clause added after each yield. The `params.minHammingDistance` /
@@ -57,7 +57,6 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
      * a fresh random subset; after several consecutive failures, fall back to an
      * unpinned solve so the contract isn't violated by a hostile pin set.
      */
-    @Suppress("LoopWithTooManyJumpStatements")
     override fun samples(params: LogicNGParams): Sequence<Sample> = sequence {
         val rng = Random(params.randomSeed ?: System.nanoTime())
         var attempts = 0L
@@ -96,7 +95,6 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
         return if (satSolver.sat() == Tristate.TRUE) decode(satSolver.model()) else null
     }
 
-    @Suppress("LoopWithTooManyJumpStatements")
     override fun enumerate(params: LogicNGParams): Sequence<Sample> = sequence {
         val (factory, satSolver) = buildSolver()
         val window = ArrayDeque<Sample>()

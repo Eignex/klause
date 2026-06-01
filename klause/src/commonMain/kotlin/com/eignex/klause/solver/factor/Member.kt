@@ -14,10 +14,7 @@ import com.eignex.klause.util.IntArrayList
  * Propagation: when every `xs[i]`'s domain is disjoint from `y`'s domain, fail; when
  * `xs` has length 1, force `y = xs[0]`.
  */
-class Member(
-    val xs: IntArray,
-    val y: Int,
-) : LocalSearchFactor {
+class Member(val xs: IntArray, val y: Int) : LocalSearchFactor {
 
     init {
         require(xs.isNotEmpty()) { "member: empty xs" }
@@ -85,17 +82,21 @@ class Member(
         if (dy.min == dy.max) {
             val yv = dy.min
             var anyContains = false
-            for (x in xs) if (yv in state.intDomains[x]) {
-                anyContains = true
-                break
+            for (x in xs) {
+                if (yv in state.intDomains[x]) {
+                    anyContains = true
+                    break
+                }
             }
             if (!anyContains) return false
         }
         // Singleton-xs[i]: if every xs[i] is singleton, y must equal one of them.
         var allSingleton = true
-        for (x in xs) if (state.intDomains[x].min != state.intDomains[x].max) {
-            allSingleton = false
-            break
+        for (x in xs) {
+            if (state.intDomains[x].min != state.intDomains[x].max) {
+                allSingleton = false
+                break
+            }
         }
         if (allSingleton) {
             val values = HashSet<Int>()

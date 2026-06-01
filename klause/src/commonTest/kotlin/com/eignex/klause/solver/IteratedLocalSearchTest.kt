@@ -35,7 +35,7 @@ class IteratedLocalSearchTest {
         val sa = AcceptanceCriterion.SimulatedAnnealing(
             initialTemperature = 1e6,
             coolingRate = 0.5,
-            minTemperature = 1e-9
+            minTemperature = 1e-9,
         )
         val rng = Random(0)
         var acceptedWorse = 0
@@ -52,7 +52,7 @@ class IteratedLocalSearchTest {
         val sa = AcceptanceCriterion.SimulatedAnnealing(
             initialTemperature = 1.0,
             coolingRate = 0.001,
-            minTemperature = 0.5
+            minTemperature = 0.5,
         )
         val rng = Random(0)
         repeat(100) { sa.accept(0.0, 0.0, rng) }
@@ -64,7 +64,7 @@ class IteratedLocalSearchTest {
         val sa = AcceptanceCriterion.SimulatedAnnealing(
             initialTemperature = 2.0,
             coolingRate = 0.5,
-            minTemperature = 0.01
+            minTemperature = 0.01,
         )
         val rng = Random(0)
         repeat(10) { sa.accept(0.0, 0.0, rng) }
@@ -168,7 +168,7 @@ class IteratedLocalSearchTest {
         val trues = (0 until 8).count { state.assignment.boolValue(it) }
         assertTrue(
             trues in 1..7,
-            "expected mixed assignment after crossover, got $trues true (8 bits, both parents pure)"
+            "expected mixed assignment after crossover, got $trues true (8 bits, both parents pure)",
         )
     }
 
@@ -178,17 +178,17 @@ class IteratedLocalSearchTest {
         assertEquals(
             1.0,
             bias.probParentA(parentAObjective = 1.0, parentBObjective = 10.0),
-            "fully-biased should pick A when A is better"
+            "fully-biased should pick A when A is better",
         )
         assertEquals(
             0.0,
             bias.probParentA(parentAObjective = 10.0, parentBObjective = 1.0),
-            "fully-biased should pick B when B is better"
+            "fully-biased should pick B when B is better",
         )
         assertEquals(
             0.5,
             bias.probParentA(parentAObjective = 5.0, parentBObjective = 5.0),
-            "tied parents should fall back to uniform"
+            "tied parents should fall back to uniform",
         )
     }
 
@@ -220,7 +220,7 @@ class IteratedLocalSearchTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))

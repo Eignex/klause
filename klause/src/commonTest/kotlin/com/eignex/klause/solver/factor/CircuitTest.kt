@@ -158,7 +158,7 @@ class CircuitTest {
         val result = problem.propagate(assumptions)
         assertTrue(
             result is com.eignex.klause.solver.propagation.PropagationResult.Implied,
-            "propagation should succeed and force the closing edge; got $result"
+            "propagation should succeed and force the closing edge; got $result",
         )
         assertEquals(0, result.ints[3], "succ[3] should be forced to 0; got implied=${result.ints}")
     }
@@ -176,7 +176,7 @@ class CircuitTest {
         val result = problem.propagate(assumptions)
         assertTrue(
             result is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
-            "should detect infeasibility; got $result"
+            "should detect infeasibility; got $result",
         )
     }
 

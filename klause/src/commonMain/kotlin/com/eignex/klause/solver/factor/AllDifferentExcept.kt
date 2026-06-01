@@ -15,10 +15,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Propagation is the same singleton-take filter as the zero-only variant: any var pinned to
  * a non-excluded value `v` removes `v` from every other var's domain.
  */
-class AllDifferentExcept(
-    val xs: IntArray,
-    except: IntArray,
-) : LocalSearchFactor {
+class AllDifferentExcept(val xs: IntArray, except: IntArray) : LocalSearchFactor {
 
     val except: IntArray = except.distinct().sorted().toIntArray()
     private val exceptSet: Set<Int> = this.except.toHashSet()
@@ -229,15 +226,19 @@ class AllDifferentExcept(
         // Forward BFS from all free vertices.
         val reachableFromFree = BooleanArray(totalV)
         val queue = ArrayDeque<Int>()
-        for (v in 0 until totalV) if (free[v]) {
-            reachableFromFree[v] = true
-            queue.add(v)
+        for (v in 0 until totalV) {
+            if (free[v]) {
+                reachableFromFree[v] = true
+                queue.add(v)
+            }
         }
         while (queue.isNotEmpty()) {
             val u = queue.removeFirst()
-            for (w in adj[u]) if (!reachableFromFree[w]) {
-                reachableFromFree[w] = true
-                queue.add(w)
+            for (w in adj[u]) {
+                if (!reachableFromFree[w]) {
+                    reachableFromFree[w] = true
+                    queue.add(w)
+                }
             }
         }
 

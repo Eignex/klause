@@ -174,10 +174,12 @@ class ReifiedPseudoBoolean(
                     lo = minOf(0L, w)
                     hi = maxOf(0L, w)
                 }
+
                 Lit.evaluate(literals[i], b) -> {
                     lo = w
                     hi = w
                 }
+
                 else -> {
                     lo = 0L
                     hi = 0L
@@ -263,11 +265,7 @@ class ReifiedPseudoBoolean(
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState,
-        factorId: Int,
-        flippedVar: Int,
-    ) {
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val newSum = state.intPayload[factorId]
         val newAux = state.assignment.boolValue(auxBoolVar)
         val oldAux: Boolean

@@ -65,7 +65,8 @@ class LocalSearchSolver(
      *  violation contribution. Idempotent and bounded by [Problem.numBoolVars +
      *  numIntVars]. */
     val greedyRepairOnRestart: Boolean = true,
-) : Solver<LocalSearchParams>, Optimizer<LocalSearchParams> {
+) : Solver<LocalSearchParams>,
+    Optimizer<LocalSearchParams> {
 
     override fun solve(params: LocalSearchParams): SolveResult = solveInternal(params, warm = null)
 
@@ -140,10 +141,8 @@ class LocalSearchSolver(
     override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult =
         improvementsInternal(objective, params, warm = null).last()
 
-    override fun improvements(
-        objective: Objective,
-        params: LocalSearchParams,
-    ): Sequence<MinimizeResult> = improvementsInternal(objective, params, warm = null)
+    override fun improvements(objective: Objective, params: LocalSearchParams): Sequence<MinimizeResult> =
+        improvementsInternal(objective, params, warm = null)
 
     /**
      * Internal minimize entry point. Local search is **incomplete**: it never proves
@@ -152,11 +151,8 @@ class LocalSearchSolver(
      * (budget gone before feasibility). Bake-time-Unsat is the one case we can prove
      * Infeasible — propagation derived it before LS started.
      */
-    internal fun minimizeInternal(
-        objective: Objective,
-        params: LocalSearchParams,
-        warm: WarmState?,
-    ): MinimizeResult = improvementsInternal(objective, params, warm).last()
+    internal fun minimizeInternal(objective: Objective, params: LocalSearchParams, warm: WarmState?): MinimizeResult =
+        improvementsInternal(objective, params, warm).last()
 
     /**
      * Streaming search. Yields one [MinimizeResult.BestFound] per new incumbent
@@ -188,8 +184,7 @@ class LocalSearchSolver(
     fun sample(): SampleResult = sample(LocalSearchParams())
     fun samples(): Sequence<Sample> = samples(LocalSearchParams())
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
-    fun minimize(objective: Objective): MinimizeResult =
-        minimize(objective, LocalSearchParams())
+    fun minimize(objective: Objective): MinimizeResult = minimize(objective, LocalSearchParams())
 
     private fun streamImpl(
         params: LocalSearchParams,
@@ -437,7 +432,7 @@ class LocalSearchSolver(
                 MinimizeResult.BestFound(bestSample, bestObj, reason)
             } else {
                 MinimizeResult.Unknown(reason)
-            }
+            },
         )
     }
 
@@ -501,11 +496,7 @@ class LocalSearchSolver(
      * the current shaped score. Unlike [greedyObjectiveStep], may step into infeasibility
      * — the main minimize loop then drives back via the configured strategy.
      */
-    private fun shapedDescentStep(
-        state: LocalSearchState,
-        objective: Objective,
-        shaping: CostShaping,
-    ): Boolean {
+    private fun shapedDescentStep(state: LocalSearchState, objective: Objective, shaping: CostShaping): Boolean {
         val baselineSnap = state.assignment.snapshot()
         val baselineObj = objective.evaluate(baselineSnap)
         val baselineShaped = shaping.shape(state.cost, baselineObj)
@@ -674,11 +665,14 @@ class LocalSearchSolver(
      *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
     private fun revertMove(state: LocalSearchState, move: Move, baselineSnap: Sample) {
         when (move) {
-            is Move.BoolFlip -> state.apply(move) // self-inverse
+            is Move.BoolFlip -> state.apply(move)
+
+            // self-inverse
             is Move.IntSet -> {
                 val old = baselineSnap.ints[move.varId]
                 if (old != state.assignment.intValue(move.varId)) state.apply(Move.IntSet(move.varId, old))
             }
+
             is Move.Compound -> {
                 // Revert in reverse order so each part sees the post-apply state of the
                 // ones after it (mirror of the forward `apply` order).

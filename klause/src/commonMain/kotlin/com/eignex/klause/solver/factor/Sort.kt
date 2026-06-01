@@ -13,10 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Propagation: chain bound-tightening on `ys` (non-decreasing) and matching bounds
  * between `ys[0]` ↔ `min(xs)` / `ys[n-1]` ↔ `max(xs)`.
  */
-class Sort(
-    val xs: IntArray,
-    val ys: IntArray,
-) : LocalSearchFactor {
+class Sort(val xs: IntArray, val ys: IntArray) : LocalSearchFactor {
 
     init {
         require(xs.size == ys.size) { "sort: xs/ys size mismatch" }
@@ -47,9 +44,11 @@ class Sort(
             if (ys[i] == intVar) newValue else state.assignment.intValue(ys[i])
         }
         var willViolate = false
-        for (i in ysVals.indices) if (ysVals[i] != xsVals[i]) {
-            willViolate = true
-            break
+        for (i in ysVals.indices) {
+            if (ysVals[i] != xsVals[i]) {
+                willViolate = true
+                break
+            }
         }
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
@@ -82,11 +81,13 @@ class Sort(
         val under = ArrayList<Int>()
         for ((v, c) in xsCount) if (c > (ysCount[v] ?: 0)) over.add(v)
         for ((v, c) in ysCount) if (c > (xsCount[v] ?: 0)) under.add(v)
-        for (v in over) for (vPrime in under) {
-            for (k in xs.indices) {
-                if (xsVals[k] == v && vPrime in state.problem.intDomains[xs[k]]) {
-                    sink.addChannelingIntSet(state, xs[k], vPrime)
-                    break
+        for (v in over) {
+            for (vPrime in under) {
+                for (k in xs.indices) {
+                    if (xsVals[k] == v && vPrime in state.problem.intDomains[xs[k]]) {
+                        sink.addChannelingIntSet(state, xs[k], vPrime)
+                        break
+                    }
                 }
             }
         }
@@ -99,9 +100,11 @@ class Sort(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // All-singleton sanity: when every operand is pinned, ys must equal sorted xs.
         var allSingleton = true
-        for (v in intVars) if (state.intDomains[v].min != state.intDomains[v].max) {
-            allSingleton = false
-            break
+        for (v in intVars) {
+            if (state.intDomains[v].min != state.intDomains[v].max) {
+                allSingleton = false
+                break
+            }
         }
         if (allSingleton) {
             val xv = IntArray(xs.size) { state.intDomains[xs[it]].min }.also { it.sort() }

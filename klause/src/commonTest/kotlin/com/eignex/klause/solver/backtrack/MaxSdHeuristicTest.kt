@@ -49,7 +49,7 @@ class MaxSdHeuristicTest {
                     vars = intArrayOf(0, 1, 2),
                     op = com.eignex.klause.solver.factor.LinearOp.LE,
                     bound = 6,
-                )
+                ),
             ),
         )
         val s1 = PropagationSession(problem)
@@ -59,16 +59,16 @@ class MaxSdHeuristicTest {
         assertEquals(
             impactOrder.size,
             maxSdOrder.size,
-            "both heuristics should yield the same set; got $impactOrder vs $maxSdOrder"
+            "both heuristics should yield the same set; got $impactOrder vs $maxSdOrder",
         )
         assertTrue(
             maxSdOrder.first() in setOf(0, 1, 2),
-            "MaxSd should prefer a v0 ∈ {0,1,2} (largest residual); got ${maxSdOrder.first()}"
+            "MaxSd should prefer a v0 ∈ {0,1,2} (largest residual); got ${maxSdOrder.first()}",
         )
         assertEquals(
             4,
             impactOrder.first(),
-            "Impact should prefer v0 = 4 (smallest residual); got ${impactOrder.first()}"
+            "Impact should prefer v0 = 4 (smallest residual); got ${impactOrder.first()}",
         )
     }
 
@@ -85,7 +85,7 @@ class MaxSdHeuristicTest {
                 variableHeuristic = SmallestDomain,
                 valueHeuristic = MaxSd(),
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())

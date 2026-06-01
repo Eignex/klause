@@ -71,8 +71,8 @@ class ChocoFactorCoverageExtraTest {
             problem(
                 3,
                 arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-                Member(xs = intArrayOf(0, 1), y = 2)
-            )
+                Member(xs = intArrayOf(0, 1), y = 2),
+            ),
         )
         assertTrue(a.ints[2] == a.ints[0] || a.ints[2] == a.ints[1])
     }
@@ -82,8 +82,8 @@ class ChocoFactorCoverageExtraTest {
             problem(
                 3,
                 arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-                ArrayMinMax(result = 2, xs = intArrayOf(0, 1), max = true)
-            )
+                ArrayMinMax(result = 2, xs = intArrayOf(0, 1), max = true),
+            ),
         )
         assertEquals(maxOf(a.ints[0], a.ints[1]), a.ints[2])
     }
@@ -93,8 +93,8 @@ class ChocoFactorCoverageExtraTest {
             problem(
                 3,
                 arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 1)),
-                ArgMinMax(idx = 2, xs = intArrayOf(0, 1), max = true, indexOffset = 0)
-            )
+                ArgMinMax(idx = 2, xs = intArrayOf(0, 1), max = true, indexOffset = 0),
+            ),
         )
         val xs = listOf(a.ints[0], a.ints[1])
         val expected = xs.indexOf(xs.max())
@@ -106,8 +106,8 @@ class ChocoFactorCoverageExtraTest {
             problem(
                 4,
                 arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 100), IntDomain(0, 100)),
-                Knapsack(weights = intArrayOf(2, 3), profits = intArrayOf(5, 1), xs = intArrayOf(0, 1), w = 2, p = 3)
-            )
+                Knapsack(weights = intArrayOf(2, 3), profits = intArrayOf(5, 1), xs = intArrayOf(0, 1), w = 2, p = 3),
+            ),
         )
         assertEquals(2 * a.ints[0] + 3 * a.ints[1], a.ints[2])
         assertEquals(5 * a.ints[0] + 1 * a.ints[1], a.ints[3])
@@ -122,9 +122,9 @@ class ChocoFactorCoverageExtraTest {
                     xs = intArrayOf(0, 1),
                     ys = intArrayOf(2, 3),
                     widths = intArrayOf(2, 2),
-                    heights = intArrayOf(2, 2)
-                )
-            )
+                    heights = intArrayOf(2, 2),
+                ),
+            ),
         )
         val x0 = a.ints[0]
         val x1 = a.ints[1]
@@ -148,8 +148,8 @@ class ChocoFactorCoverageExtraTest {
             problem(
                 4,
                 dom(4, 0, 1),
-                Sequence(low = 1, high = 2, k = 2, xs = intArrayOf(0, 1, 2, 3), values = intArrayOf(1))
-            )
+                Sequence(low = 1, high = 2, k = 2, xs = intArrayOf(0, 1, 2, 3), values = intArrayOf(1)),
+            ),
         )
         val v = listOf(a.ints[0], a.ints[1], a.ints[2], a.ints[3])
         for (s in 0..v.size - 2) assertTrue(v.subList(s, s + 2).count { it == 1 } in 1..2)
@@ -182,10 +182,10 @@ class ChocoFactorCoverageExtraTest {
                         alphabetSize = 2,
                         transitions = intArrayOf(2, 0, 2, 2),
                         q0 = 1,
-                        accepting = intArrayOf(2)
-                    )
-                )
-            )
+                        accepting = intArrayOf(2),
+                    ),
+                ),
+            ),
         )
 
     @Test fun `bin_packing fills load variables`() {
@@ -199,9 +199,9 @@ class ChocoFactorCoverageExtraTest {
                     mode = BinPacking.Mode.LoadVars,
                     loadVars = intArrayOf(2, 3),
                     numBins = 2,
-                    binOffset = 1
-                )
-            )
+                    binOffset = 1,
+                ),
+            ),
         )
         val w = intArrayOf(3, 4)
         val load1 = (0..1).filter { a.ints[it] == 1 }.sumOf { w[it] }
@@ -216,8 +216,14 @@ class ChocoFactorCoverageExtraTest {
                 1,
                 1,
                 arrayOf(IntDomain(0, 5)),
-                ReifiedLinear(auxBoolVar = 0, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.GE, bound = 3)
-            )
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.GE,
+                    bound = 3,
+                ),
+            ),
         )
         assertEquals(a.ints[0] >= 3, a.bools[0])
     }
@@ -233,9 +239,9 @@ class ChocoFactorCoverageExtraTest {
                     weights = intArrayOf(1, 1),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.GE,
-                    bound = 1
-                )
-            )
+                    bound = 1,
+                ),
+            ),
         )
         val sum = (if (a.bools[0]) 1 else 0) + (if (a.bools[1]) 1 else 0)
         assertEquals(sum >= 1, a.bools[2])
@@ -251,9 +257,9 @@ class ChocoFactorCoverageExtraTest {
                     auxBoolVar = 2,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     min = 1,
-                    max = 2
-                )
-            )
+                    max = 2,
+                ),
+            ),
         )
         val n = (if (a.bools[0]) 1 else 0) + (if (a.bools[1]) 1 else 0)
         assertEquals(n in 1..2, a.bools[2])
@@ -264,8 +270,8 @@ class ChocoFactorCoverageExtraTest {
             problem(
                 3,
                 arrayOf(IntDomain(2, 2), IntDomain(3, 3), IntDomain(0, 20)),
-                Product(a = 0, b = 1, result = 2)
-            )
+                Product(a = 0, b = 1, result = 2),
+            ),
         )
         assertEquals(6, a.ints[2])
     }
@@ -280,9 +286,9 @@ class ChocoFactorCoverageExtraTest {
                     weights = intArrayOf(1, 1),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.GE,
-                    bound = 1
-                )
-            )
+                    bound = 1,
+                ),
+            ),
         )
         assertTrue((if (a.bools[0]) 1 else 0) + (if (a.bools[1]) 1 else 0) >= 1)
     }

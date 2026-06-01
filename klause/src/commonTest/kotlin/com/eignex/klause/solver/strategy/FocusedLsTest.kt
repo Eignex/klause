@@ -65,8 +65,7 @@ class FocusedLsTest {
     }
 
     @Test
-    fun `probsat selection solves small 3 sat`() =
-        assertSolvesSat3("ProbSat", ProbSat(), seed = 23L)
+    fun `probsat selection solves small 3 sat`() = assertSolvesSat3("ProbSat", ProbSat(), seed = 23L)
 
     @Test
     fun `adaptive probsat selection solves small 3 sat`() =

@@ -61,7 +61,7 @@ interface Session<P : SolverParams> : AutoCloseable {
     fun minimize(objective: Objective, params: P): MinimizeResult {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer"
+                "Solver ${solver::class.simpleName} does not implement Optimizer",
             )
         return opt.minimize(objective, params)
     }
@@ -70,7 +70,7 @@ interface Session<P : SolverParams> : AutoCloseable {
     fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer"
+                "Solver ${solver::class.simpleName} does not implement Optimizer",
             )
         return opt.improvements(objective, params)
     }
@@ -127,7 +127,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun minimize(objective: Objective, params: P): MinimizeResult {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer"
+                "Solver ${solver::class.simpleName} does not implement Optimizer",
             )
         return opt.minimize(objective, applyStack(params))
     }
@@ -135,7 +135,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
-                "Solver ${solver::class.simpleName} does not implement Optimizer"
+                "Solver ${solver::class.simpleName} does not implement Optimizer",
             )
         return opt.improvements(objective, applyStack(params))
     }

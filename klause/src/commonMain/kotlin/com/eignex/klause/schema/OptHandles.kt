@@ -23,21 +23,15 @@ import com.eignex.klause.ast.Or
  * Use [valueOr] to materialise the value into an [IntExpr] that's safe to plug into arithmetic;
  * arithmetic on the bare [value] handle would ignore [present] and is therefore not exposed.
  */
-class OptIntHandle(
-    val name: String,
-    val present: BoolHandle,
-    val value: IntHandle,
-) {
+class OptIntHandle(val name: String, val present: BoolHandle, val value: IntHandle) {
     val min: Int get() = value.min
     val max: Int get() = value.max
 
     /** Yields an [IntExpr] equal to [value] when [present], otherwise [default]. Safe in any
      *  arithmetic context. */
-    fun valueOr(default: Int): IntExpr =
-        IntIfThenElse(present.toExpr(), value.toIntExpr(), IntLit(default))
+    fun valueOr(default: Int): IntExpr = IntIfThenElse(present.toExpr(), value.toIntExpr(), IntLit(default))
 
-    fun valueOr(default: IntTerm): IntExpr =
-        IntIfThenElse(present.toExpr(), value.toIntExpr(), default.toIntExpr())
+    fun valueOr(default: IntTerm): IntExpr = IntIfThenElse(present.toExpr(), value.toIntExpr(), default.toIntExpr())
 
     private fun cmpRhsInt(rhs: IntTerm, op: IntCmpOp): BoolExpr =
         And(listOf(present.toExpr(), IntCompare(value.toIntExpr(), op, rhs.toIntExpr())))
@@ -80,11 +74,7 @@ class OptIntHandle(
  * meaningful only when [present] is true; in a Boolean context the opt-bool itself evaluates
  * to `present ∧ value` so absent operands silently become false.
  */
-class OptBoolHandle(
-    val name: String,
-    val present: BoolHandle,
-    val value: BoolHandle,
-) : BoolTerm {
+class OptBoolHandle(val name: String, val present: BoolHandle, val value: BoolHandle) : BoolTerm {
     /** Coerces to `present ∧ value` — false whenever the variable is absent. */
     override fun toExpr(): BoolExpr = And(listOf(present.toExpr(), value.toExpr()))
 
@@ -98,11 +88,7 @@ class OptBoolHandle(
  * Optional nominal variable: a `(present, value)` pair. Comparisons against a label or another
  * nominal follow MiniZinc opt semantics — absent operands make the comparison false.
  */
-class OptNominalHandle(
-    val name: String,
-    val present: BoolHandle,
-    val value: NominalHandle,
-) {
+class OptNominalHandle(val name: String, val present: BoolHandle, val value: NominalHandle) {
     val labels: List<String> get() = value.labels
 
     infix fun eq(label: String): BoolExpr {

@@ -35,7 +35,7 @@ class KnapsackTest {
                     xs = intArrayOf(0, 1, 2),
                     w = 3,
                     p = 4,
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).minimize(
@@ -67,7 +67,7 @@ class KnapsackTest {
                     xs = intArrayOf(0, 1, 2),
                     w = 3,
                     p = 4,
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))

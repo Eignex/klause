@@ -431,9 +431,11 @@ class AllDifferent(
             while (qh < qt) {
                 val u = bfs[qh++]
                 if (u < n) acc.add(filteredVars[u])
-                for (w in adj[u]) if (!vis[w]) {
-                    vis[w] = true
-                    bfs[qt++] = w
+                for (w in adj[u]) {
+                    if (!vis[w]) {
+                        vis[w] = true
+                        bfs[qt++] = w
+                    }
                 }
             }
             acc.toIntArray()
@@ -554,9 +556,11 @@ class AllDifferent(
             // Locate the unique holder of w. O(|vars|) per candidate; bounded by
             // MAX_SWAP_CANDIDATES so total cost is fixed.
             var holder = -1
-            for (v in vars) if (state.assignment.intValue(v) == w) {
-                holder = v
-                break
+            for (v in vars) {
+                if (state.assignment.intValue(v) == w) {
+                    holder = v
+                    break
+                }
             }
             if (holder == -1 || holder == occupant) continue
             val hd = state.problem.intDomains[holder]

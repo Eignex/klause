@@ -32,7 +32,7 @@ class BacktrackSolverTest {
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             sat.assignment.bools[0] || sat.assignment.bools[1],
-            "witness must satisfy the clause: ${sat.assignment.bools.toList()}"
+            "witness must satisfy the clause: ${sat.assignment.bools.toList()}",
         )
     }
 
@@ -69,7 +69,7 @@ class BacktrackSolverTest {
         assertEquals(
             setOf(0, 1),
             core.factorIds.toSet(),
-            "core should mention both contradicting clauses, got ${core.factorIds.toList()}"
+            "core should mention both contradicting clauses, got ${core.factorIds.toList()}",
         )
     }
 
@@ -95,7 +95,7 @@ class BacktrackSolverTest {
         assertEquals(
             setOf(0, 1, 2, 3),
             core.factorIds.toSet(),
-            "transitive core should include every link in the propagation chain, got ${core.factorIds.toList()}"
+            "transitive core should include every link in the propagation chain, got ${core.factorIds.toList()}",
         )
     }
 
@@ -111,28 +111,28 @@ class BacktrackSolverTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(clause)
+            factors = arrayOf<Factor>(clause),
         )
         val state = com.eignex.klause.solver.propagation.PropagationState(problem, Assumptions.None)
         assertEquals(
             1,
             state.boolWatchersByLit[Lit.make(0, true)].size,
-            "clause should be in watcher list for +v0"
+            "clause should be in watcher list for +v0",
         )
         assertEquals(
             1,
             state.boolWatchersByLit[Lit.make(1, true)].size,
-            "clause should be in watcher list for +v1"
+            "clause should be in watcher list for +v1",
         )
         assertEquals(
             0,
             state.boolWatchersByLit[Lit.make(0, false)].size,
-            "clause should not be woken when -v0 becomes false (i.e., v0 = true)"
+            "clause should not be woken when -v0 becomes false (i.e., v0 = true)",
         )
         assertEquals(
             0,
             state.boolWatchersByLit[Lit.make(2, true)].size,
-            "v2 is not yet a watched literal"
+            "v2 is not yet a watched literal",
         )
     }
 
@@ -151,7 +151,7 @@ class BacktrackSolverTest {
                     literals = IntArray(8) { Lit.make(it, true) },
                     min = 2,
                     max = 8,
-                )
+                ),
             ),
         )
         val pins = mutableMapOf<Int, Boolean>()
@@ -159,7 +159,7 @@ class BacktrackSolverTest {
         val result = BacktrackSolver(problem).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = pins),
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(result)
         assertEquals(true, sat.assignment.bools[6], "v6 should be unit-forced true")
@@ -180,21 +180,21 @@ class BacktrackSolverTest {
                     literals = IntArray(8) { Lit.make(it, true) },
                     min = 0,
                     max = 2,
-                )
+                ),
             ),
         )
         val pins = mutableMapOf<Int, Boolean>(0 to true, 1 to true)
         val result = BacktrackSolver(problem).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = pins),
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(result)
         for (v in 2 until 8) {
             assertEquals(
                 false,
                 sat.assignment.bools[v],
-                "v$v should be unit-forced false to keep count ≤ 2, got ${sat.assignment.bools[v]}"
+                "v$v should be unit-forced false to keep count ≤ 2, got ${sat.assignment.bools[v]}",
             )
         }
     }
@@ -213,7 +213,7 @@ class BacktrackSolverTest {
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = mapOf(0 to true, 1 to true)),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(r)
     }
@@ -237,13 +237,13 @@ class BacktrackSolverTest {
         val result = BacktrackSolver(problem).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = pins),
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(result)
         assertEquals(
             true,
             sat.assignment.bools[49],
-            "watched-literal unit propagation should force v49 = true"
+            "watched-literal unit propagation should force v49 = true",
         )
         for (v in 0 until 49) {
             assertEquals(false, sat.assignment.bools[v], "v$v assumption should hold")
@@ -270,7 +270,7 @@ class BacktrackSolverTest {
         assertEquals(
             setOf(0, 1),
             core.factorIds.toSet(),
-            "both-side narrowing should put both factors in the core, got ${core.factorIds.toList()}"
+            "both-side narrowing should put both factors in the core, got ${core.factorIds.toList()}",
         )
     }
 
@@ -290,7 +290,7 @@ class BacktrackSolverTest {
                 maxDecisions = Long.MAX_VALUE,
                 maxInstructions = 2L,
                 randomSeed = 0L,
-            )
+            ),
         )
         assertIs<SolveResult.Unknown>(tight)
         val loose = BacktrackSolver(p).solve(
@@ -298,7 +298,7 @@ class BacktrackSolverTest {
                 maxDecisions = Long.MAX_VALUE,
                 maxInstructions = 1_000_000L,
                 randomSeed = 0L,
-            )
+            ),
         )
         assertIs<SolveResult.Sat>(loose)
     }
@@ -330,8 +330,8 @@ class BacktrackSolverTest {
                         Lit.make(1, true),
                         Lit.make(2, true),
                         Lit.make(3, true),
-                    )
-                )
+                    ),
+                ),
             ),
         )
         val models = BacktrackSolver(p).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
@@ -368,7 +368,7 @@ class BacktrackSolverTest {
         // Could legitimately be Unknown or Sat depending on whether the first branch hits.
         assertTrue(
             r is SolveResult.Sat || r is SolveResult.Unknown,
-            "should not report Unsat on feasible problem: $r"
+            "should not report Unsat on feasible problem: $r",
         )
     }
 
@@ -385,8 +385,8 @@ class BacktrackSolverTest {
                         Lit.make(1, true),
                         Lit.make(2, true),
                         Lit.make(3, true),
-                    )
-                )
+                    ),
+                ),
             ),
         )
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -409,11 +409,11 @@ class BacktrackSolverTest {
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
                     min = 1,
                     max = 3,
-                )
+                ),
             ),
         )
         val models = BacktrackSolver(p).enumerate(
-            BacktrackParams(minHammingDistance = 2, recentWindow = 16)
+            BacktrackParams(minHammingDistance = 2, recentWindow = 16),
         ).toList()
         for (i in 0 until models.size - 1) {
             var d = 0
@@ -437,14 +437,14 @@ class BacktrackSolverTest {
                         Lit.make(0, true),
                         Lit.make(1, true),
                         Lit.make(2, true),
-                    )
+                    ),
                 ),
                 Cardinality.exactlyOne(
                     intArrayOf(
                         Lit.make(3, true),
                         Lit.make(4, true),
                         Lit.make(5, true),
-                    )
+                    ),
                 ),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(4, false))),
@@ -455,18 +455,18 @@ class BacktrackSolverTest {
             BacktrackParams(
                 variableHeuristic = Vsids(),
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(
             1,
             sat.assignment.bools.take(3).count { it },
-            "exactly one of v0..v2 should be true"
+            "exactly one of v0..v2 should be true",
         )
         assertEquals(
             1,
             sat.assignment.bools.drop(3).count { it },
-            "exactly one of v3..v5 should be true"
+            "exactly one of v3..v5 should be true",
         )
     }
 
@@ -517,7 +517,7 @@ class BacktrackSolverTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true))))
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
         val r1 = BacktrackSolver(p1).solve(BacktrackParams(variableHeuristic = vsids))
         assertIs<SolveResult.Sat>(r1)
@@ -526,7 +526,7 @@ class BacktrackSolverTest {
             numBoolVars = 7,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(6, true))))
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(6, true)))),
         )
         val r2 = BacktrackSolver(p2).solve(BacktrackParams(variableHeuristic = vsids))
         assertIs<SolveResult.Sat>(r2)
@@ -548,7 +548,7 @@ class BacktrackSolverTest {
                         Lit.make(1, true),
                         Lit.make(2, true),
                         Lit.make(3, true),
-                    )
+                    ),
                 ),
             ),
         )
@@ -556,7 +556,7 @@ class BacktrackSolverTest {
             BacktrackParams(
                 variableHeuristic = DomWdeg(),
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r1)
         assertEquals(1, sat.assignment.bools.count { it })
@@ -573,7 +573,7 @@ class BacktrackSolverTest {
         val r2 = BacktrackSolver(unsatProblem).solve(
             BacktrackParams(
                 variableHeuristic = DomWdeg(),
-            )
+            ),
         )
         assertIs<SolveResult.Unsat>(r2)
     }
@@ -598,7 +598,7 @@ class BacktrackSolverTest {
         assertEquals(
             VarRef.Bool(3),
             picked,
-            "last-conflict should return v3 when it triggered the most recent conflict"
+            "last-conflict should return v3 when it triggered the most recent conflict",
         )
     }
 
@@ -618,7 +618,7 @@ class BacktrackSolverTest {
         assertEquals(
             VarRef.Bool(0),
             picked,
-            "last-conflict should defer to base after the prioritised var commits"
+            "last-conflict should defer to base after the prioritised var commits",
         )
     }
 
@@ -634,14 +634,14 @@ class BacktrackSolverTest {
                         Lit.make(0, true),
                         Lit.make(1, true),
                         Lit.make(2, true),
-                    )
+                    ),
                 ),
                 Cardinality.exactlyOne(
                     intArrayOf(
                         Lit.make(3, true),
                         Lit.make(4, true),
                         Lit.make(5, true),
-                    )
+                    ),
                 ),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
             ),
@@ -650,7 +650,7 @@ class BacktrackSolverTest {
             BacktrackParams(
                 variableHeuristic = LastConflict(Vsids()),
                 randomSeed = 0L,
-            )
+            ),
         )
         assertIs<SolveResult.Sat>(r)
     }

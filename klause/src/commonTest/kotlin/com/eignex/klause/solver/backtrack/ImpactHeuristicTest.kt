@@ -36,7 +36,7 @@ class ImpactHeuristicTest {
         assertEquals(
             setOf(0, 1, 3),
             values.toSet(),
-            "Impact should yield exactly the feasible values; got $values"
+            "Impact should yield exactly the feasible values; got $values",
         )
     }
 
@@ -64,12 +64,12 @@ class ImpactHeuristicTest {
         assertEquals(
             setOf(1, 2, 3),
             values.toSet(),
-            "0 must be dropped (v3 = 0); the remaining 3 values must all appear; got $values"
+            "0 must be dropped (v3 = 0); the remaining 3 values must all appear; got $values",
         )
         assertEquals(
             values.distinct().size,
             values.size,
-            "no duplicates expected; got $values"
+            "no duplicates expected; got $values",
         )
     }
 
@@ -87,7 +87,7 @@ class ImpactHeuristicTest {
                 variableHeuristic = SmallestDomain,
                 valueHeuristic = Impact(),
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         // Verify the assignment is a permutation of 0..4.
@@ -107,7 +107,7 @@ class ImpactHeuristicTest {
                     vars = intArrayOf(0, 1),
                     op = LinearOp.LE,
                     bound = 7,
-                )
+                ),
             ),
         )
         val session = PropagationSession(problem)
@@ -118,7 +118,7 @@ class ImpactHeuristicTest {
         assertEquals(
             levelBefore,
             session.decisionLevel,
-            "Impact must leave the session at the same decision level it found it at"
+            "Impact must leave the session at the same decision level it found it at",
         )
     }
 

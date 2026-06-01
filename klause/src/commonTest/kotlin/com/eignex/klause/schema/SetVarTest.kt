@@ -204,7 +204,7 @@ class SetReifiedTest {
             assertEquals(
                 expected,
                 flag,
-                "reified mismatch: x=$xv s=$sv flag=$flag expected=$expected"
+                "reified mismatch: x=$xv s=$sv flag=$flag expected=$expected",
             )
         }
     }

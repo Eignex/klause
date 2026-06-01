@@ -37,7 +37,9 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
 
     override val depth: Int get() = stack.size
 
-    override fun push(assumptions: Assumptions) { stack.addLast(assumptions) }
+    override fun push(assumptions: Assumptions) {
+        stack.addLast(assumptions)
+    }
 
     override fun pop() {
         require(stack.isNotEmpty()) { "Session.pop on an empty assumption stack" }
@@ -55,28 +57,20 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
      *  state directly — use [reset] to clear it. */
     val warmStateView: WarmState get() = warm
 
-    override fun solve(params: LocalSearchParams): SolveResult =
-        solver.solveInternal(applyStack(params), warm)
+    override fun solve(params: LocalSearchParams): SolveResult = solver.solveInternal(applyStack(params), warm)
 
-    override fun samples(params: LocalSearchParams): Sequence<Sample> =
-        solver.samplesInternal(applyStack(params), warm)
+    override fun samples(params: LocalSearchParams): Sequence<Sample> = solver.samplesInternal(applyStack(params), warm)
 
     override fun enumerate(params: LocalSearchParams): Sequence<Sample> =
         solver.enumerateInternal(applyStack(params), warm)
 
     /** Optimisation entry point — overrides [Session.minimize] with warm-start support. */
-    override fun minimize(
-        objective: Objective,
-        params: LocalSearchParams,
-    ): MinimizeResult =
+    override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult =
         solver.minimizeInternal(objective, applyStack(params), warm)
 
     /** Streaming optimisation — yields each new incumbent then a terminal verdict.
      *  Mirrors [com.eignex.klause.solver.Optimizer.improvements]. */
-    override fun improvements(
-        objective: Objective,
-        params: LocalSearchParams,
-    ): Sequence<MinimizeResult> =
+    override fun improvements(objective: Objective, params: LocalSearchParams): Sequence<MinimizeResult> =
         solver.improvementsInternal(objective, applyStack(params), warm)
 
     private fun applyStack(params: LocalSearchParams): LocalSearchParams {

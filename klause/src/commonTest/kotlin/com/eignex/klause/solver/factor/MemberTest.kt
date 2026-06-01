@@ -24,7 +24,7 @@ class MemberTest {
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(10).forEach { sample ->
             assertTrue(
                 sample.ints[3] in setOf(1, 3, 7),
-                "y = ${sample.ints[3]} not in {1, 3, 7}"
+                "y = ${sample.ints[3]} not in {1, 3, 7}",
             )
         }
     }
@@ -42,7 +42,7 @@ class MemberTest {
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             5 in sat.assignment.ints.take(3),
-            "expected some xs to hold 5; got ${sat.assignment.ints.toList()}"
+            "expected some xs to hold 5; got ${sat.assignment.ints.toList()}",
         )
     }
 }

@@ -149,14 +149,21 @@ class Portfolio<P : SolverParams>(
                             updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
                             local = r
                         }
+
                         is MinimizeResult.Optimal -> {
                             updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
                             cancelled.store(true)
                             local = r
                             break
                         }
-                        is MinimizeResult.Infeasible -> { local = r }
-                        is MinimizeResult.Unknown -> { local = r }
+
+                        is MinimizeResult.Infeasible -> {
+                            local = r
+                        }
+
+                        is MinimizeResult.Unknown -> {
+                            local = r
+                        }
                     }
                 }
                 local

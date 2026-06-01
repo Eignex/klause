@@ -15,13 +15,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * keeps that structure explicit so a stronger native sequence propagator (regin-style flow
  * across overlapping windows) can replace the per-window bound check later.
  */
-class Sequence(
-    val low: Int,
-    val high: Int,
-    val k: Int,
-    val xs: IntArray,
-    values: IntArray,
-) : LocalSearchFactor {
+class Sequence(val low: Int, val high: Int, val k: Int, val xs: IntArray, values: IntArray) : LocalSearchFactor {
 
     val values: IntArray = values.distinct().sorted().toIntArray()
 
@@ -88,9 +82,11 @@ class Sequence(
             for (w in wLo..wHi) sim[w] += delta
         }
         var willViolate = false
-        for (c in sim) if (c < low || c > high) {
-            willViolate = true
-            break
+        for (c in sim) {
+            if (c < low || c > high) {
+                willViolate = true
+                break
+            }
         }
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
@@ -113,9 +109,11 @@ class Sequence(
                 for (w in wLo..wHi) sim[w] += delta
             }
             var v = false
-            for (c in sim) if (c < low || c > high) {
-                v = true
-                break
+            for (c in sim) {
+                if (c < low || c > high) {
+                    v = true
+                    break
+                }
             }
             v
         }
@@ -186,9 +184,11 @@ class Sequence(
                 } else if (!isMatch && needIncrease) {
                     // Pick a matching value from the set.
                     var pick: Int? = null
-                    for (vv in values) if (vv in d && vv != cur) {
-                        pick = vv
-                        break
+                    for (vv in values) {
+                        if (vv in d && vv != cur) {
+                            pick = vv
+                            break
+                        }
                     }
                     if (pick != null) sink.addChannelingIntSet(state, xi, pick!!)
                 }

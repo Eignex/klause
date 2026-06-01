@@ -37,7 +37,7 @@ class CompoundMoveTest {
                 listOf(
                     Move.BoolFlip(0),
                     Move.Compound(listOf(Move.BoolFlip(1), Move.BoolFlip(2))),
-                )
+                ),
             )
         }
     }

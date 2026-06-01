@@ -15,12 +15,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  *
  * Propagation: tighten [idx] to its legal index range.
  */
-class ArgMinMax(
-    val idx: Int,
-    val xs: IntArray,
-    val max: Boolean,
-    val indexOffset: Int = 0,
-) : LocalSearchFactor {
+class ArgMinMax(val idx: Int, val xs: IntArray, val max: Boolean, val indexOffset: Int = 0) : LocalSearchFactor {
 
     init {
         require(xs.isNotEmpty()) { "arg_${if (max) "max" else "min"}: empty xs" }

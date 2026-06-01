@@ -53,7 +53,7 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
                     Sample(
                         BooleanArray(problem.numBoolVars) { value(m.boolVars[it]) == 1L },
                         IntArray(problem.numIntVars) { value(m.intVars[it]).toInt() },
-                    )
+                    ),
                 )
             }
         }
@@ -84,8 +84,8 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
                     MinimizeResult.BestFound(
                         sample,
                         objectiveValue() + objective.constant,
-                        TerminationReason.BudgetExhausted
-                    )
+                        TerminationReason.BudgetExhausted,
+                    ),
                 )
             }
         }
@@ -99,8 +99,11 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
                     MinimizeResult.Unknown(TerminationReason.SearchExhausted)
                 }
             }
+
             CpSolverStatus.INFEASIBLE -> MinimizeResult.Infeasible()
+
             CpSolverStatus.FEASIBLE -> incumbents.lastOrNull() ?: MinimizeResult.Unknown(TerminationReason.Timeout)
+
             else -> MinimizeResult.Unknown(TerminationReason.Timeout)
         }
         return (incumbents + terminal).asSequence()

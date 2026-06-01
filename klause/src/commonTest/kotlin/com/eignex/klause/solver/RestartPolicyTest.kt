@@ -32,7 +32,7 @@ class RestartPolicyTest {
                 Lit.make(0, true),
                 Lit.make(1, true),
                 Lit.make(2, true),
-            )
+            ),
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -63,7 +63,7 @@ class RestartPolicyTest {
         val differences = (0..5).count { state.assignment.boolValue(it) != best.bools[it] }
         assertTrue(
             differences in 0..2,
-            "perturbed assignment differs from bestSoFar in $differences positions, expected 0..2"
+            "perturbed assignment differs from bestSoFar in $differences positions, expected 0..2",
         )
     }
 

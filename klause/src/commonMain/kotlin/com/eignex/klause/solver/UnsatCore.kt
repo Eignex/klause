@@ -16,8 +16,7 @@ data class UnsatCore(val factorIds: IntArray) {
     val size: Int get() = factorIds.size
     val isEmpty: Boolean get() = factorIds.isEmpty()
 
-    override fun equals(other: Any?): Boolean =
-        other is UnsatCore && factorIds.contentEquals(other.factorIds)
+    override fun equals(other: Any?): Boolean = other is UnsatCore && factorIds.contentEquals(other.factorIds)
 
     override fun hashCode(): Int = factorIds.contentHashCode()
 

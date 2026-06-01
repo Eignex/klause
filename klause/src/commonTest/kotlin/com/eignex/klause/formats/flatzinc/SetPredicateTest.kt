@@ -29,7 +29,7 @@ class SetPredicateTest {
         val twoIdx = layout.elements.indexOf(2)
         assertTrue(
             sat.assignment.bools[layout.indicatorBoolIds[twoIdx]],
-            "element 2 must be in s; bools=${sat.assignment.bools.toList()}"
+            "element 2 must be in s; bools=${sat.assignment.bools.toList()}",
         )
     }
 
@@ -72,7 +72,7 @@ class SetPredicateTest {
                 val tIdx = tLayout.elements.indexOf(sLayout.elements[i])
                 assertTrue(
                     sat.assignment.bools[tLayout.indicatorBoolIds[tIdx]],
-                    "element ${sLayout.elements[i]} in s but not t"
+                    "element ${sLayout.elements[i]} in s but not t",
                 )
             }
         }
@@ -269,7 +269,7 @@ class SetPredicateTest {
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             sat.assignment.bools[program.boolVarsByName.getValue("r")],
-            "r must be true when s ⊆ t"
+            "r must be true when s ⊆ t",
         )
     }
 
@@ -294,7 +294,7 @@ class SetPredicateTest {
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             !sat.assignment.bools[program.boolVarsByName.getValue("r")],
-            "r must be false when 3 ∈ s but 3 ∉ t"
+            "r must be false when 3 ∈ s but 3 ∉ t",
         )
     }
 
@@ -378,13 +378,15 @@ class SetPredicateTest {
         val membersOf: (SetVarLayout) -> Set<Int> = { layout ->
             layout.elements.filterIndexed { idx, _ -> sat.assignment.bools[layout.indicatorBoolIds[idx]] }.toSet()
         }
-        for (i in sets.indices) for (j in i + 1 until sets.size) {
-            val m1 = membersOf(sets[i])
-            val m2 = membersOf(sets[j])
-            assertTrue(
-                m1.intersect(m2).isEmpty(),
-                "sets a[${i + 1}]=$m1 and a[${j + 1}]=$m2 must be disjoint"
-            )
+        for (i in sets.indices) {
+            for (j in i + 1 until sets.size) {
+                val m1 = membersOf(sets[i])
+                val m2 = membersOf(sets[j])
+                assertTrue(
+                    m1.intersect(m2).isEmpty(),
+                    "sets a[${i + 1}]=$m1 and a[${j + 1}]=$m2 must be disjoint",
+                )
+            }
         }
     }
 
@@ -468,7 +470,7 @@ class SetPredicateTest {
             assertEquals(
                 expected,
                 sat.assignment.bools[layout.indicatorBoolIds[i]],
-                "element $e expected in-set=$expected"
+                "element $e expected in-set=$expected",
             )
         }
     }
@@ -488,7 +490,7 @@ class SetPredicateTest {
             assertEquals(
                 expected,
                 sat.assignment.bools[layout.indicatorBoolIds[i]],
-                "element $e expected in-set=$expected"
+                "element $e expected in-set=$expected",
             )
         }
     }

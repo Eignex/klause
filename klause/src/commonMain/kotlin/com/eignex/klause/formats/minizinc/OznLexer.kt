@@ -32,14 +32,17 @@ internal class OznLexer(private val source: String) {
             val c = source[pos]
             when {
                 c.isWhitespace() -> pos++
+
                 c == '%' -> {
                     while (pos < source.length && source[pos] != '\n') pos++
                 }
+
                 c == '/' && pos + 1 < source.length && source[pos + 1] == '*' -> {
                     pos += 2
                     while (pos + 1 < source.length && !(source[pos] == '*' && source[pos + 1] == '/')) pos++
                     if (pos + 1 < source.length) pos += 2
                 }
+
                 else -> return
             }
         }
@@ -72,7 +75,7 @@ internal class OznLexer(private val source: String) {
                         '"' -> '"'
                         '\'' -> '\''
                         else -> n
-                    }
+                    },
                 )
                 pos += 2
             } else {
@@ -104,14 +107,17 @@ internal class OznLexer(private val source: String) {
         val text = source.substring(start, pos)
         val kind = when (text) {
             "true", "false" -> OznTokenKind.BOOL
+
             "output", "array", "set", "of", "var", "int", "bool", "float", "string",
             "if", "then", "elseif", "else", "endif", "in", "where", "let", "not", "xor",
             "div", "mod",
             "show", "show2d", "show3d", "show_int", "show_float", "fix",
             "array1d", "array2d", "array3d", "array4d", "array5d", "array6d",
             "min", "max", "abs", "sum", "product",
-            "bool2int", "int2float" ->
+            "bool2int", "int2float",
+            ->
                 OznTokenKind.KEYWORD
+
             else -> OznTokenKind.IDENT
         }
         return OznToken(kind, text, ln)
@@ -138,7 +144,14 @@ internal class OznLexer(private val source: String) {
 }
 
 internal enum class OznTokenKind {
-    IDENT, KEYWORD, INT, FLOAT, STRING, BOOL, PUNCT, EOF,
+    IDENT,
+    KEYWORD,
+    INT,
+    FLOAT,
+    STRING,
+    BOOL,
+    PUNCT,
+    EOF,
 }
 
 internal data class OznToken(val kind: OznTokenKind, val text: String, val line: Int)

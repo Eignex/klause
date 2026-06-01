@@ -24,7 +24,7 @@ class ChannelDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 21)).take(10).toList()
         assertTrue(samples.isNotEmpty())
@@ -50,7 +50,7 @@ class ChannelDslTest {
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
             compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500)
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 6)).take(10).toList()
         assertTrue(samples.isNotEmpty())

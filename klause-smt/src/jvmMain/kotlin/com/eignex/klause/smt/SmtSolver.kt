@@ -6,8 +6,8 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
 import org.sosy_lab.common.ShutdownNotifier
@@ -37,7 +37,9 @@ import org.sosy_lab.java_smt.api.SolverContext.ProverOptions
  * (a one-shot session is opened and immediately closed). Native `minimize()` comes in a
  * follow-up.
  */
-class SmtSolver(override val problem: Problem) : Solver<SmtParams>, Optimizer<SmtParams> {
+class SmtSolver(override val problem: Problem) :
+    Solver<SmtParams>,
+    Optimizer<SmtParams> {
 
     /**
      * Open an [SmtSession] holding ONE [org.sosy_lab.java_smt.api.SolverContext] +
@@ -80,7 +82,9 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams>, Optimizer<Sm
                         val sample = decode(prover.getModel(), t.encoding)
                         MinimizeResult.Optimal(sample, objective.evaluate(sample))
                     }
+
                     OptimizationProverEnvironment.OptStatus.UNSAT -> MinimizeResult.Infeasible()
+
                     OptimizationProverEnvironment.OptStatus.UNDEF ->
                         MinimizeResult.Unknown(TerminationReason.Timeout)
                 }
@@ -196,7 +200,10 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams>, Optimizer<Sm
         val logger = LogManager.createNullLogManager()
         val shutdownNotifier = ShutdownNotifier.createDummy()
         return SolverContextFactory.createSolverContext(
-            config, logger, shutdownNotifier, params.solver,
+            config,
+            logger,
+            shutdownNotifier,
+            params.solver,
         )
     }
 
@@ -230,8 +237,11 @@ class SmtSolver(override val problem: Problem) : Solver<SmtParams>, Optimizer<Sm
                 val real = model.evaluate(encoding.realFormulas[fid])?.toDouble() ?: 0.0
                 val ivl = meta.intervals[fid]
                 val buckets = meta.bucketCounts[fid]
-                val bucket = if (buckets <= 1) 0
-                else (((real - ivl.lo) / (ivl.hi - ivl.lo)) * (buckets - 1)).toInt().coerceIn(0, buckets - 1)
+                val bucket = if (buckets <= 1) {
+                    0
+                } else {
+                    (((real - ivl.lo) / (ivl.hi - ivl.lo)) * (buckets - 1)).toInt().coerceIn(0, buckets - 1)
+                }
                 ints[meta.intVarByFloatVar[fid]] = bucket
             }
         }

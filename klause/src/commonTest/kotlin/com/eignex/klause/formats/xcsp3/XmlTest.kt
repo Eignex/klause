@@ -13,7 +13,7 @@ class XmlTest {
         val root = parseXml(
             """<instance format="XCSP3" type="CSP">
                  <variables><var id="x"> 1..4 </var></variables>
-               </instance>"""
+               </instance>""",
         )
         assertEquals("instance", root.tag)
         assertEquals("XCSP3", root.attr("format"))
@@ -46,7 +46,7 @@ class XmlTest {
             """<?xml version="1.0" encoding="UTF-8"?>
                <!DOCTYPE instance>
                <!-- a comment -->
-               <r><!-- inner --><x>1</x></r>"""
+               <r><!-- inner --><x>1</x></r>""",
         )
         assertEquals("r", root.tag)
         assertEquals("1", root.child("x")!!.textContent)

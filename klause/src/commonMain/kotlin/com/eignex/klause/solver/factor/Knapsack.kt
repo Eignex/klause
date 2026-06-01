@@ -14,13 +14,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Decomposed propagation: bound-tighten [w] and [p] from the per-element
  * `weights[i] · domain(xs[i])` and `profits[i] · domain(xs[i])` ranges.
  */
-class Knapsack(
-    val weights: IntArray,
-    val profits: IntArray,
-    val xs: IntArray,
-    val w: Int,
-    val p: Int,
-) : LocalSearchFactor {
+class Knapsack(val weights: IntArray, val profits: IntArray, val xs: IntArray, val w: Int, val p: Int) :
+    LocalSearchFactor {
 
     init {
         require(weights.size == xs.size) { "knapsack: weights/xs size mismatch" }
@@ -110,8 +105,10 @@ class Knapsack(
         if (cur == oldValue) return 0
         // Compute pre-update violation by reversing the change on a copy.
         val wasViolated = run {
-            val priorW = s.currentWeight - xs.indices.sumOf { if (xs[it] == intVar) weights[it] * (cur - oldValue) else 0 }
-            val priorP = s.currentProfit - xs.indices.sumOf { if (xs[it] == intVar) profits[it] * (cur - oldValue) else 0 }
+            val priorW =
+                s.currentWeight - xs.indices.sumOf { if (xs[it] == intVar) weights[it] * (cur - oldValue) else 0 }
+            val priorP =
+                s.currentProfit - xs.indices.sumOf { if (xs[it] == intVar) profits[it] * (cur - oldValue) else 0 }
             val wVar = if (intVar == w) oldValue else state.assignment.intValue(w)
             val pVar = if (intVar == p) oldValue else state.assignment.intValue(p)
             wVar != priorW || pVar != priorP

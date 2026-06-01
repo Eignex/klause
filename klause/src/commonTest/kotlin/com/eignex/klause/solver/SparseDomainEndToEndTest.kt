@@ -37,12 +37,12 @@ class SparseDomainEndToEndTest {
             BacktrackParams(
                 variableHeuristic = InputOrder,
                 randomSeed = 0L,
-            )
+            ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             sat.assignment.ints[0] in intArrayOf(1, 2, 4),
-            "v0 should be in {1, 2, 4} (3 and 5 punched out); got ${sat.assignment.ints[0]}"
+            "v0 should be in {1, 2, 4} (3 and 5 punched out); got ${sat.assignment.ints[0]}",
         )
         assertEquals(3, sat.assignment.ints[1])
         assertEquals(5, sat.assignment.ints[2])
@@ -64,13 +64,13 @@ class SparseDomainEndToEndTest {
             BacktrackParams(
                 variableHeuristic = InputOrder,
                 randomSeed = 0L,
-            )
+            ),
         ).toList()
         val v0Values = models.map { it.ints[0] }.sorted()
         assertEquals(
             listOf(1, 2, 4),
             v0Values,
-            "should enumerate exactly the 3 valid assignments; got $v0Values"
+            "should enumerate exactly the 3 valid assignments; got $v0Values",
         )
     }
 
@@ -97,7 +97,7 @@ class SparseDomainEndToEndTest {
         for (m in models) {
             assertTrue(
                 m.ints[0] != 3,
-                "x = 3 violates the disequality; got $m"
+                "x = 3 violates the disequality; got $m",
             )
         }
     }
@@ -121,7 +121,7 @@ class SparseDomainEndToEndTest {
         assertEquals(5, sat.assignment.ints[2])
         assertTrue(
             sat.assignment.ints[0] != 3 && sat.assignment.ints[0] != 5,
-            "v0 must differ from v1=3 and v2=5; got ${sat.assignment.ints[0]}"
+            "v0 must differ from v1=3 and v2=5; got ${sat.assignment.ints[0]}",
         )
     }
 
@@ -150,7 +150,7 @@ class SparseDomainEndToEndTest {
         val v0 = sat.assignment.ints[0]
         assertTrue(
             v0 !in setOf(3, 5, 7),
-            "v0 must avoid singleton-taken values; got $v0"
+            "v0 must avoid singleton-taken values; got $v0",
         )
         assertTrue(v0 in 1..10, "v0 must be in domain bounds; got $v0")
     }

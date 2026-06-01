@@ -189,6 +189,7 @@ class NValue(
      *
      * Stronger inference (Hall-style under [Mode.AtMost]) lands in the next propagation pass.
      */
+
     /** Distinct-count repair: snap `n` to current `distinctCount`, plus per-mode moves
      *  that nudge the distinct count in the right direction. To increase distinctCount,
      *  pick an xs[i] in a high-occurrence value class and shift it to a value currently
@@ -202,7 +203,10 @@ class NValue(
         if (s.distinctCount in nDom) sink.addChannelingIntSet(state, n, s.distinctCount)
         val needIncrease = when (mode) {
             Mode.Eq -> nv > s.distinctCount
-            Mode.AtLeast -> true // nv > distinct → must raise distinct
+
+            Mode.AtLeast -> true
+
+            // nv > distinct → must raise distinct
             Mode.AtMost -> false
         }
         val needDecrease = when (mode) {
@@ -265,9 +269,11 @@ class NValue(
                 if (!state.tightenIntMin(n, minDistinct, ant)) return false
                 if (!state.tightenIntMax(n, maxDistinct, ant)) return false
             }
+
             Mode.AtLeast -> {
                 if (!state.tightenIntMax(n, maxDistinct, ant)) return false
             }
+
             Mode.AtMost -> {
                 if (!state.tightenIntMin(n, minDistinct, ant)) return false
             }

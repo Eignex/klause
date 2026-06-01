@@ -41,7 +41,9 @@ class XmlElement(
         },
     )
 
-    private companion object { val PARAM = Regex("""%(\.\.\.|\d+)""") }
+    private companion object {
+        val PARAM = Regex("""%(\.\.\.|\d+)""")
+    }
 }
 
 /** Parse a single XML document, returning its root element. */
@@ -61,18 +63,22 @@ private class XmlReader(private val s: String) {
         while (pos < s.length) {
             when {
                 s[pos].isWhitespace() -> pos++
+
                 s.startsWith(
                     "<?",
-                    pos
+                    pos,
                 ) -> pos = s.indexOf("?>", pos).also { require(it >= 0) { "unterminated <? ?>" } } + 2
+
                 s.startsWith(
                     "<!--",
-                    pos
+                    pos,
                 ) -> pos = s.indexOf("-->", pos).also { require(it >= 0) { "unterminated comment" } } + 3
+
                 s.startsWith(
                     "<!",
-                    pos
+                    pos,
                 ) -> pos = s.indexOf('>', pos).also { require(it >= 0) { "unterminated <! >" } } + 1
+
                 else -> return
             }
         }
@@ -108,12 +114,14 @@ private class XmlReader(private val s: String) {
             if (s[pos] == '<') {
                 when {
                     s.startsWith("<!--", pos) -> pos = s.indexOf("-->", pos).also { require(it >= 0) } + 3
+
                     s.startsWith("<![CDATA[", pos) -> {
                         val end = s.indexOf("]]>", pos)
                         require(end >= 0) { "unterminated CDATA" }
                         text.append(s, pos + 9, end)
                         pos = end + 3
                     }
+
                     s.startsWith("</", pos) -> {
                         pos += 2
                         readName()
@@ -121,6 +129,7 @@ private class XmlReader(private val s: String) {
                         expect('>')
                         break
                     }
+
                     else -> children.add(parseElement())
                 }
             } else {
@@ -156,7 +165,9 @@ private class XmlReader(private val s: String) {
         require(pos < s.length && s[pos] == c) { "expected '$c' at $pos" }
         pos++
     }
-    private fun skipWs() { while (pos < s.length && s[pos].isWhitespace()) pos++ }
+    private fun skipWs() {
+        while (pos < s.length && s[pos].isWhitespace()) pos++
+    }
 
     private fun decodeEntities(t: String): String {
         if ('&' !in t) return t

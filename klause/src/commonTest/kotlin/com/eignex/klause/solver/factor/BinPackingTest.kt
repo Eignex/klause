@@ -27,7 +27,7 @@ class BinPackingTest {
                     mode = BinPacking.Mode.UniformCapacity,
                     uniformCapacity = 5,
                     numBins = 2,
-                )
+                ),
             ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
@@ -47,7 +47,7 @@ class BinPackingTest {
                     mode = BinPacking.Mode.PerBinCapacity,
                     capacities = intArrayOf(5, 5),
                     numBins = 2,
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -78,7 +78,7 @@ class BinPackingTest {
                     mode = BinPacking.Mode.LoadVars,
                     loadVars = intArrayOf(3, 4),
                     numBins = 2,
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))

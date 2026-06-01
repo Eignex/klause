@@ -29,8 +29,7 @@ interface RestartPolicy {
 
 /** Full random restart at a fixed flip cadence. */
 class FixedCadenceRestart(val maxFlipsBeforeRestart: Int = 10_000) : RestartPolicy {
-    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
-        stepsSinceLastRestart >= maxFlipsBeforeRestart
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= maxFlipsBeforeRestart
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
 }
 
@@ -62,6 +61,7 @@ internal fun anchorAndPerturb(
             PerturbationKind.Uniform -> repeat(perturbationStrength) {
                 kickRandomVar(state, problem)
             }
+
             PerturbationKind.BasinHopping -> {
                 // Pick `perturbationStrength` factors at random; for each, randomise every
                 // variable in that factor's scope. The localisation produces a coordinated
@@ -111,12 +111,9 @@ private fun kickRandomVar(state: LocalSearchState, problem: Problem) {
  *  Falls back to a full random restart when [bestSoFar] is null (i.e. no feasible
  *  sample has been seen yet — we have nothing to anchor to).
  */
-class AdaptivePerturbationRestart(
-    val maxFlipsBeforeRestart: Int = 10_000,
-    val perturbationStrength: Int = 5,
-) : RestartPolicy {
-    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
-        stepsSinceLastRestart >= maxFlipsBeforeRestart
+class AdaptivePerturbationRestart(val maxFlipsBeforeRestart: Int = 10_000, val perturbationStrength: Int = 5) :
+    RestartPolicy {
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= maxFlipsBeforeRestart
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         if (bestSoFar == null) state.restart() else anchorAndPerturb(state, bestSoFar, perturbationStrength)
@@ -138,8 +135,7 @@ class LubyRestart(val unit: Int = 100) : RestartPolicy {
     private var v: Int = 1
     private var cadence: Int = unit
 
-    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
-        stepsSinceLastRestart >= cadence
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= cadence
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         state.restart()

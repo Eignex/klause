@@ -23,7 +23,7 @@ class TableTest {
                 Table(
                     xs = intArrayOf(0, 1),
                     tuples = intArrayOf(0, 1, 2, 3),
-                )
+                ),
             ),
         )
         val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
@@ -44,7 +44,7 @@ class TableTest {
                 Table(
                     xs = intArrayOf(0, 1),
                     tuples = intArrayOf(0, 1, 2, 3),
-                )
+                ),
             ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
@@ -62,7 +62,7 @@ class TableTest {
                 Table(
                     xs = intArrayOf(0, 1, 2),
                     tuples = intArrayOf(1, 2, 3, 1, 4, 5, 7, 8, 9),
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -70,7 +70,7 @@ class TableTest {
         val ints = sat.assignment.ints.toList()
         assertTrue(
             ints in setOf(listOf(1, 2, 3), listOf(1, 4, 5), listOf(7, 8, 9)),
-            "got $ints — not a known tuple"
+            "got $ints — not a known tuple",
         )
     }
 }

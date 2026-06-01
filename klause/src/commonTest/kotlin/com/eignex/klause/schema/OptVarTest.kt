@@ -98,7 +98,7 @@ class OptComparisonSemanticsTest {
         }
         assertTrue(
             anyAbsentWithBigY,
-            "Expected an absent-x sample with y>0, since absence should bypass the implication."
+            "Expected an absent-x sample with y>0, since absence should bypass the implication.",
         )
     }
 }
@@ -146,7 +146,7 @@ class OptAllDifferentTest {
             assertEquals(
                 presentVals.size,
                 presentVals.toSet().size,
-                "Present-only values must be distinct: pa=$pa pb=$pb pc=$pc va=$va vb=$vb vc=$vc"
+                "Present-only values must be distinct: pa=$pa pb=$pb pc=$pc va=$va vb=$vb vc=$vc",
             )
         }
     }
@@ -191,7 +191,7 @@ class OptCountTest {
             assertEquals(
                 expected,
                 actual,
-                "count opt mismatch: presents=($pa,$pb,$pc) values=($va,$vb,$vc) cnt=$actual"
+                "count opt mismatch: presents=($pa,$pb,$pc) values=($va,$vb,$vc) cnt=$actual",
             )
         }
     }
@@ -275,7 +275,7 @@ class OptGccTest {
             val zeros = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 0 }
             assertTrue(
                 zeros in 1..2,
-                "gcc opt out of range: zeros=$zeros (presents=$pa,$pb,$pc values=$va,$vb,$vc)"
+                "gcc opt out of range: zeros=$zeros (presents=$pa,$pb,$pc values=$va,$vb,$vc)",
             )
         }
     }
@@ -309,11 +309,13 @@ class OptDisjunctiveTest {
             val ps = listOf(s.s0, s.s1, s.s2).map { compiled.decode(it.present, sample) }
             val vs = listOf(s.s0, s.s1, s.s2).map { sample.ints[compiled.intVarIdByName[it.name]!!] }
             val present = ps.indices.filter { ps[it] }
-            for (i in present) for (j in present) {
-                if (i >= j) continue
-                val (si, sj) = vs[i] to vs[j]
-                val overlap = !(si + 2 <= sj || sj + 2 <= si)
-                assertTrue(!overlap, "present tasks $i and $j overlap: starts=$si,$sj")
+            for (i in present) {
+                for (j in present) {
+                    if (i >= j) continue
+                    val (si, sj) = vs[i] to vs[j]
+                    val overlap = !(si + 2 <= sj || sj + 2 <= si)
+                    assertTrue(!overlap, "present tasks $i and $j overlap: starts=$si,$sj")
+                }
             }
         }
     }
@@ -358,7 +360,7 @@ class OptCumulativeTest {
             val peak = usage.max()
             assertTrue(
                 peak <= 2,
-                "cumulative peak $peak exceeds capacity (presents=$ps starts=$vs)"
+                "cumulative peak $peak exceeds capacity (presents=$ps starts=$vs)",
             )
         }
     }

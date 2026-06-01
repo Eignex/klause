@@ -127,6 +127,7 @@ internal fun Compiler.Build.liftMul(left: IntExpr, right: IntExpr): IntExpr {
  *  [Product]) can reference it. Affine `IntScale`/`IntSum` get pinned to a fresh aux. */
 internal fun Compiler.Build.materializeIntVar(expr: IntExpr): IntRef = when (expr) {
     is IntRef -> expr
+
     else -> {
         val d = domainOf(expr)
         val name = newAuxIntVar(d)
@@ -206,7 +207,7 @@ internal fun Compiler.Build.liftAbs(child: IntExpr): IntExpr {
             listOf(
                 IntCompare(auxRef, IntCmpOp.EQ, lifted),
                 IntCompare(auxRef, IntCmpOp.EQ, IntScale(-1, lifted)),
-            )
+            ),
         ),
     )
     return auxRef
@@ -222,12 +223,15 @@ internal fun Compiler.Build.newAuxIntVar(domain: IntDomain): String {
  *  fragment (caller is responsible for lifting non-affine subexpressions first). */
 internal fun Compiler.Build.domainOf(expr: IntExpr): IntDomain = when (expr) {
     is IntRef -> intDomains[intVarOf(expr.name)]
+
     is IntLit -> IntDomain(expr.value, expr.value)
+
     is IntScale -> {
         val c = expr.coeff
         val d = domainOf(expr.child)
         if (c >= 0) IntDomain(c * d.min, c * d.max) else IntDomain(c * d.max, c * d.min)
     }
+
     is IntSum -> {
         var lo = 0
         var hi = 0
@@ -238,6 +242,7 @@ internal fun Compiler.Build.domainOf(expr: IntExpr): IntDomain = when (expr) {
         }
         IntDomain(lo, hi)
     }
+
     else -> error("domainOf called on non-affine expression: $expr")
 }
 
@@ -246,13 +251,16 @@ internal data class Affine(val coeffs: Map<String, Int>, val constant: Int)
 
 internal fun Compiler.Build.affine(expr: IntExpr): Affine = when (expr) {
     is IntRef -> Affine(mapOf(expr.name to 1), 0)
+
     is IntLit -> Affine(emptyMap(), expr.value)
+
     is IntScale -> {
         val a = affine(expr.child)
         val coeffs = HashMap<String, Int>(a.coeffs.size)
         for ((k, v) in a.coeffs) coeffs[k] = v * expr.coeff
         Affine(coeffs, a.constant * expr.coeff)
     }
+
     is IntSum -> {
         val coeffs = HashMap<String, Int>()
         var constant = 0
@@ -264,6 +272,7 @@ internal fun Compiler.Build.affine(expr: IntExpr): Affine = when (expr) {
         coeffs.entries.removeAll { it.value == 0 }
         Affine(coeffs, constant)
     }
+
     else -> error("affine() called on non-affine expression — caller must lift first: $expr")
 }
 

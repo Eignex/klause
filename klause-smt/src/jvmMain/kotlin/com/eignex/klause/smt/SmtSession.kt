@@ -35,10 +35,7 @@ import kotlin.random.Random
  * Sessions are NOT thread-safe — one consumer per session. Call [close] when done so the
  * native solver handle is released.
  */
-class SmtSession(
-    override val solver: SmtSolver,
-    initialParams: SmtParams = SmtParams(),
-) : Session<SmtParams> {
+class SmtSession(override val solver: SmtSolver, initialParams: SmtParams = SmtParams()) : Session<SmtParams> {
 
     private val context: SolverContext = run {
         val config = Configuration.defaultConfiguration()
@@ -50,6 +47,7 @@ class SmtSession(
     private val prover: ProverEnvironment
     private val stack: ArrayDeque<Assumptions> = ArrayDeque()
     private var closed: Boolean = false
+
     /** Reverse map from factor-derived assertion back to its [com.eignex.klause.solver.Problem.factors]
      *  index. Populated at session construction; lookups happen on UNSAT to attribute
      *  the prover's reported unsat core back to klause factor ids. */
@@ -90,8 +88,11 @@ class SmtSession(
     override fun solve(params: SmtParams): SolveResult {
         check(!closed) { "SmtSession is closed" }
         return withScope(params.assumptions) {
-            if (prover.isUnsat) SolveResult.Unsat(extractCore())
-            else SolveResult.Sat(decode(prover.model))
+            if (prover.isUnsat) {
+                SolveResult.Unsat(extractCore())
+            } else {
+                SolveResult.Sat(decode(prover.model))
+            }
         }
     }
 
@@ -284,8 +285,11 @@ class SmtSession(
                 val real = model.evaluate(encoding.realFormulas[fid])?.toDouble() ?: 0.0
                 val ivl = meta.intervals[fid]
                 val buckets = meta.bucketCounts[fid]
-                val bucket = if (buckets <= 1) 0
-                else (((real - ivl.lo) / (ivl.hi - ivl.lo)) * (buckets - 1)).toInt().coerceIn(0, buckets - 1)
+                val bucket = if (buckets <= 1) {
+                    0
+                } else {
+                    (((real - ivl.lo) / (ivl.hi - ivl.lo)) * (buckets - 1)).toInt().coerceIn(0, buckets - 1)
+                }
                 ints[meta.intVarByFloatVar[fid]] = bucket
             }
         }

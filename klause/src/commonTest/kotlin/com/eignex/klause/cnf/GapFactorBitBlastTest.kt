@@ -61,7 +61,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
             arrayOf<Factor>(
                 Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(3, 2)),
-            )
+            ),
         ),
     )
 
@@ -76,9 +76,9 @@ class GapFactorBitBlastTest {
                     starts = intArrayOf(0, 1, 2),
                     durations = intArrayOf(2, 2, 2),
                     resources = intArrayOf(1, 1, 1),
-                    capacity = 2
+                    capacity = 2,
                 ),
-            )
+            ),
         ),
     )
 
@@ -91,7 +91,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
             arrayOf<Factor>(
                 Count(xs = intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = 3),
-            )
+            ),
         ),
     )
 
@@ -103,7 +103,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(1, 3)),
             arrayOf<Factor>(
                 NValue(n = 3, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.Eq),
-            )
+            ),
         ),
     )
 
@@ -118,9 +118,9 @@ class GapFactorBitBlastTest {
                     xs = intArrayOf(0, 1, 2),
                     cover = intArrayOf(0, 1, 2),
                     countLow = intArrayOf(1, 1, 0),
-                    countHigh = intArrayOf(2, 2, 1)
+                    countHigh = intArrayOf(2, 2, 1),
                 ),
-            )
+            ),
         ),
     )
 
@@ -138,7 +138,7 @@ class GapFactorBitBlastTest {
                 SetBitsetSubset(leftBools = intArrayOf(0, 1), rightBools = intArrayOf(2, 3)),
                 // Force left to be non-trivial so the implication has teeth.
                 com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true))),
-            )
+            ),
         ),
     )
 
@@ -150,7 +150,7 @@ class GapFactorBitBlastTest {
             emptyArray(),
             arrayOf<Factor>(
                 SetBitsetDisjoint(leftBools = intArrayOf(0, 1), rightBools = intArrayOf(2, 3)),
-            )
+            ),
         ),
     )
 
@@ -162,7 +162,7 @@ class GapFactorBitBlastTest {
             emptyArray(),
             arrayOf<Factor>(
                 SetBitsetEq(leftBools = intArrayOf(0, 1), rightBools = intArrayOf(2, 3)),
-            )
+            ),
         ),
     )
 
@@ -184,7 +184,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
             arrayOf<Factor>(
                 Among(n = 3, xs = intArrayOf(0, 1, 2), values = intArrayOf(1, 2)),
-            )
+            ),
         ),
     )
 
@@ -196,7 +196,7 @@ class GapFactorBitBlastTest {
             Array(3) { IntDomain(0, 5) },
             arrayOf<Factor>(
                 Monotone(intArrayOf(0, 1, 2), Monotone.Direction.Increasing, strict = true),
-            )
+            ),
         ),
     )
 
@@ -208,7 +208,7 @@ class GapFactorBitBlastTest {
             Array(4) { IntDomain(0, 3) },
             arrayOf<Factor>(
                 LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true),
-            )
+            ),
         ),
     )
 
@@ -220,7 +220,7 @@ class GapFactorBitBlastTest {
             Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(
                 ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2)),
-            )
+            ),
         ),
     )
 
@@ -233,7 +233,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(1, 3), IntDomain(5, 9)),
             arrayOf<Factor>(
                 Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1),
-            )
+            ),
         ),
     )
 
@@ -246,7 +246,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(0, 5), IntDomain(1, 3), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             arrayOf<Factor>(
                 Element(idx = 1, result = 0, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1),
-            )
+            ),
         ),
     )
 
@@ -258,7 +258,7 @@ class GapFactorBitBlastTest {
             Array(6) { IntDomain(0, 2) },
             arrayOf<Factor>(
                 Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5), fOffset = 0, gOffset = 0),
-            )
+            ),
         ),
     )
 
@@ -270,7 +270,7 @@ class GapFactorBitBlastTest {
             Array(4) { IntDomain(0, 3) },
             arrayOf<Factor>(
                 SymmetricAllDifferent(xs = intArrayOf(0, 1, 2, 3), indexOffset = 0),
-            )
+            ),
         ),
     )
 
@@ -282,7 +282,7 @@ class GapFactorBitBlastTest {
             Array(6) { IntDomain(0, 3) },
             arrayOf<Factor>(
                 Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5)),
-            )
+            ),
         ),
     )
 
@@ -294,7 +294,7 @@ class GapFactorBitBlastTest {
             Array(4) { IntDomain(0, 5) },
             arrayOf<Factor>(
                 ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = true),
-            )
+            ),
         ),
     )
 
@@ -306,7 +306,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             arrayOf<Factor>(
                 ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false, indexOffset = 0),
-            )
+            ),
         ),
     )
 
@@ -321,9 +321,9 @@ class GapFactorBitBlastTest {
                     xs = intArrayOf(0, 1),
                     ys = intArrayOf(2, 3),
                     widths = intArrayOf(2, 2),
-                    heights = intArrayOf(2, 2)
+                    heights = intArrayOf(2, 2),
                 ),
-            )
+            ),
         ),
     )
 
@@ -340,9 +340,9 @@ class GapFactorBitBlastTest {
                     mode = BinPacking.Mode.UniformCapacity,
                     uniformCapacity = 3,
                     numBins = 2,
-                    binOffset = 1
+                    binOffset = 1,
                 ),
-            )
+            ),
         ),
     )
 
@@ -355,7 +355,7 @@ class GapFactorBitBlastTest {
             arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 5), IntDomain(0, 9)),
             arrayOf<Factor>(
                 Knapsack(weights = intArrayOf(2, 3), profits = intArrayOf(5, 4), xs = intArrayOf(0, 1), w = 2, p = 3),
-            )
+            ),
         ),
     )
 
@@ -367,7 +367,7 @@ class GapFactorBitBlastTest {
             Array(2) { IntDomain(0, 2) },
             arrayOf<Factor>(
                 Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 2, 2, 1)),
-            )
+            ),
         ),
     )
 
@@ -379,7 +379,7 @@ class GapFactorBitBlastTest {
             Array(5) { IntDomain(0, 1) },
             arrayOf<Factor>(
                 Sequence(low = 1, high = 2, k = 3, xs = intArrayOf(0, 1, 2, 3, 4), values = intArrayOf(1)),
-            )
+            ),
         ),
     )
 
@@ -397,9 +397,9 @@ class GapFactorBitBlastTest {
                     alphabetSize = 2,
                     transitions = intArrayOf(1, 2, 2, 1),
                     q0 = 1,
-                    accepting = intArrayOf(1)
+                    accepting = intArrayOf(1),
                 ),
-            )
+            ),
         ),
     )
 

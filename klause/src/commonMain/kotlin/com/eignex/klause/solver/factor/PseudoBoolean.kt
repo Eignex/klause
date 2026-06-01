@@ -13,12 +13,7 @@ import com.eignex.klause.util.IntArrayList
  * `Σ weights[i] * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
  * true, 0 when false). Payload at `intPayload[factorId]` is the current weighted sum.
  */
-class PseudoBoolean(
-    val weights: IntArray,
-    val literals: IntArray,
-    val op: PbOp,
-    val bound: Int,
-) : LocalSearchFactor {
+class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp, val bound: Int) : LocalSearchFactor {
 
     init {
         require(weights.size == literals.size) { "weights/literals length mismatch" }
@@ -62,8 +57,7 @@ class PseudoBoolean(
         state.intPayload[factorId] = sum
     }
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        violates(state.intPayload[factorId])
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violates(state.intPayload[factorId])
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val change = changeOnFlip(state, boolVar, current = true)
@@ -144,7 +138,7 @@ class PseudoBoolean(
                         listOf(
                             com.eignex.klause.solver.Move.BoolFlip(trueVars[i]),
                             com.eignex.klause.solver.Move.BoolFlip(falseVars[j]),
-                        )
+                        ),
                     )
                     proposed++
                     if (proposed >= PAIR_PROPOSAL_CAP) break@outer
@@ -167,7 +161,9 @@ class PseudoBoolean(
                 val newSum = sum + effChange
                 if (op == PbOp.LE && newSum <= bound) {
                     sink.addBoolFlip(v)
-                } else if (op == PbOp.GE && newSum >= bound) sink.addBoolFlip(v)
+                } else if (op == PbOp.GE && newSum >= bound) {
+                    sink.addBoolFlip(v)
+                }
             }
         }
     }
@@ -204,11 +200,7 @@ class PseudoBoolean(
     /** O(arity) — replaces the engine's two `deltaIfBoolFlipped`-driven passes (each itself
      *  O(arity)) with a single per-var diff. Computes pre- vs post-flip break/make
      *  contributions from [signedWeightByVar] and applies only the changes. */
-    override fun updateBoolBreakMakeForFlip(
-        state: LocalSearchState,
-        factorId: Int,
-        flippedVar: Int,
-    ) {
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val signedFlipped = signedWeightByVar[flippedVar]
         if (signedFlipped == 0) return
         val newSum = state.intPayload[factorId]
@@ -262,10 +254,12 @@ internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: In
                 lo += minOf(0L, w)
                 hi += maxOf(0L, w)
             }
+
             Lit.evaluate(literals[i], b) -> {
                 lo += w
                 hi += w
             }
+
             else -> { /* contributes 0 */ }
         }
     }
@@ -343,10 +337,12 @@ internal fun propagatePbBounds(
                 lo = minOf(0L, w)
                 hi = maxOf(0L, w)
             }
+
             Lit.evaluate(literals[i], b) -> {
                 lo = w
                 hi = w
             }
+
             else -> {
                 lo = 0L
                 hi = 0L

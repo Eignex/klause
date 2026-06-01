@@ -50,6 +50,7 @@ data class TabuFilter(
         }
         return when {
             admitted.isNotEmpty() -> admitted
+
             // Final fallback: every candidate was tabu and none met the aspiration; drop
             // the filter entirely rather than starve the strategy.
             else -> raw
@@ -113,8 +114,7 @@ sealed interface AspirationCriterion {
 
     /** Admit a tabu move if it strictly improves the current cost (`netDelta < 0`). */
     data object OrImproving : AspirationCriterion {
-        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean =
-            state.netDelta(move) < 0
+        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean = state.netDelta(move) < 0
     }
 
     /** Standard literature aspiration: admit a tabu move if it would lead to a cost
@@ -138,9 +138,10 @@ sealed interface AspirationCriterion {
      *  leak (behaves like [AllowAllWhenAllTabu]), 1 disables tabu entirely. Typical
      *  useful range is 0.05–0.2. */
     data class Probabilistic(val rate: Double = 0.1) : AspirationCriterion {
-        init { require(rate in 0.0..1.0) { "rate must be in [0, 1], got $rate" } }
-        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean =
-            state.rng.nextDouble() < rate
+        init {
+            require(rate in 0.0..1.0) { "rate must be in [0, 1], got $rate" }
+        }
+        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean = state.rng.nextDouble() < rate
     }
 
     /**
@@ -174,6 +175,8 @@ sealed interface AspirationCriterion {
         }
 
         /** Restore [temperature] to [initialTemperature]. */
-        fun reset() { temperature = initialTemperature }
+        fun reset() {
+            temperature = initialTemperature
+        }
     }
 }

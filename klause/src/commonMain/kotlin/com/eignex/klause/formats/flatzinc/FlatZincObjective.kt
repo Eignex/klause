@@ -56,13 +56,21 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
 /** Int var id for [e], or null if it's a constant / bool / float / unresolvable. */
 private fun FlatZincCompiler.varIdOrNull(e: FznExpr): Int? {
     if (evalIntConstOrNull(e) != null) return null
-    return try { resolveIntVar(e) } catch (_: Exception) { null }
+    return try {
+        resolveIntVar(e)
+    } catch (_: Exception) {
+        null
+    }
 }
 
 /** [e] as an [Operand]: a constant term or an int-var reference; null if neither. */
 private fun FlatZincCompiler.operandOf(e: FznExpr): Operand? {
     evalIntConstOrNull(e)?.let { return Operand.c(it) }
-    return try { Operand.v(resolveIntVar(e)) } catch (_: Exception) { null }
+    return try {
+        Operand.v(resolveIntVar(e))
+    } catch (_: Exception) {
+        null
+    }
 }
 
 /** Operands for an array argument (inline literal or named array). */
@@ -72,7 +80,12 @@ private fun FlatZincCompiler.arrayOperands(e: FznExpr): Array<Operand>? = when (
         for (el in e.elements) out.add(operandOf(el) ?: return null)
         out.toTypedArray()
     }
-    else -> try { evalIntVarArray(e).map { Operand.v(it) }.toTypedArray() } catch (_: Exception) { null }
+
+    else -> try {
+        evalIntVarArray(e).map { Operand.v(it) }.toTypedArray()
+    } catch (_: Exception) {
+        null
+    }
 }
 
 private fun FunctionalObjective.Node.inputs(): List<Operand> = when (this) {
@@ -90,50 +103,68 @@ private fun nodeInputVarIds(node: FunctionalObjective.Node): List<Int> =
 private fun FlatZincCompiler.buildObjNode(c: FznConstraint, definedId: Int): FunctionalObjective.Node? {
     return when (c.name) {
         "int_abs" -> FunctionalObjective.Abs(definedId, operandOf(c.args[0]) ?: return null)
+
         "int_max", "int_min" -> {
             val a = operandOf(c.args[0]) ?: return null
             val b = operandOf(c.args[1]) ?: return null
             FunctionalObjective.Extreme(definedId, arrayOf(a, b), max = c.name == "int_max")
         }
+
         "array_int_maximum", "array_int_minimum" -> {
             // (result, array): result = max/min(array). result == definedId.
             val xs = arrayOperands(c.args[1]) ?: return null
             FunctionalObjective.Extreme(definedId, xs, max = c.name.endsWith("maximum"))
         }
+
         "int_times" -> FunctionalObjective.Times(
             definedId,
             operandOf(c.args[0]) ?: return null,
-            operandOf(c.args[1]) ?: return null
+            operandOf(c.args[1]) ?: return null,
         )
+
         "int_plus" -> FunctionalObjective.Plus(
             definedId,
             operandOf(c.args[0]) ?: return null,
-            operandOf(c.args[1]) ?: return null
+            operandOf(c.args[1]) ?: return null,
         )
+
         "int_lin_eq" -> buildLinNode(c, definedId)
+
         else -> null
     }
 }
 
 /** `int_lin_eq([coeffs], [vars], c)` defining [definedId]: solve `Σ coeff·var = c` for it. */
 private fun FlatZincCompiler.buildLinNode(c: FznConstraint, definedId: Int): FunctionalObjective.Node? {
-    val coeffs = try { evalIntConstArray(c.args[0]) } catch (_: Exception) { return null }
+    val coeffs = try {
+        evalIntConstArray(c.args[0])
+    } catch (_: Exception) {
+        return null
+    }
     val vars = arrayOperands(c.args[1]) ?: return null
-    val cval = try { evalIntConst(c.args[2]) } catch (_: Exception) { return null }
+    val cval = try {
+        evalIntConst(c.args[2])
+    } catch (_: Exception) {
+        return null
+    }
     if (coeffs.size != vars.size) return null
     var slot = -1
-    for (k in vars.indices) if (vars[k].varId == definedId) {
-        slot = k
-        break
+    for (k in vars.indices) {
+        if (vars[k].varId == definedId) {
+            slot = k
+            break
+        }
     }
     if (slot < 0) return null
     val outCoeff = coeffs[slot].toLong()
     if (outCoeff == 0L) return null
     val ins = ArrayList<Operand>(vars.size - 1)
     val cf = ArrayList<Long>(vars.size - 1)
-    for (k in vars.indices) if (k != slot) {
-        ins.add(vars[k])
-        cf.add(coeffs[k].toLong())
+    for (k in vars.indices) {
+        if (k != slot) {
+            ins.add(vars[k])
+            cf.add(coeffs[k].toLong())
+        }
     }
     return FunctionalObjective.Lin(definedId, outCoeff, cf.toLongArray(), ins.toTypedArray(), cval)
 }

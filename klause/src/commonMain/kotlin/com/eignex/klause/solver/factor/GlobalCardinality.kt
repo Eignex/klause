@@ -123,12 +123,7 @@ class GlobalCardinality(
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    private fun simulatedViolation(
-        state: LocalSearchState,
-        intVar: Int,
-        newValue: Int,
-        simCounts: IntArray,
-    ): Boolean {
+    private fun simulatedViolation(state: LocalSearchState, intVar: Int, newValue: Int, simCounts: IntArray): Boolean {
         for (k in cover.indices) {
             if (countVars != null) {
                 val expected = if (countVars[k] == intVar) {
@@ -263,13 +258,15 @@ class GlobalCardinality(
                 val d = state.intDomains[x]
                 val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (k in 0 until toRemove.size) if (!state.excludeIntValue(
-                        x,
-                        toRemove[k],
-                        gccAntecedents
-                    )
-                ) {
-                    return false
+                for (k in 0 until toRemove.size) {
+                    if (!state.excludeIntValue(
+                            x,
+                            toRemove[k],
+                            gccAntecedents,
+                        )
+                    ) {
+                        return false
+                    }
                 }
             }
         }
@@ -388,6 +385,7 @@ class GlobalCardinality(
                     flow.addEdge(SS, v, excess[v])
                     requiredSSFlow += excess[v]
                 }
+
                 excess[v] < 0 -> flow.addEdge(v, ST, -excess[v])
             }
         }
@@ -417,13 +415,15 @@ class GlobalCardinality(
                 val d = state.intDomains[effectiveXs[i]]
                 val toRemove = IntArrayList()
                 d.forEach { if (it !in coverSet) toRemove.add(it) }
-                for (k in 0 until toRemove.size) if (!state.excludeIntValue(
-                        effectiveXs[i],
-                        toRemove[k],
-                        gccAntecedents
-                    )
-                ) {
-                    return false
+                for (k in 0 until toRemove.size) {
+                    if (!state.excludeIntValue(
+                            effectiveXs[i],
+                            toRemove[k],
+                            gccAntecedents,
+                        )
+                    ) {
+                        return false
+                    }
                 }
             }
         }
@@ -433,8 +433,7 @@ class GlobalCardinality(
     /** Per-bound atom-lit antecedents over every `xs` var — sound for any flow-based
      *  prune / tighten (every var's bounds shaped the network). Minimization can collapse
      *  redundant per-bound facts; resolution through 1UIP is finer than a bool-lit union. */
-    private fun composeGccAntecedents(state: PropagationState): IntArray? =
-        state.composeIntVarAtomAntecedents(xs)
+    private fun composeGccAntecedents(state: PropagationState): IntArray? = state.composeIntVarAtomAntecedents(xs)
 
     /**
      * Minimal Edmonds-Karp max-flow over an integer-capacity graph stored as parallel

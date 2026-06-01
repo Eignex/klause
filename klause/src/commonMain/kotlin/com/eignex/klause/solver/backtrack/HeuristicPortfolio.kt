@@ -62,11 +62,7 @@ class HeuristicPortfolio(
     }
 
     /** One strategy in the portfolio's palette. */
-    data class Arm(
-        val label: String,
-        val variableHeuristic: VariableHeuristic,
-        val valueHeuristic: ValueHeuristic,
-    )
+    data class Arm(val label: String, val variableHeuristic: VariableHeuristic, val valueHeuristic: ValueHeuristic)
 
     /** Statistics passed to [rewardFn] at the end of every Luby-restart-bounded run. */
     data class RunStats(
@@ -118,15 +114,11 @@ class HeuristicPortfolio(
         override fun values(
             session: com.eignex.klause.solver.propagation.PropagationSession,
             varRef: VarRef,
-            rng: Random
-        ) =
-            current.valueHeuristic.values(session, varRef, rng)
-        override fun onConflict(varRef: VarRef, value: Int) =
-            current.valueHeuristic.onConflict(varRef, value)
-        override fun onCommit(varRef: VarRef, value: Int) =
-            current.valueHeuristic.onCommit(varRef, value)
-        override fun onSolution(snapshot: Sample) =
-            current.valueHeuristic.onSolution(snapshot)
+            rng: Random,
+        ) = current.valueHeuristic.values(session, varRef, rng)
+        override fun onConflict(varRef: VarRef, value: Int) = current.valueHeuristic.onConflict(varRef, value)
+        override fun onCommit(varRef: VarRef, value: Int) = current.valueHeuristic.onCommit(varRef, value)
+        override fun onSolution(snapshot: Sample) = current.valueHeuristic.onSolution(snapshot)
         override fun onRestart() {
             // Bandit update is owned by the variable-heuristic delegate (fired first by the
             // engine). Here we just forward restart to the (now new) arm's value heuristic.
@@ -147,10 +139,9 @@ class HeuristicPortfolio(
          * Convenience: build a portfolio backed by classical [UCB1] over the supplied arms.
          * `exploration` is UCB1's `alpha` (1.0 = textbook default).
          */
-        fun ucb1(arms: List<Arm>, exploration: Double = 1.0): HeuristicPortfolio =
-            HeuristicPortfolio(
-                arms = arms,
-                bandit = MultiArmedBandit(nbrArms = arms.size, policy = UCB1(alpha = exploration)),
-            )
+        fun ucb1(arms: List<Arm>, exploration: Double = 1.0): HeuristicPortfolio = HeuristicPortfolio(
+            arms = arms,
+            bandit = MultiArmedBandit(nbrArms = arms.size, policy = UCB1(alpha = exploration)),
+        )
     }
 }

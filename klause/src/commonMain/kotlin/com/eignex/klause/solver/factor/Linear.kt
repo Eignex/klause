@@ -15,12 +15,7 @@ enum class LinearOp { LE, EQ, GE, NE }
  * variable, the integer value that on its own would put the sum on the right side of [bound],
  * clamped to the variable's domain.
  */
-class Linear(
-    val coeffs: IntArray,
-    val vars: IntArray,
-    val op: LinearOp,
-    val bound: Int,
-) : LocalSearchFactor {
+class Linear(val coeffs: IntArray, val vars: IntArray, val op: LinearOp, val bound: Int) : LocalSearchFactor {
 
     init {
         require(coeffs.size == vars.size) { "coeffs/vars length mismatch" }
@@ -38,16 +33,14 @@ class Linear(
         state.intPayload[factorId] = sum
     }
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        violates(state.intPayload[factorId])
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violates(state.intPayload[factorId])
 
     /** Graded violation: the residual amount by which the sum misses [bound] — `|sum-bound|`
      *  for EQ, `max(0, sum-bound)` for LE, `max(0, bound-sum)` for GE. NE has no natural
      *  magnitude, so it stays binary (1 when `sum == bound`). This is the descent gradient
      *  CBLS needs on tight arithmetic: a move shrinking the residual scores a real improvement
      *  even when it doesn't flip the satisfied/violated status. */
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degree(state.intPayload[factorId])
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = degree(state.intPayload[factorId])
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val coeff = coeffOf(intVar)
@@ -167,7 +160,7 @@ class Linear(
                         listOf(
                             com.eignex.klause.solver.Move.IntSet(vars[a], newA),
                             com.eignex.klause.solver.Move.IntSet(vars[b], newB),
-                        )
+                        ),
                     )
                 }
             }
@@ -234,11 +227,14 @@ class Linear(
      *  the global cost — exact near feasibility, log-compressed far from it. */
     private fun degree(sum: Int): Int = when (op) {
         LinearOp.LE -> compressViolation(sum.toLong() - bound)
+
         LinearOp.GE -> compressViolation(bound.toLong() - sum)
+
         LinearOp.EQ -> {
             val d = sum.toLong() - bound
             compressViolation(if (d < 0) -d else d)
         }
+
         LinearOp.NE -> if (sum == bound) 1 else 0
     }
 
@@ -248,8 +244,11 @@ class Linear(
         val numerator = bound - sumWithout
         return when (op) {
             LinearOp.EQ -> if (numerator % coeff == 0) numerator / coeff else null
+
             LinearOp.LE -> if (coeff > 0) floorDiv(numerator, coeff) else ceilDiv(numerator, coeff)
+
             LinearOp.GE -> if (coeff > 0) ceilDiv(numerator, coeff) else floorDiv(numerator, coeff)
+
             // NE: target is "any value such that the sum is not [bound]". Closest non-bound
             // value to current works: shift the var by 1 in either direction (clamped). Caller
             // re-clamps to domain; if the shifted value re-creates the bound exactly, the
@@ -290,6 +289,7 @@ class Linear(
  * it; the analyzer's 1UIP loop resolves through them. Returns `null` when nothing was
  * recorded (no extraLit, all other vars' int antecedents unset).
  */
+
 /**
  * Hole-aware antecedent collection for propagators that prune interior values (AllDifferent,
  * GlobalCardinality, Regular, AllDifferentExceptZero, Inverse, Member). Cites:
@@ -302,10 +302,7 @@ class Linear(
  * Allocates `atomVarEq` atoms on demand for each cited hole. Returns `null` when nothing is
  * tighter than the original (caller falls back to default antecedents).
  */
-internal fun collectHoleAndBoundAntecedents(
-    state: PropagationState,
-    vars: IntArray,
-): IntArray? {
+internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntArray): IntArray? {
     val seen = HashSet<Int>()
     val out = IntArrayList()
     // Sweep-prefix tightening: collect *only* antecedents tied to decision levels > 0 when
@@ -317,9 +314,11 @@ internal fun collectHoleAndBoundAntecedents(
     // restrictions are unit-propagated globals), keep everything — the level-0 reason is
     // the only seed available and is needed for unsat-core construction.
     var anyAboveRoot = false
-    for (v in vars) if (state.intLevel[v] > 0) {
-        anyAboveRoot = true
-        break
+    for (v in vars) {
+        if (state.intLevel[v] > 0) {
+            anyAboveRoot = true
+            break
+        }
     }
     for (v in vars) {
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
@@ -543,11 +542,7 @@ internal fun propagateLinearBounds(
  * reified factors to decide whether the body of a linear comparison is forced one way or the
  * other.
  */
-internal fun linearSumRange(
-    state: PropagationState,
-    coeffs: IntArray,
-    vars: IntArray,
-): LongArray {
+internal fun linearSumRange(state: PropagationState, coeffs: IntArray, vars: IntArray): LongArray {
     var lo = 0L
     var hi = 0L
     for (i in vars.indices) {

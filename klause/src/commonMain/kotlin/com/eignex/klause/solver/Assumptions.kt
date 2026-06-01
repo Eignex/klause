@@ -131,7 +131,7 @@ class Assumptions internal constructor(
             other.boolKeys,
             other.boolValues,
             mergedBoolKeys,
-            mergedBoolValues
+            mergedBoolValues,
         )
         val mergedIntKeys = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
         val mergedIntValues = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
@@ -141,7 +141,7 @@ class Assumptions internal constructor(
             other.intKeys,
             other.intValues,
             mergedIntKeys,
-            mergedIntValues
+            mergedIntValues,
         )
         // Bound tightenings: take max for mins, min for maxes; on overlap with an
         // exact int pin from either side, drop the bound (the pin subsumes).
@@ -165,7 +165,7 @@ class Assumptions internal constructor(
         other.forEachIntHole { id, v ->
             if (id !in pinned) {
                 holeSet.add(
-                    (id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)
+                    (id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL),
                 )
             }
         }
@@ -310,7 +310,7 @@ class Assumptions internal constructor(
         intHoleValues.copyInto(nv, insert + 1, insert)
         return Assumptions(
             boolKeys, boolValues, intKeys, intValues,
-            intMinKeys, intMinValues, intMaxKeys, intMaxValues, nk, nv
+            intMinKeys, intMinValues, intMaxKeys, intMaxValues, nk, nv,
         )
     }
 
@@ -409,10 +409,7 @@ class Assumptions internal constructor(
 
         /** Map-based factory. Call sites use `Assumptions(bools = mapOf(0 to true))`;
          *  internally normalises to the primitive sorted-array form. */
-        operator fun invoke(
-            bools: Map<Int, Boolean> = emptyMap(),
-            ints: Map<Int, Int> = emptyMap(),
-        ): Assumptions {
+        operator fun invoke(bools: Map<Int, Boolean> = emptyMap(), ints: Map<Int, Int> = emptyMap()): Assumptions {
             if (bools.isEmpty() && ints.isEmpty()) return None
             val bKeys = bools.keys.toIntArray().also { it.sort() }
             val bVals = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) }
@@ -438,11 +435,13 @@ class Assumptions internal constructor(
                         outV.add(av[i])
                         i++
                     }
+
                     ak[i] > bk[j] -> {
                         outK.add(bk[j])
                         outV.add(bv[j])
                         j++
                     }
+
                     else -> {
                         outK.add(bk[j])
                         outV.add(bv[j])
@@ -480,11 +479,13 @@ class Assumptions internal constructor(
                         outV.add(av[i])
                         i++
                     }
+
                     ak[i] > bk[j] -> {
                         outK.add(bk[j])
                         outV.add(bv[j])
                         j++
                     }
+
                     else -> {
                         outK.add(bk[j])
                         outV.add(bv[j])

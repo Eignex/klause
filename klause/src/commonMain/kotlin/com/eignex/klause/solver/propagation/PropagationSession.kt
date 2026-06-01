@@ -155,10 +155,7 @@ class PropagationSession(val problem: Problem) {
      * learned clause is a constraint over existing variables, not a decision. So no
      * snapshot is pushed and no decision counter is bumped.
      */
-    fun addLearnedClause(
-        clause: com.eignex.klause.solver.factor.Clause,
-        lbd: Int,
-    ): PropagationResult {
+    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause, lbd: Int): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
         val newFid = state.addLearnedClause(clause, lbd)
@@ -223,8 +220,10 @@ class PropagationSession(val problem: Problem) {
             val failingFid = state.currentFactor
             when {
                 failingFid >= 0 -> state.conflictAnalyzer.analyze(failingFid)
+
                 state.lastDecisionConflictVar >= 0 ->
                     state.conflictAnalyzer.analyzeDecisionConflict(state.lastDecisionConflictVar)
+
                 else -> null
             }
         }

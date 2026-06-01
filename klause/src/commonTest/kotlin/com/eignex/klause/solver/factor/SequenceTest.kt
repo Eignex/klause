@@ -26,8 +26,8 @@ class SequenceTest {
                     high = 2,
                     k = 3,
                     xs = intArrayOf(0, 1, 2, 3, 4, 5),
-                    values = intArrayOf(1)
-                )
+                    values = intArrayOf(1),
+                ),
             ),
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
@@ -52,8 +52,8 @@ class SequenceTest {
                     high = 3,
                     k = 3,
                     xs = intArrayOf(0, 1, 2, 3),
-                    values = intArrayOf(0)
-                )
+                    values = intArrayOf(0),
+                ),
             ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))

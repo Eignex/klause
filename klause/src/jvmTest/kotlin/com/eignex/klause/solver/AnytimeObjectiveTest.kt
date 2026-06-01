@@ -29,13 +29,13 @@ class AnytimeObjectiveTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0, 100.0, 50.0))
         // A budget of 50 flips is enough to find at least one feasible.
         val sample = LocalSearchSolver(
-            problem
+            problem,
         ).minimize(obj, LocalSearchParams(maxFlips = 50, randomSeed = 1L)).assignment
         assertNotNull(sample, "minimize must return a feasible when one was reached during the budget")
         assertTrue(sample.bools.count { it } == 1, "must be a feasible exactly-one assignment")
@@ -53,7 +53,7 @@ class AnytimeObjectiveTest {
                 Lit.make(3, true),
                 Lit.make(4, true),
                 Lit.make(5, true),
-            )
+            ),
         )
         val problem = Problem(6, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 1.0, 100.0, 50.0, 25.0))

@@ -138,6 +138,7 @@ internal class FlatZincCompiler(
         val wrappedValH = when (model.solve) {
             is FznSolve.Minimize, is FznSolve.Maximize ->
                 com.eignex.klause.solver.backtrack.SolutionGuided(valH)
+
             is FznSolve.Satisfy -> valH
         }
         return com.eignex.klause.solver.backtrack.BacktrackParams(
@@ -162,6 +163,7 @@ internal class FlatZincCompiler(
                 if (vs != null && vls != null) vs to vls else null
             }
         }
+
         "seq_search" -> {
             val list = (a.args.firstOrNull() as? FznExpr.ArrayLit)?.elements
             val first = list?.firstNotNullOfOrNull { e ->
@@ -169,16 +171,18 @@ internal class FlatZincCompiler(
             } ?: return null
             extractStrategies(FznAnnotation(first.name, first.args))
         }
+
         else -> null
     }
 
-    internal fun mapVariableStrategy(name: String): com.eignex.klause.solver.backtrack.VariableHeuristic? = when (name) {
-        "input_order" -> com.eignex.klause.solver.backtrack.InputOrder
-        "first_fail", "dom_w_deg" -> com.eignex.klause.solver.backtrack.SmallestDomain
-        "anti_first_fail", "occurrence" -> com.eignex.klause.solver.backtrack.LargestDomain
-        "random_order" -> com.eignex.klause.solver.backtrack.RandomVariable
-        else -> null
-    }
+    internal fun mapVariableStrategy(name: String): com.eignex.klause.solver.backtrack.VariableHeuristic? =
+        when (name) {
+            "input_order" -> com.eignex.klause.solver.backtrack.InputOrder
+            "first_fail", "dom_w_deg" -> com.eignex.klause.solver.backtrack.SmallestDomain
+            "anti_first_fail", "occurrence" -> com.eignex.klause.solver.backtrack.LargestDomain
+            "random_order" -> com.eignex.klause.solver.backtrack.RandomVariable
+            else -> null
+        }
 
     internal fun mapValueStrategy(name: String): com.eignex.klause.solver.backtrack.ValueHeuristic? = when (name) {
         "indomain_min", "indomain" -> com.eignex.klause.solver.backtrack.IndomainMin
@@ -231,12 +235,7 @@ internal class FlatZincCompiler(
         enumLabelsByVar[d.name] = labels
     }
 
-    internal fun processArrayDecl(
-        name: String,
-        type: FznType.Array,
-        value: FznExpr?,
-        isVar: Boolean,
-    ) {
+    internal fun processArrayDecl(name: String, type: FznType.Array, value: FznExpr?, isVar: Boolean) {
         if (!isVar) {
             // Parameter array — must have an initializer literal.
             value ?: failHere("parameter array `$name` requires an initializer")
@@ -312,7 +311,13 @@ internal class FlatZincCompiler(
         // array literal aliasing other vars, or absent (we allocate fresh).
         val length = type.length
         val varIds = IntArray(length)
-        val bucketings = if (type.element is FznType.FloatRange || type.element == FznType.FloatAny) ArrayList<FloatBucketing>() else null
+        val bucketings = if (type.element is FznType.FloatRange ||
+            type.element == FznType.FloatAny
+        ) {
+            ArrayList<FloatBucketing>()
+        } else {
+            null
+        }
         if (value is FznExpr.ArrayLit) {
             require(value.elements.size == length) {
                 "array `$name`: initializer length ${value.elements.size} ≠ declared $length"
@@ -323,7 +328,7 @@ internal class FlatZincCompiler(
                         val bn = nameOfBoundVar(e)
                         bucketings.add(
                             floatVars[bn]
-                                ?: failHere("array `$name`[${i + 1}]: float element must reference a float var")
+                                ?: failHere("array `$name`[${i + 1}]: float element must reference a float var"),
                         )
                     }
                 }
@@ -338,15 +343,21 @@ internal class FlatZincCompiler(
             val elemName = "$name[${i + 1}]"
             when (val t = type.element) {
                 FznType.Bool -> varIds[i] = allocBool(elemName)
+
                 is FznType.IntRange -> varIds[i] = allocInt(elemName, t.lo.toInt(), t.hi.toInt())
+
                 is FznType.IntSet -> varIds[i] = allocIntSet(elemName, t)
+
                 is FznType.FloatRange -> {
                     val v = allocFloat(elemName, t.lo, t.hi)
                     varIds[i] = v
                     bucketings!!.add(floatVars.getValue(elemName))
                 }
+
                 FznType.IntAny, FznType.FloatAny -> failHere("array `$name`: unbounded element type")
+
                 is FznType.SetOfInt -> failHere("array `$name`: array of set-of-int not supported")
+
                 is FznType.Array -> failHere("nested arrays not supported")
             }
         }
@@ -423,7 +434,9 @@ internal class FlatZincCompiler(
             require(elem.lo <= elem.hi) { "set `$ownerName`: empty universe ${elem.lo}..${elem.hi}" }
             IntArray((elem.hi - elem.lo + 1).toInt()) { (elem.lo + it).toInt() }
         }
+
         is FznType.IntSet -> elem.values.map { it.toInt() }.toIntArray().also { it.sort() }
+
         else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
     }
 
@@ -452,16 +465,23 @@ internal class FlatZincCompiler(
 
     internal fun evaluateParam(e: FznExpr, declaredType: FznType): ParamValue = when (e) {
         is FznExpr.BoolLit -> ParamValue.Bool(e.value)
+
         is FznExpr.IntLit -> ParamValue.Int(e.value)
+
         is FznExpr.FloatLit -> ParamValue.Float(e.value)
+
         is FznExpr.IntSetLit -> ParamValue.IntSet(e.values)
+
         is FznExpr.IntRangeLit -> ParamValue.IntSet((e.lo..e.hi).toList().toLongArray())
+
         is FznExpr.ArrayLit -> {
             val elem = (declaredType as? FznType.Array)?.element ?: FznType.IntAny
             val arr = compileParamArray("<inline>", elem, e)
             ParamValue.Array(arr)
         }
+
         is FznExpr.Ident -> params[e.name] ?: failHere("undefined parameter `${e.name}`")
+
         else -> failHere("unsupported parameter initializer: ${e::class.simpleName}")
     }
 
@@ -471,38 +491,45 @@ internal class FlatZincCompiler(
             BooleanArray(lit.elements.size) {
                 (lit.elements[it] as? FznExpr.BoolLit)?.value
                     ?: failHere("bool array `$name`: element ${it + 1} not a bool literal")
-            }
+            },
         )
+
         is FznType.IntRange, is FznType.IntSet, FznType.IntAny -> {
             FlatZincArray.IntParam(
                 name,
                 IntArray(lit.elements.size) {
                     evalIntConst(lit.elements[it]).toInt()
-                }
+                },
             )
         }
+
         is FznType.FloatRange, FznType.FloatAny -> {
             FlatZincArray.FloatParam(
                 name,
                 DoubleArray(lit.elements.size) {
                     evalFloatConst(lit.elements[it])
-                }
+                },
             )
         }
+
         is FznType.SetOfInt -> FlatZincArray.IntSetParam(
             name,
             lit.elements.map { e ->
                 val arr: IntArray = when (e) {
                     is FznExpr.IntSetLit -> IntArray(e.values.size) { e.values[it].toInt() }
+
                     is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
+
                     is FznExpr.Ident -> (params[e.name] as? ParamValue.IntSet)?.let { p ->
                         IntArray(p.values.size) { p.values[it].toInt() }
                     } ?: failHere("`${e.name}` is not an int-set parameter")
+
                     else -> failHere("set-of-int array `$name`: unexpected element ${e::class.simpleName}")
                 }
                 arr.also { it.sort() }
-            }
+            },
         )
+
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
@@ -511,18 +538,22 @@ internal class FlatZincCompiler(
     /** Constant-evaluate [e] as an integer. */
     internal fun evalIntConst(e: FznExpr): Long = when (e) {
         is FznExpr.IntLit -> e.value
+
         is FznExpr.BoolLit -> if (e.value) 1L else 0L
+
         is FznExpr.Ident -> when (val p = params[e.name]) {
             is ParamValue.Int -> p.value
             is ParamValue.Bool -> if (p.value) 1L else 0L
             null -> failHere("`${e.name}` is not a constant int")
             else -> failHere("`${e.name}` is not an int")
         }
+
         is FznExpr.ArrayAccess -> {
             val arr = arrays[e.name] as? FlatZincArray.IntParam
                 ?: failHere("`${e.name}` is not an int parameter array")
             arr.values[e.index - 1].toLong()
         }
+
         else -> failHere("expected int constant, got ${e::class.simpleName}")
     }
 
@@ -530,25 +561,32 @@ internal class FlatZincCompiler(
      *  solver variable rather than a compile-time constant. */
     internal fun evalIntConstOrNull(e: FznExpr): Long? = when (e) {
         is FznExpr.IntLit -> e.value
+
         is FznExpr.BoolLit -> if (e.value) 1L else 0L
+
         is FznExpr.Ident -> when (val p = params[e.name]) {
             is ParamValue.Int -> p.value
             is ParamValue.Bool -> if (p.value) 1L else 0L
             else -> null
         }
+
         is FznExpr.ArrayAccess -> (arrays[e.name] as? FlatZincArray.IntParam)?.values?.get(e.index - 1)?.toLong()
+
         else -> null
     }
 
     internal fun evalFloatConst(e: FznExpr): Double = when (e) {
         is FznExpr.FloatLit -> e.value
+
         is FznExpr.IntLit -> e.value.toDouble()
+
         is FznExpr.Ident -> when (val p = params[e.name]) {
             is ParamValue.Float -> p.value
             is ParamValue.Int -> p.value.toDouble()
             null -> failHere("`${e.name}` is not a constant float")
             else -> failHere("`${e.name}` is not a float")
         }
+
         is FznExpr.ArrayAccess -> {
             when (val arr = arrays[e.name]) {
                 is FlatZincArray.FloatParam -> arr.values[e.index - 1]
@@ -556,26 +594,31 @@ internal class FlatZincCompiler(
                 else -> failHere("`${e.name}` is not a numeric parameter array")
             }
         }
+
         else -> failHere("expected float constant, got ${e::class.simpleName}")
     }
 
     internal fun evalBoolConst(e: FznExpr): Boolean = when (e) {
         is FznExpr.BoolLit -> e.value
+
         is FznExpr.Ident -> when (val p = params[e.name]) {
             is ParamValue.Bool -> p.value
             null -> failHere("`${e.name}` is not a constant bool")
             else -> failHere("`${e.name}` is not a bool")
         }
+
         else -> failHere("expected bool constant, got ${e::class.simpleName}")
     }
 
     /** Resolve a constraint argument that's expected to be a list of int constants. */
     internal fun evalIntConstArray(e: FznExpr): IntArray = when (e) {
         is FznExpr.ArrayLit -> IntArray(e.elements.size) { evalIntConst(e.elements[it]).toInt() }
+
         is FznExpr.Ident -> when (val arr = arrays[e.name]) {
             is FlatZincArray.IntParam -> arr.values
             else -> failHere("`${e.name}` is not an int parameter array")
         }
+
         else -> failHere("expected int array, got ${e::class.simpleName}")
     }
 
@@ -597,24 +640,29 @@ internal class FlatZincCompiler(
             }
             if (ok) out else null
         }
+
         is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.IntParam)?.values
+
         else -> null
     }
 
     /** Resolve a constraint argument that's expected to be a list of float constants. */
     internal fun evalFloatConstArray(e: FznExpr): DoubleArray = when (e) {
         is FznExpr.ArrayLit -> DoubleArray(e.elements.size) { evalFloatConst(e.elements[it]) }
+
         is FznExpr.Ident -> when (val arr = arrays[e.name]) {
             is FlatZincArray.FloatParam -> arr.values
             is FlatZincArray.IntParam -> DoubleArray(arr.values.size) { arr.values[it].toDouble() }
             else -> failHere("`${e.name}` is not a float parameter array")
         }
+
         else -> failHere("expected float array, got ${e::class.simpleName}")
     }
 
     /** Resolve a constraint argument as an array of bool variables/literals. */
     internal fun evalBoolVarArray(e: FznExpr): IntArray = when (e) {
         is FznExpr.ArrayLit -> IntArray(e.elements.size) { resolveBoolLit(e.elements[it]) }
+
         is FznExpr.Ident -> when (val arr = arrays[e.name]) {
             is FlatZincArray.Vars -> {
                 require(arr.elementKind == FlatZincArray.Vars.ElementKind.Bool) {
@@ -622,8 +670,10 @@ internal class FlatZincCompiler(
                 }
                 IntArray(arr.varIds.size) { Lit.make(arr.varIds[it], true) }
             }
+
             else -> failHere("`${e.name}` is not a bool var array")
         }
+
         else -> failHere("expected bool var array, got ${e::class.simpleName}")
     }
 
@@ -632,26 +682,31 @@ internal class FlatZincCompiler(
             (e.elements[it] as? FznExpr.BoolLit)?.value
                 ?: failHere("expected bool literal in const array, got ${e.elements[it]::class.simpleName}")
         }
+
         is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.BoolParam)?.values
             ?: failHere("`${e.name}` is not a bool parameter array")
+
         else -> failHere("expected bool const array, got ${e::class.simpleName}")
     }
 
     /** Resolve a constraint argument as an array of int variables. */
     internal fun evalIntVarArray(e: FznExpr): IntArray = when (e) {
         is FznExpr.ArrayLit -> IntArray(e.elements.size) { resolveIntVar(e.elements[it]) }
+
         is FznExpr.Ident -> when (val arr = arrays[e.name]) {
             is FlatZincArray.Vars -> {
                 require(
                     arr.elementKind == FlatZincArray.Vars.ElementKind.Int ||
-                        arr.elementKind == FlatZincArray.Vars.ElementKind.Float
+                        arr.elementKind == FlatZincArray.Vars.ElementKind.Float,
                 ) {
                     "`${e.name}` is not an int var array"
                 }
                 arr.varIds.copyOf()
             }
+
             else -> failHere("`${e.name}` is not an int var array")
         }
+
         else -> failHere("expected int var array, got ${e::class.simpleName}")
     }
 
@@ -665,6 +720,7 @@ internal class FlatZincCompiler(
             val id = boolVars[e.name] ?: failHere("undefined bool var `${e.name}`")
             Lit.make(id, true)
         }
+
         is FznExpr.BoolLit -> {
             // Allocate a fresh constant-pinned bool — Clause/Cardinality treat it as
             // already-determined. Cheap and simple.
@@ -673,6 +729,7 @@ internal class FlatZincCompiler(
             factors.add(Clause(intArrayOf(Lit.make(id, e.value))))
             Lit.make(id, true)
         }
+
         is FznExpr.ArrayAccess -> {
             val arr = arrays[e.name] as? FlatZincArray.Vars
                 ?: failHere("`${e.name}` is not a var array")
@@ -681,21 +738,25 @@ internal class FlatZincCompiler(
             }
             Lit.make(arr.varIds[e.index - 1], true)
         }
+
         else -> failHere("expected bool var or literal, got ${e::class.simpleName}")
     }
 
     /** Resolve an int reference into a klause int-var id. Pins int constants as singletons. */
     internal fun resolveIntVar(e: FznExpr): Int = when (e) {
         is FznExpr.Ident -> intVars[e.name] ?: failHere("undefined int var `${e.name}`")
+
         is FznExpr.IntLit -> {
             val name = "__const_int_${e.value}_${intVars.size}"
             allocInt(name, e.value.toInt(), e.value.toInt())
         }
+
         is FznExpr.ArrayAccess -> {
             val arr = arrays[e.name] as? FlatZincArray.Vars
                 ?: failHere("`${e.name}` is not a var array")
             arr.varIds[e.index - 1]
         }
+
         else -> failHere("expected int var, got ${e::class.simpleName}")
     }
 
@@ -705,12 +766,16 @@ internal class FlatZincCompiler(
             val lit = resolveBoolLit(e)
             Lit.variable(lit)
         }
+
         is FznType.IntRange, is FznType.IntSet, FznType.IntAny -> resolveIntVar(e)
+
         is FznType.FloatRange, FznType.FloatAny -> when (e) {
             is FznExpr.Ident -> intVars[e.name] ?: failHere("undefined float var `${e.name}`")
             else -> failHere("expected float var, got ${e::class.simpleName}")
         }
+
         is FznType.SetOfInt -> failHere("set-of-int element refs not supported")
+
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
@@ -721,10 +786,12 @@ internal class FlatZincCompiler(
 
     internal fun compileSolve(): SolveDirective = when (val s = model.solve) {
         is FznSolve.Satisfy -> SolveDirective.Satisfy
+
         is FznSolve.Minimize -> {
             val (name, kind) = resolveObjVar(s.obj)
             SolveDirective.Minimize(name, kind)
         }
+
         is FznSolve.Maximize -> {
             val (name, kind) = resolveObjVar(s.obj)
             SolveDirective.Maximize(name, kind)
@@ -739,21 +806,25 @@ internal class FlatZincCompiler(
             is FznExpr.IntLit -> {
                 val name = "__obj_const_${e.value}"
                 val v = e.value.toInt()
-                if (name !in intVars) { allocInt(name, v, v) }
+                if (name !in intVars) {
+                    allocInt(name, v, v)
+                }
                 return name to SolveDirective.ObjKind.Int
             }
+
             is FznExpr.BoolLit -> {
                 val name = "__obj_const_${e.value}"
                 if (name !in boolVars) {
                     allocBool(name) /* pin via Clause below */
                     factors.add(
                         com.eignex.klause.solver.factor.Clause(
-                            intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[name]!!, e.value))
-                        )
+                            intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[name]!!, e.value)),
+                        ),
                     )
                 }
                 return name to SolveDirective.ObjKind.Bool
             }
+
             else -> {}
         }
         val name = (e as? FznExpr.Ident)?.name
@@ -764,7 +835,9 @@ internal class FlatZincCompiler(
         (params[name] as? ParamValue.Int)?.let { p ->
             val pinName = "__obj_const_$name"
             val v = p.value.toInt()
-            if (pinName !in intVars) { allocInt(pinName, v, v) }
+            if (pinName !in intVars) {
+                allocInt(pinName, v, v)
+            }
             return pinName to SolveDirective.ObjKind.Int
         }
         (params[name] as? ParamValue.Bool)?.let { p ->
@@ -773,8 +846,8 @@ internal class FlatZincCompiler(
                 allocBool(pinName)
                 factors.add(
                     com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[pinName]!!, p.value))
-                    )
+                        intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[pinName]!!, p.value)),
+                    ),
                 )
             }
             return pinName to SolveDirective.ObjKind.Bool
@@ -804,6 +877,7 @@ internal class FlatZincCompiler(
                     items += OutputItem.ShowArray(decl.name)
                     items += OutputItem.Literal(";\n")
                 }
+
                 asVar != null -> {
                     items += OutputItem.Literal("${decl.name} = ")
                     items += OutputItem.ShowVar(decl.name)
@@ -819,6 +893,7 @@ internal class FlatZincCompiler(
 
     internal fun compileOutputItem(e: FznExpr): OutputItem = when (e) {
         is FznExpr.StringLit -> OutputItem.Literal(e.value)
+
         is FznExpr.AnnCall -> when (e.name) {
             "show" -> {
                 val arg = e.args.firstOrNull() ?: failHere("show() needs an argument")
@@ -830,11 +905,14 @@ internal class FlatZincCompiler(
                             OutputItem.ShowVar(arg.name)
                         }
                     }
+
                     else -> failHere("show(): unsupported argument shape")
                 }
             }
+
             else -> failHere("output: unsupported function call `${e.name}`")
         }
+
         else -> failHere("unsupported output item: ${e::class.simpleName}")
     }
 

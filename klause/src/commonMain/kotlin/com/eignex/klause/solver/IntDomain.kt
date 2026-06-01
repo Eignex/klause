@@ -84,7 +84,13 @@ class IntDomain private constructor(
         return holes.binarySearchInt(value) < 0
     }
 
-    fun clamp(value: Int): Int = if (value < min) min else if (value > max) max else value
+    fun clamp(value: Int): Int = if (value < min) {
+        min
+    } else if (value > max) {
+        max
+    } else {
+        value
+    }
 
     /**
      * Return a new domain with [value] excluded, or `this` if [value] is not currently
@@ -109,6 +115,7 @@ class IntDomain private constructor(
                 val newHoles = trimHolesBelow(holes, newMin + 1)
                 IntDomain(newMin, max, newHoles, null, 0)
             }
+
             value == max -> {
                 var newMax = max - 1
                 if (holes != null) {
@@ -118,6 +125,7 @@ class IntDomain private constructor(
                 val newHoles = trimHolesAbove(holes, newMax - 1)
                 IntDomain(min, newMax, newHoles, null, 0)
             }
+
             else -> {
                 // Interior exclude. Pick the storage based on span when transitioning
                 // out of the contiguous representation; otherwise stay in holes.
@@ -314,7 +322,9 @@ class IntDomain private constructor(
             sb.append("])")
             sb.toString()
         }
+
         holes != null -> "IntDomain($min..$max - ${holes.toList()})"
+
         else -> "IntDomain($min..$max)"
     }
 

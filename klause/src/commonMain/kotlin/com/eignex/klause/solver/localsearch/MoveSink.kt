@@ -29,7 +29,9 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     /** Replace the [Assumptions] this sink filters against. Called by [LocalSearchState] on
      *  init / restart so per-call assumptions take effect. */
-    fun setAssumptions(a: Assumptions) { assumptions = a }
+    fun setAssumptions(a: Assumptions) {
+        assumptions = a
+    }
 
     fun addBoolFlip(varId: Int) {
         if (assumptions.isFrozenBool(varId)) return
@@ -48,10 +50,12 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     /** Add a multi-variable atomic transition. Skips the move entirely if any part
      *  would touch a frozen variable — a Compound is all-or-nothing. */
     fun addCompound(parts: List<Move>) {
-        for (p in parts) when (p) {
-            is Move.BoolFlip -> if (assumptions.isFrozenBool(p.varId)) return
-            is Move.IntSet -> if (assumptions.isFrozenInt(p.varId)) return
-            is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet)")
+        for (p in parts) {
+            when (p) {
+                is Move.BoolFlip -> if (assumptions.isFrozenBool(p.varId)) return
+                is Move.IntSet -> if (assumptions.isFrozenInt(p.varId)) return
+                is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet)")
+            }
         }
         val side = compounds ?: ArrayList<Move.Compound>(2).also { compounds = it }
         side.add(Move.Compound(parts))
@@ -108,18 +112,16 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         internal fun encodeBoolFlip(varId: Int): Long = varId.toLong() and VAR_MASK
 
         /** Layout: bit 63 = 1, bits 31..62 = value (32 bits), bits 0..30 = varId (31 bits). */
-        internal fun encodeIntSet(varId: Int, newValue: Int): Long =
-            KIND_BIT or
-                (varId.toLong() and VAR_MASK) or
-                ((newValue.toLong() and 0xFFFF_FFFFL) shl 31)
+        internal fun encodeIntSet(varId: Int, newValue: Int): Long = KIND_BIT or
+            (varId.toLong() and VAR_MASK) or
+            ((newValue.toLong() and 0xFFFF_FFFFL) shl 31)
 
-        internal fun decode(packed: Long): Move =
-            if (packed and KIND_BIT == 0L) {
-                Move.BoolFlip((packed and VAR_MASK).toInt())
-            } else {
-                val varId = (packed and VAR_MASK).toInt()
-                val value = (packed ushr 31).toInt()
-                Move.IntSet(varId, value)
-            }
+        internal fun decode(packed: Long): Move = if (packed and KIND_BIT == 0L) {
+            Move.BoolFlip((packed and VAR_MASK).toInt())
+        } else {
+            val varId = (packed and VAR_MASK).toInt()
+            val value = (packed ushr 31).toInt()
+            Move.IntSet(varId, value)
+        }
     }
 }

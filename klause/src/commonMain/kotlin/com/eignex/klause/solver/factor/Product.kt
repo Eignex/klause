@@ -14,11 +14,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  *
  * No payload: the product is recomputed in O(1) from the current assignment on each query.
  */
-class Product(
-    val a: Int,
-    val b: Int,
-    val result: Int,
-) : LocalSearchFactor {
+class Product(val a: Int, val b: Int, val result: Int) : LocalSearchFactor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = intArrayOf(a, b, result)
@@ -113,12 +109,7 @@ class Product(
      * isn't). Dispatches to the existing singleton-only fast path or to corner-division
      * for the general case.
      */
-    private fun reverseNarrow(
-        state: PropagationState,
-        target: Int,
-        divisorDomain: IntDomain,
-        r: IntDomain,
-    ): Boolean {
+    private fun reverseNarrow(state: PropagationState, target: Int, divisorDomain: IntDomain, r: IntDomain): Boolean {
         if (0 in divisorDomain.min..divisorDomain.max) return true // skip: zero-crossing
         if (divisorDomain.min == divisorDomain.max) {
             return narrowByDivisor(state, target, divisorDomain.min.toLong(), r)
@@ -159,12 +150,7 @@ class Product(
      * Narrow [target]'s domain so that `target * divisor ∈ [r.min, r.max]`. [divisor] must
      * be non-zero. Handles signed division by flipping the bound order when [divisor] < 0.
      */
-    private fun narrowByDivisor(
-        state: PropagationState,
-        target: Int,
-        divisor: Long,
-        r: IntDomain,
-    ): Boolean {
+    private fun narrowByDivisor(state: PropagationState, target: Int, divisor: Long, r: IntDomain): Boolean {
         val rLo = r.min.toLong()
         val rHi = r.max.toLong()
         val lo: Long

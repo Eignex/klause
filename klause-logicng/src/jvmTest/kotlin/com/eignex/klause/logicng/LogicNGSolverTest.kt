@@ -52,7 +52,7 @@ class LogicNGSolverTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val samples = LogicNGSolver(problem).enumerate(LogicNGParams()).take(10).toList()
@@ -68,7 +68,7 @@ class LogicNGSolverTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val samples = LogicNGSolver(problem).samples(LogicNGParams(maxModels = 5)).toList()
@@ -84,7 +84,7 @@ class LogicNGSolverTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val samples = LogicNGSolver(problem).enumerate(LogicNGParams(maxModels = 2)).take(10).toList()
@@ -99,11 +99,11 @@ class LogicNGSolverTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val samples = LogicNGSolver(problem).enumerate(
-            LogicNGParams(minHammingDistance = 3, recentWindow = 8)
+            LogicNGParams(minHammingDistance = 3, recentWindow = 8),
         ).take(8).toList()
         for (i in samples.indices) {
             for (j in (i + 1) until samples.size) {
@@ -123,13 +123,15 @@ class LogicNGSolverTest {
             when (ng) {
                 is SolveResult.Sat -> assertTrue(
                     ls is SolveResult.Sat,
-                    "${case.name}: LogicNG SAT but LS got $ls"
+                    "${case.name}: LogicNG SAT but LS got $ls",
                 )
+
                 is SolveResult.Unsat -> assertTrue(
                     ls is SolveResult.Unknown || ls is SolveResult.Unsat,
                     "${case.name}: LogicNG UNSAT but LS got $ls " +
-                        "(LS should run out of flips, or prove Unsat via propagation)"
+                        "(LS should run out of flips, or prove Unsat via propagation)",
                 )
+
                 is SolveResult.Unknown -> {}
             }
         }
@@ -146,7 +148,7 @@ class LogicNGSolverTest {
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
                     Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
                     Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
-                )
+                ),
             ),
         ),
         Case(
@@ -159,7 +161,7 @@ class LogicNGSolverTest {
                     Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, 4),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
-                )
+                ),
             ),
         ),
         Case(
@@ -183,7 +185,7 @@ class LogicNGSolverTest {
                 factors = arrayOf<Factor>(
                     Clause(intArrayOf(Lit.make(0, true))),
                     Clause(intArrayOf(Lit.make(0, false))),
-                )
+                ),
             ),
         ),
         Case(
@@ -195,7 +197,7 @@ class LogicNGSolverTest {
                 factors = arrayOf<Factor>(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
-                )
+                ),
             ),
         ),
         Case(
@@ -217,6 +219,7 @@ class LogicNGSolverTest {
         assertEquals(
             0,
             state.cost,
-            "$label: sample $sample violates ${state.violated.size} hard factor(s)"
+            "$label: sample $sample violates ${state.violated.size} hard factor(s)",
         )
-    } }
+    }
+}

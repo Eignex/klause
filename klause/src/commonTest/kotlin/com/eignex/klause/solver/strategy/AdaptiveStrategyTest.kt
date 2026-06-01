@@ -39,7 +39,7 @@ class AdaptiveStrategyTest {
         controller.observe(9)
         assertTrue(
             controller.level < afterBump,
-            "expected decay after improvement, got ${controller.level} vs $afterBump"
+            "expected decay after improvement, got ${controller.level} vs $afterBump",
         )
     }
 
@@ -55,7 +55,7 @@ class AdaptiveStrategyTest {
         for (cost in 99 downTo 80) controller.observe(cost.toLong())
         assertTrue(
             controller.level < before,
-            "level did not decay on strict improvements: $before -> ${controller.level}"
+            "level did not decay on strict improvements: $before -> ${controller.level}",
         )
         assertTrue(controller.level >= 0.5, "level escaped minLevel: ${controller.level}")
     }
@@ -72,7 +72,7 @@ class AdaptiveStrategyTest {
         // value (cost stays below EWMA → "improving" most of the time).
         assertTrue(
             controller.level <= 0.3,
-            "level should stay near baseline under steady improvement; got ${controller.level}"
+            "level should stay near baseline under steady improvement; got ${controller.level}",
         )
     }
 
@@ -88,7 +88,7 @@ class AdaptiveStrategyTest {
         repeat(10) { controller.observe(20) }
         assertTrue(
             controller.level > baseline,
-            "level should grow on sustained rise above smoothed avg; got $baseline -> ${controller.level}"
+            "level should grow on sustained rise above smoothed avg; got $baseline -> ${controller.level}",
         )
     }
 

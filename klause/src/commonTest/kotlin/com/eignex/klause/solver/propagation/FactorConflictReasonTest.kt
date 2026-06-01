@@ -66,7 +66,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             Lit.make(4, false) in learned.literals.toSet(),
-            "learned clause should contain ¬x (the UIP), got ${learned.literals.toList()}"
+            "learned clause should contain ¬x (the UIP), got ${learned.literals.toList()}",
         )
     }
 
@@ -94,7 +94,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             Lit.make(2, false) in learned.literals.toSet(),
-            "learned should contain ¬x, got ${learned.literals.toList()}"
+            "learned should contain ¬x, got ${learned.literals.toList()}",
         )
     }
 
@@ -122,7 +122,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             Lit.make(2, false) in learned.literals.toSet(),
-            "PB LE learned should contain ¬x, got ${learned.literals.toList()}"
+            "PB LE learned should contain ¬x, got ${learned.literals.toList()}",
         )
     }
 
@@ -153,11 +153,11 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             learned.literals.isNotEmpty(),
-            "ReifiedPB conflict should produce non-empty learned clause"
+            "ReifiedPB conflict should produce non-empty learned clause",
         )
         assertTrue(
             Lit.make(3, false) in learned.literals.toSet(),
-            "ReifiedPB learned should contain ¬x (UIP), got ${learned.literals.toList()}"
+            "ReifiedPB learned should contain ¬x (UIP), got ${learned.literals.toList()}",
         )
     }
 
@@ -188,7 +188,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             learned.literals.isNotEmpty(),
-            "ReifiedCardinality conflict should produce non-empty learned clause"
+            "ReifiedCardinality conflict should produce non-empty learned clause",
         )
     }
 
@@ -228,7 +228,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             Lit.make(0, false) in learned.literals.toSet(),
-            "Linear int-domain conflict should learn [¬x], got ${learned.literals.toList()}"
+            "Linear int-domain conflict should learn [¬x], got ${learned.literals.toList()}",
         )
     }
 
@@ -264,7 +264,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             Lit.make(0, false) in learned.literals.toSet(),
-            "AllDifferent conflict should learn [¬x], got ${learned.literals.toList()}"
+            "AllDifferent conflict should learn [¬x], got ${learned.literals.toList()}",
         )
     }
 
@@ -318,7 +318,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             Lit.make(0, false) in learned.literals.toSet(),
-            "GCC conflict should learn [¬x], got ${learned.literals.toList()}"
+            "GCC conflict should learn [¬x], got ${learned.literals.toList()}",
         )
     }
 
@@ -364,12 +364,12 @@ class FactorConflictReasonTest {
         }
         assertTrue(
             ant.intMinAntecedents[0] != null,
-            "v0.min antecedents should be set by ReifiedLinear A's body propagation"
+            "v0.min antecedents should be set by ReifiedLinear A's body propagation",
         )
         val xLit = Lit.make(0, false)
         assertTrue(
             xLit in ant.intMinAntecedents[0]!!.toSet(),
-            "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}"
+            "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}",
         )
         // z (bool var 1) implied true; its boolAntecedents now contain the *atom-lit*
         // form ¬[v0≥5] and ¬[v0≤5] — the per-bound premise atoms — rather than the
@@ -382,7 +382,7 @@ class FactorConflictReasonTest {
         val zAntSet = zAnt!!.toSet()
         assertTrue(
             ge5 in zAntSet && le5 in zAntSet,
-            "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}"
+            "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}",
         )
     }
 
@@ -434,14 +434,14 @@ class FactorConflictReasonTest {
         // already in the clause).
         assertFalse(
             Lit.make(1, true) in lits,
-            "LCG should resolve y away; got ${learned.literals.toList()}"
+            "LCG should resolve y away; got ${learned.literals.toList()}",
         )
         // We can't easily look up the atom-var ids without a state handle, but we can
         // assert the shape: every literal points at an atom var (id ≥ numBoolVars=3).
         for (l in learned.literals) {
             assertTrue(
                 Lit.variable(l) >= 3,
-                "expected only atom-lit literals (var ≥ 3), got var ${Lit.variable(l)} in ${learned.literals.toList()}"
+                "expected only atom-lit literals (var ≥ 3), got var ${Lit.variable(l)} in ${learned.literals.toList()}",
             )
         }
     }
@@ -505,11 +505,11 @@ class FactorConflictReasonTest {
         val antSet = ant!!.toSet()
         assertTrue(
             le5 in antSet,
-            "atom antecedents should contain the driving bound ¬[v0≤5], got ${ant.toList()}"
+            "atom antecedents should contain the driving bound ¬[v0≤5], got ${ant.toList()}",
         )
         assertTrue(
             ge5 !in antSet,
-            "direction-aware reason should omit the irrelevant ¬[v0≥5], got ${ant.toList()}"
+            "direction-aware reason should omit the irrelevant ¬[v0≥5], got ${ant.toList()}",
         )
         // Allocate a second atom [v1 ≥ 10] — should be false (v1.max=3 < 10).
         val atomVarGE10 = state.atomVarGe(1, 10)
@@ -517,7 +517,7 @@ class FactorConflictReasonTest {
         assertEquals(
             0,
             state.atomValue[atomId10],
-            "atom [v1≥10] should not hold (v1.max=3 < 10)"
+            "atom [v1≥10] should not hold (v1.max=3 < 10)",
         )
         // Identity: re-requesting the same atom should return the same id (cached).
         val atomVarGE3Again = state.atomVarGe(1, 3)
@@ -555,7 +555,7 @@ class FactorConflictReasonTest {
             intArrayOf(
                 Lit.make(atomV0Ge5, true),
                 Lit.make(atomV1Ge7, true),
-            )
+            ),
         )
         state.addLearnedClause(clause, lbd = 2)
         // Decide v0 ≤ 4 (which makes atom [v0 ≥ 5] false permanently, since v0.max < 5).
@@ -569,7 +569,7 @@ class FactorConflictReasonTest {
         assertEquals(
             7,
             state.intDomains[1].min,
-            "atom-lit clause should have unit-propagated [v1 ≥ 7] → tightenIntMin(v1, 7)"
+            "atom-lit clause should have unit-propagated [v1 ≥ 7] → tightenIntMin(v1, 7)",
         )
     }
 
@@ -592,7 +592,7 @@ class FactorConflictReasonTest {
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
         assertTrue(
             Lit.make(2, false) in learned.literals.toSet(),
-            "Xor learned should contain ¬x, got ${learned.literals.toList()}"
+            "Xor learned should contain ¬x, got ${learned.literals.toList()}",
         )
     }
 }

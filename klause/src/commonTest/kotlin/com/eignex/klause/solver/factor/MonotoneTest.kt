@@ -12,14 +12,12 @@ import kotlin.test.assertTrue
 
 class MonotoneTest {
 
-    private fun simple(direction: Monotone.Direction, strict: Boolean): Problem {
-        return Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = Array(4) { IntDomain(0, 5) },
-            factors = arrayOf<Factor>(Monotone(intArrayOf(0, 1, 2, 3), direction, strict)),
-        )
-    }
+    private fun simple(direction: Monotone.Direction, strict: Boolean): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = Array(4) { IntDomain(0, 5) },
+        factors = arrayOf<Factor>(Monotone(intArrayOf(0, 1, 2, 3), direction, strict)),
+    )
 
     @Test
     fun `strictly increasing finds an ascending chain`() {

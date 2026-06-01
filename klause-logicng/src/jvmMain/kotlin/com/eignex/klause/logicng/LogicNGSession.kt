@@ -48,7 +48,9 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
 
     override val depth: Int get() = stack.size
 
-    override fun push(assumptions: Assumptions) { stack.addLast(assumptions) }
+    override fun push(assumptions: Assumptions) {
+        stack.addLast(assumptions)
+    }
 
     override fun pop() {
         require(stack.isNotEmpty()) { "Session.pop on an empty assumption stack" }
@@ -64,7 +66,6 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         }
     }
 
-    @Suppress("LoopWithTooManyJumpStatements")
     override fun samples(params: LogicNGParams): Sequence<Sample> = sequence {
         val baseLits = assumptionsToLiterals(mergedAssumptions(params.assumptions))
         val rng = Random(params.randomSeed ?: System.nanoTime())
@@ -78,7 +79,6 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         }
     }
 
-    @Suppress("LoopWithTooManyJumpStatements")
     override fun enumerate(params: LogicNGParams): Sequence<Sample> = sequence {
         val baseLits = assumptionsToLiterals(mergedAssumptions(params.assumptions))
         val window = ArrayDeque<Sample>()

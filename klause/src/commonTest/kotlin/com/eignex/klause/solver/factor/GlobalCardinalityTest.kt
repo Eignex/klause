@@ -26,7 +26,7 @@ class GlobalCardinalityTest {
                     xs = intArrayOf(0, 1, 2, 3, 4),
                     cover = intArrayOf(0, 1, 2),
                     countVars = intArrayOf(5, 6, 7),
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -52,7 +52,7 @@ class GlobalCardinalityTest {
                     cover = intArrayOf(0, 1, 2),
                     countLow = intArrayOf(1, 1, 1),
                     countHigh = intArrayOf(3, 3, 3),
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -78,7 +78,7 @@ class GlobalCardinalityTest {
                     countLow = intArrayOf(0, 0, 0),
                     countHigh = intArrayOf(3, 3, 3),
                     closed = true,
-                )
+                ),
             ),
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
@@ -86,7 +86,7 @@ class GlobalCardinalityTest {
         for (i in 0..2) {
             assertTrue(
                 sat.assignment.ints[i] in setOf(1, 2, 3),
-                "closed gcc: xs[$i] = ${sat.assignment.ints[i]} not in cover"
+                "closed gcc: xs[$i] = ${sat.assignment.ints[i]} not in cover",
             )
         }
     }

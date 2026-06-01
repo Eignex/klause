@@ -60,6 +60,8 @@ sealed interface FExpr {
             return s.substring(start, pos)
         }
 
-        private fun skipWs() { while (pos < s.length && s[pos].isWhitespace()) pos++ }
+        private fun skipWs() {
+            while (pos < s.length && s[pos].isWhitespace()) pos++
+        }
     }
 }

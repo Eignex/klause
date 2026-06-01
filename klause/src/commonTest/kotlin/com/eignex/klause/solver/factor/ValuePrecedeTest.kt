@@ -27,7 +27,7 @@ class ValuePrecedeTest {
             if (firstT >= 0) {
                 assertTrue(
                     firstS >= 0 && firstS < firstT,
-                    "value_precede violated: ints=$ints firstS=$firstS firstT=$firstT"
+                    "value_precede violated: ints=$ints firstS=$firstS firstT=$firstT",
                 )
             }
         }

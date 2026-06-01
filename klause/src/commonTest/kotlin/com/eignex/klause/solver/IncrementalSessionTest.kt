@@ -142,7 +142,7 @@ class IncrementalSessionTest {
         )
         val s = PropagationSession(p)
         val u = assertIs<PropagationResult.Unsat>(
-            s.seed(Assumptions(bools = mapOf(0 to false, 1 to false)))
+            s.seed(Assumptions(bools = mapOf(0 to false, 1 to false))),
         )
         assertEquals(setOf(0, 1), u.conflictBools)
         // After Unsat, the session should be at the pre-conflict level (level 1 — just x).
@@ -206,8 +206,8 @@ class IncrementalSessionTest {
                         Lit.make(1, true),
                         Lit.make(2, true),
                         Lit.make(3, true),
-                    )
-                )
+                    ),
+                ),
             ),
         )
         val s = PropagationSession(p)

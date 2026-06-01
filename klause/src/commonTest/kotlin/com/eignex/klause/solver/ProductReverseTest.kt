@@ -139,7 +139,7 @@ class ProductReverseTest {
         val daAfter = session.intDomain(0)
         kotlin.test.assertTrue(
             daAfter.min >= 1,
-            "a.min=0 should have been pushed up since 0 * b = 0 ∉ result; got $daAfter"
+            "a.min=0 should have been pushed up since 0 * b = 0 ∉ result; got $daAfter",
         )
     }
 

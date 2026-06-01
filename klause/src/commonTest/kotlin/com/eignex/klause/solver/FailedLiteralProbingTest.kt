@@ -110,8 +110,8 @@ class FailedLiteralProbingTest {
                         Lit.make(1, true),
                         Lit.make(2, true),
                         Lit.make(3, true),
-                    )
-                )
+                    ),
+                ),
             ),
             probeFailedLiterals = true,
         )

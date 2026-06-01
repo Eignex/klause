@@ -238,12 +238,7 @@ class MinCostFlow(
      * negative weights. Returns (feasible, cost, finalPotentials). finalPotentials are valid
      * dual potentials yielding reduced costs ≥ 0 on every residual arc with leftover cap.
      */
-    private fun ssp(
-        supply: IntArray,
-        w: IntArray,
-        ub: IntArray,
-        lb: IntArray,
-    ): Triple<Boolean, Long, LongArray> {
+    private fun ssp(supply: IntArray, w: IntArray, ub: IntArray, lb: IntArray): Triple<Boolean, Long, LongArray> {
         val n = numNodes
         val m = flow.size
         // Build per-node adjacency to residual arcs. For each original arc a we maintain a
@@ -264,9 +259,11 @@ class MinCostFlow(
         while (true) {
             // Find any source with positive supply and run SPFA shortest paths to all nodes.
             var src = -1
-            for (i in 0 until n) if (supply[i] > 0) {
-                src = i
-                break
+            for (i in 0 until n) {
+                if (supply[i] > 0) {
+                    src = i
+                    break
+                }
             }
             if (src == -1) break
             val dist = LongArray(n) { INF }

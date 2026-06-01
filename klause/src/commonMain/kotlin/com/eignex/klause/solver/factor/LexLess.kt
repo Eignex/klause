@@ -20,11 +20,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  *
  * LS recomputes the relation on each query.
  */
-class LexLess(
-    val xs: IntArray,
-    val ys: IntArray,
-    val strict: Boolean,
-) : LocalSearchFactor {
+class LexLess(val xs: IntArray, val ys: IntArray, val strict: Boolean) : LocalSearchFactor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
@@ -83,11 +79,15 @@ class LexLess(
         // Lower xs[k] toward `needXLE` (preferred), or as close as the domain allows.
         if (needXLE in dx) {
             sink.addChannelingIntSet(state, xV, needXLE)
-        } else if (dx.min <= needXLE) sink.addChannelingIntSet(state, xV, dx.min)
+        } else if (dx.min <= needXLE) {
+            sink.addChannelingIntSet(state, xV, dx.min)
+        }
         // Raise ys[k] toward `needYGE` (preferred), or as close as the domain allows.
         if (needYGE in dy) {
             sink.addChannelingIntSet(state, yV, needYGE)
-        } else if (dy.max >= needYGE) sink.addChannelingIntSet(state, yV, dy.max)
+        } else if (dy.max >= needYGE) {
+            sink.addChannelingIntSet(state, yV, dy.max)
+        }
         // Lex-preserving swap: if each side's current value sits in the other's domain,
         // swapping resolves the violation (xs[k]=b, ys[k]=a → satisfies xs[k] < ys[k]).
         if (xV != yV && b in dx && a in dy) {
@@ -165,6 +165,7 @@ class LexLess(
      * relationship). Strong enough to detect singleton-pinned violations; per-suffix
      * Hall reasoning is deferred to the next strength pass.
      */
+
     /** Reason when [propagate] returns false: the current bound atoms of every paired
      *  index up to the first non-singleton-equal position, since the propagator
      *  decides exclusively on bounds (no interior-hole pruning). Sound. */
@@ -202,8 +203,12 @@ class LexLess(
             val dy = state.intDomains[ys[i]]
             if (dx.min == dx.max && dy.min == dy.max) {
                 when {
-                    dx.min < dy.min -> return true // relation forced, tail unconstrained
-                    dx.min > dy.min -> return false // violated at i
+                    dx.min < dy.min -> return true
+
+                    // relation forced, tail unconstrained
+                    dx.min > dy.min -> return false
+
+                    // violated at i
                     else -> {
                         i++
                         continue

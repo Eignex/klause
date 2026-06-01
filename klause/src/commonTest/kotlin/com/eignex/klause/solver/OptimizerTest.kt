@@ -22,7 +22,7 @@ class OptimizerTest {
                 Lit.make(1, true),
                 Lit.make(2, true),
                 Lit.make(3, true),
-            )
+            ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
@@ -42,7 +42,7 @@ class OptimizerTest {
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)
+                com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
             ),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))

@@ -25,7 +25,7 @@ class ReifiedEqNegationTest {
                     coeffs = intArrayOf(1, 1),
                     vars = intArrayOf(0, 1),
                     op = LinearOp.EQ,
-                    bound = 5
+                    bound = 5,
                 ),
             ),
         )
@@ -53,7 +53,7 @@ class ReifiedEqNegationTest {
                     coeffs = intArrayOf(1, 1),
                     vars = intArrayOf(0, 1),
                     op = LinearOp.EQ,
-                    bound = 5
+                    bound = 5,
                 ),
             ),
         )
@@ -81,7 +81,7 @@ class ReifiedEqNegationTest {
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.EQ,
-                    bound = 5
+                    bound = 5,
                 ),
             ),
         )
@@ -103,7 +103,7 @@ class ReifiedEqNegationTest {
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.EQ,
-                    bound = 5
+                    bound = 5,
                 ),
             ),
         )
@@ -125,7 +125,7 @@ class ReifiedEqNegationTest {
                     weights = intArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.EQ,
-                    bound = 5
+                    bound = 5,
                 ),
             ),
         )

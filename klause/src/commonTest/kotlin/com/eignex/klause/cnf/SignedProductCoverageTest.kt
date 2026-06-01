@@ -19,21 +19,25 @@ class SignedProductCoverageTest {
             factors = arrayOf<Factor>(factor),
         )
         val cnf = BitBlaster.compile(problem)
-        for (av in -4..3) for (bv in -4..3) for (rv in -16..16) {
-            val expected = (av * bv == rv)
-            val pins = mutableListOf<Int>()
-            val values = listOf(av, bv, rv)
-            val mins = listOf(-4, -4, -16)
-            for (idx in 0..2) {
-                val bits = cnf.intVarBits[idx]
-                val offset = values[idx] - mins[idx]
-                for (i in bits.indices) {
-                    pins += bits[i]
-                    pins += (offset shr i) and 1
+        for (av in -4..3) {
+            for (bv in -4..3) {
+                for (rv in -16..16) {
+                    val expected = (av * bv == rv)
+                    val pins = mutableListOf<Int>()
+                    val values = listOf(av, bv, rv)
+                    val mins = listOf(-4, -4, -16)
+                    for (idx in 0..2) {
+                        val bits = cnf.intVarBits[idx]
+                        val offset = values[idx] - mins[idx]
+                        for (i in bits.indices) {
+                            pins += bits[i]
+                            pins += (offset shr i) and 1
+                        }
+                    }
+                    val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
+                    assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
                 }
             }
-            val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
-            assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
         }
     }
 
@@ -47,21 +51,25 @@ class SignedProductCoverageTest {
             factors = arrayOf<Factor>(factor),
         )
         val cnf = BitBlaster.compile(problem)
-        for (av in -2..2) for (bv in -2..2) for (rv in -4..4) {
-            val expected = (av * bv == rv)
-            val pins = mutableListOf<Int>()
-            val values = listOf(av, bv, rv)
-            val mins = listOf(-2, -2, -4)
-            for (idx in 0..2) {
-                val bits = cnf.intVarBits[idx]
-                val offset = values[idx] - mins[idx]
-                for (i in bits.indices) {
-                    pins += bits[i]
-                    pins += (offset shr i) and 1
+        for (av in -2..2) {
+            for (bv in -2..2) {
+                for (rv in -4..4) {
+                    val expected = (av * bv == rv)
+                    val pins = mutableListOf<Int>()
+                    val values = listOf(av, bv, rv)
+                    val mins = listOf(-2, -2, -4)
+                    for (idx in 0..2) {
+                        val bits = cnf.intVarBits[idx]
+                        val offset = values[idx] - mins[idx]
+                        for (i in bits.indices) {
+                            pins += bits[i]
+                            pins += (offset shr i) and 1
+                        }
+                    }
+                    val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
+                    assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
                 }
             }
-            val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
-            assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
         }
     }
 }

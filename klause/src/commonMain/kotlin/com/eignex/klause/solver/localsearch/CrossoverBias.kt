@@ -20,7 +20,9 @@ sealed interface CrossoverBias {
     }
 
     data class BetterBiased(val rate: Double = 0.2) : CrossoverBias {
-        init { require(rate in 0.0..0.5) { "BetterBiased rate must be in [0, 0.5], got $rate" } }
+        init {
+            require(rate in 0.0..0.5) { "BetterBiased rate must be in [0, 0.5], got $rate" }
+        }
         override fun probParentA(parentAObjective: Double, parentBObjective: Double): Double = when {
             parentAObjective < parentBObjective -> 0.5 + rate
             parentAObjective > parentBObjective -> 0.5 - rate

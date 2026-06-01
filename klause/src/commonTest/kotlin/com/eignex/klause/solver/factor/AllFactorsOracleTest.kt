@@ -100,7 +100,7 @@ class AllFactorsOracleTest {
                 f,
                 numBoolVars = 1,
                 intDomains = arrayOf(IntDomain(-1, 2)),
-                label = "reifiedIntCompare.$op"
+                label = "reifiedIntCompare.$op",
             )
         }
     }
@@ -140,7 +140,7 @@ class AllFactorsOracleTest {
         check(
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -150,7 +150,7 @@ class AllFactorsOracleTest {
         check(
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -164,7 +164,7 @@ class AllFactorsOracleTest {
                 IntDomain(1, 3), // n
                 IntDomain(0, 2),
                 IntDomain(0, 2),
-                IntDomain(0, 2)
+                IntDomain(0, 2),
             ),
         )
     }
@@ -184,7 +184,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 1),
                 IntDomain(0, 1),
                 IntDomain(0, 1),
-            )
+            ),
         )
     }
 
@@ -242,7 +242,7 @@ class AllFactorsOracleTest {
         check(
             f,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -251,7 +251,7 @@ class AllFactorsOracleTest {
         check(
             f,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -260,7 +260,7 @@ class AllFactorsOracleTest {
         check(
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -269,7 +269,7 @@ class AllFactorsOracleTest {
         check(
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -296,7 +296,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 3),
                 IntDomain(0, 3), // arr vars
             ),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -311,7 +311,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
                 IntDomain(0, 2),
-            )
+            ),
         )
     }
 
@@ -326,7 +326,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
                 IntDomain(0, 2),
-            )
+            ),
         )
     }
 
@@ -341,7 +341,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
                 IntDomain(0, 2),
-            )
+            ),
         )
     }
 
@@ -381,7 +381,7 @@ class AllFactorsOracleTest {
         )
         check(
             f,
-            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 5))
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 5)),
         )
     }
 
@@ -411,7 +411,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
             ),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -436,7 +436,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 1),
                 IntDomain(0, 1), // machines (∈ {0,1})
             ),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -459,7 +459,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 1),
                 IntDomain(0, 1), // machines
             ),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 
@@ -477,7 +477,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
                 IntDomain(0, 2),
-            )
+            ),
         )
     }
 
@@ -503,7 +503,7 @@ class AllFactorsOracleTest {
                 IntDomain(1, 2), // width vars
                 IntDomain(1, 2),
                 IntDomain(1, 2), // height vars
-            )
+            ),
         )
     }
 
@@ -523,7 +523,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
             ),
-            exactProbe = true
+            exactProbe = true,
         )
     }
 

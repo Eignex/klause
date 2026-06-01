@@ -61,11 +61,7 @@ internal data class FznVarDecl(
     val value: FznExpr?,
 )
 
-internal data class FznConstraint(
-    val name: String,
-    val args: List<FznExpr>,
-    val annotations: List<FznAnnotation>,
-)
+internal data class FznConstraint(val name: String, val args: List<FznExpr>, val annotations: List<FznAnnotation>)
 
 internal sealed interface FznSolve {
     val annotations: List<FznAnnotation>

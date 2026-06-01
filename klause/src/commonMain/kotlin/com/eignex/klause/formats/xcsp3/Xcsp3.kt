@@ -66,6 +66,7 @@ object Xcsp3 {
         fun declareVar(e: XmlElement) {
             when (e.tag) {
                 "var" -> addVar(e.attr("id"), parseDomain(e.textContent.trim()))
+
                 "array" -> {
                     val id = e.attr("id")
                     val size = Regex("""\[(\d+)]""").find(e.attr("size"))?.groupValues?.get(1)?.toInt()
@@ -73,6 +74,7 @@ object Xcsp3 {
                     val dom = parseDomain(e.textContent.trim())
                     for (i in 0 until size) addVar("$id[$i]", dom)
                 }
+
                 else -> throw UnsupportedXcsp3Exception("variable kind '${e.tag}'")
             }
         }
@@ -169,7 +171,7 @@ object Xcsp3 {
                 product *= vs.size
                 if (product > negTableCap) {
                     throw UnsupportedXcsp3Exception(
-                        "negative table cartesian product exceeds cap ($negTableCap)"
+                        "negative table cartesian product exceeds cap ($negTableCap)",
                     )
                 }
             }
@@ -208,7 +210,10 @@ object Xcsp3 {
 
         private fun compileBool(e: FExpr): Int = when (e) {
             is FExpr.Num -> if (e.value != 0) trueLit() else Lit.negate(trueLit())
-            is FExpr.Ref -> reifyRel(FExpr.Call("ge", listOf(e, FExpr.Num(1)))) // 0/1 var truthiness
+
+            is FExpr.Ref -> reifyRel(FExpr.Call("ge", listOf(e, FExpr.Num(1))))
+
+            // 0/1 var truthiness
             is FExpr.Call -> when (e.fn) {
                 "not" -> Lit.negate(compileBool(e.args[0]))
                 "and" -> tseitinAnd(e.args.map { compileBool(it) })
@@ -226,7 +231,7 @@ object Xcsp3 {
             if (trueLitCache < 0) {
                 trueLitCache = Lit.make(newBool(), true)
                 factors.add(
-                    Clause(intArrayOf(trueLitCache))
+                    Clause(intArrayOf(trueLitCache)),
                 )
             }
             return trueLitCache
@@ -259,7 +264,7 @@ object Xcsp3 {
             val lin = relationLinear(node)
             val aux = newBool()
             factors.add(
-                ReifiedLinear(auxBoolVar = aux, coeffs = lin.coeffs, vars = lin.vars, op = lin.op, bound = lin.bound)
+                ReifiedLinear(auxBoolVar = aux, coeffs = lin.coeffs, vars = lin.vars, op = lin.op, bound = lin.bound),
             )
             return Lit.make(aux, true)
         }
@@ -303,12 +308,12 @@ object Xcsp3 {
             val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
             val idx = singleTermVar(
                 e.child("index")?.textContent
-                    ?: throw UnsupportedXcsp3Exception("element: missing <index>")
+                    ?: throw UnsupportedXcsp3Exception("element: missing <index>"),
             )
             val value = e.child("value")?.textContent?.trim()
                 ?: throw UnsupportedXcsp3Exception("element: missing <value>")
             factors.add(
-                Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = true, indexOffset = offset)
+                Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = true, indexOffset = offset),
             )
         }
 
@@ -319,12 +324,14 @@ object Xcsp3 {
                     val f = refList(lists[0].textContent).toIntArray()
                     factors.add(Inverse(f = f, g = f))
                 }
+
                 2 -> factors.add(
                     Inverse(
                         f = refList(lists[0].textContent).toIntArray(),
-                        g = refList(lists[1].textContent).toIntArray()
-                    )
+                        g = refList(lists[1].textContent).toIntArray(),
+                    ),
                 )
+
                 else -> throw UnsupportedXcsp3Exception("channel: only 1- or 2-list forms supported")
             }
         }
@@ -374,8 +381,8 @@ object Xcsp3 {
                     alphabetSize = s,
                     transitions = table,
                     q0 = stateOf(start),
-                    accepting = accepting
-                )
+                    accepting = accepting,
+                ),
             )
         }
 
@@ -388,7 +395,7 @@ object Xcsp3 {
             val (op, cap) = condition(e.child("condition")!!.textContent.trim())
             if (op != LinearOp.LE) {
                 throw UnsupportedXcsp3Exception(
-                    "cumulative: only (le, capacity) conditions supported"
+                    "cumulative: only (le, capacity) conditions supported",
                 )
             }
             factors.add(Cumulative(starts = starts, durations = durations, resources = resources, capacity = cap))
@@ -431,6 +438,7 @@ object Xcsp3 {
                     vars.forEachIndexed { i, v -> arr[v] = (if (maximize) -coeffs[i] else coeffs[i]).toDouble() }
                     objective = LinearObjective(intCoefficients = arr)
                 }
+
                 "maximum", "minimum" -> {
                     val m = newAuxVar(domainMin(vars), domainMin(vars) + domainSpan(vars) - 1)
                     factors.add(ArrayMinMax(result = m, xs = vars, max = type == "maximum"))
@@ -438,6 +446,7 @@ object Xcsp3 {
                     arr[m] = if (maximize) -1.0 else 1.0
                     objective = LinearObjective(intCoefficients = arr)
                 }
+
                 else -> throw UnsupportedXcsp3Exception("objective type '$type'")
             }
         }
@@ -448,11 +457,16 @@ object Xcsp3 {
 
         private fun linear(e: FExpr): Lin = when (e) {
             is FExpr.Num -> Lin(emptyMap(), e.value)
+
             is FExpr.Ref -> Lin(mapOf(ref(e.name) to 1), 0)
+
             is FExpr.Call -> when (e.fn) {
                 "add" -> e.args.map { linear(it) }.reduce(::addLin)
+
                 "sub" -> e.args.drop(1).fold(linear(e.args[0])) { a, x -> addLin(a, scaleLin(linear(x), -1)) }
+
                 "neg" -> scaleLin(linear(e.args[0]), -1)
+
                 "mul" -> {
                     val parts = e.args.map { linear(it) }
                     val nonConst = parts.filter { it.coeffs.isNotEmpty() }
@@ -460,6 +474,7 @@ object Xcsp3 {
                     val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
                     if (nonConst.isEmpty()) Lin(emptyMap(), k) else scaleLin(nonConst[0], k)
                 }
+
                 else -> throw UnsupportedXcsp3Exception("arithmetic fn '${e.fn}'")
             }
         }
@@ -551,7 +566,7 @@ object Xcsp3 {
                 numBoolVars = nextBool,
                 numIntVars = domains.size,
                 intDomains = domains.toTypedArray(),
-                factors = factors.toTypedArray()
+                factors = factors.toTypedArray(),
             ),
             objective,
         )

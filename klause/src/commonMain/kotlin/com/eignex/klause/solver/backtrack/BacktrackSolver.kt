@@ -32,7 +32,9 @@ import kotlin.random.Random
  *  Complete enumeration on `n` unpinned bools walks up to `2^n` branches. Use
  *  [BacktrackParams.maxDecisions] to cap exploration on large problems.
  */
-class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, Optimizer<BacktrackParams> {
+class BacktrackSolver(override val problem: Problem) :
+    Solver<BacktrackParams>,
+    Optimizer<BacktrackParams> {
 
     override fun solve(params: BacktrackParams): SolveResult {
         val sink = com.eignex.klause.solver.SolveStatsSink(backend = "backtrack")
@@ -42,11 +44,13 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             val stats = sink.snapshot()
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample, stats)
+
                 is SearchOutcome.Exhausted -> SolveResult.Unsat(
                     core = outcome.core,
                     stats = stats,
                     assumptionCore = projectTouchedToAssumptions(params.assumptions, outcome.touchedAssumptionLevels),
                 )
+
                 SearchOutcome.BudgetCapped -> {
                     sink.timedOut = true
                     SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
@@ -131,6 +135,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         }
                     }
                 }
+
                 is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return@sequence
             }
         }
@@ -167,10 +172,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      * [minimize]; just exposes the search's intermediate bests as they land instead of
      * collapsing them into a single return value.
      */
-    override fun improvements(
-        objective: Objective,
-        params: BacktrackParams,
-    ): Sequence<MinimizeResult> = sequence {
+    override fun improvements(objective: Objective, params: BacktrackParams): Sequence<MinimizeResult> = sequence {
         var best: Sample? = null
         var bestObj = Double.POSITIVE_INFINITY
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
@@ -182,6 +184,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                 val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
                 linearLowerBound(objective, session) >= effectiveBound
             }
+
             else -> null
         }
         for (outcome in driveSearch(
@@ -201,6 +204,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         yield(MinimizeResult.BestFound(outcome.sample, o, TerminationReason.BudgetExhausted))
                     }
                 }
+
                 is SearchOutcome.Exhausted -> {
                     // When an external bound supplier is active, the engine has pruned
                     // subtrees against bounds that may be tighter than the local incumbent.
@@ -215,21 +219,25 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         when {
                             externalShared && best != null ->
                                 MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted)
+
                             externalShared ->
                                 MinimizeResult.Unknown(TerminationReason.SearchExhausted)
+
                             best != null -> MinimizeResult.Optimal(best, bestObj)
+
                             else -> MinimizeResult.Infeasible(outcome.core)
-                        }
+                        },
                     )
                     return@sequence
                 }
+
                 SearchOutcome.BudgetCapped -> {
                     yield(
                         if (best != null) {
                             MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
                         } else {
                             MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-                        }
+                        },
                     )
                     return@sequence
                 }
@@ -278,7 +286,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      *  project) or no level was touched (no information). */
     private fun projectTouchedToAssumptions(
         input: com.eignex.klause.solver.Assumptions,
-        levels: IntArray
+        levels: IntArray,
     ): com.eignex.klause.solver.Assumptions? {
         if (input.isEmpty || levels.isEmpty()) return null
         val touched = HashSet<Int>(levels.size)
@@ -299,12 +307,11 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      *  Empty `conflictFactors` (seed-only contradiction, no factor invocation involved)
      *  collapses to `null` — the API contract is "core absent" rather than "core empty",
      *  since an empty core wouldn't be actionable. */
-    private fun coreOf(unsat: PropagationResult.Unsat): UnsatCore? =
-        if (unsat.conflictFactors.isEmpty()) {
-            null
-        } else {
-            UnsatCore.of(unsat.conflictFactors)
-        }
+    private fun coreOf(unsat: PropagationResult.Unsat): UnsatCore? = if (unsat.conflictFactors.isEmpty()) {
+        null
+    } else {
+        UnsatCore.of(unsat.conflictFactors)
+    }
 
     private sealed interface SearchOutcome {
         data class Found(val sample: Sample) : SearchOutcome
@@ -317,10 +324,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
          *  search — feeds the assumption-core projection in
          *  [com.eignex.klause.solver.satisfyUnderAssumptions]. Empty when no seed was
          *  in play or no conflict referenced a seed level. */
-        data class Exhausted(
-            val core: UnsatCore? = null,
-            val touchedAssumptionLevels: IntArray = IntArray(0),
-        ) : SearchOutcome
+        data class Exhausted(val core: UnsatCore? = null, val touchedAssumptionLevels: IntArray = IntArray(0)) :
+            SearchOutcome
         data object BudgetCapped : SearchOutcome
     }
 
@@ -341,10 +346,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
      *  session's [PropagationResult]. */
     private data class ApplyOutcome(val value: Int, val result: PropagationResult)
 
-    private class BoolNode(
-        override val varRef: VarRef.Bool,
-        valueSeq: Sequence<Int>,
-    ) : TrailNode {
+    private class BoolNode(override val varRef: VarRef.Bool, valueSeq: Sequence<Int>) : TrailNode {
         private val iter = valueSeq.iterator()
         override fun applyNext(session: PropagationSession): ApplyOutcome? {
             if (!iter.hasNext()) return null
@@ -353,10 +355,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         }
     }
 
-    private class IntNode(
-        override val varRef: VarRef.IntVar,
-        valueSeq: Sequence<Int>,
-    ) : TrailNode {
+    private class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Int>) : TrailNode {
         private val iter = valueSeq.iterator()
         override fun applyNext(session: PropagationSession): ApplyOutcome? {
             if (!iter.hasNext()) return null
@@ -476,14 +475,17 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             trail.add(node)
                             sink?.observeNode(trail.size)
                         }
+
                         AdvanceOutcome.Exhausted -> {
                             descend = false
                             continue@inner
                         }
+
                         AdvanceOutcome.BudgetCapped -> {
                             yield(SearchOutcome.BudgetCapped)
                             return@sequence
                         }
+
                         is AdvanceOutcome.Backjump -> {
                             sink?.observeFail()
                             sink?.observeLearn()
@@ -495,21 +497,23 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             // sequence. On cascading conflict during assertion, recurse.
                             val term = backjumpAndLearn(
                                 out.learned, trail, session, params,
-                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false,
                             )
                             when (term) {
                                 BackjumpTerm.Resume -> {
                                     descend = true
                                     continue@inner
                                 }
+
                                 BackjumpTerm.Exhausted -> {
                                     yield(
                                         SearchOutcome.Exhausted(
                                             touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                        )
+                                        ),
                                     )
                                     return@sequence
                                 }
+
                                 BackjumpTerm.Stuck -> {
                                     descend = false
                                     continue@inner
@@ -522,7 +526,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                         yield(
                             SearchOutcome.Exhausted(
                                 touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                            )
+                            ),
                         )
                         return@sequence
                     }
@@ -536,13 +540,16 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                             descend = true
                         }
+
                         AdvanceOutcome.Exhausted -> {
                             trail.removeAt(trail.size - 1)
                         }
+
                         AdvanceOutcome.BudgetCapped -> {
                             yield(SearchOutcome.BudgetCapped)
                             return@sequence
                         }
+
                         is AdvanceOutcome.Backjump -> {
                             if (touchedSeedLevels != null) {
                                 for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
@@ -551,21 +558,23 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                             // first (trail.removeAt) then proceed to backjump + learn.
                             val term = backjumpAndLearn(
                                 out.learned, trail, session, params,
-                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true
+                                boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true,
                             )
                             when (term) {
                                 BackjumpTerm.Resume -> {
                                     descend = true
                                     continue@inner
                                 }
+
                                 BackjumpTerm.Exhausted -> {
                                     yield(
                                         SearchOutcome.Exhausted(
                                             touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                        )
+                                        ),
                                     )
                                     return@sequence
                                 }
+
                                 BackjumpTerm.Stuck -> {
                                     descend = false
                                     continue@inner
@@ -590,23 +599,22 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
         boolPhaseSet: BooleanArray?,
         intPhase: IntArray?,
         intPhaseSet: BooleanArray?,
-    ): Sequence<Int> {
-        return when (varRef) {
-            is VarRef.Bool -> {
-                if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[varRef.varId]) {
-                    val saved = if (boolPhase[varRef.varId]) 1 else 0
-                    sequenceOf(saved) + values.filter { it != saved }
-                } else {
-                    values
-                }
+    ): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> {
+            if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[varRef.varId]) {
+                val saved = if (boolPhase[varRef.varId]) 1 else 0
+                sequenceOf(saved) + values.filter { it != saved }
+            } else {
+                values
             }
-            is VarRef.IntVar -> {
-                if (intPhase != null && intPhaseSet != null && intPhaseSet[varRef.varId]) {
-                    val saved = intPhase[varRef.varId]
-                    sequenceOf(saved) + values.filter { it != saved }
-                } else {
-                    values
-                }
+        }
+
+        is VarRef.IntVar -> {
+            if (intPhase != null && intPhaseSet != null && intPhaseSet[varRef.varId]) {
+                val saved = intPhase[varRef.varId]
+                sequenceOf(saved) + values.filter { it != saved }
+            } else {
+                values
             }
         }
     }
@@ -631,6 +639,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     }
                 }
             }
+
             is VarRef.IntVar -> {
                 if (intPhase != null && intPhaseSet != null) {
                     val d = session.intDomain(varRef.varId)
@@ -690,9 +699,8 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
          *  hands it to [PropagationSession.addLearnedClause], and resumes with the new
          *  clause now constraining future search and unit-propagating the asserting
          *  literal. */
-        data class Backjump(
-            val learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
-        ) : AdvanceOutcome
+        data class Backjump(val learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned) :
+            AdvanceOutcome
     }
 
     private fun advance(
@@ -842,6 +850,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
             val result = session.addLearnedClause(clause, current.lbd)
             when (result) {
                 is PropagationResult.Implied -> return BackjumpTerm.Resume
+
                 is PropagationResult.Unsat -> {
                     // Assertion cascaded into another conflict. The session ran the
                     // analyzer on the new conflict; if a new learned clause came back,
@@ -856,6 +865,7 @@ class BacktrackSolver(override val problem: Problem) : Solver<BacktrackParams>, 
                     }
                     current = next
                 }
+
                 else -> return BackjumpTerm.Stuck // shouldn't happen — addLearnedClause returns only Implied/Unsat
             }
         }

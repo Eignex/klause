@@ -33,12 +33,7 @@ import kotlin.math.min
  * The earlier "forced single-dim" pairwise scan is subsumed by the case where all but one
  * dim's M-intervals are already exhausted.
  */
-class Geost(
-    val numDims: Int,
-    val numObjects: Int,
-    val origin: IntArray,
-    val length: IntArray,
-) : LocalSearchFactor {
+class Geost(val numDims: Int, val numObjects: Int, val origin: IntArray, val length: IntArray) : LocalSearchFactor {
 
     init {
         require(numDims >= 1) { "Geost: numDims must be ≥ 1" }
@@ -82,8 +77,10 @@ class Geost(
     /** Total overlap volume over all object pairs, with an optional single-var override. */
     private fun totalVolume(state: LocalSearchState, ov: Int, nv: Int): Long {
         var sum = 0L
-        for (i in 0 until numObjects) for (j in i + 1 until numObjects) {
-            sum += overlapVolume(state, i, j, ov, nv)
+        for (i in 0 until numObjects) {
+            for (j in i + 1 until numObjects) {
+                sum += overlapVolume(state, i, j, ov, nv)
+            }
         }
         return sum
     }
@@ -117,27 +114,29 @@ class Geost(
      *  [Diffn] single-axis escape set. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
-        for (i in 0 until numObjects) for (j in i + 1 until numObjects) {
-            if (overlapVolume(state, i, j, ov = -1, nv = 0) == 0L) continue
-            for (d in 0 until numDims) {
-                val oiVar = origin[i * numDims + d]
-                val li = length[i * numDims + d]
-                val ojVar = origin[j * numDims + d]
-                val lj = length[j * numDims + d]
-                val si = state.assignment.intValue(oiVar)
-                val sj = state.assignment.intValue(ojVar)
-                val di = state.problem.intDomains[oiVar]
-                val dj = state.problem.intDomains[ojVar]
-                // Move i to just-left (before j) or just-right (after j) on dim d.
-                val iLeft = sj - li
-                val iRight = sj + lj
-                if (iLeft in di && iLeft != si) sink.addChannelingIntSet(state, oiVar, iLeft)
-                if (iRight in di && iRight != si) sink.addChannelingIntSet(state, oiVar, iRight)
-                // Symmetric for j.
-                val jLeft = si - lj
-                val jRight = si + li
-                if (jLeft in dj && jLeft != sj) sink.addChannelingIntSet(state, ojVar, jLeft)
-                if (jRight in dj && jRight != sj) sink.addChannelingIntSet(state, ojVar, jRight)
+        for (i in 0 until numObjects) {
+            for (j in i + 1 until numObjects) {
+                if (overlapVolume(state, i, j, ov = -1, nv = 0) == 0L) continue
+                for (d in 0 until numDims) {
+                    val oiVar = origin[i * numDims + d]
+                    val li = length[i * numDims + d]
+                    val ojVar = origin[j * numDims + d]
+                    val lj = length[j * numDims + d]
+                    val si = state.assignment.intValue(oiVar)
+                    val sj = state.assignment.intValue(ojVar)
+                    val di = state.problem.intDomains[oiVar]
+                    val dj = state.problem.intDomains[ojVar]
+                    // Move i to just-left (before j) or just-right (after j) on dim d.
+                    val iLeft = sj - li
+                    val iRight = sj + lj
+                    if (iLeft in di && iLeft != si) sink.addChannelingIntSet(state, oiVar, iLeft)
+                    if (iRight in di && iRight != si) sink.addChannelingIntSet(state, oiVar, iRight)
+                    // Symmetric for j.
+                    val jLeft = si - lj
+                    val jRight = si + li
+                    if (jLeft in dj && jLeft != sj) sink.addChannelingIntSet(state, ojVar, jLeft)
+                    if (jRight in dj && jRight != sj) sink.addChannelingIntSet(state, ojVar, jRight)
+                }
             }
         }
     }
@@ -160,13 +159,15 @@ class Geost(
         conflictVars = null
         // First sweep: detect "must overlap in every dim" → infeasibility. The conflict is
         // caused solely by the two objects' origin bounds — cite just those.
-        for (i in 0 until numObjects) for (j in i + 1 until numObjects) {
-            if (mustOverlapEveryDim(state, i, j, exceptDim = -1)) {
-                val acc = IntArrayList()
-                objectVarsInto(i, acc)
-                objectVarsInto(j, acc)
-                conflictVars = acc.toIntArray()
-                return false
+        for (i in 0 until numObjects) {
+            for (j in i + 1 until numObjects) {
+                if (mustOverlapEveryDim(state, i, j, exceptDim = -1)) {
+                    val acc = IntArrayList()
+                    objectVarsInto(i, acc)
+                    objectVarsInto(j, acc)
+                    conflictVars = acc.toIntArray()
+                    return false
+                }
             }
         }
         // Per (i, d) sweep.
