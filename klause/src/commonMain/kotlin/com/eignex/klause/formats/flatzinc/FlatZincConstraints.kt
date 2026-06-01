@@ -30,6 +30,8 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Cumulatives
+import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -147,6 +149,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "circuit", "fzn_circuit", "klause_circuit" -> emitCircuit(c, sub = false)
     "subcircuit", "fzn_subcircuit", "klause_subcircuit" -> emitCircuit(c, sub = true)
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
+    "cumulatives", "fzn_cumulatives" -> emitCumulatives(c)
+    "sliding_sum", "fzn_sliding_sum" -> emitSlidingSum(c)
     "disjunctive", "fzn_disjunctive",
     "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c)
 
@@ -1144,6 +1148,48 @@ internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
         resourceVars = resourceVars,
         capacityVar = capacityVar,
     ))
+}
+
+/**
+ * `fzn_cumulatives(s, d, r, m, b, upper, min_m)` — multi-machine cumulative. Each task `i`
+ * runs on machine `m[i]` (a var); per-machine bound `b[k]` is a capacity (`upper`) or a
+ * minimum-load floor. Routes to the native graded [Cumulatives] factor. Durations, resources,
+ * and bounds may each be constants or vars (resolved live at solve time).
+ */
+internal fun FlatZincCompiler.emitCumulatives(c: FznConstraint) {
+    require(c.args.size == 7) { "cumulatives expects 7 args (s,d,r,m,b,upper,min_m), got ${c.args.size}" }
+    val starts = evalIntVarArray(c.args[0])
+    val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
+    val (resources, resourceVars) = resolveIntArrayConstOrVars(c.args[2])
+    val machines = evalIntVarArray(c.args[3])
+    val (bounds, boundVars) = resolveIntArrayConstOrVars(c.args[4])
+    val upper = evalBoolConst(c.args[5])
+    val minMachine = evalIntConst(c.args[6]).toInt()
+    factors.add(Cumulatives(
+        starts = starts,
+        durations = durations,
+        resources = resources,
+        machines = machines,
+        bounds = bounds,
+        upper = upper,
+        minMachine = minMachine,
+        durationVars = durationVars,
+        resourceVars = resourceVars,
+        boundVars = boundVars,
+    ))
+}
+
+/**
+ * `fzn_sliding_sum(low, up, seq, vs)` — every length-`seq` window of `vs` sums into
+ * `[low, up]`. Routes to the native graded [SlidingSum] factor.
+ */
+internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
+    require(c.args.size == 4) { "sliding_sum expects 4 args (low,up,seq,vs), got ${c.args.size}" }
+    val low = evalIntConst(c.args[0]).toInt()
+    val up = evalIntConst(c.args[1]).toInt()
+    val seq = evalIntConst(c.args[2]).toInt()
+    val vs = evalIntVarArray(c.args[3])
+    factors.add(SlidingSum(low = low, up = up, seq = seq, vs = vs))
 }
 
 /** `disjunctive(starts, durations)` / `disjunctive_strict(...)`. Durations may be var. */

@@ -332,6 +332,48 @@ class AllFactorsOracleTest {
         check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)))
     }
 
+    @Test fun slidingSum() {
+        // Every window of 2 consecutive elements sums into [1, 3]; 4 vars ∈ [0,2].
+        val f = SlidingSum(low = 1, up = 3, seq = 2, vs = intArrayOf(0, 1, 2, 3))
+        check(f, intDomains = arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
+        ), exactProbe = true)
+    }
+
+    @Test fun cumulativesUpper() {
+        // 3 tasks (starts 0,1,2 ; machines 3,4,5), 2 machines (values 0,1), cap 2 each.
+        val f = Cumulatives(
+            starts = intArrayOf(0, 1, 2),
+            durations = intArrayOf(2, 1, 1),
+            resources = intArrayOf(1, 1, 1),
+            machines = intArrayOf(3, 4, 5),
+            bounds = intArrayOf(2, 2),
+            upper = true,
+            minMachine = 0,
+        )
+        check(f, intDomains = arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),   // starts
+            IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),   // machines (∈ {0,1})
+        ), exactProbe = true)
+    }
+
+    @Test fun cumulativesLower() {
+        // Minimum-load (upper=false): where a machine is in use it must carry ≥ bound.
+        val f = Cumulatives(
+            starts = intArrayOf(0, 1),
+            durations = intArrayOf(2, 2),
+            resources = intArrayOf(1, 1),
+            machines = intArrayOf(2, 3),
+            bounds = intArrayOf(1, 1),
+            upper = false,
+            minMachine = 0,
+        )
+        check(f, intDomains = arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2),   // starts
+            IntDomain(0, 1), IntDomain(0, 1),   // machines
+        ), exactProbe = true)
+    }
+
     @Test fun diffn() {
         val f = Diffn(
             xs = intArrayOf(0, 1), ys = intArrayOf(2, 3),
