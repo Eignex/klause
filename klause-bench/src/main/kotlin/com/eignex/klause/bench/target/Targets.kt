@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.solver.Backend
 
 /** Which measurement a target runs. */
 enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY, ANYTIME }
@@ -16,6 +17,10 @@ data class Target(
     val suiteIds: List<String>,
     val metric: MetricKind,
     val budget: Budget = Budget(),
+    /** Reference solver for differential metrics (PARITY / ANYTIME). `null` = the metric's
+     *  own default (Choco for parity, OR-Tools for anytime). Overridable at run time with
+     *  `-Dklause.bench.parity.reference` / `-Dklause.bench.anytime.reference`. */
+    val reference: Backend? = null,
 )
 
 object Targets {
@@ -36,6 +41,10 @@ object Targets {
         Target("mzn-anytime", "Anytime optimization (klause-LS vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.ANYTIME, Budget(timeoutMillis = 5_000)),
         Target("smtlib-parity", "Differential parity (klause vs Choco) over the SMT-LIB QF_LIA set", listOf("smtlib-core"), MetricKind.PARITY),
         Target("xcsp3-parity", "Differential parity (klause vs Choco) over the XCSP3 set", listOf("xcsp3-core"), MetricKind.PARITY),
+        // OR-Tools-referenced variants (same suites, OR-Tools CP-SAT as the trusted reference).
+        Target("parity-core-ortools", "Differential parity (klause vs OR-Tools) over the in-process core", IN_PROCESS_CORE, MetricKind.PARITY, reference = Backend.ORTOOLS),
+        Target("mzn-parity-ortools", "Differential parity (klause vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY, reference = Backend.ORTOOLS),
+        Target("mzn-anytime-choco", "Anytime optimization (klause-LS vs Choco) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.ANYTIME, Budget(timeoutMillis = 5_000), reference = Backend.CHOCO),
     )
 
     fun get(id: String): Target =

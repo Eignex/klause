@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
@@ -72,6 +73,14 @@ class OrToolsModel private constructor(
                 LinearExpr.weightedSum(intArgs(f.vars), f.coeffs.longs()), f.op, f.bound, boolVars[f.auxBoolVar])
             is ReifiedPseudoBoolean -> reifyPb(
                 LinearExpr.weightedSum(litArgs(f.literals), f.weights.longs()), f.op, f.bound, boolVars[f.auxBoolVar])
+            is ReifiedCardinality -> {
+                // aux ⇔ (min ≤ Σ literals ≤ max).
+                val sum = LinearExpr.sum(litArgs(f.literals))
+                val d = Domain(f.min.toLong(), f.max.toLong())
+                val aux = boolVars[f.auxBoolVar]
+                model.addLinearExpressionInDomain(sum, d).onlyEnforceIf(aux)
+                model.addLinearExpressionInDomain(sum, d.complement()).onlyEnforceIf(aux.not())
+            }
             else -> throw UnsupportedFactorException(f)
         }
     }
