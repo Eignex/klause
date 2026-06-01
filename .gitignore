@@ -15,4 +15,4 @@ build/
 out/
 .fleet/
 .kotlin/
-tools/
+/tools/
