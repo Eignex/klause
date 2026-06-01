@@ -39,7 +39,7 @@ import com.eignex.klause.solver.satisfyUnderAssumptions
  * weight-splitting + stratification — totalizer-with-weights (pseudo-Boolean encoding)
  * is a future extension.
  */
-class TotalizerOptimizer(val baseProblem: Problem) {
+internal class TotalizerOptimizer(val baseProblem: Problem) {
 
     /** Soft literal that should be true; cost 1 if it ends up false. Weight is fixed at
      *  1 — this optimiser is the unweighted-MaxSAT specialisation. */

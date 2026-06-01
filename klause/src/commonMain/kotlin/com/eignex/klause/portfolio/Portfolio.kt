@@ -54,7 +54,7 @@ import kotlin.concurrent.atomics.AtomicReference
  * interleave on one CPU — there's no wall-clock speedup, but the coordination layer
  * (cancellation, fan-in, bound sharing) still composes correctly.
  */
-class Portfolio<P : SolverParams>(
+internal class Portfolio<P : SolverParams>(
     val workers: List<Session<P>>,
     private val strategy: PortfolioStrategy = PortfolioStrategy.RaceFirstFeasible,
 ) : AutoCloseable {
@@ -259,7 +259,7 @@ class Portfolio<P : SolverParams>(
 /** Strategy knobs for [Portfolio]. Each entry currently affects `solve` only; `samples`
  *  always fans-in from every worker; `minimize` always shares the global bound regardless
  *  of strategy (race semantics are honoured via cooperative cancellation on Optimal). */
-sealed interface PortfolioStrategy {
+internal sealed interface PortfolioStrategy {
     /** First worker to produce a definitive answer wins; others are cancelled. Default. */
     data object RaceFirstFeasible : PortfolioStrategy
 

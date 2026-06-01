@@ -46,7 +46,7 @@ import kotlin.random.Random
  * Specialised to [LocalSearchParams] so we can override `maxFlips` per iteration; the
  * generic-over-`P` version would need a `SolverParams.withMaxFlips` extension point.
  */
-class Alns(
+internal class Alns(
     val inner: Optimizer<LocalSearchParams>,
     val destroyOperators: List<DestroyOperator> = DestroyOperator.Defaults,
     val repairOperators: List<RepairOperator> = RepairOperator.Defaults,

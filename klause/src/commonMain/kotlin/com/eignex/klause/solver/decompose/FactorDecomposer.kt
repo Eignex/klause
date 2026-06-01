@@ -51,7 +51,7 @@ import com.eignex.klause.solver.factor.ValuePrecede
  * encoding state (e.g. the Z3 translator allocates a Z3 const declaration alongside
  * the klause-side var id).
  */
-interface DecompositionContext {
+internal interface DecompositionContext {
     /** Allocate and return the id of a fresh Boolean variable. */
     fun freshBool(): Int
 
@@ -81,7 +81,7 @@ interface DecompositionContext {
  * mid-IR is what each can natively consume (SAT via per-factor CNF emitters; SMT via
  * direct LIA/NIA translation).
  */
-object FactorDecomposer {
+internal object FactorDecomposer {
 
     /** Returns mid-IR replacement for [f], or `null` when no decomposition is known.
      *  Mid-IR factors map to themselves; callers should check via [isMidIR] before

@@ -16,7 +16,7 @@ import kotlin.random.Random
  * [com.eignex.klause.solver.Assumptions]. Operators are expected to be stateless and
  * cheap; they're invoked once per ALNS iteration.
  */
-fun interface DestroyOperator {
+internal fun interface DestroyOperator {
     fun destroy(rng: Random, problem: Problem, incumbent: Sample, objective: Objective, fraction: Double): FreedVars
 
     companion object {
@@ -236,7 +236,7 @@ fun interface DestroyOperator {
 
 /** Variables freed by a [DestroyOperator]. Indices are in the underlying problem's space:
  *  `bools[i] ∈ [0, problem.numBoolVars)`, `ints[i] ∈ [0, problem.numIntVars)`. */
-data class FreedVars(val bools: IntArray, val ints: IntArray) {
+internal data class FreedVars(val bools: IntArray, val ints: IntArray) {
     val isEmpty: Boolean get() = bools.isEmpty() && ints.isEmpty()
     override fun equals(other: Any?): Boolean = other is FreedVars &&
         bools.contentEquals(other.bools) && ints.contentEquals(other.ints)

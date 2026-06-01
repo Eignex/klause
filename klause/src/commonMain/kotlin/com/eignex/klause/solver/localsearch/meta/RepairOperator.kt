@@ -19,7 +19,7 @@ import kotlin.random.Random
  * Returning `null` signals "this repair couldn't reach feasibility" — ALNS treats it as
  * a rejected iteration and applies the bandit's reject reward.
  */
-fun interface RepairOperator {
+internal fun interface RepairOperator {
     fun repair(context: RepairContext): Sample?
 
     companion object {
@@ -40,7 +40,7 @@ fun interface RepairOperator {
  *  [session] is provided, operators that delegate to the inner solver should route
  *  calls through it so cross-iteration state (DDFW weights, activity recency) survives;
  *  the [inner] reference remains for operators that need raw `Optimizer` access. */
-data class RepairContext(
+internal data class RepairContext(
     val inner: Optimizer<LocalSearchParams>,
     val params: LocalSearchParams,
     val objective: Objective,
@@ -57,7 +57,7 @@ data class RepairContext(
  * `params.maxFlips` — useful for differentiating "quick probe" from "deep investment"
  * variants the ALNS bandit can choose between.
  */
-class InnerLsRepair(val label: String = "standard", val flipsOverride: Long? = null) : RepairOperator {
+internal class InnerLsRepair(val label: String = "standard", val flipsOverride: Long? = null) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val params = if (flipsOverride != null) context.params.copy(maxFlips = flipsOverride) else context.params
         val merged = params.withAssumptions(context.pinAssumptions)
@@ -89,7 +89,7 @@ class InnerLsRepair(val label: String = "standard", val flipsOverride: Long? = n
  * infeasible candidates are scored `+∞` and greedy stays inside the feasible region
  * whenever it can.
  */
-class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
+internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
@@ -152,7 +152,7 @@ class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : RepairOperato
  * has dramatically different costs, regret typically reaches a feasible incumbent in fewer
  * inner LS rounds.
  */
-class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
+internal class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
@@ -219,7 +219,7 @@ class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
  * objective surface near the incumbent is smooth — the bandit learns when best-improving
  * outperforms stochastic LS.
  */
-class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIterations: Int = 100) : RepairOperator {
+internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIterations: Int = 100) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)

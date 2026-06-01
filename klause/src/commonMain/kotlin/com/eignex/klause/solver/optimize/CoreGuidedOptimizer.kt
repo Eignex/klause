@@ -41,7 +41,7 @@ import com.eignex.klause.util.IntArrayList
  * linearly with cores; a session-level "add factor at runtime" API is the natural
  * follow-up if this becomes the bottleneck.
  */
-class CoreGuidedOptimizer(val baseProblem: Problem) {
+internal class CoreGuidedOptimizer(val baseProblem: Problem) {
 
     /**
      * One soft constraint: literal that *should* be true, with positive integer weight
