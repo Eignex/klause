@@ -97,7 +97,12 @@ class CampaignSchema : VariableSchema() {
 - **Optional**: optIntVar, optBoolVar, and the opt forms of nominal and
   set vars return a (present, value) pair. The DSL routes constraints
   involving opt vars through reified or opt-aware lowerings so user code
-  does not need to write the presence guards explicitly.
+  does not need to write the presence guards explicitly. By default an
+  absent opt var is pinned to a canonical in-domain value (0 for ints,
+  false for bools, the first label for nominals), collapsing the dead-value
+  symmetry that would otherwise multiply equivalent solutions during
+  enumeration and model counting; disable it via `KlauseConfig` when absent
+  values are unconstrained by spec.
 
 ### Constraints
 
@@ -181,12 +186,35 @@ optimality proofs, and without-replacement enumeration. Swap in `LocalSearchSolv
 with `LocalSearchParams(maxFlips = ...)` when complete search is too slow on a
 large-domain problem or you want stochastic sampling with replacement.
 
+When an objective is defined by a cone of constraints rather than a single
+variable (as in a decomposed MiniZinc objective), local search evaluates it
+through a functional objective that recomputes the objective value from the
+decision variables, so a move yields the true change in the objective and
+the search gets a real gradient to descend instead of plateauing once the
+constraints are merely satisfied.
+
+Compilation and solving knobs (opt-var pinning, default bounds for unbounded
+integers) are consolidated in `KlauseConfig` — set `KlauseConfig.current` once
+at startup, or pass a config straight to `schema.compile(config)`.
+
 ## Bit-blasting
 
 ```kotlin
 val cnf = BitBlaster.compile(compiled.problem)
 val text = cnf.toDimacs()
 ```
+
+The bit-blaster covers every factor type that can appear in a compiled
+problem. Integers are encoded as binary offsets from their domain minimum;
+the core primitives (clauses, cardinality, linear and pseudo-Boolean
+constraints, xor, product, and their reified forms) and all the globals —
+allDifferent and its variants, circuit/subcircuit, cumulative/disjunctive,
+diffn, count, nValue, among, gcc, sequence, element, table, regular,
+inverse, sort, lex, binPacking, knapsack, network flow, geost, and the
+set-algebra factors — lower directly to CNF. Repeated subexpressions are
+hash-consed so shared gates are emitted once. Propagation-only natives
+(argSort, path, tree, mdd) are already paired with primitive decompositions
+during compilation, so they reach CNF through those.
 
 The CNF is for feeding into SAT-ecosystem tools, not a primary solving path.
 Use cases:
