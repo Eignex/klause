@@ -22,6 +22,23 @@ class XmlElement(
 
     fun attr(name: String): String = attributes[name] ?: ""
     fun child(tag: String): XmlElement? = children.firstOrNull { it.tag == tag }
+
+    /**
+     * Return a copy of this subtree with XCSP3 parameter placeholders substituted: `%i` →
+     * `tokens[i]`, and `%...` → all [tokens] space-joined. Used to instantiate a `<group>`
+     * template constraint against each `<args>` row.
+     */
+    fun substituteParams(tokens: List<String>): XmlElement = XmlElement(
+        tag,
+        attributes,
+        children.map { it.substituteParams(tokens) },
+        PARAM.replace(directText) { m ->
+            val g = m.groupValues[1]
+            if (g == "...") tokens.joinToString(" ") else tokens.getOrNull(g.toInt()) ?: m.value
+        },
+    )
+
+    private companion object { val PARAM = Regex("""%(\.\.\.|\d+)""") }
 }
 
 /** Parse a single XML document, returning its root element. */

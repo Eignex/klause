@@ -109,7 +109,8 @@ object Xcsp3 {
                 "cumulative" -> cumulative(e)
                 "circuit" -> circuit(e)
                 "lex", "lexLess", "lexLesseq" -> lex(e)
-                "group", "block" -> e.children.forEach { constraint(it) }
+                "group" -> group(e)
+                "block" -> e.children.forEach { constraint(it) }
                 else -> throw UnsupportedXcsp3Exception("constraint '${e.tag}'")
             }
         }
@@ -418,14 +419,34 @@ object Xcsp3 {
         private fun refList(text: String): List<Int> =
             text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }.flatMap { expandRef(it) }
 
-        private fun expandRef(tok: String): List<Int> {
+        private fun expandRef(tok: String): List<Int> = expandNames(tok).map { ref(it) }
+
+        /** Expand a list token to concrete variable names: `x[]` → all cells, `x[lo..hi]` →
+         *  the index range, `x[i]` / `x` → itself. */
+        private fun expandNames(tok: String): List<String> {
             if (tok.endsWith("[]")) {
                 val base = tok.dropLast(2)
-                return varIds.keys.filter { it.startsWith("$base[") }.map { varIds[it]!! }
+                return varIds.keys.filter { it.startsWith("$base[") }
             }
-            return listOf(ref(tok))
+            RANGE_REF.find(tok)?.let { m ->
+                val base = m.groupValues[1]; val lo = m.groupValues[2].toInt(); val hi = m.groupValues[3].toInt()
+                return (lo..hi).map { "$base[$it]" }
+            }
+            return listOf(tok)
         }
         private fun ref(name: String): Int = varIds[name] ?: throw UnsupportedXcsp3Exception("unknown variable '$name'")
+
+        /** A `<group>`: one template constraint instantiated once per `<args>` row, with the
+         *  flattened argument tokens substituted into the template's `%i` / `%...` placeholders. */
+        private fun group(e: XmlElement) {
+            val template = e.children.firstOrNull { it.tag != "args" }
+                ?: throw UnsupportedXcsp3Exception("group without a template constraint")
+            for (args in e.children.filter { it.tag == "args" }) {
+                val tokens = args.textContent.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                    .flatMap { expandNames(it) }
+                constraint(template.substituteParams(tokens))
+            }
+        }
 
         private fun domainMin(vars: IntArray) = vars.minOf { domains[it].min }
         private fun domainSpan(vars: IntArray) = vars.maxOf { domains[it].max } - domainMin(vars) + 1
@@ -451,6 +472,9 @@ object Xcsp3 {
             objective,
         )
 
-        companion object { private val REL = setOf("eq", "ne", "le", "lt", "ge", "gt") }
+        companion object {
+            private val REL = setOf("eq", "ne", "le", "lt", "ge", "gt")
+            private val RANGE_REF = Regex("""^(.+)\[(\d+)\.\.(\d+)]$""")
+        }
     }
 }

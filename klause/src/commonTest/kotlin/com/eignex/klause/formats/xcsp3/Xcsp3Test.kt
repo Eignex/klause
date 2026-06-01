@@ -219,6 +219,29 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `group instantiates a template per args row with range refs and placeholders`() {
+        val xml = """
+            <instance type="CSP">
+              <variables><array id="x" size="[4]"> 0..3 </array></variables>
+              <constraints>
+                <allDifferent> x[] </allDifferent>
+                <group>
+                  <sum><list> %0 %1 </list><condition> (le,3) </condition></sum>
+                  <args> x[0..1] </args>
+                  <args> x[2..3] </args>
+                </group>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val p = Xcsp3.parse(xml).problem
+        assertEquals(4, p.numIntVars)
+        assertEquals(2, p.factors.count { it is Linear }, "one sum per <args> row")
+        assertTrue(p.factors.any { it is AllDifferent })
+        val v = sat(xml)
+        assertTrue(v[0] + v[1] <= 3 && v[2] + v[3] <= 3, "row sums: ${v.toList()}")
+    }
+
+    @Test
     fun `objective minimizes the maximum of a list`() {
         val xml = """
             <instance type="COP">
