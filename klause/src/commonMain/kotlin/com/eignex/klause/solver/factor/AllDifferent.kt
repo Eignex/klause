@@ -296,9 +296,29 @@ class AllDifferent(
             }
         }
 
-        // BFS from free values (matchVal[v] == -1) forward through `adj`. Any node
-        // reachable corresponds to an edge that participates in *some* maximum matching
-        // (alternating-path argument).
+        // Alternating reachability from free (unmatched) values. The exposed vertices of a
+        // size-n matching with numValues >= n all sit on the value side, so the contributing
+        // alternating paths START at a free value and step value→(unmatched)→var→(matched)→
+        // value→… . In `adj`'s orientation (matched value→var, unmatched var→value) a free
+        // value has no outgoing arc — it's a sink — so a forward BFS over `adj` would reach
+        // nothing and wrongly prune every slack edge. The path is a forward walk in the
+        // *reverse* graph `radj` (matched var→value, unmatched value→var), so build that and
+        // BFS over it. (Tarjan below still uses `adj`: SCC membership is reversal-invariant.)
+        val radj = Array(total) { IntArray(0) }
+        val radjCount = IntArray(total)
+        for (i in 0 until n) {
+            for (vid in valuesPerVar[i]) {
+                if (matchVar[i] == vid) radjCount[i]++ else radjCount[n + vid]++
+            }
+        }
+        for (i in 0 until total) radj[i] = IntArray(radjCount[i])
+        val radjFill = IntArray(total)
+        for (i in 0 until n) {
+            for (vid in valuesPerVar[i]) {
+                if (matchVar[i] == vid) radj[i][radjFill[i]++] = n + vid
+                else { val src = n + vid; radj[src][radjFill[src]++] = i }
+            }
+        }
         val reachedFromFree = BooleanArray(total)
         val queue = IntArray(total)
         var qHead = 0
@@ -312,7 +332,7 @@ class AllDifferent(
         }
         while (qHead < qTail) {
             val u = queue[qHead++]
-            for (w in adj[u]) {
+            for (w in radj[u]) {
                 if (!reachedFromFree[w]) {
                     reachedFromFree[w] = true
                     queue[qTail++] = w

@@ -261,6 +261,31 @@ class AllDifferentTest {
     }
 
     @Test
+    fun `slack staircase domains are GAC — no over-prune from free-value reachability`() {
+        // Regression for the false-UNSAT bug: a *slack* all_different (more values than
+        // vars, e.g. the q[i]±i diagonal channeling in n-queens) where the responsible
+        // alternating paths start at free VALUE nodes. The residual graph orients matched
+        // edges value→var and unmatched edges var→value, so a free value is a sink there;
+        // the "reachable from a free vertex" pass must walk the REVERSE graph or it reaches
+        // nothing and prunes every slack edge unsoundly. Staircase [(1+i)..(n+i)] is fully
+        // slack — GAC must prune NOTHING — yet the buggy pass pinned var0 to its min and
+        // punched holes across the rest, which cascaded (via channeling) to a root conflict
+        // on satisfiable models. assertGac brute-checks both directions (no over-prune AND
+        // GAC-complete). n<=6 keeps the brute enumeration under the oracle's cap.
+        for (n in 3..6) {
+            val ranges = (1..n).map { i -> (1 + i) to (n + i) }
+            val lo = ranges.minOf { it.first }
+            val hi = ranges.maxOf { it.second }
+            val problem = Problem(
+                numBoolVars = 0, numIntVars = n,
+                intDomains = Array(n) { IntDomain(ranges[it].first, ranges[it].second) },
+                factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = lo, domainSize = hi - lo + 1)),
+            )
+            FactorPropagationOracle.assertGac(problem, "slack-staircase-n$n")
+        }
+    }
+
+    @Test
     fun `mismatched domain bounds fail at initialize`() {
 
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
