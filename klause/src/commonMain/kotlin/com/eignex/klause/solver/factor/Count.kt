@@ -174,7 +174,7 @@ class Count(
         return degree(nv, s.count) - degree(nv, oldCount)
     }
 
-    /**
+    /*
      * `n` bounded by the count of definite-matchers (lower) and possible-matchers (upper).
      * A var is a definite-matcher when its *entire* domain satisfies the predicate; a
      * possible-matcher when *some* of its domain does.

@@ -131,7 +131,7 @@ class Monotone(
         return intArrayOf(delta)
     }
 
-    /**
+    /*
      * Chain pairwise bound tightening: for non-strict variants, every prefix's min bounds
      * the next index's min (ascending) / max (descending); similarly for suffixes. Strict
      * variants tighten by ±1. A single forward + backward sweep reaches fixpoint over the

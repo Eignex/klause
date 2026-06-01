@@ -8,7 +8,7 @@ package com.eignex.klause.util
  * [restore] when callers need to filter for some external "still alive" predicate
  * (`session.boolValue(v) == null` etc.) without losing the popped entry.
  *
- * Positions are tracked in [pos] so [updateKey] / [remove] are O(log n) — no linear search.
+ * Positions are tracked in `pos` so [updateKey] / [remove] are O(log n) — no linear search.
  * `pos[id] = -1` means the id isn't currently in the heap (after [extractMax] or [remove];
  * [restore] reinserts at the previously cached key).
  *

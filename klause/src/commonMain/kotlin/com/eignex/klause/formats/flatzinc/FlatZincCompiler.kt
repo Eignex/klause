@@ -14,10 +14,6 @@ import com.eignex.klause.util.bsearch
  * Float variables are discretized: each `var float: x` ∈ `[lo, hi]` becomes an int var with
  * domain `[0, buckets-1]`. Float linear constraints are rescaled to integer coefficients
  * and a rescaled bound.
- *
- * @param model parsed AST
- * @param floatBuckets buckets per float variable (default 1024)
- * @param floatScale integer scale factor applied to float coefficients (default 10^6)
  */
 internal class FlatZincCompiler(
     internal val model: FznModel,

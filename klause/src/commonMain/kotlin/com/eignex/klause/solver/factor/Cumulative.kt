@@ -23,7 +23,7 @@ import kotlin.math.min
  *    factor still reports a graded overage cost when LS hits such a placement).
  *
  * LS cost is graded:
- *   `cost = Σ_t max(0, usage[t] − capacity)`
+ *   `cost = Σ_t max(0, usage`t` − capacity)`
  * — broken assignments rank by total energy overflow rather than by a flat boolean,
  * giving the search a real gradient toward the cumulative bound. The factor's binary
  * violation status (returned through [deltaIfIntSet] / [applyIntSet]) flips only on the
@@ -509,7 +509,7 @@ class Cumulative(
         return if (hi == Int.MIN_VALUE) 0 else hi
     }
 
-    /**
+    /*
      * Time-tabling propagation. Builds the mandatory profile from each task's `[lst, ect)`
      * compulsory part; fails on any `Σ > capacity` time point; for every task with a
      * non-fixed start, tightens the start-domain endpoints against placements that would

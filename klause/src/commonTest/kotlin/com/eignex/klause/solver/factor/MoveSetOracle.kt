@@ -25,7 +25,7 @@ object MoveSetOracle {
      * propose-cover property: brute-improving ⇒ propose-improving. Throws AssertionError on
      * any failure with a description of the offending state and the brute oracle's witness.
      *
-     * @param requireImprovement when true (default), every proposed move must be non-worsening
+     * `requireImprovement`: when true (default), every proposed move must be non-worsening
      *   (delta ≤ 0); set false for factors that intentionally propose neutral/diversifying moves.
      */
     fun assertRepairsCoverImproving(

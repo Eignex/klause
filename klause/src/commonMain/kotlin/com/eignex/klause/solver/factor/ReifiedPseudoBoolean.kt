@@ -9,7 +9,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
- * `auxBoolVar ↔ (Σ weights[i] * lit_i ⟨op⟩ bound)`. Payload at `intPayload[factorId]` is the
+ * `auxBoolVar ↔ (Σ weights`i` * lit_i ⟨op⟩ bound)`. Payload at `intPayload[factorId]` is the
  * current weighted sum.
  */
 class ReifiedPseudoBoolean(
@@ -151,7 +151,7 @@ class ReifiedPseudoBoolean(
     }
 
     /**
-     * Propagate `Σ weights[i] · lit_i ≠ bound`. Returns `false` iff the constraint is
+     * Propagate `Σ weights`i` · lit_i ≠ bound`. Returns `false` iff the constraint is
      * infeasible — i.e. the sum is forced to be exactly [bound] regardless of remaining
      * free literals. Otherwise prunes any single literal whose two polarities would both
      * collapse the sum to [bound] (rare; usually nothing to prune).

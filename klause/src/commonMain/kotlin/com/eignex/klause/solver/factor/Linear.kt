@@ -300,7 +300,7 @@ class Linear(
     }
 }
 
-/**
+/*
  * Compose LCG-style antecedents for an int-bound tightening on `vars[excludeIdx]` driven by
  * the `Σ coeffs · vars ⟨op⟩ bound` constraint. Unions:
  *   - [extraLit] (e.g. the reif var's false-form for [ReifiedLinear]),

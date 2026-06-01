@@ -168,10 +168,10 @@ object LargestDomain : VariableHeuristic {
 /**
  * Variable State Independent Decaying Sum (Moskewicz et al., Chaff 2001 / MiniSAT). The
  * activity counter for each variable is bumped on every conflict the variable is implicated
- * in, with the bump amount [increment] growing geometrically over time so recent conflicts
+ * in, with the bump amount `increment` growing geometrically over time so recent conflicts
  * dominate. Equivalent to per-bump multiplicative decay by a factor of [decay] applied
  * uniformly to every prior activity, but cheaper (we only mutate the increment, not every
- * activity entry). Periodically rescales when [increment] approaches [Double] overflow.
+ * activity entry). Periodically rescales when `increment` approaches [Double] overflow.
  *
  * Picks the unpinned variable with the highest activity. Ties broken by variable-id order
  * (bools precede ints). Activities persist across [onRestart] — that's the whole point of
@@ -279,7 +279,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         h.updateKey(id, h.keyOf(id) + increment)
     }
 
-    /** Scale every activity (and [increment]) by `1/rescaleThreshold` so the relative
+    /** Scale every activity (and `increment`) by `1/rescaleThreshold` so the relative
      *  ordering is preserved but we step well clear of `Double.MAX_VALUE`. Standard MiniSAT
      *  rescale; the heap's [IndexedMaxHeap.scaleKeys] applies the uniform factor without
      *  resifting. */

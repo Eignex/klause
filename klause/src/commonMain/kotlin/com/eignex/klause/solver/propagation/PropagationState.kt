@@ -19,7 +19,7 @@ import com.eignex.klause.util.IntArrayList
  *    driver reports as [PropagationResult.Unsat.conflictLevels].
  *
  *  Factors don't see the level machinery directly — they keep calling `pinBool` /
- *  `tightenIntMin` / `tightenIntMax` / `setInt` as before. The driver sets [currentLevel]
+ *  `tightenIntMin` / `tightenIntMax` / `setInt` as before. The driver sets `currentLevel`
  *  to the inherited level before each factor invocation; mutators read it.
  */
 class PropagationState(
@@ -233,7 +233,7 @@ class PropagationState(
      *  backtrack on any conflict that doesn't come from a factor's `propagate`. */
     internal var lastDecisionConflictVar: Int = -1
 
-    /**
+    /*
      * Per-factor mutable scratch space — mirrors [com.eignex.klause.solver.localsearch.LocalSearchState.refPayload]
      * on the LS side. Factors stash propagation-time bookkeeping here keyed by their own
      * factor id; the engine doesn't touch the contents. Today's only user is
@@ -1070,7 +1070,7 @@ class PropagationState(
     fun pollDirtyInt(): Int = if (dirtyInts.isEmpty()) -1 else dirtyInts.removeFirst()
 
     /** Max decision level of any variable in [boolVars] / [intVars]. Used by the driver to
-     *  set [currentLevel] before each factor invocation.
+     *  set `currentLevel` before each factor invocation.
      *
      *  No variable's level can exceed the number of decisions pushed so far ([cap]); once
      *  the running max reaches that ceiling, the remaining vars can't raise it, so we stop

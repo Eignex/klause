@@ -62,23 +62,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     sealed interface AnalysisResult {
-        /**
-         * @param literals the learned clause (disjunction of literals). At least one literal
-         *  must be true in any extension of the current partial assignment beyond the
-         *  conflict point.
-         * @param backjumpLevel the level the engine should pop trail back to. The learned
-         *  clause is guaranteed to be unit at this level — propagation will immediately
-         *  force the asserting literal, breaking the conflict.
-         * @param lbd Literal Block Distance — the number of *distinct decision levels*
-         *  appearing in the learned clause. Lower LBD ⇒ more "glue-like" (binds many
-         *  variables at the same level together) ⇒ likelier to be reused later in the
-         *  search. Restart-driven forgetting policies (see
-         *  [com.eignex.klause.solver.backtrack.BacktrackParams.maxLearnedClauses] /
-         *  `lbdGlueThreshold`) order clauses by LBD when deciding which to keep.
-         */
+        /** A learned conflict clause with its backjump target and glue metric. */
         data class Learned(
+            /** The learned clause (disjunction of literals); at least one must hold beyond the conflict point. */
             val literals: IntArray,
+            /** Level to pop the trail back to; the clause is unit there, forcing the asserting literal. */
             val backjumpLevel: Int,
+            /** Literal Block Distance: distinct decision levels in [literals] (lower ⇒ glue-like, kept longer). */
             val lbd: Int,
             /** Distinct decision levels appearing in [literals]. Sorted ascending. Used
              *  by the engine to project a conflict back to the subset of assumption-

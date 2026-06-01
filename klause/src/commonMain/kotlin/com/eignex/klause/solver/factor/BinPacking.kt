@@ -13,7 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  *    value. (`fzn_bin_packing(capacity, bins, weights)`)
  *  - [Mode.PerBinCapacity]: per-bin caps in [capacities]. ([fzn_bin_packing_capa])
  *  - [Mode.LoadVars]: per-bin load variables in [loadVars]; the constraint
- *    `load[b] = Σ weights[i] · 1[bins[i] = b + binOffset]`. ([fzn_bin_packing_load])
+ *    `load`b` = Σ weights[i] · 1[bins[i] = b + binOffset]`. ([fzn_bin_packing_load])
  *
  * [binOffset] is the value `bins[i]` takes for bin 0 — typically `1` for MZN 1-based.
  */

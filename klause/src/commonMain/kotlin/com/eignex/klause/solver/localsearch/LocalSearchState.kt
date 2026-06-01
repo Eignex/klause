@@ -321,7 +321,7 @@ class LocalSearchState(
         }
     }
 
-    /**
+    /*
      * Net change in the violated-factor count that would result from applying [move]. Used
      * by [TabuFilter]'s [AspirationCriterion.OrImproving] to decide whether a tabu move
      * is improving enough to override the tabu. Walks the affected var's occurrence list

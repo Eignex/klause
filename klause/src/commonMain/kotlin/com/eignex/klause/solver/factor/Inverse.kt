@@ -148,7 +148,7 @@ class Inverse(
         return bad
     }
 
-    /**
+    /*
      * GAC for the inverse channel: range-tighten to the legal index span, force
      * singletons across the channel, and prune value-by-value: if `i + fOffset` is
      * absent from `dom(g[j])`, also remove `j + gOffset` from `dom(f[i])`, and

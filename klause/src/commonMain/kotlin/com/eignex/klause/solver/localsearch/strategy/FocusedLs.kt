@@ -175,8 +175,6 @@ object WalkSat {
      * Adaptive-noise WalkSAT: noise starts at [baselineNoise] and is steered in
      * `[baselineNoise, 1.0]` — climbs on stalls, decays on improvement. Literature reports
      * +10-30% on hard random instances over well-tuned fixed noise.
-     *
-     * @param ewmaAlpha opt-in EWMA improvement detection (smoothed average vs all-time low).
      */
     fun adaptive(
         baselineNoise: Double = 0.2,
@@ -219,8 +217,6 @@ object ProbSat {
     /**
      * Adaptive-`cb` probSAT: the break-exponent starts at [baselineCb] and is steered down
      * during stalls (distribution flattens toward uniform) and back up on improvement.
-     *
-     * @param ewmaAlpha opt-in EWMA improvement detection; see [WalkSat.adaptive].
      */
     fun adaptive(
         baselineCb: Double = 2.06,

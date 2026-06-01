@@ -10,7 +10,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 private const val SET_BITSET_MAX_PROPOSALS = 8
 
-/**
+/*
  * Native bulk set-algebra propagators over indicator-bool arrays. A set var is represented
  * by a parallel `IntArray` of bool var ids, one per universe element (this is the same
  * `SetLayout.indicatorBoolIds` the compiler already produces). Two operands are passed
@@ -30,7 +30,7 @@ private const val SET_BITSET_MAX_PROPOSALS = 8
  */
 
 /** `leftBools ⊆ rightBools`: for each universe position `i`, enforce
- *  `leftBools[i] → rightBools[i]`. A `rightBools[i] == -1` pin forces `leftBools[i] = false`. */
+ *  `leftBools`i` → rightBools`i``. A `rightBools`i` == -1` pin forces `leftBools`i` = false`. */
 class SetBitsetSubset(
     /** Indicator bool ids of the candidate subset. */
     val leftBools: IntArray,
@@ -131,7 +131,7 @@ class SetBitsetSubset(
             val lLit = Lit.make(lb, positive = true)
             val rb = rightBools[i]
             if (rb < 0) {
-                // No right-universe slot ⇒ leftBools[i] must be false.
+                // No right-universe slot ⇒ leftBools`i` must be false.
                 if (state.litTrue(lLit)) return false
                 if (!state.litFalse(lLit)) {
                     if (!state.pinLit(Lit.negate(lLit), antecedents = null)) return false
@@ -156,8 +156,8 @@ class SetBitsetSubset(
     }
 }
 
-/** `leftBools ∩ rightBools = ∅`: for each universe position `i` where both `leftBools[i]`
- *  and `rightBools[i]` are non-negative, enforce `¬(leftBools[i] ∧ rightBools[i])`. */
+/** `leftBools ∩ rightBools = ∅`: for each universe position `i` where both `leftBools`i``
+ *  and `rightBools`i`` are non-negative, enforce `¬(leftBools`i` ∧ rightBools`i`)`. */
 class SetBitsetDisjoint(
     /** Indicator bool ids of the left set. */
     val leftBools: IntArray,

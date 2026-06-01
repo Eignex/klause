@@ -599,7 +599,7 @@ class AllFactorsOracleTest {
     // ---- Helpers ----------------------------------------------------------------
 
     /**
-     * @param exactProbe set true for factors migrated to graded violation — asserts their
+     * `exactProbe`: set true for factors migrated to graded violation — asserts their
      *   `deltaIf*` probe exactly predicts the cost change (accurate CBLS gradient). Left false
      *   for factors with approximate-by-design probes (cost-tracking is still verified).
      */

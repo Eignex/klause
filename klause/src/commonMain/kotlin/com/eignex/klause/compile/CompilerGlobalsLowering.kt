@@ -28,7 +28,7 @@ import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 
-/**
+/*
  * Decompositions for the "newer" globals. Each [decomposeXxx] returns a [BoolExpr] in
  * terms of existing primitives (And/Or/IntCompare/AllDifferent/Table). Top-level
  * [assertExpr] handles it via the normal pipeline; reified contexts go through

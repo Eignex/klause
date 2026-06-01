@@ -120,7 +120,7 @@ class Regular(
     /** Number of 64-bit words needed to bitmask `numStates`. */
     private val stateWords: Int = (numStates + 63) ushr 6
 
-    /**
+    /*
      * Pesant's layered-DAG GAC propagator, bitmask-encoded. Build the unrolled DFA
      * across `n = seq.size` layers; per layer, a `stateWords`-long bitmask records
      * which states are forward-reachable (resp. co-reachable from accepting).

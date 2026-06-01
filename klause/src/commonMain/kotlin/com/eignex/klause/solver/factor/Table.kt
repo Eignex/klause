@@ -6,7 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
- * `table_int(xs, tuples)` — the vector of `xs[i]` values must equal one of the rows of
+ * `table_int(xs, tuples)` — the vector of `xs`i`` values must equal one of the rows of
  * [tuples]. The [tuples] array stores rows row-major: `tuples[i, j]` lives at
  * `tuples[i * arity + j]` in the flat representation, where `arity = xs.size`.
  *

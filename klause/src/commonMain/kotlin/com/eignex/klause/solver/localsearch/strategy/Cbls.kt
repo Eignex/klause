@@ -8,7 +8,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * [WalkSat]) that route picks through a randomly-chosen violated factor, CBLS
  * scores moves against a *global* weighted-violation gradient:
  *
- *   `score(move) = Σ factorWeights[f] · Δviolated[f] + shapingLambda · Δobjective`
+ *   `score(move) = Σ factorWeights`f` · Δviolated`f` + shapingLambda · Δobjective`
  *
  * The strategy works *regardless* of feasibility: at violation it pulls candidate moves
  * from violated factors (via `proposeRepairMoves`), at feasibility it pulls them from

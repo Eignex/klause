@@ -7,7 +7,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /**
  * Min-cost network flow factor: for each node `n`, `Σ flow[a ∈ in(n)] − Σ flow[a ∈ out(n)]
- *  = balance[n]`. When [cost] is non-negative, also enforces `Σ weight[a] · flow[a] = cost`.
+ *  = balance`n``. When [cost] is non-negative, also enforces `Σ weight`a` · flow`a` = cost`.
  *
  * Propagation:
  *  - Component-level balance conservation (early infeasibility).
@@ -182,7 +182,7 @@ class MinCostFlow(
             ub[a] = d.max
         }
         // Residual supply at each node after saturating lower bounds.
-        // residual[n] = balance[n] - (in_lb - out_lb). If positive, node has supply to send.
+        // residual`n` = balance`n` - (in_lb - out_lb). If positive, node has supply to send.
         val w = weight!!
         // Cost from lower-bound saturation.
         var fixedCost = 0L
@@ -191,7 +191,7 @@ class MinCostFlow(
         for (pass in 0..1) {
             val ww = if (pass == 0) w else IntArray(m) { -w[it] }
             val fixed = if (pass == 0) fixedCost else -fixedCost
-            // Residual supply convention: supply[n] > 0 → must push out; < 0 → must absorb.
+            // Residual supply convention: supply`n` > 0 → must push out; < 0 → must absorb.
             // Constraint Σin − Σout = balance, so net outflow required = −balance. After
             // shipping lb on every arc, supply = −balance − (Σout_lb − Σin_lb).
             val supply = IntArray(n)
@@ -201,7 +201,7 @@ class MinCostFlow(
                 supply[arcTo[a] - nodeOffset] += lb[a]
             }
             // Now we need to route net = `supply` (positive = source, negative = sink), where
-            // arc residual capacity is (ub - lb) at cost ww[a]. Sum supply must be 0 per
+            // arc residual capacity is (ub - lb) at cost ww`a`. Sum supply must be 0 per
             // component (checked above).
             val (feasible, sspCost, potential) = ssp(supply, ww, ub, lb)
             if (!feasible) return false
@@ -212,7 +212,7 @@ class MinCostFlow(
                 // pass 1 minimised negated cost = maximised real cost.
                 if (!state.tightenIntMax(cost, -totalLb, ant)) return false
             }
-            // Reduced-cost arc pruning: rc(a) = ww[a] + y[u] - y[v]. For pass 0 (min): pushing
+            // Reduced-cost arc pruning: rc(a) = ww`a` + y[u] - y[v]. For pass 0 (min): pushing
             // one extra unit on arc a adds at least max(0, rc(a)) to LB (since after SSP
             // optimality every arc with residual cap has rc ≥ 0). If LB + rc(a) > cost.max,
             // arc must stay at its current upper bound for this pass. For pass 1, symmetric.

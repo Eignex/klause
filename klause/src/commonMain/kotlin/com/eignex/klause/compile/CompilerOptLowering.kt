@@ -26,7 +26,7 @@ import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.solver.IntDomain
 
-/**
+/*
  * Reified (sub-expression-position) lowering for global constraints. Each entry-point
  * returns a Boolean literal `b` such that `b ↔ φ`, where `φ` is the constraint's
  * decomposition into already-supported AST primitives ([IntCompare], [And], [Or],

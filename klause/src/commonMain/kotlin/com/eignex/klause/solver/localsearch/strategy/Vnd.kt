@@ -3,7 +3,7 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 
-/**
+/*
  * Variable Neighbourhood Descent — deterministic descent across a k-level neighbourhood
  * ladder, accepting only strictly-improving moves (`netDelta < 0`). Algorithm:
  *

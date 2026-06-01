@@ -814,10 +814,6 @@ class BacktrackSolver(override val problem: Problem) :
      *   - if the assertion cascades into another conflict, recurse on the new analyzer
      *     result. Bounded to keep the search loop from looping forever on pathological
      *     instances; [BackjumpTerm.Stuck] surfaces to the caller in that case.
-     *
-     * @param alignFirst when `true`, drops the stale [trail.last] entry before popping
-     *   (used by the else-path where session was already popped past trail.last by the
-     *   caller).
      */
     private fun backjumpAndLearn(
         learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned,

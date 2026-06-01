@@ -464,7 +464,7 @@ class AllDifferent(
         return true
     }
 
-    /** Conservative repair: only act on present occupants when [presents] is set. We
+    /* Conservative repair: only act on present occupants when [presents] is set. We
      *  intentionally avoid forcing presence as a repair — the LS engine flips bools via
      *  its own move pool. */
 

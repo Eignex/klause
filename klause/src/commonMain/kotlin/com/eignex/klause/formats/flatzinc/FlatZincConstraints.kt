@@ -573,7 +573,7 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
     factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), op, -b.offset))
 }
 
-/** Container for "an int var, possibly with a constant offset on the right side." */
+/** An int var, possibly with a constant offset on the right side. */
 internal data class IntVarRef(val varId: Int, val offset: Int)
 internal fun FlatZincCompiler.resolveIntVarOrConst(e: FznExpr): IntVarRef = when (e) {
     is FznExpr.IntLit -> {
@@ -1834,7 +1834,7 @@ internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
     factors.add(Count(xs, v, Count.Op.Eq, nVar))
 }
 
-/** `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
+/* `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
  *  ordering, lowered to a single [Monotone] factor. */
 
 /**

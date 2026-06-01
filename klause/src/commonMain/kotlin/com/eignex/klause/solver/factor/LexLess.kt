@@ -11,9 +11,9 @@ import com.eignex.klause.solver.propagation.PropagationState
  * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on equal-length int
  * vectors. [strict] = `true` for strict less-than, `false` for less-or-equal.
  *
- *  - Strict: `xs <ₗₑₓ ys`  iff  there exists `k` with `xs[k] < ys[k]` and `xs[i] = ys[i]`
+ *  - Strict: `xs <ₗₑₓ ys`  iff  there exists `k` with `xs`k` < ys`k`` and `xs`i` = ys`i``
  *    for all `i < k`.
- *  - Non-strict: `xs ≤ₗₑₓ ys`  iff  the strict version holds *or* `xs[i] = ys[i]` for all `i`.
+ *  - Non-strict: `xs ≤ₗₑₓ ys`  iff  the strict version holds *or* `xs`i` = ys`i`` for all `i`.
  *
  * If `xs.size != ys.size` the shorter array is treated as a prefix: a proper prefix
  * compares strictly less than the longer one (MiniZinc semantics).
@@ -51,10 +51,10 @@ class LexLess(
 
     /**
      * Problem-aware repair: locate the first position `k` where the lex relation is decided
-     * (xs[k] != ys[k]) — if violated there, propose targeted moves that restore `xs[k] ≤ ys[k]`
+     * (xs`k` != ys`k`) — if violated there, propose targeted moves that restore `xs`k` ≤ ys`k``
      * (strict: `<`). When the comparable prefix is fully equal, the violation is structural
      * (strict + equal-length, or xs has an extra suffix); propose prefix-breaking moves at
-     * the earliest position with domain slack. A Compound swap of `xs[k] ↔ ys[k]` is added
+     * the earliest position with domain slack. A Compound swap of `xs`k` ↔ ys`k`` is added
      * when both target values fit the opposite domain — the lex-preserving "swap neighbourhood".
      */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -83,20 +83,20 @@ class LexLess(
         val dy = state.problem.intDomains[yV]
         val needXLE = if (strict) b - 1 else b // xs[k] must reach ≤ this for the relation to hold
         val needYGE = if (strict) a + 1 else a // ys[k] must reach ≥ this
-        // Lower xs[k] toward `needXLE` (preferred), or as close as the domain allows.
+        // Lower xs`k` toward `needXLE` (preferred), or as close as the domain allows.
         if (needXLE in dx) {
             sink.addChannelingIntSet(state, xV, needXLE)
         } else if (dx.min <= needXLE) {
             sink.addChannelingIntSet(state, xV, dx.min)
         }
-        // Raise ys[k] toward `needYGE` (preferred), or as close as the domain allows.
+        // Raise ys`k` toward `needYGE` (preferred), or as close as the domain allows.
         if (needYGE in dy) {
             sink.addChannelingIntSet(state, yV, needYGE)
         } else if (dy.max >= needYGE) {
             sink.addChannelingIntSet(state, yV, dy.max)
         }
         // Lex-preserving swap: if each side's current value sits in the other's domain,
-        // swapping resolves the violation (xs[k]=b, ys[k]=a → satisfies xs[k] < ys[k]).
+        // swapping resolves the violation (xs`k`=b, ys`k`=a → satisfies xs`k` < ys`k`).
         if (xV != yV && b in dx && a in dy) {
             sink.addCompound(listOf(Move.IntSet(xV, b), Move.IntSet(yV, a)))
         }
@@ -105,7 +105,7 @@ class LexLess(
         if (b < dy.max) sink.addChannelingIntSet(state, yV, b + 1)
     }
 
-    /** Add the first-available prefix-breaking move (lower xs[i] or raise ys[i]) at the
+    /** Add the first-available prefix-breaking move (lower xs`i` or raise ys`i`) at the
      *  earliest paired index starting at [startK] with domain slack. Used when the
      *  comparable prefix is fully singleton-equal and the violation is structural. */
     private fun proposePrefixBreak(state: LocalSearchState, sink: MoveSink, startK: Int) {
@@ -164,10 +164,10 @@ class LexLess(
         }
     }
 
-    /**
+    /*
      * Walks the prefix while both sides are singleton-equal (the lex relation is
      * undetermined there); at the first index `k` where they aren't both forced equal,
-     * applies `xs[k] ≤ ys[k]`. If every paired index is singleton-equal, decides the
+     * applies `xs`k` ≤ ys`k``. If every paired index is singleton-equal, decides the
      * relation from the array-length tiebreak (strict requires a proper-prefix
      * relationship). Strong enough to detect singleton-pinned violations; per-suffix
      * Hall reasoning is deferred to the next strength pass.
@@ -187,7 +187,7 @@ class LexLess(
     /**
      * Chained-prefix bound propagator (Frisch et al. 2002, simplified).
      *
-     * Walk index `i` from 0 while `xs[i]` and `ys[i]` are "definitely equal" (both
+     * Walk index `i` from 0 while `xs`i`` and `ys`i`` are "definitely equal" (both
      * singleton with the same value). At the first ambiguous position `alpha`:
      *  - If `xs[α].max < ys[α].min`: relation forced satisfied, return true.
      *  - If `xs[α].min > ys[α].max`: relation forced failed, return false.
@@ -222,11 +222,11 @@ class LexLess(
                     } // equal — advance
                 }
             }
-            // Forced satisfaction: xs[i] can't reach ys[i]'s range, so xs <_lex ys.
+            // Forced satisfaction: xs`i` can't reach ys`i`'s range, so xs <_lex ys.
             if (dx.max < dy.min) return true
-            // Forced failure: even the smallest xs[i] is above the largest ys[i].
+            // Forced failure: even the smallest xs`i` is above the largest ys`i`.
             if (dx.min > dy.max) return false
-            // Bound tightening: xs[i] ≤ ys[i] is necessary for the relation to hold,
+            // Bound tightening: xs`i` ≤ ys`i` is necessary for the relation to hold,
             // since position i would otherwise decide the comparison against us.
             val antFromY = state.composeIntVarAtomAntecedents(intArrayOf(ys[i]))
             val antFromX = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))

@@ -10,7 +10,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
 /**
- * `Σ weights[i] * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
+ * `Σ weights`i` * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
  * true, 0 when false). Payload at `intPayload[factorId]` is the current weighted sum.
  */
 class PseudoBoolean(
@@ -39,7 +39,7 @@ class PseudoBoolean(
     }
     override val intVars: IntArray = EmptyIntArray
 
-    /** Sum of `weight[i] * sign(literals[i])` per Boolean variable. Flipping `v` shifts
+    /** Sum of `weight`i` * sign(literals`i`)` per Boolean variable. Flipping `v` shifts
      *  the running sum by `(if v_was_true then -signed[v] else +signed[v])`, computed in
      *  O(1) instead of scanning every literal in the factor. */
     private val signedWeightByVar: com.eignex.klause.util.IntIntMap = run {
@@ -112,7 +112,7 @@ class PseudoBoolean(
     /** Self-preserving moves during objective descent. For PB the natural structured move
      *  is a "swap two literals with equal effective weights": flip a true literal i and a
      *  false literal j with `effectiveWeight(i) == effectiveWeight(j)`, where the
-     *  effective weight is `weights[i]` for positive lits and `-weights[i]` for negative.
+     *  effective weight is `weights`i`` for positive lits and `-weights`i`` for negative.
      *  The sum stays unchanged so any feasible op (LE/GE/EQ) remains feasible. The
      *  engine scores each by objective delta and applies the best improving one.
      *
@@ -124,7 +124,7 @@ class PseudoBoolean(
         if (literals.size < 2) return
         val sum = state.intPayload[factorId]
         // Group literals by their (effective weight, current truth value). Effective
-        // weight: positive lit → +weights[i]; negative lit → -weights[i].
+        // weight: positive lit → +weights`i`; negative lit → -weights`i`.
         // Sum-preserving swap: true-effwt-W + false-effwt-W. Equivalently match on
         // signed weight magnitude AND opposing truth states.
         val trueByWeight = HashMap<Int, IntArrayList>()
@@ -246,7 +246,7 @@ class PseudoBoolean(
 }
 
 /**
- * Range `[sumLo, sumHi]` reachable by `Σ weights[i] * lit_i` given current pins.
+ * Range `[sumLo, sumHi]` reachable by `Σ weights`i` * lit_i` given current pins.
  *
  * Per-literal contribution: `{0, w}` (or `{w, 0}` for negative weights) when unassigned;
  * `{w}` when literal pinned true; `{0}` when pinned false.
@@ -316,7 +316,7 @@ internal fun pbFalseFormAntecedents(
 }
 
 /**
- * Shared bounds-propagation routine for `Σ weights[i] * lit_i ⟨op⟩ bound`. Used by
+ * Shared bounds-propagation routine for `Σ weights`i` * lit_i ⟨op⟩ bound`. Used by
  * [PseudoBoolean] directly and by [ReifiedPseudoBoolean] when its aux Boolean is pinned.
  * Returns `false` iff the constraint is infeasible. [extraLit] is an optional context
  * literal (currently false in state) to include in every pin's antecedents — used by

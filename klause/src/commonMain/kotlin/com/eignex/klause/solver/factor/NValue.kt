@@ -195,7 +195,7 @@ class NValue(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    /**
+    /*
      * Bounds on `n`:
      *  - upper: number of distinct values in union of all xs domains.
      *  - lower: count of distinct singleton-pinned values.
