@@ -4,7 +4,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
 
 /** Which measurement a target runs. */
-enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY, ANYTIME, COVERAGE, AUDIT, TUNING }
+enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY, ANYTIME, COVERAGE, AUDIT, TUNING, SEARCH }
 
 /**
  * A pre-configured bench: a set of catalog suites bound to a [metric] (and a [budget]). The
@@ -47,6 +47,8 @@ object Targets {
         Target("mzn-audit", "Compile audit over the MiniZinc Challenge benchmarks (fetched)", listOf("mzn-bench"), MetricKind.AUDIT),
         Target("tune-mixed", "Tune klause solver configs over a mixed sat+opt workload (rank by avg dense rank)",
             listOf("handwritten-core", "flatzinc-core", "opb-core", "smtlib-core", "xcsp3-core"), MetricKind.TUNING, Budget(timeoutMillis = 2_000)),
+        Target("search-slack-alldiff", "Complete-search effort (conflicts/nodes) over slack all_different instances",
+            listOf("slack-alldiff"), MetricKind.SEARCH, Budget(timeoutMillis = 30_000)),
         // OR-Tools-referenced variants (same suites, OR-Tools CP-SAT as the trusted reference).
         Target("parity-core-ortools", "Differential parity (klause vs OR-Tools) over the in-process core", IN_PROCESS_CORE, MetricKind.PARITY, reference = Backend.ORTOOLS),
         Target("mzn-parity-ortools", "Differential parity (klause vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY, reference = Backend.ORTOOLS),

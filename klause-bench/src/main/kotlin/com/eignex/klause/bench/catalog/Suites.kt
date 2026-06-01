@@ -29,7 +29,7 @@ import com.eignex.klause.solver.factor.Xor
 object Suites {
 
     val all: List<Suite> by lazy {
-        listOf(handwrittenCore, dimacsCore, opbCore, schemaCore, flatzincCore, smtlibCore, xcsp3Core, mznSmoke, satlibUf20)
+        listOf(handwrittenCore, slackAllDifferent, dimacsCore, opbCore, schemaCore, flatzincCore, smtlibCore, xcsp3Core, mznSmoke, satlibUf20)
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
@@ -63,6 +63,50 @@ object Suites {
                 )
             },
         )
+    }
+
+    // --- Slack all_different (Hall-prone; for explanation / clause-learning A/B) ---
+
+    /**
+     * Golomb-ruler feasibility built directly as a [Problem]: marks 0 = m0 < m1 < ... < m,
+     * with the C(m,2) pairwise differences channeled into aux int vars (domain `1..maxLen`)
+     * and constrained all_different. Because `maxLen` >> C(m,2) the all_different is *slack*
+     * (more values than vars ⇒ strict Hall sub-sets / multiple Régin SCCs), unlike the tight
+     * n-vars/n-values all_differents in latin_square/sudoku. That's exactly the regime where a
+     * responsible-subset (Hall-set) conflict explanation can differ from an all-vars one, so
+     * this suite is the discriminating workload for that sharpening. `maxLen >= optimal` ⇒ SAT.
+     */
+    private fun golomb(m: Int, maxLen: Int): Problem {
+        val pairs = buildList { for (i in 0 until m) for (j in i + 1 until m) add(i to j) }
+        val nDiffs = pairs.size
+        val numInt = m + nDiffs
+        val domains = Array(numInt) { idx ->
+            when {
+                idx == 0 -> IntDomain(0, 0)        // mark[0] pinned to 0
+                idx < m -> IntDomain(0, maxLen)    // marks
+                else -> IntDomain(1, maxLen)       // differences
+            }
+        }
+        val factors = ArrayList<Factor>()
+        // Strictly increasing marks: mark[i] - mark[i+1] <= -1.
+        for (i in 0 until m - 1) factors.add(Linear(intArrayOf(1, -1), intArrayOf(i, i + 1), LinearOp.LE, -1))
+        // Difference channeling: mark[j] - mark[i] - d = 0.
+        pairs.forEachIndexed { k, (i, j) ->
+            factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(j, i, m + k), LinearOp.EQ, 0))
+        }
+        // All differences distinct — the slack all_different under test.
+        factors.add(AllDifferent(IntArray(nDiffs) { m + it }, domainMin = 1, domainSize = maxLen))
+        // Symmetry break: first gap shorter than last (d_first - d_last <= -1).
+        factors.add(Linear(intArrayOf(1, -1), intArrayOf(m, m + nDiffs - 1), LinearOp.LE, -1))
+        return Problem(numBoolVars = 0, numIntVars = numInt, intDomains = domains, factors = factors.toTypedArray())
+    }
+
+    private val slackAllDifferent = suite("slack-alldiff", "Slack all_different (Golomb rulers; Hall-prone)") {
+        license = "internal"
+        // (m, maxLen) with maxLen >= optimal ruler length ⇒ satisfiable; a spread of slack/size.
+        for ((m, maxLen) in listOf(6 to 17, 6 to 20, 7 to 25, 7 to 30, 7 to 40, 8 to 45, 8 to 50)) {
+            inCode("golomb_${m}_$maxLen", Category.CSP, Expected.Sat) { golomb(m, maxLen) }
+        }
     }
 
     // --- In-code SAT/CSP (ported from the former Portfolio) ---

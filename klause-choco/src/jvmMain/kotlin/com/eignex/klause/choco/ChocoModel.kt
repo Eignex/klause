@@ -5,26 +5,61 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.AllDifferentExcept
+import com.eignex.klause.solver.factor.AllDifferentExceptZero
+import com.eignex.klause.solver.factor.AllEqual
+import com.eignex.klause.solver.factor.Among
+import com.eignex.klause.solver.factor.ArgMinMax
+import com.eignex.klause.solver.factor.ArrayMinMax
+import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Count
+import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Diffn
+import com.eignex.klause.solver.factor.Element
+import com.eignex.klause.solver.factor.Geost
+import com.eignex.klause.solver.factor.GlobalCardinality
+import com.eignex.klause.solver.factor.Inverse
+import com.eignex.klause.solver.factor.Knapsack
+import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Mdd
+import com.eignex.klause.solver.factor.Member
+import com.eignex.klause.solver.factor.Monotone
+import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Sequence
+import com.eignex.klause.solver.factor.SetBitsetDisjoint
+import com.eignex.klause.solver.factor.SetBitsetEq
+import com.eignex.klause.solver.factor.SetBitsetSubset
+import com.eignex.klause.solver.factor.Sort
+import com.eignex.klause.solver.factor.Subcircuit
+import com.eignex.klause.solver.factor.SymmetricAllDifferent
+import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import org.chocosolver.solver.Model
+import org.chocosolver.solver.constraints.extension.Tuples
+import org.chocosolver.solver.constraints.nary.automata.FA.FiniteAutomaton
 import org.chocosolver.solver.variables.BoolVar
 import org.chocosolver.solver.variables.IntVar
+import org.chocosolver.solver.variables.Task
 
 /**
- * Translates a klause [Problem] into a Choco [Model]. Mirrors the factor coverage of
- * `klause-smt`'s `SmtTranslator`: the core SAT/CP factors that compiled FlatZinc and the
- * bench's in-code suites actually use. Unsupported factors raise [UnsupportedFactorException]
- * rather than silently dropping a constraint — a reference solver that quietly ignores
- * constraints would make parity meaningless.
+ * Translates a klause [Problem] into a Choco [Model]. As a complete-search correctness
+ * reference, the adapter maps each klause factor to its closest Choco global constraint
+ * (native propagator) where one exists, and to a faithful constraint-level decomposition
+ * otherwise. Unsupported factors raise [UnsupportedFactorException] rather than silently
+ * dropping a constraint — a reference solver that quietly ignores constraints would make
+ * parity meaningless.
  */
 class UnsupportedFactorException(val factor: Factor) :
     RuntimeException("klause-choco: unsupported factor ${factor::class.simpleName}")
@@ -42,6 +77,7 @@ class ChocoModel private constructor(
     }
 
     private fun litVars(lits: IntArray): Array<IntVar> = Array(lits.size) { litVar(lits[it]) }
+    private fun intVarsOf(ids: IntArray): Array<IntVar> = Array(ids.size) { intVars[ids[it]] }
 
     private fun postFactor(f: Factor) {
         when (f) {
@@ -58,11 +94,52 @@ class ChocoModel private constructor(
                 model.scalar(litVars(f.literals), f.weights, pbStr(f.op), f.bound).reifyWith(boolVars[f.auxBoolVar])
             is ReifiedCardinality ->
                 countConstraint(litVars(f.literals), f.min, f.max).reifyWith(boolVars[f.auxBoolVar])
+
+            // ---- expanded coverage ----
+            is AllEqual -> model.allEqual(*intVarsOf(f.xs)).post()
+            is AllDifferentExceptZero -> model.allDifferentExcept0(intVarsOf(f.xs)).post()
+            is AllDifferentExcept -> postAllDifferentExcept(f)
+            is Among -> model.among(intVars[f.n], intVarsOf(f.xs), f.values).post()
+            is Member -> model.or(*Array(f.xs.size) { model.arithm(intVars[f.y], "=", intVars[f.xs[it]]) }).post()
+            is Count -> postCountFactor(f)
+            is Element ->  // Choco: element(VALUE, table, INDEX, offset) ⇒ value = table[index - offset].
+                if (f.arrIsVars) model.element(intVars[f.result], intVarsOf(f.arr), intVars[f.idx], f.indexOffset).post()
+                else model.element(intVars[f.result], f.arr, intVars[f.idx], f.indexOffset).post()
+            is Inverse -> model.inverseChanneling(intVarsOf(f.f), intVarsOf(f.g), f.fOffset, f.gOffset).post()
+            is SymmetricAllDifferent ->
+                model.inverseChanneling(intVarsOf(f.xs), intVarsOf(f.xs), f.indexOffset, f.indexOffset).post()
+            is LexLess ->
+                (if (f.strict) model.lexLess(intVarsOf(f.xs), intVarsOf(f.ys))
+                 else model.lexLessEq(intVarsOf(f.xs), intVarsOf(f.ys))).post()
+            is Monotone -> postMonotone(f)
+            is NValue -> postNValue(f)
+            is GlobalCardinality -> postGcc(f)
+            is Table -> model.table(intVarsOf(f.xs), tuplesOf(f)).post()
+            is ValuePrecede -> model.intValuePrecedeChain(intVarsOf(f.xs), f.s, f.t).post()
+            is ArgMinMax ->
+                (if (f.max) model.argmax(intVars[f.idx], f.indexOffset, intVarsOf(f.xs))
+                 else model.argmin(intVars[f.idx], f.indexOffset, intVarsOf(f.xs))).post()
+            is ArrayMinMax ->
+                (if (f.max) model.max(intVars[f.result], intVarsOf(f.xs)) else model.min(intVars[f.result], intVarsOf(f.xs))).post()
+            is Knapsack ->
+                model.knapsack(intVarsOf(f.xs), intVars[f.w], intVars[f.p], f.weights, f.profits).post()
+            is Cumulative -> postCumulative(f)
+            is Diffn -> postDiffn(f)
+            is BinPacking -> postBinPacking(f)
+            is Sort -> model.sort(intVarsOf(f.xs), intVarsOf(f.ys)).post()
+            is Sequence -> postSequence(f)
+            is Regular -> model.regular(intVarsOf(f.seq), automatonOf(f)).post()
+            is Circuit -> model.circuit(intVarsOf(f.succ), 0).post()
+            is Subcircuit -> model.subCircuit(intVarsOf(f.succ), 0, model.intVar(0, f.succ.size)).post()
+            is Geost -> postGeost(f)
+            is Mdd -> postMdd(f)
+            is SetBitsetSubset -> postSetSubset(f.leftBools, f.rightBools)
+            is SetBitsetDisjoint -> postSetDisjoint(f.leftBools, f.rightBools)
+            is SetBitsetEq -> postSetEq(f.leftBools, f.rightBools)
+
             else -> throw UnsupportedFactorException(f)
         }
     }
-
-    private fun intVarsOf(ids: IntArray): Array<IntVar> = Array(ids.size) { intVars[ids[it]] }
 
     private fun postCount(vars: Array<IntVar>, min: Int, max: Int) {
         if (min > 0) model.sum(vars, ">=", min).post()
@@ -81,6 +158,191 @@ class ChocoModel private constructor(
         model.sum(vars, "=", s).post()
         val allowed = (0..vars.size).filter { it % 2 == (targetParity and 1) }.toIntArray()
         model.member(s, allowed).post()
+    }
+
+    private fun postAllDifferentExcept(f: AllDifferentExcept) {
+        // No native general-except propagator: pairwise (xi ∈ except) ∨ (xj ∈ except) ∨ (xi ≠ xj).
+        for (i in f.xs.indices) for (j in i + 1 until f.xs.size) {
+            model.or(
+                model.member(intVars[f.xs[i]], f.except),
+                model.member(intVars[f.xs[j]], f.except),
+                model.arithm(intVars[f.xs[i]], "!=", intVars[f.xs[j]]),
+            ).post()
+        }
+    }
+
+    private fun postCountFactor(f: Count) {
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        val limit = model.intVar(0, f.xs.size)
+        model.count(f.v, intVarsOf(f.xs), limit).post()
+        model.arithm(limit, cmpStr(f.op), f.n).post()
+    }
+
+    private fun postMonotone(f: Monotone) {
+        val delta = if (f.strict) 1 else 0
+        when (f.direction) {
+            Monotone.Direction.Increasing -> model.increasing(intVarsOf(f.xs), delta).post()
+            Monotone.Direction.Decreasing -> model.decreasing(intVarsOf(f.xs), delta).post()
+        }
+    }
+
+    private fun postNValue(f: NValue) {
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        val nVar = intVars[f.n]
+        when (f.mode) {
+            NValue.Mode.Eq -> model.nValues(intVarsOf(f.xs), nVar).post()
+            NValue.Mode.AtLeast -> model.atLeastNValues(intVarsOf(f.xs), nVar, true).post()
+            NValue.Mode.AtMost -> model.atMostNValues(intVarsOf(f.xs), nVar, true).post()
+        }
+    }
+
+    private fun postGcc(f: GlobalCardinality) {
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        val countVars = f.countVars
+        val countLow = f.countLow
+        val countHigh = f.countHigh
+        val occ: Array<IntVar> = when {
+            countVars != null -> intVarsOf(countVars)
+            countLow != null && countHigh != null ->
+                Array(f.cover.size) { model.intVar(countLow[it], countHigh[it]) }
+            else -> Array(f.cover.size) { model.intVar(0, f.xs.size) }
+        }
+        model.globalCardinality(intVarsOf(f.xs), f.cover, occ, f.closed).post()
+    }
+
+    private fun postCumulative(f: Cumulative) {
+        val tasks = Array(f.starts.size) { i ->
+            val start = intVars[f.starts[i]]
+            val dur = intVars[f.durations[i]]
+            val end = model.intVar(start.lb + dur.lb, start.ub + dur.ub)
+            Task(start, dur, end)
+        }
+        val heights = intVarsOf(f.resources)
+        model.cumulative(tasks, heights, model.intVar(f.capacity)).post()
+    }
+
+    private fun postDiffn(f: Diffn) {
+        val widthVars = f.widthVars
+        val heightVars = f.heightVars
+        val w = if (widthVars != null) intVarsOf(widthVars) else Array(f.widths.size) { model.intVar(f.widths[it]) }
+        val h = if (heightVars != null) intVarsOf(heightVars) else Array(f.heights.size) { model.intVar(f.heights[it]) }
+        model.diffN(intVarsOf(f.xs), intVarsOf(f.ys), w, h, true).post()
+    }
+
+    private fun postBinPacking(f: BinPacking) {
+        val loads: Array<IntVar> = when (f.mode) {
+            BinPacking.Mode.LoadVars -> intVarsOf(f.loadVars!!)
+            BinPacking.Mode.UniformCapacity -> Array(f.numBins) { model.intVar(0, f.uniformCapacity) }
+            BinPacking.Mode.PerBinCapacity -> Array(f.numBins) { model.intVar(0, f.capacities!![it]) }
+        }
+        model.binPacking(intVarsOf(f.bins), f.weights, loads, f.binOffset).post()
+    }
+
+    private fun postSequence(f: Sequence) {
+        // |xs| - k + 1 sliding windows, each an `among` with the count bounded to [low, high].
+        for (start in 0..f.xs.size - f.k) {
+            val window = Array(f.k) { intVars[f.xs[start + it]] }
+            val nb = model.intVar(f.low, f.high)
+            model.among(nb, window, f.values).post()
+        }
+    }
+
+    private fun postGeost(f: Geost) {
+        // Pairwise separation in at least one dimension: oi+si ≤ oj  ∨  oj+sj ≤ oi (per dim).
+        for (i in 0 until f.numObjects) for (j in i + 1 until f.numObjects) {
+            val opts = ArrayList<org.chocosolver.solver.constraints.Constraint>()
+            for (d in 0 until f.numDims) {
+                val oi = intVars[f.origin[i * f.numDims + d]]; val oj = intVars[f.origin[j * f.numDims + d]]
+                val si = f.length[i * f.numDims + d]; val sj = f.length[j * f.numDims + d]
+                opts.add(model.scalar(arrayOf(oi, oj), intArrayOf(1, -1), "<=", -si)) // oi + si ≤ oj
+                opts.add(model.scalar(arrayOf(oj, oi), intArrayOf(1, -1), "<=", -sj)) // oj + sj ≤ oi
+            }
+            model.or(*opts.toTypedArray()).post()
+        }
+    }
+
+    private fun postMdd(f: Mdd) {
+        // Each layer is a transition table over (q[i], seq[i], q[i+1][, weight]); chain the
+        // state trace through them, fix q[0] = initial and require q[n] accepting.
+        val n = f.seq.size
+        val states = sortedSetOf(f.initial)
+        f.accepting.forEach { states.add(it) }
+        var p = 0
+        while (p < f.transitions.size) { states.add(f.transitions[p]); states.add(f.transitions[p + 2]); p += f.recordStride }
+        val lo = states.first(); val hi = states.last()
+        val q = Array(n + 1) { model.intVar("mddq$it", lo, hi) }
+        model.arithm(q[0], "=", f.initial).post()
+        val cost4 = f.recordStride == 4
+        val wVars = if (cost4) ArrayList<IntVar>(n) else null
+        var wLo = 0; var wHi = 0
+        if (cost4) { var r = 0; while (r < f.transitions.size) { val w = f.transitions[r + 3]; if (w < wLo) wLo = w; if (w > wHi) wHi = w; r += f.recordStride } }
+        for (i in 0 until n) {
+            val tuples = Tuples(true)
+            var row = f.layerStarts[i]
+            while (row < f.layerStarts[i + 1]) {
+                if (cost4) tuples.add(intArrayOf(f.transitions[row], f.transitions[row + 1], f.transitions[row + 2], f.transitions[row + 3]))
+                else tuples.add(intArrayOf(f.transitions[row], f.transitions[row + 1], f.transitions[row + 2]))
+                row += f.recordStride
+            }
+            if (cost4) {
+                val w = model.intVar("mddw$i", wLo, wHi)
+                wVars!!.add(w)
+                model.table(arrayOf(q[i], intVars[f.seq[i]], q[i + 1], w), tuples).post()
+            } else {
+                model.table(arrayOf(q[i], intVars[f.seq[i]], q[i + 1]), tuples).post()
+            }
+        }
+        model.member(q[n], f.accepting).post()
+        if (f.cost >= 0 && wVars != null) model.sum(wVars.toTypedArray(), "=", intVars[f.cost]).post()
+    }
+
+    private fun postSetSubset(left: IntArray, right: IntArray) {
+        for (i in left.indices) {
+            val l = left[i]; val r = right[i]
+            if (l < 0) continue
+            if (r < 0) model.arithm(boolVars[l], "=", 0).post()
+            else model.arithm(boolVars[l], "<=", boolVars[r]).post()
+        }
+    }
+
+    private fun postSetDisjoint(left: IntArray, right: IntArray) {
+        for (i in left.indices) {
+            val l = left[i]; val r = right[i]
+            if (l >= 0 && r >= 0) model.arithm(boolVars[l], "+", boolVars[r], "<=", 1).post()
+        }
+    }
+
+    private fun postSetEq(left: IntArray, right: IntArray) {
+        for (i in left.indices) {
+            val l = left[i]; val r = right[i]
+            when {
+                l >= 0 && r >= 0 -> model.arithm(boolVars[l], "=", boolVars[r]).post()
+                l >= 0 -> model.arithm(boolVars[l], "=", 0).post()
+                r >= 0 -> model.arithm(boolVars[r], "=", 0).post()
+            }
+        }
+    }
+
+    private fun tuplesOf(f: Table): Tuples {
+        val t = Tuples(true)
+        for (r in 0 until f.numTuples) {
+            t.add(IntArray(f.arity) { c -> f.tuples[r * f.arity + c] })
+        }
+        return t
+    }
+
+    private fun automatonOf(f: Regular): FiniteAutomaton {
+        // klause states are 1-based with a 0 "dead" sentinel; symbols are 1-based and equal
+        // to the seq variable value. Map klause state k → Choco state index (k-1).
+        val auto = FiniteAutomaton()
+        val states = IntArray(f.numStates) { auto.addState() }
+        auto.setInitialState(states[f.q0 - 1])
+        for (a in f.accepting) auto.setFinal(states[a - 1])
+        for (st in 1..f.numStates) for (sym in 1..f.alphabetSize) {
+            val target = f.transitions[(st - 1) * f.alphabetSize + (sym - 1)]
+            if (target != 0) auto.addTransition(states[st - 1], states[target - 1], sym)
+        }
+        return auto
     }
 
     companion object {
@@ -113,6 +375,15 @@ class ChocoModel private constructor(
             PbOp.LE -> "<="
             PbOp.EQ -> "="
             PbOp.GE -> ">="
+        }
+
+        private fun cmpStr(op: Count.Op): String = when (op) {
+            Count.Op.Eq -> "="
+            Count.Op.Ne -> "!="
+            Count.Op.Le -> "<="
+            Count.Op.Lt -> "<"
+            Count.Op.Ge -> ">="
+            Count.Op.Gt -> ">"
         }
     }
 }

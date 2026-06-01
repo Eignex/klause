@@ -95,6 +95,7 @@ object BenchCli {
         "coverage" -> MetricKind.COVERAGE
         "audit" -> MetricKind.AUDIT
         "tuning", "tune" -> MetricKind.TUNING
+        "search" -> MetricKind.SEARCH
         else -> error("unknown metric '$name' (have ${MetricKind.entries.map { it.name.lowercase() }})")
     }
 
