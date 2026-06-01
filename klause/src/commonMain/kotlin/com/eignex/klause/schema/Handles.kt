@@ -200,12 +200,22 @@ class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>
     /** `this ≠ threshold`. */
     infix fun ne(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.NE)
 
-    /** Expression-vs-expression comparison: rewrite `lhs OP rhs` as `(lhs - rhs) OP 0`. */
+    /** `this ≤ other`, rewritten as `(this - other) ≤ 0`. */
     infix fun le(other: FloatExpr): BoolExpr = (this - other) le 0.0
+
+    /** `this < other`, rewritten as `(this - other) < 0`. */
     infix fun lt(other: FloatExpr): BoolExpr = (this - other) lt 0.0
+
+    /** `this ≥ other`, rewritten as `(this - other) ≥ 0`. */
     infix fun ge(other: FloatExpr): BoolExpr = (this - other) ge 0.0
+
+    /** `this > other`, rewritten as `(this - other) > 0`. */
     infix fun gt(other: FloatExpr): BoolExpr = (this - other) gt 0.0
+
+    /** `this = other`, rewritten as `(this - other) = 0`. */
     infix fun eq(other: FloatExpr): BoolExpr = (this - other) eq 0.0
+
+    /** `this ≠ other`, rewritten as `(this - other) ≠ 0`. */
     infix fun ne(other: FloatExpr): BoolExpr = (this - other) ne 0.0
 
     private fun compare(threshold: Double, op: IntCmpOp): BoolExpr {

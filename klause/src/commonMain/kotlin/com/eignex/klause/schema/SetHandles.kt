@@ -29,7 +29,12 @@ import com.eignex.klause.ast.SetUnion
  * [SetDiff] / [SetLiteral]) return a [SetExpr] tree that the compiler materialises into
  * fresh indicator bools at lowering time.
  */
-class IntSetHandle(val name: String, val universe: List<Int>) : SetTerm {
+class IntSetHandle(
+    /** Name of the set variable. */
+    val name: String,
+    /** The integer universe the set draws from. */
+    val universe: List<Int>,
+) : SetTerm {
     override fun toSetExpr(): SetExpr = SetRef(name)
 }
 
@@ -38,7 +43,12 @@ class IntSetHandle(val name: String, val universe: List<Int>) : SetTerm {
  * schema-construction time; the decoder returns a [Set]<String> of the labels currently
  * indicated.
  */
-class NominalSetHandle(val name: String, val labels: List<String>) : SetTerm {
+class NominalSetHandle(
+    /** Name of the set variable. */
+    val name: String,
+    /** The nominal label universe the set draws from. */
+    val labels: List<String>,
+) : SetTerm {
     override fun toSetExpr(): SetExpr = SetRef(name)
 }
 
@@ -48,12 +58,18 @@ class NominalSetHandle(val name: String, val labels: List<String>) : SetTerm {
  * set-var handle is, so `x inSet setOfInts(1, 3, 5)` and `S subsetOf setOfInts(0..9)`
  * both work.
  */
-class IntSetLiteralTerm(val elements: List<Int>) : SetTerm {
+class IntSetLiteralTerm(
+    /** The literal set's elements. */
+    val elements: List<Int>,
+) : SetTerm {
     override fun toSetExpr(): SetExpr = SetLiteral(elements)
 }
 
 /** Free-standing constant set literal over a nominal universe (labels). */
-class NominalSetLiteralTerm(val labels: List<String>) : SetTerm {
+class NominalSetLiteralTerm(
+    /** The literal set's nominal labels. */
+    val labels: List<String>,
+) : SetTerm {
     override fun toSetExpr(): SetExpr = SetNominalLiteral(labels)
 }
 

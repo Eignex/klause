@@ -110,8 +110,7 @@ sealed interface MinimizeResult {
         override val objective: Double,
         /** Why the search stopped before proving optimality. */
         val reason: TerminationReason,
-    ) :
-        WithSample
+    ) : WithSample
 
     /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
     data class Infeasible(val core: UnsatCore? = null) : MinimizeResult {
