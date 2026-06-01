@@ -7,7 +7,7 @@ import kotlin.random.Random
  * Backed by a list of present elements and a parallel index map keyed by element id.
  * Element ids must be in [0, capacity).
  */
-class IntSwapSet(capacity: Int) {
+internal class IntSwapSet(capacity: Int) {
     private val elements = IntArrayList(capacity.coerceAtLeast(8))
     private val position = IntArray(capacity) { -1 }
 

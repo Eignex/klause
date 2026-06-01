@@ -178,6 +178,7 @@ class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>
         }
         return FloatExpr(merged, offset + other.offset)
     }
+
     /** `this - other`. */
     operator fun minus(other: FloatExpr): FloatExpr = this + (-other)
 

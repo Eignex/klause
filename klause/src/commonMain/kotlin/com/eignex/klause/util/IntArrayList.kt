@@ -1,6 +1,6 @@
 package com.eignex.klause.util
 
-class IntArrayList(initialCapacity: Int = 8) {
+internal class IntArrayList(initialCapacity: Int = 8) {
     private var data: IntArray = IntArray(initialCapacity.coerceAtLeast(1))
     var size: Int = 0
         private set

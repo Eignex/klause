@@ -16,7 +16,7 @@ package com.eignex.klause.util
  * tactic as kumulant's primitive heaps. Capacity is fixed at construction; growing isn't
  * needed because every variable is registered up front.
  */
-class IndexedMaxHeap(val capacity: Int) {
+internal class IndexedMaxHeap(val capacity: Int) {
 
     private val heap = IntArray(capacity) // heap-position → id
     private val pos = IntArray(capacity) { -1 } // id → heap-position, or -1 if absent

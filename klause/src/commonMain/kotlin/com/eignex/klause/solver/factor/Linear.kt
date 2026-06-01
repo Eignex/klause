@@ -7,7 +7,20 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
-enum class LinearOp { LE, EQ, GE, NE }
+/** Relational operator for a [Linear] constraint. */
+enum class LinearOp {
+    /** `≤`. */
+    LE,
+
+    /** `=`. */
+    EQ,
+
+    /** `≥`. */
+    GE,
+
+    /** `≠`. */
+    NE,
+}
 
 /**
  * `Σ coeffs[i] * intVars[i] ⟨op⟩ bound`. Payload at `intPayload[factorId]` is the current
@@ -15,7 +28,16 @@ enum class LinearOp { LE, EQ, GE, NE }
  * variable, the integer value that on its own would put the sum on the right side of [bound],
  * clamped to the variable's domain.
  */
-class Linear(val coeffs: IntArray, val vars: IntArray, val op: LinearOp, val bound: Int) : LocalSearchFactor {
+class Linear(
+    /** Coefficients, parallel to [vars]. */
+    val coeffs: IntArray,
+    /** Integer variable ids, parallel to [coeffs]. */
+    val vars: IntArray,
+    /** Relation between the weighted sum and [bound]. */
+    val op: LinearOp,
+    /** Right-hand-side bound. */
+    val bound: Int,
+) : LocalSearchFactor {
 
     init {
         require(coeffs.size == vars.size) { "coeffs/vars length mismatch" }

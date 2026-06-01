@@ -12,7 +12,7 @@ package com.eignex.klause.util
  *
  * Not thread-safe. Iteration order is FIFO from [removeFirst] / LIFO from [removeLast].
  */
-class IntArrayDeque(initialCapacity: Int = 8) {
+internal class IntArrayDeque(initialCapacity: Int = 8) {
 
     private var buf: IntArray = IntArray(nextPow2(maxOf(initialCapacity, 1)))
     private var head: Int = 0 // index of first element

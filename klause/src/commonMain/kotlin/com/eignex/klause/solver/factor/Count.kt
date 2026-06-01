@@ -23,15 +23,38 @@ import com.eignex.klause.solver.propagation.PropagationState
  * target — the common case in MiniZinc-emitted FlatZinc.
  */
 class Count(
+    /** Integer variable ids being counted over. */
     val xs: IntArray,
+    /** The constant target value compared against each `xs[i]`. */
     val v: Int,
+    /** Which comparison defines a "match". */
     val op: Op,
+    /** Integer variable id holding the match count. */
     val n: Int,
     /** Per-index presence literals; empty for the non-opt fast path. See [OptPresence]. */
     val presents: IntArray = EmptyIntArray,
 ) : LocalSearchFactor {
 
-    enum class Op { Eq, Ne, Le, Lt, Ge, Gt }
+    /** The comparison defining which `xs[i]` count toward [n]. */
+    enum class Op {
+        /** `xs[i] = v`. */
+        Eq,
+
+        /** `xs[i] ≠ v`. */
+        Ne,
+
+        /** `xs[i] ≤ v`. */
+        Le,
+
+        /** `xs[i] < v`. */
+        Lt,
+
+        /** `xs[i] ≥ v`. */
+        Ge,
+
+        /** `xs[i] > v`. */
+        Gt,
+    }
 
     init {
         require(xs.isNotEmpty()) { "count: empty xs" }

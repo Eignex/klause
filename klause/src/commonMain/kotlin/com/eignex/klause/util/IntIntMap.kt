@@ -16,7 +16,7 @@ package com.eignex.klause.util
  * construction in klause's allocator. Examples: `Cardinality.signedOccurrencesByVar`,
  * `AllDifferent.occurrencesByVar`, `Clause.litIndexByVar`.
  */
-class IntIntMap private constructor(private val backing: Backing, private val absent: Int) {
+internal class IntIntMap private constructor(private val backing: Backing, private val absent: Int) {
     operator fun get(key: Int): Int = backing.get(key, absent)
 
     fun contains(key: Int): Boolean = backing.get(key, MISSING) != MISSING
