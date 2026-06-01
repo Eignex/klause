@@ -244,8 +244,14 @@ private fun <P : SolverParams> runOptimize(
     }
     val applier = loadOznApplier(opts)
     // Streaming branch-and-bound: yield each improving incumbent, then a terminal verdict.
-    val objective = if (maximize) program.problem.maximizeInt(objVarId)
-                    else program.problem.minimizeInt(objVarId)
+    val linear = if (maximize) program.problem.maximizeInt(objVarId)
+                 else program.problem.minimizeInt(objVarId)
+    // Local search descends a *decomposed* objective only with a per-move gradient to the
+    // decision vars; use the functional objective (cone of `defines_var` aux vars) when the
+    // model provides one. Complete backends keep the LinearObjective (needed for bounding).
+    val objective: com.eignex.klause.solver.Objective =
+        if (solver is com.eignex.klause.solver.localsearch.LocalSearchSolver) (program.lsObjective ?: linear)
+        else linear
     var produced = 0
     for (step in optimizer.improvements(objective, params)) {
         when (step) {
