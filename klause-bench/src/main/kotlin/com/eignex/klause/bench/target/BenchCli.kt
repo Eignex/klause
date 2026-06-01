@@ -7,6 +7,7 @@ import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.CoverageMetric
 import com.eignex.klause.bench.metric.ParityMetric
 import com.eignex.klause.bench.metric.TimeMetric
+import com.eignex.klause.bench.metric.TuningMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
 import com.eignex.klause.bench.solver.Backend
 
@@ -35,6 +36,7 @@ object BenchCli {
             MetricKind.ANYTIME -> AnytimeMetric.run(BenchLoad.resolve(target.suiteIds), target.budget, target.reference ?: Backend.ORTOOLS)
             MetricKind.COVERAGE -> CoverageMetric.run(com.eignex.klause.bench.catalog.Catalog.problems(*target.suiteIds.toTypedArray()))
             MetricKind.AUDIT -> CompileAuditMetric.run(com.eignex.klause.bench.catalog.Catalog.problems(*target.suiteIds.toTypedArray()))
+            MetricKind.TUNING -> TuningMetric.run(BenchLoad.resolve(target.suiteIds), target.budget)
             else -> {
                 val corpus = BenchLoad.loadAndVerify(target.suiteIds)
                 when (target.metric) {
@@ -42,7 +44,7 @@ object BenchCli {
                     MetricKind.TIME -> TimeMetric.run(corpus.benchEntries)
                     MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
                     MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
-                    MetricKind.PARITY, MetricKind.ANYTIME, MetricKind.COVERAGE, MetricKind.AUDIT -> error("unreachable")
+                    MetricKind.PARITY, MetricKind.ANYTIME, MetricKind.COVERAGE, MetricKind.AUDIT, MetricKind.TUNING -> error("unreachable")
                 }
             }
         }
