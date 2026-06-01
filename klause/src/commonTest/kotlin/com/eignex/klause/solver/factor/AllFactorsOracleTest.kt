@@ -213,22 +213,26 @@ class AllFactorsOracleTest {
 
     @Test fun arrayMin() {
         val f = ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = false)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)))
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+              exactProbe = true)
     }
 
     @Test fun arrayMax() {
         val f = ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = true)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)))
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+              exactProbe = true)
     }
 
     @Test fun argMin() {
         val f = ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+              exactProbe = true)
     }
 
     @Test fun argMax() {
         val f = ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = true)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+              exactProbe = true)
     }
 
     @Test fun member() {

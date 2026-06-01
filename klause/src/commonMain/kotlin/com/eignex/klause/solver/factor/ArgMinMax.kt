@@ -51,24 +51,53 @@ class ArgMinMax(
         return state.assignment.intValue(idx) != expected
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val wasViolated = isViolated(state, factorId)
-        // Simulate: find best with intVar = newValue.
-        var bestIdx = -1
-        var bestValue = 0
-        for (i in xs.indices) {
-            val v = if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
-            if (bestIdx == -1 || extreme(v, bestValue)) { bestIdx = i; bestValue = v }
+    /** Graded degree for a hypothetical `idx = idxVal` and operand values supplied by
+     *  [valueAt] (0-based position → value). `0` exactly when `idx` names the canonical
+     *  arg-extreme position; otherwise positive. Two regimes:
+     *   - `idx` out of `[indexOffset, indexOffset+n-1]` → graded by its distance back into range.
+     *   - `idx` in range but not the (lowest-index) extremum → graded by the value gap between
+     *     the extremum and the value at the named position, floored at 1 so a tie (named
+     *     position holds the extreme value but isn't the lowest such index) still reads violated. */
+    private inline fun degreeAt(idxVal: Int, valueAt: (pos: Int) -> Int): Int {
+        val lo = indexOffset
+        val hi = indexOffset + xs.size - 1
+        if (idxVal < lo) return compressViolation((lo - idxVal).toLong())
+        if (idxVal > hi) return compressViolation((idxVal - hi).toLong())
+        val pos = idxVal - indexOffset
+        var bestPos = 0
+        var bestValue = valueAt(0)
+        for (i in 1 until xs.size) {
+            val v = valueAt(i)
+            if (extreme(v, bestValue)) { bestPos = i; bestValue = v }
         }
-        val expected = bestIdx + indexOffset
-        val newIdxValue = if (intVar == idx) newValue else state.assignment.intValue(idx)
-        val willViolate = newIdxValue != expected
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        if (bestPos == pos) return 0
+        val gap = bestValue.toLong() - valueAt(pos)
+        val ad = if (gap < 0) -gap else gap
+        return maxOf(1, compressViolation(ad))
+    }
+
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        degreeAt(state.assignment.intValue(idx)) { pos -> state.assignment.intValue(xs[pos]) }
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val curIdx = state.assignment.intValue(idx)
+        val newIdx = if (intVar == idx) newValue else curIdx
+        val newDeg = degreeAt(newIdx) { pos ->
+            if (xs[pos] == intVar) newValue else state.assignment.intValue(xs[pos])
+        }
+        val oldDeg = degreeAt(curIdx) { pos -> state.assignment.intValue(xs[pos]) }
+        return newDeg - oldDeg
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        // Stateless. Delta queries already correct.
-        return 0
+        // Stateless: reconstruct the pre-move degree from [oldValue] and compare to the live one.
+        val curIdxNow = state.assignment.intValue(idx)
+        val oldIdx = if (intVar == idx) oldValue else curIdxNow
+        val newDeg = degreeAt(curIdxNow) { pos -> state.assignment.intValue(xs[pos]) }
+        val oldDeg = degreeAt(oldIdx) { pos ->
+            if (xs[pos] == intVar) oldValue else state.assignment.intValue(xs[pos])
+        }
+        return newDeg - oldDeg
     }
 
     /** Repair: either snap `idx` to the current arg-extreme, or shift `xs[idx]` to the
