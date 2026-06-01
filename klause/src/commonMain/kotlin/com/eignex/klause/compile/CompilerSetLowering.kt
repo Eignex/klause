@@ -47,7 +47,7 @@ private const val BITSET_UNIVERSE_THRESHOLD: Int = 64
  * either by looking up an existing set var via [Compiler.Build.materializeSet] or by
  * synthesising aux indicators for `union` / `intersect` / `diff` / set literals.
  */
-class SetLayout(val universe: IntArray, val indicatorBoolIds: IntArray) {
+internal class SetLayout(val universe: IntArray, val indicatorBoolIds: IntArray) {
     init {
         require(universe.size == indicatorBoolIds.size) {
             "SetLayout parallel arrays must have equal length"

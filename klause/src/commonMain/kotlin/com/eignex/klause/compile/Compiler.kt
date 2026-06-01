@@ -49,7 +49,7 @@ import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.skema.SchemaDef
 
-class Compiler(
+internal class Compiler(
     private val config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current,
 ) {
 
@@ -520,6 +520,6 @@ class Compiler(
     }
 }
 
-fun VariableSchema.compile(
+internal fun VariableSchema.compile(
     config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current,
 ): CompiledProblem = Compiler(config).compile(this.definition())

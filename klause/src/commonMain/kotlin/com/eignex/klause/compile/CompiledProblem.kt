@@ -26,7 +26,7 @@ import com.eignex.klause.solver.minimizeInt
  * to int-array ids in `intVarIdByName`. Float vars round-trip through their bucket index
  * using the [FloatSpec] in `floatDecoders`.
  */
-class CompiledProblem(
+internal class CompiledProblem(
     val problem: Problem,
     val boolVarIdByName: Map<String, Int>,
     val intVarIdByName: Map<String, Int>,
