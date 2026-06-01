@@ -28,15 +28,15 @@ application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
-/** Forward any `-Dklause.bench.*` props from the gradle invocation into the JavaExec
- *  child JVM so callers can tune bench knobs (repetitions, sampleCount, regression
- *  threshold, etc.) without editing source. Uses doFirst so the System.getProperties()
- *  snapshot is captured at execution time — config-cache safe. */
+/** Forward any `-Dklause.*` props from the gradle invocation into the JavaExec child JVM so
+ *  callers can tune every bench / selection / diagnostic knob (`klause.bench.*`,
+ *  `klause.measure.*`, `klause.cblsdiag.*`, …) without editing source. Uses doFirst so the
+ *  System.getProperties() snapshot is captured at execution time — config-cache safe. */
 fun JavaExec.forwardBenchProps() {
     doFirst {
         for ((k, v) in System.getProperties()) {
             val key = k.toString()
-            if (key.startsWith("klause.bench.")) systemProperty(key, v.toString())
+            if (key.startsWith("klause.")) systemProperty(key, v.toString())
         }
     }
 }

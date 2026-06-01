@@ -121,13 +121,17 @@ object CorpusSelection {
     }
 
     /** Apply per-family cap (head or seeded sample), interleave, then overall cap. */
-    fun applySelection(all: List<Discovered>, sel: Selection): List<Discovered> {
-        val byFamily = LinkedHashMap<String, MutableList<Discovered>>()
-        for (d in all) byFamily.getOrPut(d.family) { mutableListOf() }.add(d)
-        val capped = byFamily.values.map { family ->
-            val k = sel.perFamily ?: return@map family.toList()
-            if (sel.sampleSeed != null) family.shuffled(Random(sel.sampleSeed)).take(k)
-            else family.take(k)
+    fun applySelection(all: List<Discovered>, sel: Selection): List<Discovered> =
+        applySelectionBy(all, sel) { it.family }
+
+    /** Generic family-aware selection over any item type, keyed by [family]. Reused for
+     *  catalog [com.eignex.klause.bench.catalog.ProblemRef] selection in the ad-hoc CLI. */
+    fun <T> applySelectionBy(all: List<T>, sel: Selection, family: (T) -> String): List<T> {
+        val byFamily = LinkedHashMap<String, MutableList<T>>()
+        for (d in all) byFamily.getOrPut(family(d)) { mutableListOf() }.add(d)
+        val capped = byFamily.values.map { fam ->
+            val k = sel.perFamily ?: return@map fam.toList()
+            if (sel.sampleSeed != null) fam.shuffled(Random(sel.sampleSeed)).take(k) else fam.take(k)
         }
         val interleaved = interleave(capped)
         return sel.maxInstances?.let { interleaved.take(it) } ?: interleaved
