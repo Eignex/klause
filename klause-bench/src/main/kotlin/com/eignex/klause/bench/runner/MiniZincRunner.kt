@@ -28,22 +28,26 @@ class MiniZincRunner(
     override fun supports(ref: ProblemRef): Boolean = ref.format == Format.MINIZINC
 
     override fun resolve(ref: ProblemRef): ResolvedProblem {
-        require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
-        val root = CorpusFetcher.workspaceRoot()
-        val mzn = CorpusFetcher.resolve(ref.source)
-        val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
-
-        val workDir = File(root, "klause-bench/build/mzn-fzn").apply { mkdirs() }
-        val fzn = File(workDir, "${ref.name.replace('/', '_')}.fzn")
-        compile(root, mzn, dzn, fzn)
-
-        val program = parseFlatZinc(fzn.readText())
+        val program = parseFlatZinc(compileFzn(ref).readText())
         val objective: Objective? = when (val s = program.solve) {
             is SolveDirective.Minimize -> program.intVarsByName[s.objVar]?.let { program.problem.minimizeInt(it) }
             is SolveDirective.Maximize -> program.intVarsByName[s.objVar]?.let { program.problem.maximizeInt(it) }
             is SolveDirective.Satisfy -> null
         }
         return ResolvedProblem(ref, program.problem, objective)
+    }
+
+    /** Compile [ref]'s `.mzn`(+`.dzn`) to FlatZinc and return the `.fzn` file (used by the
+     *  resolve path and by the coverage / compile-audit metrics that inspect the FZN). */
+    fun compileFzn(ref: ProblemRef): File {
+        require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
+        val root = CorpusFetcher.workspaceRoot()
+        val mzn = CorpusFetcher.resolve(ref.source)
+        val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
+        val workDir = File(root, "klause-bench/build/mzn-fzn").apply { mkdirs() }
+        val fzn = File(workDir, "${ref.name.replace('/', '_')}.fzn")
+        compile(root, mzn, dzn, fzn)
+        return fzn
     }
 
     private fun compile(root: File, mzn: File, dzn: File?, out: File) {
