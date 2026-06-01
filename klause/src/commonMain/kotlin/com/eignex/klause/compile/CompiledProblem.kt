@@ -121,8 +121,7 @@ class CompiledProblem(
             ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        val bucket = sample.ints[id]
-        return spec.min + (bucket.toDouble() / (spec.buckets - 1)) * (spec.max - spec.min)
+        return spec.realValue(sample.ints[id])
     }
 
     /**
@@ -163,9 +162,8 @@ class CompiledProblem(
             ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        val scale = (spec.max - spec.min) / (spec.buckets - 1)
         val arr = DoubleArray(problem.numIntVars)
-        arr[id] = scale
+        arr[id] = spec.scale
         return LinearObjective(intCoefficients = arr, constant = spec.min)
     }
 
@@ -174,9 +172,8 @@ class CompiledProblem(
             ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        val scale = (spec.max - spec.min) / (spec.buckets - 1)
         val arr = DoubleArray(problem.numIntVars)
-        arr[id] = -scale
+        arr[id] = -spec.scale
         // For maximise we minimise the negated real, so the constant flips too.
         return LinearObjective(intCoefficients = arr, constant = -spec.min)
     }
