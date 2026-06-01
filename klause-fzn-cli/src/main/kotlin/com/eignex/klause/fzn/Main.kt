@@ -84,8 +84,32 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
     }
 }
 
+/** Default complete-search configuration when the model carries no `solve :: *_search(...)`
+ *  annotation. A bare [BacktrackParams] (RandomVariable + IndomainRandom, no restarts, no
+ *  learning) is far too weak; use the CDCL setup the bench sweep relies on — VSIDS +
+ *  phase-saving + LBD clause learning — under a FIXED [randomSeed] so the CLI is deterministic
+ *  and reproducible (with a null seed the trajectory varies run-to-run and optimization
+ *  optimality-proofs flakily blow the time budget). A `-r/--random-seed` flag still overrides.
+ *
+ *  The CDCL setup is applied to SATISFACTION only. On klause's branch-and-bound it actually
+ *  *regresses* optimality proofs — VSIDS branching + Luby restarts make graph_coloring /
+ *  zero_one_knapsack find the optimum instantly yet burn the whole budget proving it, whereas
+ *  the bare RandomVariable + IndomainRandom search proves them in milliseconds (a VSIDS/
+ *  restart × BnB interaction in the core worth fixing separately). So minimize/maximize keep
+ *  the bare params, just pinned to the fixed seed for determinism. */
+private fun defaultBacktrackParams(program: FlatZincProgram): BacktrackParams =
+    if (program.solve is SolveDirective.Satisfy)
+        BacktrackParams(
+            randomSeed = 1L,
+            variableHeuristic = com.eignex.klause.solver.backtrack.Vsids(),
+            phaseSaving = true,
+            lubyRestartBase = 100L,
+            maxLearnedClauses = 20_000,
+        )
+    else BacktrackParams(randomSeed = 1L)
+
 private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
-    val base = program.defaultBacktrackParams ?: BacktrackParams()
+    val base = program.defaultBacktrackParams ?: defaultBacktrackParams(program)
     val params = base.copy(randomSeed = opts.randomSeed ?: base.randomSeed)
     runGeneric(BacktrackSolver(program.problem), params, program, opts, complete = true)
 }

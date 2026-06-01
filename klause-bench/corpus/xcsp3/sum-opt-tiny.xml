@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Self-authored XCSP3 COP smoke instance. License: internal. -->
+<!-- maximize 3a+2b+c s.t. a+b+c<=4, each in 0..2  =>  a=2,b=2,c=0 -> 10. -->
+<instance format="XCSP3" type="COP">
+  <variables>
+    <var id="a"> 0..2 </var>
+    <var id="b"> 0..2 </var>
+    <var id="c"> 0..2 </var>
+  </variables>
+  <constraints>
+    <sum>
+      <list> a b c </list>
+      <coeffs> 1 1 1 </coeffs>
+      <condition> (le,4) </condition>
+    </sum>
+  </constraints>
+  <objectives>
+    <maximize type="sum">
+      <list> a b c </list>
+      <coeffs> 3 2 1 </coeffs>
+    </maximize>
+  </objectives>
+</instance>
