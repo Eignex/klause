@@ -401,6 +401,18 @@ class AllFactorsOracleTest {
         ))
     }
 
+    @Test fun geost() {
+        // 2 boxes in 2D, each 2×2, origins ∈ [0,2]. Row-major origin = [o0x,o0y, o1x,o1y].
+        val f = Geost(
+            numDims = 2, numObjects = 2,
+            origin = intArrayOf(0, 1, 2, 3),
+            length = intArrayOf(2, 2, 2, 2),
+        )
+        check(f, intDomains = arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2),
+        ), exactProbe = true)
+    }
+
     // ---- Automata ----------------------------------------------------------------
 
     @Test fun regular() {

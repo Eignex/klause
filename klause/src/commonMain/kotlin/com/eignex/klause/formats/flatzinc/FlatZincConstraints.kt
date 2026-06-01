@@ -19,6 +19,7 @@ import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Diffn
+import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Regular
@@ -151,6 +152,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "cumulative", "fzn_cumulative" -> emitCumulative(c)
     "cumulatives", "fzn_cumulatives" -> emitCumulatives(c)
     "sliding_sum", "fzn_sliding_sum" -> emitSlidingSum(c)
+    "fzn_geost_nonoverlap_k", "geost_nonoverlap_k" -> emitGeostNonoverlapK(c)
     "disjunctive", "fzn_disjunctive",
     "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c)
 
@@ -1190,6 +1192,28 @@ internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
     val seq = evalIntConst(c.args[2]).toInt()
     val vs = evalIntVarArray(c.args[3])
     factors.add(SlidingSum(low = low, up = up, seq = seq, vs = vs))
+}
+
+/**
+ * `fzn_geost_nonoverlap_k(x1, w1, x2, w2)` — the k-dimensional pairwise non-overlap primitive
+ * that `geost` decomposes into (two boxes must be disjoint on at least one axis). Routes to a
+ * 2-object [Geost] factor (graded overlap-volume violation + separation repair) instead of the
+ * `exists`-over-clauses decomposition (issue #43). General `fzn_geost` lowers to many of these,
+ * so each pair gets the native graded gradient.
+ */
+internal fun FlatZincCompiler.emitGeostNonoverlapK(c: FznConstraint) {
+    require(c.args.size == 4) { "geost_nonoverlap_k expects 4 args (x1,w1,x2,w2), got ${c.args.size}" }
+    val x1 = evalIntVarArray(c.args[0])
+    val w1 = evalIntConstArray(c.args[1])
+    val x2 = evalIntVarArray(c.args[2])
+    val w2 = evalIntConstArray(c.args[3])
+    val k = x1.size
+    require(w1.size == k && x2.size == k && w2.size == k) { "geost_nonoverlap_k: dimension mismatch" }
+    factors.add(Geost(
+        numDims = k, numObjects = 2,
+        origin = x1 + x2,
+        length = w1 + w2,
+    ))
 }
 
 /** `disjunctive(starts, durations)` / `disjunctive_strict(...)`. Durations may be var. */
