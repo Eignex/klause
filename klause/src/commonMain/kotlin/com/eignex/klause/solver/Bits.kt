@@ -8,7 +8,7 @@ package com.eignex.klause.solver
  *
  * Not exposed beyond the solver package: the surface stays small on purpose.
  */
-class Bits(val size: Int) {
+internal class Bits(val size: Int) {
     @PublishedApi internal val words: LongArray = LongArray((size + 63) ushr 6)
 
     fun get(i: Int): Boolean {

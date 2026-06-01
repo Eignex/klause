@@ -23,7 +23,7 @@ import kotlin.math.abs
  *
  * "Lower is better": for minimization the objective is `V`; for maximization it is `−V`.
  */
-class FunctionalObjective internal constructor(
+internal class FunctionalObjective internal constructor(
     private val objectiveVar: Int,
     private val minimize: Boolean,
     /** Defining nodes in topological order — every node's inputs are leaves or earlier nodes. */

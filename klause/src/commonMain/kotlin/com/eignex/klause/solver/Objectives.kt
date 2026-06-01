@@ -29,7 +29,7 @@ fun Problem.maximizeInt(intVar: Int): LinearObjective {
 }
 
 /** Penalise the Boolean being true. */
-fun Problem.minimizeBool(boolVar: Int): LinearObjective {
+internal fun Problem.minimizeBool(boolVar: Int): LinearObjective {
     require(boolVar in 0 until numBoolVars) { "boolVar $boolVar out of [0, $numBoolVars)" }
     val arr = DoubleArray(numBoolVars)
     arr[boolVar] = 1.0
@@ -37,7 +37,7 @@ fun Problem.minimizeBool(boolVar: Int): LinearObjective {
 }
 
 /** Reward the Boolean being true. */
-fun Problem.maximizeBool(boolVar: Int): LinearObjective {
+internal fun Problem.maximizeBool(boolVar: Int): LinearObjective {
     require(boolVar in 0 until numBoolVars) { "boolVar $boolVar out of [0, $numBoolVars)" }
     val arr = DoubleArray(numBoolVars)
     arr[boolVar] = -1.0

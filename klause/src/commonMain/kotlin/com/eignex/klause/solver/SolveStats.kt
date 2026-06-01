@@ -61,7 +61,7 @@ data class SolveStats(
  * that fan out across threads (LS portfolio, parallel restarts) should keep one sink per
  * worker and merge their [SolveStats] snapshots after.
  */
-class SolveStatsSink(val backend: String) {
+internal class SolveStatsSink(val backend: String) {
     val nodes: CountStat = CountStat()
     val fails: CountStat = CountStat()
     val restarts: CountStat = CountStat()
