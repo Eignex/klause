@@ -107,28 +107,28 @@ class Subcircuit(val succ: IntArray) : LocalSearchFactor {
         }
         // Cycle decomposition restricted to included nodes (use successor only when in
         // range, not self-loop, and successor is also included — otherwise dead-end).
-        val UNVISITED = 0
-        val ON_STACK = 1
-        val DONE = 2
+        val unvisited = 0
+        val onStack = 1
+        val done = 2
         val markers = IntArray(n)
         val enterStep = IntArray(n)
         var globalStep = 0
         var numCycles = 0
         var nodesInCycles = 0
         for (start in 0 until n) {
-            if (!included[start] || markers[start] != UNVISITED) continue
+            if (!included[start] || markers[start] != unvisited) continue
             var cur = start
-            while (cur >= 0 && markers[cur] == UNVISITED && included[cur]) {
-                markers[cur] = ON_STACK
+            while (cur >= 0 && markers[cur] == unvisited && included[cur]) {
+                markers[cur] = onStack
                 enterStep[cur] = globalStep++
                 val s = effective[cur]
                 cur = if (s in 0 until n && s != cur && included[s]) s else -1
             }
-            if (cur >= 0 && markers[cur] == ON_STACK) {
+            if (cur >= 0 && markers[cur] == onStack) {
                 numCycles++
                 nodesInCycles += globalStep - enterStep[cur]
             }
-            for (i in 0 until n) if (markers[i] == ON_STACK) markers[i] = DONE
+            for (i in 0 until n) if (markers[i] == onStack) markers[i] = done
         }
         return abs(numCycles - 1) + (numIncluded - nodesInCycles) + numPointToExcluded + numOob
     }

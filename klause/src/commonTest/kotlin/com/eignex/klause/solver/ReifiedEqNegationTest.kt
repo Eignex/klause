@@ -36,7 +36,7 @@ class ReifiedEqNegationTest {
         // Hard to assert exact value without more structure; verify no Unsat.
 
         @Suppress("UNUSED_VARIABLE")
-        val _ok = impl
+        val ok = impl
     }
 
     @Test

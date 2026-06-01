@@ -22,7 +22,7 @@ class ProductReverseTest {
         // isn't returned. Tighter-result tests below cover the singleton case.
 
         @Suppress("UNUSED_VARIABLE")
-        val _ok = r
+        val ok = r
     }
 
     @Test

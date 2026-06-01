@@ -296,9 +296,9 @@ class Mdd(
 
         if (cost >= 0) {
             // Compute min/max path cost over fwd∩bwd reachable graph.
-            val INF = Long.MAX_VALUE / 4
-            val minCost = Array(n + 1) { LongArray(numStatesPerLayer[it]) { INF } }
-            val maxCost = Array(n + 1) { LongArray(numStatesPerLayer[it]) { -INF } }
+            val inf = Long.MAX_VALUE / 4
+            val minCost = Array(n + 1) { LongArray(numStatesPerLayer[it]) { inf } }
+            val maxCost = Array(n + 1) { LongArray(numStatesPerLayer[it]) { -inf } }
             minCost[0][initial] = 0L
             maxCost[0][initial] = 0L
             for (i in 0 until n) {
@@ -328,8 +328,8 @@ class Mdd(
                     p += recordStride
                 }
             }
-            var bestLo = INF
-            var bestHi = -INF
+            var bestLo = inf
+            var bestHi = -inf
             for (s in accepting) {
                 if (s in 0 until numStatesPerLayer[n] &&
                     ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L
@@ -338,7 +338,7 @@ class Mdd(
                     if (maxCost[n][s] > bestHi) bestHi = maxCost[n][s]
                 }
             }
-            if (bestLo == INF) return false
+            if (bestLo == inf) return false
             // Cost var is Int-typed: if the min path cost exceeds Int.MAX_VALUE (or the max
             // path cost is below Int.MIN_VALUE), the constraint is unsatisfiable. Clamping
             // bestLo down to Int.MAX_VALUE would otherwise leave Int.MAX_VALUE in the domain

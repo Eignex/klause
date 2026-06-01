@@ -470,7 +470,7 @@ class Cumulatives(
             }
         }
         val absT = if (peakT >= 0) peakT + ls.tLow else 0
-        val MAX_TARGETS = 4
+        val maxTargets = 4
         for (i in 0 until n) {
             val sv = starts[i]
             val sCur = state.assignment.intValue(sv)
@@ -491,14 +491,14 @@ class Cumulatives(
             // Generic single-var coverage (also drives the lower-bound / minimum-load case).
             if (sCur < sDom.max) sink.addChannelingIntSet(state, sv, sCur + 1)
             if (sCur > sDom.min) sink.addChannelingIntSet(state, sv, sCur - 1)
-            enumerateOrSample(state, sv, sCur, sDom, MAX_TARGETS, sink)
+            enumerateOrSample(state, sv, sCur, sDom, maxTargets, sink)
             // Machine var coverage.
             val mv = machines[i]
             val mCur = state.assignment.intValue(mv)
             val mDom = state.problem.intDomains[mv]
             if (mCur < mDom.max) sink.addChannelingIntSet(state, mv, mCur + 1)
             if (mCur > mDom.min) sink.addChannelingIntSet(state, mv, mCur - 1)
-            enumerateOrSample(state, mv, mCur, mDom, MAX_TARGETS, sink)
+            enumerateOrSample(state, mv, mCur, mDom, maxTargets, sink)
         }
     }
 

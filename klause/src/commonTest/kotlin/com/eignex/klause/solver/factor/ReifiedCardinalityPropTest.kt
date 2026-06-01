@@ -48,7 +48,7 @@ class ReifiedCardinalityPropTest {
         assertEquals(true, session.boolValue(2), "v2 should be forced true")
         // Silence unused warning.
         @Suppress("UNUSED_VARIABLE")
-        val _r = implied
+        val r = implied
     }
 
     @Test
@@ -79,7 +79,7 @@ class ReifiedCardinalityPropTest {
         assertEquals(false, session.boolValue(0), "v0 should be forced false")
         assertEquals(false, session.boolValue(1), "v1 should be forced false")
         @Suppress("UNUSED_VARIABLE")
-        val _r = implied
+        val r = implied
     }
 
     @Test

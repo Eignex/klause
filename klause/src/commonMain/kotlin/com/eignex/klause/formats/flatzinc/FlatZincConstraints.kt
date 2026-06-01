@@ -1040,8 +1040,8 @@ internal fun FlatZincCompiler.emitSymmetricAllDifferent(c: FznConstraint) {
 internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
     require(c.args.size == 6)
     val seq = evalIntVarArray(c.args[0])
-    val Q = evalIntConst(c.args[1]).toInt()
-    val S = evalIntConst(c.args[2]).toInt()
+    val numStates = evalIntConst(c.args[1]).toInt()
+    val numSymbols = evalIntConst(c.args[2]).toInt()
     val transitions = evalIntConstArray(c.args[3])
     val q0 = evalIntConst(c.args[4]).toInt()
     val fSet = c.args[5]
@@ -1050,7 +1050,7 @@ internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
         is FznExpr.IntRangeLit -> IntArray((fSet.hi - fSet.lo + 1).toInt()) { (fSet.lo + it).toInt() }
         else -> failHere("regular: expected set literal for F, got ${fSet::class.simpleName}")
     }
-    factors.add(Regular(seq, Q, S, transitions, q0, accepting))
+    factors.add(Regular(seq, numStates, numSymbols, transitions, q0, accepting))
 }
 
 /**

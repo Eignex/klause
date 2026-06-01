@@ -81,23 +81,23 @@ class CumulativeThetaTreeTest {
         // Same task set, different leaf orderings: the recurrence anchors at the
         // leftmost EST in the subtree, so EST-ascending leaf order is the one that
         // gives the correct envelope.
-        val a_est = 0
-        val a_e = 10L
-        val b_est = 5
-        val b_e = 4L
+        val aEst = 0
+        val aE = 10L
+        val bEst = 5
+        val bE = 4L
         val capacity = 1
 
         val ordered = CumulativeThetaTree(n = 2, capacity = capacity)
         ordered.setLeafOrder(intArrayOf(0, 1))
-        ordered.activate(0, a_est, a_e)
-        ordered.activate(1, b_est, b_e)
+        ordered.activate(0, aEst, aE)
+        ordered.activate(1, bEst, bE)
         // env = max(env(a) + e(b), env(b)) = max((0+10)+4, 5+4) = max(14, 9) = 14
         assertEquals(14L, ordered.envOfTheta())
 
         val swapped = CumulativeThetaTree(n = 2, capacity = capacity)
         swapped.setLeafOrder(intArrayOf(1, 0))
-        swapped.activate(0, a_est, a_e)
-        swapped.activate(1, b_est, b_e)
+        swapped.activate(0, aEst, aE)
+        swapped.activate(1, bEst, bE)
         // Now L holds b (est=5, e=4), R holds a (est=0, e=10).
         // env = max((1*5+4) + 10, (1*0+10)) = max(19, 10) = 19
         // Different — and wrong as a cumulative envelope. Documenting the contract:

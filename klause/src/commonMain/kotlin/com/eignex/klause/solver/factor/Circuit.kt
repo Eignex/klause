@@ -113,29 +113,29 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         // with next[i] = -1 are sinks. Walk from each unvisited start, track entry step
         // so a revisit can identify whether we closed a cycle (re-entered current path)
         // or merged into a previously-explored region (no new cycle).
-        val UNVISITED = 0
-        val ON_STACK = 1
-        val DONE = 2
+        val unvisited = 0
+        val onStack = 1
+        val done = 2
         val markers = IntArray(n) // 0 = unvisited
         val enterStep = IntArray(n)
         var globalStep = 0
         var numCycles = 0
         var nodesInCycles = 0
         for (start in 0 until n) {
-            if (markers[start] != UNVISITED) continue
+            if (markers[start] != unvisited) continue
             var cur = start
-            while (cur >= 0 && markers[cur] == UNVISITED) {
-                markers[cur] = ON_STACK
+            while (cur >= 0 && markers[cur] == unvisited) {
+                markers[cur] = onStack
                 enterStep[cur] = globalStep++
                 cur = next[cur]
             }
-            if (cur >= 0 && markers[cur] == ON_STACK) {
+            if (cur >= 0 && markers[cur] == onStack) {
                 // Returned to a node on the current path → cycle from `cur` to end-of-path.
                 numCycles++
                 nodesInCycles += globalStep - enterStep[cur]
             }
-            // Settle path nodes as DONE so they're never revisited.
-            for (i in 0 until n) if (markers[i] == ON_STACK) markers[i] = DONE
+            // Settle path nodes as done so they're never revisited.
+            for (i in 0 until n) if (markers[i] == onStack) markers[i] = done
         }
         return abs(numCycles - 1) + (n - nodesInCycles) + numSelfLoops + numOob
     }
@@ -302,18 +302,18 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
         if (n < 3) return
         // Compute cycle id per node from the current assignment.
         val cycleOf = IntArray(n) { -1 }
-        val UNVISITED = -1
+        val unvisited = -1
         var cycleId = 0
         val effective = IntArray(n) { i ->
             val s = state.assignment.intValue(succ[i])
             if (s < 0 || s >= n || s == i) -1 else s
         }
         for (start in 0 until n) {
-            if (cycleOf[start] != UNVISITED) continue
+            if (cycleOf[start] != unvisited) continue
             // Walk; detect cycle.
             val pathBuf = IntArrayList()
             var cur = start
-            while (cur >= 0 && cycleOf[cur] == UNVISITED && !pathBuf.contains(cur)) {
+            while (cur >= 0 && cycleOf[cur] == unvisited && !pathBuf.contains(cur)) {
                 pathBuf.add(cur)
                 cur = effective[cur]
             }
@@ -322,7 +322,7 @@ class Circuit(val succ: IntArray) : LocalSearchFactor {
                 for (idx in cycleStartIdx until pathBuf.size) cycleOf[pathBuf[idx]] = cycleId
                 cycleId++
             }
-            // Nodes outside any cycle (in tails) stay at UNVISITED; ignored for swaps.
+            // Nodes outside any cycle (in tails) stay at unvisited; ignored for swaps.
         }
         if (cycleId < 2) return // single cycle (or none) — no merge swaps.
         // Pick up to MAX_SWAP_CANDIDATES cross-cycle pairs.

@@ -317,23 +317,23 @@ class GlobalCardinality(
         }
 
         // ---- 2. Régin GAC via max-flow -----------------------------------------------
-        // Node layout: 0 = S, 1 = T, 2..2+n-1 = var nodes, 2+n..2+n+m-1 = cover nodes,
-        // (optional) 2+n+m = other node. Plus SS, ST appended for lower-bound reduction.
-        val S = 0
-        val T = 1
+        // Node layout: 0 = source, 1 = sink, 2..2+n-1 = var nodes, 2+n..2+n+m-1 = cover nodes,
+        // (optional) 2+n+m = other node. Plus superSource, superSink appended for lower-bound reduction.
+        val source = 0
+        val sink = 1
         val varNode = IntArray(n) { 2 + it }
         val covNode = IntArray(m) { 2 + n + it }
         val otherNode = if (anyOther) 2 + n + m else -1
         val baseNodes = 2 + n + m + (if (anyOther) 1 else 0)
-        val SS = baseNodes
-        val ST = baseNodes + 1
+        val superSource = baseNodes
+        val superSink = baseNodes + 1
         val totalNodes = baseNodes + 2
 
         // Edge list: parallel arrays (to, cap, rev). `headForward[i]` = first forward
         // edge index in `edgeTo` for node i; we just keep flat lists per node.
         val flow = FlowBuilder(totalNodes)
 
-        // S → x_i with bounds [1, 1]: reduces to cap 0, excess[S] -= 1, excess[x_i] += 1.
+        // source → x_i with bounds [1, 1]: reduces to cap 0, excess[source] -= 1, excess[x_i] += 1.
         // Encoded by accumulating into `excess` and adding zero-cap edge.
         val excess = IntArray(totalNodes)
         // Track xᵢ → cover_k edge indices so we can read out flow + check residual later.
@@ -341,11 +341,11 @@ class GlobalCardinality(
         val xToOtherEdgeIdx = IntArray(n) { -1 }
 
         for (i in 0 until n) {
-            // S → x_i lower bound 1, upper 1.
-            excess[S] -= 1
+            // source → x_i lower bound 1, upper 1.
+            excess[source] -= 1
             excess[varNode[i]] += 1
             // No residual capacity on this edge (l == h).
-            flow.addEdge(S, varNode[i], 0)
+            flow.addEdge(source, varNode[i], 0)
         }
 
         for (i in 0 until n) {
@@ -363,39 +363,39 @@ class GlobalCardinality(
 
         for (k in 0 until m) {
             if (lo[k] > hi[k]) return false
-            // cover_k → T with bounds [lo_k, hi_k]
+            // cover_k → sink with bounds [lo_k, hi_k]
             excess[covNode[k]] -= lo[k]
-            excess[T] += lo[k]
-            flow.addEdge(covNode[k], T, hi[k] - lo[k])
+            excess[sink] += lo[k]
+            flow.addEdge(covNode[k], sink, hi[k] - lo[k])
         }
         if (otherNode != -1) {
-            // other → T with bounds [0, n]; no excess shift.
-            flow.addEdge(otherNode, T, n)
+            // other → sink with bounds [0, n]; no excess shift.
+            flow.addEdge(otherNode, sink, n)
         }
-        // T → S back-edge to convert s-t feasibility into a circulation: bounds [n, n].
-        excess[T] -= n
-        excess[S] += n
-        flow.addEdge(T, S, 0)
+        // sink → source back-edge to convert s-t feasibility into a circulation: bounds [n, n].
+        excess[sink] -= n
+        excess[source] += n
+        flow.addEdge(sink, source, 0)
 
-        // SS / ST excess-balancing edges.
+        // superSource / superSink excess-balancing edges.
         var requiredSSFlow = 0
         for (v in 0 until baseNodes) {
             when {
                 excess[v] > 0 -> {
-                    flow.addEdge(SS, v, excess[v])
+                    flow.addEdge(superSource, v, excess[v])
                     requiredSSFlow += excess[v]
                 }
 
-                excess[v] < 0 -> flow.addEdge(v, ST, -excess[v])
+                excess[v] < 0 -> flow.addEdge(v, superSink, -excess[v])
             }
         }
 
-        // Edmonds-Karp max-flow from SS to ST. If the saturation of all ss-out edges
+        // Edmonds-Karp max-flow from superSource to superSink. If the saturation of all ss-out edges
         // is less than requiredSSFlow → infeasible.
-        val obtained = flow.maxFlow(SS, ST)
+        val obtained = flow.maxFlow(superSource, superSink)
         if (obtained < requiredSSFlow) return false
 
-        // ---- 3. SCC on residual graph (excluding SS, ST) -----------------------------
+        // ---- 3. SCC on residual graph (excluding superSource, superSink) -----------------------------
         val sccId = IntArray(baseNodes) { -1 }
         flow.computeSccResidual(baseNodes, sccId)
 

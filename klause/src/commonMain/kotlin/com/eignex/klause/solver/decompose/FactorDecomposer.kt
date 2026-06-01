@@ -811,7 +811,7 @@ object FactorDecomposer {
         val out = ArrayList<Factor>()
         val n = f.seq.size
         val numQ = f.numStates
-        val S = f.alphabetSize
+        val numSymbols = f.alphabetSize
         // q[0..n] aux ints. States are 1-based (0 = dead).
         val q = IntArray(n + 1) {
             ctx.freshInt(com.eignex.klause.solver.IntDomain(0, numQ))
@@ -820,8 +820,8 @@ object FactorDecomposer {
         out.add(Linear(intArrayOf(1), intArrayOf(q[0]), LinearOp.EQ, f.q0))
         for (i in 0 until n) {
             for (qCurr in 1..numQ) {
-                for (sym in 1..S) {
-                    val nextQ = f.transitions[(qCurr - 1) * S + (sym - 1)]
+                for (sym in 1..numSymbols) {
+                    val nextQ = f.transitions[(qCurr - 1) * numSymbols + (sym - 1)]
                     // aux ↔ (q[i] = qCurr ∧ seq[i] = sym)
                     val eqQ = ctx.freshBool()
                     val eqS = ctx.freshBool()
@@ -1601,7 +1601,7 @@ object FactorDecomposer {
                     // Touch aux so the unused-var warning is silenced; it's the placeholder
                     // counter we added above.
                     @Suppress("UNUSED_VARIABLE")
-                    val _t = auxCount
+                    val t = auxCount
                 }
 
                 f.countLow != null || f.countHigh != null -> {

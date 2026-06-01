@@ -173,14 +173,14 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
         maxDecisions: Long = Long.MAX_VALUE,
     ) {
         replaceAt(
-            SEARCH_KEY,
+            searchKey,
             SearchAnnotation(variableStrategy, valueStrategy, phaseSaving, lubyRestartBase, maxDecisions),
         )
     }
 
     /** Synthetic name under which the (at-most-one) search annotation is registered.
      *  Starts with `__` so it can't collide with a user-declared property. */
-    private val SEARCH_KEY: String get() = "__search"
+    private val searchKey: String get() = "__search"
 
     /** Register [entry] under [name], or under a uniquely-suffixed variant when [name]
      *  is already taken. `Schema.add` rejects duplicates and exposes no in-place mutator,

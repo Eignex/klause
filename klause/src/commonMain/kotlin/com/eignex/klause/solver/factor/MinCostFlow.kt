@@ -254,7 +254,7 @@ class MinCostFlow(
         var totalCost = 0L
         // For each source node, push out its supply.
         // We process by total supply iteratively until none remain.
-        val INF = Long.MAX_VALUE / 4
+        val inf = Long.MAX_VALUE / 4
         while (true) {
             // Find any source with positive supply and run SPFA shortest paths to all nodes.
             var src = -1
@@ -265,7 +265,7 @@ class MinCostFlow(
                 }
             }
             if (src == -1) break
-            val dist = LongArray(n) { INF }
+            val dist = LongArray(n) { inf }
             val prevArc = IntArray(n) { -1 }
             val prevNode = IntArray(n) { -1 }
             val inQueue = BooleanArray(n)
@@ -305,7 +305,7 @@ class MinCostFlow(
             }
             // Find any sink (supply < 0) with reachable distance; pick the cheapest.
             var bestSink = -1
-            var bestDist = INF
+            var bestDist = inf
             for (i in 0 until n) {
                 if (supply[i] < 0 && dist[i] < bestDist) {
                     bestDist = dist[i]
@@ -344,7 +344,7 @@ class MinCostFlow(
             supply[bestSink] += bottleneck
             totalCost += bottleneck * bestDist
             // Update potentials so that reduced costs stay non-negative.
-            for (i in 0 until n) if (dist[i] < INF) potential[i] += dist[i]
+            for (i in 0 until n) if (dist[i] < inf) potential[i] += dist[i]
         }
         return Triple(true, totalCost, potential)
     }

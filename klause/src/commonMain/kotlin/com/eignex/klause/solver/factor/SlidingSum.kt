@@ -118,16 +118,16 @@ class SlidingSum(val low: Int, val up: Int, val seq: Int, val vs: IntArray) : Lo
             }
         }
         // Generic coverage for the oracle / fine moves.
-        val MAX_TARGETS = 4
+        val maxTargets = 4
         for (v in vs) {
             val cur = state.assignment.intValue(v)
             val dom = state.problem.intDomains[v]
             if (cur < dom.max) sink.addChannelingIntSet(state, v, cur + 1)
             if (cur > dom.min) sink.addChannelingIntSet(state, v, cur - 1)
-            if (dom.size <= MAX_TARGETS) {
+            if (dom.size <= maxTargets) {
                 dom.forEach { t -> if (t != cur) sink.addChannelingIntSet(state, v, t) }
             } else {
-                repeat(MAX_TARGETS) {
+                repeat(maxTargets) {
                     val pick = dom.valueAt(state.rng.nextInt(dom.size))
                     if (pick != cur) sink.addChannelingIntSet(state, v, pick)
                 }

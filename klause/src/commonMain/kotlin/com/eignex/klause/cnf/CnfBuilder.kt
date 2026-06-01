@@ -13,8 +13,8 @@ class CnfBuilder {
 
     private val _clauses = mutableListOf<IntArray>()
     private var _numVars = 0
-    private var _falseLit: Int = -1
-    private var _trueLit: Int = -1
+    private var cachedFalseLit: Int = -1
+    private var cachedTrueLit: Int = -1
 
     val clauses: List<IntArray> get() = _clauses
     val numVars: Int get() = _numVars
@@ -69,19 +69,19 @@ class CnfBuilder {
     }
 
     fun falseLit(): Int {
-        if (_falseLit == -1) {
+        if (cachedFalseLit == -1) {
             val v = newVar()
             // Unit clause `¬v` forces v=false; positive literal of v evaluates to false.
             addClause(intArrayOf(Lit.make(v, positive = false)))
-            _falseLit = Lit.make(v, positive = true)
-            _trueLit = Lit.make(v, positive = false)
+            cachedFalseLit = Lit.make(v, positive = true)
+            cachedTrueLit = Lit.make(v, positive = false)
         }
-        return _falseLit
+        return cachedFalseLit
     }
 
     fun trueLit(): Int {
-        if (_trueLit == -1) falseLit()
-        return _trueLit
+        if (cachedTrueLit == -1) falseLit()
+        return cachedTrueLit
     }
 
     /** Literal `aux` such that `aux ↔ AND(inputs)`. Hash-consed. */

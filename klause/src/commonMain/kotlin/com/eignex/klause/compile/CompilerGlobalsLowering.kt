@@ -749,8 +749,8 @@ internal fun Compiler.Build.assertCostMddDecomposed(expr: CostMddExpr) {
 
 internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
     val n = expr.seq.size
-    val Q = expr.numStates
-    val S = expr.numSymbols
+    val numStates = expr.numStates
+    val numSymbols = expr.numSymbols
     val off = expr.symbolOffset
 
     // Try the native MDD path first — expand uniform DFA transitions into per-layer tables.
@@ -759,14 +759,14 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
     if (liftedSeq.all { it is IntRef } && liftedCost is IntRef) {
         // Build a single layer's transition rows then replicate per layer.
         val baseRows = mutableListOf<Int>()
-        for (q in 0 until Q) {
-            for (s in 0 until S) {
-                val dst = expr.transitions[q * S + s]
+        for (q in 0 until numStates) {
+            for (s in 0 until numSymbols) {
+                val dst = expr.transitions[q * numSymbols + s]
                 if (dst == 0) continue
                 baseRows += q
                 baseRows += s + off
                 baseRows += dst - 1
-                baseRows += expr.weights[q * S + s]
+                baseRows += expr.weights[q * numSymbols + s]
             }
         }
         if (baseRows.isNotEmpty()) {
@@ -779,7 +779,7 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
             starts[n] = flatTrans.size
             assertMddNative(
                 expr.seq,
-                List(n + 1) { Q },
+                List(n + 1) { numStates },
                 starts.toList(),
                 flatTrans,
                 expr.initial,
@@ -792,7 +792,7 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
 
     // Decomposition path: always emitted so the bit-blast pipeline (which skips the
     // propagation-only Mdd factor) still sees the constraint as primitive Table + Linear.
-    val stateRefs = Array(n + 1) { IntRef(newAuxIntVar(IntDomain(0, Q - 1))) }
+    val stateRefs = Array(n + 1) { IntRef(newAuxIntVar(IntDomain(0, numStates - 1))) }
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
     if (expr.accepting.isEmpty()) {
         assertExpr(IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(1)))
@@ -802,11 +802,11 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
 
     // Build the transition table as tuples (src, sym, dst, weight) — same shape across layers.
     val tuples = mutableListOf<List<Int>>()
-    for (q in 0 until Q) {
-        for (s in 0 until S) {
-            val dst = expr.transitions[q * S + s]
+    for (q in 0 until numStates) {
+        for (s in 0 until numSymbols) {
+            val dst = expr.transitions[q * numSymbols + s]
             if (dst == 0) continue // 0 means no transition (matches FlatZinc's `regular` convention)
-            tuples += listOf(q, s + off, dst - 1, expr.weights[q * S + s])
+            tuples += listOf(q, s + off, dst - 1, expr.weights[q * numSymbols + s])
         }
     }
     val wLo = tuples.minOfOrNull { it[3] } ?: 0

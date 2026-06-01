@@ -253,7 +253,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
     /** LBD (Literal Block Distance) per learned clause, parallel to [_learnedClauses].
      *  Glucose-style glue metric: lower = more re-usable. Forgetting policies key on
      *  this to decide which clauses to drop. */
-    private val _learnedLbd: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    private val learnedLbds: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
 
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
@@ -270,7 +270,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
     /**
      * Register a learned clause and return its assigned factor id. Performs four things:
      *   - append to [_learnedClauses];
-     *   - record the clause's [lbd] in [_learnedLbd] (parallel array);
+     *   - record the clause's [lbd] in [learnedLbds] (parallel array);
      *   - grow [_refPayload] by one slot so [Clause.propagate]'s
      *     `state.refPayload[factorId]` access stays in-bounds;
      *   - install the clause's initial watch literals in [boolWatchersByLit] so it
@@ -282,7 +282,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
     fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause, lbd: Int): Int {
         val newFid = totalFactorCount
         _learnedClauses.add(clause)
-        _learnedLbd.add(lbd)
+        learnedLbds.add(lbd)
         _refPayload.add(null)
         val watchers = clause.initialBoolWatchers
         if (watchers != null) {
@@ -292,14 +292,14 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
     }
 
     /** Read-only view of LBDs for tests / introspection. Parallel to [learnedClauses]. */
-    fun learnedClauseLbd(learnedIndex: Int): Int = _learnedLbd[learnedIndex]
+    fun learnedClauseLbd(learnedIndex: Int): Int = learnedLbds[learnedIndex]
 
     /**
      * Prune the learned-clause database. The [keep] predicate decides per (learnedIndex,
      * lbd) whether to retain that clause; dropped clauses' factor ids vanish and the
      * remaining clauses are renumbered contiguously starting at `problem.numFactors`.
      * Three things are rebuilt:
-     *   - [_learnedClauses] / [_learnedLbd] compacted to the kept entries in order;
+     *   - [_learnedClauses] / [learnedLbds] compacted to the kept entries in order;
      *   - the learned-clause tail of [_refPayload] compacted similarly;
      *   - every list in [boolWatchersByLit] walked once, with learned factor ids
      *     remapped through `oldFid → newFid` or removed when dropped.
@@ -314,23 +314,23 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
         val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
         var newCount = 0
         for (i in 0 until n) {
-            remap[i] = if (keep(i, _learnedLbd[i])) newCount++ else -1
+            remap[i] = if (keep(i, learnedLbds[i])) newCount++ else -1
         }
         if (newCount == n) return // nothing dropped
 
-        // Compact _learnedClauses + _learnedLbd in place using a two-pointer walk —
+        // Compact _learnedClauses + learnedLbds in place using a two-pointer walk —
         // every kept entry slides down to its new position; tail beyond newCount is
         // trimmed at the end.
         var w = 0
         for (i in 0 until n) {
             if (remap[i] >= 0) {
                 _learnedClauses[w] = _learnedClauses[i]
-                _learnedLbd[w] = _learnedLbd[i]
+                learnedLbds[w] = learnedLbds[i]
                 w++
             }
         }
         while (_learnedClauses.size > newCount) _learnedClauses.removeAt(_learnedClauses.size - 1)
-        _learnedLbd.truncateTo(newCount)
+        learnedLbds.truncateTo(newCount)
 
         // Compact the learned tail of _refPayload similarly. Static-factor entries stay
         // at indices [0, problem.numFactors) untouched.
@@ -716,7 +716,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
     /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
      *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
      *  a singleton, so this never allocates. Read-only: [undoTo] only iterates it. */
-    private val EMPTY_PAYLOADS: Map<Int, SnapshottablePayload> = emptyMap()
+    private val emptyPayloads: Map<Int, SnapshottablePayload> = emptyMap()
 
     /** Reusable conflict analyzer for this state — one instance whose scratch buffers
      *  persist across conflicts instead of reallocating per analysis. Single-threaded
@@ -1200,7 +1200,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
 
     /** Capture a [LevelMark] at the current state. Cheap: four ints plus a snapshotCopy of
      *  each [SnapshottablePayload]. The map is allocated only when at least one payload is
-     *  present (Table / Mdd factors); the common no-payload case shares [EMPTY_PAYLOADS] and
+     *  present (Table / Mdd factors); the common no-payload case shares [emptyPayloads] and
      *  never allocates per push. */
     fun mark(): LevelMark {
         var payloads: HashMap<Int, SnapshottablePayload>? = null
@@ -1216,7 +1216,7 @@ class PropagationState(val problem: Problem, assumptions: Assumptions) {
             ltdvSize = levelToDecisionVar.size,
             pinOrderSize = boolPinOrder.size,
             atomCount = atomIntVar.size,
-            snapshottablePayloads = payloads ?: EMPTY_PAYLOADS,
+            snapshottablePayloads = payloads ?: emptyPayloads,
         )
     }
 

@@ -794,7 +794,7 @@ class Cumulative(
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0
         val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else IntArray(0)
-        val MAX_TARGETS = 4
+        val maxTargets = 4
         for (i in 0 until n) {
             val v = starts[i]
             val cur = state.assignment.intValue(v)
@@ -810,10 +810,10 @@ class Cumulative(
             }
             if (cur < dom.max) sink.addChannelingIntSet(state, v, cur + 1)
             if (cur > dom.min) sink.addChannelingIntSet(state, v, cur - 1)
-            if (dom.size <= MAX_TARGETS) {
+            if (dom.size <= maxTargets) {
                 dom.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }
             } else {
-                repeat(MAX_TARGETS) {
+                repeat(maxTargets) {
                     val pick = dom.valueAt(state.rng.nextInt(dom.size))
                     if (pick != cur) sink.addChannelingIntSet(state, v, pick)
                 }
