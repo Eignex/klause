@@ -93,7 +93,7 @@ object Xcsp3 {
             val values = HashSet<Int>()
             for (tok in text.split(Regex("\\s+")).filter { it.isNotBlank() }) {
                 val r = tok.split("..")
-                if (r.size == 2) (r[0].toInt()..r[1].toInt()).forEach { values.add(it) } else values.add(tok.toInt())
+                if (r.size == 2) for (v in r[0].toInt()..r[1].toInt()) values.add(v) else values.add(tok.toInt())
             }
             if (values.isEmpty()) throw UnsupportedXcsp3Exception("empty domain")
             val lo = values.min()
@@ -386,6 +386,7 @@ object Xcsp3 {
             )
         }
 
+        @Suppress("ThrowsCount") // one guarded throw per unsupported cumulative shape
         private fun cumulative(e: XmlElement) {
             val starts = refList(e.child("origins")!!.textContent).toIntArray()
             val durations = parseInts(e.child("lengths")?.textContent)

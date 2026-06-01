@@ -492,8 +492,8 @@ object BitBlaster {
         val product = b.signedMultiply(aSigned, bSigned)
         // Sign-extend whichever side is shorter so unsignedEq can compare bit-for-bit.
         val targetWidth = maxOf(product.size, rSigned.size)
-        val productExt = signExtend(b, product, targetWidth)
-        val rExt = signExtend(b, rSigned, targetWidth)
+        val productExt = signExtend(product, targetWidth)
+        val rExt = signExtend(rSigned, targetWidth)
         b.addClause(intArrayOf(b.unsignedEq(productExt, rExt)))
     }
 
@@ -521,7 +521,7 @@ object BitBlaster {
     }
 
     /** Sign-extend a two's-complement bit-vector to [width]. */
-    private fun signExtend(b: CnfBuilder, bits: IntArray, width: Int): IntArray {
+    private fun signExtend(bits: IntArray, width: Int): IntArray {
         if (bits.size >= width) return bits.copyOfRange(0, width)
         val sign = bits.last()
         val out = IntArray(width)
@@ -574,6 +574,7 @@ object BitBlaster {
     }
 
     /** Bitblast [Geost] as pairwise Or-of-LE separation across dimensions. */
+    @Suppress("UnusedParameter") // `problem` kept for signature symmetry with the emit dispatch
     private fun emitGeost(b: CnfBuilder, f: Geost, intBits: Array<IntArray>, intMin: IntArray, problem: Problem) {
         val d = f.numDims
         val n = f.numObjects
@@ -845,6 +846,7 @@ object BitBlaster {
      * decoded). `succ` values are 0-indexed in `[0, n)`; the compiler channels any value
      * offset away before the factor is built.
      */
+    @Suppress("UnusedParameter") // `problem` kept for signature symmetry with the emit dispatch
     private fun emitCircuit(
         b: CnfBuilder,
         succ: IntArray,
@@ -1097,6 +1099,7 @@ object BitBlaster {
     /** `inverse(f, g)`: `f[i] = j ⇔ g[j − gOffset + fOffset] = i`. Reused by
      *  [SymmetricAllDifferent] with `f = g`. Channels biconditionally over the logical index
      *  ranges, with range clamps making each side a permutation. */
+    @Suppress("UnusedParameter") // `problem` kept for signature symmetry with the emit dispatch
     private fun emitInverse(
         b: CnfBuilder,
         fArr: IntArray,

@@ -333,7 +333,8 @@ class PropagationTest {
             factors = arrayOf<Factor>(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5)),
         )
         val r = implied(p.propagate())
-        // y forced to 0, x's domain narrowed: 0 already pinned for y. Force Linear(intArrayOf(1), intArrayOf(x), LinearOp.LE, 3) to get singleton
+        // y forced to 0, x's domain narrowed: 0 already pinned for y. Force
+        // Linear(intArrayOf(1), intArrayOf(x), LinearOp.LE, 3) to get singleton
         // — instead just check x's lower bound by adding IntLeq.
         val p2 = Problem(
             numBoolVars = 0,

@@ -76,7 +76,8 @@ class Cumulative(
 
     init {
         require(starts.size == durations.size && starts.size == resources.size) {
-            "Cumulative arrays must match: starts=${starts.size} durations=${durations.size} resources=${resources.size}"
+            "Cumulative arrays must match: starts=${starts.size} " +
+                "durations=${durations.size} resources=${resources.size}"
         }
         require(capacity >= 0) { "Cumulative capacity must be ≥ 0, got $capacity" }
         for (i in durations.indices) {
@@ -117,8 +118,6 @@ class Cumulative(
 
     private val n: Int = starts.size
 
-    /** Variable role: which side of a task the changed int-var represents. */
-    private enum class VarRole { START, DURATION, RESOURCE, CAPACITY }
     private val startPos: Map<Int, Int> = starts.withIndex().associate { (i, v) -> v to i }
     private val durPos: Map<Int, Int> =
         if (durationVars.isEmpty()) emptyMap() else durationVars.withIndex().associate { (i, v) -> v to i }

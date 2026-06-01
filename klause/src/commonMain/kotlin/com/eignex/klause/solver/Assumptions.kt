@@ -193,7 +193,18 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = boolValues.copyOf()
             nv[idx] = value
-            Assumptions(boolKeys, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
+            Assumptions(
+                boolKeys,
+                nv,
+                intKeys,
+                intValues,
+                intMinKeys,
+                intMinValues,
+                intMaxKeys,
+                intMaxValues,
+                intHoleVarIds,
+                intHoleValues,
+            )
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(boolKeys.size + 1)
@@ -204,7 +215,18 @@ class Assumptions internal constructor(
             nv[insert] = value
             boolKeys.copyInto(nk, insert + 1, insert)
             boolValues.copyInto(nv, insert + 1, insert)
-            Assumptions(nk, nv, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
+            Assumptions(
+                nk,
+                nv,
+                intKeys,
+                intValues,
+                intMinKeys,
+                intMinValues,
+                intMaxKeys,
+                intMaxValues,
+                intHoleVarIds,
+                intHoleValues,
+            )
         }
     }
 
@@ -244,7 +266,18 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = intValues.copyOf()
             nv[idx] = value
-            Assumptions(boolKeys, boolValues, intKeys, nv, newMinK, newMinV, newMaxK, newMaxV, intHoleVarIds, intHoleValues)
+            Assumptions(
+                boolKeys,
+                boolValues,
+                intKeys,
+                nv,
+                newMinK,
+                newMinV,
+                newMaxK,
+                newMaxV,
+                intHoleVarIds,
+                intHoleValues,
+            )
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intKeys.size + 1)
@@ -266,7 +299,18 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = intMinValues.copyOf()
             nv[idx] = maxOf(nv[idx], value)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, nv, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
+            Assumptions(
+                boolKeys,
+                boolValues,
+                intKeys,
+                intValues,
+                intMinKeys,
+                nv,
+                intMaxKeys,
+                intMaxValues,
+                intHoleVarIds,
+                intHoleValues,
+            )
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intMinKeys.size + 1)
@@ -277,7 +321,18 @@ class Assumptions internal constructor(
             nv[insert] = value
             intMinKeys.copyInto(nk, insert + 1, insert)
             intMinValues.copyInto(nv, insert + 1, insert)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, nk, nv, intMaxKeys, intMaxValues, intHoleVarIds, intHoleValues)
+            Assumptions(
+                boolKeys,
+                boolValues,
+                intKeys,
+                intValues,
+                nk,
+                nv,
+                intMaxKeys,
+                intMaxValues,
+                intHoleVarIds,
+                intHoleValues,
+            )
         }
     }
 
@@ -320,7 +375,18 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = intMaxValues.copyOf()
             nv[idx] = minOf(nv[idx], value)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, intMaxKeys, nv, intHoleVarIds, intHoleValues)
+            Assumptions(
+                boolKeys,
+                boolValues,
+                intKeys,
+                intValues,
+                intMinKeys,
+                intMinValues,
+                intMaxKeys,
+                nv,
+                intHoleVarIds,
+                intHoleValues,
+            )
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intMaxKeys.size + 1)
@@ -331,7 +397,18 @@ class Assumptions internal constructor(
             nv[insert] = value
             intMaxKeys.copyInto(nk, insert + 1, insert)
             intMaxValues.copyInto(nv, insert + 1, insert)
-            Assumptions(boolKeys, boolValues, intKeys, intValues, intMinKeys, intMinValues, nk, nv, intHoleVarIds, intHoleValues)
+            Assumptions(
+                boolKeys,
+                boolValues,
+                intKeys,
+                intValues,
+                intMinKeys,
+                intMinValues,
+                nk,
+                nv,
+                intHoleVarIds,
+                intHoleValues,
+            )
         }
     }
 

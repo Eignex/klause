@@ -224,7 +224,8 @@ internal fun Compiler.Build.assertSetNominalIn(expr: SetNominalIn) {
     val set = materializeSet(expr.set)
     val setName = setRefName(expr.set)
         ?: error(
-            "set membership of label '${expr.label}' requires a nominal-set var on the right, not a compound expression",
+            "set membership of label '${expr.label}' requires a nominal-set var on the right, " +
+                "not a compound expression",
         )
     val labels = setLabelOrder[setName]
         ?: error("set '$setName' is an integer-universe set; use `intVar inSet $setName` instead")

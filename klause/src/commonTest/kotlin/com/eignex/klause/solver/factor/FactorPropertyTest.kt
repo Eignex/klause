@@ -296,14 +296,16 @@ class FactorPropertyTest {
                     is Move.BoolFlip -> {
                         assertTrue(
                             move.varId in factor.boolVars,
-                            "${factor::class.simpleName} proposed flip of var ${move.varId} not in boolVars ${factor.boolVars.toList()}",
+                            "${factor::class.simpleName} proposed flip of var ${move.varId} " +
+                                "not in boolVars ${factor.boolVars.toList()}",
                         )
                     }
 
                     is Move.IntSet -> {
                         assertTrue(
                             move.varId in factor.intVars,
-                            "${factor::class.simpleName} proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}",
+                            "${factor::class.simpleName} proposed IntSet on var ${move.varId} " +
+                                "not in intVars ${factor.intVars.toList()}",
                         )
                         val d = problem.intDomains[move.varId]
                         assertTrue(

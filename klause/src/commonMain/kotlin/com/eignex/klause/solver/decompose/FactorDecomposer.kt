@@ -987,7 +987,9 @@ object FactorDecomposer {
                 val ay = ctx.freshBool()
                 val bx = ctx.freshBool()
                 val by = ctx.freshBool()
-                val opX = if (f.nonStrict) LinearOp.LE else LinearOp.LE // strict not natively expressible — use LE with bound +1
+                // Strict `<` is not natively expressible, so both cases use LE; strictness is
+                // folded into the bound via the `+1` adjustments below.
+                val opX = LinearOp.LE
                 val xAdj = if (f.nonStrict) -f.widths[i] else -f.widths[i] + 1
                 val xAdjRev = if (f.nonStrict) -f.widths[j] else -f.widths[j] + 1
                 val yAdj = if (f.nonStrict) -f.heights[i] else -f.heights[i] + 1

@@ -199,6 +199,7 @@ internal class OznEvaluator(items: List<OznItem>) {
         return OznValue.ArrayV(out)
     }
 
+    @Suppress("ThrowsCount") // one guarded throw per malformed-call shape; splitting would obscure the dispatch
     private fun evalCall(c: OznExpr.Call, ctx: Context): OznValue {
         val args = c.args.map { eval(it, ctx) }
         return when (c.name) {

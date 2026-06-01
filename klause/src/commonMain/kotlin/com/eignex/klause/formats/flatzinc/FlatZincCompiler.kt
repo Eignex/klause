@@ -201,7 +201,7 @@ internal class FlatZincCompiler(
             // Parameter arrays also become FlatZincArray entries so output items can
             // address them by name.
             (params[d.name] as? ParamValue.Array)?.let { arr ->
-                arrays[d.name] = arrayToFlatZincArray(d.name, arr)
+                arrays[d.name] = arrayToFlatZincArray(arr)
             }
             return
         }
@@ -533,7 +533,7 @@ internal class FlatZincCompiler(
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
-    internal fun arrayToFlatZincArray(name: String, arr: ParamValue.Array): FlatZincArray = arr.arr
+    internal fun arrayToFlatZincArray(arr: ParamValue.Array): FlatZincArray = arr.arr
 
     /** Constant-evaluate [e] as an integer. */
     internal fun evalIntConst(e: FznExpr): Long = when (e) {

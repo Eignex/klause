@@ -522,14 +522,16 @@ object SmtLibQfLia {
         }
 
         private fun hardLinear(t: SExpr.SList): Linear {
-            val (vars, coeffs, op, bound) = relationToLinear(t)
-            return Linear(coeffs, vars, op, bound)
+            val rel = relationToLinear(t)
+            return Linear(rel.coeffs, rel.vars, rel.op, rel.bound)
         }
 
         private fun reifyRelation(t: SExpr.SList): Int {
-            val (vars, coeffs, op, bound) = relationToLinear(t)
+            val rel = relationToLinear(t)
             val aux = newBool()
-            factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = coeffs, vars = vars, op = op, bound = bound))
+            factors.add(
+                ReifiedLinear(auxBoolVar = aux, coeffs = rel.coeffs, vars = rel.vars, op = rel.op, bound = rel.bound),
+            )
             return Lit.make(aux, true)
         }
 

@@ -164,9 +164,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "arg_sort_int", "fzn_arg_sort_int", "klause_arg_sort_int", "arg_sort" -> emitArgSort(c)
 
-    "symmetric_all_different", "fzn_symmetric_all_different", "klause_symmetric_all_different" -> emitSymmetricAllDifferent(
-        c,
-    )
+    "symmetric_all_different", "fzn_symmetric_all_different", "klause_symmetric_all_different" ->
+        emitSymmetricAllDifferent(c)
 
     "inverse", "fzn_inverse", "klause_inverse" -> emitInverse(c, withOffsets = false)
 
@@ -757,7 +756,8 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
     } else {
         (a as FloatRef.Const).value
     }
-    // Build a synthetic float_lin_* invocation: 1·a − 1·b op 0  ⇒  sign · var + (-sign) · other = -constPart on var side.
+    // Build a synthetic float_lin_* invocation: 1·a − 1·b op 0  ⇒
+    // sign · var + (-sign) · other = -constPart on var side.
     // Simpler: use the existing emitFloatLinear by constructing scaled coefficients/bound
     // directly, without round-tripping through FznExpr.
     val step = if (varSide.buckets > 1) (varSide.hi - varSide.lo) / (varSide.buckets - 1) else 0.0
@@ -2877,8 +2877,9 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
         for (vi in xDom.min..xDom.max) {
             val yIdx = vi - xDom.min
             if (yIdx !in ys.indices) {
-                // x can't realistically take value vi (no corresponding ys entry); forbid.
-                factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf(/* unsat sentinel */)))
+                // x can't realistically take value vi (no corresponding ys entry); forbid via
+                // an empty clause (unsat sentinel).
+                factors.add(com.eignex.klause.solver.factor.Clause(intArrayOf()))
                 continue
             }
             val ySet = ys[yIdx]
