@@ -97,14 +97,22 @@ object AnytimeMetric {
         var best: Double? = null
         var solutions = 0
         var provedOptimal = false
-        for (r in stream()) {
-            if (r is MinimizeResult.WithSample) {
-                val now = System.currentTimeMillis() - t0
-                if (firstMs < 0) firstMs = now
-                if (best == null || r.objective < best!!) { best = r.objective; bestMs = now }
-                solutions++
-                if (r is MinimizeResult.Optimal) provedOptimal = true
+        // A solver that can't model the instance (e.g. the reference adapter hits an
+        // unsupported factor) must not abort the whole sweep — record what was produced (often
+        // nothing) and move on. The instance still appears in the report with that solver's
+        // results blank, so "reference can't model this" reads distinctly from "no incumbent".
+        try {
+            for (r in stream()) {
+                if (r is MinimizeResult.WithSample) {
+                    val now = System.currentTimeMillis() - t0
+                    if (firstMs < 0) firstMs = now
+                    if (best == null || r.objective < best!!) { best = r.objective; bestMs = now }
+                    solutions++
+                    if (r is MinimizeResult.Optimal) provedOptimal = true
+                }
             }
+        } catch (e: Exception) {
+            System.err.println("[anytime] solver aborted on this instance: ${e.message}")
         }
         return Anytime(if (firstMs < 0) -1L else firstMs, if (bestMs < 0) -1L else bestMs, best, solutions, provedOptimal)
     }
