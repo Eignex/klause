@@ -21,6 +21,14 @@ object Reports {
         println("wrote $path")
     }
 
+    /** Write a Markdown summary next to the JSON report. */
+    fun writeMarkdown(path: String, md: Markdown) {
+        val file = File(path)
+        file.parentFile?.mkdirs()
+        file.writeText(md.toString())
+        println("wrote $path")
+    }
+
     fun readGitSha(): String? = runCatching {
         val proc = ProcessBuilder("git", "rev-parse", "HEAD")
             .redirectErrorStream(true)

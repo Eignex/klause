@@ -4,7 +4,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
 
 /** Which measurement a target runs. */
-enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY, ANYTIME }
+enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY, ANYTIME, COVERAGE }
 
 /**
  * A pre-configured bench: a set of catalog suites bound to a [metric] (and a [budget]). The
@@ -41,6 +41,8 @@ object Targets {
         Target("mzn-anytime", "Anytime optimization (klause-LS vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.ANYTIME, Budget(timeoutMillis = 5_000)),
         Target("smtlib-parity", "Differential parity (klause vs Choco) over the SMT-LIB QF_LIA set", listOf("smtlib-core"), MetricKind.PARITY),
         Target("xcsp3-parity", "Differential parity (klause vs Choco) over the XCSP3 set", listOf("xcsp3-core"), MetricKind.PARITY),
+        Target("mzn-coverage-smoke", "Native-predicate coverage over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.COVERAGE),
+        Target("mzn-coverage", "Native-predicate coverage over the MiniZinc Challenge benchmarks (fetched)", listOf("mzn-bench"), MetricKind.COVERAGE),
         // OR-Tools-referenced variants (same suites, OR-Tools CP-SAT as the trusted reference).
         Target("parity-core-ortools", "Differential parity (klause vs OR-Tools) over the in-process core", IN_PROCESS_CORE, MetricKind.PARITY, reference = Backend.ORTOOLS),
         Target("mzn-parity-ortools", "Differential parity (klause vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY, reference = Backend.ORTOOLS),
