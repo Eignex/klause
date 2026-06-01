@@ -9,8 +9,12 @@ import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
+import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import java.time.Instant
 import kotlinx.serialization.Serializable
 
@@ -81,7 +85,20 @@ object AnytimeMetric {
 
     private fun row(entry: ResolvedProblem, budget: Budget, ref: Reference): AnytimeRow {
         val obj = entry.objective!!
-        val k = anytime { LocalSearchSolver(entry.problem).improvements(obj, lsParams(budget)) }
+        // Mirror the shipped LS configuration (klause-ls.msc → CLI): CBLS for both the satisfy
+        // fight and the objective descent, with the functional (gradient-bearing) objective when
+        // the model provides one. A bare LocalSearchSolver(problem) would use the ProbSat default
+        // with no objective shaping — not representative of the product. The reference keeps the
+        // plain (linear) objective, which its native model builder requires.
+        val tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
+        val solver = LocalSearchSolver(
+            entry.problem,
+            strategy = Cbls(tabu = tabu),
+            optimizeStrategy = Cbls(tabu = tabu),
+            pairSwapBudget = 1024,
+        )
+        val klauseObj = entry.lsObjective ?: obj
+        val k = anytime { solver.improvements(klauseObj, lsParams(budget)) }
         val r = anytime { ref.improvements(entry.problem, obj, budget) }
         val gap = if (k.best != null && r.best != null) k.best - r.best else null
         return AnytimeRow(entry.name, k.firstMs, k.bestMs, k.best, k.solutions,
@@ -119,8 +136,13 @@ object AnytimeMetric {
 
     private fun lsParams(budget: Budget): LocalSearchParams {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        return LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 1L)
-            .withCancellation(Cancellation { System.currentTimeMillis() > deadline }) as LocalSearchParams
+        // λ=1.0 cost shaping folds the objective delta into move scoring — without it CBLS is
+        // objective-blind and only descends opportunistically via constraint repair (mirrors
+        // the CLI's runWithLocalSearch).
+        return LocalSearchParams(
+            maxFlips = Long.MAX_VALUE, randomSeed = 1L,
+            costShaping = CostShaping.Linear(lambda = 1.0),
+        ).withCancellation(Cancellation { System.currentTimeMillis() > deadline }) as LocalSearchParams
     }
 
     private fun fmt(v: Double?): String = v?.let { "%.1f".format(it) } ?: "—"
