@@ -4,6 +4,8 @@ import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
+import com.eignex.klause.ortools.OrToolsParams
+import com.eignex.klause.ortools.OrToolsSolver
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -31,10 +33,10 @@ enum class Backend {
     LOGICNG,
     /** Exhaustive enumeration; only viable when the assignment space is tiny. */
     BRUTE_FORCE,
-    /** Choco Solver, complete-search reference adapter (phase 2, `klause-choco`). */
+    /** Choco Solver, complete-search reference adapter (`klause-choco`). */
     CHOCO,
-    /** OscaR.cbls, local-search reference adapter (phase 2, `klause-oscar`). */
-    OSCAR_CBLS,
+    /** OR-Tools CP-SAT, anytime / local-search reference adapter (`klause-ortools`). */
+    ORTOOLS,
 }
 
 /** A named solver configuration: a [Backend] plus its pre-bound params. */
@@ -120,12 +122,26 @@ private class ChocoBench(
     override fun samplesSequence() = s.samples(params)
 }
 
+private class OrToolsBench(
+    override val problem: Problem,
+    private val params: OrToolsParams = OrToolsParams(),
+) : InProcessSolver {
+    private val s = OrToolsSolver(problem)
+    override val name = "ortools"
+    override fun solve() = s.solve(params)
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
+    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
+}
+
 object Solvers {
     val KLAUSE_LS = SolverConfig("local-search", Backend.KLAUSE_LS)
     val KLAUSE_COMPLETE = SolverConfig("backtrack", Backend.KLAUSE_COMPLETE)
     val LOGICNG = SolverConfig("logicng", Backend.LOGICNG)
     val BRUTE_FORCE = SolverConfig("brute-force", Backend.BRUTE_FORCE)
     val CHOCO = SolverConfig("choco", Backend.CHOCO)
+    val ORTOOLS = SolverConfig("ortools", Backend.ORTOOLS)
 
     /** Build a bound solver for [problem]. */
     fun build(config: SolverConfig, problem: Problem): InProcessSolver = when (config.backend) {
@@ -134,7 +150,7 @@ object Solvers {
         Backend.LOGICNG -> LogicNGBench(problem)
         Backend.BRUTE_FORCE -> BruteForceBench(problem)
         Backend.CHOCO -> ChocoBench(problem)
-        Backend.OSCAR_CBLS -> error("OscaR.cbls LS reference adapter is not yet wired")
+        Backend.ORTOOLS -> OrToolsBench(problem)
     }
 
     /** The default in-process portfolio, mirroring the legacy `defaultSolvers`: LS +

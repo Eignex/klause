@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.metric.AnytimeMetric
 import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.ParityMetric
 import com.eignex.klause.bench.metric.TimeMetric
@@ -28,6 +29,7 @@ object BenchCli {
         println("=== target '${target.id}' — ${target.description} ===")
         when (target.metric) {
             MetricKind.PARITY -> ParityMetric.run(BenchLoad.resolve(target.suiteIds), target.budget)
+            MetricKind.ANYTIME -> AnytimeMetric.run(BenchLoad.resolve(target.suiteIds), target.budget)
             else -> {
                 val corpus = BenchLoad.loadAndVerify(target.suiteIds)
                 when (target.metric) {
@@ -35,7 +37,7 @@ object BenchCli {
                     MetricKind.TIME -> TimeMetric.run(corpus.benchEntries)
                     MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
                     MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
-                    MetricKind.PARITY -> error("unreachable")
+                    MetricKind.PARITY, MetricKind.ANYTIME -> error("unreachable")
                 }
             }
         }
