@@ -109,6 +109,7 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
             for ((name, entry) in def.entries) {
                 when (entry) {
                     is BoolSpec -> boolVarIdByName[name] = newBoolVar()
+                    is com.eignex.klause.ast.PresenceSpec -> boolVarIdByName[name] = newBoolVar()
                     is NominalSpec -> {
                         val ids = LinkedHashMap<String, Int>()
                         for (label in entry.labels) ids[label] = newBoolVar()
@@ -198,10 +199,11 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
         }
 
         /**
-         * Emit `¬present → value = default` for every optional variable. An opt var named
-         * `X` is declared (by [com.eignex.klause.schema.VariableSchema.optIntVar] and friends)
-         * alongside a synthetic presence Boolean named `X$PRESENCE_SUFFIX`; we detect the pair
-         * by that naming convention. Default per kind:
+         * Emit `¬present → value = default` for every optional variable. An opt var is declared
+         * (by [com.eignex.klause.schema.VariableSchema.optIntVar] and friends) alongside a
+         * presence Boolean carrying a [com.eignex.klause.ast.PresenceSpec] that names the value
+         * variable it gates; we detect the pair by that marker — explicit and type-driven, so an
+         * unrelated bool can never be misread as a presence flag. Default per kind:
          *  - int     → `0` coerced into `[min, max]` (always representable, so the pin can never
          *              accidentally force `present` true by being unsatisfiable),
          *  - bool    → `false`,
@@ -209,8 +211,8 @@ class Compiler(private val config: com.eignex.klause.config.KlauseConfig = com.e
          */
         private fun emitOptVarPins(def: SchemaDef<SchemaEntry>) {
             for ((name, entry) in def.entries) {
-                if (entry !is BoolSpec || !name.endsWith(PRESENCE_SUFFIX)) continue
-                val base = name.removeSuffix(PRESENCE_SUFFIX)
+                if (entry !is com.eignex.klause.ast.PresenceSpec) continue
+                val base = entry.valueName
                 val absent = Not(BoolRef(name))
                 when {
                     intVarIdByName.containsKey(base) -> {

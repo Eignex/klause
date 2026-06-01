@@ -7,6 +7,7 @@ import com.eignex.klause.ast.IntSpec
 import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.NamedConstraint
 import com.eignex.klause.ast.NominalSpec
+import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.ast.SearchAnnotation
 import com.eignex.klause.ast.SetSpec
@@ -58,7 +59,7 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
     protected fun optIntVar(min: Int, max: Int) =
         PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptIntHandle>> { thisRef, prop ->
             val pName = presenceName(prop.name)
-            thisRef.add(pName, BoolSpec)
+            thisRef.add(pName, PresenceSpec(prop.name))
             thisRef.add(prop.name, IntSpec(min, max))
             val handle = OptIntHandle(
                 name = prop.name,
@@ -76,7 +77,7 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
     protected fun optBoolVar() =
         PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptBoolHandle>> { thisRef, prop ->
             val pName = presenceName(prop.name)
-            thisRef.add(pName, BoolSpec)
+            thisRef.add(pName, PresenceSpec(prop.name))
             thisRef.add(prop.name, BoolSpec)
             val handle = OptBoolHandle(
                 name = prop.name,
@@ -114,7 +115,7 @@ abstract class VariableSchema : Schema<SchemaEntry>() {
     protected fun optNominal(vararg labels: String) = labels.toList().let { ls ->
         PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptNominalHandle>> { thisRef, prop ->
             val pName = presenceName(prop.name)
-            thisRef.add(pName, BoolSpec)
+            thisRef.add(pName, PresenceSpec(prop.name))
             thisRef.add(prop.name, NominalSpec(ls))
             val handle = OptNominalHandle(
                 name = prop.name,
