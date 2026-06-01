@@ -27,10 +27,15 @@ import com.eignex.klause.solver.minimizeInt
  * using the [FloatSpec] in `floatDecoders`.
  */
 class CompiledProblem internal constructor(
+    /** The compiled solver problem. */
     val problem: Problem,
+    /** Boolean variable id by schema name. */
     val boolVarIdByName: Map<String, Int>,
+    /** Integer variable id by schema name. */
     val intVarIdByName: Map<String, Int>,
+    /** Per-nominal one-hot indicator bool ids, by schema name. */
     val nominalIndicators: Map<String, Map<String, Int>>,
+    /** Per-float bucket→real decoders, by schema name. */
     val floatDecoders: Map<String, FloatSpec>,
     /** Default branching params derived from the schema's `search { … }` annotation, if
      *  any. `null` when the schema didn't declare one — callers should fall back to
@@ -51,12 +56,14 @@ class CompiledProblem internal constructor(
     fun backtrackParams(): com.eignex.klause.solver.backtrack.BacktrackParams =
         defaultBacktrackParams ?: com.eignex.klause.solver.backtrack.BacktrackParams()
 
+    /** Decode [handle]'s Boolean value from [sample]. */
     fun decode(handle: BoolHandle, sample: Sample): Boolean {
         val id = boolVarIdByName[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
         return sample.bools[id]
     }
 
+    /** Decode [handle]'s label from [sample]. */
     fun decode(handle: NominalHandle, sample: Sample): String {
         val map = nominalIndicators[handle.name]
             ?: error("No nominal variable named '${handle.name}'")
@@ -64,6 +71,7 @@ class CompiledProblem internal constructor(
             ?: error("Nominal '${handle.name}' has no label set in assignment")
     }
 
+    /** Decode [handle]'s integer value from [sample]. */
     fun decode(handle: IntHandle, sample: Sample): Int {
         val id = intVarIdByName[handle.name]
             ?: error("No integer variable named '${handle.name}'")
@@ -116,6 +124,7 @@ class CompiledProblem internal constructor(
         return out
     }
 
+    /** Decode [handle]'s real value from [sample]. */
     fun decode(handle: FloatHandle, sample: Sample): Double {
         val spec = floatDecoders[handle.name]
             ?: error("No float variable named '${handle.name}'")
@@ -135,18 +144,21 @@ class CompiledProblem internal constructor(
         return problem.minimizeInt(id)
     }
 
+    /** A [LinearObjective] that maximises [handle]. */
     fun maximize(handle: IntHandle): LinearObjective {
         val id = intVarIdByName[handle.name]
             ?: error("No integer variable named '${handle.name}'")
         return problem.maximizeInt(id)
     }
 
+    /** A [LinearObjective] that minimises [handle]. */
     fun minimize(handle: BoolHandle): LinearObjective {
         val id = boolVarIdByName[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
         return problem.minimizeBool(id)
     }
 
+    /** A [LinearObjective] that maximises [handle]. */
     fun maximize(handle: BoolHandle): LinearObjective {
         val id = boolVarIdByName[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
@@ -167,6 +179,7 @@ class CompiledProblem internal constructor(
         return LinearObjective(intCoefficients = arr, constant = spec.min)
     }
 
+    /** A [LinearObjective] that maximises [handle]. */
     fun maximize(handle: FloatHandle): LinearObjective {
         val spec = floatDecoders[handle.name]
             ?: error("No float variable named '${handle.name}'")

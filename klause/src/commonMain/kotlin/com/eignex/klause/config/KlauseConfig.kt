@@ -47,6 +47,7 @@ data class KlauseConfig(
     /** Upper bound counterpart to [unboundedIntLo]. Env: `KLAUSE_FZN_UNBOUNDED_INT_HI`. */
     val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
 ) {
+    /** Default configuration values. */
     companion object {
         /** Built-in defaults. */
         val DEFAULT: KlauseConfig = KlauseConfig()

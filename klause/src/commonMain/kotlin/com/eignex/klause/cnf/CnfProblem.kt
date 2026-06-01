@@ -22,8 +22,10 @@ class CnfProblem(
     val intVarBits: Array<IntArray>,
     val intVarMin: IntArray,
 ) {
+    /** Decode a Boolean variable's value from a CNF model. */
     fun decodeBool(originalBoolVar: Int, model: BooleanArray): Boolean = model[boolVarToCnfVar[originalBoolVar]]
 
+    /** Decode an integer variable's value from a CNF model. */
     fun decodeInt(originalIntVar: Int, model: BooleanArray): Int {
         val bits = intVarBits[originalIntVar]
         var v = 0

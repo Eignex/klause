@@ -16,11 +16,16 @@ class CnfBuilder {
     private var cachedFalseLit: Int = -1
     private var cachedTrueLit: Int = -1
 
+    /** The accumulated clauses. */
     val clauses: List<IntArray> get() = _clauses
+
+    /** Number of allocated CNF variables. */
     val numVars: Int get() = _numVars
 
+    /** Allocate a fresh CNF variable id. */
     fun newVar(): Int = _numVars++
 
+    /** Add a clause (disjunction of literals). */
     fun addClause(lits: IntArray) {
         _clauses.add(lits)
     }
@@ -68,6 +73,7 @@ class CnfBuilder {
         return false
     }
 
+    /** A literal that is always false (allocated lazily). */
     fun falseLit(): Int {
         if (cachedFalseLit == -1) {
             val v = newVar()
@@ -79,6 +85,7 @@ class CnfBuilder {
         return cachedFalseLit
     }
 
+    /** A literal that is always true (allocated lazily). */
     fun trueLit(): Int {
         if (cachedTrueLit == -1) falseLit()
         return cachedTrueLit

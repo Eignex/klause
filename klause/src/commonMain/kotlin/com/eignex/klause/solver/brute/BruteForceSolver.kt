@@ -220,6 +220,7 @@ class BruteForceSolver(override val problem: Problem) :
     private data class Dim(val kind: DimKind, val varId: Int, val radix: Long)
     private data class Chunk(val dims: List<Dim>, val totalSize: Long)
 
+    /** Factory and shared constants for [BruteForceSolver]. */
     companion object {
         /** Largest per-chunk product. Stays well below [Long.MAX_VALUE] so adding one more
          *  dim's worth of multiplication can't overflow even for radix = Int.MAX_VALUE. */

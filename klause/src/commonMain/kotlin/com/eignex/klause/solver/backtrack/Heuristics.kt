@@ -13,8 +13,13 @@ import kotlin.random.Random
  * `int_search(vars, var_strategy, value_strategy, complete)`).
  */
 sealed interface VarRef {
+    /** The referenced variable id. */
     val varId: Int
+
+    /** A Boolean variable reference. */
     data class Bool(override val varId: Int) : VarRef
+
+    /** An integer variable reference. */
     data class IntVar(override val varId: Int) : VarRef
 }
 
@@ -27,6 +32,7 @@ sealed interface VarRef {
  * Pure heuristics (random, smallest-domain, input-order) ignore them via the defaults.
  */
 interface VariableHeuristic {
+    /** Pick the next variable to branch on, or null when all are determined. */
     fun pick(session: PropagationSession, rng: Random): VarRef?
 
     /** Called once per propagation conflict at [varRef]; bump activity / failure weight. */
@@ -77,9 +83,16 @@ interface VariableHeuristic {
  * heuristics consume these.
  */
 interface ValueHeuristic {
+    /** Candidate values for [varRef], yielded in trial order. */
     fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int>
+
+    /** Hook: a conflict involved [varRef] taking [value]. */
     fun onConflict(varRef: VarRef, value: Int) {}
+
+    /** Hook: [varRef] was committed to [value]. */
     fun onCommit(varRef: VarRef, value: Int) {}
+
+    /** Hook: the search restarted. */
     fun onRestart() {}
 
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot

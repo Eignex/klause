@@ -75,6 +75,7 @@ import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
  */
 object BitBlaster {
 
+    /** Bit-blast [problem] into an equisatisfiable [CnfProblem]. */
     fun compile(problem: Problem): CnfProblem {
         val b = CnfBuilder()
         val boolMap = IntArray(problem.numBoolVars) { b.newVar() }
