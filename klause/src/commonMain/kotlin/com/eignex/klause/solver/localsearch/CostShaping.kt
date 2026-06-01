@@ -35,8 +35,12 @@ sealed interface CostShaping {
     }
 
     /** `violationPenalty(violationCount) + lambda * objective`. */
-    data class Linear(val lambda: Double = 1.0, val violationPenalty: ViolationPenalty = ViolationPenalty.Identity) :
-        CostShaping {
+    data class Linear(
+        /** Weight on the objective term. */
+        val lambda: Double = 1.0,
+        /** Shaping applied to the violation count. */
+        val violationPenalty: ViolationPenalty = ViolationPenalty.Identity,
+    ) : CostShaping {
         init {
             require(lambda >= 0) { "lambda must be non-negative, got $lambda" }
         }
@@ -45,6 +49,7 @@ sealed interface CostShaping {
         override val feasibilityGated: Boolean = false
     }
 
+    /** Builders for common [CostShaping] blends. */
     companion object {
         /** Linear blend without saturation. */
         fun linear(lambda: Double): CostShaping = Linear(lambda)
@@ -59,20 +64,27 @@ sealed interface CostShaping {
     }
 }
 
+/** Maps a violation count to a penalty contribution. */
 sealed interface ViolationPenalty {
+    /** Penalty contribution for [violationCount] violations. */
     fun of(violationCount: Long): Double
 
+    /** Penalty equal to the raw violation count. */
     data object Identity : ViolationPenalty {
         override fun of(violationCount: Long): Double = violationCount.toDouble()
     }
 
-    data class Saturating(val cap: Double) : ViolationPenalty {
+    data class Saturating(
+        /** Maximum penalty any single violation count contributes. */
+        val cap: Double,
+    ) : ViolationPenalty {
         init {
             require(cap >= 0) { "cap must be non-negative, got $cap" }
         }
         override fun of(violationCount: Long): Double = min(violationCount.toDouble(), cap)
     }
 
+    /** Square-root (sub-linear) violation penalty. */
     data object SquareRoot : ViolationPenalty {
         override fun of(violationCount: Long): Double = sqrt(violationCount.toDouble())
     }

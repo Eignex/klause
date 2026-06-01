@@ -29,7 +29,9 @@ import com.eignex.klause.solver.Sample
  *    as [AdaptivePerturbationRestart] before the first feasible.
  */
 class IteratedLocalSearchRestart(
+    /** Steps without improvement before a restart. */
     val maxFlipsBeforeRestart: Int = 1_000,
+    /** Initial perturbation strength. */
     val initialPerturbationStrength: Int = 5,
     val acceptance: AcceptanceCriterion = AcceptanceCriterion.Improving,
     val adaptivePerturbation: Boolean = true,
@@ -73,7 +75,12 @@ class IteratedLocalSearchRestart(
     /** Read-only view for tests / diagnostics. */
     val incumbents: List<Incumbent> get() = population
 
-    data class Incumbent(val sample: Sample, val objective: Double)
+    data class Incumbent(
+        /** The incumbent assignment. */
+        val sample: Sample,
+        /** Its objective value. */
+        val objective: Double,
+    )
 
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= maxFlipsBeforeRestart
 

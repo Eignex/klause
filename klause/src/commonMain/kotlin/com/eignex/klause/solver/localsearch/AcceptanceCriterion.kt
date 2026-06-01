@@ -19,18 +19,22 @@ import kotlin.random.Random
  *    state — do not share a single instance across concurrent uses.
  */
 sealed interface AcceptanceCriterion {
+    /** True iff a candidate at [newObjective] should replace the incumbent at [incumbentObjective]. */
     fun accept(newObjective: Double, incumbentObjective: Double, rng: Random): Boolean
 
+    /** Accept only strictly improving candidates. */
     data object Improving : AcceptanceCriterion {
         override fun accept(newObjective: Double, incumbentObjective: Double, rng: Random): Boolean =
             newObjective < incumbentObjective
     }
 
+    /** Accept equal-or-better candidates. */
     data object BetterOrEqual : AcceptanceCriterion {
         override fun accept(newObjective: Double, incumbentObjective: Double, rng: Random): Boolean =
             newObjective <= incumbentObjective
     }
 
+    /** Accept every candidate (pure random walk). */
     data object RandomWalk : AcceptanceCriterion {
         override fun accept(newObjective: Double, incumbentObjective: Double, rng: Random): Boolean = true
     }
@@ -47,6 +51,7 @@ sealed interface AcceptanceCriterion {
      * production), cooling = 0.999, floor = 1e-3.
      */
     class SimulatedAnnealing(
+        /** Starting temperature. */
         val initialTemperature: Double = 1.0,
         val coolingRate: Double = 0.999,
         val minTemperature: Double = 1e-3,
@@ -57,6 +62,7 @@ sealed interface AcceptanceCriterion {
             require(minTemperature > 0) { "minTemperature must be positive, got $minTemperature" }
         }
 
+        /** Current temperature (cools on each call). */
         var temperature: Double = initialTemperature
             private set
 

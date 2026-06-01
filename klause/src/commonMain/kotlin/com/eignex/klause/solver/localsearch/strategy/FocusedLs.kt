@@ -33,6 +33,7 @@ import kotlin.math.pow
  */
 class FocusedLs internal constructor(
     internal val selection: MoveSelection = NoiseGreedy(),
+    /** Tabu filter applied to candidate moves. */
     val tabu: TabuFilter = TabuFilter(tenure = 10),
     val configurationChecking: Boolean = false,
 ) : Strategy {
@@ -163,6 +164,7 @@ internal class Annealing(
  * on both.
  */
 object WalkSat {
+    /** Run one focused-LS step. */
     operator fun invoke(
         noise: Double = 0.5,
         tabu: TabuFilter = TabuFilter(tenure = 10),
@@ -206,6 +208,7 @@ object WalkSat {
  * on both (probSAT + CC is a strong combo on structured instances).
  */
 object ProbSat {
+    /** Run one focused-LS step. */
     operator fun invoke(
         cb: Double = 2.06,
         eps: Double = 1.0,
@@ -244,6 +247,7 @@ object ProbSat {
  * Configuration checking is opt-in.
  */
 object SimulatedAnnealing {
+    /** Run one focused-LS step. */
     operator fun invoke(
         initialTemperature: Double = 1.0,
         coolingRate: Double = 0.999,

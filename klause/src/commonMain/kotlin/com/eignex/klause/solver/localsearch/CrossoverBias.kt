@@ -13,13 +13,18 @@ package com.eignex.klause.solver.localsearch
  *    reasonable starting point.
  */
 sealed interface CrossoverBias {
+    /** Probability of taking parent A's value at a crossover position. */
     fun probParentA(parentAObjective: Double, parentBObjective: Double): Double
 
+    /** Unbiased 50/50 crossover. */
     data object Uniform : CrossoverBias {
         override fun probParentA(parentAObjective: Double, parentBObjective: Double): Double = 0.5
     }
 
-    data class BetterBiased(val rate: Double = 0.2) : CrossoverBias {
+    data class BetterBiased(
+        /** Bias strength toward the better parent, in `[0, 0.5]`. */
+        val rate: Double = 0.2,
+    ) : CrossoverBias {
         init {
             require(rate in 0.0..0.5) { "BetterBiased rate must be in [0, 0.5], got $rate" }
         }

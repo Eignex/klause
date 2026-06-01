@@ -39,7 +39,13 @@ class FixedCadenceRestart(val maxFlipsBeforeRestart: Int = 10_000) : RestartPoli
  *  — every variable touched by that factor is randomised — producing a coordinated
  *  multi-variable jump more likely to land in a different basin than scattered single
  *  flips would. */
-enum class PerturbationKind { Uniform, BasinHopping }
+enum class PerturbationKind {
+    /** Re-randomise a uniform random subset of variables. */
+    Uniform,
+
+    /** Apply a coordinated multi-variable jump to escape the current basin. */
+    BasinHopping,
+}
 
 /**
  * Copy [anchor] into [state]'s assignment, apply [perturbationStrength] mutations

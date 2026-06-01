@@ -27,10 +27,15 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  *  a problem-specific operator (e.g. swap-pair at level 2, hot-spot at level 3). */
 typealias VndLevelOperator = (state: LocalSearchState, k: Int, candidatesPerLevel: Int) -> List<Move>
 
+/** Variable-neighborhood-descent strategy. */
 class Vnd(
+    /** Highest neighborhood level explored. */
     val maxNeighborhood: Int = 3,
+    /** Candidate moves generated per level. */
     val candidatesPerLevel: Int = 4,
+    /** Per-step random-noise probability. */
     val noise: Double = 0.05,
+    /** Tabu filter applied to candidate moves. */
     val tabu: TabuFilter = TabuFilter(tenure = 10),
     /** Skewed-VNS acceptance parameter (Hansen et al. 2010). When non-zero, the
      *  acceptance test becomes `netDelta + skewAlpha * distance < 0` where `distance`

@@ -28,6 +28,7 @@ data class TabuFilter(
     val aspiration: AspirationCriterion = AspirationCriterion.AllowAllWhenAllTabu,
     val dynamicTenure: ((step: Long) -> Int)? = null,
 ) {
+    /** Filter [moves], dropping tabu ones (subject to aspiration). */
     fun filter(state: LocalSearchState, raw: List<Move>): List<Move> {
         val effective = dynamicTenure?.invoke(state.step) ?: tenure
         if (effective <= 0 || raw.isEmpty()) return raw
@@ -57,6 +58,7 @@ data class TabuFilter(
         }
     }
 
+    /** Shared [TabuFilter] helpers. */
     companion object {
         /** No tabu filtering at all — every raw candidate passes through. */
         val Disabled: TabuFilter = TabuFilter(tenure = 0)
@@ -105,6 +107,7 @@ data class TabuFilter(
  * the current violation count).
  */
 sealed interface AspirationCriterion {
+    /** True iff [move] is currently tabu. */
     fun admitsTabu(state: LocalSearchState, move: Move): Boolean
 
     /** No per-move admission — only the [TabuFilter] "everything tabu" fallback applies. */
@@ -155,6 +158,7 @@ sealed interface AspirationCriterion {
      * solvers.
      */
     class Cooling(
+        /** Starting temperature. */
         val initialTemperature: Double = 1.0,
         val coolingRate: Double = 0.999,
         val minTemperature: Double = 1e-3,
@@ -165,6 +169,7 @@ sealed interface AspirationCriterion {
             require(minTemperature > 0) { "minTemperature must be positive, got $minTemperature" }
         }
 
+        /** Current temperature. */
         var temperature: Double = initialTemperature
             private set
 

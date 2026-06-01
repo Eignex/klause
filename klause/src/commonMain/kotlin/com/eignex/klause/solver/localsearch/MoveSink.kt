@@ -33,6 +33,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         assumptions = a
     }
 
+    /** Queue a Boolean-flip move on [boolVar]. */
     fun addBoolFlip(varId: Int) {
         if (assumptions.isFrozenBool(varId)) return
         ensureCapacity()
@@ -40,6 +41,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
     }
 
+    /** Queue an int-set move on [intVar]. */
     fun addIntSet(varId: Int, newValue: Int) {
         if (assumptions.isFrozenInt(varId)) return
         ensureCapacity()
@@ -62,6 +64,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
     }
 
+    /** Discard all queued moves. */
     fun clear() {
         laneSize = 0
         compounds = null
@@ -104,6 +107,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         return out
     }
 
+    /** Shared [MoveSink] helpers. */
     companion object {
         private const val INITIAL_CAPACITY: Int = 16
         private const val KIND_BIT: Long = 1L shl 63

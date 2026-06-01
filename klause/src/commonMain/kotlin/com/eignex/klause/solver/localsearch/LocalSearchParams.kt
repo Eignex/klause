@@ -25,6 +25,7 @@ data class LocalSearchParams(
      * remembering which knob each one prefers.
      */
     val maxInstructions: Long? = null,
+    /** Seed for the search RNG; null picks a nondeterministic seed. */
     val randomSeed: Long? = null,
     /** Variables to pin for the duration of this call. The solver initialises them to
      *  the requested values on every restart and ignores any move that would change

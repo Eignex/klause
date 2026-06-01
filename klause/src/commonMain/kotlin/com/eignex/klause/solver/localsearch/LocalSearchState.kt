@@ -14,11 +14,21 @@ import kotlin.random.Random
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
  * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard cost.
  */
-class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: Assumptions = Assumptions.None) {
+class LocalSearchState(
+    /** The problem being searched. */
+    val problem: Problem,
+    /** Search RNG. */
+    val rng: Random,
+    /** Variables pinned for this search. */
+    var assumptions: Assumptions = Assumptions.None,
+) {
+    /** The current variable assignment. */
     val assignment: Assignment = Assignment(
         numBoolVars = problem.numBoolVars,
         numIntVars = problem.numIntVars,
     )
+
+    /** Factor ids currently violated (degree > 0). */
     val violated: IntSwapSet = IntSwapSet(problem.numFactors)
 
     /** Per-factor graded violation degree (0 = satisfied), the source of truth for both
@@ -30,6 +40,8 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
     val factorDegree: IntArray = IntArray(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
+
+    /** Buffer that strategies push candidate moves into. */
     val moveSink: MoveSink = MoveSink(assumptions)
 
     /**
@@ -114,6 +126,8 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
      *  probes [factorWeightsAllocated] before reading to avoid forcing the allocation just
      *  to capture all-1.0 defaults from sessions that ran a weight-blind strategy. */
     private var _factorWeights: DoubleArray? = null
+
+    /** Per-factor dynamic weights for weighted-violation strategies. */
     val factorWeights: DoubleArray
         get() {
             var w = _factorWeights
@@ -138,6 +152,7 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
     val intConfChange: BooleanArray = BooleanArray(problem.numIntVars) { true }
 
+    /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
         // Overwrite the assumed slots so the assignment starts feasible w.r.t. the caller's pins.
@@ -159,6 +174,7 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
         step = 0L
     }
 
+    /** Recompute cost and per-factor degrees from scratch. */
     fun recompute() {
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0L
@@ -191,6 +207,7 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 
+    /** Apply [move], updating cost and payloads incrementally. */
     fun apply(move: Move): Unit = when (move) {
         is Move.BoolFlip -> applyBoolFlip(move.varId)
 
@@ -425,6 +442,7 @@ class LocalSearchState(val problem: Problem, val rng: Random, var assumptions: A
         pinned += u
     }
 
+    /** Net cost change if [move] were applied, without mutating state. */
     fun netDelta(move: Move): Long = when (move) {
         is Move.BoolFlip -> {
             var sum = 0L

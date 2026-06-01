@@ -17,6 +17,7 @@ interface LocalSearchFactor : Factor {
      *  Default no-op for stateless factors that maintain no payload. */
     fun initialize(state: LocalSearchState, factorId: Int) {}
 
+    /** True iff this factor is violated under the current state. */
     fun isViolated(state: LocalSearchState, factorId: Int): Boolean
 
     /**
@@ -49,6 +50,8 @@ interface LocalSearchFactor : Factor {
      * they handle.
      */
     fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
+
+    /** Δ violation-degree if [intVar] were set to [newValue], without mutating state. */
     fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
 
     /**
@@ -58,6 +61,8 @@ interface LocalSearchFactor : Factor {
      * deltaIf* method would have returned before the move.
      */
     fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
+
+    /** Apply a committed int-set of [intVar] from [oldValue]; returns the Δ violation-degree. */
     fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
     /**

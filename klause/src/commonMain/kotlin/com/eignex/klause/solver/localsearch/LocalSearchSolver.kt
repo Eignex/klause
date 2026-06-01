@@ -41,6 +41,7 @@ class LocalSearchSolver(
     // the cb-tuning burden by widening the distribution during stalls and re-sharpening on
     // progress (Hoos 2002, Balint-Schöning 2012). Tabu aspiration admits individually
     // improving moves that would otherwise be blocked by the tenure window.
+    /** Strategy used during the satisfy phase. */
     val strategy: Strategy = ProbSat.adaptive(
         tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
     ),
@@ -52,6 +53,7 @@ class LocalSearchSolver(
      *  problems, where CBLS's global weighted-violation gradient descends the objective on
      *  instances where probSAT alone plateaus. */
     val optimizeStrategy: Strategy? = null,
+    /** Restart policy controlling diversification. */
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
     /** Cap on pair-swap candidates considered before the objective descent gives up at a
      *  single-flip local minimum. Pair swaps escape plateaus where every single flip
@@ -180,10 +182,19 @@ class LocalSearchSolver(
         runMinimizeStream(objective, params, eff, warm)
     }
 
+    /** Solve once and return a [SolveResult]. */
     fun solve(): SolveResult = solve(LocalSearchParams())
+
+    /** Draw a single diverse sample, or null if none exists. */
     fun sample(): SampleResult = sample(LocalSearchParams())
+
+    /** Lazily draw diverse samples. */
     fun samples(): Sequence<Sample> = samples(LocalSearchParams())
+
+    /** Lazily enumerate distinct models. */
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
+
+    /** Optimise against [objective] under the hard constraints. */
     fun minimize(objective: Objective): MinimizeResult = minimize(objective, LocalSearchParams())
 
     private fun streamImpl(
