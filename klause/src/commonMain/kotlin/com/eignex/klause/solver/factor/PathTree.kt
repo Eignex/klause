@@ -22,10 +22,13 @@ import com.eignex.klause.solver.propagation.PropagationState
  */
 abstract class PathTreeBase(
     val numNodes: Int,
+    /** Tail node of each edge. */
     val from: IntArray,
+    /** Head node of each edge. */
     val to: IntArray,
     val nodePresent: IntArray,
     val edgePresent: IntArray,
+    /** Integer representing node 0. */
     val nodeOffset: Int,
 ) : LocalSearchFactor {
 
@@ -90,7 +93,9 @@ class Path(
     numNodes: Int,
     from: IntArray,
     to: IntArray,
+    /** Source node variable id. */
     val source: Int,
+    /** Sink node variable id. */
     val sink: Int,
     nodePresent: IntArray,
     edgePresent: IntArray,
@@ -194,6 +199,7 @@ class Tree(
     numNodes: Int,
     from: IntArray,
     to: IntArray,
+    /** Root node variable id. */
     val root: Int,
     nodePresent: IntArray,
     edgePresent: IntArray,

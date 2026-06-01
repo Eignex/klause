@@ -31,6 +31,7 @@ class Regular(
     val accepting: IntArray,
 ) : LocalSearchFactor {
 
+    /** Accepting states as a set for O(1) membership. */
     val acceptingSet: HashSet<Int> = accepting.toHashSet()
 
     init {

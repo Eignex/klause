@@ -135,6 +135,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Int) {
         }
     }
 
+    /** Factory and shared constants for this factor. */
     companion object {
         /** Sentinel representing "no envelope" (subtree contains no active leaf). Chosen
          *  far enough below zero that adding any non-negative `e(R)` keeps the value

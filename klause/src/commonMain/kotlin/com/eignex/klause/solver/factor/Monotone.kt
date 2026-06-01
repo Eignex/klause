@@ -27,6 +27,7 @@ class Monotone(
     val strict: Boolean,
 ) : LocalSearchFactor {
 
+    /** The Direction case. */
     enum class Direction { Increasing, Decreasing }
 
     init {

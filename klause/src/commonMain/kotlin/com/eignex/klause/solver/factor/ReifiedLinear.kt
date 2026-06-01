@@ -22,8 +22,7 @@ class ReifiedLinear(
     val op: LinearOp,
     /** Right-hand-side bound. */
     val bound: Int,
-) :
-    LocalSearchFactor {
+) : LocalSearchFactor {
 
     init {
         require(coeffs.size == vars.size) { "coeffs/vars length mismatch" }

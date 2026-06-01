@@ -29,7 +29,9 @@ import com.eignex.klause.util.IntArrayList
  * cannot extend to a feasible solution and is pruned from `dom(xᵢ)`.
  */
 class GlobalCardinality(
+    /** Variable ids the constraint ranges over. */
     val xs: IntArray,
+    /** Values whose occurrence counts are bounded. */
     val cover: IntArray,
     val countVars: IntArray? = null,
     val countLow: IntArray? = null,

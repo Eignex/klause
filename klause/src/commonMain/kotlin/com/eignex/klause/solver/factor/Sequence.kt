@@ -27,6 +27,7 @@ class Sequence(
     values: IntArray,
 ) : LocalSearchFactor {
 
+    /** The distinct values, sorted ascending. */
     val values: IntArray = values.distinct().sorted().toIntArray()
 
     init {

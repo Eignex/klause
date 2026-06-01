@@ -39,6 +39,7 @@ import kotlin.math.min
  * better if `machines × horizon` explodes.
  */
 class Cumulatives(
+    /** Task start-time variable ids. */
     val starts: IntArray,
     /** Per-task duration: constant fallback / ub (when [durationVars] is set, the var's ub). */
     val durations: IntArray,

@@ -573,6 +573,7 @@ class Cardinality(
         }
     }
 
+    /** Factory and shared constants for this factor. */
     companion object {
         fun atMostOne(literals: IntArray): Cardinality = Cardinality(literals, min = 0, max = 1)
 

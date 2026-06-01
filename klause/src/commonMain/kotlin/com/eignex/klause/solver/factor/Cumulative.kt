@@ -50,6 +50,7 @@ import kotlin.math.min
  * Linear-per-timepoint decomposition.
  */
 class Cumulative(
+    /** Task start-time variable ids. */
     val starts: IntArray,
     /** Per-task duration: constant fallback / upper bound (when [durationVars] is set this
      *  holds the var's domain ub, used for horizon sizing). */

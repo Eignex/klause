@@ -20,7 +20,9 @@ import com.eignex.klause.solver.propagation.PropagationState
  * dimensional rectangles must satisfy the non-overlap criterion.
  */
 class Diffn(
+    /** Variable ids the constraint ranges over. */
     val xs: IntArray,
+    /** Second-vector variable ids. */
     val ys: IntArray,
     val widths: IntArray,
     val heights: IntArray,

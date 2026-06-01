@@ -41,7 +41,9 @@ import kotlin.math.min
  * are per propagator call; the deductive engine iterates to fixpoint via the worklist.
  */
 class Disjunctive(
+    /** Task start-time variable ids. */
     val starts: IntArray,
+    /** Constant per-task durations. */
     val durations: IntArray,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks impose
      *  no no-overlap obligation. The cost / propagation passes route through the
