@@ -102,7 +102,8 @@ object CorpusSelection {
         layout: Layout,
         selection: Selection,
         category: Category,
-        expected: (Discovered) -> Expected = { Expected.Unknown },
+        /** Resolve an instance's oracle from its resolved `.mzn` [File] (e.g. parse directives). */
+        expected: (File) -> Expected = { Expected.Unknown },
     ): List<ProblemRef> {
         val root = CorpusFetcher.ensure(collection)
         val chosen = applySelection(layout.discover(root), selection)
@@ -112,7 +113,7 @@ object CorpusSelection {
                 format = Format.MINIZINC,
                 source = ProblemSource.External(collection, d.mznRelPath),
                 category = category,
-                expected = expected(d),
+                expected = expected(File(root, d.mznRelPath)),
                 data = d.dznRelPath?.let { ProblemSource.External(collection, it) },
                 license = collection.license,
             )

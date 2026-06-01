@@ -51,6 +51,7 @@ object Suites {
                     com.eignex.klause.bench.source.CorpusSelection.Layout.FlatMzn("tests/spec/unit"),
                     com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.CSP,
+                    expected = { com.eignex.klause.bench.source.LibminizincExpected.parse(it) },
                 )
             },
             DynamicSuite("hakank", "hakank MiniZinc collection (fetched, sparse minizinc/; 1/family by default)") {
