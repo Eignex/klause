@@ -33,7 +33,16 @@ import kotlin.math.min
  * The earlier "forced single-dim" pairwise scan is subsumed by the case where all but one
  * dim's M-intervals are already exhausted.
  */
-class Geost(val numDims: Int, val numObjects: Int, val origin: IntArray, val length: IntArray) : LocalSearchFactor {
+class Geost(
+    /** Number of spatial dimensions. */
+    val numDims: Int,
+    /** Number of boxes to place. */
+    val numObjects: Int,
+    /** Flat row-major `[numObjects × numDims]` origin variable ids. */
+    val origin: IntArray,
+    /** Flat row-major `[numObjects × numDims]` constant box sizes. */
+    val length: IntArray,
+) : LocalSearchFactor {
 
     init {
         require(numDims >= 1) { "Geost: numDims must be ≥ 1" }

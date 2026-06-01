@@ -25,8 +25,7 @@ class Knapsack(
     val w: Int,
     /** Variable id holding the total selected profit. */
     val p: Int,
-) :
-    LocalSearchFactor {
+) : LocalSearchFactor {
 
     init {
         require(weights.size == xs.size) { "knapsack: weights/xs size mismatch" }

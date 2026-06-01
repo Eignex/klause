@@ -35,8 +35,7 @@ class Element(
     val arrIsVars: Boolean,
     /** Integer representing index 0 of [arr]. */
     val indexOffset: Int = 1,
-) :
-    LocalSearchFactor {
+) : LocalSearchFactor {
 
     init {
         require(arr.isNotEmpty()) { "element: empty array" }

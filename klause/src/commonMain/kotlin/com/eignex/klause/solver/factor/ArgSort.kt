@@ -16,7 +16,14 @@ import com.eignex.klause.solver.propagation.PropagationState
  *  - When all [perm] entries are pinned, verify sorted-ness directly and propagate
  *    bound-tightenings from [values] back to the ordering implied by perm.
  */
-class ArgSort(val values: IntArray, val perm: IntArray, val permOffset: Int = 0) : LocalSearchFactor {
+class ArgSort(
+    /** The values being ranked. */
+    val values: IntArray,
+    /** Output permutation variable ids that sort [values] ascending. */
+    val perm: IntArray,
+    /** Integer representing index 0 in [perm]. */
+    val permOffset: Int = 0,
+) : LocalSearchFactor {
 
     init {
         require(values.size == perm.size) { "ArgSort: values and perm length mismatch" }
