@@ -7,6 +7,8 @@ import com.eignex.kumulant.stat.summary.MeanStat
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.kumulant.stat.summary.WeightedMeanResult
 import kotlinx.serialization.Serializable
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource.Monotonic
 
 /**
  * Snapshot of solver-side counters and distributions from a single solve. Carried as a
@@ -71,12 +73,12 @@ internal class SolveStatsSink(val backend: String) {
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
 
-    private var startMark: kotlin.time.TimeMark? = null
+    private var startMark: TimeMark? = null
     private var endElapsedMs: Long? = null
     var timedOut: Boolean = false
 
     fun start() {
-        startMark = kotlin.time.TimeSource.Monotonic.markNow()
+        startMark = Monotonic.markNow()
     }
     fun stop() {
         val mark = startMark ?: return

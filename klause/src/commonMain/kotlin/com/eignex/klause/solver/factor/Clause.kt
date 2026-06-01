@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntIntMap
 
 /**
  * Disjunction of Boolean literals.
@@ -57,7 +58,7 @@ class Clause(val literals: IntArray) : LocalSearchFactor {
      *  construction; turns the per-flip "find my literal" loop into a hash lookup. The
      *  compile path doesn't generate clauses where a var appears multiple times (`v` and
      *  `¬v` together would be a tautology and gets dropped). Sentinel `-1` for absent. */
-    private val litIndexByVar: com.eignex.klause.util.IntIntMap = com.eignex.klause.util.IntIntMap.build(
+    private val litIndexByVar: IntIntMap = IntIntMap.build(
         keys = IntArray(literals.size) { Lit.variable(literals[it]) },
         values = IntArray(literals.size) { it },
         absent = -1,

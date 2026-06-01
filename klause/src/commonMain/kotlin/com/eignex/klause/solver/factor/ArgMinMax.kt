@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -112,11 +113,7 @@ class ArgMinMax(
 
     /** Repair: either snap `idx` to the current arg-extreme, or shift `xs[idx]` to the
      *  current arg-extreme value so the named position becomes extreme. */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val bestIdx = argExtreme(state)
         val bestValue = state.assignment.intValue(xs[bestIdx])

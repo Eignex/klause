@@ -8,6 +8,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `intVars[i] != intVars[j]` for every pair `i < j`. Stored payload:
@@ -55,10 +56,10 @@ class AllDifferent(
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
      *  common case where each var appears exactly once this is always 1. */
-    private val occurrencesByVar: com.eignex.klause.util.IntIntMap = run {
+    private val occurrencesByVar: IntIntMap = run {
         val counts = HashMap<Int, Int>()
         for (v in vars) counts[v] = (counts[v] ?: 0) + 1
-        com.eignex.klause.util.IntIntMap.build(
+        IntIntMap.build(
             keys = counts.keys.toIntArray(),
             values = counts.values.toIntArray(),
             absent = 0,

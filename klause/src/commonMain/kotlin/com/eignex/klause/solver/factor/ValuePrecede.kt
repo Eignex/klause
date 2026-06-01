@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -52,11 +53,7 @@ class ValuePrecede(
     /** Repair: at the first xs[i] holding `t` before any `s` appeared, propose moves to
      *  either drop xs[i] off `t` (replace with anything else in its domain) or to set
      *  some xs[j] (j < i) to `s` so the precedence holds. */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (satisfied(state)) return
         var firstTAt = -1
         for (i in xs.indices) {

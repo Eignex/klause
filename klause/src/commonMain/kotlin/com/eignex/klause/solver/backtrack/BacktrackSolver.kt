@@ -8,10 +8,14 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.SolveStatsSink
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
+import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
+import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
@@ -37,7 +41,7 @@ class BacktrackSolver(override val problem: Problem) :
     Optimizer<BacktrackParams> {
 
     override fun solve(params: BacktrackParams): SolveResult {
-        val sink = com.eignex.klause.solver.SolveStatsSink(backend = "backtrack")
+        val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
         for (outcome in driveSearch(params, sink = sink)) {
             sink.stop()
@@ -284,14 +288,11 @@ class BacktrackSolver(override val problem: Problem) :
     /** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
      *  levels. Returns `null` when the input was empty (no assumption layer to
      *  project) or no level was touched (no information). */
-    private fun projectTouchedToAssumptions(
-        input: com.eignex.klause.solver.Assumptions,
-        levels: IntArray,
-    ): com.eignex.klause.solver.Assumptions? {
+    private fun projectTouchedToAssumptions(input: Assumptions, levels: IntArray): Assumptions? {
         if (input.isEmpty || levels.isEmpty()) return null
         val touched = HashSet<Int>(levels.size)
         for (l in levels) touched.add(l)
-        return com.eignex.klause.solver.projectSeedConflictToAssumptions(input, touched)
+        return projectSeedConflictToAssumptions(input, touched)
     }
 
     /** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty
@@ -373,7 +374,7 @@ class BacktrackSolver(override val problem: Problem) :
     private fun driveSearch(
         params: BacktrackParams,
         pruneIf: ((PropagationSession) -> Boolean)? = null,
-        sink: com.eignex.klause.solver.SolveStatsSink? = null,
+        sink: SolveStatsSink? = null,
     ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted(coreOf(problem.baked)))
@@ -699,8 +700,7 @@ class BacktrackSolver(override val problem: Problem) :
          *  hands it to [PropagationSession.addLearnedClause], and resumes with the new
          *  clause now constraining future search and unit-propagating the asserting
          *  literal. */
-        data class Backjump(val learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned) :
-            AdvanceOutcome
+        data class Backjump(val learned: Learned) : AdvanceOutcome
     }
 
     private fun advance(
@@ -710,7 +710,7 @@ class BacktrackSolver(override val problem: Problem) :
         pruneIf: ((PropagationSession) -> Boolean)?,
         decisionsRemaining: () -> Long,
         decrement: () -> Unit,
-        sink: com.eignex.klause.solver.SolveStatsSink? = null,
+        sink: SolveStatsSink? = null,
     ): AdvanceOutcome {
         while (true) {
             if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
@@ -808,7 +808,7 @@ class BacktrackSolver(override val problem: Problem) :
     /**
      * Execute the CDB backjump + clause-learn sequence:
      *   - pop trail + session to [learned.backjumpLevel];
-     *   - materialise [learned.literals] as a [com.eignex.klause.solver.factor.Clause]
+     *   - materialise [learned.literals] as a [Clause]
      *     and feed it to [PropagationSession.addLearnedClause], which asserts it via
      *     propagation (forcing the asserting literal as a unit pin);
      *   - if the assertion cascades into another conflict, recurse on the new analyzer
@@ -816,7 +816,7 @@ class BacktrackSolver(override val problem: Problem) :
      *     instances; [BackjumpTerm.Stuck] surfaces to the caller in that case.
      */
     private fun backjumpAndLearn(
-        learned: com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned,
+        learned: Learned,
         trail: MutableList<TrailNode>,
         session: PropagationSession,
         @Suppress("UNUSED_PARAMETER") params: BacktrackParams,
@@ -842,7 +842,7 @@ class BacktrackSolver(override val problem: Problem) :
             // long as the analyzer produced a UIP (always the case in well-formed
             // calls); if the clause came out empty, fall back to chronological.
             if (current.literals.isEmpty()) return BackjumpTerm.Stuck
-            val clause = com.eignex.klause.solver.factor.Clause(current.literals)
+            val clause = Clause(current.literals)
             val result = session.addLearnedClause(clause, current.lbd)
             when (result) {
                 is PropagationResult.Implied -> return BackjumpTerm.Resume
@@ -852,7 +852,7 @@ class BacktrackSolver(override val problem: Problem) :
                     // analyzer on the new conflict; if a new learned clause came back,
                     // recurse — otherwise we're stuck.
                     val next = result.learnedClause
-                        as? com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
+                        as? Learned
                         ?: return BackjumpTerm.Stuck
                     // If the new backjump target is level 0 and the clause is empty
                     // after that jump, the whole problem is infeasible.

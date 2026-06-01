@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -97,11 +98,7 @@ class ArgSort(
 
     /** Repair: snap `perm` to the true argsort of `values`. Computing the correct
      *  permutation gives strategies a one-shot fix for an entire violated argsort. */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val n = perm.size
         val indices = IntArray(n) { it }

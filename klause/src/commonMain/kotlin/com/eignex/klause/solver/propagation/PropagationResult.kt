@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.propagation
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -12,7 +13,7 @@ sealed interface PropagationResult {
     /**
      * Newly-forced facts beyond the input assumptions. Stored as parallel primitive
      * arrays sorted ascending by key — no autoboxing on iteration or lookup, no
-     * `HashMap` allocations when combining with [com.eignex.klause.solver.Assumptions].
+     * `HashMap` allocations when combining with [Assumptions].
      *
      * Primitive APIs ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull])
      * are the hot path; the [bools] / [ints] map views serve cold call-sites (the
@@ -102,10 +103,10 @@ sealed interface PropagationResult {
             for (i in intKeys.indices) action(intKeys[i], intValues[i])
         }
 
-        /** Reinterpret this implied set as an [com.eignex.klause.solver.Assumptions].
+        /** Reinterpret this implied set as an [Assumptions].
          *  Both share the same key-sorted parallel-array layout, so the conversion is
          *  three [copyOf] calls (one per primitive array) — no rebuild, no boxing. */
-        fun toAssumptions(): com.eignex.klause.solver.Assumptions = com.eignex.klause.solver.Assumptions(
+        fun toAssumptions(): Assumptions = Assumptions(
             boolKeys = boolKeys.copyOf(),
             boolValues = boolValues.copyOf(),
             intKeys = intKeys.copyOf(),

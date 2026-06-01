@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -532,7 +533,7 @@ class Cumulatives(
         state: LocalSearchState,
         v: Int,
         cur: Int,
-        dom: com.eignex.klause.solver.IntDomain,
+        dom: IntDomain,
         maxTargets: Int,
         sink: MoveSink,
     ) {

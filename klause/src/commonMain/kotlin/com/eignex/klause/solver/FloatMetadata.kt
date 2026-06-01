@@ -1,4 +1,5 @@
 package com.eignex.klause.solver
+import com.eignex.klause.solver.factor.LinearOp
 
 /**
  * Optional sidecar on [Problem] that records the original real-valued view of float
@@ -72,7 +73,7 @@ data class RealLinearConstraint(
     /** Float variable ids, parallel to [coeffs]. */
     val floatVarIds: IntArray,
     /** Comparison relating the weighted sum to [bound]. */
-    val op: com.eignex.klause.solver.factor.LinearOp,
+    val op: LinearOp,
     /** Right-hand-side bound. */
     val bound: Double,
 ) {

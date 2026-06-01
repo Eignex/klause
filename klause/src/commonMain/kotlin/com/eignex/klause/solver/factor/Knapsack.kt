@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -77,11 +78,7 @@ class Knapsack(
 
     /** Repair: snap `w` / `p` to the current totals; if w/p are pinned and the totals
      *  diverge, propose flipping a high-leverage xs[i] in the direction that closes the gap. */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State
         val wDom = state.problem.intDomains[w]

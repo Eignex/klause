@@ -1,5 +1,8 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.BoolFlip
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -148,7 +151,7 @@ class ReifiedLinear(
         // Thread the aux's current pinning as an extra antecedent for every implied int
         // tighten — the body-propagation path was selected by this pin, so any subsequent
         // conflict must trace back through it.
-        val auxAntecedent = com.eignex.klause.solver.Lit.make(auxBoolVar, !aux)
+        val auxAntecedent = Lit.make(auxBoolVar, !aux)
         return if (aux) {
             propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = auxAntecedent)
         } else {
@@ -192,7 +195,7 @@ class ReifiedLinear(
         val sum = state.intPayload[factorId]
         if (aux == holds(sum)) return
         sink.addBoolFlip(auxBoolVar)
-        val auxFlipMove = com.eignex.klause.solver.Move.BoolFlip(auxBoolVar)
+        val auxFlipMove = BoolFlip(auxBoolVar)
         for (i in vars.indices) {
             val v = vars[i]
             val c = coeffs[i]
@@ -218,7 +221,7 @@ class ReifiedLinear(
             if (targetOpp != null) {
                 val clamped = state.problem.intDomains[v].clamp(targetOpp)
                 if (clamped != cur && !aux == holds(sumWithout + c * clamped)) {
-                    sink.addCompound(listOf(auxFlipMove, com.eignex.klause.solver.Move.IntSet(v, clamped)))
+                    sink.addCompound(listOf(auxFlipMove, IntSet(v, clamped)))
                 }
             }
         }

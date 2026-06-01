@@ -1,21 +1,27 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.AllDifferent
+import com.eignex.klause.ast.AllDifferentExceptExpr
 import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
+import com.eignex.klause.ast.ArgSortExpr
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.CardinalityExpr
 import com.eignex.klause.ast.CircuitExpr
+import com.eignex.klause.ast.CostMddExpr
+import com.eignex.klause.ast.CostRegularExpr
 import com.eignex.klause.ast.CountExprOpt
 import com.eignex.klause.ast.CountOp
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.CumulativeExprOpt
 import com.eignex.klause.ast.DisjunctiveExpr
 import com.eignex.klause.ast.DisjunctiveExprOpt
+import com.eignex.klause.ast.FloatLinearConstraint
 import com.eignex.klause.ast.GccExprOpt
+import com.eignex.klause.ast.GeostExpr
 import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
@@ -23,17 +29,28 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
+import com.eignex.klause.ast.MddExpr
 import com.eignex.klause.ast.NValueExprOpt
 import com.eignex.klause.ast.NValueMode
+import com.eignex.klause.ast.NetworkFlowCostExpr
+import com.eignex.klause.ast.NetworkFlowExpr
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
+import com.eignex.klause.ast.PathExpr
 import com.eignex.klause.ast.PseudoBooleanExpr
+import com.eignex.klause.ast.SetDisjoint
+import com.eignex.klause.ast.SetEq
+import com.eignex.klause.ast.SetIn
+import com.eignex.klause.ast.SetNominalIn
+import com.eignex.klause.ast.SetSubsetOf
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.TableConstraint
+import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
@@ -96,29 +113,29 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
 
         is IntCompare -> assertIntCompare(expr)
 
-        is com.eignex.klause.ast.FloatLinearConstraint -> assertFloatLinear(expr)
+        is FloatLinearConstraint -> assertFloatLinear(expr)
 
         is AllDifferent -> assertAllDifferent(expr.terms)
 
-        is com.eignex.klause.ast.AllDifferentExceptExpr -> assertAllDifferentExcept(expr)
+        is AllDifferentExceptExpr -> assertAllDifferentExcept(expr)
 
-        is com.eignex.klause.ast.ArgSortExpr -> assertArgSort(expr)
+        is ArgSortExpr -> assertArgSort(expr)
 
-        is com.eignex.klause.ast.NetworkFlowExpr -> assertNetworkFlow(expr)
+        is NetworkFlowExpr -> assertNetworkFlow(expr)
 
-        is com.eignex.klause.ast.NetworkFlowCostExpr -> assertNetworkFlowCost(expr)
+        is NetworkFlowCostExpr -> assertNetworkFlowCost(expr)
 
-        is com.eignex.klause.ast.GeostExpr -> assertGeost(expr)
+        is GeostExpr -> assertGeost(expr)
 
-        is com.eignex.klause.ast.PathExpr -> assertPath(expr)
+        is PathExpr -> assertPath(expr)
 
-        is com.eignex.klause.ast.TreeExpr -> assertTree(expr)
+        is TreeExpr -> assertTree(expr)
 
-        is com.eignex.klause.ast.MddExpr -> assertMdd(expr)
+        is MddExpr -> assertMdd(expr)
 
-        is com.eignex.klause.ast.CostMddExpr -> assertCostMdd(expr)
+        is CostMddExpr -> assertCostMdd(expr)
 
-        is com.eignex.klause.ast.CostRegularExpr -> assertCostRegular(expr)
+        is CostRegularExpr -> assertCostRegular(expr)
 
         is CircuitExpr -> assertCircuit(expr.succ, expr.valueOffset, sub = false)
 
@@ -140,15 +157,15 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
 
         is GccExprOpt -> assertGccOpt(expr)
 
-        is com.eignex.klause.ast.SetIn -> assertSetIn(expr)
+        is SetIn -> assertSetIn(expr)
 
-        is com.eignex.klause.ast.SetNominalIn -> assertSetNominalIn(expr)
+        is SetNominalIn -> assertSetNominalIn(expr)
 
-        is com.eignex.klause.ast.SetSubsetOf -> assertSetSubsetOf(expr)
+        is SetSubsetOf -> assertSetSubsetOf(expr)
 
-        is com.eignex.klause.ast.SetDisjoint -> assertSetDisjoint(expr)
+        is SetDisjoint -> assertSetDisjoint(expr)
 
-        is com.eignex.klause.ast.SetEq -> assertSetEq(expr)
+        is SetEq -> assertSetEq(expr)
 
         is TableConstraint -> assertExpr(expandTable(expr))
 
@@ -186,12 +203,12 @@ internal fun Compiler.Build.expandTable(t: TableConstraint): BoolExpr {
 }
 
 /**
- * Lower a [com.eignex.klause.ast.FloatLinearConstraint] in two parallel ways:
+ * Lower a [FloatLinearConstraint] in two parallel ways:
  *
  *  1. Bucket each referenced float variable using its declared [FloatSpec.buckets]
  *     and emit a scaled-integer [Linear] factor — this is what every existing
  *     backend solves over.
- *  2. Append a [com.eignex.klause.solver.RealLinearConstraint] (over float-var
+ *  2. Append a [RealLinearConstraint] (over float-var
  *     ids) to the metadata buffer so a native-real backend (Z3) can solve it
  *     directly in real arithmetic.
  *
@@ -200,26 +217,26 @@ internal fun Compiler.Build.expandTable(t: TableConstraint): BoolExpr {
  * `Σ (c_v · step_v) · b_v ⟨op⟩ bound − Σ c_v · lo_v`, then multiply by `SCALE` and
  * round to integer coefficients. Discretisation error is ~1/SCALE per term.
  */
-internal fun Compiler.Build.assertFloatLinear(c: com.eignex.klause.ast.FloatLinearConstraint) {
+internal fun Compiler.Build.assertFloatLinear(c: FloatLinearConstraint) {
     val n = c.varNames.size
     val realIds = IntArray(n) { i ->
         floatVarIdByName[c.varNames[i]]
             ?: error("Float variable '${c.varNames[i]}' not declared")
     }
     val realOp = when (c.op) {
-        com.eignex.klause.ast.IntCmpOp.LE,
-        com.eignex.klause.ast.IntCmpOp.LT,
-        -> com.eignex.klause.solver.factor.LinearOp.LE
+        IntCmpOp.LE,
+        IntCmpOp.LT,
+        -> LinearOp.LE
 
-        com.eignex.klause.ast.IntCmpOp.GE,
-        com.eignex.klause.ast.IntCmpOp.GT,
-        -> com.eignex.klause.solver.factor.LinearOp.GE
+        IntCmpOp.GE,
+        IntCmpOp.GT,
+        -> LinearOp.GE
 
-        com.eignex.klause.ast.IntCmpOp.EQ -> com.eignex.klause.solver.factor.LinearOp.EQ
+        IntCmpOp.EQ -> LinearOp.EQ
 
-        com.eignex.klause.ast.IntCmpOp.NE -> com.eignex.klause.solver.factor.LinearOp.NE
+        IntCmpOp.NE -> LinearOp.NE
     }
-    floatMetaConstraints += com.eignex.klause.solver.RealLinearConstraint(
+    floatMetaConstraints += RealLinearConstraint(
         coeffs = c.coeffs.copyOf(),
         floatVarIds = realIds,
         op = realOp,
@@ -243,7 +260,7 @@ internal fun Compiler.Build.assertFloatLinear(c: com.eignex.klause.ast.FloatLine
         scaledBound -= c.coeffs[i] * interval.lo
     }
     val scaledBoundInt = (scaledBound * scale).toLong().toInt()
-    factors += com.eignex.klause.solver.factor.Linear(scaledCoeffs, intVarIds, realOp, scaledBoundInt)
+    factors += Linear(scaledCoeffs, intVarIds, realOp, scaledBoundInt)
 }
 
 internal fun Compiler.Build.assertAllDifferent(terms: List<IntExpr>) {

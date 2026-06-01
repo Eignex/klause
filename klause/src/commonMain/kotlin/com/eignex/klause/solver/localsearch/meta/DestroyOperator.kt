@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -202,7 +203,7 @@ internal fun interface DestroyOperator {
             }
             val end = start + windowSize // exclusive
             // Collect int vars whose current value lies in [start, end).
-            val inWindow = com.eignex.klause.util.IntArrayList()
+            val inWindow = IntArrayList()
             for (i in 0 until n) {
                 val v = incumbent.ints[i]
                 if (v in start until end) inWindow.add(i)

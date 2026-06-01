@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -220,11 +222,7 @@ class Diffn(
     /** Repair: for each overlapping pair, propose single-axis shifts of either rectangle out
      *  of the overlap, diagonal compound shifts, and a position swap. Sizes are read at their
      *  current values (so the escape distances respect variable dimensions). */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         for (i in 0 until n) {
             val xi = rx(state, i, -1, 0)
@@ -262,8 +260,8 @@ class Diffn(
                     if (nx !in dxsI || ny !in dysI) return
                     sink.addCompound(
                         listOf(
-                            com.eignex.klause.solver.Move.IntSet(xs[i], nx),
-                            com.eignex.klause.solver.Move.IntSet(ys[i], ny),
+                            IntSet(xs[i], nx),
+                            IntSet(ys[i], ny),
                         ),
                     )
                 }
@@ -276,10 +274,10 @@ class Diffn(
                 ) {
                     sink.addCompound(
                         listOf(
-                            com.eignex.klause.solver.Move.IntSet(xs[i], xj),
-                            com.eignex.klause.solver.Move.IntSet(ys[i], yj),
-                            com.eignex.klause.solver.Move.IntSet(xs[j], xi),
-                            com.eignex.klause.solver.Move.IntSet(ys[j], yi),
+                            IntSet(xs[i], xj),
+                            IntSet(ys[i], yj),
+                            IntSet(xs[j], xi),
+                            IntSet(ys[j], yi),
                         ),
                     )
                 }

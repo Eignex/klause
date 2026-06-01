@@ -10,6 +10,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SampleResult
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.SolveStatsSink
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
@@ -82,7 +83,7 @@ class LocalSearchSolver(
     override fun session(): LocalSearchSession = LocalSearchSession(this)
 
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
-        val sink = com.eignex.klause.solver.SolveStatsSink(backend = "ls")
+        val sink = SolveStatsSink(backend = "ls")
         sink.start()
         val eff = effectiveAssumptions(params.assumptions)
         if (eff == null) {
@@ -332,7 +333,7 @@ class LocalSearchSolver(
         // split (strategy for satisfy, optimizeStrategy for descent) for non-unified
         // strategies that bail at feasibility (DDFW/ProbSat).
         val descentStrategy = optimizeStrategy
-        val unified = descentStrategy is com.eignex.klause.solver.localsearch.strategy.Cbls
+        val unified = descentStrategy is Cbls
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {

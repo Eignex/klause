@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
+@file:OptIn(ExperimentalAtomicApi::class)
 
 package com.eignex.klause.portfolio
 
@@ -20,7 +20,9 @@ import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.localsearch.strategy.Vnd
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
+import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Build a diverse pool of [LocalSearchSession] workers for a multi-core LS [Portfolio].
@@ -171,11 +173,11 @@ internal class LocalSearchPortfolio(val problem: Problem, val configs: List<Loca
      * improved the global incumbent on the last cycle.
      *
      * Set up by the caller using `kumulant.bandit.RouletteWheelBandit(configs.size)`
-     * or any other [com.eignex.kumulant.bandit.UnivariateBandit]; reading and updating
+     * or any other [UnivariateBandit]; reading and updating
      * the bandit are the caller's responsibility — this slot is purely the shared
      * handle. Defaults to null (no cross-worker learning).
      */
-    var restartBandit: com.eignex.kumulant.bandit.UnivariateBandit? = null
+    var restartBandit: UnivariateBandit? = null
 
     fun close() {
         workers.forEach { runCatching { it.close() } }

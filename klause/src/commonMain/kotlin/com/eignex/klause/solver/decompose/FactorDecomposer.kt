@@ -32,6 +32,7 @@ import com.eignex.klause.solver.factor.MinCostFlow
 import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Path
+import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
@@ -67,10 +68,10 @@ internal interface DecompositionContext {
 /**
  * Lowers a complex global factor to a list of mid-level IR factors that arithmetic
  * backends consume natively. Mid-IR is the small set:
- *  - [Clause], [Linear], [Cardinality], [com.eignex.klause.solver.factor.PseudoBoolean],
- *    [com.eignex.klause.solver.factor.Product],
- *  - [ReifiedLinear], [com.eignex.klause.solver.factor.ReifiedCardinality],
- *    [com.eignex.klause.solver.factor.ReifiedPseudoBoolean].
+ *  - [Clause], [Linear], [Cardinality], [PseudoBoolean],
+ *    [Product],
+ *  - [ReifiedLinear], [ReifiedCardinality],
+ *    [ReifiedPseudoBoolean].
  *
  * Backends call [decompose] with their own [DecompositionContext]. The returned list is
  * a semantically-equivalent encoding using only mid-IR factor types; the caller is
@@ -164,11 +165,11 @@ internal object FactorDecomposer {
         is Clause,
         is Linear,
         is Cardinality,
-        is com.eignex.klause.solver.factor.PseudoBoolean,
-        is com.eignex.klause.solver.factor.Product,
+        is PseudoBoolean,
+        is Product,
         is ReifiedLinear,
-        is com.eignex.klause.solver.factor.ReifiedCardinality,
-        is com.eignex.klause.solver.factor.ReifiedPseudoBoolean,
+        is ReifiedCardinality,
+        is ReifiedPseudoBoolean,
         -> true
 
         else -> false
@@ -547,7 +548,7 @@ internal object FactorDecomposer {
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
         }
-        val resultValue = ctx.freshInt(com.eignex.klause.solver.IntDomain(lo, hi))
+        val resultValue = ctx.freshInt(IntDomain(lo, hi))
         // result_value relates to xs[i] via ≥ or ≤ per max/min, plus an equality witness.
         val winLits = IntArray(f.xs.size) { i ->
             val aux = ctx.freshBool()
@@ -814,7 +815,7 @@ internal object FactorDecomposer {
         val numSymbols = f.alphabetSize
         // q[0..n] aux ints. States are 1-based (0 = dead).
         val q = IntArray(n + 1) {
-            ctx.freshInt(com.eignex.klause.solver.IntDomain(0, numQ))
+            ctx.freshInt(IntDomain(0, numQ))
         }
         // q[0] = q0.
         out.add(Linear(intArrayOf(1), intArrayOf(q[0]), LinearOp.EQ, f.q0))
@@ -858,7 +859,7 @@ internal object FactorDecomposer {
         val n = f.seq.size
         // Per-layer state aux: state[i] ∈ [0, numStatesPerLayer[i] - 1].
         val state = IntArray(n + 1) { i ->
-            ctx.freshInt(com.eignex.klause.solver.IntDomain(0, f.numStatesPerLayer[i] - 1))
+            ctx.freshInt(IntDomain(0, f.numStatesPerLayer[i] - 1))
         }
         out.add(Linear(intArrayOf(1), intArrayOf(state[0]), LinearOp.EQ, f.initial))
         val allFires = ArrayList<Int>()
@@ -1150,9 +1151,9 @@ internal object FactorDecomposer {
         // Level vars: level[0] pinned to 0; level[i] ∈ [1, n-1] for i ≠ 0.
         val level = IntArray(n) { i ->
             if (i == 0) {
-                ctx.freshInt(com.eignex.klause.solver.IntDomain(0, 0))
+                ctx.freshInt(IntDomain(0, 0))
             } else {
-                ctx.freshInt(com.eignex.klause.solver.IntDomain(1, n - 1))
+                ctx.freshInt(IntDomain(1, n - 1))
             }
         }
         // For each i, for each j ∈ [1, n-1]: succ[i] = j ⇒ level[j] = level[i] + 1.
@@ -1194,7 +1195,7 @@ internal object FactorDecomposer {
         // level[i] ∈ [0, n-1]; for the in-cycle subset, level forms a cycle of length
         // = number of in-cycle nodes. We adopt the same level convention as Circuit,
         // gated by `in_cycle_i ∧ in_cycle_j`.
-        val level = IntArray(n) { ctx.freshInt(com.eignex.klause.solver.IntDomain(0, n - 1)) }
+        val level = IntArray(n) { ctx.freshInt(IntDomain(0, n - 1)) }
         for (i in 0 until n) {
             for (j in 0 until n) {
                 if (i == j) continue
@@ -1260,7 +1261,7 @@ internal object FactorDecomposer {
                 allLits[xsEq.size + i] = ysEq[i]
                 allWeights[xsEq.size + i] = -1
             }
-            out.add(PseudoBoolean(allWeights, allLits, com.eignex.klause.ast.PbOp.EQ, 0))
+            out.add(PseudoBoolean(allWeights, allLits, PbOp.EQ, 0))
         }
         return out
     }
@@ -1286,7 +1287,7 @@ internal object FactorDecomposer {
                 if (d.min < lo) lo = d.min
                 if (d.max > hi) hi = d.max
             }
-            com.eignex.klause.solver.IntDomain(lo, hi)
+            IntDomain(lo, hi)
         }
         val valAt = IntArray(n) { ctx.freshInt(unionDom) }
         // Element constraint: valAt[i] = values[perm[i] − permOffset]. For each i, for
@@ -1338,11 +1339,11 @@ internal object FactorDecomposer {
         // inDeg / outDeg ints in [0, max-incident].
         val inDeg = IntArray(n) { v ->
             val k = inArcs[v].size
-            ctx.freshInt(com.eignex.klause.solver.IntDomain(0, k))
+            ctx.freshInt(IntDomain(0, k))
         }
         val outDeg = IntArray(n) { v ->
             val k = outArcs[v].size
-            ctx.freshInt(com.eignex.klause.solver.IntDomain(0, k))
+            ctx.freshInt(IntDomain(0, k))
         }
         // Linear: inDeg[v] − Σ edgePresent[e for e ∈ inArcs[v]] = 0; sim for out.
         for (v in 0 until n) {
@@ -1456,7 +1457,7 @@ internal object FactorDecomposer {
         // `level[source] = 0`, and `edgePresent[e] = (u→v) ⇒ level[v] = level[u] + 1`.
         // Around any cycle this would require level[u]+k = level[u], so all simple cycles
         // are excluded; the only feasible subgraph is a source-to-sink path.
-        val level = IntArray(n) { ctx.freshInt(com.eignex.klause.solver.IntDomain(0, n - 1)) }
+        val level = IntArray(n) { ctx.freshInt(IntDomain(0, n - 1)) }
         for (v in 0 until n) {
             val isSourceL = ctx.freshBool()
             out.add(ReifiedLinear(isSourceL, intArrayOf(1), intArrayOf(f.source), LinearOp.EQ, v + off))
@@ -1486,7 +1487,7 @@ internal object FactorDecomposer {
         val off = f.nodeOffset
         val inArcs = Array(n) { ArrayList<Int>() }
         for (e in 0 until m) inArcs[f.to[e] - off].add(e)
-        val inDeg = IntArray(n) { v -> ctx.freshInt(com.eignex.klause.solver.IntDomain(0, inArcs[v].size)) }
+        val inDeg = IntArray(n) { v -> ctx.freshInt(IntDomain(0, inArcs[v].size)) }
         for (v in 0 until n) {
             val k = inArcs[v].size
             if (k == 0) {
@@ -1531,7 +1532,7 @@ internal object FactorDecomposer {
         // `(u→v)`: `edgePresent[e] ⇒ level[v] = level[u] + 1`. This eliminates cycles
         // (level monotonically increases along present edges) and any non-root present
         // node is forced to descend from the root.
-        val level = IntArray(n) { ctx.freshInt(com.eignex.klause.solver.IntDomain(0, n - 1)) }
+        val level = IntArray(n) { ctx.freshInt(IntDomain(0, n - 1)) }
         for (v in 0 until n) {
             val isRootL = ctx.freshBool()
             out.add(ReifiedLinear(isRootL, intArrayOf(1), intArrayOf(f.root), LinearOp.EQ, v + off))

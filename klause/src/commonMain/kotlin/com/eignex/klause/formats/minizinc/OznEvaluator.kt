@@ -1,4 +1,5 @@
 package com.eignex.klause.formats.minizinc
+import kotlin.math.abs
 
 /**
  * Evaluates a parsed `.ozn` program against a binding map from the FZN solver. Produces
@@ -257,7 +258,7 @@ internal class OznEvaluator(items: List<OznItem>) {
 
             "abs" -> when (val v = args[0]) {
                 is OznValue.IntV -> OznValue.IntV(if (v.value < 0) -v.value else v.value)
-                is OznValue.FloatV -> OznValue.FloatV(kotlin.math.abs(v.value))
+                is OznValue.FloatV -> OznValue.FloatV(abs(v.value))
                 else -> throw OznEvalException("abs: unsupported arg $v")
             }
 

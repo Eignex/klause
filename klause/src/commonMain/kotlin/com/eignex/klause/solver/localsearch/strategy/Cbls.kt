@@ -1,7 +1,10 @@
 package com.eignex.klause.solver.localsearch.strategy
 
+import com.eignex.klause.solver.FunctionalObjective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
  * Constraint-Based Local Search strategy. Unlike SAT-family strategies ([ProbSat],
@@ -204,7 +207,7 @@ class Cbls(
         for (i in w.indices) w[i] = keep * w[i] + pull
     }
 
-    private fun sampleFromViolated(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
+    private fun sampleFromViolated(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         repeat(minOf(violatedSampleCount, state.violated.size)) {
             val fid = state.violated.random(state.rng)
@@ -219,7 +222,7 @@ class Cbls(
      *  ±1 / bool-flip moves on the variables of factors that *neighbour* a violated factor
      *  (share a variable), giving the search — together with the raised stall noise — moves
      *  to step through the basin wall. Capped at [frontierMoveCap] per call. */
-    private fun sampleFrontier(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
+    private fun sampleFrontier(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         val problem = state.problem
         var budget = frontierMoveCap
@@ -246,12 +249,7 @@ class Cbls(
 
     /** Emit ±1 int-steps and bool flips for every variable of factor [nf], spending from and
      *  returning the remaining [budget]. */
-    private fun addNeighbourMoves(
-        state: LocalSearchState,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-        nf: Int,
-        budget: Int,
-    ): Int {
+    private fun addNeighbourMoves(state: LocalSearchState, sink: MoveSink, nf: Int, budget: Int): Int {
         var b = budget
         val nfac = state.factors[nf]
         for (u in nfac.intVars) {
@@ -276,7 +274,7 @@ class Cbls(
         return b
     }
 
-    private fun sampleFromSatisfied(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
+    private fun sampleFromSatisfied(state: LocalSearchState, sink: MoveSink) {
         if (satisfiedSampleCount == 0) return
         // At infeasibility the structured-move source contributes nothing useful — its
         // moves only matter when the engine is already at cost==0 and looking for
@@ -302,11 +300,11 @@ class Cbls(
      *  infeasibility for the same reason as [sampleFromSatisfied]: the objective gradient
      *  doesn't matter when we're still chasing violations, and the engine has
      *  proposeRepairMoves to cover that phase. */
-    private fun seedObjectiveMoves(state: LocalSearchState, sink: com.eignex.klause.solver.localsearch.MoveSink) {
+    private fun seedObjectiveMoves(state: LocalSearchState, sink: MoveSink) {
         if (state.cost > 0) return
         val obj = state.objective ?: return
         when (obj) {
-            is com.eignex.klause.solver.LinearObjective -> {
+            is LinearObjective -> {
                 for (v in obj.boolWeights.indices) {
                     if (obj.boolWeights[v] == 0.0) continue
                     sink.addBoolFlip(v)
@@ -322,7 +320,7 @@ class Cbls(
                 }
             }
 
-            is com.eignex.klause.solver.FunctionalObjective -> {
+            is FunctionalObjective -> {
                 // Decomposed objective: its gradient lives in deltaIfApplied, not in per-var
                 // coefficients, so we can't pick a direction a priori. Seed *geometric* steps
                 // (±1, ±2, ±4, …, plus the domain endpoints) on each decision (leaf) variable

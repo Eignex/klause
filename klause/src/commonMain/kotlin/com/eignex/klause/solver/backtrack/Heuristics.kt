@@ -1,10 +1,16 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationResult.Unsat
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IndexedMaxHeap
 import com.eignex.klause.util.IntArrayList
+import kotlin.math.abs
+import kotlin.math.ln
 import kotlin.random.Random
 
 /**
@@ -40,7 +46,7 @@ interface VariableHeuristic {
 
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
      *  the assignment here so they can bias future picks toward it. Default no-op. */
-    fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
+    fun onSolution(snapshot: Sample) {}
 
     /**
      * Richer conflict notification: [varRef] is the decision that triggered the conflict,
@@ -97,7 +103,7 @@ interface ValueHeuristic {
 
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
      *  the assignment here so they can bias future picks toward it. Default no-op. */
-    fun onSolution(snapshot: com.eignex.klause.solver.Sample) {}
+    fun onSolution(snapshot: Sample) {}
 }
 
 // ---- Variable heuristics ---------------------------------------------------------------
@@ -177,7 +183,7 @@ object LargestDomain : VariableHeuristic {
  * (bools precede ints). Activities persist across [onRestart] — that's the whole point of
  * VSIDS, learning carries over.
  *
- * Pre-LCG limitation: today the engine's [com.eignex.klause.solver.propagation.PropagationResult.Unsat]
+ * Pre-LCG limitation: today the engine's [Unsat]
  * carries the *decision variables* at conflict levels, not every variable on the
  * propagation-reason path. Bumping decision variables only gives a useful (if coarser)
  * signal — still consistently better than random / smallest-domain on hard instances. When
@@ -509,7 +515,7 @@ internal class LastConflict(private val base: VariableHeuristic) : VariableHeuri
         base.onRestart()
     }
 
-    override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {
+    override fun onSolution(snapshot: Sample) {
         base.onSolution(snapshot)
     }
 }
@@ -715,7 +721,7 @@ internal class ConflictOrdering(private val base: VariableHeuristic) : VariableH
     override fun onCommit(varRef: VarRef) = base.onCommit(varRef)
     override fun onPropagation(implied: PropagationResult.Implied) = base.onPropagation(implied)
     override fun onRestart() = base.onRestart()
-    override fun onSolution(snapshot: com.eignex.klause.solver.Sample) = base.onSolution(snapshot)
+    override fun onSolution(snapshot: Sample) = base.onSolution(snapshot)
 }
 
 /**
@@ -734,7 +740,7 @@ internal class ConflictOrdering(private val base: VariableHeuristic) : VariableH
  * Pair with [IndomainBest] for a complete objective-aware (var, value) strategy.
  */
 internal class MaxRegret(
-    private val objective: com.eignex.klause.solver.LinearObjective,
+    private val objective: LinearObjective,
     private val base: VariableHeuristic = SmallestDomain,
 ) : VariableHeuristic {
 
@@ -745,7 +751,7 @@ internal class MaxRegret(
         for (v in 0 until problem.numBoolVars) {
             if (session.boolValue(v) != null) continue
             val w = if (v < objective.boolWeights.size) objective.boolWeights[v] else 0.0
-            val r = kotlin.math.abs(w)
+            val r = abs(w)
             if (r > bestRegret) {
                 bestRegret = r
                 best = VarRef.Bool(v)
@@ -755,7 +761,7 @@ internal class MaxRegret(
             val d = session.intDomain(v)
             if (d.size <= 1) continue
             val c = if (v < objective.intCoefficients.size) objective.intCoefficients[v] else 0.0
-            val r = kotlin.math.abs(c) * (d.max - d.min)
+            val r = abs(c) * (d.max - d.min)
             if (r > bestRegret) {
                 bestRegret = r
                 best = VarRef.IntVar(v)
@@ -769,7 +775,7 @@ internal class MaxRegret(
     override fun onCommit(varRef: VarRef) = base.onCommit(varRef)
     override fun onPropagation(implied: PropagationResult.Implied) = base.onPropagation(implied)
     override fun onRestart() = base.onRestart()
-    override fun onSolution(snapshot: com.eignex.klause.solver.Sample) = base.onSolution(snapshot)
+    override fun onSolution(snapshot: Sample) = base.onSolution(snapshot)
 }
 
 // ---- Value heuristics ------------------------------------------------------------------
@@ -946,7 +952,7 @@ private fun probeAndOrder(
             is VarRef.Bool -> session.pinBool(varRef.varId, v != 0)
             is VarRef.IntVar -> session.pinInt(varRef.varId, v)
         }
-        if (r is com.eignex.klause.solver.propagation.PropagationResult.Unsat) continue
+        if (r is Unsat) continue
         val post = logRemainingDomainProduct(session)
         session.popLast()
         scored.add(v to post)
@@ -971,11 +977,11 @@ private fun probeAndOrder(
 private fun logRemainingDomainProduct(session: PropagationSession): Double {
     var s = 0.0
     val p = session.problem
-    val ln2 = kotlin.math.ln(2.0)
+    val ln2 = ln(2.0)
     for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += ln2
     for (v in 0 until p.numIntVars) {
         val sz = session.intDomain(v).size
-        if (sz > 1) s += kotlin.math.ln(sz.toDouble())
+        if (sz > 1) s += ln(sz.toDouble())
     }
     return s
 }
@@ -992,7 +998,7 @@ private fun logRemainingDomainProduct(session: PropagationSession): Double {
  * early. For a satisfiability problem, falls through to [IndomainMin] (every coefficient
  * is zero so ascending order is preserved).
  */
-internal class IndomainBest(private val objective: com.eignex.klause.solver.LinearObjective) : ValueHeuristic {
+internal class IndomainBest(private val objective: LinearObjective) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
         is VarRef.Bool -> {
             val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0.0
@@ -1072,7 +1078,7 @@ internal class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic
     override fun onCommit(varRef: VarRef, value: Int) = base.onCommit(varRef, value)
     override fun onRestart() = base.onRestart()
 
-    override fun onSolution(snapshot: com.eignex.klause.solver.Sample) {
+    override fun onSolution(snapshot: Sample) {
         bools = snapshot.bools.copyOf()
         ints = snapshot.ints.copyOf()
         base.onSolution(snapshot)
@@ -1081,11 +1087,10 @@ internal class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic
 
 /** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
  *  the engine can early-exit before enumerating the full domain on a backtrack. */
-private fun domainValuesAscending(d: com.eignex.klause.solver.IntDomain): Sequence<Int> =
-    sequence { d.forEach { yield(it) } }
+private fun domainValuesAscending(d: IntDomain): Sequence<Int> = sequence { d.forEach { yield(it) } }
 
 /** Descending sequence; same skip-holes semantics. */
-private fun domainValuesDescending(d: com.eignex.klause.solver.IntDomain): Sequence<Int> = sequence {
+private fun domainValuesDescending(d: IntDomain): Sequence<Int> = sequence {
     // Backwards walk: iterate from max down to min, skip holes via membership check.
     // For sparse domains this is O((max - min) + holes); for contiguous it's O(span).
     for (v in d.max downTo d.min) if (v in d) yield(v)

@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -93,11 +94,7 @@ class Mdd(
      *  DAG; at that position, propose every in-domain symbol that has a valid transition
      *  from the live state (regardless of forward feasibility to an accepting state — the
      *  cheap heuristic; the engine will eventually find paths that lead to acceptance). */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         var current = initial
         for (i in 0 until seq.size) {

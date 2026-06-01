@@ -1,4 +1,5 @@
 package com.eignex.klause.ast
+import com.eignex.klause.schema.IntHandle
 
 /** Minimum of [xs] (at least one argument). */
 fun min(vararg xs: IntTerm): IntExpr {
@@ -30,7 +31,7 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
     require(xs.size >= 2) { "allDifferent(): need at least two terms" }
     // Pigeonhole guard: if all operands are bare schema handles, check that the union of their
     // domains is large enough to host one distinct value per term.
-    val handles = xs.mapNotNull { it as? com.eignex.klause.schema.IntHandle }
+    val handles = xs.mapNotNull { it as? IntHandle }
     if (handles.size == xs.size) {
         val unionSize = unionDomainSize(handles.map { it.min to it.max })
         require(unionSize >= xs.size) {
@@ -111,7 +112,7 @@ private fun validateTableTuples(vars: List<IntTerm>, tuples: List<List<Int>>) {
         "table: every tuple must have arity ${vars.size}"
     }
     for ((i, term) in vars.withIndex()) {
-        val handle = term as? com.eignex.klause.schema.IntHandle ?: continue
+        val handle = term as? IntHandle ?: continue
         for ((tIdx, tup) in tuples.withIndex()) {
             val v = tup[i]
             require(v in handle.min..handle.max) {

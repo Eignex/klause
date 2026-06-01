@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import kotlin.math.abs
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -231,11 +232,11 @@ class Product(
         val center = rv / otherValue // truncated
         val domain = state.problem.intDomains[operandVar]
         var bestCandidate = currentValue
-        var bestError = kotlin.math.abs(currentValue.toLong() * otherValue - rv)
+        var bestError = abs(currentValue.toLong() * otherValue - rv)
         for (delta in -2..2) {
             val cand = center + delta
             if (cand !in domain) continue
-            val error = kotlin.math.abs(cand.toLong() * otherValue - rv)
+            val error = abs(cand.toLong() * otherValue - rv)
             if (error < bestError) {
                 bestError = error
                 bestCandidate = cand

@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -98,11 +99,7 @@ class Table(
      *  current assignment, then propose IntSet moves that bring `xs` toward each matching
      *  column in that tuple. Caps proposals at the top-2 closest tuples to keep the
      *  candidate set focused while still giving strategies multiple repair directions. */
-    override fun proposeRepairMoves(
-        state: com.eignex.klause.solver.localsearch.LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         // Score each tuple by Hamming distance to the current assignment.
         data class Scored(val row: Int, val distance: Int)

@@ -1,8 +1,10 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.AllDifferent
+import com.eignex.klause.ast.AllDifferentExceptExpr
 import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
+import com.eignex.klause.ast.ArgSortExpr
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
 import com.eignex.klause.ast.BoolExpr
@@ -10,13 +12,17 @@ import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.BoolSpec
 import com.eignex.klause.ast.CardinalityExpr
 import com.eignex.klause.ast.CircuitExpr
+import com.eignex.klause.ast.CostMddExpr
+import com.eignex.klause.ast.CostRegularExpr
 import com.eignex.klause.ast.CountExprOpt
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.CumulativeExprOpt
 import com.eignex.klause.ast.DisjunctiveExpr
 import com.eignex.klause.ast.DisjunctiveExprOpt
+import com.eignex.klause.ast.FloatLinearConstraint
 import com.eignex.klause.ast.FloatSpec
 import com.eignex.klause.ast.GccExprOpt
+import com.eignex.klause.ast.GeostExpr
 import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
@@ -24,22 +30,40 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntSpec
+import com.eignex.klause.ast.MddExpr
+import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.NValueExprOpt
 import com.eignex.klause.ast.NamedConstraint
+import com.eignex.klause.ast.NetworkFlowCostExpr
+import com.eignex.klause.ast.NetworkFlowExpr
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
+import com.eignex.klause.ast.PathExpr
+import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.SchemaEntry
+import com.eignex.klause.ast.SearchAnnotation
+import com.eignex.klause.ast.SetDisjoint
+import com.eignex.klause.ast.SetEq
+import com.eignex.klause.ast.SetIn
+import com.eignex.klause.ast.SetNominalIn
+import com.eignex.klause.ast.SetSpec
+import com.eignex.klause.ast.SetSubsetOf
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.TableConstraint
+import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.ast.XorExpr
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FloatInterval
+import com.eignex.klause.solver.FloatMetadata
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.LinearOp
@@ -49,13 +73,11 @@ import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.skema.SchemaDef
 
-internal class Compiler(
-    private val config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current,
-) {
+internal class Compiler(private val config: KlauseConfig = KlauseConfig.current) {
 
     fun compile(def: SchemaDef<SchemaEntry>): CompiledProblem = Build(config).run(def)
 
-    internal class Build(val config: com.eignex.klause.config.KlauseConfig) {
+    internal class Build(val config: KlauseConfig) {
         val factors = mutableListOf<Factor>()
         val boolVarIdByName = mutableMapOf<String, Int>()
         val intVarIdByName = mutableMapOf<String, Int>()
@@ -68,17 +90,17 @@ internal class Compiler(
         // arrays that get packaged into the Problem's optional [FloatMetadata] for backends
         // that solve over reals natively.
         val floatDecoders = mutableMapOf<String, FloatSpec>()
-        val floatMetaIntervals = mutableListOf<com.eignex.klause.solver.FloatInterval>()
+        val floatMetaIntervals = mutableListOf<FloatInterval>()
         val floatMetaIntVarIds = mutableListOf<Int>()
         val floatMetaBuckets = mutableListOf<Int>()
         val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
-        val floatMetaConstraints = mutableListOf<com.eignex.klause.solver.RealLinearConstraint>()
+        val floatMetaConstraints = mutableListOf<RealLinearConstraint>()
 
         /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
          *  `SetVarLayout`: for set var `S` over universe `[e_0, …, e_{n-1}]`,
          *  `setLayouts["S"].indicatorBoolIds[i]` is the klause bool var that's `true` iff
-         *  `e_i ∈ S`. Both [com.eignex.klause.ast.SetSpec] (int universe) and
-         *  [com.eignex.klause.ast.MultipleSpec] (nominal universe) populate this — the
+         *  `e_i ∈ S`. Both [SetSpec] (int universe) and
+         *  [MultipleSpec] (nominal universe) populate this — the
          *  difference is the decoder shape (ints vs label strings). */
         val setLayouts = mutableMapOf<String, SetLayout>()
 
@@ -94,7 +116,7 @@ internal class Compiler(
                 when (entry) {
                     is BoolSpec -> boolVarIdByName[name] = newBoolVar()
 
-                    is com.eignex.klause.ast.PresenceSpec -> boolVarIdByName[name] = newBoolVar()
+                    is PresenceSpec -> boolVarIdByName[name] = newBoolVar()
 
                     is NominalSpec -> {
                         val ids = LinkedHashMap<String, Int>()
@@ -108,7 +130,7 @@ internal class Compiler(
 
                     is IntSpec -> intVarIdByName[name] = newIntVar(IntDomain(entry.min, entry.max))
 
-                    is com.eignex.klause.ast.SetSpec -> {
+                    is SetSpec -> {
                         // Allocate one indicator bool per universe element. Universe is
                         // already deduplicated and sorted by [setVar]'s declarator.
                         val universe = entry.universe.toIntArray()
@@ -116,7 +138,7 @@ internal class Compiler(
                         setLayouts[name] = SetLayout(universe, indicators)
                     }
 
-                    is com.eignex.klause.ast.MultipleSpec -> {
+                    is MultipleSpec -> {
                         // Nominal universe: indicators are typed against labels, but the
                         // encoding is the same — one bool per label. We synthesise a
                         // synthetic int "id" (the label's index) for the universe so the
@@ -138,7 +160,7 @@ internal class Compiler(
                         floatDecoders[name] = entry
                         val fid = floatMetaIntervals.size
                         floatVarIdByName[name] = fid
-                        floatMetaIntervals += com.eignex.klause.solver.FloatInterval(entry.min, entry.max)
+                        floatMetaIntervals += FloatInterval(entry.min, entry.max)
                         floatMetaIntVarIds += intId
                         floatMetaBuckets += entry.buckets
                     }
@@ -146,7 +168,7 @@ internal class Compiler(
                     is NamedConstraint -> {}
 
                     // handled in a second pass once all vars are registered
-                    is com.eignex.klause.ast.SearchAnnotation -> {} // picked up at the end of compile()
+                    is SearchAnnotation -> {} // picked up at the end of compile()
                 }
             }
 
@@ -159,11 +181,11 @@ internal class Compiler(
             // contribute dead-value symmetry. Gated by config so it can be turned off.
             if (config.pinAbsentOptVars) emitOptVarPins(def)
 
-            val metadata: com.eignex.klause.solver.FloatMetadata? =
+            val metadata: FloatMetadata? =
                 if (floatMetaIntervals.isEmpty()) {
                     null
                 } else {
-                    com.eignex.klause.solver.FloatMetadata(
+                    FloatMetadata(
                         intervals = floatMetaIntervals.toTypedArray(),
                         bucketCounts = floatMetaBuckets.toIntArray(),
                         intVarByFloatVar = floatMetaIntVarIds.toIntArray(),
@@ -174,8 +196,8 @@ internal class Compiler(
             // Pick up the last `__search*` annotation in declaration order — schemas may
             // re-declare to refine an inherited choice.
             val searchAnnotation = def.entries.entries
-                .filter { it.value is com.eignex.klause.ast.SearchAnnotation }
-                .lastOrNull()?.value as? com.eignex.klause.ast.SearchAnnotation
+                .filter { it.value is SearchAnnotation }
+                .lastOrNull()?.value as? SearchAnnotation
             return CompiledProblem(
                 problem = Problem(
                     numBoolVars = numBoolVars,
@@ -197,7 +219,7 @@ internal class Compiler(
         /**
          * Emit `¬present → value = default` for every optional variable. An opt var is declared
          * (by [com.eignex.klause.schema.VariableSchema.optIntVar] and friends) alongside a
-         * presence Boolean carrying a [com.eignex.klause.ast.PresenceSpec] that names the value
+         * presence Boolean carrying a [PresenceSpec] that names the value
          * variable it gates; we detect the pair by that marker — explicit and type-driven, so an
          * unrelated bool can never be misread as a presence flag. Default per kind:
          *  - int     → `0` coerced into `[min, max]` (always representable, so the pin can never
@@ -207,7 +229,7 @@ internal class Compiler(
          */
         private fun emitOptVarPins(def: SchemaDef<SchemaEntry>) {
             for ((name, entry) in def.entries) {
-                if (entry !is com.eignex.klause.ast.PresenceSpec) continue
+                if (entry !is PresenceSpec) continue
                 val base = entry.valueName
                 val absent = Not(BoolRef(name))
                 when {
@@ -271,7 +293,7 @@ internal class Compiler(
 
             is IntCompare -> reifyIntCompare(expr)
 
-            is com.eignex.klause.ast.FloatLinearConstraint -> {
+            is FloatLinearConstraint -> {
                 // Reified float-linear: introduce an aux bool, assert one factor per
                 // truth side. Today we have FloatLinear but not ReifiedFloatLinear, so
                 // the implication is inert in the engine — usable as a top-level constraint
@@ -290,25 +312,25 @@ internal class Compiler(
 
             is AllDifferent -> reifyAllDifferent(expr.terms.map { lift(it) })
 
-            is com.eignex.klause.ast.AllDifferentExceptExpr -> lowerToLit(decomposeAllDifferentExcept(expr))
+            is AllDifferentExceptExpr -> lowerToLit(decomposeAllDifferentExcept(expr))
 
-            is com.eignex.klause.ast.ArgSortExpr -> lowerToLit(decomposeArgSort(expr))
+            is ArgSortExpr -> lowerToLit(decomposeArgSort(expr))
 
-            is com.eignex.klause.ast.NetworkFlowExpr -> lowerToLit(decomposeNetworkFlow(expr))
+            is NetworkFlowExpr -> lowerToLit(decomposeNetworkFlow(expr))
 
-            is com.eignex.klause.ast.NetworkFlowCostExpr -> lowerToLit(decomposeNetworkFlowCost(expr))
+            is NetworkFlowCostExpr -> lowerToLit(decomposeNetworkFlowCost(expr))
 
-            is com.eignex.klause.ast.GeostExpr -> lowerToLit(decomposeGeost(expr))
+            is GeostExpr -> lowerToLit(decomposeGeost(expr))
 
-            is com.eignex.klause.ast.PathExpr -> error("path: reified context not supported (use at top-level)")
+            is PathExpr -> error("path: reified context not supported (use at top-level)")
 
-            is com.eignex.klause.ast.TreeExpr -> error("tree: reified context not supported (use at top-level)")
+            is TreeExpr -> error("tree: reified context not supported (use at top-level)")
 
-            is com.eignex.klause.ast.MddExpr -> error("mdd: reified context not supported (use at top-level)")
+            is MddExpr -> error("mdd: reified context not supported (use at top-level)")
 
-            is com.eignex.klause.ast.CostMddExpr -> error("cost_mdd: reified context not supported (use at top-level)")
+            is CostMddExpr -> error("cost_mdd: reified context not supported (use at top-level)")
 
-            is com.eignex.klause.ast.CostRegularExpr -> error(
+            is CostRegularExpr -> error(
                 "cost_regular: reified context not supported (use at top-level)",
             )
 
@@ -332,15 +354,15 @@ internal class Compiler(
 
             is GccExprOpt -> reifyGccOpt(expr)
 
-            is com.eignex.klause.ast.SetIn -> reifySetIn(expr)
+            is SetIn -> reifySetIn(expr)
 
-            is com.eignex.klause.ast.SetNominalIn -> reifySetNominalIn(expr)
+            is SetNominalIn -> reifySetNominalIn(expr)
 
-            is com.eignex.klause.ast.SetSubsetOf -> reifySetSubsetOf(expr)
+            is SetSubsetOf -> reifySetSubsetOf(expr)
 
-            is com.eignex.klause.ast.SetDisjoint -> reifySetDisjoint(expr)
+            is SetDisjoint -> reifySetDisjoint(expr)
 
-            is com.eignex.klause.ast.SetEq -> reifySetEq(expr)
+            is SetEq -> reifySetEq(expr)
 
             is TableConstraint -> lowerToLit(expandTable(expr))
 
@@ -520,6 +542,5 @@ internal class Compiler(
     }
 }
 
-internal fun VariableSchema.compile(
-    config: com.eignex.klause.config.KlauseConfig = com.eignex.klause.config.KlauseConfig.current,
-): CompiledProblem = Compiler(config).compile(this.definition())
+internal fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): CompiledProblem =
+    Compiler(config).compile(this.definition())

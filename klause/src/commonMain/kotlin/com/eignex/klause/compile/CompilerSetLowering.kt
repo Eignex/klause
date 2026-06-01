@@ -1,10 +1,15 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.ast.And
 import com.eignex.klause.ast.BoolExpr
+import com.eignex.klause.ast.BoolRef
+import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
+import com.eignex.klause.ast.Not
+import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.SetCard
 import com.eignex.klause.ast.SetDiff
 import com.eignex.klause.ast.SetDisjoint
@@ -23,6 +28,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.SetBitsetDisjoint
 import com.eignex.klause.solver.factor.SetBitsetEq
 import com.eignex.klause.solver.factor.SetBitsetSubset
@@ -209,14 +215,14 @@ internal fun Compiler.Build.assertSetIn(expr: SetIn) {
     for (i in set.universe.indices) {
         val e = set.universe[i]
         val bId = set.indicatorBoolIds[i]
-        pieces += com.eignex.klause.ast.And(
+        pieces += And(
             listOf(
                 IntCompare(expr.elem, IntCmpOp.EQ, IntLit(e)),
                 indicatorBoolExpr(bId),
             ),
         )
     }
-    val expanded = if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.Or(pieces)
+    val expanded = if (pieces.size == 1) pieces[0] else Or(pieces)
     assertExpr(expanded)
 }
 
@@ -335,14 +341,14 @@ internal fun Compiler.Build.reifySetIn(expr: SetIn): Int {
     val set = materializeSet(expr.set)
     val pieces = mutableListOf<BoolExpr>()
     for (i in set.universe.indices) {
-        pieces += com.eignex.klause.ast.And(
+        pieces += And(
             listOf(
                 IntCompare(expr.elem, IntCmpOp.EQ, IntLit(set.universe[i])),
                 indicatorBoolExpr(set.indicatorBoolIds[i]),
             ),
         )
     }
-    return lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.Or(pieces))
+    return lowerToLit(if (pieces.size == 1) pieces[0] else Or(pieces))
 }
 
 internal fun Compiler.Build.reifySetNominalIn(expr: SetNominalIn): Int {
@@ -365,12 +371,12 @@ internal fun Compiler.Build.reifySetSubsetOf(expr: SetSubsetOf): Int {
         val ll = indicatorBoolExpr(l.indicatorBoolIds[i])
         val ri = r.indexOf(v)
         pieces += if (ri >= 0) {
-            com.eignex.klause.ast.Or(listOf(com.eignex.klause.ast.Not(ll), indicatorBoolExpr(r.indicatorBoolIds[ri])))
+            Or(listOf(Not(ll), indicatorBoolExpr(r.indicatorBoolIds[ri])))
         } else {
-            com.eignex.klause.ast.Not(ll)
+            Not(ll)
         }
     }
-    return lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.And(pieces))
+    return lowerToLit(if (pieces.size == 1) pieces[0] else And(pieces))
 }
 
 internal fun Compiler.Build.reifySetDisjoint(expr: SetDisjoint): Int {
@@ -383,12 +389,12 @@ internal fun Compiler.Build.reifySetDisjoint(expr: SetDisjoint): Int {
         if (ri < 0) continue
         val ll = indicatorBoolExpr(l.indicatorBoolIds[i])
         val rl = indicatorBoolExpr(r.indicatorBoolIds[ri])
-        pieces += com.eignex.klause.ast.Or(listOf(com.eignex.klause.ast.Not(ll), com.eignex.klause.ast.Not(rl)))
+        pieces += Or(listOf(Not(ll), Not(rl)))
     }
     return if (pieces.isEmpty()) {
         trueLit()
     } else {
-        lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.And(pieces))
+        lowerToLit(if (pieces.size == 1) pieces[0] else And(pieces))
     }
 }
 
@@ -401,19 +407,19 @@ internal fun Compiler.Build.reifySetEq(expr: SetEq): Int {
         val li = l.indexOf(v)
         val ri = r.indexOf(v)
         pieces += when {
-            li >= 0 && ri >= 0 -> com.eignex.klause.ast.Iff(
+            li >= 0 && ri >= 0 -> Iff(
                 indicatorBoolExpr(l.indicatorBoolIds[li]),
                 indicatorBoolExpr(r.indicatorBoolIds[ri]),
             )
 
-            li >= 0 -> com.eignex.klause.ast.Not(indicatorBoolExpr(l.indicatorBoolIds[li]))
+            li >= 0 -> Not(indicatorBoolExpr(l.indicatorBoolIds[li]))
 
-            ri >= 0 -> com.eignex.klause.ast.Not(indicatorBoolExpr(r.indicatorBoolIds[ri]))
+            ri >= 0 -> Not(indicatorBoolExpr(r.indicatorBoolIds[ri]))
 
             else -> error("impossible")
         }
     }
-    return lowerToLit(if (pieces.size == 1) pieces[0] else com.eignex.klause.ast.And(pieces))
+    return lowerToLit(if (pieces.size == 1) pieces[0] else And(pieces))
 }
 
 // -----------------------------------------------------------------------------------
@@ -436,7 +442,7 @@ internal fun Compiler.Build.liftSetCard(expr: SetCard): IntRef {
         val boolId = layout.indicatorBoolIds[i]
         val auxBool = newBoolVar()
         // auxBool ↔ (id = 1)
-        factors += com.eignex.klause.solver.factor.ReifiedLinear(
+        factors += ReifiedLinear(
             auxBool,
             intArrayOf(1),
             intArrayOf(id),
@@ -474,7 +480,7 @@ private fun Compiler.Build.indicatorBoolExpr(boolId: Int): BoolExpr {
             boolVarIdByName[synth] = boolId
             synth
         }
-    return com.eignex.klause.ast.BoolRef(name)
+    return BoolRef(name)
 }
 
 /** Resolve a [SetExpr] to a set-var name if it's a bare [SetRef]; else null. */

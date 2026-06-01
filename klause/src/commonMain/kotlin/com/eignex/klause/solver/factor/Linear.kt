@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -180,8 +182,8 @@ class Linear(
                     if (newA !in domA || newB !in domB) continue
                     sink.addCompound(
                         listOf(
-                            com.eignex.klause.solver.Move.IntSet(vars[a], newA),
-                            com.eignex.klause.solver.Move.IntSet(vars[b], newB),
+                            IntSet(vars[a], newA),
+                            IntSet(vars[b], newB),
                         ),
                     )
                 }
@@ -347,11 +349,11 @@ internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntAr
         val d = state.intDomains[v]
         val orig = state.problem.intDomains[v]
         if (d.min > orig.min) {
-            val lit = com.eignex.klause.solver.Lit.make(state.atomVarGe(v, d.min), false)
+            val lit = Lit.make(state.atomVarGe(v, d.min), false)
             if (seen.add(lit)) out.add(lit)
         }
         if (d.max < orig.max) {
-            val lit = com.eignex.klause.solver.Lit.make(state.atomVarLe(v, d.max), false)
+            val lit = Lit.make(state.atomVarLe(v, d.max), false)
             if (seen.add(lit)) out.add(lit)
         }
         val lo = maxOf(d.min, orig.min)
@@ -417,12 +419,12 @@ internal fun collectLinearDirAntecedents(
         val orig = state.problem.intDomains[v]
         if (citeMin) {
             if (d.min > orig.min) {
-                val lit = com.eignex.klause.solver.Lit.make(state.atomVarGe(v, d.min), false)
+                val lit = Lit.make(state.atomVarGe(v, d.min), false)
                 if (seen.add(lit)) out.add(lit)
             }
         } else {
             if (d.max < orig.max) {
-                val lit = com.eignex.klause.solver.Lit.make(state.atomVarLe(v, d.max), false)
+                val lit = Lit.make(state.atomVarLe(v, d.max), false)
                 if (seen.add(lit)) out.add(lit)
             }
         }
@@ -460,11 +462,11 @@ internal fun collectLinearTightenAntecedents(
         val d = state.intDomains[v]
         val orig = state.problem.intDomains[v]
         if (d.min > orig.min) {
-            val lit = com.eignex.klause.solver.Lit.make(state.atomVarGe(v, d.min), false)
+            val lit = Lit.make(state.atomVarGe(v, d.min), false)
             if (seen.add(lit)) out.add(lit)
         }
         if (d.max < orig.max) {
-            val lit = com.eignex.klause.solver.Lit.make(state.atomVarLe(v, d.max), false)
+            val lit = Lit.make(state.atomVarLe(v, d.max), false)
             if (seen.add(lit)) out.add(lit)
         }
     }

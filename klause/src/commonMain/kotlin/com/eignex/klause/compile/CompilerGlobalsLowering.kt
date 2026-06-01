@@ -12,6 +12,7 @@ import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
+import com.eignex.klause.ast.IntElement
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
@@ -27,6 +28,13 @@ import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.factor.AllDifferentExcept
+import com.eignex.klause.solver.factor.ArgSort
+import com.eignex.klause.solver.factor.Geost
+import com.eignex.klause.solver.factor.Mdd
+import com.eignex.klause.solver.factor.MinCostFlow
+import com.eignex.klause.solver.factor.Path
+import com.eignex.klause.solver.factor.Tree
 
 /*
  * Decompositions for the "newer" globals. Each [decomposeXxx] returns a [BoolExpr] in
@@ -45,7 +53,7 @@ import com.eignex.klause.solver.Lit
 //  alldifferent_except
 // ----------------------------------------------------------------------------
 
-/** Top-level entry: emit the native [com.eignex.klause.solver.factor.AllDifferentExcept]
+/** Top-level entry: emit the native [AllDifferentExcept]
  *  factor when every operand lifts to a bare [IntRef]. Otherwise fall back to the
  *  BoolExpr decomposition routed through [assertExpr]. */
 internal fun Compiler.Build.assertAllDifferentExcept(expr: AllDifferentExceptExpr) {
@@ -53,7 +61,7 @@ internal fun Compiler.Build.assertAllDifferentExcept(expr: AllDifferentExceptExp
     if (lifted.all { it is IntRef } && expr.except.isNotEmpty()) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
-            factors += com.eignex.klause.solver.factor.AllDifferentExcept(
+            factors += AllDifferentExcept(
                 xs = ids,
                 except = expr.except.toIntArray(),
             )
@@ -94,7 +102,7 @@ internal fun Compiler.Build.decomposeAllDifferentExcept(expr: AllDifferentExcept
 //  arg_sort
 // ----------------------------------------------------------------------------
 
-/** Top-level entry: emit the [com.eignex.klause.solver.factor.ArgSort] factor when both
+/** Top-level entry: emit the [ArgSort] factor when both
  *  arrays lift to bare [IntRef]s. Also emit the AST decomposition so the bit-blast path
  *  (which skips propagation-only factors) still enforces the constraint. */
 internal fun Compiler.Build.assertArgSort(expr: ArgSortExpr) {
@@ -104,7 +112,7 @@ internal fun Compiler.Build.assertArgSort(expr: ArgSortExpr) {
         val valueIds = IntArray(liftedValues.size) { intVarOf((liftedValues[it] as IntRef).name) }
         val permIds = IntArray(liftedPerm.size) { intVarOf((liftedPerm[it] as IntRef).name) }
         if (valueIds.toSet().size == valueIds.size && permIds.toSet().size == permIds.size) {
-            factors += com.eignex.klause.solver.factor.ArgSort(
+            factors += ArgSort(
                 values = valueIds,
                 perm = permIds,
                 permOffset = expr.permOffset,
@@ -131,8 +139,8 @@ internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
     // Each consecutive pair must be ascending in value, with ties broken by index.
     val clauses = mutableListOf<BoolExpr>()
     for (i in 0 until n - 1) {
-        val a = com.eignex.klause.ast.IntElement(permIndex(i), values)
-        val b = com.eignex.klause.ast.IntElement(permIndex(i + 1), values)
+        val a = IntElement(permIndex(i), values)
+        val b = IntElement(permIndex(i + 1), values)
         clauses += Or(
             listOf(
                 IntCompare(a, IntCmpOp.LT, b),
@@ -158,13 +166,13 @@ internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
 //  network_flow / network_flow_cost
 // ----------------------------------------------------------------------------
 
-/** Top-level entry: emit the [com.eignex.klause.solver.factor.MinCostFlow] factor when
+/** Top-level entry: emit the [MinCostFlow] factor when
  *  every flow term lifts to a bare [IntRef]. Falls back to the linear-per-node decomposition. */
 internal fun Compiler.Build.assertNetworkFlow(expr: NetworkFlowExpr) {
     val lifted = expr.flow.map { lift(it) }
     if (lifted.all { it is IntRef }) {
         val flowIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
-        factors += com.eignex.klause.solver.factor.MinCostFlow(
+        factors += MinCostFlow(
             numNodes = expr.numNodes,
             arcFrom = expr.arcFrom.toIntArray(),
             arcTo = expr.arcTo.toIntArray(),
@@ -185,7 +193,7 @@ internal fun Compiler.Build.assertNetworkFlowCost(expr: NetworkFlowCostExpr) {
     if (lifted.all { it is IntRef } && liftedCost is IntRef) {
         val flowIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         val costId = intVarOf(liftedCost.name)
-        factors += com.eignex.klause.solver.factor.MinCostFlow(
+        factors += MinCostFlow(
             numNodes = expr.numNodes,
             arcFrom = expr.arcFrom.toIntArray(),
             arcTo = expr.arcTo.toIntArray(),
@@ -267,13 +275,13 @@ internal fun Compiler.Build.decomposeNetworkFlowCost(expr: NetworkFlowCostExpr):
 //  geost
 // ----------------------------------------------------------------------------
 
-/** Top-level entry: emit [com.eignex.klause.solver.factor.Geost] when every origin is
+/** Top-level entry: emit [Geost] when every origin is
  *  a bare [IntRef]. */
 internal fun Compiler.Build.assertGeost(expr: GeostExpr) {
     val lifted = expr.origin.map { lift(it) }
     if (lifted.all { it is IntRef }) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
-        factors += com.eignex.klause.solver.factor.Geost(
+        factors += Geost(
             numDims = expr.numDims,
             numObjects = expr.numObjects,
             origin = ids,
@@ -362,7 +370,7 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
         require(Lit.isPositive(lit)) { "path: edgePresent[$e] must be a bare BoolRef" }
         Lit.variable(lit)
     }
-    factors += com.eignex.klause.solver.factor.Path(
+    factors += Path(
         numNodes = n,
         from = expr.from.toIntArray(),
         to = expr.to.toIntArray(),
@@ -510,7 +518,7 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
         require(Lit.isPositive(lit)) { "tree: edgePresent[$e] must be a bare BoolRef" }
         Lit.variable(lit)
     }
-    factors += com.eignex.klause.solver.factor.Tree(
+    factors += Tree(
         numNodes = n,
         from = expr.from.toIntArray(),
         to = expr.to.toIntArray(),
@@ -582,7 +590,7 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
 //  MDD / cost_mdd / cost_regular — table-based state-channel decompositions
 // ----------------------------------------------------------------------------
 
-/** Helper: build the [com.eignex.klause.solver.factor.Mdd] factor and emit it when
+/** Helper: build the [Mdd] factor and emit it when
  *  [seq] is all bare IntRefs. Falls back to the table-based decomposition. */
 internal fun Compiler.Build.assertMddNative(
     seqExpr: List<IntExpr>,
@@ -598,7 +606,7 @@ internal fun Compiler.Build.assertMddNative(
     if (lifted.all { it is IntRef }) {
         val seqIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         val costId = if (costRef != null) intVarOf(costRef.name) else -1
-        factors += com.eignex.klause.solver.factor.Mdd(
+        factors += Mdd(
             seq = seqIds,
             numStatesPerLayer = numStatesPerLayer.toIntArray(),
             layerStarts = layerStarts.toIntArray(),

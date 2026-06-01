@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -58,11 +59,7 @@ class Sort(val xs: IntArray, val ys: IntArray) : LocalSearchFactor {
      *  propose retargeting some `xs[k] = v` to a value `v'` that `ys` has more of. Without
      *  the xs-side proposal, the LS engine can't reach feasibility when the *multiset* of
      *  `xs` needs to change to match `ys` — only its order. */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val xsVals = IntArray(xs.size) { state.assignment.intValue(xs[it]) }
         val ysVals = IntArray(ys.size) { state.assignment.intValue(ys[it]) }

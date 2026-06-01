@@ -2,6 +2,7 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
 import kotlin.random.Random
@@ -84,8 +85,7 @@ internal class HeuristicPortfolio(
 
     /** Drop-in [VariableHeuristic] slot for [BacktrackParams.variableHeuristic]. */
     val variableHeuristic: VariableHeuristic = object : VariableHeuristic {
-        override fun pick(session: com.eignex.klause.solver.propagation.PropagationSession, rng: Random) =
-            current.variableHeuristic.pick(session, rng)
+        override fun pick(session: PropagationSession, rng: Random) = current.variableHeuristic.pick(session, rng)
         override fun onConflict(varRef: VarRef) {
             conflicts++
             current.variableHeuristic.onConflict(varRef)
@@ -111,11 +111,8 @@ internal class HeuristicPortfolio(
 
     /** Drop-in [ValueHeuristic] slot for [BacktrackParams.valueHeuristic]. */
     val valueHeuristic: ValueHeuristic = object : ValueHeuristic {
-        override fun values(
-            session: com.eignex.klause.solver.propagation.PropagationSession,
-            varRef: VarRef,
-            rng: Random,
-        ) = current.valueHeuristic.values(session, varRef, rng)
+        override fun values(session: PropagationSession, varRef: VarRef, rng: Random) =
+            current.valueHeuristic.values(session, varRef, rng)
         override fun onConflict(varRef: VarRef, value: Int) = current.valueHeuristic.onConflict(varRef, value)
         override fun onCommit(varRef: VarRef, value: Int) = current.valueHeuristic.onCommit(varRef, value)
         override fun onSolution(snapshot: Sample) = current.valueHeuristic.onSolution(snapshot)

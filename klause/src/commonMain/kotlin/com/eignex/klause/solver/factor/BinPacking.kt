@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -208,11 +210,7 @@ class BinPacking(
      *     loaded bin whose weight roughly compensates and propose the atomic swap.
      *  Under [Mode.LoadVars] also snap loadVars to current loads.
      */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State
         if (mode == Mode.LoadVars) {
@@ -288,8 +286,8 @@ class BinPacking(
                     if (targetForJ !in state.problem.intDomains[bins[j]]) continue
                     sink.addCompound(
                         listOf(
-                            com.eignex.klause.solver.Move.IntSet(binVarI, targetForI),
-                            com.eignex.klause.solver.Move.IntSet(bins[j], targetForJ),
+                            IntSet(binVarI, targetForI),
+                            IntSet(bins[j], targetForJ),
                         ),
                     )
                     if (++swapsAdded >= MAX_SWAPS_PER_ITEM) break

@@ -2,6 +2,8 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
+import kotlin.random.Random
 
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
@@ -170,7 +172,7 @@ class Problem(
             // wdeg state shared across bound-SAC and hole-SAC: a probe failure under bound-SAC
             // raises factor weights that then steer hole-SAC's first iteration, and vice versa.
             val factorWeights = DoubleArray(factors.size) { 1.0 }
-            val rng = kotlin.random.Random(probeSeed)
+            val rng = Random(probeSeed)
             result = probeBoundSac(result as PropagationResult.Implied, factorWeights, rng)
             if (result is PropagationResult.Unsat) return result
             if (probeIntHoles) {
@@ -186,7 +188,7 @@ class Problem(
     private fun probeIntHoles(
         base: PropagationResult.Implied,
         factorWeights: DoubleArray,
-        rng: kotlin.random.Random,
+        rng: Random,
     ): PropagationResult {
         var acc: PropagationResult.Implied = base
         val perVarCalls = IntArray(numIntVars)
@@ -267,11 +269,7 @@ class Problem(
      *  (the classic wdeg adaptation). Ties break by a per-pass random key (deterministic
      *  for a given [probeSeed]) — this avoids the deterministic-id-order bias that the
      *  prior dom-sized order would inherit when every var has the same dom and weight. */
-    private fun sacProbeOrder(
-        acc: PropagationResult.Implied,
-        factorWeights: DoubleArray,
-        rng: kotlin.random.Random,
-    ): IntArray {
+    private fun sacProbeOrder(acc: PropagationResult.Implied, factorWeights: DoubleArray, rng: Random): IntArray {
         val scores = DoubleArray(numIntVars) { v ->
             if (acc.intValueOrNull(v) != null) return@DoubleArray Double.NEGATIVE_INFINITY
             val orig = intDomains[v]
@@ -313,7 +311,7 @@ class Problem(
     private fun probeBoundSac(
         base: PropagationResult.Implied,
         factorWeights: DoubleArray,
-        rng: kotlin.random.Random,
+        rng: Random,
     ): PropagationResult {
         var acc: PropagationResult.Implied = base
         val perVarCalls = IntArray(numIntVars)
@@ -523,7 +521,7 @@ class Problem(
 
         // Diff against input: only emit newly-forced facts. Iterates vars in ascending
         // id order so the resulting primitive arrays are pre-sorted (no separate sort).
-        val bKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val bKeys = IntArrayList(initialCapacity = 8)
         val bVals = ArrayList<Boolean>()
         for (v in 0 until numBoolVars) {
             val b = state.boolValues[v] ?: continue
@@ -531,14 +529,14 @@ class Problem(
             bKeys.add(v)
             bVals.add(b)
         }
-        val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iMinKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iMinVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iMaxKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iMaxVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iHoleIds = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iHoleVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iKeys = IntArrayList(initialCapacity = 8)
+        val iVals = IntArrayList(initialCapacity = 8)
+        val iMinKeys = IntArrayList(initialCapacity = 8)
+        val iMinVals = IntArrayList(initialCapacity = 8)
+        val iMaxKeys = IntArrayList(initialCapacity = 8)
+        val iMaxVals = IntArrayList(initialCapacity = 8)
+        val iHoleIds = IntArrayList(initialCapacity = 8)
+        val iHoleVals = IntArrayList(initialCapacity = 8)
         for (v in 0 until numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {

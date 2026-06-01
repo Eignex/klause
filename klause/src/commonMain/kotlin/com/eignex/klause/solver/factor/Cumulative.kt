@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -828,7 +829,7 @@ class Cumulative(
 
     /** Tasks whose interval covers [absT] under the current assignment, in declaration order. */
     private fun collectPeakTasks(state: LocalSearchState, absT: Int): IntArray {
-        val out = com.eignex.klause.util.IntArrayList()
+        val out = IntArrayList()
         for (i in 0 until n) {
             val r = curRes(state, i)
             val d = curDur(state, i)
@@ -867,8 +868,8 @@ class Cumulative(
                 if (di + dj >= 0) continue // not feasibility-preserving by this approximation
                 sink.addCompound(
                     listOf(
-                        com.eignex.klause.solver.Move.IntSet(iV, jCur),
-                        com.eignex.klause.solver.Move.IntSet(jV, iCur),
+                        IntSet(iV, jCur),
+                        IntSet(jV, iCur),
                     ),
                 )
                 swapsAdded++

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolverParams
 
 /**
@@ -31,8 +32,8 @@ data class LocalSearchParams(
      *  the requested values on every restart and ignores any move that would change
      *  them. Defaults to none. */
     val assumptions: Assumptions = Assumptions.None,
-    /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
-    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.Cancellation.Never,
+    /** Cooperative cancellation predicate; see [Cancellation]. */
+    val cancellation: Cancellation = Cancellation.Never,
     /** How [LocalSearchSolver.minimize] combines constraint violations with the objective
      *  for greedy descent. Defaults to two-phase feasibility-first behaviour; switch to
      *  [CostShaping.linear] or [CostShaping.saturating] on tight problems where the
@@ -42,8 +43,7 @@ data class LocalSearchParams(
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
-    override fun withCancellation(cancellation: com.eignex.klause.solver.Cancellation): LocalSearchParams =
-        copy(cancellation = cancellation)
+    override fun withCancellation(cancellation: Cancellation): LocalSearchParams = copy(cancellation = cancellation)
 
     private companion object {
         fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)

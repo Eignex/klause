@@ -3,10 +3,12 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `auxBoolVar ↔ (Σ weights`i` * lit_i ⟨op⟩ bound)`. Payload at `intPayload[factorId]` is the
@@ -42,7 +44,7 @@ class ReifiedPseudoBoolean(
     override val intVars: IntArray = EmptyIntArray
 
     /** Per-var signed weight (excluding [auxBoolVar]); aux flips don't shift the body sum. */
-    private val signedWeightByVar: com.eignex.klause.util.IntIntMap = run {
+    private val signedWeightByVar: IntIntMap = run {
         val signs = HashMap<Int, Int>()
         for (i in literals.indices) {
             val v = Lit.variable(literals[i])
@@ -50,7 +52,7 @@ class ReifiedPseudoBoolean(
             val s = if (Lit.isPositive(literals[i])) weights[i] else -weights[i]
             signs[v] = (signs[v] ?: 0) + s
         }
-        com.eignex.klause.util.IntIntMap.build(
+        IntIntMap.build(
             keys = signs.keys.toIntArray(),
             values = signs.values.toIntArray(),
             absent = 0,
@@ -223,7 +225,7 @@ class ReifiedPseudoBoolean(
         val sum = state.intPayload[factorId]
         if (aux == predHolds(sum)) return
         sink.addBoolFlip(auxBoolVar)
-        val auxFlip = com.eignex.klause.solver.Move.BoolFlip(auxBoolVar)
+        val auxFlip = BoolFlip(auxBoolVar)
         val wantHolds = aux
         val curDist = distanceToInRange(sum)
         for (i in literals.indices) {
@@ -240,7 +242,7 @@ class ReifiedPseudoBoolean(
             // escape the current reification side atomically.
             val improvesOpp = if (wantHolds) newDist >= curDist else newDist <= curDist
             if (improvesOpp && !improvesSame) {
-                sink.addCompound(listOf(auxFlip, com.eignex.klause.solver.Move.BoolFlip(v)))
+                sink.addCompound(listOf(auxFlip, BoolFlip(v)))
             }
         }
     }

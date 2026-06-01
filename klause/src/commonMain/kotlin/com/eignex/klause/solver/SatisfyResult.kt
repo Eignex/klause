@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
@@ -60,7 +61,7 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     params: P,
     minimizeCore: Boolean = false,
 ): SatisfyResult {
-    if (this is BacktrackSolver && params is com.eignex.klause.solver.backtrack.BacktrackParams) {
+    if (this is BacktrackSolver && params is BacktrackParams) {
         return satisfyUnderAssumptionsBacktrack(this, assumptions, params, minimizeCore)
     }
     val merged = params.withAssumptions(assumptions)
@@ -94,7 +95,7 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
 private fun satisfyUnderAssumptionsBacktrack(
     solver: BacktrackSolver,
     assumptions: Assumptions,
-    params: com.eignex.klause.solver.backtrack.BacktrackParams,
+    params: BacktrackParams,
     minimizeCore: Boolean,
 ): SatisfyResult {
     if (assumptions.isEmpty) {

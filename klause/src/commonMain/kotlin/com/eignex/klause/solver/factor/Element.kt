@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `result = arr[idx]` — the element constraint, native to local search instead of the old
@@ -157,7 +158,7 @@ class Element(
         // 2. Prune idx positions whose element can't equal result. Collect first (don't mutate
         //    the domain mid-iteration), then exclude.
         val idxDom = state.intDomains[idx]
-        var toExclude: com.eignex.klause.util.IntArrayList? = null
+        var toExclude: IntArrayList? = null
         idxDom.forEach { iv ->
             val pos = iv - indexOffset
             if (pos in 0 until len) {
@@ -165,7 +166,7 @@ class Element(
                 val hi = elemHigh(state, pos)
                 // Element range [lo,hi] disjoint from result's [min,max] ⇒ position infeasible.
                 if (hi < resultDom.min || lo > resultDom.max) {
-                    (toExclude ?: com.eignex.klause.util.IntArrayList().also { toExclude = it }).add(iv)
+                    (toExclude ?: IntArrayList().also { toExclude = it }).add(iv)
                 }
             }
         }

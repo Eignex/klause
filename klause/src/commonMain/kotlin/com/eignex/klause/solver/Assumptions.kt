@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -147,8 +148,8 @@ class Assumptions internal constructor(
             mergedBoolKeys,
             mergedBoolValues,
         )
-        val mergedIntKeys = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
-        val mergedIntValues = com.eignex.klause.util.IntArrayList(intKeys.size + other.intKeys.size)
+        val mergedIntKeys = IntArrayList(intKeys.size + other.intKeys.size)
+        val mergedIntValues = IntArrayList(intKeys.size + other.intKeys.size)
         sortedMergeInts(
             intKeys,
             intValues,
@@ -560,8 +561,8 @@ class Assumptions internal constructor(
             av: IntArray,
             bk: IntArray,
             bv: IntArray,
-            outK: com.eignex.klause.util.IntArrayList,
-            outV: com.eignex.klause.util.IntArrayList,
+            outK: IntArrayList,
+            outV: IntArrayList,
         ) {
             var i = 0
             var j = 0

@@ -3,6 +3,8 @@ package com.eignex.klause.solver.propagation
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.util.IntArrayList
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
 enum class VarKind {
@@ -61,7 +63,7 @@ class PropagationSession(
     private val boolPinned: IntArray = IntArray(problem.numBoolVars) { -1 }
     private val intPinnedSet: BooleanArray = BooleanArray(problem.numIntVars)
     private val intPinnedVal: IntArray = IntArray(problem.numIntVars)
-    private val trail: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    private val trail: IntArrayList = IntArrayList()
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
     private fun trailIsBool(enc: Int): Boolean = enc < problem.numBoolVars
@@ -164,7 +166,7 @@ class PropagationSession(
      * learned clause is a constraint over existing variables, not a decision. So no
      * snapshot is pushed and no decision counter is bumped.
      */
-    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause, lbd: Int): PropagationResult {
+    fun addLearnedClause(clause: Clause, lbd: Int): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
         val newFid = state.addLearnedClause(clause, lbd)
@@ -322,7 +324,7 @@ class PropagationSession(
      * [seed]'s full-implied return (the hot push path uses the incremental [impliedSince]).
      */
     private fun computeImplied(): PropagationResult.Implied {
-        val bKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val bKeys = IntArrayList(initialCapacity = 8)
         val bVals = ArrayList<Boolean>()
         for (v in 0 until problem.numBoolVars) {
             val b = state.boolValues[v] ?: continue
@@ -330,8 +332,8 @@ class PropagationSession(
             bKeys.add(v)
             bVals.add(b)
         }
-        val iKeys = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
-        val iVals = com.eignex.klause.util.IntArrayList(initialCapacity = 8)
+        val iKeys = IntArrayList(initialCapacity = 8)
+        val iVals = IntArrayList(initialCapacity = 8)
         for (v in 0 until problem.numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
@@ -359,13 +361,13 @@ class PropagationSession(
     private fun impliedSince(base: Int): PropagationResult.Implied {
         val top = state.undoTop
         if (top <= base) return PropagationResult.Implied.Empty
-        val bRaw = com.eignex.klause.util.IntArrayList()
-        val iRaw = com.eignex.klause.util.IntArrayList()
+        val bRaw = IntArrayList()
+        val iRaw = IntArrayList()
         for (i in base until top) {
             val v = state.undoVarAt(i)
             if (state.undoIsBoolAt(i)) bRaw.add(v) else iRaw.add(v)
         }
-        val bKeys = com.eignex.klause.util.IntArrayList()
+        val bKeys = IntArrayList()
         val bVals = ArrayList<Boolean>()
         if (bRaw.size > 0) {
             val sorted = bRaw.toIntArray()
@@ -380,8 +382,8 @@ class PropagationSession(
                 bVals.add(b)
             }
         }
-        val iKeys = com.eignex.klause.util.IntArrayList()
-        val iVals = com.eignex.klause.util.IntArrayList()
+        val iKeys = IntArrayList()
+        val iVals = IntArrayList()
         if (iRaw.size > 0) {
             val sorted = iRaw.toIntArray()
             sorted.sort()

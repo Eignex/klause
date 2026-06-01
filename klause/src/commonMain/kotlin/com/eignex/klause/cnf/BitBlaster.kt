@@ -8,6 +8,7 @@ import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
+import com.eignex.klause.solver.factor.ArgSort
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
@@ -25,10 +26,12 @@ import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.MinCostFlow
 import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
+import com.eignex.klause.solver.factor.Path
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Regular
@@ -43,8 +46,10 @@ import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.factor.Tree
 import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
+import kotlin.math.abs
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 
 /**
@@ -64,9 +69,9 @@ import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
  * [ArgMinMax], [BinPacking], [Knapsack], [MinCostFlow], [Geost], and the [SetBitsetSubset] /
  * [SetBitsetEq] / [SetBitsetDisjoint] set-algebra factors.
  *
- * Propagation-only natives ([com.eignex.klause.solver.factor.ArgSort],
- * [com.eignex.klause.solver.factor.Path], [com.eignex.klause.solver.factor.Tree],
- * [com.eignex.klause.solver.factor.Mdd]) are skipped — the compile lowering already pairs them
+ * Propagation-only natives ([ArgSort],
+ * [Path], [Tree],
+ * [Mdd]) are skipped — the compile lowering already pairs them
  * with primitive decompositions BitBlaster handles directly. Out-of-domain `Linear` constants
  * are short-circuited at compile time to a true/false unit clause via [emitLinear].
  *
@@ -201,10 +206,10 @@ object BitBlaster {
 
                 is Regular -> emitRegular(b, factor, intBits, intMin)
 
-                is com.eignex.klause.solver.factor.ArgSort,
-                is com.eignex.klause.solver.factor.Path,
-                is com.eignex.klause.solver.factor.Tree,
-                is com.eignex.klause.solver.factor.Mdd,
+                is ArgSort,
+                is Path,
+                is Tree,
+                is Mdd,
                 -> {
                     // Propagation-only native factors. The compile lowering pairs them with
                     // primitive constraints (Linear / Clause / Table / AllDifferent / Iff)
@@ -431,7 +436,7 @@ object BitBlaster {
             if (w == 0) continue
             val lit = literals[i]
             val cnfLit = Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
-            val term = b.multiplyByConstant(intArrayOf(cnfLit), kotlin.math.abs(w))
+            val term = b.multiplyByConstant(intArrayOf(cnfLit), abs(w))
             if (w > 0) posTerms += term else negTerms += term
         }
         val pSum = sumAll(b, posTerms)
@@ -1388,7 +1393,7 @@ object BitBlaster {
         for (i in vars.indices) {
             val c = coeffs[i]
             if (c == 0) continue
-            val term = b.multiplyByConstant(bitsToLits(intBits[vars[i]]), kotlin.math.abs(c))
+            val term = b.multiplyByConstant(bitsToLits(intBits[vars[i]]), abs(c))
             if (c > 0) posTerms += term else negTerms += term
         }
         val pSum = sumAll(b, posTerms)

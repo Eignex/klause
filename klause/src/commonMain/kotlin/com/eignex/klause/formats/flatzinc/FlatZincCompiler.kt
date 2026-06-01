@@ -1,8 +1,15 @@
 package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FloatInterval
+import com.eignex.klause.solver.FloatMetadata
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.RealLinearConstraint
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.SolutionGuided
+import com.eignex.klause.solver.backtrack.ValueHeuristic
+import com.eignex.klause.solver.backtrack.VariableHeuristic
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.util.bsearch
 
@@ -51,15 +58,15 @@ internal class FlatZincCompiler(
 
     /**
      * Float-var-index assigned in allocation order — keyed by the float var's backing int
-     * id. Populated by [allocFloat]. Builds [com.eignex.klause.solver.FloatMetadata] at
+     * id. Populated by [allocFloat]. Builds [FloatMetadata] at
      * compile time so backends with native real support (Z3) can recover the real-valued
      * view instead of solving over the bucketed ints.
      */
     internal val floatVarIndex = HashMap<Int, Int>()
-    internal val floatIntervals = ArrayList<com.eignex.klause.solver.FloatInterval>()
+    internal val floatIntervals = ArrayList<FloatInterval>()
     internal val floatBucketCounts = ArrayList<Int>()
     internal val floatIntVarIds = ArrayList<Int>()
-    internal val realConstraints = ArrayList<com.eignex.klause.solver.RealLinearConstraint>()
+    internal val realConstraints = ArrayList<RealLinearConstraint>()
 
     /** Enum-typed int vars: declared label list per var name. Populated from
      *  `klause_enum_labels([...])` annotations on the var decl. */
@@ -77,7 +84,7 @@ internal class FlatZincCompiler(
         val floatMetadata = if (floatIntervals.isEmpty()) {
             null
         } else {
-            com.eignex.klause.solver.FloatMetadata(
+            FloatMetadata(
                 intervals = floatIntervals.toTypedArray(),
                 bucketCounts = floatBucketCounts.toIntArray(),
                 intVarByFloatVar = floatIntVarIds.toIntArray(),
@@ -115,7 +122,7 @@ internal class FlatZincCompiler(
 
     /**
      * Map a `solve :: int_search(...) / bool_search(...) / seq_search([...])` annotation
-     * onto a [com.eignex.klause.solver.backtrack.BacktrackParams] with the requested
+     * onto a [BacktrackParams] with the requested
      * heuristics. Returns `null` when no recognised search annotation is present.
      *
      * Klause's engine doesn't take per-variable-array search blocks today, so when the
@@ -123,7 +130,7 @@ internal class FlatZincCompiler(
      * `seq_search([s1, s2, ...])` we adopt the first search block's strategies. Strategies
      * we don't recognise fall through to the engine's defaults (random/random).
      */
-    internal fun compileSearchAnnotation(): com.eignex.klause.solver.backtrack.BacktrackParams? {
+    internal fun compileSearchAnnotation(): BacktrackParams? {
         val ann = model.solve.annotations.firstOrNull(::isSearchAnnotation) ?: return null
         val (varStr, valStr) = extractStrategies(ann) ?: return null
         val varH = mapVariableStrategy(varStr) ?: return null
@@ -133,11 +140,11 @@ internal class FlatZincCompiler(
         // — the standard SOTA phase-saving-for-BnB pattern.
         val wrappedValH = when (model.solve) {
             is FznSolve.Minimize, is FznSolve.Maximize ->
-                com.eignex.klause.solver.backtrack.SolutionGuided(valH)
+                SolutionGuided(valH)
 
             is FznSolve.Satisfy -> valH
         }
-        return com.eignex.klause.solver.backtrack.BacktrackParams(
+        return BacktrackParams(
             variableHeuristic = varH,
             valueHeuristic = wrappedValH,
         )
@@ -171,16 +178,15 @@ internal class FlatZincCompiler(
         else -> null
     }
 
-    internal fun mapVariableStrategy(name: String): com.eignex.klause.solver.backtrack.VariableHeuristic? =
-        when (name) {
-            "input_order" -> com.eignex.klause.solver.backtrack.InputOrder
-            "first_fail", "dom_w_deg" -> com.eignex.klause.solver.backtrack.SmallestDomain
-            "anti_first_fail", "occurrence" -> com.eignex.klause.solver.backtrack.LargestDomain
-            "random_order" -> com.eignex.klause.solver.backtrack.RandomVariable
-            else -> null
-        }
+    internal fun mapVariableStrategy(name: String): VariableHeuristic? = when (name) {
+        "input_order" -> com.eignex.klause.solver.backtrack.InputOrder
+        "first_fail", "dom_w_deg" -> com.eignex.klause.solver.backtrack.SmallestDomain
+        "anti_first_fail", "occurrence" -> com.eignex.klause.solver.backtrack.LargestDomain
+        "random_order" -> com.eignex.klause.solver.backtrack.RandomVariable
+        else -> null
+    }
 
-    internal fun mapValueStrategy(name: String): com.eignex.klause.solver.backtrack.ValueHeuristic? = when (name) {
+    internal fun mapValueStrategy(name: String): ValueHeuristic? = when (name) {
         "indomain_min", "indomain" -> com.eignex.klause.solver.backtrack.IndomainMin
         "indomain_max" -> com.eignex.klause.solver.backtrack.IndomainMax
         "indomain_middle", "indomain_split" -> com.eignex.klause.solver.backtrack.IndomainMiddle
@@ -443,7 +449,7 @@ internal class FlatZincCompiler(
         floatVars[name] = FloatBucketing(id, lo, hi, floatBuckets)
         // Assign a float-var-index for FloatMetadata in allocation order.
         floatVarIndex[id] = floatIntervals.size
-        floatIntervals.add(com.eignex.klause.solver.FloatInterval(lo, hi))
+        floatIntervals.add(FloatInterval(lo, hi))
         floatBucketCounts.add(floatBuckets)
         floatIntVarIds.add(id)
         return id
@@ -813,8 +819,8 @@ internal class FlatZincCompiler(
                 if (name !in boolVars) {
                     allocBool(name) /* pin via Clause below */
                     factors.add(
-                        com.eignex.klause.solver.factor.Clause(
-                            intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[name]!!, e.value)),
+                        Clause(
+                            intArrayOf(Lit.make(boolVars[name]!!, e.value)),
                         ),
                     )
                 }
@@ -841,8 +847,8 @@ internal class FlatZincCompiler(
             if (pinName !in boolVars) {
                 allocBool(pinName)
                 factors.add(
-                    com.eignex.klause.solver.factor.Clause(
-                        intArrayOf(com.eignex.klause.solver.Lit.make(boolVars[pinName]!!, p.value)),
+                    Clause(
+                        intArrayOf(Lit.make(boolVars[pinName]!!, p.value)),
                     ),
                 )
             }

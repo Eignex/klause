@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.propagation.PropagationState
 
 /** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
@@ -100,7 +101,7 @@ internal fun defaultBoolPinsConflictReason(state: PropagationState): IntArray? {
     var w = 0
     for (i in 0 until numBool) {
         val b = state.boolValues[i] ?: continue
-        out[w++] = com.eignex.klause.solver.Lit.make(i, !b)
+        out[w++] = Lit.make(i, !b)
     }
     return out
 }

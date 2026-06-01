@@ -115,7 +115,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         val priorAnt = state.boolAntecedents[conflictedVar]
         // The just-attempted decision lit (currently false in state because the prior
         // pin still holds and pinBoolImpl rejected the new value).
-        val decisionLit = com.eignex.klause.solver.Lit.make(conflictedVar, !priorValue)
+        val decisionLit = Lit.make(conflictedVar, !priorValue)
         val seed = if (priorAnt == null) {
             intArrayOf(decisionLit)
         } else {

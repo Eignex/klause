@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -204,7 +205,7 @@ class Count(
         return true
     }
 
-    private fun domainAllMatches(d: com.eignex.klause.solver.IntDomain): Boolean = when (op) {
+    private fun domainAllMatches(d: IntDomain): Boolean = when (op) {
         Op.Eq -> d.min == d.max && d.min == v
         Op.Ne -> d.max < v || d.min > v
         Op.Le -> d.max <= v
@@ -246,7 +247,7 @@ class Count(
     }
 
     /** Pick an in-domain value that matches the predicate; returns null if impossible. */
-    private fun pickMatching(d: com.eignex.klause.solver.IntDomain, avoid: Int): Int? = when (op) {
+    private fun pickMatching(d: IntDomain, avoid: Int): Int? = when (op) {
         Op.Eq -> if (v in d && v != avoid) v else null
 
         Op.Ne -> {
@@ -265,7 +266,7 @@ class Count(
     }
 
     /** Pick an in-domain value that does NOT match the predicate; returns null if impossible. */
-    private fun pickNonMatching(d: com.eignex.klause.solver.IntDomain, avoid: Int): Int? = when (op) {
+    private fun pickNonMatching(d: IntDomain, avoid: Int): Int? = when (op) {
         Op.Eq -> {
             var pick: Int? = null
             d.forEach { if (it != v && it != avoid && pick == null) pick = it }
@@ -283,7 +284,7 @@ class Count(
         Op.Gt -> if (d.min <= v) d.min.takeIf { it != avoid } ?: d.min else null
     }
 
-    private fun domainAnyMatches(d: com.eignex.klause.solver.IntDomain): Boolean = when (op) {
+    private fun domainAnyMatches(d: IntDomain): Boolean = when (op) {
         Op.Eq -> v in d
         Op.Ne -> !(d.min == d.max && d.min == v)
         Op.Le -> d.min <= v

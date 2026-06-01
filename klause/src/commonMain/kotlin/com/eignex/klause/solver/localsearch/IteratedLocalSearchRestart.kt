@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Sample
+import kotlin.random.Random
 
 /**
  * Iterated Local Search restart policy. Maintains a *population* of incumbent local
@@ -132,20 +133,14 @@ class IteratedLocalSearchRestart(
         return population[state.rng.nextInt(population.size)].sample
     }
 
-    private fun pickTwoDistinct(rng: kotlin.random.Random): Pair<Incumbent, Incumbent> {
+    private fun pickTwoDistinct(rng: Random): Pair<Incumbent, Incumbent> {
         val i = rng.nextInt(population.size)
         var j = rng.nextInt(population.size - 1)
         if (j >= i) j++
         return population[i] to population[j]
     }
 
-    private fun biasedCrossover(
-        state: LocalSearchState,
-        a: Sample,
-        b: Sample,
-        probA: Double,
-        rng: kotlin.random.Random,
-    ): Sample {
+    private fun biasedCrossover(state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: Random): Sample {
         if (linkageAware) return linkageAwareCrossover(state, a, b, probA, rng)
         val bools = BooleanArray(a.bools.size) { if (rng.nextDouble() < probA) a.bools[it] else b.bools[it] }
         val ints = IntArray(a.ints.size) { if (rng.nextDouble() < probA) a.ints[it] else b.ints[it] }
@@ -163,7 +158,7 @@ class IteratedLocalSearchRestart(
         a: Sample,
         b: Sample,
         probA: Double,
-        rng: kotlin.random.Random,
+        rng: Random,
     ): Sample {
         val bools = BooleanArray(a.bools.size)
         val ints = IntArray(a.ints.size)

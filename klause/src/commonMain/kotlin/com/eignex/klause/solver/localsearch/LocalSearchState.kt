@@ -7,6 +7,9 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
 
@@ -360,8 +363,8 @@ class LocalSearchState(
             // Indicator channeling: single-var EQ reified-linear (the bool2int /
             // int_eq_reif pattern). Flip the aux bool iff the new value changes the truth
             // of `coeff·v == bound`.
-            if (f is com.eignex.klause.solver.factor.ReifiedLinear) {
-                if (f.vars.size == 1 && f.op == com.eignex.klause.solver.factor.LinearOp.EQ) {
+            if (f is ReifiedLinear) {
+                if (f.vars.size == 1 && f.op == LinearOp.EQ) {
                     val coeff = f.coeffs[0]
                     val auxVar = f.auxBoolVar
                     if (assumptions.isFrozenBool(auxVar)) continue
@@ -382,8 +385,8 @@ class LocalSearchState(
             // Only apply to *currently-satisfied* Linear EQs: a violated one is the very
             // constraint the caller is trying to repair via the IntSet — adding a
             // counter-shift would undo the repair. Side-effect preservation only.
-            if (f is com.eignex.klause.solver.factor.Linear &&
-                f.op == com.eignex.klause.solver.factor.LinearOp.EQ &&
+            if (f is Linear &&
+                f.op == LinearOp.EQ &&
                 !violated.contains(fid)
             ) {
                 propagateLinearEqShift(f, intVar, cur, newValue, parts, pinned)
@@ -397,7 +400,7 @@ class LocalSearchState(
      *  from [oldV] to [newV]. Skips when no clean integer compensation exists, when the
      *  candidate target is frozen / pinned / would exit its domain. */
     private fun propagateLinearEqShift(
-        f: com.eignex.klause.solver.factor.Linear,
+        f: Linear,
         intVar: Int,
         oldV: Int,
         newV: Int,

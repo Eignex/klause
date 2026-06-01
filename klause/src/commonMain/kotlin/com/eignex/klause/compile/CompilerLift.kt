@@ -19,6 +19,7 @@ import com.eignex.klause.ast.IntScale
 import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
+import com.eignex.klause.ast.SetCard
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.factor.Product
 
@@ -43,7 +44,7 @@ internal fun Compiler.Build.lift(expr: IntExpr): IntExpr = when (expr) {
     is IntMul -> liftMul(expr.left, expr.right)
     is IntDiv -> liftDivMod(expr.num, expr.den, returnRemainder = false)
     is IntMod -> liftDivMod(expr.num, expr.den, returnRemainder = true)
-    is com.eignex.klause.ast.SetCard -> liftSetCard(expr)
+    is SetCard -> liftSetCard(expr)
 }
 
 /**

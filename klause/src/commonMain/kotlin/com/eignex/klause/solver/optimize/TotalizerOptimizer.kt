@@ -15,6 +15,7 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.satisfyUnderAssumptions
+import com.eignex.klause.util.IntArrayList
 
 /**
  * Totalizer-encoded core-guided MaxSAT optimiser for **unweighted** problems. Builds
@@ -251,7 +252,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
     }
 
     private fun projectCoreToSofts(core: Assumptions, selectorToSoft: HashMap<Int, Int>): IntArray {
-        val out = com.eignex.klause.util.IntArrayList()
+        val out = IntArrayList()
         for (i in core.boolKeys.indices) {
             val id = core.boolKeys[i]
             val softIdx = selectorToSoft[id] ?: continue

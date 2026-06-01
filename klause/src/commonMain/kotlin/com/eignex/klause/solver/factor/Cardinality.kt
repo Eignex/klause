@@ -2,10 +2,12 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true
@@ -59,14 +61,14 @@ class Cardinality(
      *  delta of flipping [boolVar] from `pre` to `!pre` is then
      *     `(if (pre then -1 else 1)) * signedOccurrencesByVar[boolVar]`
      *  computed in O(1) instead of scanning every literal in the factor. */
-    private val signedOccurrencesByVar: com.eignex.klause.util.IntIntMap = run {
+    private val signedOccurrencesByVar: IntIntMap = run {
         val signs = HashMap<Int, Int>()
         for (lit in literals) {
             val v = Lit.variable(lit)
             val sign = if (Lit.isPositive(lit)) 1 else -1
             signs[v] = (signs[v] ?: 0) + sign
         }
-        com.eignex.klause.util.IntIntMap.build(
+        IntIntMap.build(
             keys = signs.keys.toIntArray(),
             values = signs.values.toIntArray(),
             absent = 0,
@@ -491,8 +493,8 @@ class Cardinality(
                 for (j in 0 until nF) {
                     sink.addCompound(
                         listOf(
-                            com.eignex.klause.solver.Move.BoolFlip(trueLits[i]),
-                            com.eignex.klause.solver.Move.BoolFlip(falseLits[j]),
+                            BoolFlip(trueLits[i]),
+                            BoolFlip(falseLits[j]),
                         ),
                     )
                 }
@@ -504,8 +506,8 @@ class Cardinality(
                 val b = falseLits[rng.nextInt(nF)]
                 sink.addCompound(
                     listOf(
-                        com.eignex.klause.solver.Move.BoolFlip(a),
-                        com.eignex.klause.solver.Move.BoolFlip(b),
+                        BoolFlip(a),
+                        BoolFlip(b),
                     ),
                 )
             }

@@ -1,6 +1,7 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.FloatSpec
+import com.eignex.klause.compile.SetLayout
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.IntHandle
@@ -13,6 +14,7 @@ import com.eignex.klause.schema.OptNominalHandle
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.maximizeBool
 import com.eignex.klause.solver.maximizeInt
 import com.eignex.klause.solver.minimizeBool
@@ -41,20 +43,19 @@ class CompiledProblem internal constructor(
      *  any. `null` when the schema didn't declare one — callers should fall back to
      *  `BacktrackParams()` in that case. The convenience [backtrackParams] handles that
      *  fallback. */
-    val defaultBacktrackParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
+    val defaultBacktrackParams: BacktrackParams? = null,
     /** Per-set-var indicator layout: parallel `(universe[i], indicatorBoolId[i])`. Used by
      *  the set decoders to read indicator bools back into a [Set]. Nominal-set vars stash
      *  their label order in [setNominalLabels] alongside this. */
-    internal val setLayouts: Map<String, com.eignex.klause.compile.SetLayout> = emptyMap(),
+    internal val setLayouts: Map<String, SetLayout> = emptyMap(),
     /** Label list (in universe-index order) for each nominal-set var. Empty map entry for
      *  int-universe set vars. */
     val setNominalLabels: Map<String, List<String>> = emptyMap(),
 ) {
     /** Return the schema's declared `BacktrackParams` if any, else a fresh default
-     *  [com.eignex.klause.solver.backtrack.BacktrackParams]. Convenience for the common
+     *  [BacktrackParams]. Convenience for the common
      *  pattern `BacktrackSolver(p.problem).solve(p.backtrackParams())`. */
-    fun backtrackParams(): com.eignex.klause.solver.backtrack.BacktrackParams =
-        defaultBacktrackParams ?: com.eignex.klause.solver.backtrack.BacktrackParams()
+    fun backtrackParams(): BacktrackParams = defaultBacktrackParams ?: BacktrackParams()
 
     /** Decode [handle]'s Boolean value from [sample]. */
     fun decode(handle: BoolHandle, sample: Sample): Boolean {

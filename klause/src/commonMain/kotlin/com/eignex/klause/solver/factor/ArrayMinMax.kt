@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -97,11 +98,7 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : LocalSe
     /** Repair: snap `result` to the current best xs value (the most reliable single move),
      *  and additionally propose moves that bring an xs element to `result`'s current value
      *  (so the constraint holds via the value-side rather than the result-side). */
-    override fun proposeRepairMoves(
-        state: LocalSearchState,
-        factorId: Int,
-        sink: com.eignex.klause.solver.localsearch.MoveSink,
-    ) {
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State
         val best = s.bestValue

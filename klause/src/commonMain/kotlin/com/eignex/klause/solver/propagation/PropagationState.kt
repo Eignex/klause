@@ -2,9 +2,12 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Bits
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -66,10 +69,10 @@ class PropagationState(
 
     /** Vars whose pin/domain changed since the driver last drained them. Primitive int
      *  ring buffers to avoid the autoboxing tax `ArrayDeque<Int>` pays on every push/poll. */
-    private val dirtyBools: com.eignex.klause.util.IntArrayDeque =
-        com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
-    private val dirtyInts: com.eignex.klause.util.IntArrayDeque =
-        com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
+    private val dirtyBools: IntArrayDeque =
+        IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
+    private val dirtyInts: IntArrayDeque =
+        IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
 
     // -------- Reusable propagation worklist (was allocated fresh per runToFixpoint) --------
     //
@@ -78,8 +81,8 @@ class PropagationState(
     // O(1) (just bump [propGen]) instead of zeroing a `BooleanArray(factorCount)` on every
     // pin. A factor is queued iff `propStamp[fid] == propGen`; dequeuing writes `propGen - 1`
     // (any value ≠ propGen) so a factor can still re-enqueue itself within the same run.
-    private val propQueue: com.eignex.klause.util.IntArrayDeque =
-        com.eignex.klause.util.IntArrayDeque(initialCapacity = problem.numFactors.coerceAtLeast(8))
+    private val propQueue: IntArrayDeque =
+        IntArrayDeque(initialCapacity = problem.numFactors.coerceAtLeast(8))
     private var propStamp: IntArray = IntArray(problem.numFactors.coerceAtLeast(8))
     private var propGen: Int = 0
 
@@ -125,8 +128,8 @@ class PropagationState(
      * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed. Primitive
      * int list (no boxing on push or indexed read).
      */
-    private val levelToDecisionVar: com.eignex.klause.util.IntArrayList =
-        com.eignex.klause.util.IntArrayList()
+    private val levelToDecisionVar: IntArrayList =
+        IntArrayList()
 
     /** Number of decisions pushed so far. Equals the maximum level. */
     val numDecisions: Int get() = levelToDecisionVar.size
@@ -155,7 +158,7 @@ class PropagationState(
                     (d.min.toLong() - Int.MIN_VALUE.toLong())
                 if (seen.add(key)) {
                     out.add(
-                        com.eignex.klause.solver.Lit.make(atomVarGe(v, d.min), false),
+                        Lit.make(atomVarGe(v, d.min), false),
                     )
                 }
             }
@@ -164,7 +167,7 @@ class PropagationState(
                     (d.max.toLong() - Int.MIN_VALUE.toLong())
                 if (seen.add(key)) {
                     out.add(
-                        com.eignex.klause.solver.Lit.make(atomVarLe(v, d.max), false),
+                        Lit.make(atomVarLe(v, d.max), false),
                     )
                 }
             }
@@ -237,7 +240,7 @@ class PropagationState(
      * Per-factor mutable scratch space — mirrors [com.eignex.klause.solver.localsearch.LocalSearchState.refPayload]
      * on the LS side. Factors stash propagation-time bookkeeping here keyed by their own
      * factor id; the engine doesn't touch the contents. Today's only user is
-     * [com.eignex.klause.solver.factor.Clause]'s two-watched-literal scheme, but the slot
+     * [Clause]'s two-watched-literal scheme, but the slot
      * is general so future factors (Cardinality watched literals, etc.) can adopt the
      * same pattern.
      *
@@ -258,19 +261,19 @@ class PropagationState(
 
     /** Learned clauses accumulated during search (LCG-style nogoods produced by
      *  [ConflictAnalyzer]). Their factor ids live in `[problem.numFactors, totalFactorCount)` —
-     *  treat them like any other [com.eignex.klause.solver.factor.Clause] via [factorAt];
+     *  treat them like any other [Clause] via [factorAt];
      *  they participate in propagation through [boolWatchersByLit] just like static
      *  clauses. Survives [restore] (clauses are facts about the original problem, not
      *  trail state); pruned by [forgetLearnedClauses]. */
-    private val _learnedClauses: ArrayList<com.eignex.klause.solver.factor.Clause> = ArrayList()
+    private val _learnedClauses: ArrayList<Clause> = ArrayList()
 
     /** Clauses learned during conflict analysis. */
-    val learnedClauses: List<com.eignex.klause.solver.factor.Clause> get() = _learnedClauses
+    val learnedClauses: List<Clause> get() = _learnedClauses
 
     /** LBD (Literal Block Distance) per learned clause, parallel to [_learnedClauses].
      *  Glucose-style glue metric: lower = more re-usable. Forgetting policies key on
      *  this to decide which clauses to drop. */
-    private val learnedLbds: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    private val learnedLbds: IntArrayList = IntArrayList()
 
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
@@ -278,7 +281,7 @@ class PropagationState(
 
     /** Unified factor accessor; routes static factor ids to [Problem.factors] and learned
      *  factor ids (≥ `problem.numFactors`) to [learnedClauses]. */
-    fun factorAt(fid: Int): com.eignex.klause.solver.Factor = if (fid < problem.numFactors) {
+    fun factorAt(fid: Int): Factor = if (fid < problem.numFactors) {
         problem.factors[fid]
     } else {
         _learnedClauses[fid - problem.numFactors]
@@ -296,7 +299,7 @@ class PropagationState(
      * Does NOT eagerly propagate — that's the session-level
      * [PropagationSession.addLearnedClause]'s job. Returns the new factor id.
      */
-    fun addLearnedClause(clause: com.eignex.klause.solver.factor.Clause, lbd: Int): Int {
+    fun addLearnedClause(clause: Clause, lbd: Int): Int {
         val newFid = totalFactorCount
         _learnedClauses.add(clause)
         learnedLbds.add(lbd)
@@ -380,10 +383,10 @@ class PropagationState(
     }
 
     /**
-     * Per-literal wakeup index for factors opting into [com.eignex.klause.solver.Factor.initialBoolWatchers].
+     * Per-literal wakeup index for factors opting into [Factor.initialBoolWatchers].
      * Slot `boolWatchersByLit[lit]` lists factor ids that should fire when literal `lit`
      * transitions to false. Sized `2 * problem.numBoolVars`; lit ids are the standard
-     * [com.eignex.klause.solver.Lit.make] encoding. Populated at construction from each
+     * [Lit.make] encoding. Populated at construction from each
      * factor's initial watch set; factors with dynamic watches (Clause) keep it in sync
      * via [moveBoolWatcher] as their watches drift during propagation.
      *
@@ -392,8 +395,8 @@ class PropagationState(
      * sound, since the invariant is "watch is on a non-false literal", and pop reverts
      * pins which only *adds* non-false literals.
      */
-    internal val boolWatchersByLit: Array<com.eignex.klause.util.IntArrayList> =
-        Array(2 * problem.numBoolVars) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
+    internal val boolWatchersByLit: Array<IntArrayList> =
+        Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
 
     /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
@@ -403,7 +406,7 @@ class PropagationState(
      * means either:
      *   - the var was pinned as a decision / assumption (no factor reason), or
      *   - the var was pinned by a factor that doesn't yet record antecedents
-     *     (everything except [com.eignex.klause.solver.factor.Clause] today).
+     *     (everything except [Clause] today).
      *
      * Maintained alongside [boolReason] (factor id) for first-UIP conflict analysis
      * (lazy clause generation). When the conflict analyzer hits a `null` entry it treats
@@ -434,7 +437,7 @@ class PropagationState(
     //
     // An "atom" represents a fact like `[x ≥ k]` or `[x ≤ k]`. Each atom gets a virtual
     // variable id past the bool var space (`numBoolVars + atomId`), so atom *literals*
-    // — encoded with [com.eignex.klause.solver.Lit.make] using that virtual id — slot
+    // — encoded with [Lit.make] using that virtual id — slot
     // into the same array structure the analyzer already understands. Allocation is
     // lazy: an atom only enters the registry when a factor first references it as an
     // antecedent or conflict-reason literal.
@@ -447,23 +450,23 @@ class PropagationState(
 
     /** Atom id → (intVar, kind = 0 for GE / 1 for LE, threshold). Packed into a single
      *  long for the reverse lookup; stored separately here for fast iteration. */
-    internal val atomIntVar: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    internal val atomIntVar: IntArrayList = IntArrayList()
 
     /** 0 = `[x ≥ k]`, 1 = `[x ≤ k]`. */
-    internal val atomKind: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    internal val atomKind: IntArrayList = IntArrayList()
 
     /** Threshold value `k` for the atom. */
-    internal val atomThreshold: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    internal val atomThreshold: IntArrayList = IntArrayList()
 
     /** Truth of the atom at allocation time. `true` = atom holds (bound met),
      *  `false` = atom is currently violated (bound not met). Never null — allocation
      *  is only ever requested for atoms whose truth can be derived from current
      *  domains. */
-    internal val atomValue: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList() // 1 / 0
+    internal val atomValue: IntArrayList = IntArrayList() // 1 / 0
 
     /** Decision level at which the atom became true (or 0 for atoms that were already
      *  true at problem-bake time). Mirrors [boolLevel] for atoms. */
-    internal val atomLevel: com.eignex.klause.util.IntArrayList = com.eignex.klause.util.IntArrayList()
+    internal val atomLevel: IntArrayList = IntArrayList()
 
     /** Per-atom antecedents — bool literals (or other atom literals via their virtual
      *  ids) whose collective truth forced this atom. Mirrors [boolAntecedents]. */
@@ -476,16 +479,16 @@ class PropagationState(
     /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions
      *  to false. Mirrors [boolWatchersByLit] for atoms; keyed by atom-lit id rather than
      *  fixed-array indexed because atoms are allocated dynamically. */
-    internal val atomWatchersByLit: HashMap<Int, com.eignex.klause.util.IntArrayList> = HashMap()
+    internal val atomWatchersByLit: HashMap<Int, IntArrayList> = HashMap()
 
     /** For each int variable, the atoms whose truth depends on it — used to recompute
      *  atom truth and fire watchers after a successful tighten / exclude. */
-    private val atomsByIntVar: HashMap<Int, com.eignex.klause.util.IntArrayList> = HashMap()
+    private val atomsByIntVar: HashMap<Int, IntArrayList> = HashMap()
 
     /** Factor ids woken by atom-lit transitions during the current propagation step.
      *  Drained alongside dirty-int / dirty-bool processing in [runToFixpoint]. */
-    private val dirtyAtomFactors: com.eignex.klause.util.IntArrayDeque =
-        com.eignex.klause.util.IntArrayDeque(initialCapacity = 8)
+    private val dirtyAtomFactors: IntArrayDeque =
+        IntArrayDeque(initialCapacity = 8)
 
     private fun atomKey(intVar: Int, kind: Int, threshold: Int): Long {
         // Threshold can be negative; bias by Int.MIN_VALUE to keep it non-negative within
@@ -495,7 +498,7 @@ class PropagationState(
     }
 
     /** Allocate (or look up) the atom for `[intVar ≥ threshold]` and return its virtual
-     *  variable id (past the bool var space). Pair with [com.eignex.klause.solver.Lit.make]
+     *  variable id (past the bool var space). Pair with [Lit.make]
      *  to encode as a positive or negative literal. */
     fun atomVarGe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = 0, threshold = threshold)
 
@@ -508,18 +511,16 @@ class PropagationState(
     fun atomVarEq(intVar: Int, value: Int): Int = allocAtom(intVar, kind = 2, threshold = value)
 
     /** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
-    fun atomLitGe(intVar: Int, threshold: Int): Int =
-        com.eignex.klause.solver.Lit.make(atomVarGe(intVar, threshold), true)
+    fun atomLitGe(intVar: Int, threshold: Int): Int = Lit.make(atomVarGe(intVar, threshold), true)
 
     /** Literal for the bound atom `intVar ≤ threshold`. */
-    fun atomLitLe(intVar: Int, threshold: Int): Int =
-        com.eignex.klause.solver.Lit.make(atomVarLe(intVar, threshold), true)
+    fun atomLitLe(intVar: Int, threshold: Int): Int = Lit.make(atomVarLe(intVar, threshold), true)
 
     /** Literal for the value atom `intVar = value`. */
-    fun atomLitEq(intVar: Int, value: Int): Int = com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), true)
+    fun atomLitEq(intVar: Int, value: Int): Int = Lit.make(atomVarEq(intVar, value), true)
 
     /** Literal for the value atom `intVar ≠ value`. */
-    fun atomLitNe(intVar: Int, value: Int): Int = com.eignex.klause.solver.Lit.make(atomVarEq(intVar, value), false)
+    fun atomLitNe(intVar: Int, value: Int): Int = Lit.make(atomVarEq(intVar, value), false)
 
     /** True iff [v] is an atom-id (past the bool var space). Used by the conflict
      *  analyzer to dispatch between bool-trail and atom-table lookups. */
@@ -538,14 +539,14 @@ class PropagationState(
      *  when undetermined. Pair with [Lit.evaluate] / explicit polarity branching to
      *  reason about literal truth. */
     fun litTruth(lit: Int): Boolean? {
-        val v = com.eignex.klause.solver.Lit.variable(lit)
+        val v = Lit.variable(lit)
         val raw: Boolean? = if (v < problem.numBoolVars) {
             boolValues[v]
         } else {
             atomCurrentTruth(atomIdOf(v))
         }
         if (raw == null) return null
-        return com.eignex.klause.solver.Lit.evaluate(lit, raw)
+        return Lit.evaluate(lit, raw)
     }
 
     /** True iff [lit] is currently `true` (returns false when undetermined). */
@@ -558,8 +559,8 @@ class PropagationState(
      *  ([pinBool]) and atom assignment (re-derived as the corresponding int-bound
      *  tighten on the underlying var). Returns `false` on conflict. */
     fun pinLit(lit: Int, antecedents: IntArray? = null): Boolean {
-        val v = com.eignex.klause.solver.Lit.variable(lit)
-        val pos = com.eignex.klause.solver.Lit.isPositive(lit)
+        val v = Lit.variable(lit)
+        val pos = Lit.isPositive(lit)
         if (v < problem.numBoolVars) return pinBoolImpl(v, pos, antecedents)
         val atomId = atomIdOf(v)
         val intVar = atomIntVar[atomId]
@@ -629,7 +630,7 @@ class PropagationState(
             }
         }
         atomByKey[key] = id
-        val list = atomsByIntVar.getOrPut(intVar) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
+        val list = atomsByIntVar.getOrPut(intVar) { IntArrayList(initialCapacity = 2) }
         list.add(id)
         return problem.numBoolVars + id
     }
@@ -680,7 +681,7 @@ class PropagationState(
             atomValue[atomId] = newRaw
             atomLevel[atomId] = currentLevel
             atomAntecedents[atomId] = ant
-            val falseLit = com.eignex.klause.solver.Lit.make(problem.numBoolVars + atomId, !newT)
+            val falseLit = Lit.make(problem.numBoolVars + atomId, !newT)
             val w = atomWatchersByLit[falseLit] ?: continue
             for (j in 0 until w.size) dirtyAtomFactors.addLast(w[j])
         }
@@ -689,11 +690,11 @@ class PropagationState(
     /** Install [fid] as a watcher of [lit]. Dispatches between [boolWatchersByLit]
      *  (bool var space) and [atomWatchersByLit] (atom var space). */
     internal fun installLitWatch(lit: Int, fid: Int) {
-        val v = com.eignex.klause.solver.Lit.variable(lit)
+        val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
             boolWatchersByLit[lit].add(fid)
         } else {
-            val list = atomWatchersByLit.getOrPut(lit) { com.eignex.klause.util.IntArrayList(initialCapacity = 2) }
+            val list = atomWatchersByLit.getOrPut(lit) { IntArrayList(initialCapacity = 2) }
             list.add(fid)
         }
     }
@@ -705,8 +706,8 @@ class PropagationState(
      * *most recently pinned* variable in the current conflict, which requires this
      * append-only trail.
      */
-    internal val boolPinOrder: com.eignex.klause.util.IntArrayList =
-        com.eignex.klause.util.IntArrayList(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
+    internal val boolPinOrder: IntArrayList =
+        IntArrayList(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
 
     // -------- Undo trail (replaces per-level full-array snapshots) --------
     //
@@ -727,11 +728,11 @@ class PropagationState(
     // from the restored int domains (matching the old `restore`), and atoms allocated
     // after a mark are truncated wholesale. atomLevel / atomAntecedents drift across pops,
     // exactly as they did under the snapshot scheme (advisory, like watches).
-    private val undoTag = com.eignex.klause.util.IntArrayList()
-    private val undoVar = com.eignex.klause.util.IntArrayList()
-    private val undoLevel = com.eignex.klause.util.IntArrayList() // int: prior intLevel
-    private val undoMinReason = com.eignex.klause.util.IntArrayList() // int: prior intMinReason
-    private val undoMaxReason = com.eignex.klause.util.IntArrayList() // int: prior intMaxReason
+    private val undoTag = IntArrayList()
+    private val undoVar = IntArrayList()
+    private val undoLevel = IntArrayList() // int: prior intLevel
+    private val undoMinReason = IntArrayList() // int: prior intMinReason
+    private val undoMaxReason = IntArrayList() // int: prior intMaxReason
     private val undoDomain = ArrayList<IntDomain?>() // int: prior intDomains[v]
     private val undoMinAnt = ArrayList<IntArray?>() // int: prior intMinAntecedents
     private val undoMaxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents
@@ -815,7 +816,7 @@ class PropagationState(
     fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
         if (oldLit == newLit) return
         // Remove from old (swap-remove via a tight hoisted-local scan inside IntArrayList).
-        val oldV = com.eignex.klause.solver.Lit.variable(oldLit)
+        val oldV = Lit.variable(oldLit)
         if (oldV < problem.numBoolVars) {
             boolWatchersByLit[oldLit].removeValue(factorId)
         } else {
@@ -1108,7 +1109,7 @@ class PropagationState(
         val cap = levelToDecisionVar.size
         var max = 0
         for (lit in literals) {
-            val v = com.eignex.klause.solver.Lit.variable(lit)
+            val v = Lit.variable(lit)
             val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevel[v - problem.numBoolVars]
             if (l > max) {
                 max = l
@@ -1312,8 +1313,8 @@ class PropagationState(
                     }
                 }
             }
-            atomWatchersByLit.remove(com.eignex.klause.solver.Lit.make(problem.numBoolVars + id, true))
-            atomWatchersByLit.remove(com.eignex.klause.solver.Lit.make(problem.numBoolVars + id, false))
+            atomWatchersByLit.remove(Lit.make(problem.numBoolVars + id, true))
+            atomWatchersByLit.remove(Lit.make(problem.numBoolVars + id, false))
             atomIntVar.truncateTo(id)
             atomKind.truncateTo(id)
             atomThreshold.truncateTo(id)
@@ -1390,7 +1391,7 @@ class PropagationState(
             // at the current level), so its effective level is exactly the current decision
             // level — no scan at all. Atom-lit clauses can fire on an atom that flipped at a
             // sub-decision level, so they keep the literal scan.
-            currentLevel = if (f is com.eignex.klause.solver.factor.Clause) {
+            currentLevel = if (f is Clause) {
                 if (f.allLiteralsBool(problem.numBoolVars)) {
                     levelToDecisionVar.size
                 } else {

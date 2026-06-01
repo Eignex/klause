@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolverParams
 
 /**
@@ -86,14 +87,13 @@ data class BacktrackParams(
      * can't yield a sound LB and silently skip external pruning.
      */
     val objectiveBoundSupplier: (() -> Double)? = null,
-    /** Cooperative cancellation predicate; see [com.eignex.klause.solver.Cancellation]. */
-    val cancellation: com.eignex.klause.solver.Cancellation = com.eignex.klause.solver.Cancellation.Never,
+    /** Cooperative cancellation predicate; see [Cancellation]. */
+    val cancellation: Cancellation = Cancellation.Never,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
-    override fun withCancellation(cancellation: com.eignex.klause.solver.Cancellation): BacktrackParams =
-        copy(cancellation = cancellation)
+    override fun withCancellation(cancellation: Cancellation): BacktrackParams = copy(cancellation = cancellation)
 
     private companion object {
         fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)

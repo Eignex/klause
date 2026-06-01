@@ -3,11 +3,13 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `Σ weights`i` * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -42,14 +44,14 @@ class PseudoBoolean(
     /** Sum of `weight`i` * sign(literals`i`)` per Boolean variable. Flipping `v` shifts
      *  the running sum by `(if v_was_true then -signed[v] else +signed[v])`, computed in
      *  O(1) instead of scanning every literal in the factor. */
-    private val signedWeightByVar: com.eignex.klause.util.IntIntMap = run {
+    private val signedWeightByVar: IntIntMap = run {
         val signs = HashMap<Int, Int>()
         for (i in literals.indices) {
             val v = Lit.variable(literals[i])
             val s = if (Lit.isPositive(literals[i])) weights[i] else -weights[i]
             signs[v] = (signs[v] ?: 0) + s
         }
-        com.eignex.klause.util.IntIntMap.build(
+        IntIntMap.build(
             keys = signs.keys.toIntArray(),
             values = signs.values.toIntArray(),
             absent = 0,
@@ -145,8 +147,8 @@ class PseudoBoolean(
                     if (trueVars[i] == falseVars[j]) continue // same var — degenerate
                     sink.addCompound(
                         listOf(
-                            com.eignex.klause.solver.Move.BoolFlip(trueVars[i]),
-                            com.eignex.klause.solver.Move.BoolFlip(falseVars[j]),
+                            BoolFlip(trueVars[i]),
+                            BoolFlip(falseVars[j]),
                         ),
                     )
                     proposed++

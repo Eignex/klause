@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import kotlin.math.exp
 import kotlin.random.Random
 
 /**
@@ -174,7 +175,7 @@ sealed interface AspirationCriterion {
             private set
 
         override fun admitsTabu(state: LocalSearchState, move: Move): Boolean {
-            val admit = state.rng.nextDouble() < kotlin.math.exp(-1.0 / temperature)
+            val admit = state.rng.nextDouble() < exp(-1.0 / temperature)
             temperature = (temperature * coolingRate).coerceAtLeast(minTemperature)
             return admit
         }

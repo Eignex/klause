@@ -2,10 +2,12 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `auxBoolVar ↔ (#true literals in [min, max])`. Created by the compiler when a
@@ -44,7 +46,7 @@ class ReifiedCardinality(
      *  [auxBoolVar] — aux flips don't affect the body count). `+1` per positive
      *  occurrence, `-1` per negative; vars whose occurrences cancel exactly have entry 0
      *  and don't shift the count when flipped. */
-    private val signedOccurrencesByVar: com.eignex.klause.util.IntIntMap = run {
+    private val signedOccurrencesByVar: IntIntMap = run {
         val signs = HashMap<Int, Int>()
         for (lit in literals) {
             val v = Lit.variable(lit)
@@ -52,7 +54,7 @@ class ReifiedCardinality(
             val sign = if (Lit.isPositive(lit)) 1 else -1
             signs[v] = (signs[v] ?: 0) + sign
         }
-        com.eignex.klause.util.IntIntMap.build(
+        IntIntMap.build(
             keys = signs.keys.toIntArray(),
             values = signs.values.toIntArray(),
             absent = 0,
@@ -227,7 +229,7 @@ class ReifiedCardinality(
         val n = state.intPayload[factorId]
         if (aux == inRange(n)) return
         sink.addBoolFlip(auxBoolVar)
-        val auxFlip = com.eignex.klause.solver.Move.BoolFlip(auxBoolVar)
+        val auxFlip = BoolFlip(auxBoolVar)
         val wantInRange = aux
         for (lit in literals) {
             val v = Lit.variable(lit)
@@ -240,7 +242,7 @@ class ReifiedCardinality(
             // drives count toward the *opposite* predicate, so strategies can atomically
             // transition to the other reification side.
             if (wantInRange != inRange(newN)) {
-                sink.addCompound(listOf(auxFlip, com.eignex.klause.solver.Move.BoolFlip(v)))
+                sink.addCompound(listOf(auxFlip, BoolFlip(v)))
             }
         }
     }
