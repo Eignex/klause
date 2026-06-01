@@ -13,19 +13,40 @@ import com.eignex.klause.ast.IntTerm
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.not
 
-class BoolHandle(val name: String) : BoolTerm {
+/** DSL handle for a declared Boolean variable; usable directly as a [BoolTerm]. */
+class BoolHandle(
+    /** Name of the underlying Boolean variable. */
+    val name: String,
+) : BoolTerm {
     override fun toExpr(): BoolExpr = BoolRef(name, negated = false)
 }
 
-class NominalHandle(val name: String, val labels: List<String>) {
+/** DSL handle for a declared nominal variable, exposing label equality tests. */
+class NominalHandle(
+    /** Name of the underlying nominal variable. */
+    val name: String,
+    /** The valid category labels. */
+    val labels: List<String>,
+) {
+    /** `this == label`; the label must be one of [labels]. */
     infix fun eq(label: String): BoolExpr {
         require(label in labels) { "Label '$label' not in nominal '$name' (have $labels)" }
         return NominalEq(name, label)
     }
+
+    /** `this != label`. */
     infix fun ne(label: String): BoolExpr = !eq(label)
 }
 
-class IntHandle(val name: String, val min: Int, val max: Int) : IntTerm {
+/** DSL handle for a declared integer variable; usable directly as an [IntTerm]. */
+class IntHandle(
+    /** Name of the underlying integer variable. */
+    val name: String,
+    /** Inclusive lower bound of the domain. */
+    val min: Int,
+    /** Inclusive upper bound of the domain. */
+    val max: Int,
+) : IntTerm {
     override fun toIntExpr(): IntExpr = IntRef(name)
 }
 
@@ -41,40 +62,82 @@ class IntHandle(val name: String, val min: Int, val max: Int) : IntTerm {
  * support (Z3) ignore the lowering entirely.
  */
 class FloatHandle(
+    /** Name of the underlying float variable. */
     val name: String,
+    /** Inclusive lower real bound. */
     val min: Double,
+    /** Inclusive upper real bound. */
     val max: Double,
     @Deprecated("Bucketing is now a per-backend solve-time concern; this parameter is ignored.")
+    /** Deprecated, ignored bucket count kept for source compatibility. */
     val buckets: Int = 0,
 ) {
 
     /** Identity expression `1·f + 0`. Use this when an API needs a [FloatExpr]. */
     fun toExpr(): FloatExpr = FloatExpr(this, coeff = 1.0, offset = 0.0)
 
+    /** `this + d`. */
     operator fun plus(d: Double): FloatExpr = FloatExpr(this, 1.0, d)
+
+    /** `this - d`. */
     operator fun minus(d: Double): FloatExpr = FloatExpr(this, 1.0, -d)
+
+    /** `c · this`. */
     operator fun times(c: Int): FloatExpr = FloatExpr(this, c.toDouble(), 0.0)
+
+    /** `c · this`. */
     operator fun times(c: Double): FloatExpr = FloatExpr(this, c, 0.0)
+
+    /** `-this`. */
     operator fun unaryMinus(): FloatExpr = FloatExpr(this, -1.0, 0.0)
 
+    /** `this ≤ c`. */
     infix fun le(c: Double): BoolExpr = toExpr() le c
+
+    /** `this < c`. */
     infix fun lt(c: Double): BoolExpr = toExpr() lt c
+
+    /** `this ≥ c`. */
     infix fun ge(c: Double): BoolExpr = toExpr() ge c
+
+    /** `this > c`. */
     infix fun gt(c: Double): BoolExpr = toExpr() gt c
+
+    /** `this = c`. */
     infix fun eq(c: Double): BoolExpr = toExpr() eq c
+
+    /** `this ≠ c`. */
     infix fun ne(c: Double): BoolExpr = toExpr() ne c
 
+    /** `this ≤ other`. */
     infix fun le(other: FloatExpr): BoolExpr = toExpr() le other
+
+    /** `this < other`. */
     infix fun lt(other: FloatExpr): BoolExpr = toExpr() lt other
+
+    /** `this ≥ other`. */
     infix fun ge(other: FloatExpr): BoolExpr = toExpr() ge other
+
+    /** `this > other`. */
     infix fun gt(other: FloatExpr): BoolExpr = toExpr() gt other
+
+    /** `this = other`. */
     infix fun eq(other: FloatExpr): BoolExpr = toExpr() eq other
+
+    /** `this ≠ other`. */
     infix fun ne(other: FloatExpr): BoolExpr = toExpr() ne other
 }
 
+/** `this · handle`. */
 operator fun Int.times(handle: FloatHandle): FloatExpr = FloatExpr(handle, this.toDouble(), 0.0)
+
+/** `this · handle`. */
 operator fun Double.times(handle: FloatHandle): FloatExpr = FloatExpr(handle, this, 0.0)
+
+/** `this · expr`. */
 operator fun Int.times(expr: FloatExpr): FloatExpr = expr * this
+
+/** `this · expr`. */
 operator fun Double.times(expr: FloatExpr): FloatExpr = expr * this
 
 /**
