@@ -238,11 +238,31 @@ class GlobalCardinality(
         return false
     }
 
-    /** Hole-aware conflict reason. */
+    /** The variable subset responsible for the most recent [propagate] failure, captured at
+     *  the failing point. A count-capacity violation implicates only the vars pinned to the
+     *  offending cover value (a pigeonhole over that value), so [conflictReason] cites just
+     *  those rather than every var. Reset at the start of each [propagate]; `null` ⇒ a failure
+     *  path (flow-deficiency, lower-bound shortfall, closed/SCC wipe-out) that did not capture
+     *  a subset, so fall back to all vars. */
+    private var conflictVars: IntArray? = null
+
+    /** Vars currently pinned (singleton) to [value], among [scope]. */
+    private fun pinnedTo(state: PropagationState, scope: IntArray, value: Int): IntArrayList {
+        val out = IntArrayList()
+        for (x in scope) {
+            val d = state.intDomains[x]
+            if (d.min == d.max && d.min == value) out.add(x)
+        }
+        return out
+    }
+
+    /** Hole-aware conflict reason, sharpened to the pigeonhole subset captured by [propagate];
+     *  falls back to all vars when no subset was recorded. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, intVars)
+        collectHoleAndBoundAntecedents(state, conflictVars ?: intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        conflictVars = null // stale-guard; set at each pigeonhole failure point below.
         // ---- 1. Count tightening + closure --------------------------------------------
         // Opt-aware: filter to definitely-present xs for the flow analysis. Definitely-
         // absent xs contribute nothing; unpinned-presence xs may still go absent, so we
@@ -292,11 +312,20 @@ class GlobalCardinality(
                 if (target in d) possible[k]++
             }
             if (countVars != null) {
-                if (!state.tightenIntMin(countVars[k], definite[k], gccAntecedents)) return false
+                // More vars pinned to cover[k] than countVars[k]'s max: the pinned vars plus
+                // the count var alone prove it (a pigeonhole over cover[k]).
+                if (!state.tightenIntMin(countVars[k], definite[k], gccAntecedents)) {
+                    conflictVars = pinnedTo(state, effectiveXs, target).also { it.add(countVars[k]) }.toIntArray()
+                    return false
+                }
                 if (!state.tightenIntMax(countVars[k], possible[k], gccAntecedents)) return false
             } else {
                 if (requireNotNull(countLow)[k] > possible[k]) return false
-                if (requireNotNull(countHigh)[k] < definite[k]) return false
+                // More vars pinned to cover[k] than countHigh[k] allows: cite only those pins.
+                if (requireNotNull(countHigh)[k] < definite[k]) {
+                    conflictVars = pinnedTo(state, effectiveXs, target).toIntArray()
+                    return false
+                }
             }
         }
 
