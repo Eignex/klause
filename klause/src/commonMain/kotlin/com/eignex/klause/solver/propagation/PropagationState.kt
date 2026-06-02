@@ -895,6 +895,28 @@ class PropagationState(
         return setIntImpl(v, value, null)
     }
 
+    /**
+     * Push an int upper-bound tightening (`v ≤ hi`) as a new decision. Unlike
+     * [setIntAsDecision], this records a *single* bound atom at the new decision level, so
+     * conflicts seeded by it have a single 1UIP literal there (an equality pin contributes
+     * two same-level bound atoms that 1UIP cannot collapse). The caller must ensure `hi`
+     * strictly narrows the domain (`hi in d.min until d.max`) so the level is non-empty.
+     */
+    fun setIntMaxAsDecision(v: Int, hi: Int): Boolean {
+        levelToDecisionVar.add(problem.numBoolVars + v)
+        currentLevel = levelToDecisionVar.size
+        currentFactor = -1
+        return tightenIntMaxImpl(v, hi, null)
+    }
+
+    /** Push an int lower-bound tightening (`v ≥ lo`) as a new decision. See [setIntMaxAsDecision]. */
+    fun setIntMinAsDecision(v: Int, lo: Int): Boolean {
+        levelToDecisionVar.add(problem.numBoolVars + v)
+        currentLevel = levelToDecisionVar.size
+        currentFactor = -1
+        return tightenIntMinImpl(v, lo, null)
+    }
+
     /** Force bool [v] to [value]; returns false on conflict. */
     fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value, antecedents = null)
 
