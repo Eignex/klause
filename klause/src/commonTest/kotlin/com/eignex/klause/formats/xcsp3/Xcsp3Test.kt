@@ -192,6 +192,33 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `lex solve terminates under every search ordering`() {
+        // Regression: certain orderings (e.g. randomSeed=6) drove BacktrackSolver into a
+        // non-terminating conflict-learning loop on this lex+eq instance, because an int
+        // equality decision contributes two same-level bound atoms that 1UIP cannot
+        // collapse to a single asserting literal. The engine now falls back to
+        // chronological backtracking for non-asserting clauses, so every seed terminates.
+        val xml = """
+            <instance type="CSP">
+              <variables>
+                <array id="a" size="[2]"> 0..1 </array><array id="b" size="[2]"> 0..1 </array>
+              </variables>
+              <constraints>
+                <lex><list> a[] </list><list> b[] </list><operator> lt </operator></lex>
+                <intension> eq(a[0],b[0]) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val problem = Xcsp3.parse(xml).problem
+        for (seed in 0L until 200L) {
+            val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = seed))
+            assertTrue(r is SolveResult.Sat, "seed=$seed expected SAT, got $r")
+            val v = r.assignment.ints
+            assertTrue(v[0] == v[2] && v[1] < v[3], "seed=$seed bad model a=${v[0]},${v[1]} b=${v[2]},${v[3]}")
+        }
+    }
+
+    @Test
     fun `cumulative keeps resource use within capacity`() {
         val xml = """
             <instance type="CSP">

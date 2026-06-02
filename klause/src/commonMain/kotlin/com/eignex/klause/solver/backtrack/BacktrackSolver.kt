@@ -734,7 +734,14 @@ class BacktrackSolver(override val problem: Problem) :
                 // literal now and constrains all future propagation — not just the one-shot
                 // jump-distance prune.
                 val learned = r.learnedClause as? ConflictAnalyzer.AnalysisResult.Learned
-                if (learned != null) return AdvanceOutcome.Backjump(learned)
+                // Only take the non-chronological backjump when the clause is a proper
+                // 1UIP (asserting) clause — popping to its backjump level then makes it
+                // unit and forces the asserting literal. A non-asserting clause (e.g. the
+                // two same-level bound atoms an int *equality* decision contributes, which
+                // 1UIP cannot collapse) would never become unit, so asserting it is a no-op
+                // and the search would re-make the same decision forever. Fall through to
+                // chronological within-node value enumeration instead, which is complete.
+                if (learned != null && learned.asserting) return AdvanceOutcome.Backjump(learned)
                 continue
             }
             if (pruneIf != null && pruneIf(session)) {
@@ -833,6 +840,9 @@ class BacktrackSolver(override val problem: Problem) :
         // always < the conflict's current level), so termination is guaranteed in a
         // sane analyzer — the cap is purely defensive.
         repeat(MAX_CASCADING_BACKJUMPS) {
+            // A non-asserting clause never becomes unit after the backjump, so it can't
+            // force its asserting literal — fall back to chronological backtracking.
+            if (!current.asserting) return BackjumpTerm.Stuck
             // Pop trail + session to the backjump level.
             while (trail.size > current.backjumpLevel) {
                 session.popLast()

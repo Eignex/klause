@@ -75,6 +75,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
              *  level pins (decision levels 1..|seed|) that participated — feeds the
              *  assumption-core extraction path in [com.eignex.klause.solver.satisfyUnderAssumptions]. */
             val decisionLevels: IntArray,
+            /** True iff the clause is a proper 1UIP clause — exactly one literal at the
+             *  conflict level — so that after popping to [backjumpLevel] it becomes unit
+             *  and forces its asserting literal. When false (which can happen for int
+             *  *equality* decisions, whose pin contributes two same-level bound atoms that
+             *  1UIP cannot collapse to a single UIP), the engine must fall back to
+             *  chronological backtracking instead of trying to assert a non-unit clause. */
+            val asserting: Boolean = true,
         ) : AnalysisResult {
             override fun equals(other: Any?): Boolean = other is Learned &&
                 literals.contentEquals(other.literals) &&
@@ -229,11 +236,22 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private fun finalizeClause(learned: IntArrayList, currentLevel: Int): AnalysisResult.Learned {
         val minimized = minimize(learned, currentLevel)
         val levels = distinctLevelsOf(minimized)
+        // A proper 1UIP clause carries exactly one literal at the conflict level; that lone
+        // literal becomes the unit-asserting literal after the backjump. Some conflicts —
+        // notably those seeded by an int *equality* decision, whose pin contributes two
+        // same-level bound atoms (`v ≥ k` and `v ≤ k`) that have no antecedents to resolve
+        // against — leave more than one literal at the conflict level. Such a clause is not
+        // unit after any backjump, so the engine must not try to assert it.
+        var atConflictLevel = 0
+        for (i in 0 until minimized.size) {
+            if (levelOf(Lit.variable(minimized[i])) == currentLevel) atConflictLevel++
+        }
         return AnalysisResult.Learned(
             minimized.toIntArray(),
             backjumpLevelOf(minimized, currentLevel),
             levels.size,
             levels,
+            asserting = atConflictLevel == 1,
         )
     }
 
