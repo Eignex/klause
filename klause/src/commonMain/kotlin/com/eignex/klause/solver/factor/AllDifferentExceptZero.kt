@@ -101,27 +101,45 @@ class AllDifferentExceptZero(
     /** Count of unordered pairs from [k] indistinguishable elements: k * (k-1) / 2. */
     private fun pairsAt(k: Int): Int = if (k <= 1) 0 else k * (k - 1) / 2
 
-    /** Hole-aware conflict reason. */
+    /** The variable subset responsible for the most recent [propagate] failure. A singleton
+     *  clash is exactly two vars pinned to the same non-zero value; only that pair's pins
+     *  prove the contradiction, so [conflictReason] cites just those two rather than every
+     *  var. Reset at the start of each [propagate]; read immediately afterwards on failure
+     *  (`null` ⇒ a failure path that didn't capture a pair, so fall back to all vars). */
+    private var conflictVars: IntArray? = null
+
+    /** Hole-aware conflict reason, sharpened to the responsible pair when [propagate]
+     *  captured a singleton clash; falls back to all vars otherwise. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, xs)
+        collectHoleAndBoundAntecedents(state, conflictVars ?: xs)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Singleton conflicts on non-zero values.
-        val taken = HashSet<Int>()
+        conflictVars = null // stale-guard; set at the singleton-clash failure point below.
+        // Singleton conflicts on non-zero values. Track each taken value's owner so a clash
+        // cites exactly the two colliding vars, and each punch-out cites just the single
+        // owner forcing it — both are strictly sharper than the whole-constraint reason.
+        val owner = HashMap<Int, Int>()
         for (v in xs) {
             val d = state.intDomains[v]
             if (d.min != d.max) continue
             if (d.min == 0) continue
-            if (!taken.add(d.min)) return false
+            val prev = owner.put(d.min, v)
+            if (prev != null) {
+                // Two vars pinned to the same non-zero value: that pair alone is the reason.
+                conflictVars = intArrayOf(prev, v)
+                return false
+            }
         }
-        // Punch every singleton-taken value out of every other var's domain.
-        if (taken.isNotEmpty()) {
-            val ant = state.composeIntVarAtomAntecedents(xs)
+        // Punch every singleton-taken value out of every other var's domain. The sole reason
+        // value `t` leaves dom(v) is its owner's pin, so cite only that owner (a singleton, so
+        // never v itself).
+        if (owner.isNotEmpty()) {
             for (v in xs) {
                 val d = state.intDomains[v]
                 if (d.min == d.max) continue
-                for (t in taken) {
+                for ((t, w) in owner) {
                     if (t < d.min || t > d.max) continue
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(w))
                     if (!state.excludeIntValue(v, t, ant)) return false
                 }
             }
