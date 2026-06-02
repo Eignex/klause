@@ -6,6 +6,8 @@ import com.eignex.klause.bench.report.markdown
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.Backend
+import com.eignex.klause.portfolio.PortfolioBuilder
+import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
@@ -98,7 +100,16 @@ object AnytimeMetric {
             pairSwapBudget = 1024,
         )
         val klauseObj = entry.lsObjective ?: obj
-        val k = anytime { solver.improvements(klauseObj, lsParams(budget)) }
+        // Optional portfolio mode: -Dklause.anytime.portfolio=<ls>:<bt> runs a multi-core
+        // Portfolio (ls local-search + bt backtrack workers) instead of the single CBLS solver,
+        // streaming its fanned-in incumbents. Mixed pools use the linear objective both engines
+        // share; pure-LS pools keep the functional/gradient objective.
+        val portfolioProp = System.getProperty("klause.anytime.portfolio")
+        val k = if (portfolioProp != null) {
+            anytime { portfolioImprovements(entry, portfolioProp, klauseObj, obj, budget) }
+        } else {
+            anytime { solver.improvements(klauseObj, lsParams(budget)) }
+        }
         val r = anytime { ref.improvements(entry.problem, obj, budget) }
         val gap = if (k.best != null && r.best != null) k.best - r.best else null
         return AnytimeRow(entry.name, k.firstMs, k.bestMs, k.best, k.solutions,
@@ -134,16 +145,64 @@ object AnytimeMetric {
         return Anytime(if (firstMs < 0) -1L else firstMs, if (bestMs < 0) -1L else bestMs, best, solutions, provedOptimal)
     }
 
+    /** Sentinel marking the end of the bridged portfolio stream. */
+    private val streamDone = Any()
+
+    /** Build a [com.eignex.klause.portfolio.Portfolio] from the `<ls>:<bt>` spec and bridge its
+     *  fanned-in incumbents (a coroutine [kotlinx.coroutines.flow.Flow]) into the synchronous
+     *  [Sequence] the anytime harness consumes, via a daemon collector thread + blocking queue. */
+    private fun portfolioImprovements(
+        entry: ResolvedProblem,
+        prop: String,
+        klauseObj: Objective,
+        linearObj: Objective,
+        budget: Budget,
+    ): Sequence<MinimizeResult> {
+        val parts = prop.split(":", ",")
+        val ls = parts.getOrNull(0)?.toIntOrNull() ?: 4
+        val bt = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        val portfolio = PortfolioBuilder.build(
+            entry.problem, PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L),
+        )
+        // Pure-LS pool can use the gradient-bearing functional objective; a mixed pool must use
+        // the linear objective both engines share (backtrack bounds on it).
+        val objective = if (bt == 0) klauseObj else linearObj
+        val deadline = System.currentTimeMillis() + budget.timeoutMillis
+        val cancel = Cancellation { System.currentTimeMillis() > deadline }
+        val queue = java.util.concurrent.LinkedBlockingQueue<Any>()
+        kotlin.concurrent.thread(isDaemon = true, name = "portfolio-anytime") {
+            try {
+                // Dispatchers.Default → the channelFlow's per-worker launches get real OS threads
+                // and run in parallel; plain runBlocking is single-threaded and CPU-bound workers
+                // (which never suspend) would starve each other.
+                kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.Default) {
+                    portfolio.improvements(objective, cancel).collect { queue.put(it) }
+                }
+            } finally {
+                portfolio.close()
+                queue.put(streamDone)
+            }
+        }
+        return generateSequence { queue.take().takeIf { it !== streamDone } as MinimizeResult? }
+    }
+
     private fun lsParams(budget: Budget): LocalSearchParams {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         // λ=1.0 cost shaping folds the objective delta into move scoring — without it CBLS is
         // objective-blind and only descends opportunistically via constraint repair (mirrors
-        // the CLI's runWithLocalSearch).
+        // the CLI's runWithLocalSearch). Override via -Dklause.anytime.shaping=feasibilityFirst
+        // or -Dklause.anytime.lambda=<x> for A/B experiments on the feasibility/descent split.
         return LocalSearchParams(
             maxFlips = Long.MAX_VALUE, randomSeed = 1L,
-            costShaping = CostShaping.Linear(lambda = 1.0),
+            costShaping = shapingFromProps(),
         ).withCancellation(Cancellation { System.currentTimeMillis() > deadline }) as LocalSearchParams
     }
+
+    private fun shapingFromProps(): CostShaping =
+        when (System.getProperty("klause.anytime.shaping")?.lowercase()) {
+            "feasibilityfirst", "feasibility-first", "ff" -> CostShaping.FeasibilityFirst
+            else -> CostShaping.Linear(lambda = System.getProperty("klause.anytime.lambda")?.toDouble() ?: 1.0)
+        }
 
     private fun fmt(v: Double?): String = v?.let { "%.1f".format(it) } ?: "—"
 }

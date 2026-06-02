@@ -14,7 +14,6 @@ import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import com.eignex.klause.solver.localsearch.strategy.Vnd
 import java.io.File
 
 /**
@@ -45,7 +44,7 @@ object LsConfigProbe {
                     perturbationKind = PerturbationKind.BasinHopping, acceptance = com.eignex.klause.solver.localsearch.AcceptanceCriterion.Improving)),
             Triple("cbls/adaptive-perturb", Cbls(tabu = tabu), AdaptivePerturbationRestart()),
             Triple("vnd/ils-linkage",
-                Vnd(maxNeighborhood = 3, skewAlpha = 0.2),
+                Cbls.vnd(maxNeighborhood = 3, skewAlpha = 0.2),
                 IteratedLocalSearchRestart(populationSize = 5, crossoverRate = 0.4, linkageAware = true)),
         )
 

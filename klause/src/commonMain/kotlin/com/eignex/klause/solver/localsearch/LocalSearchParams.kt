@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 
 /**
@@ -39,6 +40,19 @@ data class LocalSearchParams(
      *  [CostShaping.linear] or [CostShaping.saturating] on tight problems where the
      *  feasible region is narrow. Ignored by `solve` / `samples` / `enumerate`. */
     val costShaping: CostShaping = CostShaping.FeasibilityFirst,
+    /**
+     * Optional warm-start *assignment* for [LocalSearchSolver.minimize] / `improvements`: when
+     * non-null, the descent begins from this assignment instead of a random restart, then
+     * optimises the objective from there. Intended for a hybrid pipeline that hands a feasible
+     * point found by the CP/backtrack solver to LS (the #54 misses reach feasibility trivially
+     * under CP but never under LS). Size-mismatched samples are ignored.
+     *
+     * **Competition note:** this MUST stay `null` for the MiniZinc *local-search* competition,
+     * which forbids CP seeding — the pure-LS entry point ([com.eignex.klause] FZN CLI
+     * `runWithLocalSearch`) never sets it, so the default is competition-safe. Only the bench /
+     * hybrid driver populates it. Ignored by `solve` / `samples` / `enumerate`.
+     */
+    val initialAssignment: Sample? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

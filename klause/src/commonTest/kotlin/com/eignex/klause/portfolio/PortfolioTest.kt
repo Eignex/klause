@@ -29,9 +29,11 @@ class PortfolioTest {
     @Test
     fun `portfolio solve on satisfiable problem returns sat`() = runTest {
         val problem = exactlyOneOver(4)
-        val workers = List(4) { i -> BacktrackSolver(problem).session() }
+        val workers = List(4) { i ->
+            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = i.toLong()))
+        }
         Portfolio(workers).use { p ->
-            val r = p.solve(BacktrackParams(randomSeed = 1L))
+            val r = p.solve()
             assertTrue(r is SolveResult.Sat, "expected Sat, got $r")
         }
     }
@@ -48,9 +50,11 @@ class PortfolioTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val workers = List(2) { BacktrackSolver(problem).session() }
+        val workers = List(2) { i ->
+            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
+        }
         Portfolio(workers).use { p ->
-            val r = p.solve(BacktrackParams(randomSeed = 0L))
+            val r = p.solve()
             assertIs<SolveResult.Unsat>(r)
             Unit
         }
@@ -59,12 +63,17 @@ class PortfolioTest {
     @Test
     fun `portfolio samples fans in from all workers and respects collector cancellation`() = runTest {
         val problem = exactlyOneOver(5)
-        val workers = List(4) { LocalSearchSolver(problem).session() }
+        val workers = List(4) { i ->
+            PortfolioWorker.of(
+                "ls#$i", LocalSearchSolver(problem).session(),
+                LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = i.toLong()),
+            )
+        }
         Portfolio(workers).use { p ->
             // take(20) cancels the upstream flow after 20 samples — every worker's
             // sequence must terminate promptly when the collector stops.
             val started = TimeSource.Monotonic.markNow()
-            val samples = p.samples(LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 1L))
+            val samples = p.samples()
                 .take(20)
                 .toList()
             val elapsed = started.elapsedNow().inWholeMilliseconds
@@ -80,9 +89,11 @@ class PortfolioTest {
     @Test
     fun `portfolio with one worker behaves like the underlying session`() = runTest {
         val problem = exactlyOneOver(3)
-        val solo = LocalSearchSolver(problem).session()
+        val solo = PortfolioWorker.of(
+            "ls", LocalSearchSolver(problem).session(), LocalSearchParams(maxFlips = 5_000, randomSeed = 0L),
+        )
         Portfolio(listOf(solo)).use { p ->
-            val samples = p.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 0L))
+            val samples = p.samples()
                 .take(5).toList()
             assertEquals(5, samples.size)
             for (s in samples) assertEquals(1, s.bools.count { it })
@@ -111,11 +122,13 @@ class PortfolioTest {
         val obj = LinearObjective(
             intCoefficients = doubleArrayOf(1.0, 2.0),
         )
-        val workers = List(3) { i -> BacktrackSolver(problem).session() }
-        Portfolio(workers).use { p ->
-            val r = p.minimize(obj, BacktrackParams(randomSeed = 0L)) { params, supplier ->
+        val workers = List(3) { i ->
+            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L)) { params, supplier ->
                 params.copy(objectiveBoundSupplier = supplier)
             }
+        }
+        Portfolio(workers).use { p ->
+            val r = p.minimize(obj)
             val optimal = assertIs<Optimal>(r)
             assertEquals(3.0, optimal.objectiveValue)
         }
@@ -124,10 +137,23 @@ class PortfolioTest {
     @Test
     fun `exhaustive strategy runs every worker to budget`() = runTest {
         val problem = exactlyOneOver(3)
-        val workers = List(2) { BacktrackSolver(problem).session() }
+        val workers = List(2) { i ->
+            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
+        }
         Portfolio(workers, strategy = PortfolioStrategy.Exhaustive).use { p ->
-            val r = p.solve(BacktrackParams(randomSeed = 0L))
+            val r = p.solve()
             assertTrue(r is SolveResult.Sat, "expected Sat from exhaustive run; got $r")
+        }
+    }
+
+    @Test
+    fun `builder makes a mixed LS plus backtrack portfolio that solves`() = runTest {
+        val problem = exactlyOneOver(4)
+        PortfolioBuilder.build(
+            problem, PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
+        ).use { p ->
+            val r = p.solve()
+            assertTrue(r is SolveResult.Sat, "mixed LS+backtrack portfolio should solve exactly-one; got $r")
         }
     }
 

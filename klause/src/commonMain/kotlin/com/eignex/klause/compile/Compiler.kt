@@ -72,6 +72,7 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.skema.SchemaDef
+import kotlin.math.roundToInt
 
 internal class Compiler(private val config: KlauseConfig = KlauseConfig.current) {
 
@@ -223,6 +224,8 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
          * unrelated bool can never be misread as a presence flag. Default per kind:
          *  - int     → `0` coerced into `[min, max]` (always representable, so the pin can never
          *              accidentally force `present` true by being unsatisfiable),
+         *  - float   → the bucket index nearest the canonical real default `0.0` coerced into
+         *              `[min, max]` (the pin lands on the backing `[0, buckets-1]` int var),
          *  - bool    → `false`,
          *  - nominal → the first declared label.
          */
@@ -232,6 +235,16 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
                 val base = entry.valueName
                 val absent = Not(BoolRef(name))
                 when {
+                    // Float branch must precede the int branch: float base vars also live in
+                    // intVarIdByName (backed by a [0, buckets-1] int var), but their canonical
+                    // default is a *bucket index*, not `0.coerceIn(min, max)` in bucket space.
+                    floatDecoders.containsKey(base) -> {
+                        val spec = floatDecoders.getValue(base)
+                        val default = 0.0.coerceIn(spec.min, spec.max)
+                        val bucket = ((default - spec.min) / spec.scale).roundToInt().coerceIn(0, spec.buckets - 1)
+                        assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(bucket))))
+                    }
+
                     intVarIdByName.containsKey(base) -> {
                         val d = intDomains[intVarIdByName.getValue(base)]
                         val default = 0.coerceIn(d.min, d.max)
