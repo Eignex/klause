@@ -434,7 +434,18 @@ class GlobalCardinality(
         // Edmonds-Karp max-flow from superSource to superSink. If the saturation of all ss-out edges
         // is less than requiredSSFlow → infeasible.
         val obtained = flow.maxFlow(superSource, superSink)
-        if (obtained < requiredSSFlow) return false
+        if (obtained < requiredSSFlow) {
+            // Flow-deficiency conflict: the min cut's source side (nodes still reachable from
+            // superSource in the residual) carries the unroutable demand. Cite only the vars
+            // (and any count vars) on that side — a generalized-Hall subset — rather than all.
+            // Vars off the source side route fine; their domains play no part in the deficit.
+            val reach = flow.residualReachable(superSource)
+            val resp = IntArrayList()
+            for (i in 0 until n) if (reach[varNode[i]]) resp.add(effectiveXs[i])
+            if (countVars != null) for (k in 0 until m) if (reach[covNode[k]]) resp.add(countVars[k])
+            if (resp.size > 0) conflictVars = resp.toIntArray()
+            return false
+        }
 
         // ---- 3. SCC on residual graph (excluding superSource, superSink) -----------------------------
         val sccId = IntArray(baseNodes) { -1 }
@@ -497,6 +508,31 @@ class GlobalCardinality(
         }
 
         fun flowOf(eIdx: Int): Int = originalCap[eIdx] - cap[eIdx]
+
+        /** Nodes reachable from [source] over residual arcs (positive remaining capacity) —
+         *  the source side of the min cut after a (failed) max-flow. */
+        fun residualReachable(source: Int): BooleanArray {
+            val seen = BooleanArray(numNodes)
+            val queue = IntArray(numNodes)
+            var qHead = 0
+            var qTail = 0
+            seen[source] = true
+            queue[qTail++] = source
+            while (qHead < qTail) {
+                val u = queue[qHead++]
+                val neigh = adj[u]
+                for (i in 0 until neigh.size) {
+                    val eIdx = neigh[i]
+                    if (cap[eIdx] <= 0) continue
+                    val v = edgeTo[eIdx]
+                    if (!seen[v]) {
+                        seen[v] = true
+                        queue[qTail++] = v
+                    }
+                }
+            }
+            return seen
+        }
 
         fun maxFlow(source: Int, sink: Int): Int {
             var total = 0
