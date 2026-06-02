@@ -43,10 +43,20 @@ object CblsDiag {
             state.recompute()
             val noTabu = System.getProperty("klause.cblsdiag.notabu") == "true"
             val noise = System.getProperty("klause.cblsdiag.noise")?.toDouble() ?: 0.05
+            val maxNbhd = System.getProperty("klause.cblsdiag.maxnbhd")?.toInt() ?: 1
+            val skew = System.getProperty("klause.cblsdiag.skew")?.toDouble() ?: 0.0
+            val scoring = if (System.getProperty("klause.cblsdiag.scoring")?.lowercase() == "raw") {
+                com.eignex.klause.solver.localsearch.strategy.MoveScoring.Raw
+            } else {
+                com.eignex.klause.solver.localsearch.strategy.MoveScoring.Weighted
+            }
             val strat = Cbls(
                 noiseProbability = noise,
                 tabu = if (noTabu) TabuFilter.Disabled
                 else TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
+                maxNeighborhood = maxNbhd,
+                skewAlpha = skew,
+                scoring = scoring,
             )
             var minCost = state.cost
             var flipsToMin = 0L
