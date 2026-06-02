@@ -154,46 +154,59 @@ class Inverse(
      * based (Hall sets), which inverse's bijection structure rarely needs in practice.
      */
 
-    /** Hole-aware conflict reason. */
+    /** The variable subset responsible for the most recent [propagate] failure. Inverse
+     *  conflicts are pair-local: a structural range failure implicates one channel var, and
+     *  every singleton-forcing / value-removal failure implicates exactly the source var and
+     *  its target across the channel. Citing only that var (or pair) is strictly sharper than
+     *  the whole-constraint reason. Reset at the start of each [propagate]; read on failure
+     *  (`null` ⇒ fall back to all vars). */
+    private var conflictVars: IntArray? = null
+
+    /** Hole-aware conflict reason, sharpened to the responsible channel var / pair captured
+     *  by [propagate]; falls back to all vars when no pair was recorded. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, intVars)
+        collectHoleAndBoundAntecedents(state, conflictVars ?: intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // Range tightens are structural (no input antecedents).
+        conflictVars = null // stale-guard; set at each failure point below.
+        // Range tightens are structural (no input antecedents). A failure means that one var
+        // alone cannot reach the legal index span, so it is the sole reason.
         val gLo = gOffset
         val gHi = gOffset + g.size - 1
         for (i in f.indices) {
-            if (!state.tightenIntMin(f[i], gLo)) return false
-            if (!state.tightenIntMax(f[i], gHi)) return false
+            if (!state.tightenIntMin(f[i], gLo)) { conflictVars = intArrayOf(f[i]); return false }
+            if (!state.tightenIntMax(f[i], gHi)) { conflictVars = intArrayOf(f[i]); return false }
         }
         val fLo = fOffset
         val fHi = fOffset + f.size - 1
         for (i in g.indices) {
-            if (!state.tightenIntMin(g[i], fLo)) return false
-            if (!state.tightenIntMax(g[i], fHi)) return false
+            if (!state.tightenIntMin(g[i], fLo)) { conflictVars = intArrayOf(g[i]); return false }
+            if (!state.tightenIntMax(g[i], fHi)) { conflictVars = intArrayOf(g[i]); return false }
         }
-        // Singleton-forcing: the source var's int trail antecedents drive the pin.
+        // Singleton-forcing: the source var's int trail antecedents drive the pin. A failure
+        // implicates the pinned source and the target it forces across the channel.
         for (i in f.indices) {
             val d = state.intDomains[f[i]]
             if (d.min != d.max) continue
             val gIdx = d.min - gOffset
-            if (gIdx !in g.indices) return false
+            if (gIdx !in g.indices) { conflictVars = intArrayOf(f[i]); return false }
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
-            if (!state.tightenIntMin(g[gIdx], i + fOffset, ant)) return false
-            if (!state.tightenIntMax(g[gIdx], i + fOffset, ant)) return false
+            if (!state.tightenIntMin(g[gIdx], i + fOffset, ant)) { conflictVars = intArrayOf(f[i], g[gIdx]); return false }
+            if (!state.tightenIntMax(g[gIdx], i + fOffset, ant)) { conflictVars = intArrayOf(f[i], g[gIdx]); return false }
         }
         for (i in g.indices) {
             val d = state.intDomains[g[i]]
             if (d.min != d.max) continue
             val fIdx = d.min - fOffset
-            if (fIdx !in f.indices) return false
+            if (fIdx !in f.indices) { conflictVars = intArrayOf(g[i]); return false }
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[i]))
-            if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) return false
-            if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) return false
+            if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) { conflictVars = intArrayOf(g[i], f[fIdx]); return false }
+            if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) { conflictVars = intArrayOf(g[i], f[fIdx]); return false }
         }
         // Bidirectional value removal: for each (i, gIdx) where gIdx is in range, the
         // channel forces "j+gOffset in dom(f[i])  iff  i+fOffset in dom(g[gIdx])".
-        // Whichever side has the value missing, remove from the other.
+        // Whichever side has the value missing, remove from the other. A wipe-out failure
+        // implicates exactly the channel pair (f[i], g[gIdx]).
         for (i in f.indices) {
             val df = state.intDomains[f[i]]
             for (gIdx in g.indices) {
@@ -204,10 +217,10 @@ class Inverse(
                 val gHas = iVal in dg
                 if (fHas && !gHas) {
                     val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
-                    if (!state.excludeIntValue(f[i], jVal, ant)) return false
+                    if (!state.excludeIntValue(f[i], jVal, ant)) { conflictVars = intArrayOf(f[i], g[gIdx]); return false }
                 } else if (!fHas && gHas) {
                     val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
-                    if (!state.excludeIntValue(g[gIdx], iVal, ant)) return false
+                    if (!state.excludeIntValue(g[gIdx], iVal, ant)) { conflictVars = intArrayOf(f[i], g[gIdx]); return false }
                 }
             }
         }

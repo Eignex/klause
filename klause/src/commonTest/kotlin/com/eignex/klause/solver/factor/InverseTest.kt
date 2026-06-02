@@ -6,11 +6,66 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.Vsids
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class InverseTest {
+
+    /**
+     * Soundness gate for the pair-local conflict explanations. Under the full CDCL
+     * backtracker (VSIDS + clause forgetting, so the sharpened pair antecedents are exercised
+     * by learning) enumeration must equal the brute-force mutual-inverse solution set. An
+     * unsound reason — citing too small a pair — would drop a feasible assignment.
+     */
+    @Test
+    fun `backtrack learning enumerates exactly the brute-force solution set`() {
+        // var ids: f = 0..n-1, g = n..2n-1; per-var [min,max] over 0..n-1 (0-based offsets).
+        val instances = listOf(
+            Triple(3, listOf(0 to 2, 0 to 2, 0 to 2), listOf(0 to 2, 0 to 2, 0 to 2)),
+            Triple(3, listOf(1 to 1, 0 to 2, 0 to 2), listOf(0 to 2, 0 to 2, 0 to 2)), // f0 pinned
+            Triple(3, listOf(0 to 1, 0 to 1, 0 to 2), listOf(0 to 2, 0 to 2, 0 to 2)), // tight f
+            Triple(4, listOf(0 to 3, 0 to 3, 0 to 3, 0 to 3), listOf(0 to 3, 0 to 3, 0 to 3, 0 to 3)),
+        )
+        for ((idx, inst) in instances.withIndex()) {
+            val (n, fr, gr) = inst
+            val k = 2 * n
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(k)
+            fun ok(): Boolean {
+                for (i in 0 until n) { // f[i]=j ⇒ valid index and g[j]=i
+                    val j = acc[i]
+                    if (j !in 0 until n || acc[n + j] != i) return false
+                }
+                for (i in 0 until n) { // g[i]=j ⇒ valid index and f[j]=i
+                    val j = acc[n + i]
+                    if (j !in 0 until n || acc[j] != i) return false
+                }
+                return true
+            }
+            fun rec(p: Int) {
+                if (p == k) { if (ok()) brute.add(acc.toList()); return }
+                val range = if (p < n) fr[p] else gr[p - n]
+                for (v in range.first..range.second) { acc[p] = v; rec(p + 1) }
+            }
+            rec(0)
+
+            val doms = Array(k) {
+                if (it < n) IntDomain(fr[it].first, fr[it].second) else IntDomain(gr[it - n].first, gr[it - n].second)
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = k,
+                intDomains = doms,
+                factors = arrayOf<Factor>(Inverse(f = IntArray(n) { it }, g = IntArray(n) { n + it })),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableHeuristic = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
+        }
+    }
 
     @Test
     fun `0-based inverse pair`() {
