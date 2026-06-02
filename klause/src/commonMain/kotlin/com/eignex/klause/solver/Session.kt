@@ -1,5 +1,9 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.count.ApproxCount
+import com.eignex.klause.solver.count.ApproxCountConfig
+import com.eignex.klause.solver.count.SamplingConfig
+
 /**
  * Stateful per-instance handle for a [Solver]. A Session holds the per-instance state
  * that would otherwise have to be threaded through every call:
@@ -59,6 +63,12 @@ interface Session<P : SolverParams> : AutoCloseable {
 
     /** Lazily enumerate distinct models under the current assumptions. */
     fun enumerate(params: P): Sequence<Sample>
+
+    /** Approximate model count. See [Solver.approximateCount]. */
+    fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): ApproxCount = solver.approximateCount(config)
+
+    /** Quality-tiered sampling under the current assumptions. See [Solver.samples]. */
+    fun samples(config: SamplingConfig, params: P): Sequence<Sample> = solver.samples(config, params)
 
     /**
      * Optional optimisation entrypoint. Default delegates to the underlying solver via
@@ -131,6 +141,11 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun solve(params: P): SolveResult = solver.solve(applyStack(params))
     override fun samples(params: P): Sequence<Sample> = solver.samples(applyStack(params))
     override fun enumerate(params: P): Sequence<Sample> = solver.enumerate(applyStack(params))
+
+    override fun approximateCount(config: ApproxCountConfig): ApproxCount = solver.approximateCount(config)
+
+    override fun samples(config: SamplingConfig, params: P): Sequence<Sample> =
+        solver.samples(config, applyStack(params))
 
     override fun minimize(objective: Objective, params: P): MinimizeResult {
         val opt = solver as? Optimizer<P>
