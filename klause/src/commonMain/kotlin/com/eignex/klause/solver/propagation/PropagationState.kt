@@ -454,6 +454,15 @@ class PropagationState(
             }
             list.truncateTo(wi)
         }
+
+        // The compaction renumbered learned fids and shifted every list position, so the
+        // back-pointer index is stale — rebuild it wholesale from the final lists. Cheap
+        // relative to the rest of forget, which is itself infrequent (≈ once per restart).
+        boolWatchPos.clear()
+        for (lit in boolWatchersByLit.indices) {
+            val list = boolWatchersByLit[lit]
+            for (i in 0 until list.size) boolWatchPos[packWatch(list[i], lit)] = i
+        }
     }
 
     /**
@@ -471,6 +480,25 @@ class PropagationState(
      */
     internal val boolWatchersByLit: Array<IntArrayList> =
         Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
+
+    /**
+     * Back-pointer index for O(1) [moveBoolWatcher] removal (#42): maps `pack(fid, lit)` to
+     * `fid`'s position inside `boolWatchersByLit[lit]`, so removing a moved watch is a swap-pop
+     * at a known index instead of a linear scan of a possibly-long popular-literal list.
+     *
+     * Kept in sync at every list mutation: [installLitWatch] records the appended position,
+     * [moveBoolWatcher] swap-pops and fixes the swapped element's recorded position, and
+     * [forgetLearnedClauses] rebuilds it wholesale after compacting/remapping the lists. Like
+     * the watcher lists themselves it drifts across snapshot/restore (pop never edits the
+     * lists, so both stay mutually consistent at the deepest level reached).
+     *
+     * Correctness guard: [moveBoolWatcher] verifies `list[pos] == fid` before swap-popping and
+     * falls back to the linear scan on any mismatch — a desynced index can never silently
+     * remove the wrong watcher (the soundness hazard called out in #42).
+     */
+    private val boolWatchPos: HashMap<Long, Int> = HashMap()
+
+    private fun packWatch(fid: Int, lit: Int): Long = (fid.toLong() shl 32) or (lit.toLong() and 0xFFFFFFFFL)
 
     /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
@@ -789,7 +817,9 @@ class PropagationState(
     internal fun installLitWatch(lit: Int, fid: Int) {
         val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
-            boolWatchersByLit[lit].add(fid)
+            val list = boolWatchersByLit[lit]
+            boolWatchPos[packWatch(fid, lit)] = list.size // position of the about-to-append entry
+            list.add(fid)
         } else {
             val list = atomWatchersByLit.getOrPut(lit) { IntArrayList(initialCapacity = 2) }
             list.add(fid)
@@ -920,15 +950,47 @@ class PropagationState(
      */
     fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
         if (oldLit == newLit) return
-        // Remove from old (swap-remove via a tight hoisted-local scan inside IntArrayList).
         val oldV = Lit.variable(oldLit)
         if (oldV < problem.numBoolVars) {
-            boolWatchersByLit[oldLit].removeValue(factorId)
+            removeBoolWatch(factorId, oldLit)
         } else {
             atomWatchersByLit[oldLit]?.removeValue(factorId)
         }
         // Install on new.
         installLitWatch(newLit, factorId)
+    }
+
+    /** O(1) removal of [factorId] from `boolWatchersByLit[lit]` via the [boolWatchPos]
+     *  back-pointer: swap the tail entry into the freed slot and fix its recorded position.
+     *  Verifies the recorded position actually holds [factorId]; on any miss/mismatch falls
+     *  back to the linear swap-remove and self-heals the index, so a stale back-pointer can
+     *  never remove the wrong watcher. */
+    private fun removeBoolWatch(factorId: Int, lit: Int) {
+        val list = boolWatchersByLit[lit]
+        val key = packWatch(factorId, lit)
+        val pos = boolWatchPos[key]
+        if (pos == null || pos >= list.size || list[pos] != factorId) {
+            // Index miss/desync — fall back to the linear scan and resync this lit's positions.
+            list.removeValue(factorId)
+            boolWatchPos.remove(key)
+            resyncBoolWatchPos(lit)
+            return
+        }
+        val last = list.size - 1
+        if (pos != last) {
+            val movedFid = list[last]
+            list[pos] = movedFid
+            boolWatchPos[packWatch(movedFid, lit)] = pos
+        }
+        list.truncateTo(last)
+        boolWatchPos.remove(key)
+    }
+
+    /** Recompute every recorded position for [lit]'s watcher list (used by the self-heal
+     *  fallback in [removeBoolWatch]). */
+    private fun resyncBoolWatchPos(lit: Int) {
+        val list = boolWatchersByLit[lit]
+        for (i in 0 until list.size) boolWatchPos[packWatch(list[i], lit)] = i
     }
 
     init {
