@@ -101,7 +101,9 @@ class Linear(
             LinearOp.GE -> false
             else -> range[0] > bound.toLong() // EQ: lo side (mins too big) vs hi side
         }
-        return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
+        return collectLinearRelaxedConflictAntecedents(
+            state, coeffs, vars, bound.toLong(), sumLo = range[0], sumHi = range[1], useLo = useLo,
+        )
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -425,6 +427,91 @@ internal fun collectLinearDirAntecedents(
         } else {
             if (d.max < orig.max) {
                 val lit = Lit.make(state.atomVarLe(v, d.max), false)
+                if (seen.add(lit)) out.add(lit)
+            }
+        }
+    }
+    if (out.size == 0) return null
+    return out.toIntArray()
+}
+
+/**
+ * Weakest-bound relaxation of a [Linear] **conflict** reason. Same direction-aware seed as
+ * [collectLinearDirAntecedents] (only the driving sum-side's bounds), but each cited bound is
+ * relaxed to the loosest value that still proves infeasibility, distributing the slack across
+ * vars. A relaxed bound `[v ≥ k']` (k' below the current min) is cited as a **leaf** at the
+ * level its min *first* reached k' (`minLevelForGe`) — strictly below the conflict level, so
+ * the analyzer never resolves through it and the historical antecedent is irrelevant. The
+ * looser cited bounds make the learned clause strictly more general / reusable.
+ *
+ * Soundness: the driving sum after relaxation = original driving extreme − (slack consumed),
+ * and slack is capped at `breach − 1`, so the relaxed bounds still force the sum past [bound].
+ * Each relaxed atom sits at a level < the conflict level (a sound leaf); vars at their root
+ * bound are global facts and cited nothing; vars whose full relaxation can't fit the remaining
+ * slack keep their current tight bound (the existing behaviour, with its real antecedent).
+ *
+ * Falls back to [collectLinearDirAntecedents] when `vars` repeats a variable (the per-entry
+ * slack accounting assumes distinct vars).
+ */
+internal fun collectLinearRelaxedConflictAntecedents(
+    state: PropagationState,
+    coeffs: IntArray,
+    vars: IntArray,
+    bound: Long,
+    sumLo: Long,
+    sumHi: Long,
+    useLo: Boolean,
+): IntArray? {
+    // The per-var relaxation treats each entry independently; duplicate vars would double-spend
+    // slack or under-cite, so defer to the unrelaxed direction-aware reason in that case.
+    run {
+        val seenVar = HashSet<Int>(vars.size)
+        for (v in vars) if (!seenVar.add(v)) {
+            return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
+        }
+    }
+    val currentLevel = state.currentLevel
+    // Slack we may give back while keeping the driving sum strictly past `bound`.
+    var slack = if (useLo) sumLo - bound - 1 else bound - sumHi - 1
+    if (slack < 0) slack = 0
+    val seen = HashSet<Int>()
+    val out = IntArrayList()
+    for (j in vars.indices) {
+        val c = coeffs[j]
+        if (c == 0) continue
+        val v = vars[j]
+        val absC = if (c < 0) -c.toLong() else c.toLong()
+        val citeMin = if (useLo) c > 0 else c < 0
+        if (citeMin) {
+            val rootMin = state.problem.intDomains[v].min
+            val curMin = state.intDomains[v].min
+            if (curMin <= rootMin) continue // at root → global fact, cite nothing
+            val kBelow = state.minBelowLevel(v, currentLevel) // loosest min at a level < current
+            val cost = absC * (curMin - kBelow)
+            if (cost <= slack) {
+                slack -= cost
+                if (kBelow > rootMin) {
+                    val lit = Lit.make(state.atomBoundLeafIfNew(v, 0, kBelow, state.minLevelForGe(v, kBelow)), false)
+                    if (seen.add(lit)) out.add(lit)
+                } // else relaxed all the way to root → global fact, cite nothing
+            } else {
+                val lit = Lit.make(state.atomVarGe(v, curMin), false) // can't afford; keep tight bound
+                if (seen.add(lit)) out.add(lit)
+            }
+        } else {
+            val rootMax = state.problem.intDomains[v].max
+            val curMax = state.intDomains[v].max
+            if (curMax >= rootMax) continue
+            val kAbove = state.maxAboveLevel(v, currentLevel)
+            val cost = absC * (kAbove - curMax)
+            if (cost <= slack) {
+                slack -= cost
+                if (kAbove < rootMax) {
+                    val lit = Lit.make(state.atomBoundLeafIfNew(v, 1, kAbove, state.maxLevelForLe(v, kAbove)), false)
+                    if (seen.add(lit)) out.add(lit)
+                }
+            } else {
+                val lit = Lit.make(state.atomVarLe(v, curMax), false)
                 if (seen.add(lit)) out.add(lit)
             }
         }

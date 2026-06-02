@@ -123,6 +123,78 @@ class PropagationState(
     /** Deepest decision level contributing to this int var's current domain (-1 = untouched). */
     val intLevel: IntArray = IntArray(problem.numIntVars) { -1 }
 
+    // Per-int-var bound-change history: the sequence of (value, level) at which `min` rose
+    // (resp. `max` fell) past each search-time tighten. `min` is monotone-increasing along a
+    // path, so [minHistVal] is ascending and [minHistLvl] non-decreasing (symmetric for max).
+    // Lets [minLevelForGe] / [maxLevelForLe] answer "the level v's bound *first* reached k" —
+    // the correct (often lower) level to attribute to a *relaxed* bound atom, instead of the
+    // current [intLevel] which is too high. Allocated lazily per var; only maintained while
+    // [undoLogging] (the search phase); truncated on backtrack via the undo log. Powers the
+    // weakest-bound LCG relaxation (see collectLinearRelaxedConflictAntecedents).
+    private val minHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    private val minHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    private val maxHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    private val maxHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+
+    private fun pushMinHist(v: Int, value: Int, level: Int) {
+        val vals = minHistVal[v] ?: IntArrayList(initialCapacity = 4).also { minHistVal[v] = it }
+        val lvls = minHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { minHistLvl[v] = it }
+        vals.add(value)
+        lvls.add(level)
+    }
+
+    private fun pushMaxHist(v: Int, value: Int, level: Int) {
+        val vals = maxHistVal[v] ?: IntArrayList(initialCapacity = 4).also { maxHistVal[v] = it }
+        val lvls = maxHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { maxHistLvl[v] = it }
+        vals.add(value)
+        lvls.add(level)
+    }
+
+    /** Level at which `v`'s min *first* reached ≥ [k]. `0` when [k] is within the root domain
+     *  (a global fact). Conservative fallback to [intLevel] if history is absent. */
+    fun minLevelForGe(v: Int, k: Int): Int {
+        if (k <= problem.intDomains[v].min) return 0
+        val vals = minHistVal[v] ?: return maxOf(intLevel[v], 0)
+        val lvls = minHistLvl[v]!!
+        for (i in 0 until vals.size) if (vals[i] >= k) return lvls[i]
+        return maxOf(intLevel[v], 0)
+    }
+
+    /** Level at which `v`'s max *first* reached ≤ [k]. Symmetric to [minLevelForGe]. */
+    fun maxLevelForLe(v: Int, k: Int): Int {
+        if (k >= problem.intDomains[v].max) return 0
+        val vals = maxHistVal[v] ?: return maxOf(intLevel[v], 0)
+        val lvls = maxHistLvl[v]!!
+        for (i in 0 until vals.size) if (vals[i] <= k) return lvls[i]
+        return maxOf(intLevel[v], 0)
+    }
+
+    /** Loosest (smallest) min-value established at a level strictly below [level]; the root
+     *  min when `v` was never tightened before [level]. */
+    fun minBelowLevel(v: Int, level: Int): Int {
+        val rootMin = problem.intDomains[v].min
+        val vals = minHistVal[v] ?: return rootMin
+        val lvls = minHistLvl[v]!!
+        var best = rootMin
+        for (i in 0 until vals.size) {
+            if (lvls[i] < level) best = vals[i] else break // lvls non-decreasing → prefix
+        }
+        return best
+    }
+
+    /** Loosest (largest) max-value established at a level strictly below [level]; the root
+     *  max when `v` was never tightened before [level]. */
+    fun maxAboveLevel(v: Int, level: Int): Int {
+        val rootMax = problem.intDomains[v].max
+        val vals = maxHistVal[v] ?: return rootMax
+        val lvls = maxHistLvl[v]!!
+        var best = rootMax
+        for (i in 0 until vals.size) {
+            if (lvls[i] < level) best = vals[i] else break
+        }
+        return best
+    }
+
     /**
      * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
      * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed. Primitive
@@ -512,6 +584,29 @@ class PropagationState(
      *  a dedicated `Ne` kind. */
     fun atomVarEq(intVar: Int, value: Int): Int = allocAtom(intVar, kind = 2, threshold = value)
 
+    /**
+     * Allocate a *relaxed* bound atom (`kind` 0 = `[v ≥ threshold]`, 1 = `[v ≤ threshold]`)
+     * for use as a conflict-reason leaf: when the atom is **freshly** allocated and currently
+     * true, pin its level to [level] (the level the bound first reached [threshold], from the
+     * history) and clear its antecedent so the analyzer keeps it as a leaf rather than the
+     * over-attributed current [intLevel]. An already-existing atom is returned untouched (its
+     * level is ≥ the true level — sound, just not improved). Returns the virtual var id.
+     *
+     * Caller guarantees the atom is currently true (the relaxed bound is implied by the
+     * current domain) and [level] is exactly the level it became true — both required for the
+     * learned clause's backjump level to be sound.
+     */
+    fun atomBoundLeafIfNew(intVar: Int, kind: Int, threshold: Int, level: Int): Int {
+        atomByKey[atomKey(intVar, kind, threshold)]?.let { return problem.numBoolVars + it }
+        val vId = allocAtom(intVar, kind = kind, threshold = threshold)
+        val id = vId - problem.numBoolVars
+        if (atomValue[id] == 1) { // freshly allocated and true → make it a correct-level leaf
+            atomLevel[id] = level
+            atomAntecedents[id] = null
+        }
+        return vId
+    }
+
     /** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
     fun atomLitGe(intVar: Int, threshold: Int): Int = Lit.make(atomVarGe(intVar, threshold), true)
 
@@ -738,6 +833,8 @@ class PropagationState(
     private val undoDomain = ArrayList<IntDomain?>() // int: prior intDomains[v]
     private val undoMinAnt = ArrayList<IntArray?>() // int: prior intMinAntecedents
     private val undoMaxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents
+    private val undoMinHistLen = IntArrayList() // int: prior minHist length for the var (history truncation)
+    private val undoMaxHistLen = IntArrayList() // int: prior maxHist length for the var
 
     /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
      *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
@@ -765,6 +862,8 @@ class PropagationState(
         undoDomain.add(null)
         undoMinAnt.add(null)
         undoMaxAnt.add(null)
+        undoMinHistLen.add(0)
+        undoMaxHistLen.add(0)
     }
 
     /** Capture int var [v]'s full prior state. Must be called *before* the mutation. */
@@ -777,6 +876,8 @@ class PropagationState(
         undoDomain.add(intDomains[v])
         undoMinAnt.add(intMinAntecedents[v])
         undoMaxAnt.add(intMaxAntecedents[v])
+        undoMinHistLen.add(minHistVal[v]?.size ?: 0)
+        undoMaxHistLen.add(maxHistVal[v]?.size ?: 0)
     }
 
     private fun truncateUndo(n: Int) {
@@ -788,6 +889,8 @@ class PropagationState(
         while (undoDomain.size > n) undoDomain.removeAt(undoDomain.size - 1)
         while (undoMinAnt.size > n) undoMinAnt.removeAt(undoMinAnt.size - 1)
         while (undoMaxAnt.size > n) undoMaxAnt.removeAt(undoMaxAnt.size - 1)
+        undoMinHistLen.truncateTo(n)
+        undoMaxHistLen.truncateTo(n)
     }
 
     /** Current undo-log size. A [LevelMark] captures this; iterating [undoVarAt] /
@@ -1003,6 +1106,7 @@ class PropagationState(
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMinReason[v] = currentFactor
         intMinAntecedents[v] = antecedents
+        if (undoLogging) pushMinHist(v, lo, currentLevel)
         dirtyInts.addLast(v)
         propagateAtomsForVar(v, antecedents)
         return true
@@ -1023,6 +1127,7 @@ class PropagationState(
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = antecedents
+        if (undoLogging) pushMaxHist(v, hi, currentLevel)
         dirtyInts.addLast(v)
         propagateAtomsForVar(v, antecedents)
         return true
@@ -1311,6 +1416,12 @@ class PropagationState(
                     intMaxReason[v] = undoMaxReason[i]
                     intMinAntecedents[v] = undoMinAnt[i]
                     intMaxAntecedents[v] = undoMaxAnt[i]
+                    // Truncate the bound-change history back to its pre-mutation length so the
+                    // (value, level) record stays exactly aligned with the restored domain.
+                    minHistVal[v]?.truncateTo(undoMinHistLen[i])
+                    minHistLvl[v]?.truncateTo(undoMinHistLen[i])
+                    maxHistVal[v]?.truncateTo(undoMaxHistLen[i])
+                    maxHistLvl[v]?.truncateTo(undoMaxHistLen[i])
                 }
             }
             i--
