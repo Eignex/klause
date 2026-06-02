@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.Vsids
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -42,6 +43,55 @@ class AllDifferentExceptZeroTest {
         val ints = sat.assignment.ints.toList()
         val zeros = ints.count { it == 0 }
         assertTrue(zeros >= 2, "expected ≥ 2 zeros for 5-var/3-value problem; got $ints")
+    }
+
+    /**
+     * Soundness gate for the sharpened (pair / single-owner) conflict and punch-out
+     * explanations. Under the full CDCL backtracker (VSIDS + LBD clause forgetting, so the
+     * sharpened antecedents are exercised by clause learning) enumeration must equal the
+     * brute-force solution set on a battery of singleton-prone instances. An unsound reason —
+     * e.g. citing too few owners — would prune a feasible subtree and drop a solution.
+     */
+    @Test
+    fun `backtrack learning enumerates exactly the brute-force solution set`() {
+        val instances = listOf(
+            listOf(0 to 3, 0 to 3, 0 to 3, 0 to 3), // free 4-var
+            listOf(1 to 1, 1 to 3, 1 to 3, 0 to 3), // singleton v0=1 punches 1 out of others
+            listOf(2 to 2, 2 to 2, 0 to 3), // clashing singletons → no solution
+            listOf(1 to 2, 1 to 2, 1 to 2, 0 to 2), // 3 vars over {1,2} non-zero → forces zeros
+            listOf(0 to 2, 1 to 2, 0 to 1, 0 to 2, 0 to 2), // 5 vars, overlapping tight set
+        )
+        for ((idx, ranges) in instances.withIndex()) {
+            val k = ranges.size
+            val brute = HashSet<List<Int>>()
+            fun rec(i: Int, acc: IntArray) {
+                if (i == k) {
+                    val nz = acc.filter { it != 0 }
+                    if (nz.distinct().size == nz.size) brute.add(acc.toList())
+                    return
+                }
+                for (v in ranges[i].first..ranges[i].second) {
+                    acc[i] = v
+                    rec(i + 1, acc)
+                }
+            }
+            rec(0, IntArray(k))
+
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = k,
+                intDomains = Array(k) { IntDomain(ranges[it].first, ranges[it].second) },
+                factors = arrayOf<Factor>(AllDifferentExceptZero(IntArray(k) { it })),
+            )
+            val params = BacktrackParams(
+                randomSeed = 1L,
+                variableHeuristic = Vsids(),
+                maxLearnedClauses = 1_000,
+            )
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
+        }
     }
 
     @Test
