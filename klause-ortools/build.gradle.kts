@@ -2,10 +2,6 @@ plugins {
     id("com.eignex.kmp") version "1.2.2"
 }
 
-repositories {
-    mavenLocal()
-}
-
 eignexPublish {
     description.set("Google OR-Tools CP-SAT reference / anytime adapter for klause.")
     githubRepo.set("Eignex/klause")
