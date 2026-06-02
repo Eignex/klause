@@ -146,6 +146,17 @@ class PortfolioTest {
         }
     }
 
+    @Test
+    fun `builder makes a mixed LS plus backtrack portfolio that solves`() = runTest {
+        val problem = exactlyOneOver(4)
+        PortfolioBuilder.build(
+            problem, PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
+        ).use { p ->
+            val r = p.solve()
+            assertTrue(r is SolveResult.Sat, "mixed LS+backtrack portfolio should solve exactly-one; got $r")
+        }
+    }
+
     private fun exactlyOneOver(n: Int): Problem {
         val factor = Cardinality.exactlyOne(IntArray(n) { Lit.make(it, true) })
         return Problem(n, 0, emptyArray(), listOf(factor))

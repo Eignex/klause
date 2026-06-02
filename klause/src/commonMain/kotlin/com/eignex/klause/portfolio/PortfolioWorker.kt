@@ -18,7 +18,7 @@ import com.eignex.klause.solver.SolverParams
  * closes over the concrete `Session<P>`/`P` so the only unchecked cast is the
  * already-idiomatic `withCancellation` covariant-return one.
  */
-internal class PortfolioWorker private constructor(
+class PortfolioWorker private constructor(
     /** Human-readable id for progress / telemetry (e.g. "cbls/fixed", "backtrack#2"). */
     val label: String,
     private val solveFn: (Cancellation) -> SolveResult,

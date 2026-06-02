@@ -49,7 +49,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * **Platform note**: JVM / Kotlin/Native give workers real parallelism via the default
  * dispatcher; JS / WASM interleave cooperatively on one thread (correct, no wall-clock speedup).
  */
-internal class Portfolio(
+class Portfolio(
     val workers: List<PortfolioWorker>,
     private val strategy: PortfolioStrategy = PortfolioStrategy.RaceFirstFeasible,
 ) : AutoCloseable {
@@ -199,7 +199,7 @@ internal class Portfolio(
 /** Strategy knobs for [Portfolio]. Affects `solve` only; `samples` always fans in from every
  *  worker and `minimize` always shares the global bound (race honoured via cancellation on
  *  Optimal). */
-internal sealed interface PortfolioStrategy {
+sealed interface PortfolioStrategy {
     /** First worker to produce a definitive answer wins; others are cancelled. Default. */
     data object RaceFirstFeasible : PortfolioStrategy
 
