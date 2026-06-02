@@ -132,18 +132,29 @@ class Regular(
      * Long encoding still avoids per-layer object allocation.
      */
 
-    /** Hole-aware conflict reason. */
+    /** The variable subset responsible for the most recent [propagate] failure. A forward
+     *  layer collapse at layer `i` is caused solely by the prefix `seq[0 until i]` (the
+     *  symbols consumed so far drove every live state dead) — later positions are irrelevant,
+     *  so [conflictReason] cites only that prefix. The backward-empty / q0-not-co-reachable
+     *  failures genuinely depend on the whole sequence, so they leave this `null` and fall
+     *  back to all of `seq`. Reset at the start of each [propagate]. */
+    private var conflictVars: IntArray? = null
+
+    /** Hole-aware conflict reason, sharpened to the responsible prefix when [propagate]
+     *  captured a forward-collapse layer; falls back to the whole sequence otherwise. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, seq)
+        collectHoleAndBoundAntecedents(state, conflictVars ?: seq)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        conflictVars = null // stale-guard; set at the forward-collapse failure point below.
         val n = seq.size
         val w = stateWords
         val forward = LongArray((n + 1) * w)
         // Layer 0: only q0 is reachable.
         setBit(forward, 0, q0 - 1)
         for (i in 0 until n) {
-            if (isLayerEmpty(forward, i)) return false
+            // forward[i] empty ⇒ the prefix seq[0 until i] alone drove every state dead.
+            if (isLayerEmpty(forward, i)) { conflictVars = seq.copyOfRange(0, i); return false }
             val d = state.intDomains[seq[i]]
             d.forEach { s ->
                 forEachStateInLayer(forward, i) { q ->
