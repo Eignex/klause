@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -75,11 +76,50 @@ class Member(
         }
     }
 
-    /** Hole-aware conflict reason. */
+    /** Bound-style sharpened antecedents captured at a singleton-y conflict: `y`'s pin plus,
+     *  per candidate, only the single literal proving `y`'s value is excluded from it —
+     *  strictly sharper than every var's whole domain. `null` ⇒ no such conflict captured
+     *  this run (the `allSingleton` exclusion path genuinely needs all candidates), so fall
+     *  back to the constraint-wide reason. */
+    private var conflictLits: IntArray? = null
+
+    /** Conflict reason, sharpened to the singleton-y witness captured by [propagate]; falls
+     *  back to the hole-aware constraint-wide reason otherwise. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, intVars)
+        conflictLits ?: collectHoleAndBoundAntecedents(state, intVars)
+
+    /** Append the one literal proving value [v] is absent from `dom(x)` — the tightened
+     *  bound that steps past it, or the hole atom when [v] sits inside the bounds. Skips a
+     *  bound still at its original value (a structural/global fact with no trail literal).
+     *  Uses the same atoms as [collectHoleAndBoundAntecedents], so soundness/level handling
+     *  matches. Caller guarantees `v !in dom(x)`. */
+    private fun addExcludeLit(state: PropagationState, x: Int, v: Int, out: IntArrayList, seen: HashSet<Int>) {
+        val d = state.intDomains[x]
+        val orig = state.problem.intDomains[x]
+        val lit = when {
+            d.min > v -> if (d.min > orig.min) Lit.make(state.atomVarGe(x, d.min), false) else return
+            d.max < v -> if (d.max < orig.max) Lit.make(state.atomVarLe(x, d.max), false) else return
+            else -> state.atomLitNe(x, v) // v inside [min,max] but removed → a hole
+        }
+        if (seen.add(lit)) out.add(lit)
+    }
+
+    /** Append `y`'s pin literals (the tightened bounds collapsing it to a singleton). */
+    private fun addPinLits(state: PropagationState, out: IntArrayList, seen: HashSet<Int>) {
+        val d = state.intDomains[y]
+        val orig = state.problem.intDomains[y]
+        if (d.min > orig.min) {
+            val l = Lit.make(state.atomVarGe(y, d.min), false)
+            if (seen.add(l)) out.add(l)
+        }
+        if (d.max < orig.max) {
+            val l = Lit.make(state.atomVarLe(y, d.max), false)
+            if (seen.add(l)) out.add(l)
+        }
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        conflictLits = null // stale-guard; set at the singleton-y failure point below.
         // Singleton-y check: if y is singleton and no xs[i]'s domain contains y's value, fail.
         val dy = state.intDomains[y]
         if (dy.min == dy.max) {
@@ -91,7 +131,17 @@ class Member(
                     break
                 }
             }
-            if (!anyContains) return false
+            if (!anyContains) {
+                // Sharp reason: y is pinned to yv and every candidate excludes yv. Cite y's
+                // pin plus, per candidate, only the literal that excludes yv — not its whole
+                // domain. (Every candidate participates, so the var set itself is minimal.)
+                val out = IntArrayList()
+                val seen = HashSet<Int>()
+                addPinLits(state, out, seen)
+                for (x in xs) addExcludeLit(state, x, yv, out, seen)
+                conflictLits = if (out.size == 0) null else out.toIntArray()
+                return false
+            }
         }
         // Singleton-xs[i]: if every xs[i] is singleton, y must equal one of them.
         var allSingleton = true
