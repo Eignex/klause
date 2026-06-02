@@ -541,5 +541,5 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
     }
 }
 
-internal fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): CompiledProblem =
+fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): CompiledProblem =
     Compiler(config).compile(this.definition())
