@@ -7,6 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -40,6 +41,6 @@ class SymmetricAllDifferentTest {
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        kotlin.test.assertEquals(0, sat.assignment.ints[2])
+        assertEquals(0, sat.assignment.ints[2])
     }
 }

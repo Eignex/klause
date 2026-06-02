@@ -150,8 +150,8 @@ class LocalSearchStateRecomputeTest {
         val factors = arrayOf<Factor>(
             Linear(coeffs = intArrayOf(2, -1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.LE, 4),
             Linear(coeffs = intArrayOf(1, 1, 1), vars = intArrayOf(0, 1, 2), op = LinearOp.GE, -1),
-            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 4),
-            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 4),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
         )
         return Case("intHeavy", Problem(numBoolVars = 0, numIntVars = 3, intDomains = intDomains, factors = factors))
     }
@@ -185,8 +185,8 @@ class LocalSearchStateRecomputeTest {
         val intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3))
         val factors = arrayOf<Factor>(
             AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4),
-            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-            com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(3), LinearOp.GE, 1),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            Linear(intArrayOf(1), intArrayOf(3), LinearOp.GE, 1),
         )
         return Case("permutation", Problem(numBoolVars = 0, numIntVars = 4, intDomains = intDomains, factors = factors))
     }

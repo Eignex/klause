@@ -5,6 +5,7 @@ import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.IndomainRandom
 import com.eignex.klause.solver.backtrack.InputOrder
 import com.eignex.klause.solver.backtrack.SmallestDomain
+import com.eignex.klause.solver.backtrack.SolutionGuided
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -76,7 +77,7 @@ class FlatZincSearchAnnotationTest {
         """.trimIndent()
         val program = parseFlatZinc(src)
         val params = assertNotNull(program.defaultBacktrackParams)
-        val sg = params.valueHeuristic as? com.eignex.klause.solver.backtrack.SolutionGuided
+        val sg = params.valueHeuristic as? SolutionGuided
         assertNotNull(sg, "minimize should wrap valueHeuristic in SolutionGuided")
     }
 
@@ -89,7 +90,7 @@ class FlatZincSearchAnnotationTest {
         """.trimIndent()
         val program = parseFlatZinc(src)
         val params = assertNotNull(program.defaultBacktrackParams)
-        val sg = params.valueHeuristic as? com.eignex.klause.solver.backtrack.SolutionGuided
+        val sg = params.valueHeuristic as? SolutionGuided
         assertNotNull(sg, "maximize should wrap valueHeuristic in SolutionGuided")
     }
 

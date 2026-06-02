@@ -6,6 +6,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationSession
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -40,17 +42,17 @@ class ActivityBasedSearchTest {
             intDomains = Array(3) { IntDomain(0, 9) },
             factors = emptyArray(),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val session = PropagationSession(problem)
         val abs = ActivityBasedSearch()
         // Bake the initial size so the activity arrays exist (one pick to size them).
-        abs.pick(session, kotlin.random.Random(0L))
+        abs.pick(session, Random(0L))
         // Simulate a propagation event bumping var 2 ten times.
         repeat(10) {
             abs.onPropagation(implied(intKeys = intArrayOf(2)))
             abs.onCommit(VarRef.IntVar(2))
         }
         // Verify var 2 wins.
-        val picked = abs.pick(session, kotlin.random.Random(0L))
+        val picked = abs.pick(session, Random(0L))
         assertEquals(
             VarRef.IntVar(2),
             picked,
@@ -69,16 +71,16 @@ class ActivityBasedSearchTest {
             intDomains = Array(2) { IntDomain(0, 9) },
             factors = emptyArray(),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val session = PropagationSession(problem)
         val abs = ActivityBasedSearch(decay = 0.95)
-        abs.pick(session, kotlin.random.Random(0L))
+        abs.pick(session, Random(0L))
         // Bump var 0 first.
         abs.onPropagation(implied(intKeys = intArrayOf(0)))
         // Pass time via commits (increment grows).
         repeat(50) { abs.onCommit(VarRef.IntVar(0)) }
         // Now bump var 1 (gets the larger increment).
         abs.onPropagation(implied(intKeys = intArrayOf(1)))
-        val picked = abs.pick(session, kotlin.random.Random(0L))
+        val picked = abs.pick(session, Random(0L))
         assertEquals(
             VarRef.IntVar(1),
             picked,
@@ -94,15 +96,15 @@ class ActivityBasedSearchTest {
             intDomains = Array(2) { IntDomain(0, 9) },
             factors = emptyArray(),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val session = PropagationSession(problem)
         val abs = ActivityBasedSearch(resetOnRestart = true)
-        abs.pick(session, kotlin.random.Random(0L))
+        abs.pick(session, Random(0L))
         abs.onPropagation(implied(intKeys = intArrayOf(1)))
         // Confirm var 1 is preferred before restart.
-        assertEquals(VarRef.IntVar(1), abs.pick(session, kotlin.random.Random(0L)))
+        assertEquals(VarRef.IntVar(1), abs.pick(session, Random(0L)))
         abs.onRestart()
         // After restart, activity is reset → ties broken by id → var 0 wins.
-        assertEquals(VarRef.IntVar(0), abs.pick(session, kotlin.random.Random(0L)))
+        assertEquals(VarRef.IntVar(0), abs.pick(session, Random(0L)))
     }
 
     private fun implied(boolKeys: IntArray = IntArray(0), intKeys: IntArray = IntArray(0)): PropagationResult.Implied {

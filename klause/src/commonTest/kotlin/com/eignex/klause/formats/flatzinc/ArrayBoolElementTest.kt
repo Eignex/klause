@@ -33,7 +33,7 @@ class ArrayBoolElementTest {
         )
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        val rId = program.boolVarsByName["r"]!!
+        val rId = program.boolVarsByName.getValue("r")
         assertEquals(false, sat.assignment.bools[rId], "arr[2] = false")
     }
 
@@ -58,7 +58,7 @@ class ArrayBoolElementTest {
         )
         val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(res)
-        val cId = program.boolVarsByName["c"]!!
+        val cId = program.boolVarsByName.getValue("c")
         assertEquals(true, sat.assignment.bools[cId], "arr[3] = c must be true")
     }
 }

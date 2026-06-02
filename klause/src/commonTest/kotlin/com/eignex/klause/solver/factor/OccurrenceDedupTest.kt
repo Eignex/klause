@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
@@ -26,7 +28,7 @@ class OccurrenceDedupTest {
         state.recompute()
         val brute = if (factor.isViolated(state, 0)) 1L else 0L
         assertEquals(brute, state.cost)
-        state.apply(com.eignex.klause.solver.Move.BoolFlip(a))
+        state.apply(BoolFlip(a))
         val brute2 = if (factor.isViolated(state, 0)) 1L else 0L
         assertEquals(brute2, state.cost, "cost drifted from brute-force after flipping a")
     }
@@ -45,7 +47,7 @@ class OccurrenceDedupTest {
         val factor = PseudoBoolean(
             weights = intArrayOf(2, 3),
             literals = intArrayOf(Lit.make(a, true), Lit.make(a, false)),
-            op = com.eignex.klause.ast.PbOp.LE,
+            op = PbOp.LE,
             bound = 4,
         )
         val problem = Problem(1, 0, emptyArray(), listOf(factor))

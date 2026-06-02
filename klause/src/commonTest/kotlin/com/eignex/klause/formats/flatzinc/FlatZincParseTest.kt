@@ -194,8 +194,8 @@ class FlatZincParseTest {
         val sample = LocalSearchSolver(program.problem)
             .sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 3L)).assignment
         assertNotNull(sample)
-        val xVal = program.floatVarsByName["x"]!!.valueOf(sample.ints[0])
-        val yVal = program.floatVarsByName["y"]!!.valueOf(sample.ints[1])
+        val xVal = program.floatVarsByName.getValue("x").valueOf(sample.ints[0])
+        val yVal = program.floatVarsByName.getValue("y").valueOf(sample.ints[1])
         // Allow a small tolerance for rounding through the bucket/scale pipeline.
         assertTrue(xVal + yVal <= 5.0 + 0.5, "x+y = ${xVal + yVal}")
     }

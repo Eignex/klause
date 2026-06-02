@@ -5,6 +5,7 @@ import com.eignex.klause.ast.ValSearchStrategy
 import com.eignex.klause.ast.VarSearchStrategy
 import com.eignex.klause.ast.allDifferent
 import com.eignex.klause.compile.compile
+import com.eignex.klause.solver.SolveResult.Sat
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.InputOrder
@@ -96,7 +97,7 @@ class SearchAnnotationTest {
         val solver = BacktrackSolver(compiled.problem)
         val result = solver.solve(compiled.backtrackParams())
         assertTrue(
-            result is com.eignex.klause.solver.SolveResult.Sat,
+            result is Sat,
             "expected SAT under the schema-declared strategy, got $result",
         )
         // Verify the result is feasible — the constraint network still owns correctness.

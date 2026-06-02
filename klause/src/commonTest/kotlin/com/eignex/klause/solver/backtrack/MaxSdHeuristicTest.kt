@@ -5,6 +5,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 import kotlin.test.Test
@@ -44,10 +46,10 @@ class MaxSdHeuristicTest {
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Linear(
+                Linear(
                     coeffs = intArrayOf(1, 1, 1),
                     vars = intArrayOf(0, 1, 2),
-                    op = com.eignex.klause.solver.factor.LinearOp.LE,
+                    op = LinearOp.LE,
                     bound = 6,
                 ),
             ),

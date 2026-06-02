@@ -98,7 +98,7 @@ class SatisfyTest {
             factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
         )
         val r = BacktrackSolver(problem).solve(
-            com.eignex.klause.solver.backtrack.BacktrackParams(
+            BacktrackParams(
                 assumptions = Assumptions(bools = mapOf(0 to true, 1 to true, 2 to true)),
             ),
         )

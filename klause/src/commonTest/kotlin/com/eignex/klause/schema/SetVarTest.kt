@@ -4,6 +4,8 @@ import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.SetSpec
 import com.eignex.klause.ast.eq
 import com.eignex.klause.ast.iff
+import com.eignex.klause.cnf.BitBlaster
+import com.eignex.klause.compile.CompiledProblem
 import com.eignex.klause.compile.compile
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -12,14 +14,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SetVarDeclaratorTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val chosen by setVar(0..3)
         val pickedLabels by multiple("a", "b", "c")
     }
 
     @Test
     fun `declarators register SetSpec and MultipleSpec`() {
-        val s = S()
+        val s = Sch()
         val entries = s.entries.entries.toList()
         assertEquals(2, entries.size)
         assertEquals("chosen", entries[0].key)
@@ -32,18 +34,18 @@ class SetVarDeclaratorTest {
 
     @Test
     fun `compile allocates one indicator bool per universe element`() {
-        val s = S()
+        val s = Sch()
         val compiled = s.compile()
         // 4 + 3 = 7 indicators
         assertEquals(7, compiled.problem.numBoolVars)
-        assertEquals(4, compiled.setLayouts["chosen"]!!.size)
-        assertEquals(3, compiled.setLayouts["pickedLabels"]!!.size)
+        assertEquals(4, compiled.setLayouts.getValue("chosen").size)
+        assertEquals(3, compiled.setLayouts.getValue("pickedLabels").size)
         assertEquals(listOf("a", "b", "c"), compiled.setNominalLabels["pickedLabels"])
     }
 }
 
 class SetMembershipTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val s by setVar(0..3)
         val x by intVar(0, 3)
         val c by constraint { x inSet s }
@@ -51,7 +53,7 @@ class SetMembershipTest {
 
     @Test
     fun `top-level x inSet s forces x to a present element`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(50).toList()
@@ -65,7 +67,7 @@ class SetMembershipTest {
 }
 
 class SetSubsetTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val a by setVar(0..2)
         val b by setVar(0..2)
         val c by constraint { a subsetOf b }
@@ -73,7 +75,7 @@ class SetSubsetTest {
 
     @Test
     fun `a subsetOf b holds in every solution`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(100).toList()
@@ -89,7 +91,7 @@ class SetSubsetTest {
 }
 
 class SetDisjointTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val a by setVar(0..2)
         val b by setVar(0..2)
         val c by constraint { a disjointFrom b }
@@ -97,7 +99,7 @@ class SetDisjointTest {
 
     @Test
     fun `disjoint sets share no elements`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(100).toList()
@@ -113,7 +115,7 @@ class SetDisjointTest {
 }
 
 class SetUnionIntersectTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val a by setVar(0..2)
         val b by setVar(0..2)
         val u by setVar(0..2)
@@ -122,7 +124,7 @@ class SetUnionIntersectTest {
 
     @Test
     fun `union is computed correctly`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(200).toList()
@@ -159,14 +161,14 @@ class SetUnionIntersectTest {
 }
 
 class SetCardTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val s by setVar(0..3)
         val c by constraint { card(s) eq 2 }
     }
 
     @Test
     fun `card constraint forces exactly two members`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(20).toList()
@@ -180,7 +182,7 @@ class SetCardTest {
 }
 
 class SetReifiedTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val s by setVar(0..2)
         val x by intVar(0, 2)
         val flag by boolVar()
@@ -191,7 +193,7 @@ class SetReifiedTest {
 
     @Test
     fun `reified set membership tracks flag`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(100).toList()
@@ -211,14 +213,14 @@ class SetReifiedTest {
 }
 
 class NominalSetTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val tags by multiple("red", "green", "blue")
         val c by constraint { "red" inSet tags }
     }
 
     @Test
     fun `nominal-set membership pins the indicator`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(20).toList()
@@ -232,14 +234,14 @@ class NominalSetTest {
 }
 
 class SetEqLiteralTest {
-    private class S : VariableSchema() {
+    private class Sch : VariableSchema() {
         val s by setVar(0..3)
         val c by constraint { s eq setOfInts(1, 2) }
     }
 
     @Test
     fun `set equals literal pins all indicators`() {
-        val schema = S()
+        val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).take(5).toList()
@@ -298,8 +300,8 @@ class SetBitBlastTest {
 
     @Test fun `reified inSet bit-blasts`() = assertBitBlasts(ReifiedSchema().compile())
 
-    private fun assertBitBlasts(compiled: com.eignex.klause.compile.CompiledProblem) {
-        val cnf = com.eignex.klause.cnf.BitBlaster.compile(compiled.problem)
+    private fun assertBitBlasts(compiled: CompiledProblem) {
+        val cnf = BitBlaster.compile(compiled.problem)
         assertTrue(cnf.clauses.isNotEmpty(), "bit-blasted CNF should be non-empty")
     }
 }

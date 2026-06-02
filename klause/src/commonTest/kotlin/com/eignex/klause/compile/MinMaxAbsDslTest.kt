@@ -13,6 +13,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.math.abs as kabs
+import kotlin.math.min as kmin
 
 class MinMaxAbsDslTest {
 
@@ -32,7 +34,7 @@ class MinMaxAbsDslTest {
         for (s in samples) {
             val xv = compiled.decode(schema.x, s)
             val yv = compiled.decode(schema.y, s)
-            assertTrue(kotlin.math.min(xv, yv) <= 2, "min($xv,$yv)>2")
+            assertTrue(kmin(xv, yv) <= 2, "min($xv,$yv)>2")
         }
     }
 
@@ -72,7 +74,7 @@ class MinMaxAbsDslTest {
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
             val xv = compiled.decode(schema.x, s)
-            assertTrue(kotlin.math.abs(xv) <= 2, "|$xv|>2")
+            assertTrue(kabs(xv) <= 2, "|$xv|>2")
         }
     }
 

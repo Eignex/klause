@@ -12,6 +12,10 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.propagation.PropagationResult.Unsat
+import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.solver.propagation.PropagationState
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -113,7 +117,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(clause),
         )
-        val state = com.eignex.klause.solver.propagation.PropagationState(problem, Assumptions.None)
+        val state = PropagationState(problem, Assumptions.None)
         assertEquals(
             1,
             state.boolWatchersByLit[Lit.make(0, true)].size,
@@ -501,9 +505,8 @@ class BacktrackSolverTest {
         val vsids = Vsids()
         // Bump v3 directly via the rich onConflict signature with an empty Unsat record
         // so only v3 (the failing decision) gets the bump.
-        val emptyUnsat = com.eignex.klause.solver.propagation.PropagationResult.Unsat()
+        val emptyUnsat = Unsat()
         repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
-        val pinned = mutableMapOf<Int, Boolean>()
         val r = BacktrackSolver(problem).solve(BacktrackParams(variableHeuristic = vsids))
         assertIs<SolveResult.Sat>(r)
     }
@@ -593,8 +596,8 @@ class BacktrackSolverTest {
         val base = RandomVariable
         val lc = LastConflict(base)
         lc.onConflict(VarRef.Bool(3))
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
-        val picked = lc.pick(session, kotlin.random.Random(0L))
+        val session = PropagationSession(problem)
+        val picked = lc.pick(session, Random(0L))
         assertEquals(
             VarRef.Bool(3),
             picked,
@@ -613,8 +616,8 @@ class BacktrackSolverTest {
         val lc = LastConflict(SmallestDomain)
         lc.onConflict(VarRef.Bool(2))
         lc.onCommit(VarRef.Bool(2))
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
-        val picked = lc.pick(session, kotlin.random.Random(0L))
+        val session = PropagationSession(problem)
+        val picked = lc.pick(session, Random(0L))
         assertEquals(
             VarRef.Bool(0),
             picked,

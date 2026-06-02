@@ -25,7 +25,7 @@ class SlidingSumTest {
         assertTrue(program.problem.factors.any { it is SlidingSum }, "expected a native SlidingSum factor")
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        val x = listOf("x1", "x2", "x3", "x4", "x5").map { sat.assignment.ints[program.intVarsByName[it]!!] }
+        val x = listOf("x1", "x2", "x3", "x4", "x5").map { sat.assignment.ints[program.intVarsByName.getValue(it)] }
         for (i in 0..x.size - 3) {
             val window = x[i] + x[i + 1] + x[i + 2]
             assertTrue(window in 3..5, "window at $i sums to $window, outside [3,5] (x=$x)")

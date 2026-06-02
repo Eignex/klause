@@ -42,7 +42,7 @@ class OptimizerTest {
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 5)),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
             ),
         )
         val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))

@@ -36,8 +36,8 @@ class CumulativesTest {
         )
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        val starts = listOf("s1", "s2", "s3", "s4").map { sat.assignment.ints[program.intVarsByName[it]!!] }
-        val machines = listOf("m1", "m2", "m3", "m4").map { sat.assignment.ints[program.intVarsByName[it]!!] }
+        val starts = listOf("s1", "s2", "s3", "s4").map { sat.assignment.ints[program.intVarsByName.getValue(it)] }
+        val machines = listOf("m1", "m2", "m3", "m4").map { sat.assignment.ints[program.intVarsByName.getValue(it)] }
         // Verify: no two tasks on the same machine overlap (each occupies [start, start+2)).
         for (i in 0 until 4) {
             for (j in i + 1 until 4) {

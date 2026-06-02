@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -118,8 +119,8 @@ class CumulativeTest {
         state.assignment.setInt(2, 0)
         state.recompute()
         val before = state.intPayload[0]
-        state.apply(com.eignex.klause.solver.Move.IntSet(1, 2))
-        state.apply(com.eignex.klause.solver.Move.IntSet(2, 4))
+        state.apply(IntSet(1, 2))
+        state.apply(IntSet(2, 4))
         val afterIncr = state.intPayload[0]
         val fresh = LocalSearchState(problem, Random(0))
         fresh.assignment.setInt(0, 0)

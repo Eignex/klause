@@ -2,7 +2,10 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move.BoolFlip
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
@@ -28,7 +31,7 @@ class IncrementalBreakMakeTest {
         // Flip each var once and verify the incremental break/make vectors agree with
         // a fresh recompute that uses the brute-force deltaIfBoolFlipped walk.
         for (v in 0 until problem.numBoolVars) {
-            state.apply(com.eignex.klause.solver.Move.BoolFlip(v))
+            state.apply(BoolFlip(v))
             val incBreak = state.boolBreakCountSnapshot()
             val incMake = state.boolMakeCountSnapshot()
             state.recompute()
@@ -234,7 +237,7 @@ class IncrementalBreakMakeTest {
             op = LinearOp.LE,
             bound = 10,
         )
-        val intDomains = Array(3) { com.eignex.klause.solver.IntDomain(0, 5) }
+        val intDomains = Array(3) { IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         for (i in 0 until 3) state.assignment.setInt(i, i + 1)
@@ -246,7 +249,7 @@ class IncrementalBreakMakeTest {
             val cur = state.assignment.intValue(v)
             val target = (cur + 1) % 6
             if (cur == target) continue
-            state.apply(com.eignex.klause.solver.Move.IntSet(v, target))
+            state.apply(IntSet(v, target))
             val incBreak = state.boolBreakCountSnapshot()
             val incMake = state.boolMakeCountSnapshot()
             state.recompute()
@@ -273,14 +276,14 @@ class IncrementalBreakMakeTest {
             op = LinearOp.LE,
             bound = 10,
         )
-        val intDomains = Array(3) { com.eignex.klause.solver.IntDomain(0, 5) }
+        val intDomains = Array(3) { IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         for (i in 0 until 3) state.assignment.setInt(i, i + 1)
         state.recompute()
         // Repeatedly flip the aux through the engine and verify against a fresh recompute().
-        for (round in 0 until 4) {
-            state.apply(com.eignex.klause.solver.Move.BoolFlip(0))
+        repeat(4) {
+            state.apply(BoolFlip(0))
             val incBreak = state.boolBreakCountSnapshot()
             val incMake = state.boolMakeCountSnapshot()
             state.recompute()

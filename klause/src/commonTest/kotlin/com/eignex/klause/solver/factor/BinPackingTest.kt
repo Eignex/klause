@@ -7,6 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -83,7 +84,7 @@ class BinPackingTest {
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        kotlin.test.assertEquals(6, sat.assignment.ints[3], "load[0] should equal 6")
-        kotlin.test.assertEquals(0, sat.assignment.ints[4], "load[1] should equal 0")
+        assertEquals(6, sat.assignment.ints[3], "load[0] should equal 6")
+        assertEquals(0, sat.assignment.ints[4], "load[1] should equal 0")
     }
 }

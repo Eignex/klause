@@ -10,6 +10,7 @@ import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.BinPacking
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
@@ -137,7 +138,7 @@ class GapFactorBitBlastTest {
             arrayOf<Factor>(
                 SetBitsetSubset(leftBools = intArrayOf(0, 1), rightBools = intArrayOf(2, 3)),
                 // Force left to be non-trivial so the implication has teeth.
-                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, true))),
             ),
         ),
     )

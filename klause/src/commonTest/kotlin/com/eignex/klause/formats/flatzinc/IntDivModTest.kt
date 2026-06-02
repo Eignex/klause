@@ -22,7 +22,7 @@ class IntDivModTest {
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         // Find q's value via its name → int var id.
-        val qId = program.intVarsByName["q"]!!
+        val qId = program.intVarsByName.getValue("q")
         assertEquals(2, sat.assignment.ints[qId], "7 / 3 truncated = 2")
     }
 
@@ -38,7 +38,7 @@ class IntDivModTest {
         val program = parseFlatZinc(src)
         val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(res)
-        val rId = program.intVarsByName["r"]!!
+        val rId = program.intVarsByName.getValue("r")
         assertEquals(1, sat.assignment.ints[rId], "7 mod 3 = 1")
     }
 
@@ -55,7 +55,7 @@ class IntDivModTest {
         val program = parseFlatZinc(src)
         val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(res)
-        val rId = program.intVarsByName["r"]!!
+        val rId = program.intVarsByName.getValue("r")
         assertEquals(-1, sat.assignment.ints[rId], "−7 mod 3 truncated = −1")
     }
 }

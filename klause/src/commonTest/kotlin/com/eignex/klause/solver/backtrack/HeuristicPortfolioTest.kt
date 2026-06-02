@@ -3,6 +3,7 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
@@ -92,14 +93,16 @@ class HeuristicPortfolioTest {
         portfolio.variableHeuristic.onConflict(VarRef.IntVar(0))
         portfolio.variableHeuristic.onConflict(VarRef.IntVar(1))
         portfolio.variableHeuristic.onSolution(
-            com.eignex.klause.solver.Sample(BooleanArray(0), intArrayOf(0)),
+            Sample(BooleanArray(0), intArrayOf(0)),
         )
         portfolio.variableHeuristic.onRestart()
-        assertEquals(2, lastStats!!.conflicts)
-        assertEquals(1, lastStats!!.solutionsFound)
+        val firstStats = requireNotNull(lastStats)
+        assertEquals(2, firstStats.conflicts)
+        assertEquals(1, firstStats.solutionsFound)
         // Stats reset on restart.
         portfolio.variableHeuristic.onRestart()
-        assertEquals(0, lastStats!!.conflicts)
-        assertEquals(0, lastStats!!.solutionsFound)
+        val resetStats = requireNotNull(lastStats)
+        assertEquals(0, resetStats.conflicts)
+        assertEquals(0, resetStats.solutionsFound)
     }
 }

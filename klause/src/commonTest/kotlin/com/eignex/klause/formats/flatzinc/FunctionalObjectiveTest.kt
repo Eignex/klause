@@ -2,7 +2,9 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.FunctionalObjective
 import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,9 +33,9 @@ class FunctionalObjectiveTest {
         assertTrue(obj is FunctionalObjective)
         val fo = obj as FunctionalObjective
         // leaf vars should be a,b,c (the decision vars), not the aux/objective vars.
-        val aId = program.intVarsByName["a"]!!
-        val bId = program.intVarsByName["b"]!!
-        val cId = program.intVarsByName["c"]!!
+        val aId = program.intVarsByName.getValue("a")
+        val bId = program.intVarsByName.getValue("b")
+        val cId = program.intVarsByName.getValue("c")
         assertEquals(setOf(aId, bId, cId), fo.leafVars.toSet())
 
         val rng = Random(7)
@@ -63,7 +65,7 @@ class FunctionalObjectiveTest {
             val b = state.assignment.intValue(bId)
             val cc = state.assignment.intValue(cId)
             assertEquals(
-                (kotlin.math.abs(a - b) + kotlin.math.abs(a - cc)).toDouble(),
+                (abs(a - b) + abs(a - cc)).toDouble(),
                 after,
                 1e-9,
                 "evaluate != true objective",
@@ -71,9 +73,9 @@ class FunctionalObjectiveTest {
         }
     }
 
-    private fun snapshot(state: LocalSearchState, program: FlatZincProgram): com.eignex.klause.solver.Sample {
+    private fun snapshot(state: LocalSearchState, program: FlatZincProgram): Sample {
         val bools = BooleanArray(program.problem.numBoolVars) { state.assignment.boolValue(it) }
         val ints = IntArray(program.problem.numIntVars) { state.assignment.intValue(it) }
-        return com.eignex.klause.solver.Sample(bools, ints)
+        return Sample(bools, ints)
     }
 }

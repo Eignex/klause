@@ -2,6 +2,7 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -9,6 +10,8 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.InputOrder
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -106,12 +109,12 @@ class ConflictAnalyzerTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
-            intDomains = arrayOf(com.eignex.klause.solver.IntDomain(0, 3)),
+            intDomains = arrayOf(IntDomain(0, 3)),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Linear(
+                Linear(
                     intArrayOf(1),
                     intArrayOf(0),
-                    com.eignex.klause.solver.factor.LinearOp.EQ,
+                    LinearOp.EQ,
                     5,
                 ),
             ),
@@ -283,7 +286,7 @@ class ConflictAnalyzerTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
-        val state = PropagationState(problem, com.eignex.klause.solver.Assumptions.None)
+        val state = PropagationState(problem, Assumptions.None)
         val baseFid = problem.numFactors
         val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true)))

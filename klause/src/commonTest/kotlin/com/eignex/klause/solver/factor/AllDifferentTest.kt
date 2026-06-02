@@ -2,6 +2,8 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Move.Compound
+import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -9,6 +11,11 @@ import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.PropagationResult.Unsat
+import com.eignex.klause.solver.propagation.PropagationSession
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -109,21 +116,21 @@ class AllDifferentTest {
     @Test
     fun `repair proposes multiple unused targets when domain has many spare values`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 10)
-        val problem = com.eignex.klause.solver.Problem(
+        val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setInt(0, 5)
         state.assignment.setInt(1, 5)
         state.assignment.setInt(2, 0)
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
-        val sink = com.eignex.klause.solver.localsearch.MoveSink()
+        val sink = MoveSink()
         factor.proposeRepairMoves(state, factorId = 0, sink = sink)
         // MAX_REPAIR_TARGETS caps proposals at 4.
-        val intSets = sink.list.filterIsInstance<com.eignex.klause.solver.Move.IntSet>()
+        val intSets = sink.list.filterIsInstance<IntSet>()
         assertTrue(intSets.size in 2..4, "expected 2-4 candidates (cap 4), got ${intSets.size}: $intSets")
         val occupantSet = intSets.map { it.varId }.toSet()
         assertTrue(
@@ -142,26 +149,26 @@ class AllDifferentTest {
         // 4 vars over [0..2] saturates the domain so there is no unused target; the
         // swap pass kicks in. (Pigeonhole-infeasible, but we're testing move generation.)
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 3)
-        val problem = com.eignex.klause.solver.Problem(
+        val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 2)
         state.assignment.setInt(3, 0)
         state.recompute()
-        val sink = com.eignex.klause.solver.localsearch.MoveSink()
+        val sink = MoveSink()
         factor.proposeRepairMoves(state, factorId = 0, sink = sink)
-        val compounds = sink.list.filterIsInstance<com.eignex.klause.solver.Move.Compound>()
+        val compounds = sink.list.filterIsInstance<Compound>()
         assertTrue(compounds.isNotEmpty(), "expected swap candidates with saturated domain; got ${sink.list}")
         for (c in compounds) {
             assertTrue(c.parts.size == 2, "swap should be 2-part, got ${c.parts.size}")
-            val a = c.parts[0] as com.eignex.klause.solver.Move.IntSet
-            val b = c.parts[1] as com.eignex.klause.solver.Move.IntSet
+            val a = c.parts[0] as IntSet
+            val b = c.parts[1] as IntSet
             assertTrue(a.varId != b.varId, "swap should target distinct vars")
             assertTrue(
                 a.newValue == state.assignment.intValue(b.varId),
@@ -190,14 +197,14 @@ class AllDifferentTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val session = PropagationSession(problem)
         val v3Domain = session.intDomain(3)
-        kotlin.test.assertEquals(
+        assertEquals(
             4,
             v3Domain.min,
             "v3's min should be tightened to 4 (Hall set [1,3] forbids 2,3 for v3); got $v3Domain",
         )
-        kotlin.test.assertEquals(
+        assertEquals(
             5,
             v3Domain.max,
             "v3's max should remain 5; got $v3Domain",
@@ -215,7 +222,7 @@ class AllDifferentTest {
         )
         val baked = problem.baked
         assertTrue(
-            baked is com.eignex.klause.solver.propagation.PropagationResult.Unsat,
+            baked is Unsat,
             "expected bake-time Unsat from Hall pigeonhole; got $baked",
         )
     }
@@ -234,13 +241,13 @@ class AllDifferentTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val session = PropagationSession(problem)
         val v2 = session.intDomain(2)
         val v3 = session.intDomain(3)
-        kotlin.test.assertEquals(5, v2.min, "v2's min should be pushed past Hall set; got $v2")
-        kotlin.test.assertEquals(7, v2.max)
-        kotlin.test.assertEquals(1, v3.min)
-        kotlin.test.assertEquals(2, v3.max, "v3's max should be pulled below Hall set; got $v3")
+        assertEquals(5, v2.min, "v2's min should be pushed past Hall set; got $v2")
+        assertEquals(7, v2.max)
+        assertEquals(1, v3.min)
+        assertEquals(2, v3.max, "v3's max should be pulled below Hall set; got $v3")
     }
 
     @Test
@@ -254,13 +261,13 @@ class AllDifferentTest {
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 5)),
             factors = arrayOf<Factor>(factor),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val session = PropagationSession(problem)
         val d1 = session.intDomain(1)
-        kotlin.test.assertEquals(1, d1.min, "v1's min should remain 1 (3 is interior)")
-        kotlin.test.assertEquals(5, d1.max, "v1's max should remain 5 (3 is interior)")
-        kotlin.test.assertEquals(4, d1.size, "v1 should have 4 values after punching out 3; got $d1")
-        kotlin.test.assertTrue(3 !in d1, "v1 should no longer contain 3")
-        kotlin.test.assertTrue(2 in d1 && 4 in d1, "v1 should still contain 2 and 4")
+        assertEquals(1, d1.min, "v1's min should remain 1 (3 is interior)")
+        assertEquals(5, d1.max, "v1's max should remain 5 (3 is interior)")
+        assertEquals(4, d1.size, "v1 should have 4 values after punching out 3; got $d1")
+        assertTrue(3 !in d1, "v1 should no longer contain 3")
+        assertTrue(2 in d1 && 4 in d1, "v1 should still contain 2 and 4")
     }
 
     @Test
@@ -279,13 +286,13 @@ class AllDifferentTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(problem)
+        val session = PropagationSession(problem)
         val d3 = session.intDomain(3)
-        kotlin.test.assertEquals(1, d3.min)
-        kotlin.test.assertEquals(7, d3.max)
-        for (h in 3..5) kotlin.test.assertTrue(h !in d3, "value $h should be a hole, got $d3")
+        assertEquals(1, d3.min)
+        assertEquals(7, d3.max)
+        for (h in 3..5) assertTrue(h !in d3, "value $h should be a hole, got $d3")
         for (k in intArrayOf(1, 2, 6, 7)) {
-            kotlin.test.assertTrue(k in d3, "value $k should remain; got $d3")
+            assertTrue(k in d3, "value $k should remain; got $d3")
         }
     }
 

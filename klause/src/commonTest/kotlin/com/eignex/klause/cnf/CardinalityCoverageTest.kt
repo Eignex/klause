@@ -11,9 +11,6 @@ class CardinalityCoverageTest {
 
     private fun isSat(cnf: CnfProblem, fixed: IntArray): Boolean = SatCheck.isSat(cnf.numVars, cnf.clauses, fixed)
 
-    private fun pinBool(cnf: CnfProblem, originalVar: Int, value: Boolean): IntArray =
-        intArrayOf(cnf.boolVarToCnfVar[originalVar], if (value) 1 else 0)
-
     @Test
     fun `at most k exactly matches enumeration`() {
         val lits = IntArray(4) { Lit.make(it, true) }

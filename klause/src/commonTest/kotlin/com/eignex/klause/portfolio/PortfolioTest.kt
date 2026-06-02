@@ -1,13 +1,18 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.MinimizeResult.Optimal
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.coroutines.flow.take
@@ -91,19 +96,19 @@ class PortfolioTest {
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(
-                com.eignex.klause.solver.IntDomain(0, 5),
-                com.eignex.klause.solver.IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(0, 5),
             ),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Linear(
+                Linear(
                     coeffs = intArrayOf(1, 1),
                     vars = intArrayOf(0, 1),
-                    op = com.eignex.klause.solver.factor.LinearOp.GE,
+                    op = LinearOp.GE,
                     bound = 3,
                 ),
             ),
         )
-        val obj = com.eignex.klause.solver.LinearObjective(
+        val obj = LinearObjective(
             intCoefficients = doubleArrayOf(1.0, 2.0),
         )
         val workers = List(3) { i -> BacktrackSolver(problem).session() }
@@ -111,7 +116,7 @@ class PortfolioTest {
             val r = p.minimize(obj, BacktrackParams(randomSeed = 0L)) { params, supplier ->
                 params.copy(objectiveBoundSupplier = supplier)
             }
-            val optimal = assertIs<com.eignex.klause.solver.MinimizeResult.Optimal>(r)
+            val optimal = assertIs<Optimal>(r)
             assertEquals(3.0, optimal.objectiveValue)
         }
     }

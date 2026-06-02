@@ -332,7 +332,7 @@ class PropagationTest {
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 0)),
             factors = arrayOf<Factor>(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5)),
         )
-        val r = implied(p.propagate())
+        implied(p.propagate())
         // y forced to 0, x's domain narrowed: 0 already pinned for y. Force
         // Linear(intArrayOf(1), intArrayOf(x), LinearOp.LE, 3) to get singleton
         // — instead just check x's lower bound by adding IntLeq.
@@ -449,7 +449,7 @@ class PropagationTest {
                 ),
             ),
         )
-        val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
+        implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
         // x's domain is now [0..2], y is pinned at 3. y returns as 3 in Implied; x not yet singleton.
         // Add Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 2) to force singleton x=2.
         val p2 = Problem(

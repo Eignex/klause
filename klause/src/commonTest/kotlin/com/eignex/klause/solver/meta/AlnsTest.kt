@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.meta
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
@@ -14,6 +15,7 @@ import com.eignex.klause.solver.localsearch.meta.DestroyOperator
 import com.eignex.klause.solver.localsearch.meta.FreedVars
 import com.eignex.klause.solver.localsearch.meta.GreedyConstructionRepair
 import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
+import com.eignex.klause.solver.localsearch.meta.RepairContext
 import com.eignex.klause.solver.localsearch.meta.RepairOperator
 import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
@@ -162,14 +164,14 @@ class AlnsTest {
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
         val incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0))
-        val context = com.eignex.klause.solver.localsearch.meta.RepairContext(
+        val context = RepairContext(
             inner = inner,
             params = LocalSearchParams(randomSeed = 0L),
             objective = objective,
-            pinAssumptions = com.eignex.klause.solver.Assumptions.None,
+            pinAssumptions = Assumptions.None,
             incumbent = incumbent,
-            freed = com.eignex.klause.solver.localsearch.meta.FreedVars(intArrayOf(0, 1, 2, 3), IntArray(0)),
-            rng = kotlin.random.Random(0),
+            freed = FreedVars(intArrayOf(0, 1, 2, 3), IntArray(0)),
+            rng = Random(0),
         )
         val sample = GreedyConstructionRepair().repair(context)
         assertNotNull(sample)
@@ -192,15 +194,15 @@ class AlnsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
         val inner = LocalSearchSolver(problem)
-        val pinAssumptions = com.eignex.klause.solver.Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false))
-        val context = com.eignex.klause.solver.localsearch.meta.RepairContext(
+        val pinAssumptions = Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false))
+        val context = RepairContext(
             inner = inner,
             params = LocalSearchParams(randomSeed = 0L),
             objective = objective,
             pinAssumptions = pinAssumptions,
             incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0)),
-            freed = com.eignex.klause.solver.localsearch.meta.FreedVars(intArrayOf(3), IntArray(0)),
-            rng = kotlin.random.Random(0),
+            freed = FreedVars(intArrayOf(3), IntArray(0)),
+            rng = Random(0),
         )
         val sample = GreedyConstructionRepair().repair(context)
         assertNotNull(sample)
@@ -217,11 +219,11 @@ class AlnsTest {
         val objective = LinearObjective(boolWeights = doubleArrayOf(1.0, 5.0))
         val inner = LocalSearchSolver(problem)
         val repair = InnerLsRepair(label = "test", flipsOverride = 100L)
-        val context = com.eignex.klause.solver.localsearch.meta.RepairContext(
+        val context = RepairContext(
             inner = inner,
             params = LocalSearchParams(maxFlips = 999_999L, randomSeed = 0L),
             objective = objective,
-            pinAssumptions = com.eignex.klause.solver.Assumptions.None,
+            pinAssumptions = Assumptions.None,
             incumbent = Sample(booleanArrayOf(false, true), IntArray(0)),
             freed = FreedVars(intArrayOf(0, 1), IntArray(0)),
         )

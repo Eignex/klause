@@ -78,7 +78,7 @@ class CompoundMoveTest {
 
     @Test
     fun `compound isTaboo if any part is taboo`() {
-        val (problem, state) = setupAllDifferentConflict()
+        val (_, state) = setupAllDifferentConflict()
         // Apply a flip on x0 to taint its lastTouched.
         state.apply(Move.IntSet(0, 9))
         val compound = Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(2, 7)))

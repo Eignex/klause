@@ -139,9 +139,9 @@ class OptAllDifferentTest {
             val pa = compiled.decode(s.a.present, sample)
             val pb = compiled.decode(s.b.present, sample)
             val pc = compiled.decode(s.c.present, sample)
-            val va = if (pa) sample.ints[compiled.intVarIdByName["a"]!!] else null
-            val vb = if (pb) sample.ints[compiled.intVarIdByName["b"]!!] else null
-            val vc = if (pc) sample.ints[compiled.intVarIdByName["c"]!!] else null
+            val va = if (pa) sample.ints[compiled.intVarIdByName.getValue("a")] else null
+            val vb = if (pb) sample.ints[compiled.intVarIdByName.getValue("b")] else null
+            val vc = if (pc) sample.ints[compiled.intVarIdByName.getValue("c")] else null
             val presentVals = listOfNotNull(va, vb, vc)
             assertEquals(
                 presentVals.size,
@@ -183,9 +183,9 @@ class OptCountTest {
             val pa = compiled.decode(s.a.present, sample)
             val pb = compiled.decode(s.b.present, sample)
             val pc = compiled.decode(s.c.present, sample)
-            val va = sample.ints[compiled.intVarIdByName["a"]!!]
-            val vb = sample.ints[compiled.intVarIdByName["b"]!!]
-            val vc = sample.ints[compiled.intVarIdByName["c"]!!]
+            val va = sample.ints[compiled.intVarIdByName.getValue("a")]
+            val vb = sample.ints[compiled.intVarIdByName.getValue("b")]
+            val vc = sample.ints[compiled.intVarIdByName.getValue("c")]
             val expected = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 1 }
             val actual = compiled.decode(s.cnt, sample)
             assertEquals(
@@ -226,9 +226,9 @@ class OptNValueTest {
             val pa = compiled.decode(s.a.present, sample)
             val pb = compiled.decode(s.b.present, sample)
             val pc = compiled.decode(s.c.present, sample)
-            val va = sample.ints[compiled.intVarIdByName["a"]!!]
-            val vb = sample.ints[compiled.intVarIdByName["b"]!!]
-            val vc = sample.ints[compiled.intVarIdByName["c"]!!]
+            val va = sample.ints[compiled.intVarIdByName.getValue("a")]
+            val vb = sample.ints[compiled.intVarIdByName.getValue("b")]
+            val vc = sample.ints[compiled.intVarIdByName.getValue("c")]
             val expected = buildSet {
                 if (pa) add(va)
                 if (pb) add(vb)
@@ -269,9 +269,9 @@ class OptGccTest {
             val pa = compiled.decode(s.a.present, sample)
             val pb = compiled.decode(s.b.present, sample)
             val pc = compiled.decode(s.c.present, sample)
-            val va = sample.ints[compiled.intVarIdByName["a"]!!]
-            val vb = sample.ints[compiled.intVarIdByName["b"]!!]
-            val vc = sample.ints[compiled.intVarIdByName["c"]!!]
+            val va = sample.ints[compiled.intVarIdByName.getValue("a")]
+            val vb = sample.ints[compiled.intVarIdByName.getValue("b")]
+            val vc = sample.ints[compiled.intVarIdByName.getValue("c")]
             val zeros = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 0 }
             assertTrue(
                 zeros in 1..2,
@@ -307,7 +307,7 @@ class OptDisjunctiveTest {
         val samples = solver.samples(LocalSearchParams(maxFlips = 8_000, randomSeed = 29)).take(40).toList()
         for (sample in samples) {
             val ps = listOf(s.s0, s.s1, s.s2).map { compiled.decode(it.present, sample) }
-            val vs = listOf(s.s0, s.s1, s.s2).map { sample.ints[compiled.intVarIdByName[it.name]!!] }
+            val vs = listOf(s.s0, s.s1, s.s2).map { sample.ints[compiled.intVarIdByName.getValue(it.name)] }
             val present = ps.indices.filter { ps[it] }
             for (i in present) {
                 for (j in present) {
@@ -353,7 +353,7 @@ class OptCumulativeTest {
         val samples = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 31)).take(40).toList()
         for (sample in samples) {
             val ps = listOf(s.s0, s.s1, s.s2).map { compiled.decode(it.present, sample) }
-            val vs = listOf(s.s0, s.s1, s.s2).map { sample.ints[compiled.intVarIdByName[it.name]!!] }
+            val vs = listOf(s.s0, s.s1, s.s2).map { sample.ints[compiled.intVarIdByName.getValue(it.name)] }
             // Reconstruct the usage profile from present tasks; max must be ≤ capacity.
             val usage = IntArray(6)
             for (i in 0..2) if (ps[i]) for (t in vs[i] until vs[i] + 2) if (t in usage.indices) usage[t]++

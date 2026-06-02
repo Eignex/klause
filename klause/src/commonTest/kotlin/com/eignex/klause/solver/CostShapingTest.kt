@@ -1,10 +1,14 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.ViolationPenalty
+import kotlin.math.abs
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -57,10 +61,10 @@ class CostShapingTest {
         // breakScore exactly for every move.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.recompute()
         for (b in 0..1) {
-            val move = com.eignex.klause.solver.Move.BoolFlip(b)
+            val move = BoolFlip(b)
             val raw = state.breakScore(move).toDouble()
             val shaped = state.shapedBreakScore(move)
             assertEquals(raw, shaped, "shaped should match raw when shaping is off")
@@ -75,14 +79,14 @@ class CostShapingTest {
         // differ exactly by the weight gap.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
         state.objective = LinearObjective(boolWeights = doubleArrayOf(100.0, 1.0))
         state.shapingLambda = 1.0
-        val score0 = state.shapedBreakScore(com.eignex.klause.solver.Move.BoolFlip(0))
-        val score1 = state.shapedBreakScore(com.eignex.klause.solver.Move.BoolFlip(1))
+        val score0 = state.shapedBreakScore(BoolFlip(0))
+        val score1 = state.shapedBreakScore(BoolFlip(1))
         // Both flips have the same break score (both resolve cost=1 → 0). Shaped scores
         // differ by 99 (objective coefficient gap).
         assertEquals(99.0, score0 - score1, "shaped break gap must equal objective gap")
@@ -92,29 +96,29 @@ class CostShapingTest {
     fun `shapedObjectiveDelta returns zero when shaping is off`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.recompute()
         // No objective set → delta is 0 for any move.
-        assertEquals(0.0, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(0)))
+        assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
         // Objective set but lambda = 0 → still 0.
         state.objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0))
         state.shapingLambda = 0.0
-        assertEquals(0.0, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(0)))
+        assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
     }
 
     @Test
     fun `shapedObjectiveDelta returns lambda times linear delta when shaping is on`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
         state.objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0))
         state.shapingLambda = 0.5
         // Flipping bool 0 false → true adds 10 to objective; with lambda=0.5, delta = 5.
-        assertEquals(5.0, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(0)))
-        assertEquals(0.5, state.shapedObjectiveDelta(com.eignex.klause.solver.Move.BoolFlip(1)))
+        assertEquals(5.0, state.shapedObjectiveDelta(BoolFlip(0)))
+        assertEquals(0.5, state.shapedObjectiveDelta(BoolFlip(1)))
     }
 
     @Test
@@ -123,7 +127,7 @@ class CostShapingTest {
         // Implement IncrementalObjective so the LS engine can fold it into shaped descent.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
@@ -131,7 +135,7 @@ class CostShapingTest {
             override fun evaluate(sample: Sample): Double {
                 val b0 = if (sample.bools[0]) 1 else 0
                 val b1 = if (sample.bools[1]) 1 else 0
-                return kotlin.math.abs(2.0 * b0 - b1 - 1.0)
+                return abs(2.0 * b0 - b1 - 1.0)
             }
             override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
                 val before = score(assignment.boolValue(0), assignment.boolValue(1))
@@ -149,7 +153,7 @@ class CostShapingTest {
             private fun score(b0: Boolean, b1: Boolean): Double {
                 val x = if (b0) 1 else 0
                 val y = if (b1) 1 else 0
-                return kotlin.math.abs(2.0 * x - y - 1.0)
+                return abs(2.0 * x - y - 1.0)
             }
         }
         state.objective = abs
@@ -167,7 +171,7 @@ class CostShapingTest {
         // return 0.0 (descent objective-blind) rather than crash or apply-revert.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(problem, kotlin.random.Random(0))
+        val state = LocalSearchState(problem, Random(0))
         state.recompute()
         state.objective = object : Objective {
             override fun evaluate(sample: Sample): Double = 42.0

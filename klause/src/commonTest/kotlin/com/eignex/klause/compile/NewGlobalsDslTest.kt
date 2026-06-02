@@ -76,11 +76,6 @@ class NewGlobalsDslTest {
         BitBlaster.compile(compiled.problem)
     }
 
-    private fun assertSolves(compiled: CompiledProblem, label: String) {
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
-        assertTrue(sample != null, "$label: solver found no sample")
-    }
-
     @Test
     fun `network_flow - simple two-arc balance`() {
         class S : VariableSchema() {

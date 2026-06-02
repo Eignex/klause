@@ -1,5 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ast.IntCmpOp
+import com.eignex.klause.ast.IntCompare
+import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.allDifferent
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
@@ -70,10 +73,10 @@ class SolveStatsTest {
             val x by intVar(0, 0)
             val y by intVar(1, 1)
             val c by constraint {
-                com.eignex.klause.ast.IntCompare(
-                    com.eignex.klause.ast.IntRef("x"),
-                    com.eignex.klause.ast.IntCmpOp.EQ,
-                    com.eignex.klause.ast.IntRef("y"),
+                IntCompare(
+                    IntRef("x"),
+                    IntCmpOp.EQ,
+                    IntRef("y"),
                 )
             }
         }

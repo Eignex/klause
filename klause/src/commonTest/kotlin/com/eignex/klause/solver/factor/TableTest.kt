@@ -7,6 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -30,7 +31,7 @@ class TableTest {
             .map { it.ints.toList() }
             .toList()
             .toSet()
-        kotlin.test.assertEquals(setOf(listOf(0, 1), listOf(2, 3)), results)
+        assertEquals(setOf(listOf(0, 1), listOf(2, 3)), results)
     }
 
     @Test

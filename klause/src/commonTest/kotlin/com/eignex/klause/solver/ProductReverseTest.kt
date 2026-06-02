@@ -2,9 +2,11 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ProductReverseTest {
 
@@ -86,10 +88,10 @@ class ProductReverseTest {
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(2, 4), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(p)
+        val session = PropagationSession(p)
         val daAfter = session.intDomain(0)
-        kotlin.test.assertEquals(3, daAfter.min, "a.min should be ceil(10/4) = 3; got $daAfter")
-        kotlin.test.assertEquals(10, daAfter.max, "a.max should be floor(20/2) = 10; got $daAfter")
+        assertEquals(3, daAfter.min, "a.min should be ceil(10/4) = 3; got $daAfter")
+        assertEquals(10, daAfter.max, "a.max should be floor(20/2) = 10; got $daAfter")
     }
 
     @Test
@@ -102,10 +104,10 @@ class ProductReverseTest {
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(-4, -2), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(p)
+        val session = PropagationSession(p)
         val daAfter = session.intDomain(0)
-        kotlin.test.assertEquals(-10, daAfter.min, "got $daAfter")
-        kotlin.test.assertEquals(-3, daAfter.max, "got $daAfter")
+        assertEquals(-10, daAfter.min, "got $daAfter")
+        assertEquals(-3, daAfter.max, "got $daAfter")
     }
 
     @Test
@@ -119,10 +121,10 @@ class ProductReverseTest {
             intDomains = arrayOf(IntDomain(-100, 100), IntDomain(-2, 3), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(p)
+        val session = PropagationSession(p)
         val daAfter = session.intDomain(0)
-        kotlin.test.assertEquals(-100, daAfter.min, "a.min should not be touched")
-        kotlin.test.assertEquals(100, daAfter.max, "a.max should not be touched")
+        assertEquals(-100, daAfter.min, "a.min should not be touched")
+        assertEquals(100, daAfter.max, "a.max should not be touched")
     }
 
     @Test
@@ -135,9 +137,9 @@ class ProductReverseTest {
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(1, 5), IntDomain(10, 20)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
-        val session = com.eignex.klause.solver.propagation.PropagationSession(p)
+        val session = PropagationSession(p)
         val daAfter = session.intDomain(0)
-        kotlin.test.assertTrue(
+        assertTrue(
             daAfter.min >= 1,
             "a.min=0 should have been pushed up since 0 * b = 0 ∉ result; got $daAfter",
         )

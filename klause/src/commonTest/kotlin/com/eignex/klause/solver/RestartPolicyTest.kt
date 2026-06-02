@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -117,9 +118,9 @@ class RestartPolicyTest {
     @Test
     fun `luby integrates with local search solver`() {
         val clauses = listOf(
-            com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-            com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
         )
         val problem = Problem(3, 0, emptyArray(), clauses)
         val solver = LocalSearchSolver(problem, restartPolicy = LubyRestart(unit = 50))

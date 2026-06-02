@@ -1,5 +1,6 @@
 package com.eignex.klause.schema
 
+import com.eignex.klause.ast.BoolRef
 import com.eignex.klause.ast.BoolSpec
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.NamedConstraint
@@ -52,7 +53,7 @@ class SchemaTest {
         val nc = schema.entries["noPremiumForA"] as NamedConstraint
         val imp = nc.expr as Implies
         val right = imp.right
-        assertTrue(right is com.eignex.klause.ast.BoolRef)
+        assertTrue(right is BoolRef)
         assertTrue(right.negated)
         assertEquals("premium", right.name)
     }

@@ -42,7 +42,7 @@ class CompileTest {
         assertTrue(compiled.problem.factors[0] is Cardinality)
         assertTrue(compiled.problem.factors[1] is Clause)
         assertNotNull(compiled.boolVarIdByName["premium"])
-        assertEquals(setOf("a", "b", "c"), compiled.nominalIndicators["type"]!!.keys)
+        assertEquals(setOf("a", "b", "c"), compiled.nominalIndicators.getValue("type").keys)
     }
 
     @Test

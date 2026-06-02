@@ -97,7 +97,7 @@ class LocalSearchSessionTest {
         val solver = LocalSearchSolver(weightLearningProblem())
         val session: LocalSearchSession = solver.session()
         assertEquals(0, session.depth)
-        session.push(com.eignex.klause.solver.Assumptions(bools = mapOf(0 to true)))
+        session.push(Assumptions(bools = mapOf(0 to true)))
         assertEquals(1, session.depth)
         session.pop()
         assertEquals(0, session.depth)

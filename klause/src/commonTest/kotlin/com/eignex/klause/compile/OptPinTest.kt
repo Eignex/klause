@@ -3,6 +3,7 @@ package com.eignex.klause.compile
 import com.eignex.klause.ast.Not
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
@@ -37,7 +38,7 @@ class OptPinTest {
         }
     }
 
-    private fun firstFeasible(compiled: CompiledProblem): com.eignex.klause.solver.Sample {
+    private fun firstFeasible(compiled: CompiledProblem): Sample {
         val solver = LocalSearchSolver(compiled.problem)
         val s = solver.samples(LocalSearchParams(maxFlips = 20_000, randomSeed = 7)).firstOrNull()
         assertTrue(s != null, "solver found no feasible sample")

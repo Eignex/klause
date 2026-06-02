@@ -140,7 +140,7 @@ class ArithmeticDslTest {
 
         assertTrue(cnf.clauses.isNotEmpty())
 
-        cnf.decodeInt(compiled.intVarIdByName["x"]!!, BooleanArray(cnf.numVars))
+        cnf.decodeInt(compiled.intVarIdByName.getValue("x"), BooleanArray(cnf.numVars))
     }
 
     @Test
@@ -171,7 +171,7 @@ class ArithmeticDslTest {
         val cnf = BitBlaster.compile(compiled.problem)
         assertEquals(1, compiled.intVarIdByName.size)
 
-        val flagCnfVar = cnf.boolVarToCnfVar[compiled.boolVarIdByName["flag"]!!]
+        val flagCnfVar = cnf.boolVarToCnfVar[compiled.boolVarIdByName.getValue("flag")]
         assertTrue(flagCnfVar in 0 until cnf.numVars)
 
         Lit.make(flagCnfVar, true)

@@ -3,7 +3,9 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 import kotlin.test.Test
@@ -46,7 +48,7 @@ class HeuristicCallbackTest {
         }
         override fun onCommit(varRef: VarRef, value: Int) { /* not exercised by this test */ }
         override fun onConflict(varRef: VarRef, value: Int) { /* not exercised by this test */ }
-        override fun onSolution(snapshot: com.eignex.klause.solver.Sample) { /* not exercised by this test */ }
+        override fun onSolution(snapshot: Sample) { /* not exercised by this test */ }
     }
 
     @Test
@@ -80,10 +82,10 @@ class HeuristicCallbackTest {
             numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             ),
         )
         val h = CountingHeuristics()

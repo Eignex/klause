@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -205,14 +206,14 @@ class FactorConflictReasonTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.ReifiedLinear(
+                ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(0),
                     op = LinearOp.EQ,
                     bound = 5,
                 ),
-                com.eignex.klause.solver.factor.ReifiedLinear(
+                ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(1),
@@ -241,14 +242,14 @@ class FactorConflictReasonTest {
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.ReifiedLinear(
+                ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(0),
                     op = LinearOp.EQ,
                     bound = 0,
                 ),
-                com.eignex.klause.solver.factor.ReifiedLinear(
+                ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(1),
@@ -282,21 +283,21 @@ class FactorConflictReasonTest {
                 IntDomain(0, 2),
             ),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.ReifiedLinear(
+                ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(0),
                     op = LinearOp.EQ,
                     bound = 1,
                 ),
-                com.eignex.klause.solver.factor.ReifiedLinear(
+                ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(1),
                     op = LinearOp.EQ,
                     bound = 1,
                 ),
-                com.eignex.klause.solver.factor.ReifiedLinear(
+                ReifiedLinear(
                     auxBoolVar = 0,
                     coeffs = intArrayOf(1),
                     vars = intArrayOf(2),
@@ -353,9 +354,9 @@ class FactorConflictReasonTest {
         val r = session.pinBool(0, true)
         assertIs<PropagationResult.Implied>(r)
         val ant = problem.factors.let {
-            val s = com.eignex.klause.solver.propagation.PropagationState(
+            val s = PropagationState(
                 problem,
-                com.eignex.klause.solver.Assumptions.None,
+                Assumptions.None,
             )
             s.pinBoolAsDecision(0, true)
             val confl = s.runToFixpoint(allFactors = false)
@@ -379,7 +380,7 @@ class FactorConflictReasonTest {
         assertTrue(zAnt != null, "z's antecedents should be set by ReifiedLinear C's aux pin")
         val ge5 = Lit.make(ant.atomVarGe(0, 5), false)
         val le5 = Lit.make(ant.atomVarLe(0, 5), false)
-        val zAntSet = zAnt!!.toSet()
+        val zAntSet = requireNotNull(zAnt).toSet()
         assertTrue(
             ge5 in zAntSet && le5 in zAntSet,
             "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}",
@@ -466,7 +467,7 @@ class FactorConflictReasonTest {
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 5),
-                com.eignex.klause.solver.factor.Linear(
+                Linear(
                     intArrayOf(1, 1),
                     intArrayOf(0, 1),
                     LinearOp.EQ,
@@ -477,9 +478,9 @@ class FactorConflictReasonTest {
         val session = PropagationSession(problem)
         assertIs<PropagationResult.Implied>(session.pinBool(0, true))
         // State: v0=5, v1=3 (forced by Linear after x=true at level 1).
-        val state = com.eignex.klause.solver.propagation.PropagationState(
+        val state = PropagationState(
             problem,
-            com.eignex.klause.solver.Assumptions.None,
+            Assumptions.None,
         )
         state.pinBoolAsDecision(0, true)
         state.runToFixpoint(allFactors = false)
@@ -502,7 +503,7 @@ class FactorConflictReasonTest {
         assertTrue(ant != null, "atom should have antecedents from intMinAntecedents[v1]")
         val ge5 = Lit.make(state.atomVarGe(0, 5), false)
         val le5 = Lit.make(state.atomVarLe(0, 5), false)
-        val antSet = ant!!.toSet()
+        val antSet = requireNotNull(ant).toSet()
         assertTrue(
             le5 in antSet,
             "atom antecedents should contain the driving bound ¬[v0≤5], got ${ant.toList()}",
@@ -541,9 +542,9 @@ class FactorConflictReasonTest {
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = emptyArray(),
         )
-        val state = com.eignex.klause.solver.propagation.PropagationState(
+        val state = PropagationState(
             problem,
-            com.eignex.klause.solver.Assumptions.None,
+            Assumptions.None,
         )
         // Allocate atoms. Both currently undetermined (5 ∈ [0,9], 7 ∈ [0,9]).
         // Wait — atom truth derives from currentTruth(): [v0 ≥ 5] is true iff v0.min ≥ 5.
@@ -551,7 +552,7 @@ class FactorConflictReasonTest {
         val atomV0Ge5 = state.atomVarGe(0, 5)
         val atomV1Ge7 = state.atomVarGe(1, 7)
         // Add the clause as a learned clause.
-        val clause = com.eignex.klause.solver.factor.Clause(
+        val clause = Clause(
             intArrayOf(
                 Lit.make(atomV0Ge5, true),
                 Lit.make(atomV1Ge7, true),

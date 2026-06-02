@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -72,7 +73,7 @@ class BoundSacProbingTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Table(
+                Table(
                     xs = intArrayOf(0, 1),
                     tuples = intArrayOf(0, 0, 3, 3),
                 ),

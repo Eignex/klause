@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
+import com.eignex.klause.solver.localsearch.CrossoverBias.BetterBiased
 import com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -174,7 +175,7 @@ class IteratedLocalSearchTest {
 
     @Test
     fun `BetterBiased crossover skews toward the better parent`() {
-        val bias = com.eignex.klause.solver.localsearch.CrossoverBias.BetterBiased(rate = 0.5)
+        val bias = BetterBiased(rate = 0.5)
         assertEquals(
             1.0,
             bias.probParentA(parentAObjective = 1.0, parentBObjective = 10.0),

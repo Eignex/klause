@@ -172,7 +172,7 @@ class CumulativeThetaTreeTest {
             val active = BooleanArray(n) { rng.nextBoolean() }
 
             // Build leaf positions = argsort of ests (ascending; ties broken by id).
-            val order = (0 until n).sortedWith(compareBy({ ests[it] }, { it }))
+            val order = (0 until n).sortedWith(compareBy({ id -> ests[id] }, { id -> id }))
             val leafPos = IntArray(n)
             for ((leafIdx, id) in order.withIndex()) leafPos[id] = leafIdx
 
@@ -188,7 +188,7 @@ class CumulativeThetaTreeTest {
                 "mismatch: n=$n cap=$capacity ests=${ests.toList()} e=${energies.toList()} active=${active.toList()}",
             )
 
-            val expectedE = (0 until n).filter { active[it] }.sumOf { energies[it] }
+            val expectedE = (0 until n).filter { id -> active[id] }.sumOf { id -> energies[id] }
             assertEquals(expectedE, tree.energyOfTheta())
         }
     }
