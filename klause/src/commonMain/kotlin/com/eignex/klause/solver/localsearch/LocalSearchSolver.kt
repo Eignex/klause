@@ -299,8 +299,13 @@ class LocalSearchSolver(
         // the field at 0.0 so behavior is identical to the no-shaping path.
         state.objective = objective
         state.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
-        // No bestSample yet — first restart is always full random.
-        restartPolicy.restart(state, bestSoFar = null)
+        // Warm-start the descent from a caller-supplied assignment (e.g. a CP-found feasible
+        // point) instead of a random restart, when one is provided and arity-compatible. Null
+        // by default → pure random restart (the competition-safe path). See
+        // [LocalSearchParams.initialAssignment].
+        val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
+        // No bestSample yet — first restart is always full random (unless we seeded above).
+        if (!seeded) restartPolicy.restart(state, bestSoFar = null)
         // Greedy-repair is gated on problem size: on tiny problems the LS engine reaches
         // feasibility in microseconds and the repair pass is pure overhead; the gating
         // also avoids changing observable convergence on the existing small unit tests.
@@ -446,6 +451,24 @@ class LocalSearchSolver(
                 MinimizeResult.Unknown(reason)
             },
         )
+    }
+
+    /** Load [sample] into [state]'s assignment (re-pinning assumed slots), reset the tabu/CC
+     *  epoch, and recompute cost/degrees — the warm-start seed path for
+     *  [LocalSearchParams.initialAssignment]. Returns false (leaving the state untouched for a
+     *  normal random restart) when the sample's arity doesn't match this problem. */
+    private fun seedFrom(state: LocalSearchState, sample: Sample): Boolean {
+        if (sample.bools.size != problem.numBoolVars || sample.ints.size != problem.numIntVars) return false
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
+        // Respect caller pins exactly as restart() does, so a seed can't violate assumptions.
+        state.assumptions.forEachBool { id, value ->
+            if (state.assignment.boolValue(id) != value) state.assignment.flipBool(id)
+        }
+        state.assumptions.forEachInt { id, value -> state.assignment.setInt(id, value) }
+        state.resetStepCounters()
+        state.recompute()
+        return true
     }
 
     /**
