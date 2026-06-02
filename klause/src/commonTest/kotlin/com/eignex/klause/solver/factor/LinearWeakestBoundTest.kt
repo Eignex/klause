@@ -46,6 +46,15 @@ class LinearWeakestBoundTest {
             Inst(3, 0, 3, listOf(Con(intArrayOf(1, 1, 1), LinearOp.LE, 4), Con(intArrayOf(1, 1, 1), LinearOp.GE, 2))),
             Inst(4, 0, 2, listOf(Con(intArrayOf(2, 1, 1, 0), LinearOp.LE, 4), Con(intArrayOf(0, 1, 2, 1), LinearOp.GE, 3))),
             Inst(3, 0, 3, listOf(Con(intArrayOf(1, -1, 2), LinearOp.EQ, 3))),
+            // Larger coefficients → bigger per-tighten relaxation room (rounding remainder up to
+            // |c|-1); stresses the per-tighten weakest-bound relaxation specifically.
+            Inst(3, 0, 4, listOf(Con(intArrayOf(3, 2, 1), LinearOp.LE, 9))),
+            Inst(3, 0, 4, listOf(Con(intArrayOf(3, 2, 1), LinearOp.GE, 8))),
+            Inst(4, 0, 3, listOf(Con(intArrayOf(2, 3, 1, 2), LinearOp.LE, 10), Con(intArrayOf(1, 1, 1, 1), LinearOp.GE, 3))),
+            // Deep tighten chain that then conflicts (exercises stored per-tighten antecedents
+            // being resolved through during conflict analysis).
+            Inst(4, 0, 3, listOf(Con(intArrayOf(2, 2, 2, 2), LinearOp.EQ, 9))), // odd RHS, even coeffs → tightenings + UNSAT
+            Inst(4, 0, 5, listOf(Con(intArrayOf(4, -2, 3, -1), LinearOp.LE, 6), Con(intArrayOf(1, 1, 1, 1), LinearOp.GE, 4))),
         )
         for ((idx, inst) in instances.withIndex()) {
             val n = inst.n

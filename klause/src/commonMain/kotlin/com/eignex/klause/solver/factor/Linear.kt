@@ -101,9 +101,10 @@ class Linear(
             LinearOp.GE -> false
             else -> range[0] > bound.toLong() // EQ: lo side (mins too big) vs hi side
         }
-        return collectLinearRelaxedConflictAntecedents(
-            state, coeffs, vars, bound.toLong(), sumLo = range[0], sumHi = range[1], useLo = useLo,
-        )
+        // Conflict: the driving extreme breaches `bound`; slack = how far it can fall back and
+        // still breach (sumLo > bound ⇒ sumLo-bound-1; sumHi < bound ⇒ bound-sumHi-1).
+        val slack = if (useLo) range[0] - bound.toLong() - 1 else bound.toLong() - range[1] - 1
+        return collectLinearRelaxedAntecedents(state, coeffs, vars, excludeIdx = -1, slack = slack, useLo = useLo, extraLit = 0)
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -436,47 +437,59 @@ internal fun collectLinearDirAntecedents(
 }
 
 /**
- * Weakest-bound relaxation of a [Linear] **conflict** reason. Same direction-aware seed as
- * [collectLinearDirAntecedents] (only the driving sum-side's bounds), but each cited bound is
- * relaxed to the loosest value that still proves infeasibility, distributing the slack across
- * vars. A relaxed bound `[v ≥ k']` (k' below the current min) is cited as a **leaf** at the
- * level its min *first* reached k' (`minLevelForGe`) — strictly below the conflict level, so
- * the analyzer never resolves through it and the historical antecedent is irrelevant. The
- * looser cited bounds make the learned clause strictly more general / reusable.
+ * Weakest-bound relaxation of a [Linear] direction-aware reason — used for both the
+ * whole-constraint **conflict** ([excludeIdx] = -1) and a per-variable bound **tighten**
+ * ([excludeIdx] = the deduced var, which is omitted from the cited set). Same direction-aware
+ * seed as [collectLinearDirAntecedents] (only the driving sum-side's bounds), but each cited
+ * bound is relaxed toward its loosest value that still proves the deduction, distributing
+ * [slack] (the room the driving sum has before the deduction would change) across the vars.
  *
- * Soundness: the driving sum after relaxation = original driving extreme − (slack consumed),
- * and slack is capped at `breach − 1`, so the relaxed bounds still force the sum past [bound].
- * Each relaxed atom sits at a level < the conflict level (a sound leaf); vars at their root
- * bound are global facts and cited nothing; vars whose full relaxation can't fit the remaining
- * slack keep their current tight bound (the existing behaviour, with its real antecedent).
+ * A relaxed bound `[v ≥ k']` (k' below the current min) is cited as a **leaf** at the level its
+ * min *first* reached k' (`minLevelForGe`) — strictly below the current level, so the analyzer
+ * never resolves through it and the historical antecedent is irrelevant. The looser cited
+ * bounds make the eventual learned clause strictly more general / reusable.
+ *
+ * Soundness: relaxing a cited bound moves the driving sum toward [bound] by `|c|·(loosening)`;
+ * the total is capped at [slack], so the relaxed bounds still imply the original deduction
+ * (conflict: sum still breaches [bound]; tighten: the rounded bound on the deduced var is
+ * unchanged). [slack] MUST be a sound *under*-estimate of the true room — over-estimating drops
+ * feasible solutions. Vars at their root bound are global facts (cited nothing); vars whose full
+ * relaxation can't fit the remaining slack keep their current tight bound (existing behaviour,
+ * real antecedent). [extraLit], when non-zero, is prepended (the reif aux context literal).
  *
  * Falls back to [collectLinearDirAntecedents] when `vars` repeats a variable (the per-entry
  * slack accounting assumes distinct vars).
  */
-internal fun collectLinearRelaxedConflictAntecedents(
+internal fun collectLinearRelaxedAntecedents(
     state: PropagationState,
     coeffs: IntArray,
     vars: IntArray,
-    bound: Long,
-    sumLo: Long,
-    sumHi: Long,
+    excludeIdx: Int,
+    slack: Long,
     useLo: Boolean,
+    extraLit: Int,
 ): IntArray? {
     // The per-var relaxation treats each entry independently; duplicate vars would double-spend
     // slack or under-cite, so defer to the unrelaxed direction-aware reason in that case.
     run {
         val seenVar = HashSet<Int>(vars.size)
-        for (v in vars) if (!seenVar.add(v)) {
-            return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
+        for (j in vars.indices) {
+            if (j == excludeIdx) continue
+            if (!seenVar.add(vars[j])) {
+                return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx, extraLit, useLo)
+            }
         }
     }
     val currentLevel = state.currentLevel
-    // Slack we may give back while keeping the driving sum strictly past `bound`.
-    var slack = if (useLo) sumLo - bound - 1 else bound - sumHi - 1
-    if (slack < 0) slack = 0
+    var remaining = if (slack < 0) 0 else slack
     val seen = HashSet<Int>()
     val out = IntArrayList()
+    if (extraLit != 0) {
+        out.add(extraLit)
+        seen.add(extraLit)
+    }
     for (j in vars.indices) {
+        if (j == excludeIdx) continue
         val c = coeffs[j]
         if (c == 0) continue
         val v = vars[j]
@@ -488,8 +501,8 @@ internal fun collectLinearRelaxedConflictAntecedents(
             if (curMin <= rootMin) continue // at root → global fact, cite nothing
             val kBelow = state.minBelowLevel(v, currentLevel) // loosest min at a level < current
             val cost = absC * (curMin - kBelow)
-            if (cost <= slack) {
-                slack -= cost
+            if (cost <= remaining) {
+                remaining -= cost
                 if (kBelow > rootMin) {
                     val lit = Lit.make(state.atomBoundLeafIfNew(v, 0, kBelow, state.minLevelForGe(v, kBelow)), false)
                     if (seen.add(lit)) out.add(lit)
@@ -504,8 +517,8 @@ internal fun collectLinearRelaxedConflictAntecedents(
             if (curMax >= rootMax) continue
             val kAbove = state.maxAboveLevel(v, currentLevel)
             val cost = absC * (kAbove - curMax)
-            if (cost <= slack) {
-                slack -= cost
+            if (cost <= remaining) {
+                remaining -= cost
                 if (kAbove < rootMax) {
                     val lit = Lit.make(state.atomBoundLeafIfNew(v, 1, kAbove, state.maxLevelForLe(v, kAbove)), false)
                     if (seen.add(lit)) out.add(lit)
@@ -625,22 +638,31 @@ internal fun propagateLinearBounds(
         val otherLo = sumLo - rLo[i]
         val otherHi = sumHi - rHi[i]
         if (op == LinearOp.LE || op == LinearOp.EQ) {
-            // Upper-bound tighten driven by the lo side (Σ rLo of the other vars).
-            val slack = bound - otherLo
-            val ant = collectLinearDirAntecedents(state, coeffs, vars, i, extraLit, useLo = true)
+            // Upper-bound tighten driven by the lo side (Σ rLo of the other vars). The deduced
+            // bound is `floor(slack0 / c)`; the lo-driving bounds may loosen until that floor
+            // would increment — `c·(t+1)−1−slack0 ∈ [0, c−1]` is that (sound) room. c<0 uses 0.
+            val slack0 = bound - otherLo
             if (c > 0) {
-                if (!tightenMaxClamped(state, v, floorDivLong(slack, c), ant)) return false
+                val t = floorDivLong(slack0, c)
+                val relax = c * (t + 1) - 1 - slack0
+                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, relax, useLo = true, extraLit)
+                if (!tightenMaxClamped(state, v, t, ant)) return false
             } else {
-                if (!tightenMinClamped(state, v, ceilDivLong(slack, c), ant)) return false
+                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, 0L, useLo = true, extraLit)
+                if (!tightenMinClamped(state, v, ceilDivLong(slack0, c), ant)) return false
             }
         }
         if (op == LinearOp.GE || op == LinearOp.EQ) {
-            // Lower-bound tighten driven by the hi side (Σ rHi of the other vars).
+            // Lower-bound tighten driven by the hi side (Σ rHi of the other vars). Symmetric
+            // room: `needed − c·(t−1) − 1 ∈ [0, c−1]` for the ceil. c<0 uses 0.
             val needed = bound - otherHi
-            val ant = collectLinearDirAntecedents(state, coeffs, vars, i, extraLit, useLo = false)
             if (c > 0) {
-                if (!tightenMinClamped(state, v, ceilDivLong(needed, c), ant)) return false
+                val t = ceilDivLong(needed, c)
+                val relax = needed - c * (t - 1) - 1
+                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, relax, useLo = false, extraLit)
+                if (!tightenMinClamped(state, v, t, ant)) return false
             } else {
+                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, 0L, useLo = false, extraLit)
                 if (!tightenMaxClamped(state, v, floorDivLong(needed, c), ant)) return false
             }
         }
