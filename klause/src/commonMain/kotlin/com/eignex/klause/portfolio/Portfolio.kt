@@ -176,6 +176,32 @@ class Portfolio(
     }
 
     /**
+     * Streaming branch-and-bound: fan in every worker's improving incumbents into one flow,
+     * emitting only those that strictly beat the shared global best (so the consumer sees a
+     * monotonically-improving sequence). The shared bound is exposed to bound-pruning workers
+     * exactly as in [minimize]. Collector cancellation (and [cancellation]) stops all workers.
+     * This is the anytime entry point the bench's optimisation metric consumes.
+     */
+    fun improvements(objective: Objective, cancellation: Cancellation = Cancellation.Never): Flow<MinimizeResult> =
+        channelFlow {
+            val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
+            val bestSample = AtomicReference<Sample?>(null)
+            fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
+            for (worker in workers) {
+                launch {
+                    val job = requireNotNull(coroutineContext[Job])
+                    val token: Cancellation = { !job.isActive || cancellation() }
+                    for (r in worker.improvements(objective, ::readBound, token)) {
+                        if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
+                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                            send(r)
+                        }
+                    }
+                }
+            }
+        }
+
+    /**
      * Stream samples in parallel across all workers, fanning in to a single flow. Each worker
      * runs its own sample sequence with cancellation tied to the collector — when the consumer
      * stops collecting, every worker is cancelled.
