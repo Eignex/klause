@@ -6,12 +6,122 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.Vsids
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class GlobalCardinalityTest {
+
+    private class LowUpInst(
+        val xsRanges: List<Pair<Int, Int>>,
+        val cover: IntArray,
+        val low: IntArray,
+        val high: IntArray,
+        val closed: Boolean,
+    )
+
+    /**
+     * Soundness gate for the sharpened (pigeonhole-subset) GCC conflict reasons, low/up form.
+     * Battery includes a capacity-infeasible instance (3 vars, 2 values cap-1 each) so the
+     * count-pigeonhole and Régin-flow failure paths fire. Under the full CDCL backtracker
+     * enumeration must equal brute force; an unsound reason drops a feasible assignment.
+     */
+    @Test
+    fun `backtrack learning enumerates exactly the brute-force solution set (low-up)`() {
+        val instances = listOf(
+            LowUpInst(listOf(0 to 1, 0 to 1, 0 to 1), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(1, 1), false),
+            LowUpInst(listOf(0 to 2, 0 to 2, 0 to 2), intArrayOf(0, 1, 2), intArrayOf(1, 1, 1), intArrayOf(1, 1, 1), false),
+            LowUpInst(
+                listOf(0 to 2, 0 to 2, 0 to 2, 0 to 2),
+                intArrayOf(0, 1, 2), intArrayOf(0, 0, 0), intArrayOf(2, 2, 2), false,
+            ),
+            LowUpInst(listOf(0 to 3, 0 to 3, 0 to 3), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(3, 3), true),
+            LowUpInst(listOf(0 to 2, 0 to 2, 1 to 2), intArrayOf(0, 1, 2), intArrayOf(0, 0, 1), intArrayOf(1, 2, 2), false),
+        )
+        for ((idx, inst) in instances.withIndex()) {
+            val n = inst.xsRanges.size
+            val coverIdx = inst.cover.withIndex().associate { (i, v) -> v to i }
+            fun ok(acc: IntArray): Boolean {
+                val counts = IntArray(inst.cover.size)
+                for (i in 0 until n) {
+                    val ci = coverIdx[acc[i]]
+                    if (ci != null) counts[ci]++ else if (inst.closed) return false
+                }
+                for (kk in inst.cover.indices) if (counts[kk] < inst.low[kk] || counts[kk] > inst.high[kk]) return false
+                return true
+            }
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(n)
+            fun rec(p: Int) {
+                if (p == n) { if (ok(acc)) brute.add(acc.toList()); return }
+                for (v in inst.xsRanges[p].first..inst.xsRanges[p].second) { acc[p] = v; rec(p + 1) }
+            }
+            rec(0)
+
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(inst.xsRanges[it].first, inst.xsRanges[it].second) },
+                factors = arrayOf<Factor>(
+                    GlobalCardinality(
+                        xs = IntArray(n) { it },
+                        cover = inst.cover,
+                        countLow = inst.low,
+                        countHigh = inst.high,
+                        closed = inst.closed,
+                    ),
+                ),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableHeuristic = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
+        }
+    }
+
+    /** Soundness gate for the count-var (`countVars[k] = #{xs=cover[k]}`) form. */
+    @Test
+    fun `backtrack learning enumerates exactly the brute-force solution set (count vars)`() {
+        val n = 3
+        val cover = intArrayOf(0, 1)
+        val m = cover.size
+        val xsRange = 0 to 1
+        val cvRange = 0 to 3
+        val coverIdx = cover.withIndex().associate { (i, v) -> v to i }
+        val k = n + m
+        val brute = HashSet<List<Int>>()
+        val acc = IntArray(k)
+        fun ok(): Boolean {
+            val counts = IntArray(m)
+            for (i in 0 until n) coverIdx[acc[i]]?.let { counts[it]++ }
+            for (j in 0 until m) if (acc[n + j] != counts[j]) return false
+            return true
+        }
+        fun rec(p: Int) {
+            if (p == k) { if (ok()) brute.add(acc.toList()); return }
+            val r = if (p < n) xsRange else cvRange
+            for (v in r.first..r.second) { acc[p] = v; rec(p + 1) }
+        }
+        rec(0)
+
+        val doms = Array(k) {
+            if (it < n) IntDomain(xsRange.first, xsRange.second) else IntDomain(cvRange.first, cvRange.second)
+        }
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = k,
+            intDomains = doms,
+            factors = arrayOf<Factor>(
+                GlobalCardinality(xs = IntArray(n) { it }, cover = cover, countVars = IntArray(m) { n + it }),
+            ),
+        )
+        val params = BacktrackParams(randomSeed = 1L, variableHeuristic = Vsids(), maxLearnedClauses = 1_000)
+        val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            .map { it.ints.toList() }.toHashSet()
+        assertEquals(brute, found, "count-vars backtrack solution set must equal brute force")
+    }
 
     @Test
     fun `gcc with count vars`() {
