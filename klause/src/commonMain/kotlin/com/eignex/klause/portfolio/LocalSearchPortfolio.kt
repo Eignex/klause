@@ -18,7 +18,6 @@ import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import com.eignex.klause.solver.localsearch.strategy.Vnd
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
 import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.concurrent.atomics.AtomicReference
@@ -113,7 +112,7 @@ internal data class LocalSearchWorkerConfig(
                 // restart-layer shaking — the "shake + descent" framework.
                 LocalSearchWorkerConfig(
                     "vnd/ils-linkage",
-                    Vnd(maxNeighborhood = 3, skewAlpha = 0.2),
+                    Cbls.vnd(maxNeighborhood = 3, skewAlpha = 0.2),
                     IteratedLocalSearchRestart(
                         populationSize = 5,
                         crossoverRate = 0.4,

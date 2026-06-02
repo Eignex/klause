@@ -75,6 +75,26 @@ class Cbls(
      *  diversification over the broadened pool that lets strict local minima be escaped. */
     val stallNoise: Double = 0.4,
     val tabu: TabuFilter = TabuFilter.Disabled,
+    /** Move-scoring basis. [MoveScoring.Weighted] (default) scores by the per-factor
+     *  [LocalSearchState.factorWeights] gradient — the CBLS signal. [MoveScoring.Raw] scores by
+     *  the plain (unweighted) violation-count delta — the classical VND signal. The merged
+     *  CBLS×VND configuration keeps [MoveScoring.Weighted] so the variable-neighborhood ladder
+     *  is steered by the learned constraint weights. */
+    val scoring: MoveScoring = MoveScoring.Weighted,
+    /** Variable-neighborhood-descent ladder depth. `1` (default) = the flat CBLS candidate
+     *  pool (existing behavior, unchanged). `>1` engages an escalating k-level neighborhood:
+     *  level `k` proposes coordinated k-deep [couplingChain] moves, only escalating to `k+1`
+     *  when level `k` yields no accepted move, and resetting to level 1 on a strict cost drop.
+     *  This is the VND half of the merge — the structured large-move neighborhood CBLS's flat
+     *  pool lacks — while move *scoring* and *weight learning* stay CBLS's. */
+    val maxNeighborhood: Int = 1,
+    /** Candidate moves generated per ladder level. Only consulted when [maxNeighborhood] > 1. */
+    val candidatesPerLevel: Int = 4,
+    /** Skewed-VNS acceptance (Hansen et al. 2010). When non-zero, a move is accepted as
+     *  "improving" if `score + skewAlpha · moveSize < 0`, letting the descent take a
+     *  slightly-worsening move whose spatial reach is small — the classical mechanism for
+     *  crossing plateau lakes. `0.0` (default) = strict descent on the scored delta. */
+    val skewAlpha: Double = 0.0,
 ) : Strategy {
 
     init {
@@ -89,6 +109,9 @@ class Cbls(
         require(frontierAfterStall >= 0) { "frontierAfterStall ≥ 0, got $frontierAfterStall" }
         require(frontierMoveCap >= 1) { "frontierMoveCap ≥ 1, got $frontierMoveCap" }
         require(stallNoise in 0.0..1.0) { "stallNoise ∈ [0, 1], got $stallNoise" }
+        require(maxNeighborhood >= 1) { "maxNeighborhood ≥ 1, got $maxNeighborhood" }
+        require(candidatesPerLevel >= 1) { "candidatesPerLevel ≥ 1, got $candidatesPerLevel" }
+        require(skewAlpha >= 0.0) { "skewAlpha ≥ 0, got $skewAlpha" }
     }
 
     private var lastImprovingStep: Long = -1L
@@ -122,6 +145,14 @@ class Cbls(
             }
             lastSeenStep = state.step
         }
+
+        // VND ladder mode (the CBLS×VND merge): when a neighborhood ladder is configured,
+        // drive the *infeasible* fight through escalating coordinated neighborhoods — scored
+        // by [scoring] (Weighted keeps the CBLS gradient) and accepted via [accepts] (skewed
+        // when [skewAlpha] > 0). At feasibility we fall through to the flat objective-descent
+        // pool below, which owns the satisfied/objective candidate sources. Defaults
+        // ([maxNeighborhood] == 1) skip this entirely, leaving the flat CBLS path unchanged.
+        if (maxNeighborhood > 1 && state.cost > 0L) return pickMoveLadder(state)
 
         // Plateau escape: when no strict cost drop for [frontierAfterStall] steps, the search
         // is trapped — the violated-only candidate pool is too small for noise/weight-bumping
@@ -180,9 +211,25 @@ class Cbls(
      *  pure weighted-violation delta wins. At feasibility the objective is the only
      *  signal that distinguishes the equally-cost-0 candidates, so it fully drives. */
     private fun score(state: LocalSearchState, move: Move): Double {
-        val violationDelta = state.weightedNetDelta(move)
+        val violationDelta = when (scoring) {
+            MoveScoring.Weighted -> state.weightedNetDelta(move)
+            MoveScoring.Raw -> state.netDelta(move).toDouble()
+        }
         val objDelta = if (state.cost == 0L) state.shapedObjectiveDelta(move) else 0.0
         return violationDelta + objDelta
+    }
+
+    /** Move "size" for skewed-VNS acceptance: 1 for primitives, part-count for compounds. */
+    private fun moveSize(move: Move): Int = when (move) {
+        is Move.BoolFlip, is Move.IntSet -> 1
+        is Move.Compound -> move.parts.size
+    }
+
+    /** Skewed-VNS acceptance test: strict descent when [skewAlpha] is 0, otherwise admits a
+     *  slightly-worsening move whose spatial reach (size) is small. */
+    private fun accepts(state: LocalSearchState, move: Move): Boolean {
+        val s = score(state, move)
+        return if (skewAlpha == 0.0) s < 0.0 else s + skewAlpha * moveSize(move) < 0.0
     }
 
     /** Bump weights on every currently-violated factor by [increment]. SAPS-style scale
@@ -348,8 +395,139 @@ class Cbls(
         }
     }
 
-    private companion object {
+    /**
+     * Variable-neighborhood-descent pick over the infeasible landscape (the VND half of the
+     * merge). Escalates level `k = 1 … maxNeighborhood`: level `k` generates [candidatesPerLevel]
+     * coordinated k-deep moves (via [generateLevel]); the first level with an accepted move
+     * (per [accepts], so skewed when [skewAlpha] > 0) returns its best-scored move, resetting
+     * the ladder for next call. When no level yields an accepted move, walk the plateau from
+     * the level-1 pool's least-bad move so the search keeps progress instead of forcing a
+     * restart. Stall (no cost drop for [frontierAfterStall]) raises the diversification noise
+     * to [stallNoise], exactly as the flat path does.
+     */
+    private fun pickMoveLadder(state: LocalSearchState): Move? {
+        if (state.violated.isEmpty()) return null
+        val stalled = frontierAfterStall > 0 && state.step - lastDropStep >= frontierAfterStall
+        val effectiveNoise = if (stalled) stallNoise else noiseProbability
+        var plateauPool: List<Move>? = null
+        for (k in 1..maxNeighborhood) {
+            val sink = state.moveSink
+            sink.clear()
+            generateLevel(state, k, sink)
+            val raw = sink.list
+            if (raw.isEmpty()) continue
+            val filtered = tabu.filter(state, raw)
+            // While stalled, never let tabu starve the pool into a restart — fall back to the
+            // unfiltered candidates so the search keeps walking the plateau (mirrors flat path).
+            val moves = if (filtered.isEmpty()) {
+                if (stalled) raw else continue
+            } else {
+                filtered
+            }
+            if (plateauPool == null) plateauPool = moves.toList()
+            if (state.rng.nextDouble() < effectiveNoise) return moves[state.rng.nextInt(moves.size)]
+            var best: Move? = null
+            var bestScore = Double.POSITIVE_INFINITY
+            for (m in moves) {
+                if (!accepts(state, m)) continue
+                val s = score(state, m)
+                if (s < bestScore) {
+                    bestScore = s
+                    best = m
+                }
+            }
+            if (best != null) return best
+        }
+        // No accepted (improving / skew-improving) move at any level: walk the plateau.
+        val pool = plateauPool ?: return null
+        var best = pool[0]
+        var bestScore = score(state, best)
+        for (i in 1 until pool.size) {
+            val s = score(state, pool[i])
+            if (s < bestScore) {
+                bestScore = s
+                best = pool[i]
+            }
+        }
+        return best
+    }
+
+    /** Generate level-[k] candidates into [sink]. Level 1 is the single-factor repair pool
+     *  ([sampleFromViolated]); deeper levels are coordinated k-deep [couplingChain] moves. */
+    private fun generateLevel(state: LocalSearchState, k: Int, sink: MoveSink) {
+        if (k == 1) {
+            sampleFromViolated(state, sink)
+            return
+        }
+        repeat(candidatesPerLevel) {
+            couplingChain(state, k, sink)
+        }
+    }
+
+    /**
+     * Build one coordinated depth-[k] move and add it to [sink]. PLACEHOLDER (increment 1):
+     * a primitive k-factor concatenation ported from the legacy `Vnd.sampleCompound` — pick
+     * `k` random violated factors and staple one random repair from each. This is the *weak*
+     * neighborhood ("vnd is primitive"); increment 2 replaces it with a coupling-following
+     * ejection chain that walks the factor↔variable graph so the parts actually coordinate.
+     */
+    private fun couplingChain(state: LocalSearchState, k: Int, sink: MoveSink) {
+        // Per-factor repairs are proposed into a private scratch sink, never the accumulation
+        // target [sink]. Frozen-variable filtering happens when parts are added to [sink].
+        val scratch = chainScratch
+        val parts = ArrayList<Move>(k)
+        repeat(k) {
+            if (state.violated.isEmpty()) return@repeat
+            val fid = state.violated.random(state.rng)
+            scratch.clear()
+            state.factors[fid].proposeRepairMoves(state, fid, scratch)
+            val raw = scratch.list
+            if (raw.isEmpty()) return@repeat
+            when (val pick = raw[state.rng.nextInt(raw.size)]) {
+                is Move.BoolFlip, is Move.IntSet -> parts.add(pick)
+                is Move.Compound -> parts.addAll(pick.parts)
+            }
+        }
+        when (parts.size) {
+            0 -> {}
+            1 -> when (val p = parts[0]) {
+                is Move.BoolFlip -> sink.addBoolFlip(p.varId)
+                is Move.IntSet -> sink.addIntSet(p.varId, p.newValue)
+                is Move.Compound -> sink.addCompound(p.parts)
+            }
+            else -> sink.addCompound(parts)
+        }
+    }
+
+    /** Private scratch sink for per-factor repair proposals during [couplingChain] — kept off
+     *  the shared [LocalSearchState.moveSink] which the ladder uses as its accumulation target. */
+    private val chainScratch: MoveSink = MoveSink()
+
+    companion object {
         /** Largest geometric step seeded per leaf var during functional-objective descent. */
-        const val OBJ_SEED_MAX_STEP = 4096
+        private const val OBJ_SEED_MAX_STEP = 4096
+
+        /**
+         * Classical Variable-Neighbourhood-Descent as a [Cbls] preset (the unified strategy
+         * subsumes the former standalone `Vnd`): [MoveScoring.Raw] move scoring, a `k`-level
+         * neighbourhood ladder, skewed acceptance, and a default tabu tenure. The CBLS×VND
+         * *merge* is instead the plain [Cbls] constructor with [maxNeighborhood] > 1 and the
+         * default [MoveScoring.Weighted] — keeping the learned-weight gradient steering the
+         * ladder rather than the raw violation count.
+         */
+        fun vnd(
+            maxNeighborhood: Int = 3,
+            candidatesPerLevel: Int = 4,
+            noise: Double = 0.05,
+            skewAlpha: Double = 0.0,
+            tabu: TabuFilter = TabuFilter(tenure = 10),
+        ): Cbls = Cbls(
+            noiseProbability = noise,
+            tabu = tabu,
+            scoring = MoveScoring.Raw,
+            maxNeighborhood = maxNeighborhood,
+            candidatesPerLevel = candidatesPerLevel,
+            skewAlpha = skewAlpha,
+        )
     }
 }
