@@ -1,7 +1,9 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.count.ApproxCount
 import com.eignex.klause.solver.count.ApproxCountConfig
+import com.eignex.klause.solver.count.Count
+import com.eignex.klause.solver.count.CountConfig
+import com.eignex.klause.solver.count.ExactCountConfig
 import com.eignex.klause.solver.count.SamplingConfig
 
 /**
@@ -65,7 +67,13 @@ interface Session<P : SolverParams> : AutoCloseable {
     fun enumerate(params: P): Sequence<Sample>
 
     /** Approximate model count. See [Solver.approximateCount]. */
-    fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): ApproxCount = solver.approximateCount(config)
+    fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): Count = solver.approximateCount(config)
+
+    /** Anytime exact model count. See [Solver.exactCount]. */
+    fun exactCount(config: ExactCountConfig = ExactCountConfig()): Sequence<Count> = solver.exactCount(config)
+
+    /** Best-effort count (exact, else ApproxMC fallback). See [Solver.count]. */
+    fun count(config: CountConfig = CountConfig()): Count = solver.count(config)
 
     /** Quality-tiered sampling under the current assumptions. See [Solver.samples]. */
     fun samples(config: SamplingConfig, params: P): Sequence<Sample> = solver.samples(config, params)
@@ -142,7 +150,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun samples(params: P): Sequence<Sample> = solver.samples(applyStack(params))
     override fun enumerate(params: P): Sequence<Sample> = solver.enumerate(applyStack(params))
 
-    override fun approximateCount(config: ApproxCountConfig): ApproxCount = solver.approximateCount(config)
+    override fun approximateCount(config: ApproxCountConfig): Count = solver.approximateCount(config)
 
     override fun samples(config: SamplingConfig, params: P): Sequence<Sample> =
         solver.samples(config, applyStack(params))

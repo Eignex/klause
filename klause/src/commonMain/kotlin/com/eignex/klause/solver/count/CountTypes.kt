@@ -38,19 +38,93 @@ data class ApproxCountConfig(
     }
 }
 
-/** Result of [com.eignex.klause.solver.Solver.approximateCount]. */
-data class ApproxCount(
-    /** The (median) estimated number of distinct projected models. */
+/**
+ * A model-count answer as an interval `[lower, upper]` that contains the true (projected) count,
+ * together with the [confidence] that it does. Produced by both counting entry points on
+ * [com.eignex.klause.solver.Solver]:
+ *
+ *  - [com.eignex.klause.solver.Solver.approximateCount] (ApproxMC) fills a *probabilistic* interval
+ *    at [confidence] `1 - δ` around a median [estimate].
+ *  - [com.eignex.klause.solver.Solver.exactCount] (anytime exact) fills a *deterministic* interval
+ *    ([confidence] `1.0`) that tightens — [lower] only rises, [upper] only falls — until [exact].
+ */
+data class Count(
+    /** Best point estimate of the count. */
     val estimate: Long,
-    /** The `ε` the estimate is guaranteed within (multiplicatively). */
-    val epsilon: Double,
-    /** The `δ` failure probability the guarantee holds with probability `1 - δ`. */
-    val delta: Double,
-    /** Number of independent ApproxMC runs performed. */
-    val iterations: Int,
-    /** True when the count was obtained exactly (problem small enough to enumerate fully). */
+    /** The count is `≥ lower`. For the anytime exact counter this only increases. */
+    val lower: Long,
+    /** The count is `≤ upper` (`Long.MAX_VALUE` if not yet bounded). For exact counting it only decreases. */
+    val upper: Long,
+    /** True iff the count is proven exactly (`lower == upper`). */
     val exact: Boolean,
-)
+    /** Probability the true count lies in `[lower, upper]`: `1.0` for exact, `1 - δ` for ApproxMC. */
+    val confidence: Double,
+) {
+    /** Multiplicative gap `upper / lower` (1.0 == exact, ∞ when nothing is proven yet). */
+    val ratio: Double get() = if (lower <= 0L) Double.POSITIVE_INFINITY else upper.toDouble() / lower.toDouble()
+}
+
+/**
+ * Configuration for anytime exact (projected) model counting
+ * ([com.eignex.klause.solver.Solver.exactCount]). Counting walks the projection variables in a
+ * fixed order, proving each partial assignment feasible or not via the solver; the result is a
+ * deterministic interval that tightens to exact when the space is fully explored.
+ */
+data class ExactCountConfig(
+    /** Boolean variable ids to count over; see [ApproxCountConfig.samplingSet] for defaulting. */
+    val samplingSet: IntArray? = null,
+    /** Integer variable ids to count over; see [ApproxCountConfig.intSamplingSet] for defaulting. */
+    val intSamplingSet: IntArray? = null,
+    /** Overall budget: stop after this many feasibility checks, reporting the current interval. */
+    val maxChecks: Long = Long.MAX_VALUE,
+    /** Per-check search budget; a check that exceeds it is treated as "possibly feasible" (kept in [Count.upper]). */
+    val maxDecisionsPerCheck: Long = 1_000_000L,
+    /** Emit a tighter [Count] roughly every this many feasibility checks. */
+    val reportEvery: Long = 1_000L,
+) {
+    init {
+        require(maxChecks > 0) { "maxChecks must be positive" }
+        require(reportEvery > 0) { "reportEvery must be positive" }
+    }
+}
+
+/**
+ * Configuration for the hybrid [com.eignex.klause.solver.Solver.count]: try exact counting first,
+ * fall back to ApproxMC if it doesn't converge within the budget. Carries a single projection used
+ * by both phases so their bounds are comparable.
+ */
+data class CountConfig(
+    /** Boolean variable ids to count over; see [ApproxCountConfig.samplingSet] for defaulting. */
+    val samplingSet: IntArray? = null,
+    /** Integer variable ids to count over; see [ApproxCountConfig.intSamplingSet] for defaulting. */
+    val intSamplingSet: IntArray? = null,
+    /** Feasibility-check budget for the exact phase before handing off to ApproxMC. */
+    val exactBudget: Long = 100_000L,
+    /** Per-check search budget within the exact phase. */
+    val maxDecisionsPerCheck: Long = 1_000_000L,
+    /** ApproxMC multiplicative tolerance for the fallback. */
+    val epsilon: Double = 0.8,
+    /** ApproxMC failure probability for the fallback. */
+    val delta: Double = 0.2,
+    /** Seed for the ApproxMC fallback's hash family. */
+    val seed: Long? = null,
+) {
+    internal fun toExactConfig() = ExactCountConfig(
+        samplingSet = samplingSet,
+        intSamplingSet = intSamplingSet,
+        maxChecks = exactBudget,
+        maxDecisionsPerCheck = maxDecisionsPerCheck,
+        reportEvery = exactBudget, // hybrid only needs the final interval — report once at the end
+    )
+
+    internal fun toApproxConfig() = ApproxCountConfig(
+        epsilon = epsilon,
+        delta = delta,
+        samplingSet = samplingSet,
+        intSamplingSet = intSamplingSet,
+        seed = seed,
+    )
+}
 
 /** Quality tier for [com.eignex.klause.solver.Solver.samples]. */
 enum class SampleQuality {

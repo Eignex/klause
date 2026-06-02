@@ -1,9 +1,12 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.count.ApproxCount
+import com.eignex.klause.solver.count.AnytimeCounter
 import com.eignex.klause.solver.count.ApproxCountConfig
 import com.eignex.klause.solver.count.ApproxMC
+import com.eignex.klause.solver.count.Count
+import com.eignex.klause.solver.count.CountConfig
+import com.eignex.klause.solver.count.ExactCountConfig
 import com.eignex.klause.solver.count.SampleQuality
 import com.eignex.klause.solver.count.SamplingConfig
 import com.eignex.klause.solver.count.UniGen
@@ -124,11 +127,40 @@ interface Solver<P : SolverParams> {
     fun enumerate(params: P): Sequence<Sample>
 
     /**
-     * Approximate model count over [config]'s sampling set (all bool vars by default), within a
-     * multiplicative `(1 ± ε)` factor with probability `1 - δ`. Backend-agnostic: the problem's
-     * XOR hashes are bit-blasted to CNF and counted via ApproxMC (see [ApproxCount] / [ApproxMC]).
+     * Approximate model count over [config]'s sampling set (all variables by default): a
+     * probabilistic interval within a multiplicative `(1 ± ε)` factor at confidence `1 - δ`.
+     * Backend-agnostic — XOR hashes are bit-blasted to CNF and counted via ApproxMC (see [Count]).
      */
-    fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): ApproxCount = ApproxMC.run(problem, config)
+    fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): Count = ApproxMC.run(problem, config)
+
+    /**
+     * Anytime *exact* (projected) model counting: a lazy stream of deterministic [Count]s whose
+     * interval tightens (`lower` ↑, `upper` ↓) until [Count.exact]. Iterate as far as you want;
+     * each step resumes the feasibility search. Cheap when the count is small (it converges fast),
+     * expensive when large — pair it with [approximateCount] via [count] for graceful degradation.
+     */
+    fun exactCount(config: ExactCountConfig = ExactCountConfig()): Sequence<Count> = AnytimeCounter.run(problem, config)
+
+    /**
+     * Best-effort count: run the exact counter up to [CountConfig.exactBudget] feasibility checks;
+     * if it proves the count exactly, return that, otherwise fall back to [approximateCount] with
+     * the estimate clamped into the exact phase's proven `[lower, upper]` (the hard bounds can only
+     * sharpen the probabilistic answer). Exact when cheap, approximate when not.
+     */
+    fun count(config: CountConfig = CountConfig()): Count {
+        val proven = exactCount(config.toExactConfig()).last()
+        if (proven.exact) return proven
+        val approx = approximateCount(config.toApproxConfig())
+        val lower = maxOf(proven.lower, approx.lower)
+        val upper = maxOf(lower, minOf(proven.upper, approx.upper))
+        return Count(
+            estimate = approx.estimate.coerceIn(lower, upper),
+            lower = lower,
+            upper = upper,
+            exact = lower == upper,
+            confidence = approx.confidence,
+        )
+    }
 
     /**
      * Quality-tiered sampling. [SampleQuality.CHEAP] (the default and the production path)
