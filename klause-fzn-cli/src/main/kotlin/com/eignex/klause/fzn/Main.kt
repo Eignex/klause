@@ -83,29 +83,21 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
     }
 }
 
-/** Default complete-search configuration when the model carries no `solve :: *_search(...)`
- *  annotation. A bare [BacktrackParams] (RandomVariable + IndomainRandom, no restarts, no
- *  learning) is far too weak; use the CDCL setup the bench sweep relies on — VSIDS +
- *  phase-saving + LBD clause learning — under a FIXED [randomSeed] so the CLI is deterministic
- *  and reproducible (with a null seed the trajectory varies run-to-run and optimization
- *  optimality-proofs flakily blow the time budget). A `-r/--random-seed` flag still overrides.
- *
- *  Applied to satisfaction *and* optimization alike. The VSIDS/Luby × branch-and-bound
- *  regression (#47) — restarts re-traversing the bound-pruned tree instead of exhausting it,
- *  blowing the optimality-proof budget — is fixed in the core: [BacktrackSolver.improvements]
- *  suppresses Luby restarts on the optimization path while keeping VSIDS + phase-saving + LBD.
- *  So a single config now serves both goals; no satisfy/optimize split is needed. */
-private fun defaultBacktrackParams(): BacktrackParams =
-    BacktrackParams(
+private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
+    // Default complete-search config when the model carries no `solve :: *_search(...)`: the
+    // full CDCL setup — VSIDS + phase-saving + Luby restarts + LBD clause learning — under a
+    // FIXED seed so the CLI is deterministic (a null seed makes optimality proofs flakily blow
+    // the budget); `-r/--random-seed` still overrides. Applied to satisfaction *and*
+    // optimization alike: the VSIDS/Luby × branch-and-bound regression (#47) is fixed in the
+    // core ([BacktrackSolver.improvements] suppresses Luby restarts on the optimization path),
+    // so one config serves both goals with no satisfy/optimize split.
+    val base = program.defaultBacktrackParams ?: BacktrackParams(
         randomSeed = 1L,
         variableHeuristic = com.eignex.klause.solver.backtrack.Vsids(),
         phaseSaving = true,
         lubyRestartBase = 100L,
         maxLearnedClauses = 20_000,
     )
-
-private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
-    val base = program.defaultBacktrackParams ?: defaultBacktrackParams()
     val params = base.copy(randomSeed = opts.randomSeed ?: base.randomSeed)
     runGeneric(BacktrackSolver(program.problem), params, program, opts, complete = true)
 }
