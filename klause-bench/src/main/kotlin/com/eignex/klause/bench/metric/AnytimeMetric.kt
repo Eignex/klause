@@ -138,12 +138,19 @@ object AnytimeMetric {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         // λ=1.0 cost shaping folds the objective delta into move scoring — without it CBLS is
         // objective-blind and only descends opportunistically via constraint repair (mirrors
-        // the CLI's runWithLocalSearch).
+        // the CLI's runWithLocalSearch). Override via -Dklause.anytime.shaping=feasibilityFirst
+        // or -Dklause.anytime.lambda=<x> for A/B experiments on the feasibility/descent split.
         return LocalSearchParams(
             maxFlips = Long.MAX_VALUE, randomSeed = 1L,
-            costShaping = CostShaping.Linear(lambda = 1.0),
+            costShaping = shapingFromProps(),
         ).withCancellation(Cancellation { System.currentTimeMillis() > deadline }) as LocalSearchParams
     }
+
+    private fun shapingFromProps(): CostShaping =
+        when (System.getProperty("klause.anytime.shaping")?.lowercase()) {
+            "feasibilityfirst", "feasibility-first", "ff" -> CostShaping.FeasibilityFirst
+            else -> CostShaping.Linear(lambda = System.getProperty("klause.anytime.lambda")?.toDouble() ?: 1.0)
+        }
 
     private fun fmt(v: Double?): String = v?.let { "%.1f".format(it) } ?: "—"
 }
