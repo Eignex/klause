@@ -69,6 +69,25 @@ open class VariableSchema : Schema<SchemaEntry>() {
         }
 
     /**
+     * Optional float variable: declares a presence Boolean named `<prop>__present` alongside the
+     * bucketised-float value variable. Compare via [OptFloatHandle]'s opt-aware operators to get
+     * MiniZinc's "undefined → false" semantics; decode with
+     * [com.eignex.klause.compile.CompiledProblem.decode] to read `null` when absent.
+     */
+    protected fun optFloatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptFloatHandle>> { thisRef, prop ->
+            val pName = presenceName(prop.name)
+            thisRef.add(pName, PresenceSpec(prop.name))
+            thisRef.add(prop.name, FloatSpec(min, max, buckets))
+            val handle = OptFloatHandle(
+                name = prop.name,
+                present = BoolHandle(pName),
+                value = FloatHandle(prop.name, min, max),
+            )
+            ReadOnlyProperty { _, _ -> handle }
+        }
+
+    /**
      * Optional Boolean variable: declares a presence bool plus the value bool. In a Boolean
      * context the handle coerces to `present ∧ value`; access [OptBoolHandle.present] /
      * [OptBoolHandle.value] for direct manipulation.
