@@ -541,5 +541,7 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
     }
 }
 
+/** Compile this schema's [VariableSchema.definition] into a solver-ready [CompiledProblem],
+ *  using [config] (defaults to the ambient [KlauseConfig.current]). */
 fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): CompiledProblem =
     Compiler(config).compile(this.definition())
