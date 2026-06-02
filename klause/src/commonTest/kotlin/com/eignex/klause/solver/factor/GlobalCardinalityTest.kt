@@ -39,6 +39,13 @@ class GlobalCardinalityTest {
             ),
             LowUpInst(listOf(0 to 3, 0 to 3, 0 to 3), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(3, 3), true),
             LowUpInst(listOf(0 to 2, 0 to 2, 1 to 2), intArrayOf(0, 1, 2), intArrayOf(0, 0, 1), intArrayOf(1, 2, 2), false),
+            // alldiff-like (each value ≤ 1): v0,v1 confined to {0,1} form a tight Hall set, so
+            // pinning v2/v3 into {0,1} during search fires the Régin flow-deficiency path on a
+            // problem that is satisfiable overall — probes the min-cut reason for soundness.
+            LowUpInst(
+                listOf(0 to 1, 0 to 1, 0 to 3, 0 to 3),
+                intArrayOf(0, 1, 2, 3), intArrayOf(0, 0, 0, 0), intArrayOf(1, 1, 1, 1), false,
+            ),
         )
         for ((idx, inst) in instances.withIndex()) {
             val n = inst.xsRanges.size
