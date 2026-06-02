@@ -356,12 +356,44 @@ class BacktrackSolver(override val problem: Problem) :
         }
     }
 
+    /**
+     * Int decisions branch on a **bound**, not an equality: `v ≤ s` then `v ≥ s+1` (or the
+     * reverse). Each branch is a single bound atom, so a conflict it seeds has one literal at
+     * its level and 1UIP yields an asserting clause — an equality pin (`v = k`) instead pins
+     * two same-level bound atoms that 1UIP cannot collapse, which stalls conflict learning.
+     * The split point `s` is the value heuristic's preferred value (clamped into `[min, max-1]`
+     * so both children are non-empty); the side holding that preferred value is explored first.
+     */
     private class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Int>) : TrailNode {
-        private val iter = valueSeq.iterator()
+        private val preferred: Int = valueSeq.firstOrNull() ?: 0
+        private var step = 0
+        private var split = 0
+        private var lowerFirst = true
+        private var resolved = false
+
         override fun applyNext(session: PropagationSession): ApplyOutcome? {
-            if (!iter.hasNext()) return null
-            val v = iter.next()
-            return ApplyOutcome(v, session.pinInt(varRef.varId, v))
+            if (!resolved) {
+                val d = session.intDomain(varRef.varId)
+                split = if (preferred >= d.max) d.max - 1 else maxOf(preferred, d.min)
+                lowerFirst = preferred <= split
+                resolved = true
+            }
+            val vid = varRef.varId
+            return when (step++) {
+                0 -> if (lowerFirst) {
+                    ApplyOutcome(split, session.pinIntAtMost(vid, split))
+                } else {
+                    ApplyOutcome(split + 1, session.pinIntAtLeast(vid, split + 1))
+                }
+
+                1 -> if (lowerFirst) {
+                    ApplyOutcome(split + 1, session.pinIntAtLeast(vid, split + 1))
+                } else {
+                    ApplyOutcome(split, session.pinIntAtMost(vid, split))
+                }
+
+                else -> null
+            }
         }
     }
 

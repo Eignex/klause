@@ -35,6 +35,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     // a buffer may be larger than the current universe after a deeper earlier conflict.
     private var universe = 0
     private var seen = BooleanArray(0)
+
+    // Variables already resolved out as a pivot this analysis. Int-atom antecedents are
+    // walked in allocation order (atoms have no trail order), so unlike the bool implication
+    // graph they can present a same-level cycle (A's reason mentions B and vice-versa). Once
+    // a var has been resolved we must never re-ingest it, or the 1UIP loop ping-pongs forever
+    // (and grows [bumpIntVars] until OOM). In the acyclic bool case this never triggers.
+    private var resolved = BooleanArray(0)
     private var inClause = BooleanArray(0)
     private var toDrop = BooleanArray(0)
 
@@ -147,6 +154,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         val atomCount = state.atomIntVar.size
         universe = numBoolVars + atomCount
         seen = scratch(seen, universe)
+        resolved = scratch(resolved, universe)
         bumpBoolVars.clear()
         bumpIntVars.clear()
         var currentLevelCount = 0
@@ -185,6 +193,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 if (pivot < 0) break
             }
             seen[pivot] = false
+            resolved[pivot] = true
             currentLevelCount--
             if (currentLevelCount == 0) {
                 learned.add(uipLit(pivot))
@@ -368,7 +377,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         for (lit in reason) {
             val v = Lit.variable(lit)
             if (v >= universe) continue // atom allocated after analyzer started; shouldn't happen
-            if (seen[v]) continue
+            if (seen[v] || resolved[v]) continue // already in the frontier, or resolved out (cycle guard)
             val lvl = levelOf(v)
             if (lvl <= 0) continue
             seen[v] = true

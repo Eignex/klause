@@ -154,6 +154,35 @@ class PropagationSession(
     }
 
     /**
+     * Decide `v ≤ hi` at a fresh decision level (a single-bound decision). Unlike [pinInt]
+     * this narrows only the upper bound, so the decision contributes a single 1UIP literal
+     * to any conflict it seeds — letting CDCL learn an asserting clause where an equality
+     * pin (two same-level bound atoms) could not. The complementary branch is [pinIntAtLeast].
+     */
+    fun pinIntAtMost(v: Int, hi: Int): PropagationResult {
+        bakedUnsat?.let { return it }
+        val base = state.undoTop
+        if (!state.setIntMaxAsDecision(v, hi)) return revertAndUnsat(state.conflictLevels.orEmpty())
+        val conflict = state.runToFixpoint(allFactors = false)
+        if (conflict != null) return revertAndUnsat(conflict)
+        trail.add(encInt(v))
+        levelPush(state.mark())
+        return impliedSince(base)
+    }
+
+    /** Decide `v ≥ lo` at a fresh decision level. See [pinIntAtMost]. */
+    fun pinIntAtLeast(v: Int, lo: Int): PropagationResult {
+        bakedUnsat?.let { return it }
+        val base = state.undoTop
+        if (!state.setIntMinAsDecision(v, lo)) return revertAndUnsat(state.conflictLevels.orEmpty())
+        val conflict = state.runToFixpoint(allFactors = false)
+        if (conflict != null) return revertAndUnsat(conflict)
+        trail.add(encInt(v))
+        levelPush(state.mark())
+        return impliedSince(base)
+    }
+
+    /**
      * Register a learned [clause] and immediately propagate it. Used by the
      * BacktrackSolver after a CDB backjump to make the analyzer's 1UIP clause stick:
      * the clause stays alive for the rest of the session and participates in every
