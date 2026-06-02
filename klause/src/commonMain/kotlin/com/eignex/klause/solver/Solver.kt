@@ -1,6 +1,12 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.count.ApproxCount
+import com.eignex.klause.solver.count.ApproxCountConfig
+import com.eignex.klause.solver.count.ApproxMC
+import com.eignex.klause.solver.count.SampleQuality
+import com.eignex.klause.solver.count.SamplingConfig
+import com.eignex.klause.solver.count.UniGen
 
 /**
  * Marker for backend-specific solver params. Each solver backend ships its own data class
@@ -116,6 +122,24 @@ interface Solver<P : SolverParams> {
 
     /** Lazily enumerate distinct models. */
     fun enumerate(params: P): Sequence<Sample>
+
+    /**
+     * Approximate model count over [config]'s sampling set (all bool vars by default), within a
+     * multiplicative `(1 ± ε)` factor with probability `1 - δ`. Backend-agnostic: the problem's
+     * XOR hashes are bit-blasted to CNF and counted via ApproxMC (see [ApproxCount] / [ApproxMC]).
+     */
+    fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): ApproxCount = ApproxMC.run(problem, config)
+
+    /**
+     * Quality-tiered sampling. [SampleQuality.CHEAP] (the default and the production path)
+     * delegates to this backend's [samples]; [SampleQuality.ACCURATE] runs near-uniform UniGen2
+     * XOR-hashing over the bit-blasted problem (an accuracy-validation tool). Returns a lazy,
+     * unbounded sequence — use `.take(n)`.
+     */
+    fun samples(config: SamplingConfig, params: P): Sequence<Sample> = when (config.quality) {
+        SampleQuality.CHEAP -> samples(params)
+        SampleQuality.ACCURATE -> UniGen.samples(problem, config) { samples(params) }
+    }
 
     /**
      * Open a stateful [Session] against this solver. The default returns a
