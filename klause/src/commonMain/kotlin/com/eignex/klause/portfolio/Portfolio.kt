@@ -63,12 +63,12 @@ class Portfolio(
      * any worker produces a definitive Sat/Unsat; [PortfolioStrategy.Exhaustive] runs every
      * worker to its own budget and reduces afterwards (prefer Sat, then Unsat, then Unknown).
      */
-    suspend fun solve(): SolveResult = coroutineScope {
+    suspend fun solve(cancellation: Cancellation = Cancellation.Never): SolveResult = coroutineScope {
         val winnerFlag = AtomicBoolean(false)
-        val token: Cancellation = { winnerFlag.load() }
+        val token: Cancellation = { winnerFlag.load() || cancellation() }
         val cancelToken: Cancellation = when (strategy) {
             PortfolioStrategy.RaceFirstFeasible -> token
-            PortfolioStrategy.Exhaustive -> Cancellation.Never
+            PortfolioStrategy.Exhaustive -> cancellation
         }
 
         val results = workers.map { worker ->
@@ -95,13 +95,13 @@ class Portfolio(
      * on it; LS ignores it). A worker proving Optimal cancels the rest; otherwise the global
      * incumbent is returned as BestFound, or Optimal if every worker terminated cleanly.
      */
-    suspend fun minimize(objective: Objective): MinimizeResult = coroutineScope {
+    suspend fun minimize(objective: Objective, cancellation: Cancellation = Cancellation.Never): MinimizeResult = coroutineScope {
         // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity equality
         // and CAS would fail spuriously on autoboxed Doubles.
         val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
         val bestSample = AtomicReference<Sample?>(null)
         val cancelled = AtomicBoolean(false)
-        val token: Cancellation = { cancelled.load() }
+        val token: Cancellation = { cancelled.load() || cancellation() }
 
         fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
 

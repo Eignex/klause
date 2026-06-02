@@ -72,11 +72,12 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
     when (engine) {
         "backtrack", "bt" -> runWithBacktrack(program, opts)
         "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
+        "portfolio", "pf" -> runWithPortfolio(program, opts)
         "logicng" -> runWithLogicNG(program, opts)
         "brute", "bruteforce", "brute-force" -> runWithBrute(program, opts)
         else -> {
             System.err.println("klause-fzn: unknown engine `$engine`; expected one of " +
-                "backtrack, ls, logicng, brute")
+                "backtrack, ls, portfolio, logicng, brute")
             exitProcess(2)
         }
     }
@@ -173,6 +174,70 @@ private fun runWithBrute(program: FlatZincProgram, opts: Options) {
  * search backend is incomplete — it exhausts a flip/restart budget, never the solution space —
  * so a fruitless run is `UNKNOWN`, never `UNSATISFIABLE`.
  */
+/**
+ * Multi-core portfolio engine: a [com.eignex.klause.portfolio.Portfolio] of diverse local-search
+ * workers and/or backtrack workers, racing on satisfaction and sharing the objective bound on
+ * optimisation. Worker counts come from `-Dklause.fzn.portfolio.ls` / `.bt` (defaults 4 / 2).
+ *
+ * **Competition note:** a pure-LS pool (`-Dklause.fzn.portfolio.bt=0`) involves no CP and never
+ * seeds the LS — safe for the MiniZinc local-search competition. The hybrid default (bt>0) is
+ * for general use.
+ */
+private fun runWithPortfolio(program: FlatZincProgram, opts: Options) {
+    val ls = System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4
+    val bt = System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2
+    val spec = com.eignex.klause.portfolio.PortfolioSpec(
+        localSearchWorkers = ls, backtrackWorkers = bt, seed = opts.randomSeed ?: 1L,
+    )
+    val portfolio = com.eignex.klause.portfolio.PortfolioBuilder.build(program.problem, spec)
+    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val cancel = if (deadline != null)
+        com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
+    else com.eignex.klause.solver.Cancellation.Never
+    val applier = loadOznApplier(opts)
+    // Only a backtrack worker can *prove* UNSAT / optimality; a pure-LS pool reports UNKNOWN.
+    val complete = bt > 0
+    try {
+        when (val solve = program.solve) {
+            is SolveDirective.Satisfy -> {
+                when (val r = kotlinx.coroutines.runBlocking { portfolio.solve(cancel) }) {
+                    is com.eignex.klause.solver.SolveResult.Sat -> {
+                        print(renderSolution(applier, program, r.assignment)); println("==========")
+                    }
+                    is com.eignex.klause.solver.SolveResult.Unsat -> println("=====UNSATISFIABLE=====")
+                    else -> println("=====UNKNOWN=====")
+                }
+            }
+            is SolveDirective.Minimize, is SolveDirective.Maximize -> {
+                val (objName, maximize) = when (solve) {
+                    is SolveDirective.Minimize -> solve.objVar to false
+                    is SolveDirective.Maximize -> solve.objVar to true
+                    else -> error("unreachable")
+                }
+                val objVarId = program.intVarsByName[objName]
+                    ?: error("objective variable '$objName' not found in int var map")
+                val linear = if (maximize) program.problem.maximizeInt(objVarId)
+                             else program.problem.minimizeInt(objVarId)
+                // LS-only pools use the functional (gradient) objective; mixed pools use the
+                // linear objective both engines share (backtrack needs it for bound pruning).
+                val objective: com.eignex.klause.solver.Objective =
+                    if (bt == 0) (program.lsObjective ?: linear) else linear
+                when (val r = kotlinx.coroutines.runBlocking { portfolio.minimize(objective, cancel) }) {
+                    is MinimizeResult.Optimal -> {
+                        print(renderSolution(applier, program, r.sample)); println("==========")
+                    }
+                    is MinimizeResult.BestFound -> print(renderSolution(applier, program, r.sample))
+                    is MinimizeResult.Infeasible ->
+                        println(if (complete) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
+                    is MinimizeResult.Unknown -> println("=====UNKNOWN=====")
+                }
+            }
+        }
+    } finally {
+        portfolio.close()
+    }
+}
+
 private fun <P : SolverParams> runGeneric(
     solver: Solver<P>,
     params: P,
