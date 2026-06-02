@@ -136,6 +136,91 @@ class OptBoolHandle(
 }
 
 /**
+ * Optional float variable: a `(present, value)` pair, mirroring [OptIntHandle] for the
+ * bucketised-float kind. The presence bool is an ordinary Boolean; the value is a [FloatHandle]
+ * meaningful only when [present]. Comparisons follow MiniZinc opt semantics — any comparison
+ * involving an absent operand evaluates to false rather than dropping out of the constraint.
+ *
+ * Unlike [OptIntHandle] there is no `valueOr`: floats lower only to linear
+ * ([com.eignex.klause.ast.FloatLinearConstraint]) factors, and the AST has no float
+ * if-then-else node to express "value when present, default otherwise" in an arithmetic
+ * context. Use [present] / [value] directly when a conditional real value is needed.
+ */
+class OptFloatHandle(
+    /** Name of the optional variable. */
+    val name: String,
+    /** Presence literal: true iff the variable is present. */
+    val present: BoolHandle,
+    /** The value handle, meaningful only when [present]. */
+    val value: FloatHandle,
+) {
+    /** Inclusive lower bound of the value's real domain. */
+    val min: Double get() = value.min
+
+    /** Inclusive upper bound of the value's real domain. */
+    val max: Double get() = value.max
+
+    private fun guarded(cmp: BoolExpr): BoolExpr = And(listOf(present.toExpr(), cmp))
+
+    /** `this ≤ c`, and present (false if absent). */
+    infix fun le(c: Double): BoolExpr = guarded(value le c)
+
+    /** `this < c`, and present (false if absent). */
+    infix fun lt(c: Double): BoolExpr = guarded(value lt c)
+
+    /** `this ≥ c`, and present (false if absent). */
+    infix fun ge(c: Double): BoolExpr = guarded(value ge c)
+
+    /** `this > c`, and present (false if absent). */
+    infix fun gt(c: Double): BoolExpr = guarded(value gt c)
+
+    /** `this = c`, and present (false if absent). */
+    infix fun eq(c: Double): BoolExpr = guarded(value eq c)
+
+    /** `this ≠ c`, and present (false if absent). */
+    infix fun ne(c: Double): BoolExpr = guarded(value ne c)
+
+    /** `this ≤ other`, and present (false if absent). */
+    infix fun le(other: FloatExpr): BoolExpr = guarded(value le other)
+
+    /** `this < other`, and present (false if absent). */
+    infix fun lt(other: FloatExpr): BoolExpr = guarded(value lt other)
+
+    /** `this ≥ other`, and present (false if absent). */
+    infix fun ge(other: FloatExpr): BoolExpr = guarded(value ge other)
+
+    /** `this > other`, and present (false if absent). */
+    infix fun gt(other: FloatExpr): BoolExpr = guarded(value gt other)
+
+    /** `this = other`, and present (false if absent). */
+    infix fun eq(other: FloatExpr): BoolExpr = guarded(value eq other)
+
+    /** `this ≠ other`, and present (false if absent). */
+    infix fun ne(other: FloatExpr): BoolExpr = guarded(value ne other)
+
+    private fun cmpOpt(other: OptFloatHandle, cmp: BoolExpr): BoolExpr =
+        And(listOf(present.toExpr(), other.present.toExpr(), cmp))
+
+    /** `this ≤ other`, and both present (false if either absent). */
+    infix fun le(other: OptFloatHandle): BoolExpr = cmpOpt(other, value le other.value.toExpr())
+
+    /** `this < other`, and both present (false if either absent). */
+    infix fun lt(other: OptFloatHandle): BoolExpr = cmpOpt(other, value lt other.value.toExpr())
+
+    /** `this ≥ other`, and both present (false if either absent). */
+    infix fun ge(other: OptFloatHandle): BoolExpr = cmpOpt(other, value ge other.value.toExpr())
+
+    /** `this > other`, and both present (false if either absent). */
+    infix fun gt(other: OptFloatHandle): BoolExpr = cmpOpt(other, value gt other.value.toExpr())
+
+    /** `this = other`, and both present (false if either absent). */
+    infix fun eq(other: OptFloatHandle): BoolExpr = cmpOpt(other, value eq other.value.toExpr())
+
+    /** `this ≠ other`, and both present (false if either absent). */
+    infix fun ne(other: OptFloatHandle): BoolExpr = cmpOpt(other, value ne other.value.toExpr())
+}
+
+/**
  * Optional nominal variable: a `(present, value)` pair. Comparisons against a label or another
  * nominal follow MiniZinc opt semantics — absent operands make the comparison false.
  */

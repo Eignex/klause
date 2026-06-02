@@ -9,6 +9,7 @@ import com.eignex.klause.schema.IntSetHandle
 import com.eignex.klause.schema.NominalHandle
 import com.eignex.klause.schema.NominalSetHandle
 import com.eignex.klause.schema.OptBoolHandle
+import com.eignex.klause.schema.OptFloatHandle
 import com.eignex.klause.schema.OptIntHandle
 import com.eignex.klause.schema.OptNominalHandle
 import com.eignex.klause.solver.LinearObjective
@@ -87,6 +88,12 @@ class CompiledProblem internal constructor(
 
     /** Decodes an optional Boolean: `null` when absent. */
     fun decode(handle: OptBoolHandle, sample: Sample): Boolean? {
+        if (!decode(handle.present, sample)) return null
+        return decode(handle.value, sample)
+    }
+
+    /** Decodes an optional float: `null` when the presence bit is false, the real value otherwise. */
+    fun decode(handle: OptFloatHandle, sample: Sample): Double? {
         if (!decode(handle.present, sample)) return null
         return decode(handle.value, sample)
     }

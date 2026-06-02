@@ -490,11 +490,13 @@ class Cbls(
         }
         when (parts.size) {
             0 -> {}
+
             1 -> when (val p = parts[0]) {
                 is Move.BoolFlip -> sink.addBoolFlip(p.varId)
                 is Move.IntSet -> sink.addIntSet(p.varId, p.newValue)
                 is Move.Compound -> sink.addCompound(p.parts)
             }
+
             else -> sink.addCompound(parts)
         }
     }

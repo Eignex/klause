@@ -67,7 +67,12 @@ object PortfolioBuilder {
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
             val params = if (i % 2 == 0) {
-                BacktrackParams(randomSeed = spec.seed + 1000L + i, variableHeuristic = Vsids(), phaseSaving = true, lubyRestartBase = 100L)
+                BacktrackParams(
+                    randomSeed = spec.seed + 1000L + i,
+                    variableHeuristic = Vsids(),
+                    phaseSaving = true,
+                    lubyRestartBase = 100L,
+                )
             } else {
                 BacktrackParams(randomSeed = spec.seed + 1000L + i)
             }

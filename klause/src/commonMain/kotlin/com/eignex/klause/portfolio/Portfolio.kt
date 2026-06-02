@@ -95,68 +95,70 @@ class Portfolio(
      * on it; LS ignores it). A worker proving Optimal cancels the rest; otherwise the global
      * incumbent is returned as BestFound, or Optimal if every worker terminated cleanly.
      */
-    suspend fun minimize(objective: Objective, cancellation: Cancellation = Cancellation.Never): MinimizeResult = coroutineScope {
-        // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity equality
-        // and CAS would fail spuriously on autoboxed Doubles.
-        val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
-        val bestSample = AtomicReference<Sample?>(null)
-        val cancelled = AtomicBoolean(false)
-        val token: Cancellation = { cancelled.load() || cancellation() }
+    suspend fun minimize(objective: Objective, cancellation: Cancellation = Cancellation.Never): MinimizeResult =
+        coroutineScope {
+            // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity equality
+            // and CAS would fail spuriously on autoboxed Doubles.
+            val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
+            val bestSample = AtomicReference<Sample?>(null)
+            val cancelled = AtomicBoolean(false)
+            val token: Cancellation = { cancelled.load() || cancellation() }
 
-        fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
+            fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
 
-        val deferreds = workers.map { worker ->
-            async {
-                var local: MinimizeResult = MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-                for (r in worker.improvements(objective, ::readBound, token)) {
-                    when (r) {
-                        is MinimizeResult.BestFound -> {
-                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
-                            local = r
+            val deferreds = workers.map { worker ->
+                async {
+                    var local: MinimizeResult = MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                    for (r in worker.improvements(objective, ::readBound, token)) {
+                        when (r) {
+                            is MinimizeResult.BestFound -> {
+                                updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                                local = r
+                            }
+
+                            is MinimizeResult.Optimal -> {
+                                updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                                cancelled.store(true)
+                                local = r
+                                break
+                            }
+
+                            is MinimizeResult.Infeasible -> local = r
+
+                            is MinimizeResult.Unknown -> local = r
                         }
-
-                        is MinimizeResult.Optimal -> {
-                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
-                            cancelled.store(true)
-                            local = r
-                            break
-                        }
-
-                        is MinimizeResult.Infeasible -> local = r
-                        is MinimizeResult.Unknown -> local = r
                     }
+                    local
                 }
-                local
             }
-        }
-        val results = deferreds.awaitAll()
+            val results = deferreds.awaitAll()
 
-        // Reduce verdicts. A direct Optimal claim is only honoured from a worker that didn't run
-        // under external bound sharing (the engine downgrades to BestFound when shared); single-
-        // worker / unshared portfolios still produce direct Optimal here.
-        val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
-        if (directOptimal != null) return@coroutineScope directOptimal
+            // Reduce verdicts. A direct Optimal claim is only honoured from a worker that didn't run
+            // under external bound sharing (the engine downgrades to BestFound when shared); single-
+            // worker / unshared portfolios still produce direct Optimal here.
+            val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
+            if (directOptimal != null) return@coroutineScope directOptimal
 
-        // "Dirty" Unknown = ran out of budget / timed out / cancelled before fully exploring.
-        // SearchExhausted is clean — the worker's space was fully covered.
-        val anyDirtyUnknown = results.any { r ->
-            r is MinimizeResult.Unknown && r.reason != TerminationReason.SearchExhausted
-        }
-        val sample = bestSample.load()
-        val finalBound = readBound()
-        if (sample != null) {
-            return@coroutineScope if (anyDirtyUnknown) {
-                MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted)
+            // "Dirty" Unknown = ran out of budget / timed out / cancelled before fully exploring.
+            // SearchExhausted is clean — the worker's space was fully covered.
+            val anyDirtyUnknown = results.any { r ->
+                r is MinimizeResult.Unknown && r.reason != TerminationReason.SearchExhausted
+            }
+            val sample = bestSample.load()
+            val finalBound = readBound()
+            if (sample != null) {
+                return@coroutineScope if (anyDirtyUnknown) {
+                    MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted)
+                } else {
+                    MinimizeResult.Optimal(sample, finalBound)
+                }
+            }
+            if (anyDirtyUnknown) {
+                MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
             } else {
-                MinimizeResult.Optimal(sample, finalBound)
+                MinimizeResult.Infeasible()
             }
         }
-        if (anyDirtyUnknown) {
-            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-        } else {
-            MinimizeResult.Infeasible()
-        }
-    }
 
     private fun updateSharedBound(
         boundBits: AtomicLong,
