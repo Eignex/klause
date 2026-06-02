@@ -134,6 +134,7 @@ internal class Alns(
             if (freed.isEmpty) {
                 destroyBandit.update(destroyIdx, rejectedReward)
                 repairBandit.update(repairIdx, rejectedReward)
+                iter++
                 continue
             }
 
@@ -143,6 +144,7 @@ internal class Alns(
             if (repaired == null) {
                 destroyBandit.update(destroyIdx, rejectedReward)
                 repairBandit.update(repairIdx, rejectedReward)
+                iter++
                 continue
             }
             val repairedObj = objective.evaluate(repaired)
