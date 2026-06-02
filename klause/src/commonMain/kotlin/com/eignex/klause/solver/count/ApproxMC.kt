@@ -2,6 +2,7 @@ package com.eignex.klause.solver.count
 
 import com.eignex.klause.solver.Problem
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.random.Random
 
@@ -19,25 +20,16 @@ import kotlin.random.Random
  */
 internal object ApproxMC {
 
-    fun run(problem: Problem, config: ApproxCountConfig): ApproxCount {
+    fun run(problem: Problem, config: ApproxCountConfig): Count {
         val ctx = CellContext.resolve(problem, config.samplingSet, config.intSamplingSet)
         val eps = config.epsilon
         val thresh = threshold(eps)
 
         // Cheap short-circuit: if the whole problem has ≤ thresh projected models, count exactly.
         val base = cellCount(ctx, hashes = emptyList(), cap = thresh)
-        if (!base.capped) {
-            return ApproxCount(
-                estimate = base.count.toLong(),
-                epsilon = eps,
-                delta = config.delta,
-                iterations = 1,
-                exact = true,
-            )
-        }
-        // Empty hash domain but base is capped — nothing to hash over; report the (capped) count.
-        if (ctx.hashDomain.isEmpty()) {
-            return ApproxCount(base.count.toLong(), eps, config.delta, iterations = 1, exact = true)
+        if (!base.capped || ctx.hashDomain.isEmpty()) {
+            val c = base.count.toLong()
+            return Count(estimate = c, lower = c, upper = c, exact = true, confidence = 1.0)
         }
 
         val t = iterationCount(config.delta)
@@ -48,13 +40,10 @@ internal object ApproxMC {
             if (est != null) estimates.add(est)
         }
         val estimate = if (estimates.isEmpty()) base.count.toLong() else median(estimates)
-        return ApproxCount(
-            estimate = estimate,
-            epsilon = eps,
-            delta = config.delta,
-            iterations = t,
-            exact = false,
-        )
+        // The (ε, δ) guarantee: the true count lies in [estimate/(1+ε), estimate·(1+ε)] w.p. ≥ 1-δ.
+        val lower = floor(estimate / (1.0 + eps)).toLong()
+        val upper = ceil(estimate * (1.0 + eps)).toLong()
+        return Count(estimate = estimate, lower = lower, upper = upper, exact = false, confidence = 1.0 - config.delta)
     }
 
     /** One ApproxMC iteration: returns the cell estimate, or `null` for a failed (empty-cell) run. */
