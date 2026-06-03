@@ -393,7 +393,7 @@ internal fun Compiler.Build.assertAllDifferentOpt(expr: AllDifferentOpt) {
  *  presence literals back through the AST-level guards in the pairwise fallback path. */
 private fun Compiler.Build.boolFromLit(lit: Int): BoolExpr {
     val v = Lit.variable(lit)
-    val name = boolVarIdByName.entries.firstOrNull { it.value == v }?.key
+    val name = idToBoolName[v]
         ?: error("opt: unknown bool var id $v in presence lowering")
     return BoolRef(name, negated = !Lit.isPositive(lit))
 }
