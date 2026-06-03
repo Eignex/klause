@@ -5,9 +5,11 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -125,6 +127,34 @@ class DiffnTest {
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Sat>(r)
+    }
+
+    @Test
+    fun `propagation shaves the separating axis when overlap is forced on the other`() {
+        // Two 3-wide rectangles whose x-ranges force them to overlap on x (each spans 3 units
+        // from a start in [0,1], so neither can clear the other horizontally). Rect 0's y is
+        // pinned to 0 with height 2 → occupies y in [0,2). Rect 1 (height 2) therefore cannot
+        // sit at-or-below rect 0, so its y must start at ≥ 2.
+        val factor = Diffn(
+            xs = intArrayOf(0, 1),
+            ys = intArrayOf(2, 3),
+            widths = intArrayOf(3, 3),
+            heights = intArrayOf(2, 2),
+        )
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(
+                IntDomain(0, 1), // rect 0 x
+                IntDomain(0, 1), // rect 1 x
+                IntDomain(0, 0), // rect 0 y pinned to 0
+                IntDomain(0, 5), // rect 1 y free
+            ),
+            factors = arrayOf<Factor>(factor),
+        )
+        val r = problem.propagate(Assumptions.None)
+        val implied = assertIs<PropagationResult.Implied>(r)
+        assertEquals(2, implied.intMinOrNullCompat(3), "rect 1 y.min must be pushed to 2 (above rect 0)")
     }
 
     @Test
