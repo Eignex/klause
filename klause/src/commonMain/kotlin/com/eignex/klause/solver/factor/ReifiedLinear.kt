@@ -139,6 +139,15 @@ class ReifiedLinear private constructor(
             val ant = composeAuxAntecedents(state)
             return state.pinBool(auxBoolVar, false, ant)
         }
+        // Bounds alone miss the case where a single-term EQ targets a value that is unreachable
+        // *inside* the bound interval — an interior domain hole, or a bound not divisible by the
+        // coefficient. The equality can then never hold, so pin the aux false now with a
+        // hole-aware antecedent. Without this the aux stays free, search may set it true, and the
+        // resulting empty-domain conflict carries a bounds-only (hole-blind) reason that yields an
+        // unsound learned clause — the latent false-UNSAT of #121.
+        if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
+            return state.pinBool(auxBoolVar, false, collectHoleAndBoundAntecedents(state, vars))
+        }
 
         val aux = state.boolValues[auxBoolVar] ?: return true
         // Thread the aux's current pinning as an extra antecedent for every implied int
@@ -181,6 +190,19 @@ class ReifiedLinear private constructor(
      * through 1UIP / self-subsuming minimization at per-bound granularity.
      */
     private fun composeAuxAntecedents(state: PropagationState): IntArray? = state.composeIntVarAtomAntecedents(vars)
+
+    /** For a single-term `c·x = bound`, true when `bound/c` is not an integer in `x`'s current
+     *  domain — i.e. the equality is unsatisfiable even though `bound` lies within `x`'s bounds
+     *  (an interior hole) or `bound` is not divisible by `c`. */
+    private fun eqTargetUnreachable(state: PropagationState): Boolean {
+        val c = coeffs[0].toLong()
+        val b = bound.toLong()
+        if (c == 0L) return b != 0L
+        if (b % c != 0L) return true
+        val value = b / c
+        if (value < Int.MIN_VALUE.toLong() || value > Int.MAX_VALUE.toLong()) return true
+        return value.toInt() !in state.intDomains[vars[0]]
+    }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
