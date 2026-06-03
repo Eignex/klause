@@ -61,9 +61,16 @@ class ChocoFactorCoverageExtraTest {
         assertEquals(kept.size, kept.toSet().size, "non-excepted values must be distinct: $kept")
     }
 
-    @Test fun `count equals the target occurrences`() {
-        val a = sat(problem(3, dom(3, 0, 2), Count(intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = 2)))
-        assertEquals(2, listOf(a.ints[0], a.ints[1], a.ints[2]).count { it == 1 })
+    @Test fun `count variable equals the number of matches`() {
+        // n (var id 3) is the count variable, distinct from xs (ids 0,1,2): n = #{xs[i] = 1}.
+        val a = sat(
+            problem(
+                4,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
+                Count(intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = 3),
+            ),
+        )
+        assertEquals((0..2).count { a.ints[it] == 1 }, a.ints[3], "n must hold the count of xs = 1")
     }
 
     @Test fun `member picks one of the array values`() {

@@ -245,9 +245,16 @@ class ChocoModel private constructor(
 
     private fun postCountFactor(f: Count) {
         if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
-        val limit = model.intVar(0, f.xs.size)
-        model.count(f.v, intVarsOf(f.xs), limit).post()
-        model.arithm(limit, cmpStr(f.op), f.n).post()
+        // `n = #{i : xs[i] ⟨op⟩ v}` with `n` the count *variable* (intVars[f.n]). `op` is the
+        // per-element match predicate, not the count-vs-n relation. Choco's `count` only counts
+        // equality, so reify each element's match and sum the indicators into the count var —
+        // uniform across all ops. (The earlier `count(eq)` + `arithm(limit, op, f.n)` form was
+        // wrong twice: it ignored non-Eq match ops, and compared against the raw id `f.n` as a
+        // constant rather than the variable, fabricating false UNSATs when `f.n > xs.size`.)
+        val matches = Array(f.xs.size) { i ->
+            model.arithm(intVars[f.xs[i]], cmpStr(f.op), f.v).reify()
+        }
+        model.sum(matches, "=", intVars[f.n]).post()
     }
 
     private fun postMonotone(f: Monotone) {
