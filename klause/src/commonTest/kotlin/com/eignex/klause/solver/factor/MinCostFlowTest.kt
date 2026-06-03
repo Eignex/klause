@@ -61,6 +61,36 @@ class MinCostFlowTest {
     }
 
     @Test
+    fun `negative-weight residual cycle is handled without hanging`() {
+        // #85 regression: negative arc weights create a negative-cost cycle (2->3->2, w=-3 each)
+        // in the residual graph reachable from the source. Without the SPFA negative-cycle guard,
+        // ssp would loop forever (distances decrease around the cycle). The guard detects it and
+        // skips the unsound SSP tightening, so propagation still terminates and stays sound — the
+        // trivial linear cost bounds remain in force.
+        val factor = MinCostFlow(
+            numNodes = 4,
+            arcFrom = intArrayOf(0, 0, 2, 3),
+            arcTo = intArrayOf(1, 2, 3, 2),
+            balance = intArrayOf(-1, 1, 0, 0),
+            flow = intArrayOf(0, 1, 2, 3),
+            weight = intArrayOf(1, 0, -3, -3),
+            cost = 4,
+        )
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = arrayOf(
+                IntDomain(0, 1), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(-1000, 1000),
+            ),
+            factors = arrayOf<Factor>(factor),
+        )
+        val r = problem.propagate(Assumptions.None)
+        // Must terminate and stay sound: the unit is forced onto arc 0 (cost 1) by balance.
+        assertTrue(r is PropagationResult.Implied, "expected propagation success; got $r")
+        assertEquals(1, r.intValueOrNull(0), "the single supply unit must flow on arc 0")
+    }
+
+    @Test
     fun `reduced cost pruning forbids dearer arc when cost max is tight`() {
         // Same parallel-arcs graph; force cost.max = 3 — the dearer (w=5) arc must drop to 0.
         val factor = MinCostFlow(
