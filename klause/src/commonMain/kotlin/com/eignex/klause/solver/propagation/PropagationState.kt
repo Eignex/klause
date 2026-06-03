@@ -156,8 +156,10 @@ class PropagationState(
         if (k <= problem.intDomains[v].min) return 0
         val vals = minHistVal[v] ?: return maxOf(intLevel[v], 0)
         val lvls = minHistLvl[v] ?: error("minHistLvl[$v] missing while minHistVal present")
-        for (i in 0 until vals.size) if (vals[i] >= k) return lvls[i]
-        return maxOf(intLevel[v], 0)
+        // [minHistVal] is ascending (min rises monotonically), so the first value ≥ k is the
+        // lower bound of k — found in O(log n) instead of a linear scan (#97).
+        val i = vals.lowerBound(k)
+        return if (i < vals.size) lvls[i] else maxOf(intLevel[v], 0)
     }
 
     /** Level at which `v`'s max *first* reached ≤ [k]. Symmetric to [minLevelForGe]. */
@@ -165,8 +167,10 @@ class PropagationState(
         if (k >= problem.intDomains[v].max) return 0
         val vals = maxHistVal[v] ?: return maxOf(intLevel[v], 0)
         val lvls = maxHistLvl[v] ?: error("maxHistLvl[$v] missing while maxHistVal present")
-        for (i in 0 until vals.size) if (vals[i] <= k) return lvls[i]
-        return maxOf(intLevel[v], 0)
+        // [maxHistVal] is descending (max falls monotonically); the first value ≤ k is the
+        // descending lower bound — O(log n) (#97).
+        val i = vals.lowerBoundDescending(k)
+        return if (i < vals.size) lvls[i] else maxOf(intLevel[v], 0)
     }
 
     /** Loosest (smallest) min-value established at a level strictly below [level]; the root
