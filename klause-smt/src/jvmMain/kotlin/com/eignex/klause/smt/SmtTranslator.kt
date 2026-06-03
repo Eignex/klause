@@ -159,9 +159,10 @@ internal object SmtTranslator {
         val sum = rmgr.sum(terms)
         val bound = rmgr.makeNumber(c.bound)
         return when (c.op) {
-            LinearOp.LE -> rmgr.lessOrEquals(sum, bound)
+            // strict carries an original float `<` / `>` that LinearOp cannot represent (#83).
+            LinearOp.LE -> if (c.strict) rmgr.lessThan(sum, bound) else rmgr.lessOrEquals(sum, bound)
             LinearOp.EQ -> rmgr.equal(sum, bound)
-            LinearOp.GE -> rmgr.greaterOrEquals(sum, bound)
+            LinearOp.GE -> if (c.strict) rmgr.greaterThan(sum, bound) else rmgr.greaterOrEquals(sum, bound)
             LinearOp.NE -> e.fm.booleanFormulaManager.not(rmgr.equal(sum, bound))
         }
     }

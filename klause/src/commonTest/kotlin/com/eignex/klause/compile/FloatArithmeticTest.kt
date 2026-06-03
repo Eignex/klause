@@ -47,6 +47,44 @@ class FloatArithmeticTest {
     }
 
     @Test
+    fun `strict less-than excludes the exact boundary bucket`() {
+        // #83: 0.5 is exactly bucket 10 (21 buckets over [0,1], step 0.05). `rate < 0.5` must
+        // exclude it; before the strict-lowering fix LT was solved as LE and 0.5 leaked in.
+        class S : VariableSchema() {
+            val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
+
+            val c by constraint { rate lt 0.5 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(50).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val rate = compiled.decode(schema.rate, s)
+            assertTrue(rate < 0.5 - 1e-9, "rate=$rate admitted on/over the strict boundary of rate < 0.5")
+        }
+    }
+
+    @Test
+    fun `strict greater-than excludes the exact boundary bucket`() {
+        class S : VariableSchema() {
+            val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
+
+            val c by constraint { rate gt 0.5 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 12)).take(50).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val rate = compiled.decode(schema.rate, s)
+            assertTrue(rate > 0.5 + 1e-9, "rate=$rate admitted on/under the strict boundary of rate > 0.5")
+        }
+    }
+
+    @Test
     fun `negative coefficient flips comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
