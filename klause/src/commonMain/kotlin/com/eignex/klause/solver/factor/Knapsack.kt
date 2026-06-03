@@ -37,42 +37,42 @@ class Knapsack(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + intArrayOf(w, p)
 
-    private class State(var currentWeight: Int, var currentProfit: Int)
+    private class State(var currentWeight: Long, var currentProfit: Long)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        var ww = 0
-        var pp = 0
+        var ww = 0L
+        var pp = 0L
         for (i in xs.indices) {
             val v = state.assignment.intValue(xs[i])
-            ww += weights[i] * v
-            pp += profits[i] * v
+            ww += weights[i].toLong() * v
+            pp += profits[i].toLong() * v
         }
         state.refPayload[factorId] = State(ww, pp)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val s = state.refPayload[factorId] as State
-        return state.assignment.intValue(w) != s.currentWeight ||
-            state.assignment.intValue(p) != s.currentProfit
+        return state.assignment.intValue(w).toLong() != s.currentWeight ||
+            state.assignment.intValue(p).toLong() != s.currentProfit
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val wasViolated = isViolated(state, factorId)
-        var dWeight = 0
-        var dProfit = 0
+        var dWeight = 0L
+        var dProfit = 0L
         for (i in xs.indices) {
             if (xs[i] != intVar) continue
             val old = state.assignment.intValue(intVar)
             val deltaCell = newValue - old
-            dWeight += weights[i] * deltaCell
-            dProfit += profits[i] * deltaCell
+            dWeight += weights[i].toLong() * deltaCell
+            dProfit += profits[i].toLong() * deltaCell
         }
         val newW = s.currentWeight + dWeight
         val newP = s.currentProfit + dProfit
         val newWvar = if (intVar == w) newValue else state.assignment.intValue(w)
         val newPvar = if (intVar == p) newValue else state.assignment.intValue(p)
-        val willViolate = newWvar != newW || newPvar != newP
+        val willViolate = newWvar.toLong() != newW || newPvar.toLong() != newP
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
@@ -82,24 +82,29 @@ class Knapsack(
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State
         val wDom = state.problem.intDomains[w]
-        if (s.currentWeight in wDom && s.currentWeight != state.assignment.intValue(w)) {
-            sink.addChannelingIntSet(state, w, s.currentWeight)
+        // Snap w / p to the running totals only when those totals fit Int and land inside
+        // the (possibly holed) declared domain — a total beyond Int range can't be a valid
+        // assignment target.
+        if (s.currentWeight in INT_RANGE) {
+            val cw = s.currentWeight.toInt()
+            if (cw in wDom && cw != state.assignment.intValue(w)) sink.addChannelingIntSet(state, w, cw)
         }
         val pDom = state.problem.intDomains[p]
-        if (s.currentProfit in pDom && s.currentProfit != state.assignment.intValue(p)) {
-            sink.addChannelingIntSet(state, p, s.currentProfit)
+        if (s.currentProfit in INT_RANGE) {
+            val cp = s.currentProfit.toInt()
+            if (cp in pDom && cp != state.assignment.intValue(p)) sink.addChannelingIntSet(state, p, cp)
         }
         // For each xs[i], if w-var requires lower weight, propose decreasing xs[i] when
         // weights[i] > 0; symmetric for profit.
         val wTarget = state.assignment.intValue(w)
         val wGap = wTarget - s.currentWeight // positive: need more weight
-        if (wGap != 0) {
+        if (wGap != 0L) {
             for (i in xs.indices) {
                 if (weights[i] == 0) continue
                 val xi = xs[i]
                 val cur = state.assignment.intValue(xi)
                 val d = state.problem.intDomains[xi]
-                val wantIncrease = (weights[i] > 0) == (wGap > 0)
+                val wantIncrease = (weights[i] > 0) == (wGap > 0L)
                 val candidate = if (wantIncrease) cur + 1 else cur - 1
                 if (candidate in d) sink.addChannelingIntSet(state, xi, candidate)
             }
@@ -113,22 +118,28 @@ class Knapsack(
         // Compute pre-update violation by reversing the change on a copy.
         val wasViolated = run {
             val priorW =
-                s.currentWeight - xs.indices.sumOf { if (xs[it] == intVar) weights[it] * (cur - oldValue) else 0 }
+                s.currentWeight -
+                    xs.indices.sumOf { if (xs[it] == intVar) weights[it].toLong() * (cur - oldValue) else 0L }
             val priorP =
-                s.currentProfit - xs.indices.sumOf { if (xs[it] == intVar) profits[it] * (cur - oldValue) else 0 }
+                s.currentProfit -
+                    xs.indices.sumOf { if (xs[it] == intVar) profits[it].toLong() * (cur - oldValue) else 0L }
             val wVar = if (intVar == w) oldValue else state.assignment.intValue(w)
             val pVar = if (intVar == p) oldValue else state.assignment.intValue(p)
-            wVar != priorW || pVar != priorP
+            wVar.toLong() != priorW || pVar.toLong() != priorP
         }
         // Apply update to maintained sums.
         for (i in xs.indices) {
             if (xs[i] != intVar) continue
             val delta = cur - oldValue
-            s.currentWeight += weights[i] * delta
-            s.currentProfit += profits[i] * delta
+            s.currentWeight += weights[i].toLong() * delta
+            s.currentProfit += profits[i].toLong() * delta
         }
         val nowViolated = isViolated(state, factorId)
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+    }
+
+    private companion object {
+        private val INT_RANGE = Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()
     }
 
     /**

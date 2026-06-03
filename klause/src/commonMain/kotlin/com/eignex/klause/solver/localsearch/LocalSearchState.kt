@@ -42,6 +42,12 @@ class LocalSearchState(
      *  descent gradient on tight arithmetic/global constraints. */
     val factorDegree: IntArray = IntArray(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
+
+    /** Per-factor `Long` scratch, the wide counterpart to [intPayload]. The weighted-sum
+     *  family ([Linear], [ReifiedLinear], [PseudoBoolean], [ReifiedPseudoBoolean]) keeps its
+     *  running `Σ coeff·value` here so large coefficients / wide domains can't wrap a 32-bit
+     *  accumulator and silently corrupt `isViolated` / `violationDegree`. */
+    val longPayload: LongArray = LongArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
 
     /** Buffer that strategies push candidate moves into. */
@@ -368,7 +374,7 @@ class LocalSearchState(
                     val coeff = f.coeffs[0]
                     val auxVar = f.auxBoolVar
                     if (assumptions.isFrozenBool(auxVar)) continue
-                    val shouldHold = coeff * newValue == f.bound
+                    val shouldHold = coeff.toLong() * newValue == f.bound.toLong()
                     val auxCurrent = assignment.boolValue(auxVar)
                     if (auxCurrent != shouldHold) parts += Move.BoolFlip(auxVar)
                 }

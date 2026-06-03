@@ -113,8 +113,22 @@ private fun scale(coeff: Int, expr: IntExpr): IntExpr {
     if (coeff == 0) return IntLit(0)
     if (coeff == 1) return expr
     return when (expr) {
-        is IntLit -> IntLit(coeff * expr.value)
-        is IntScale -> IntScale(coeff * expr.coeff, expr.child)
+        is IntLit -> IntLit(checkedIntFold(coeff.toLong() * expr.value) { "scale literal ($coeff · ${expr.value})" })
+
+        is IntScale -> IntScale(
+            checkedIntFold(coeff.toLong() * expr.coeff) { "scale coefficient ($coeff · ${expr.coeff})" },
+            expr.child,
+        )
+
         else -> IntScale(coeff, expr)
     }
+}
+
+/** Narrow a constant-fold result to `Int`, failing loudly on overflow rather than wrapping
+ *  a wide product into a garbage literal/coefficient (issue #73). */
+private fun checkedIntFold(value: Long, what: () -> String): Int {
+    require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+        "Int expression overflows Int: ${what()} = $value"
+    }
+    return value.toInt()
 }

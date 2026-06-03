@@ -94,6 +94,16 @@ class IntDomain private constructor(
         value
     }
 
+    /** Nearest in-[min]..[max] value to a `Long` [value], returned as `Int`. Used by the
+     *  weighted-sum factors whose repair targets are computed in `Long` (to avoid overflow)
+     *  but must land on an `Int` domain value. A target beyond `Int` range necessarily lies
+     *  past the corresponding bound, so it clamps to [min] / [max]. */
+    fun clampLong(value: Long): Int = when {
+        value < min -> min
+        value > max -> max
+        else -> value.toInt()
+    }
+
     /**
      * Return a new domain with [value] excluded, or `this` if [value] is not currently
      * present (idempotent on absent values). Throws [IllegalStateException] if removing

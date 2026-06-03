@@ -155,7 +155,7 @@ class PropagationState(
     fun minLevelForGe(v: Int, k: Int): Int {
         if (k <= problem.intDomains[v].min) return 0
         val vals = minHistVal[v] ?: return maxOf(intLevel[v], 0)
-        val lvls = minHistLvl[v]!!
+        val lvls = minHistLvl[v] ?: error("minHistLvl[$v] missing while minHistVal present")
         for (i in 0 until vals.size) if (vals[i] >= k) return lvls[i]
         return maxOf(intLevel[v], 0)
     }
@@ -164,7 +164,7 @@ class PropagationState(
     fun maxLevelForLe(v: Int, k: Int): Int {
         if (k >= problem.intDomains[v].max) return 0
         val vals = maxHistVal[v] ?: return maxOf(intLevel[v], 0)
-        val lvls = maxHistLvl[v]!!
+        val lvls = maxHistLvl[v] ?: error("maxHistLvl[$v] missing while maxHistVal present")
         for (i in 0 until vals.size) if (vals[i] <= k) return lvls[i]
         return maxOf(intLevel[v], 0)
     }
@@ -174,7 +174,7 @@ class PropagationState(
     fun minBelowLevel(v: Int, level: Int): Int {
         val rootMin = problem.intDomains[v].min
         val vals = minHistVal[v] ?: return rootMin
-        val lvls = minHistLvl[v]!!
+        val lvls = minHistLvl[v] ?: error("minHistLvl[$v] missing while minHistVal present")
         var best = rootMin
         for (i in 0 until vals.size) {
             if (lvls[i] < level) best = vals[i] else break // lvls non-decreasing → prefix
@@ -187,7 +187,7 @@ class PropagationState(
     fun maxAboveLevel(v: Int, level: Int): Int {
         val rootMax = problem.intDomains[v].max
         val vals = maxHistVal[v] ?: return rootMax
-        val lvls = maxHistLvl[v]!!
+        val lvls = maxHistLvl[v] ?: error("maxHistLvl[$v] missing while maxHistVal present")
         var best = rootMax
         for (i in 0 until vals.size) {
             if (lvls[i] < level) best = vals[i] else break
