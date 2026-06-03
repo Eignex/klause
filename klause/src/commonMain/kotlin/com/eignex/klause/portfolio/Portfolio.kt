@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -100,14 +99,13 @@ class Portfolio(
      * as BestFound, or Optimal if every worker terminated cleanly.
      */
     suspend fun minimize(cancellation: Cancellation = Cancellation.Never): MinimizeResult = coroutineScope {
-        // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity equality
-        // and CAS would fail spuriously on autoboxed Doubles.
-        val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
-        val bestSample = AtomicReference<Sample?>(null)
+        // Bound and best sample travel together in one atomically-swapped holder so a reported
+        // bound always matches the stored sample (#81).
+        val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
         val cancelled = AtomicBoolean(false)
         val token: Cancellation = { cancelled.load() || cancellation() }
 
-        fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
+        fun readBound(): Double = incumbent.load().bound
 
         val deferreds = workers.map { worker ->
             async {
@@ -115,12 +113,12 @@ class Portfolio(
                 for (r in worker.improvements(::readBound, token)) {
                     when (r) {
                         is MinimizeResult.BestFound -> {
-                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                            updateSharedBound(incumbent, r.objectiveValue, r.sample)
                             local = r
                         }
 
                         is MinimizeResult.Optimal -> {
-                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                            updateSharedBound(incumbent, r.objectiveValue, r.sample)
                             cancelled.store(true)
                             local = r
                             break
@@ -147,8 +145,9 @@ class Portfolio(
         val anyDirtyUnknown = results.any { r ->
             r is MinimizeResult.Unknown && r.reason != TerminationReason.SearchExhausted
         }
-        val sample = bestSample.load()
-        val finalBound = readBound()
+        val snapshot = incumbent.load()
+        val sample = snapshot.sample
+        val finalBound = snapshot.bound
         if (sample != null) {
             return@coroutineScope if (anyDirtyUnknown) {
                 MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted)
@@ -163,20 +162,15 @@ class Portfolio(
         }
     }
 
-    private fun updateSharedBound(
-        boundBits: AtomicLong,
-        best: AtomicReference<Sample?>,
-        objective: Double,
-        sample: Sample,
-    ) {
+    private fun updateSharedBound(incumbent: AtomicReference<Incumbent>, objective: Double, sample: Sample) {
         while (true) {
-            val curBits = boundBits.load()
-            val cur = Double.fromBits(curBits)
-            if (objective >= cur) return
-            if (boundBits.compareAndSet(curBits, objective.toRawBits())) {
-                best.store(sample)
-                return
-            }
+            val cur = incumbent.load()
+            if (objective >= cur.bound) return
+            // One CAS swaps bound and sample together, so a worker that wins the bound can never be
+            // preempted between updating the bound and the sample: there is no separate store for a
+            // racing worker to interleave with (#81). CAS uses identity equality, which is correct
+            // here — each update publishes a fresh Incumbent instance.
+            if (incumbent.compareAndSet(cur, Incumbent(objective, sample))) return
         }
     }
 
@@ -189,16 +183,15 @@ class Portfolio(
      * entry point the bench's optimisation metric consumes.
      */
     fun improvements(cancellation: Cancellation = Cancellation.Never): Flow<MinimizeResult> = channelFlow {
-        val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
-        val bestSample = AtomicReference<Sample?>(null)
-        fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
+        val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
+        fun readBound(): Double = incumbent.load().bound
         for (worker in workers) {
             launch {
                 val job = requireNotNull(coroutineContext[Job])
                 val token: Cancellation = { !job.isActive || cancellation() }
                 for (r in worker.improvements(::readBound, token)) {
                     if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
-                        updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                        updateSharedBound(incumbent, r.objectiveValue, r.sample)
                         send(r)
                     }
                 }
@@ -226,6 +219,11 @@ class Portfolio(
         workers.forEach { runCatching { it.close() } }
     }
 }
+
+/** Immutable (bound, sample) pair published as one [AtomicReference] cell so the shared bound and
+ *  the best sample are swapped together in a single CAS — they can never desync under a worker race
+ *  (#81). `bound` is the objective value; `sample` is null only before the first incumbent. */
+private class Incumbent(val bound: Double, val sample: Sample?)
 
 /** Strategy knobs for [Portfolio]. Affects `solve` only; `samples` always fans in from every
  *  worker and `minimize` always shares the global bound (race honoured via cancellation on

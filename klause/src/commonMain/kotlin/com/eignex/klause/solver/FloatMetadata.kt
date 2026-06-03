@@ -76,6 +76,11 @@ data class RealLinearConstraint(
     val op: LinearOp,
     /** Right-hand-side bound. */
     val bound: Double,
+    /** When true, [op] (always `LE` or `GE` here) is the strict variant: `< bound` / `> bound`.
+     *  [LinearOp] has no strict members, so an original strict float comparison carries the
+     *  strictness through this flag for backends that solve over reals (#83). Non-real (bucketed)
+     *  backends instead see a bound nudged by one scaled ULP and ignore this flag. */
+    val strict: Boolean = false,
 ) {
     init {
         require(coeffs.size == floatVarIds.size) {
@@ -88,7 +93,7 @@ data class RealLinearConstraint(
         if (other !is RealLinearConstraint) return false
         return coeffs.contentEquals(other.coeffs) &&
             floatVarIds.contentEquals(other.floatVarIds) &&
-            op == other.op && bound == other.bound
+            op == other.op && bound == other.bound && strict == other.strict
     }
 
     override fun hashCode(): Int {
@@ -96,6 +101,7 @@ data class RealLinearConstraint(
         h = 31 * h + floatVarIds.contentHashCode()
         h = 31 * h + op.hashCode()
         h = 31 * h + bound.hashCode()
+        h = 31 * h + strict.hashCode()
         return h
     }
 }

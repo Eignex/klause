@@ -301,6 +301,24 @@ class LocalSearchState(
         return shapingLambda * delta
     }
 
+    /**
+     * Raw per-move objective delta `evaluate(applyMove(current)) − evaluate(current)`,
+     * computed against the current assignment WITHOUT committing the move — O(arity) for a
+     * [LinearObjective], the objective's own cost for an [IncrementalObjective]. Returns
+     * `null` for objectives with no incremental path, signalling the caller to fall back to
+     * `apply` + full [Objective.evaluate].
+     *
+     * Distinct from [shapedObjectiveDelta], which multiplies by [shapingLambda] (zero on the
+     * feasibility-gated descent path) for pre-feasibility shaping; this returns the unscaled
+     * delta the optimize-side descent steps score candidates by, paired with [netDelta] for
+     * the feasibility/cost side.
+     */
+    fun objectiveDelta(obj: Objective, move: Move): Double? = when (obj) {
+        is LinearObjective -> linearObjectiveDelta(move, obj)
+        is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
+        else -> null
+    }
+
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double = when (move) {
         is Move.BoolFlip -> {
             val v = move.varId
@@ -703,6 +721,10 @@ class LocalSearchState(
         // the apply+revert dance.
         val touchedSlots = IntArray(move.parts.size) { slotOf(move.parts[it]) }
         val savedTouched = LongArray(touchedSlots.size) { lastTouched[touchedSlots[it]] }
+        // touchCount is cross-epoch activity (WarmState.activityTouches / ALNS). A probe must
+        // not register as real activity: each apply+revert bumps it twice, so snapshot here and
+        // restore below alongside lastTouched.
+        val savedTouchCount = IntArray(touchedSlots.size) { touchCount[touchedSlots[it]] }
 
         for (p in move.parts) apply(p)
 
@@ -716,6 +738,7 @@ class LocalSearchState(
         // Restore: step, lastTouched, conf-change arrays, best-cost watermark.
         step = oldStep
         for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
+        for (i in touchedSlots.indices) touchCount[touchedSlots[i]] = savedTouchCount[i]
         for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
         for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
         bestCostSeen = oldBestCost

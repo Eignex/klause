@@ -14,10 +14,14 @@ import org.sosy_lab.common.ShutdownNotifier
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
+import org.sosy_lab.java_smt.api.BasicProverEnvironment
 import org.sosy_lab.java_smt.api.BooleanFormula
 import org.sosy_lab.java_smt.api.Model
+import org.sosy_lab.java_smt.api.NumeralFormula
+import org.sosy_lab.java_smt.api.NumeralFormula.IntegerFormula
 import org.sosy_lab.java_smt.api.NumeralFormula.RationalFormula
 import org.sosy_lab.java_smt.api.OptimizationProverEnvironment
+import org.sosy_lab.java_smt.api.ProverEnvironment
 import org.sosy_lab.java_smt.api.SolverContext
 import org.sosy_lab.java_smt.api.SolverContext.ProverOptions
 
@@ -62,6 +66,7 @@ class SmtSolver(override val problem: Problem) :
      * indicators lifted via `ifThenElse`, ints cast via `castToRational`). Non-Linear
      * [Objective] subtypes throw at runtime — JavaSMT has no generic objective callback.
      */
+    @Suppress("IgnoredReturnValue") // the objective handle is not needed; we only check()/getModel()
     override fun minimize(objective: Objective, params: SmtParams): MinimizeResult {
         require(objective is LinearObjective) {
             "SmtSolver only supports LinearObjective; got ${objective::class.simpleName}"
@@ -120,15 +125,12 @@ class SmtSolver(override val problem: Problem) :
      *  `RationalFormulaManager` accepts an integer formula directly in arithmetic
      *  operations on backends that support mixed arithmetic; for the lean path we wrap
      *  via a fresh rational variable equated to the int. */
-    private fun castIntToRational(
-        intF: org.sosy_lab.java_smt.api.NumeralFormula.IntegerFormula,
-        encoding: SmtEncoding,
-    ): RationalFormula {
+    private fun castIntToRational(intF: IntegerFormula, encoding: SmtEncoding): RationalFormula {
         // RationalFormulaManager.add accepts IntegerFormula via covariance on most backends,
         // but the static return type forces a NumeralFormula. Multiplying 1 × intF yields a
         // RationalFormula whose value tracks the int.
         val rmgr = encoding.fm.rationalFormulaManager
-        return rmgr.multiply(rmgr.makeNumber(1L), intF as org.sosy_lab.java_smt.api.NumeralFormula)
+        return rmgr.multiply(rmgr.makeNumber(1L), intF as NumeralFormula)
     }
 
     override fun solve(params: SmtParams): SolveResult {
@@ -167,10 +169,7 @@ class SmtSolver(override val problem: Problem) :
     /** Map JavaSMT's unsat-core formulas back to klause factor ids. Returns `null` when
      *  the backend doesn't support core extraction (returns an empty list despite UNSAT),
      *  preserving the "core is opt-in per backend" contract. */
-    private fun extractCore(
-        prover: org.sosy_lab.java_smt.api.ProverEnvironment,
-        factorByFormula: Map<BooleanFormula, Int>,
-    ): UnsatCore? {
+    private fun extractCore(prover: ProverEnvironment, factorByFormula: Map<BooleanFormula, Int>): UnsatCore? {
         val coreFormulas = try {
             prover.unsatCore
         } catch (_: UnsupportedOperationException) {
@@ -207,11 +206,7 @@ class SmtSolver(override val problem: Problem) :
         )
     }
 
-    private fun addAssumptions(
-        params: SmtParams,
-        encoding: SmtEncoding,
-        prover: org.sosy_lab.java_smt.api.BasicProverEnvironment<*>,
-    ) {
+    private fun addAssumptions(params: SmtParams, encoding: SmtEncoding, prover: BasicProverEnvironment<*>) {
         val bmgr = encoding.fm.booleanFormulaManager
         val imgr = encoding.fm.integerFormulaManager
         params.assumptions.forEachBool { boolVar, value ->

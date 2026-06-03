@@ -14,21 +14,31 @@ import com.eignex.klause.solver.propagation.PropagationState
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
  * is the current weighted sum, mirrored from [Linear].
  */
-class ReifiedLinear(
+class ReifiedLinear private constructor(
     /** Reification literal: true iff the linear relation holds. */
     val auxBoolVar: Int,
-    /** Coefficients, parallel to [vars]. */
-    val coeffs: IntArray,
-    /** Integer variable ids, parallel to [coeffs]. */
-    val vars: IntArray,
+    terms: CoalescedTerms,
     /** Relation between the weighted sum and [bound]. */
     val op: LinearOp,
     /** Right-hand-side bound. */
     val bound: Int,
 ) : LocalSearchFactor {
 
+    /** Integer variable ids, parallel to [coeffs]; each variable appears at most once. */
+    val vars: IntArray = terms.vars
+
+    /** Coefficients, parallel to [vars]. */
+    val coeffs: IntArray = terms.coeffs
+
+    /**
+     * `auxBoolVar ↔ (Σ coeffs[i] * vars[i] ⟨op⟩ bound)`. Duplicate variables are coalesced
+     * (their coefficients summed) so the local-search payload stays consistent regardless of
+     * caller (issue #84).
+     */
+    constructor(auxBoolVar: Int, coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
+        this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound)
+
     init {
-        require(coeffs.size == vars.size) { "coeffs/vars length mismatch" }
         require(coeffs.isNotEmpty()) { "ReifiedLinear must have at least one term" }
     }
 
