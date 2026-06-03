@@ -128,6 +128,31 @@ class TotalizerOptimizerTest {
     }
 
     @Test
+    fun `weighted - large weights solve via lazily-built thresholds`() {
+        // #91 regression. totalWeight = 1999, so the old eager encoding baked ~2000
+        // ReifiedPseudoBoolean threshold factors up front; the lazy path materialises only
+        // the handful the OLL loop assumes (here k=1 then k=1000). Optimum under the mutex:
+        // keep the weight-1000 soft, drop the weight-999 one ⇒ cost 999.
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
+        )
+        val r = TotalizerOptimizer(problem).minimizeWeighted(
+            listOf(
+                TotalizerOptimizer.WeightedSoft(Lit.make(0, true), weight = 1000L),
+                TotalizerOptimizer.WeightedSoft(Lit.make(1, true), weight = 999L),
+            ),
+            BacktrackParams(),
+        )
+        val opt = assertIs<TotalizerOptimizer.Result.Optimal>(r)
+        assertEquals(999L, opt.lowerBound)
+        assertEquals(true, opt.sample.bools[0])
+        assertEquals(false, opt.sample.bools[1])
+    }
+
+    @Test
     fun `globally unsat returns Infeasible`() {
         val problem = Problem(
             numBoolVars = 1,
