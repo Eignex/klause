@@ -69,6 +69,36 @@ internal class IntArrayList(initialCapacity: Int = 8) {
 
     fun last(): Int = data[size - 1]
 
+    /**
+     * Index of the first element `>= element` in `[0, size)`, assuming the list is sorted
+     * **strictly ascending** (no duplicates) — the lower-bound / insertion point. Returns
+     * [size] when every element is strictly below [element]. O(log size) via [binarySearchInt],
+     * whose exact-or-`-(insertion)-1` result is an exact lower bound only when elements are
+     * distinct; the monotone bound-change histories this serves (each tighten pushes a strictly
+     * larger min, see [com.eignex.klause.solver.propagation.PropagationState.minLevelForGe]) are
+     * always distinct.
+     */
+    fun lowerBound(element: Int): Int {
+        val idx = data.binarySearchInt(element, 0, size)
+        return if (idx >= 0) idx else -(idx + 1)
+    }
+
+    /**
+     * Index of the first element `<= element` in `[0, size)`, assuming the list is sorted
+     * **descending** — the symmetric lower bound for a monotone-decreasing history (see
+     * [com.eignex.klause.solver.propagation.PropagationState.maxLevelForLe]). Returns [size]
+     * when every element is strictly above [element]. O(log size).
+     */
+    fun lowerBoundDescending(element: Int): Int {
+        var lo = 0
+        var hi = size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (data[mid] <= element) hi = mid else lo = mid + 1
+        }
+        return lo
+    }
+
     inline fun forEach(action: (Int) -> Unit) {
         for (i in 0 until size) action(this[i])
     }
