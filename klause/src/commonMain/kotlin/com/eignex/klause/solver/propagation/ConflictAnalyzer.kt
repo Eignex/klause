@@ -45,6 +45,17 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private var inClause = BooleanArray(0)
     private var toDrop = BooleanArray(0)
 
+    // Reusable explicit-stack buffers for the iterative [isRedundant] DFS (cleared per call),
+    // so deep implication graphs can't overflow the call stack. Three parallel stacks: the
+    // variable under examination, its antecedent literals, and the resume index into them.
+    private val redVarStack = IntArrayList()
+    private val redIdxStack = IntArrayList()
+    private val redAntStack = ArrayList<IntArray>()
+
+    // Marks variables currently on the [isRedundant] DFS path, so a back-edge (atom antecedent
+    // graphs can be cyclic — see [resolved]) is detected as a cycle rather than re-pushed forever.
+    private var onPath = BooleanArray(0)
+
     // Variables encountered (resolved through or kept) during the most recent analysis —
     // the canonical CDCL VSIDS bump set (MiniSAT/Glucose bump every var seen while walking
     // the implication graph, not just the decision vars at the conflict levels). Recorded
@@ -254,12 +265,18 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
     }
 
+    /** Antecedents of [v], or null when [v] is a decision/leaf — or when [v] falls outside
+     *  the current antecedent universe. Out-of-range atom ids can be reached only through the
+     *  recursive antecedent walk in [isRedundant] (the 1UIP loop stays within `seen`/`resolved`
+     *  bounds); treating them as antecedent-less leaves keeps the literal, which is always sound
+     *  for minimization, rather than indexing past [PropagationState.atomAntecedents]. */
     private fun antecedentsOf(v: Int): IntArray? {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
-            state.boolAntecedents[v]
+            if (v < 0) null else state.boolAntecedents[v]
         } else {
-            state.atomAntecedents[v - numBoolVars]
+            val atomId = v - numBoolVars
+            if (atomId < state.atomAntecedents.size) state.atomAntecedents[atomId] else null
         }
     }
 
@@ -321,6 +338,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         if (learned.size <= 1) return learned
         val universeSize = universe
         inClause = scratch(inClause, universeSize)
+        onPath = scratch(onPath, universeSize)
         for (i in 0 until learned.size) {
             val v = Lit.variable(learned[i])
             if (v < universeSize) inClause[v] = true
@@ -356,23 +374,83 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * depth is bounded by the size of the implication graph reached, but the cache
      * keeps the total work linear.
      */
-    private fun isRedundant(v: Int, inClause: BooleanArray, cache: HashMap<Int, Boolean>): Boolean {
-        cache[v]?.let { return it }
-        val antecedents = antecedentsOf(v) ?: run {
-            cache[v] = false
+    private fun isRedundant(root: Int, inClause: BooleanArray, cache: HashMap<Int, Boolean>): Boolean {
+        cache[root]?.let { return it }
+        val rootAnt = antecedentsOf(root) ?: run {
+            cache[root] = false
             return false
         }
-        for (lit in antecedents) {
-            val u = Lit.variable(lit)
-            if (u == v) continue
-            if (levelOf(u) <= 0) continue
-            if (u < inClause.size && inClause[u]) continue
-            if (!isRedundant(u, inClause, cache)) {
-                cache[v] = false
+        // Iterative post-order DFS over the implication graph, replacing the former recursion
+        // (which overflowed the stack on deep graphs — #118). The stack holds the root-to-current
+        // path; a node is redundant iff all its antecedents are redundant / in-clause / level-0.
+        redVarStack.clear()
+        redIdxStack.clear()
+        redAntStack.clear()
+        redVarStack.add(root)
+        redAntStack.add(rootAnt)
+        redIdxStack.add(0)
+        if (root < onPath.size) onPath[root] = true
+        while (!redVarStack.isEmpty()) {
+            val top = redVarStack.size - 1
+            val v = redVarStack[top]
+            val ant = redAntStack[top]
+            var i = redIdxStack[top]
+            var failed = false
+            var pushed = false
+            while (i < ant.size) {
+                val u = Lit.variable(ant[i])
+                i++
+                if (u == v) continue
+                if (levelOf(u) <= 0) continue
+                if (u < inClause.size && inClause[u]) continue
+                // A back-edge to a variable already on the path is a cycle; it can't be proven
+                // redundant, so treat it (and thus v) as non-redundant — sound, just keeps the literal.
+                if (u < onPath.size && onPath[u]) {
+                    failed = true
+                    break
+                }
+                when (cache[u]) {
+                    true -> continue
+
+                    false -> {
+                        failed = true
+                        break
+                    }
+
+                    else -> {
+                        val uAnt = antecedentsOf(u)
+                        if (uAnt == null) {
+                            cache[u] = false
+                            failed = true
+                            break
+                        }
+                        redIdxStack[top] = i // resume here once the child frame completes
+                        redVarStack.add(u)
+                        redAntStack.add(uAnt)
+                        redIdxStack.add(0)
+                        if (u < onPath.size) onPath[u] = true
+                        pushed = true
+                        break
+                    }
+                }
+            }
+            if (pushed) continue
+            if (failed) {
+                // A non-redundant antecedent makes v — and therefore every ancestor on the
+                // current path — non-redundant. Mark them all and stop.
+                for (k in 0 until redVarStack.size) {
+                    val a = redVarStack[k]
+                    cache[a] = false
+                    if (a < onPath.size) onPath[a] = false
+                }
                 return false
             }
+            cache[v] = true // all antecedents resolved redundant
+            if (v < onPath.size) onPath[v] = false
+            redVarStack.removeAt(top)
+            redAntStack.removeAt(redAntStack.size - 1)
+            redIdxStack.removeAt(top)
         }
-        cache[v] = true
         return true
     }
 
