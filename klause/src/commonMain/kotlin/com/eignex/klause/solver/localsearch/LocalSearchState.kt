@@ -703,6 +703,10 @@ class LocalSearchState(
         // the apply+revert dance.
         val touchedSlots = IntArray(move.parts.size) { slotOf(move.parts[it]) }
         val savedTouched = LongArray(touchedSlots.size) { lastTouched[touchedSlots[it]] }
+        // touchCount is cross-epoch activity (WarmState.activityTouches / ALNS). A probe must
+        // not register as real activity: each apply+revert bumps it twice, so snapshot here and
+        // restore below alongside lastTouched.
+        val savedTouchCount = IntArray(touchedSlots.size) { touchCount[touchedSlots[it]] }
 
         for (p in move.parts) apply(p)
 
@@ -716,6 +720,7 @@ class LocalSearchState(
         // Restore: step, lastTouched, conf-change arrays, best-cost watermark.
         step = oldStep
         for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
+        for (i in touchedSlots.indices) touchCount[touchedSlots[i]] = savedTouchCount[i]
         for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
         for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
         bestCostSeen = oldBestCost
