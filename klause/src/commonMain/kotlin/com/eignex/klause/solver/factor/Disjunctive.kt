@@ -6,7 +6,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.math.max
-import kotlin.math.min
 
 /**
  * Disjunctive (one-machine / unary-resource) constraint: tasks must not overlap in time.
@@ -28,14 +27,15 @@ import kotlin.math.min
  *     `i` and `start_i.min ≥ est_j + dur_j`. Catches the "two tasks both want to run on
  *     the resource and one is provably first" pattern that drives most JSP / SMT
  *     scheduling decompositions.
- *  3. **Edge-finding (Carlier-Pinson lite, O(n²))**. For each task `i` and each
- *     lct-sorted prefix `Ω` of the other tasks, checks the energetic overflow
- *     `est(Ω∪{i}) + dur_i + sum_dur(Ω) > lct(Ω)`. When it fires, `i` must finish after
- *     all of `Ω`, so `start_i.min ≥ est(Ω) + sum_dur(Ω)`. Symmetric pass on est-sorted
- *     suffixes tightens `start_i.max ≤ lct(Ω) − sum_dur(Ω) − dur_i`.
+ *  3. **Edge-finding (Vilím Θ-tree, O(n² log n))**. Routed through [CumulativeThetaTree] at
+ *     capacity 1 — the unary special case. For each LCT threshold τ the envelope
+ *     `Env(Θ_τ) = max_{Ω⊆Θ_τ} (est(Ω) + e(Ω)) = ect(Θ_τ)`; a task `i ∉ Θ_τ` whose insertion
+ *     pushes `Env(Θ_τ ∪ {i}) > τ` must end after all of Θ_τ, giving `start_i.min ≥ Env(Θ_τ)`.
+ *     A second sweep on the reflected timeline tightens `start_i.max`, and `Env(Θ_τ) > τ`
+ *     detects the energetic overload. This is the maximum-over-subsets bound, not a relaxation.
  *
- * Together (1)+(2)+(3) match Choco's `disjunctive(default)` strength on classical JSP
- * benchmarks.
+ * Together (1)+(2)+(3) — time-tabling, detectable precedences, and Θ-tree-tight unary
+ * edge-finding — match Choco's `disjunctive(default)` strength on classical JSP benchmarks.
  *
  * Variable durations aren't supported yet (matches [Cumulative]). All complexity figures
  * are per propagator call; the deductive engine iterates to fixpoint via the worklist.
@@ -128,39 +128,16 @@ class Disjunctive(
      *  level > 1; shave any non-fixed task's start endpoints if placement would create
      *  an additional unit-overlap with the mandatory profile. */
     private fun timeTable(state: PropagationState, effDur: IntArray): Boolean {
-        val events = ArrayList<IntArray>(n * 2)
+        // Capacity-1, unit-resource specialization of the shared mandatory profile.
+        val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             if (d == 0) continue
             val dom = state.intDomains[starts[i]]
-            val lst = dom.max
-            val ect = dom.min + d
-            if (lst < ect) {
-                events.add(intArrayOf(lst, +1))
-                events.add(intArrayOf(ect, -1))
-            }
+            profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1)
         }
-        events.sortWith(compareBy({ it[0] }, { -it[1] }))
-        // Sweep; capture segments where level > 0 (mandatory occupied).
-        val segFrom = IntArray(events.size)
-        val segTo = IntArray(events.size)
-        var segCount = 0
-        var level = 0
-        var cursor = if (events.isEmpty()) 0 else events[0][0]
-        for ((idx, ev) in events.withIndex()) {
-            val t = ev[0]
-            if (t > cursor && level > 0) {
-                segFrom[segCount] = cursor
-                segTo[segCount] = t
-                segCount++
-            }
-            level += ev[1]
-            cursor = t
-            if (idx == events.size - 1 || events[idx + 1][0] != t) {
-                if (level > 1) return false
-            }
-        }
+        if (!profile.build(cap = 1)) return false
         // Shave non-fixed tasks against the mandatory profile. Only definitely-present
         // tasks get tightened — unpinned-presence tasks might still vanish.
         for (i in 0 until n) {
@@ -176,7 +153,7 @@ class Disjunctive(
             // Tighten dom.min upward.
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
-                if (mandatoryConflicts(segFrom, segTo, segCount, newMin, newMin + d, ownsMandatory, lstI, ectI)) {
+                if (profile.overloadsAt(newMin, newMin + d, r = 1, cap = 1, ownsMandatory, lstI, ectI)) {
                     newMin++
                 } else {
                     break
@@ -187,7 +164,7 @@ class Disjunctive(
             // Tighten dom.max downward.
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
-                if (mandatoryConflicts(segFrom, segTo, segCount, newMax, newMax + d, ownsMandatory, lstI, ectI)) {
+                if (profile.overloadsAt(newMax, newMax + d, r = 1, cap = 1, ownsMandatory, lstI, ectI)) {
                     newMax--
                 } else {
                     break
@@ -204,34 +181,6 @@ class Disjunctive(
             }
         }
         return true
-    }
-
-    /** True iff placing a task `[s, sPlusD)` would coincide with any existing mandatory
-     *  segment (subtracting the task's own already-counted mandatory contribution). */
-    private fun mandatoryConflicts(
-        segFrom: IntArray,
-        segTo: IntArray,
-        segCount: Int,
-        s: Int,
-        sPlusD: Int,
-        ownsMandatory: Boolean,
-        lstI: Int,
-        ectI: Int,
-    ): Boolean {
-        for (k in 0 until segCount) {
-            val from = segFrom[k]
-            val to = segTo[k]
-            if (to <= s || from >= sPlusD) continue
-            if (ownsMandatory) {
-                // The task's own mandatory part shadows the segment; the placement only
-                // *adds* extra occupancy if the segment extends past this task's own
-                // mandatory window.
-                val outsideOwn = (from < lstI) || (to > ectI)
-                if (!outsideOwn) continue
-            }
-            return true
-        }
-        return false
     }
 
     /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
@@ -262,114 +211,99 @@ class Disjunctive(
     }
 
     /**
-     * Carlier-Pinson "lite" edge-finding (O(n²)). For each task i and each lct-sorted
-     * prefix Ω of the remaining tasks, fires when `est(Ω∪{i}) + dur_i + sum_dur(Ω) >
-     * lct(Ω)` — i can't fit inside the window so it must come after all of Ω — and pushes
-     * `start_i.min ≥ est(Ω) + sum_dur(Ω)`. Symmetric pass on est-sorted suffixes tightens
-     * `start_i.max`.
+     * Vilím Θ-tree edge-finding for the unary case — capacity 1, unit energy `e_i = dur_i`,
+     * the [CumulativeThetaTree]'s strongest specialization. For each LCT threshold τ the
+     * active set Θ_τ = { j : lct(j) ≤ τ } has the C = 1 envelope (its earliest completion)
+     *   Env(Θ_τ) = max_{Ω ⊆ Θ_τ, Ω ≠ ∅} (est(Ω) + e(Ω)) = ect(Θ_τ).
      *
-     * Not tight as Vilím's Θ-tree (we always push to `est(Ω) + sum_dur(Ω)` rather than to
-     * the maximum-over-subsets adjustment), but sound and catches the JSP / RCPSP
-     * disjunctive-only patterns the user-facing TODO calls out.
+     *  - **Overload:** `Env(Θ_τ) > τ` ⇒ Θ_τ cannot complete by its own deadline ⇒ infeasible.
+     *  - **Edge-finding:** for a task `i ∉ Θ_τ`, if *inserting* `i` pushes the envelope past τ
+     *    — `Env(Θ_τ ∪ {i}) > τ` — then `i` cannot finish within the window, so it must end
+     *    after all of Θ_τ and `est(i) ≥ Env(Θ_τ)`.
+     *
+     * Crucially the detection inserts `i` into the tree, so the envelope folds in `i`'s own
+     * est; flat-adding `e_i` to `Env(Θ_τ)` would over-detect when `est_i < est(Ω)` (a task
+     * able to run *before* Θ would be wrongly forced after it). The [forwardPass] tightens
+     * earliest starts; rerunning it on the reflected timeline (`t → −t`, so a start `s` maps
+     * to `−(s + dur)`) tightens latest starts. Each pass is O(m² log m) over the active tasks.
      */
     private fun edgeFinding(state: PropagationState, effDur: IntArray): Boolean {
         if (n < 2) return true
-        val others = IntArray(n)
+        return forwardPass(state, effDur, reversed = false) && forwardPass(state, effDur, reversed = true)
+    }
+
+    /**
+     * One Θ-tree edge-finding sweep. With [reversed] = false it works in normal time and
+     * tightens `start.min`; with [reversed] = true it works on the reflected timeline (where
+     * an earliest-start bound maps back to a `start.max` bound) and so tightens `start.max`.
+     */
+    @Suppress("ReturnCount")
+    private fun forwardPass(state: PropagationState, effDur: IntArray, reversed: Boolean): Boolean {
+        val active = ArrayList<Int>()
         for (i in 0 until n) {
-            if (effDur[i] == 0) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val vi = starts[i]
-            val di = state.intDomains[vi]
-            var k = 0
-            for (j in 0 until n) {
-                if (j != i && effDur[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
-                    others[k++] = j
-                }
-            }
-            sortByLct(others, k, state, effDur)
-            var sumDur = 0
-            var minEstOmega = Int.MAX_VALUE
-            var newMinI = di.min
-            for (p in 0 until k) {
-                val j = others[p]
-                val dj = state.intDomains[starts[j]]
-                sumDur += effDur[j]
-                minEstOmega = min(minEstOmega, dj.min)
-                val lctOmega = dj.max + effDur[j]
-                val estUnion = min(minEstOmega, di.min)
-                if (estUnion + effDur[i] + sumDur > lctOmega) {
-                    val push = minEstOmega + sumDur
-                    if (push > newMinI) newMinI = push
-                }
-            }
-            if (newMinI != di.min) {
-                if (newMinI > di.max) return false
-                if (!state.tightenIntMin(vi, newMinI, state.composeIntVarAtomAntecedents(starts))) return false
+            if (effDur[i] > 0) active.add(i)
+        }
+        val m = active.size
+        if (m < 2) return true
+
+        val taskIds = IntArray(m) { active[it] }
+        val durs = IntArray(m) { effDur[taskIds[it]] }
+        // In reflected time a task occupying [s, s+d) maps to start −(s + d): est' = −(lst+d),
+        // lct' = −est. So the est/lct arrays just negate-and-swap the original endpoints.
+        val ests = IntArray(m)
+        val lcts = IntArray(m)
+        for (t in 0 until m) {
+            val dom = state.intDomains[starts[taskIds[t]]]
+            if (!reversed) {
+                ests[t] = dom.min
+                lcts[t] = dom.max + durs[t]
+            } else {
+                ests[t] = -(dom.max + durs[t])
+                lcts[t] = -dom.min
             }
         }
-        for (i in 0 until n) {
-            if (effDur[i] == 0) continue
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val vi = starts[i]
-            val di = state.intDomains[vi]
-            var k = 0
-            for (j in 0 until n) {
-                if (j != i && effDur[j] > 0 && OptPresence.isDefinitelyPresent(presents, j, state)) {
-                    others[k++] = j
-                }
+        val energies = LongArray(m) { durs[it].toLong() }
+
+        val estOrder = (0 until m).sortedWith(compareBy({ ests[it] }, { it })).toIntArray()
+        val leafPos = IntArray(m)
+        for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
+        val lctOrder = (0 until m).sortedWith(compareBy({ lcts[it] }, { it })).toIntArray()
+
+        val tree = CumulativeThetaTree(n = m, capacity = 1)
+        tree.setLeafOrder(leafPos)
+        val ant = state.composeIntVarAtomAntecedents(starts)
+
+        var k = 0
+        while (k < m) {
+            val tau = lcts[lctOrder[k]].toLong()
+            while (k < m && lcts[lctOrder[k]].toLong() == tau) {
+                val j = lctOrder[k]
+                tree.activate(j, ests[j], energies[j])
+                k++
             }
-            sortByEstDesc(others, k, state)
-            var sumDur = 0
-            var maxLctOmega = Int.MIN_VALUE
-            var newMaxI = di.max
-            for (p in 0 until k) {
-                val j = others[p]
-                val dj = state.intDomains[starts[j]]
-                sumDur += effDur[j]
-                val lctJ = dj.max + effDur[j]
-                if (lctJ > maxLctOmega) maxLctOmega = lctJ
-                val estOmega = dj.min
-                val lctUnion = max(maxLctOmega, di.max + effDur[i])
-                if (estOmega + effDur[i] + sumDur > lctUnion) {
-                    val push = maxLctOmega - sumDur - effDur[i]
-                    if (push < newMaxI) newMaxI = push
+            val envTheta = tree.envOfTheta() // ect(Θ_τ)
+            if (envTheta > tau) return false // overload
+            for (ki in k until m) {
+                val cand = lctOrder[ki]
+                // Detection inserts the candidate so its own est folds into the envelope anchor,
+                // then restores the tree — this is what makes the bound sound (vs flat env+e).
+                tree.activate(cand, ests[cand], energies[cand])
+                val envWith = tree.envOfTheta()
+                tree.deactivate(cand)
+                if (envWith <= tau) continue
+                if (envTheta > Int.MAX_VALUE.toLong()) continue
+                val bound = envTheta.toInt() // est(cand) ≥ ect(Θ_τ)
+                val v = starts[taskIds[cand]]
+                if (!reversed) {
+                    if (bound > state.intDomains[v].min && !state.tightenIntMin(v, bound, ant)) return false
+                } else {
+                    // s' ≥ bound with s' = −(s + dur) ⇒ s ≤ −bound − dur.
+                    val newMax = -bound - durs[cand]
+                    if (newMax < state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
                 }
-            }
-            if (newMaxI != di.max) {
-                if (newMaxI < di.min) return false
-                if (!state.tightenIntMax(vi, newMaxI, state.composeIntVarAtomAntecedents(starts))) return false
             }
         }
         return true
-    }
-
-    private fun sortByLct(arr: IntArray, len: Int, state: PropagationState, effDur: IntArray) {
-        for (i in 1 until len) {
-            val cur = arr[i]
-            val curKey = state.intDomains[starts[cur]].max + effDur[cur]
-            var j = i - 1
-            while (j >= 0) {
-                val cmpKey = state.intDomains[starts[arr[j]]].max + effDur[arr[j]]
-                if (cmpKey <= curKey) break
-                arr[j + 1] = arr[j]
-                j--
-            }
-            arr[j + 1] = cur
-        }
-    }
-
-    private fun sortByEstDesc(arr: IntArray, len: Int, state: PropagationState) {
-        for (i in 1 until len) {
-            val cur = arr[i]
-            val curKey = state.intDomains[starts[cur]].min
-            var j = i - 1
-            while (j >= 0) {
-                val cmpKey = state.intDomains[starts[arr[j]]].min
-                if (cmpKey >= curKey) break
-                arr[j + 1] = arr[j]
-                j--
-            }
-            arr[j + 1] = cur
-        }
     }
 }

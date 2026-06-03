@@ -367,4 +367,67 @@ class CumulativeTest {
         state.recompute()
         assertTrue(state.cost > 0, "extending d0 to 3 overlaps task 1 at t=2")
     }
+
+    @Test
+    fun `single task never overloads`() {
+        // One task, dur 2 res 1, capacity 1 — always fits, no false failure or tightening.
+        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(2), resources = intArrayOf(1), capacity = 1)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 4)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val result = problem.propagate(Assumptions.None)
+        assertTrue(result is PropagationResult.Implied, "single task is always feasible; got $result")
+    }
+
+    @Test
+    fun `zero-duration task contributes no usage`() {
+        // A duration-0 task occupies no time, so it never loads the resource — feasible even
+        // when its resource demand exceeds capacity.
+        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(0), resources = intArrayOf(5), capacity = 1)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 4)),
+            factors = arrayOf<Factor>(factor),
+        )
+        assertTrue(problem.propagate(Assumptions.None) is PropagationResult.Implied)
+    }
+
+    @Test
+    fun `zero capacity with a positive task is infeasible`() {
+        // dur 1, res 1 task cannot run on a capacity-0 resource: per-task feasibility fails.
+        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(1), resources = intArrayOf(1), capacity = 0)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 4)),
+            factors = arrayOf<Factor>(factor),
+        )
+        assertTrue(problem.propagate(Assumptions.None) is PropagationResult.Unsat)
+    }
+
+    @Test
+    fun `edge-finding does not push a task that can run before the cluster`() {
+        // Regression guard for the unsound env(Θ)+e_i detection. Capacity 1. Task 0 is fixed
+        // at t=1 (dur 1, res 1) → busy [1, 2). Task 1 (dur 1, res 1, dom [0, 3]) can legitimately
+        // run at t=0, before task 0. The flat detection would force task 1 after task 0
+        // (start ≥ 2); the sound env(Θ ∪ {i}) insertion must leave t=0 feasible.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1),
+            durations = intArrayOf(1, 1),
+            resources = intArrayOf(1, 1),
+            capacity = 1,
+        )
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(1, 1), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val ok = problem.propagate(Assumptions(ints = mapOf(1 to 0)))
+        assertTrue(ok is PropagationResult.Implied, "task 1 at t=0 (before task 0) must stay feasible; got $ok")
+    }
 }

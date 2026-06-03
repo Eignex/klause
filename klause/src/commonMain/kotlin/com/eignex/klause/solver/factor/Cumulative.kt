@@ -521,12 +521,15 @@ class Cumulative(
      * with planning horizons in the tens of thousands.
      */
 
-    /** Conflict reason: starts-bound atoms of every task. Cumulative is bound-only
-     *  (sweep-line time-tabling tightens start mins/maxes, never excludes interior
-     *  start values), so citing the current bound atoms of every task captures the
-     *  full cause of any capacity-overload conflict. */
+    /** Conflict reason: bound atoms of every int var the propagator reads. The sweep is
+     *  bound-only over the *starts* (it tightens start mins/maxes, never excludes interior
+     *  start values), but [propagate] also snapshots and requires the fixed durations,
+     *  resources, and capacity — an overload/edge-finding failure can be driven by those
+     *  fixed values, so the reason must cite them too or the learned nogood is unsound and
+     *  can prune feasible space on backtrack. [intVars] is starts plus any
+     *  duration / resource / capacity vars. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, starts, excludeIdx = -1, extraLit = 0)
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
@@ -564,67 +567,20 @@ class Cumulative(
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             if (effDur[i] > 0 && effRes[i] > effCap) return false
         }
-        // Overload check (Vilím 2002 / Schutt-Feydy-Stuckey 2009 simplified). For each
-        // anchor LCT τ, let Ω(τ) = { j : LCT(j) ≤ τ }; if Σ_{j∈Ω} dur(j)·res(j) exceeds
-        // capacity · (τ − EST(Ω)), the instance is infeasible.
-        run {
-            val idx = IntArray(n) { it }
-            val lcts = IntArray(n) { i ->
-                val d = state.intDomains[starts[i]]
-                d.max + effDur[i]
-            }
-            val ests = IntArray(n) { i -> state.intDomains[starts[i]].min }
-            val sorted = idx.sortedBy { lcts[it] }.toIntArray()
-            var totalEnergy = 0L
-            var minEst = Int.MAX_VALUE
-            for (k in 0 until n) {
-                val j = sorted[k]
-                if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
-                val e = effDur[j].toLong() * effRes[j].toLong()
-                if (e == 0L) continue
-                totalEnergy += e
-                if (ests[j] < minEst) minEst = ests[j]
-                val tau = lcts[j]
-                val slack = (tau.toLong() - minEst.toLong()) * effCap.toLong()
-                if (totalEnergy > slack) return false
-            }
-        }
+        // Overload + edge-finding, both driven off the Θ-tree max-envelope (the overload
+        // failure test is the envelope check `env(Θ_τ) > C·τ`, strictly tighter than the
+        // old scalar full-prefix sweep — it catches every energy-concentrated sub-window).
         if (!edgeFindingPass(state, effDur, effRes, effCap)) return false
-        val events = ArrayList<IntArray>(n * 2)
+        val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
             if (d == 0 || r == 0) continue
             val dom = state.intDomains[starts[i]]
-            val lst = dom.max
-            val ect = dom.min + d
-            if (lst < ect) {
-                events.add(intArrayOf(lst, +r))
-                events.add(intArrayOf(ect, -r))
-            }
+            profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
         }
-        events.sortWith(compareBy({ it[0] }, { -it[1] }))
-        val segFrom = IntArray(events.size)
-        val segTo = IntArray(events.size)
-        val segLevel = IntArray(events.size)
-        var segCount = 0
-        var level = 0
-        var cursor = if (events.isEmpty()) 0 else events[0][0]
-        for ((idx, ev) in events.withIndex()) {
-            val t = ev[0]
-            if (t > cursor && level > 0) {
-                segFrom[segCount] = cursor
-                segTo[segCount] = t
-                segLevel[segCount] = level
-                segCount++
-            }
-            level += ev[1]
-            cursor = t
-            if (idx == events.size - 1 || events[idx + 1][0] != t) {
-                if (level > effCap) return false
-            }
-        }
+        if (!profile.build(effCap)) return false
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
@@ -638,26 +594,20 @@ class Cumulative(
             val ownsMandatory = lstI < ectI
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
-                if (overloadsAt(
-                        segFrom, segTo, segLevel, segCount,
-                        newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI,
-                    )
-                ) {
+                if (profile.overloadsAt(newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI)) {
                     newMin++
                 } else {
                     break
                 }
             }
             if (newMin > state.intDomains[v].max) return false
-            val ant = state.composeIntVarAtomAntecedents(starts)
+            // Cite all read int vars (starts + fixed durations/resources/capacity), not just
+            // starts — the shave can be driven by those fixed values (see [conflictReason]).
+            val ant = state.composeIntVarAtomAntecedents(intVars)
             if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
-                if (overloadsAt(
-                        segFrom, segTo, segLevel, segCount,
-                        newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI,
-                    )
-                ) {
+                if (profile.overloadsAt(newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI)) {
                     newMax--
                 } else {
                     break
@@ -670,54 +620,30 @@ class Cumulative(
     }
 
     /**
-     * Returns true iff placing a task (resource `r`, occupying `[s, s + d)`) anywhere in
-     * the mandatory-profile segments would push that segment over [capacity] — after
-     * subtracting the task's own already-contributed mandatory part on overlapping segments.
-     */
-    private fun overloadsAt(
-        segFrom: IntArray,
-        segTo: IntArray,
-        segLevel: IntArray,
-        segCount: Int,
-        s: Int,
-        sPlusD: Int,
-        r: Int,
-        cap: Int,
-        ownsMandatory: Boolean,
-        lstI: Int,
-        ectI: Int,
-    ): Boolean {
-        for (k in 0 until segCount) {
-            val from = segFrom[k]
-            val to = segTo[k]
-            val lvl = segLevel[k]
-            if (to <= s || from >= sPlusD) continue
-            var effective = lvl
-            if (ownsMandatory) {
-                val ovFrom = max(from, lstI)
-                val ovTo = min(to, ectI)
-                if (ovFrom < ovTo) effective -= r
-            }
-            if (effective + r > cap) return true
-        }
-        return false
-    }
-
-    /**
-     * Vilím cumulative edge-finding using [CumulativeThetaTree].
+     * Vilím cumulative overload + edge-finding using [CumulativeThetaTree].
      *
      * For each LCT threshold τ (swept in ascending order), the tree's active set Θ_τ
      * contains every task j with `lct(j) ≤ τ`, and the root envelope
      *   env(Θ_τ) = max_{Ω ⊆ Θ_τ, Ω ≠ ∅} (C · est(Ω) + e(Ω))
-     * captures the worst-case energy concentration at any anchor inside Θ_τ. The rule:
-     *   env(Θ_τ) + e_i > C · τ   ⇒   est(i) ≥ ⌈(env(Θ_τ) − (C − c_i) · τ) / c_i⌉
+     * captures the worst-case energy concentration at any anchor inside Θ_τ.
+     *
+     * **Overload:** `env(Θ_τ) > C · τ` means some Ω's energy can't fit in `[est(Ω), τ]` at
+     * capacity C — the instance is infeasible. This single envelope test subsumes the
+     * weaker scalar full-prefix sweep it replaced (which only anchored at the global min
+     * EST); it is checked for every τ including the full active set.
+     *
+     * **Edge-finding:** the rule
+     *   env(Θ_τ ∪ {i}) > C · τ   ⇒   est(i) ≥ ⌈(env(Θ_τ) − (C − c_i) · τ) / c_i⌉
      * for every task i with `lct(i) > τ`. The derivation is the standard
      * energy-conservation argument over `[est(Ω), τ]`: if Ω's energy plus i's full
      * energy would exceed the rectangle's capacity-area, i must end after Ω, which
      * forces i's earliest start up by however much room c_i leaves outside Ω's anchor.
+     * The detection inserts i into the tree (`env(Θ_τ ∪ {i})`) rather than flat-adding
+     * `e_i`, so a task whose est lets it run *before* Ω is not wrongly forced after it.
      *
-     * Cost is O(m²) where m = active task count (tasks with positive duration and
-     * resource): one inner sweep over outside tasks per distinct LCT value.
+     * Cost is O(m² log m) where m = active task count (tasks with positive duration and
+     * resource): one inner sweep over outside tasks per distinct LCT value, each probing
+     * the tree with an O(log m) insert/remove of the candidate.
      */
     private fun edgeFindingPass(state: PropagationState, effDur: IntArray, effRes: IntArray, effCap: Int): Boolean {
         if (n < 2 || effCap == 0) return true
@@ -747,7 +673,9 @@ class Cumulative(
         val tree = CumulativeThetaTree(n = m, capacity = effCap)
         tree.setLeafOrder(leafPos)
         val capL = effCap.toLong()
-        val ant = state.composeIntVarAtomAntecedents(starts)
+        // Cite all read int vars — edge-finding deductions depend on the fixed durations /
+        // resources / capacity, not just the start bounds (see [conflictReason]).
+        val ant = state.composeIntVarAtomAntecedents(intVars)
 
         var k = 0
         while (k < m) {
@@ -757,14 +685,24 @@ class Cumulative(
                 tree.activate(j, ests[j], energies[j])
                 k++
             }
-            if (k >= m) break
             val envTheta = tree.envOfTheta()
             val capTau = capL * tau.toLong()
+            // Overload: env(Θ_τ) = max_{Ω⊆Θ_τ} (C·est(Ω) + e(Ω)); if it exceeds C·τ some
+            // subset's energy can't fit in [est(Ω), τ] at capacity C — infeasible. Runs for
+            // every τ including the full set (k == m), where edge-finding below is a no-op.
+            if (envTheta > capTau) return false
             for (ki in k until m) {
                 val i = lctOrder[ki]
                 val eI = energies[i]
                 val cI = cs[i]
-                if (envTheta + eI <= capTau) continue
+                // Detection: env(Θ_τ ∪ {i}) > C·τ. Insert i (it is inactive — lct(i) > τ) so the
+                // envelope folds i's own est into the anchor, read it, then restore the tree.
+                // The flat `envTheta + e_i` upper-bounds env(Θ∪{i}) and over-detects when
+                // est_i < est(Ω) — wrongly forcing a task that could run before Θ to come after.
+                tree.activate(i, ests[i], eI)
+                val envWith = tree.envOfTheta()
+                tree.deactivate(i)
+                if (envWith <= capTau) continue
                 val numerator = envTheta - (effCap - cI).toLong() * tau.toLong()
                 if (numerator <= 0L) continue
                 val newEstL = (numerator + cI - 1L) / cI.toLong()

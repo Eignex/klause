@@ -161,8 +161,11 @@ internal object SmtTranslator {
         return when (c.op) {
             // strict carries an original float `<` / `>` that LinearOp cannot represent (#83).
             LinearOp.LE -> if (c.strict) rmgr.lessThan(sum, bound) else rmgr.lessOrEquals(sum, bound)
+
             LinearOp.EQ -> rmgr.equal(sum, bound)
+
             LinearOp.GE -> if (c.strict) rmgr.greaterThan(sum, bound) else rmgr.greaterOrEquals(sum, bound)
+
             LinearOp.NE -> e.fm.booleanFormulaManager.not(rmgr.equal(sum, bound))
         }
     }
