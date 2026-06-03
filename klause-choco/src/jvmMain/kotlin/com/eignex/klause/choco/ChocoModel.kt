@@ -292,14 +292,26 @@ class ChocoModel private constructor(
     }
 
     private fun postCumulative(f: Cumulative) {
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        // durations/resources/capacity are constants; the var forms live in the *Vars arrays
+        // (empty = use the constant). Indexing intVars with the constant values is the #119 crash.
+        val durVars = f.durationVars.takeIf { it.isNotEmpty() }
+        val resVars = f.resourceVars.takeIf { it.isNotEmpty() }
         val tasks = Array(f.starts.size) { i ->
             val start = intVars[f.starts[i]]
-            val dur = intVars[f.durations[i]]
+            val dur = if (durVars != null) intVars[durVars[i]] else model.intVar(f.durations[i])
             val end = model.intVar(start.lb + dur.lb, start.ub + dur.ub)
             Task(start, dur, end)
         }
-        val heights = intVarsOf(f.resources)
-        model.cumulative(tasks, heights, model.intVar(f.capacity)).post()
+        val heights = if (resVars != null) {
+            intVarsOf(
+                resVars,
+            )
+        } else {
+            Array(f.resources.size) { model.intVar(f.resources[it]) }
+        }
+        val capacity = if (f.capacityVar >= 0) intVars[f.capacityVar] else model.intVar(f.capacity)
+        model.cumulative(tasks, heights, capacity).post()
     }
 
     private fun postDiffn(f: Diffn) {
