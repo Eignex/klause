@@ -301,7 +301,7 @@ class LocalSearchSolver(
         state.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
         // Warm-start the descent from a caller-supplied assignment (e.g. a CP-found feasible
         // point) instead of a random restart, when one is provided and arity-compatible. Null
-        // by default → pure random restart (the competition-safe path). See
+        // by default → pure random restart (no CP dependency). See
         // [LocalSearchParams.initialAssignment].
         val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
         // No bestSample yet — first restart is always full random (unless we seeded above).

@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -12,8 +13,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
  * Declarative recipe for a [Portfolio] over a single [Problem]. Both engine counts are knobs
  * the CLI / bench set, so one builder serves every use:
  *
- *  - **Pure local search** (e.g. the MiniZinc LS competition): `backtrackWorkers = 0`. No CP
- *    is involved, so nothing seeds the LS — competition-safe by construction.
+ *  - **Pure local search**: `backtrackWorkers = 0`. No CP is involved, so nothing seeds the LS —
+ *    a self-contained local-search pool with no CP dependency.
  *  - **Complete / proof**: `localSearchWorkers = 0`.
  *  - **Hybrid**: both > 0 — LS streams good incumbents fast while backtrack tightens the bound
  *    and can prove optimality, sharing the incumbent through the portfolio.
@@ -39,12 +40,34 @@ data class PortfolioSpec(
 /** Materialises a [Portfolio] for [problem] from a [PortfolioSpec]. The single entry point the
  *  CLI and bench call — they differ only in the [PortfolioSpec] they pass. */
 object PortfolioBuilder {
-    fun build(problem: Problem, spec: PortfolioSpec): Portfolio {
+    /**
+     * Build the portfolio.
+     *
+     * For optimisation the two objective representations differ per engine but agree on the
+     * scalar bound (#63): [lsObjective] is the functional/gradient objective the local-search
+     * workers descend (the per-move gradient that keeps CBLS optimising), [linearObjective] is
+     * the [com.eignex.klause.solver.LinearObjective] the backtrack workers bound-prune on. A
+     * mixed pool therefore no longer collapses both engines onto one representation — each worker
+     * gets its preferred form, and the shared incumbent bound stays comparable because every
+     * worker minimises the same objective var.
+     *
+     * Either objective may be null: pass both null for a satisfaction-only portfolio ([solve]),
+     * or just one if the model only provides that form (each engine falls back to the other when
+     * its preferred representation is absent).
+     */
+    fun build(
+        problem: Problem,
+        spec: PortfolioSpec,
+        lsObjective: Objective? = null,
+        linearObjective: Objective? = null,
+    ): Portfolio {
         val workers = ArrayList<PortfolioWorker>(spec.localSearchWorkers + spec.backtrackWorkers)
 
         // Local-search workers: the diverse CBLS-led palette, one distinct (strategy, restart)
         // per worker, each on its own seed. Linear λ shaping so the optimize phase feels the
-        // objective (matches the shipped CLI LS config).
+        // objective (matches the shipped CLI LS config). Each descends the functional/gradient
+        // objective when the model provides one (falling back to the linear form otherwise).
+        val lsObj = lsObjective ?: linearObjective
         if (spec.localSearchWorkers > 0) {
             LocalSearchWorkerConfig.diverse(spec.localSearchWorkers).forEachIndexed { i, cfg ->
                 val session = LocalSearchSolver(
@@ -57,13 +80,15 @@ object PortfolioBuilder {
                     randomSeed = spec.seed + i,
                     costShaping = CostShaping.Linear(lambda = spec.lsLambda),
                 )
-                workers += PortfolioWorker.of("ls/${cfg.label}", session, params)
+                workers += PortfolioWorker.of("ls/${cfg.label}", session, params, objective = lsObj)
             }
         }
 
         // Backtrack workers: seed diversity, plus a CDCL/VSIDS variant every other worker for
-        // satisfaction robustness. Each injects the shared objective bound so a tighter
-        // incumbent from any worker prunes the others' subtrees.
+        // satisfaction robustness. Each bounds on the linear objective (falling back to the
+        // functional form if only that exists) and injects the shared objective bound so a
+        // tighter incumbent from any worker prunes the others' subtrees.
+        val btObj = linearObjective ?: lsObjective
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
             val params = if (i % 2 == 0) {
@@ -76,7 +101,7 @@ object PortfolioBuilder {
             } else {
                 BacktrackParams(randomSeed = spec.seed + 1000L + i)
             }
-            workers += PortfolioWorker.of("backtrack#$i", session, params) { p, supplier ->
+            workers += PortfolioWorker.of("backtrack#$i", session, params, objective = btObj) { p, supplier ->
                 p.copy(objectiveBoundSupplier = supplier)
             }
         }

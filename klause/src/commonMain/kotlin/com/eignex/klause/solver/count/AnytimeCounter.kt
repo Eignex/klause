@@ -68,7 +68,9 @@ internal object AnytimeCounter {
             } else {
                 openMass = suffix[0]
             }
+
             is SolveResult.Unsat -> { /* count 0 */ }
+
             is SolveResult.Unknown -> undecidedMass = suffix[0]
         }
 
@@ -97,7 +99,7 @@ internal object AnytimeCounter {
                         if (d + 1 == depth) {
                             lower += 1
                         } else {
-                            stack.addLast(Node(d + 1, childBools, childInts));
+                            stack.addLast(Node(d + 1, childBools, childInts))
                             openMass += suffix[d + 1]
                         }
 

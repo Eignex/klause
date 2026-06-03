@@ -135,11 +135,36 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
     val cancellation = if (deadline != null)
         com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
     else com.eignex.klause.solver.Cancellation.Never
+    // CP-seeding (#65): OFF unless `--cp-seed` is passed. When on, a short backtrack solve finds
+    // a feasible point that warm-starts LS (the #54 misses reach feasibility trivially under CP
+    // but never under cold LS). EXPLICIT OPT-IN: the default path leaves initialAssignment null,
+    // so the shipped pure-LS entry point stays free of any CP dependency.
+    val initial = if (opts.cpSeed) cpFeasibleSeed(program, deadline) else null
     val cblsParams = params.copy(
         costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = 1.0),
         cancellation = cancellation,
+        initialAssignment = initial,
     )
     runGeneric(solver, cblsParams, program, opts, complete = false)
+}
+
+/**
+ * CP-seeding helper for the `--cp-seed` opt-in (#65): run the backtrack solver for up to
+ * `-Dklause.fzn.cpseed.ms` (default 2000ms, capped by any `-t` deadline) to find a *feasible*
+ * assignment, returned as an LS warm-start. Null when CP doesn't reach feasibility in its slice
+ * (LS then runs cold). Only reached when the explicit `--cp-seed` flag is set.
+ */
+private fun cpFeasibleSeed(program: FlatZincProgram, overallDeadline: Long?): Sample? {
+    val cpMs = System.getProperty("klause.fzn.cpseed.ms")?.toLong() ?: 2000L
+    var cpDeadline = System.currentTimeMillis() + cpMs
+    if (overallDeadline != null) cpDeadline = minOf(cpDeadline, overallDeadline)
+    val r = BacktrackSolver(program.problem).solve(
+        BacktrackParams(
+            randomSeed = 1L,
+            cancellation = com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > cpDeadline },
+        ),
+    )
+    return (r as? com.eignex.klause.solver.SolveResult.Sat)?.assignment
 }
 
 private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {
@@ -168,17 +193,37 @@ private fun runWithBrute(program: FlatZincProgram, opts: Options) {
  * workers and/or backtrack workers, racing on satisfaction and sharing the objective bound on
  * optimisation. Worker counts come from `-Dklause.fzn.portfolio.ls` / `.bt` (defaults 4 / 2).
  *
- * **Competition note:** a pure-LS pool (`-Dklause.fzn.portfolio.bt=0`) involves no CP and never
- * seeds the LS — safe for the MiniZinc local-search competition. The hybrid default (bt>0) is
- * for general use.
+ * A pure-LS pool (`-Dklause.fzn.portfolio.bt=0`) involves no CP and never seeds the LS — a
+ * self-contained local-search pool with no CP dependency. The hybrid default (bt>0) is for
+ * general use.
  */
+/**
+ * Build the two per-worker objective representations for a portfolio (#63): the functional
+ * (gradient-bearing) objective the LS workers descend, and the [com.eignex.klause.solver.LinearObjective]
+ * the backtrack workers bound-prune on. Returns `(null, null)` for satisfaction models. They stay
+ * comparable because both score the same FlatZinc objective var.
+ */
+private fun portfolioObjectives(
+    program: FlatZincProgram,
+): Pair<com.eignex.klause.solver.Objective?, com.eignex.klause.solver.Objective?> {
+    val (objName, maximize) = when (val solve = program.solve) {
+        is SolveDirective.Minimize -> solve.objVar to false
+        is SolveDirective.Maximize -> solve.objVar to true
+        is SolveDirective.Satisfy -> return null to null
+    }
+    val objVarId = program.intVarsByName[objName]
+        ?: error("objective variable '$objName' not found in int var map")
+    val linear = if (maximize) program.problem.maximizeInt(objVarId)
+                 else program.problem.minimizeInt(objVarId)
+    return (program.lsObjective ?: linear) to linear
+}
+
 private fun runWithPortfolio(program: FlatZincProgram, opts: Options) {
     val ls = System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4
     val bt = System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2
     val spec = com.eignex.klause.portfolio.PortfolioSpec(
         localSearchWorkers = ls, backtrackWorkers = bt, seed = opts.randomSeed ?: 1L,
     )
-    val portfolio = com.eignex.klause.portfolio.PortfolioBuilder.build(program.problem, spec)
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
     val cancel = if (deadline != null)
         com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
@@ -186,6 +231,13 @@ private fun runWithPortfolio(program: FlatZincProgram, opts: Options) {
     val applier = loadOznApplier(opts)
     // Only a backtrack worker can *prove* UNSAT / optimality; a pure-LS pool reports UNKNOWN.
     val complete = bt > 0
+    // Build per-worker objectives up front (#63): the LS workers descend the functional/gradient
+    // objective, the backtrack workers bound the linear one. For satisfy there is no objective —
+    // both stay null and the portfolio is solve-only.
+    val (lsObjective, linearObjective) = portfolioObjectives(program)
+    val portfolio = com.eignex.klause.portfolio.PortfolioBuilder.build(
+        program.problem, spec, lsObjective = lsObjective, linearObjective = linearObjective,
+    )
     try {
         when (val solve = program.solve) {
             is SolveDirective.Satisfy -> {
@@ -198,20 +250,10 @@ private fun runWithPortfolio(program: FlatZincProgram, opts: Options) {
                 }
             }
             is SolveDirective.Minimize, is SolveDirective.Maximize -> {
-                val (objName, maximize) = when (solve) {
-                    is SolveDirective.Minimize -> solve.objVar to false
-                    is SolveDirective.Maximize -> solve.objVar to true
-                    else -> error("unreachable")
-                }
-                val objVarId = program.intVarsByName[objName]
-                    ?: error("objective variable '$objName' not found in int var map")
-                val linear = if (maximize) program.problem.maximizeInt(objVarId)
-                             else program.problem.minimizeInt(objVarId)
-                // LS-only pools use the functional (gradient) objective; mixed pools use the
-                // linear objective both engines share (backtrack needs it for bound pruning).
-                val objective: com.eignex.klause.solver.Objective =
-                    if (bt == 0) (program.lsObjective ?: linear) else linear
-                when (val r = kotlinx.coroutines.runBlocking { portfolio.minimize(objective, cancel) }) {
+                // Per-worker objectives were wired into the builder above (#63): each worker
+                // streams against its own representation; the portfolio only shares the scalar
+                // bound. No single objective is passed to minimize any more.
+                when (val r = kotlinx.coroutines.runBlocking { portfolio.minimize(cancel) }) {
                     is MinimizeResult.Optimal -> {
                         print(renderSolution(applier, program, r.sample)); println("==========")
                     }
@@ -384,6 +426,10 @@ private data class Options(
     val unboundedIntLo: Int?,
     /** Upper bound counterpart to [unboundedIntLo]. Flag: `--unbounded-int-hi N`. */
     val unboundedIntHi: Int?,
+    /** `--cp-seed`: hybrid CP-seeding for the `ls` engine (#65) — a short backtrack solve finds a
+     *  feasible point that warm-starts LS. Default false — the default keeps the pure-LS path free
+     *  of any CP dependency; CP-seeding is strictly an explicit opt-in. */
+    val cpSeed: Boolean,
 )
 
 /**
@@ -403,6 +449,7 @@ private fun parseArgs(args: Array<String>): Options {
     var oznPath: String? = null
     var unboundedIntLo: Int? = null
     var unboundedIntHi: Int? = null
+    var cpSeed = false
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
@@ -416,6 +463,7 @@ private fun parseArgs(args: Array<String>): Options {
             "--ozn" -> { oznPath = args[++i]; i++ }
             "--unbounded-int-lo" -> { unboundedIntLo = args[++i].toInt(); i++ }
             "--unbounded-int-hi" -> { unboundedIntHi = args[++i].toInt(); i++ }
+            "--cp-seed" -> { cpSeed = true; i++ }
             else -> {
                 if (a.startsWith("-")) {
                     System.err.println("klause-fzn: ignoring unknown flag $a")
@@ -432,5 +480,5 @@ private fun parseArgs(args: Array<String>): Options {
         System.err.println("usage: klause-fzn [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi)
+    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed)
 }

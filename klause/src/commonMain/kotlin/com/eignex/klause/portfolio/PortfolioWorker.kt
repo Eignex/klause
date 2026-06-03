@@ -22,7 +22,7 @@ class PortfolioWorker private constructor(
     /** Human-readable id for progress / telemetry (e.g. "cbls/fixed", "backtrack#2"). */
     val label: String,
     private val solveFn: (Cancellation) -> SolveResult,
-    private val improvementsFn: (Objective, () -> Double, Cancellation) -> Sequence<MinimizeResult>,
+    private val improvementsFn: (() -> Double, Cancellation) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
     private val closeFn: () -> Unit,
 ) : AutoCloseable {
@@ -30,11 +30,14 @@ class PortfolioWorker private constructor(
     /** Solve once, honouring [cancel] (set when a sibling wins the race). */
     fun solve(cancel: Cancellation): SolveResult = solveFn(cancel)
 
-    /** Stream improving incumbents. [readBound] exposes the portfolio's shared best objective;
-     *  workers that prune on it (backtrack) read it via their injected bound supplier, workers
-     *  that don't (LS) simply ignore it. */
-    fun improvements(objective: Objective, readBound: () -> Double, cancel: Cancellation): Sequence<MinimizeResult> =
-        improvementsFn(objective, readBound, cancel)
+    /** Stream improving incumbents against this worker's *own* objective representation (the one
+     *  it was built with — see [of]). [readBound] exposes the portfolio's shared best objective
+     *  scalar; workers that prune on it (backtrack) read it via their injected bound supplier,
+     *  workers that don't (LS) simply ignore it. The two representations stay comparable because
+     *  both minimise the same FlatZinc objective var, so [MinimizeResult.objectiveValue] is one
+     *  scalar the portfolio can fold across a heterogeneous pool. */
+    fun improvements(readBound: () -> Double, cancel: Cancellation): Sequence<MinimizeResult> =
+        improvementsFn(readBound, cancel)
 
     /** Stream diverse samples, honouring [cancel] (set when the collector stops). */
     fun samples(cancel: Cancellation): Sequence<Sample> = samplesFn(cancel)
@@ -43,9 +46,15 @@ class PortfolioWorker private constructor(
         closeFn()
     }
 
+    /** Factory for type-erased workers over a concrete typed session. */
     companion object {
         /**
-         * Wrap a typed [session] + base [params] as a type-erased worker. [withBound] injects
+         * Wrap a typed [session] + base [params] as a type-erased worker. [objective] is the
+         * worker's *own* objective representation — the functional/gradient objective for a
+         * local-search worker, the [com.eignex.klause.solver.LinearObjective] for a backtrack
+         * worker — so a heterogeneous pool no longer forces one representation on every engine
+         * (see #63). It may be null for a satisfaction-only worker that never streams
+         * [improvements]; calling [improvements] on such a worker fails fast. [withBound] injects
          * the portfolio's shared objective bound into the params for [improvements] (e.g.
          * `{ p, supplier -> p.copy(objectiveBoundSupplier = supplier) }` for backtrack); pass
          * null for engines that don't bound-prune (local search).
@@ -54,6 +63,7 @@ class PortfolioWorker private constructor(
             label: String,
             session: Session<P>,
             params: P,
+            objective: Objective? = null,
             withBound: ((P, () -> Double) -> P)? = null,
         ): PortfolioWorker {
             // withCancellation declares a SolverParams return on the interface but every
@@ -63,7 +73,10 @@ class PortfolioWorker private constructor(
             return PortfolioWorker(
                 label = label,
                 solveFn = { c -> session.solve(withCancel(c)) },
-                improvementsFn = { obj, readBound, c ->
+                improvementsFn = { readBound, c ->
+                    val obj = requireNotNull(objective) {
+                        "PortfolioWorker '$label' was built without an objective; cannot stream improvements"
+                    }
                     val p = withCancel(c)
                     session.improvements(obj, withBound?.invoke(p, readBound) ?: p)
                 },

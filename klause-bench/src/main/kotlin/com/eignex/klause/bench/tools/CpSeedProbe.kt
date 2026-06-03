@@ -28,7 +28,7 @@ import java.io.File
  *   3. LS minimize **seeded** from the CP point (via [LocalSearchParams.initialAssignment]).
  *
  * NB: CP-seeding is OFF in the shipped LS path (the FZN CLI never sets `initialAssignment`),
- * as required by the MiniZinc local-search competition; this is a bench-only experiment.
+ * keeping pure local search free of any CP dependency; this is a bench-only experiment.
  *
  * Run: `./gradlew :klause-bench:bench --args="diag:cpseed <fzn>" -Dklause.cpseed.cpms=4000 -Dklause.cpseed.lsms=8000`
  */

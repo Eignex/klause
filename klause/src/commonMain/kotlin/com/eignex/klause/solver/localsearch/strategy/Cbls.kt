@@ -505,6 +505,7 @@ class Cbls(
      *  the shared [LocalSearchState.moveSink] which the ladder uses as its accumulation target. */
     private val chainScratch: MoveSink = MoveSink()
 
+    /** Tuning constants and the [vnd] preset factory. */
     companion object {
         /** Largest geometric step seeded per leaf var during functional-objective descent. */
         private const val OBJ_SEED_MAX_STEP = 4096

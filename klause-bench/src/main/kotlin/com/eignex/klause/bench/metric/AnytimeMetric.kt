@@ -11,6 +11,10 @@ import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -105,10 +109,16 @@ object AnytimeMetric {
         // streaming its fanned-in incumbents. Mixed pools use the linear objective both engines
         // share; pure-LS pools keep the functional/gradient objective.
         val portfolioProp = System.getProperty("klause.anytime.portfolio")
-        val k = if (portfolioProp != null) {
-            anytime { portfolioImprovements(entry, portfolioProp, klauseObj, obj, budget) }
-        } else {
-            anytime { solver.improvements(klauseObj, lsParams(budget)) }
+        // Optional CP-seeding (#65, OFF by default): -Dklause.anytime.cpseed=true runs a short
+        // backtrack solve for a *feasible* point and warm-starts LS from it (the #54 misses reach
+        // feasibility trivially under CP but never under cold LS). This is an opt-in hybrid — the
+        // shipped pure-LS CLI path never sets initialAssignment; only this opt-in and the
+        // diag:cpseed probe do.
+        val cpseed = System.getProperty("klause.anytime.cpseed")?.toBoolean() == true
+        val k = when {
+            portfolioProp != null -> anytime { portfolioImprovements(entry, portfolioProp, klauseObj, obj, budget) }
+            cpseed -> anytime { cpSeededImprovements(entry, solver, klauseObj, budget) }
+            else -> anytime { solver.improvements(klauseObj, lsParams(budget)) }
         }
         val r = anytime { ref.improvements(entry.problem, obj, budget) }
         val gap = if (k.best != null && r.best != null) k.best - r.best else null
@@ -161,12 +171,13 @@ object AnytimeMetric {
         val parts = prop.split(":", ",")
         val ls = parts.getOrNull(0)?.toIntOrNull() ?: 4
         val bt = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        // Per-worker objectives (#63): the LS workers descend the functional/gradient objective
+        // (klauseObj), the backtrack workers bound the linear one (linearObj). A mixed pool no
+        // longer collapses the LS workers onto the linear objective and loses the gradient.
         val portfolio = PortfolioBuilder.build(
             entry.problem, PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L),
+            lsObjective = klauseObj, linearObjective = linearObj,
         )
-        // Pure-LS pool can use the gradient-bearing functional objective; a mixed pool must use
-        // the linear objective both engines share (backtrack bounds on it).
-        val objective = if (bt == 0) klauseObj else linearObj
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }
         val queue = java.util.concurrent.LinkedBlockingQueue<Any>()
@@ -176,7 +187,7 @@ object AnytimeMetric {
                 // and run in parallel; plain runBlocking is single-threaded and CPU-bound workers
                 // (which never suspend) would starve each other.
                 kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.Default) {
-                    portfolio.improvements(objective, cancel).collect { queue.put(it) }
+                    portfolio.improvements(cancel).collect { queue.put(it) }
                 }
             } finally {
                 portfolio.close()
@@ -184,6 +195,35 @@ object AnytimeMetric {
             }
         }
         return generateSequence { queue.take().takeIf { it !== streamDone } as MinimizeResult? }
+    }
+
+    /**
+     * CP-seeded LS (#65, opt-in): spend up to `-Dklause.anytime.cpseed.ms` (default 1000ms,
+     * capped by the overall budget) running the backtrack solver for a feasible point, then
+     * LS-optimize from it via [LocalSearchParams.initialAssignment] under the *remaining* budget —
+     * so the comparison against the reference stays honest end-to-end (CP time counts). If CP
+     * doesn't reach feasibility in its slice, the seed is null and LS runs cold (degrades exactly
+     * to the non-seeded path). Bench-only opt-in; the shipped LS CLI never seeds by default.
+     */
+    private fun cpSeededImprovements(
+        entry: ResolvedProblem,
+        solver: LocalSearchSolver,
+        klauseObj: Objective,
+        budget: Budget,
+    ): Sequence<MinimizeResult> {
+        val overallDeadline = System.currentTimeMillis() + budget.timeoutMillis
+        val cpMs = System.getProperty("klause.anytime.cpseed.ms")?.toLong() ?: 1000L
+        val cpDeadline = minOf(System.currentTimeMillis() + cpMs, overallDeadline)
+        val cp = BacktrackSolver(entry.problem).solve(
+            BacktrackParams(randomSeed = 1L, cancellation = Cancellation { System.currentTimeMillis() > cpDeadline }),
+        )
+        val seed: Sample? = (cp as? SolveResult.Sat)?.assignment
+        val params = LocalSearchParams(
+            maxFlips = Long.MAX_VALUE, randomSeed = 1L,
+            costShaping = shapingFromProps(),
+            initialAssignment = seed,
+        ).withCancellation(Cancellation { System.currentTimeMillis() > overallDeadline }) as LocalSearchParams
+        return solver.improvements(klauseObj, params)
     }
 
     private fun lsParams(budget: Budget): LocalSearchParams {
