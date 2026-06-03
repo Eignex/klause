@@ -46,13 +46,19 @@ internal object UniGen {
 
             var seedCounter = config.seed ?: Random.Default.nextLong()
 
-            // Small enough to sample exactly-uniformly with no hashing.
+            // Small enough to sample exactly-uniformly with no hashing — but decide on a real bounded
+            // enumeration, not the lossy ε=0.8 estimate (which can under-count by ~1.8×). If the
+            // estimate is in band yet the enumeration caps out, the true count exceeds hiThresh and a
+            // capped representative set would hold only the search-order-first hiThresh+1 projections,
+            // biasing the draw — so fall through to hashing instead of sampling that truncated set (#78).
             if (count <= hiThresh) {
                 val all = cellCount(ctx, hashes = emptyList(), cap = hiThresh)
-                if (all.representatives.isEmpty()) return@sequence
-                while (true) {
-                    val rng = Random(seedCounter++)
-                    yield(all.representatives[rng.nextInt(all.representatives.size)])
+                if (!all.capped) {
+                    if (all.representatives.isEmpty()) return@sequence
+                    while (true) {
+                        val rng = Random(seedCounter++)
+                        yield(all.representatives[rng.nextInt(all.representatives.size)])
+                    }
                 }
             }
 
