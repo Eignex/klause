@@ -106,6 +106,41 @@ class FactorPropertyTest {
         )
     }
 
+    @Test fun `linear duplicate var delta matches apply`() {
+        // 2·x + 3·x ≤ 4  (same var twice). Without constructor coalescing the LS payload
+        // desyncs: initialize sums every index (5·x) but coeffOf returns one entry (3), so a
+        // move on x shifts the payload by only 3·Δ — issue #84. Coalescing collapses to 5·x.
+        val factor = Linear(
+            coeffs = intArrayOf(2, 3),
+            vars = intArrayOf(0, 0),
+            op = LinearOp.LE,
+            bound = 4,
+        )
+        runFactorPropertyCheck(
+            factor,
+            numBoolVars = 0,
+            intDomains = arrayOf(IntDomain(0, 5)),
+            seed = 84,
+        )
+    }
+
+    @Test fun `reified linear duplicate var delta matches apply`() {
+        // aux ↔ (2·x + 3·x = 5): same duplicate-var desync on the reified path (issue #84).
+        val factor = ReifiedLinear(
+            auxBoolVar = 0,
+            coeffs = intArrayOf(2, 3),
+            vars = intArrayOf(0, 0),
+            op = LinearOp.EQ,
+            bound = 5,
+        )
+        runFactorPropertyCheck(
+            factor,
+            numBoolVars = 1,
+            intDomains = arrayOf(IntDomain(0, 5)),
+            seed = 85,
+        )
+    }
+
     @Test fun `product delta matches apply`() {
         val factor = Product(a = 0, b = 1, result = 2)
         runFactorPropertyCheck(
