@@ -535,9 +535,13 @@ internal object SmtTranslator {
                     },
                 )
                 when (f.mode) {
-                    BinPacking.Mode.LoadVars -> conj.add(imgr.equal(iv(f.loadVars!![b]), load))
+                    BinPacking.Mode.LoadVars -> conj.add(imgr.equal(iv(requireNotNull(f.loadVars)[b]), load))
+
                     BinPacking.Mode.UniformCapacity -> conj.add(imgr.lessOrEquals(load, num(f.uniformCapacity)))
-                    BinPacking.Mode.PerBinCapacity -> conj.add(imgr.lessOrEquals(load, num(f.capacities!![b])))
+
+                    BinPacking.Mode.PerBinCapacity -> conj.add(
+                        imgr.lessOrEquals(load, num(requireNotNull(f.capacities)[b])),
+                    )
                 }
             }
             return bmgr.and(conj)

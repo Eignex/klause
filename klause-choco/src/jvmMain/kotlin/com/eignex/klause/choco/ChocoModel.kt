@@ -47,6 +47,7 @@ import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import org.chocosolver.solver.Model
+import org.chocosolver.solver.constraints.Constraint
 import org.chocosolver.solver.constraints.extension.Tuples
 import org.chocosolver.solver.constraints.nary.automata.FA.FiniteAutomaton
 import org.chocosolver.solver.variables.BoolVar
@@ -305,9 +306,9 @@ class ChocoModel private constructor(
 
     private fun postBinPacking(f: BinPacking) {
         val loads: Array<IntVar> = when (f.mode) {
-            BinPacking.Mode.LoadVars -> intVarsOf(f.loadVars!!)
+            BinPacking.Mode.LoadVars -> intVarsOf(requireNotNull(f.loadVars))
             BinPacking.Mode.UniformCapacity -> Array(f.numBins) { model.intVar(0, f.uniformCapacity) }
-            BinPacking.Mode.PerBinCapacity -> Array(f.numBins) { model.intVar(0, f.capacities!![it]) }
+            BinPacking.Mode.PerBinCapacity -> Array(f.numBins) { model.intVar(0, requireNotNull(f.capacities)[it]) }
         }
         model.binPacking(intVarsOf(f.bins), f.weights, loads, f.binOffset).post()
     }
@@ -326,7 +327,7 @@ class ChocoModel private constructor(
         // Pairwise separation in at least one dimension: oi+si ≤ oj  ∨  oj+sj ≤ oi (per dim).
         for (i in 0 until f.numObjects) {
             for (j in i + 1 until f.numObjects) {
-                val opts = ArrayList<org.chocosolver.solver.constraints.Constraint>()
+                val opts = ArrayList<Constraint>()
                 for (d in 0 until f.numDims) {
                     val oi = intVars[f.origin[i * f.numDims + d]]
                     val oj = intVars[f.origin[j * f.numDims + d]]
@@ -391,7 +392,7 @@ class ChocoModel private constructor(
             }
             if (cost4) {
                 val w = model.intVar("mddw$i", wLo, wHi)
-                wVars!!.add(w)
+                requireNotNull(wVars).add(w)
                 model.table(arrayOf(q[i], intVars[f.seq[i]], q[i + 1], w), tuples).post()
             } else {
                 model.table(arrayOf(q[i], intVars[f.seq[i]], q[i + 1]), tuples).post()
