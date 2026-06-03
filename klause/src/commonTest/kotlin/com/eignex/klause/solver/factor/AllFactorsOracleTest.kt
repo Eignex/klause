@@ -788,6 +788,18 @@ class AllFactorsOracleTest {
         )
     }
 
+    @Test fun valuePrecedeHoley() {
+        // s=1, t=2 with interior holes at 1 in the first two positions — exercises the
+        // hole-aware "no premature t" rule under the brute oracle (sound-only; not GAC).
+        val f = ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), holey(0, 2, 1), IntDomain(0, 2)),
+            "ValuePrecede.holey",
+            gac = false,
+        )
+    }
+
     @Test fun allEqualHoley() {
         // x0,x1 ∈ {0,2}; x2 ∈ {0,1,2}. all-equal ⟹ common value ∈ {0,2}, so x2's 1 is
         // unsupported. AllEqual documents intersection filtering, so assert full GAC (#82).

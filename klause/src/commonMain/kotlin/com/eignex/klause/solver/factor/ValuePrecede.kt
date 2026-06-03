@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `value_precede(s, t, xs)` — if value `t` appears in [xs], then the first occurrence of `s`
@@ -15,9 +16,13 @@ import com.eignex.klause.solver.propagation.PropagationState
  * values[i+1], xs)` factors at the FZN-dispatch level — one factor per consecutive pair
  * — so chain semantics fall out for free.
  *
- * Propagation is a singleton-violation check at all-pinned time. The bound-only
- * propagation lets BacktrackSolver find correct models because the singleton check
- * fires at every leaf attempt.
+ * Propagation runs the two standard value-precedence rules each call:
+ *  - **no premature `t`**: let `p` be the earliest position whose domain still contains `s`.
+ *    No position `i ≤ p` can hold `t` (there is no room for a preceding `s`), so `t` is
+ *    pruned from `dom(xs[0..p])`. If `s` is impossible everywhere, `t` is forbidden entirely.
+ *  - **forced `t` demands an earlier `s`**: if some position is pinned to `t`, an `s` must
+ *    occupy an earlier position; zero candidates ⟹ UNSAT, exactly one ⟹ force it to `s`.
+ * This prunes during search rather than acting as a leaf-only sanity check.
  */
 class ValuePrecede(
     /** The value that must first appear before [t]. */
@@ -94,21 +99,54 @@ class ValuePrecede(
         return true
     }
 
+    /** Hole-aware conflict reason: the rules turn on which positions can/can't hold `s` or
+     *  `t`, which holey domains decide, so cite filtered bounds *and* interior holes. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, xs)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // All-singleton sanity check: walk and detect first-t before first-s.
-        var allSingleton = true
-        for (x in xs) {
-            val d = state.intDomains[x]
-            if (d.min != d.max) {
-                allSingleton = false
+        // Earliest position whose domain can still hold `s` (xs.size if none).
+        var firstSPossible = xs.size
+        for (i in xs.indices) {
+            if (s in state.intDomains[xs[i]]) {
+                firstSPossible = i
                 break
             }
         }
-        if (allSingleton) {
-            for (x in xs) {
-                val v = state.intDomains[x].min
-                if (v == t) return false // violated: first t before first s
-                if (v == s) return true // satisfied
+        val ant = collectHoleAndBoundAntecedents(state, xs)
+        // Rule 1: no `t` at any position ≤ firstSPossible — no room for a preceding `s`.
+        // (firstSPossible == xs.size ⟹ `s` impossible everywhere ⟹ `t` forbidden everywhere.)
+        for (i in xs.indices) {
+            if (i > firstSPossible) break
+            if (!state.excludeIntValue(xs[i], t, ant)) return false // emptied a pinned-`t` slot
+        }
+        // Rule 2: if a position is pinned to `t`, an `s` must precede it.
+        var firstTForced = -1
+        for (i in xs.indices) {
+            val d = state.intDomains[xs[i]]
+            if (d.min == d.max && d.min == t) {
+                firstTForced = i
+                break
+            }
+        }
+        if (firstTForced >= 0) {
+            var sCandidate = -1
+            var sCount = 0
+            for (j in 0 until firstTForced) {
+                if (s in state.intDomains[xs[j]]) {
+                    sCount++
+                    sCandidate = j
+                }
+            }
+            if (sCount == 0) return false // forced `t` with no possible preceding `s`
+            if (sCount == 1) {
+                // The sole pre-`t` candidate must take `s`: drop every other value.
+                val xj = xs[sCandidate]
+                val drop = IntArrayList()
+                state.intDomains[xj].forEach { if (it != s) drop.add(it) }
+                for (k in 0 until drop.size) {
+                    if (!state.excludeIntValue(xj, drop[k], ant)) return false
+                }
             }
         }
         return true
