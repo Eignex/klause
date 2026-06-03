@@ -50,6 +50,53 @@ class Diffn(
     /** Whether the search can resize rectangles (var dimensions present). */
     private val varSize: Boolean = widthVars != null || heightVars != null
 
+    /** var id → the single rectangle index it belongs to, or `-1` when the same id is shared
+     *  by ≥2 distinct rectangles (a degenerate model). The affected-pair delta only touches
+     *  the moved rectangle, which is exact iff the moved var maps to exactly one rectangle;
+     *  a shared id forces the O(n²) full-recount fallback to preserve exact semantics. */
+    private val varToRect: Map<Int, Int> = run {
+        val m = HashMap<Int, Int>(n * 2)
+        fun record(v: Int, i: Int) {
+            val prev = m[v]
+            m[v] = if (prev == null || prev == i) i else -1
+        }
+        for (i in 0 until n) {
+            record(xs[i], i)
+            record(ys[i], i)
+            widthVars?.let { record(it[i], i) }
+            heightVars?.let { record(it[i], i) }
+        }
+        m
+    }
+
+    /** Number of overlapping pairs that include rectangle [r], under an optional single-var
+     *  override (`ov < 0` = none). The override var belongs to [r], so only [r]'s own
+     *  components change; every other rectangle reads its current assignment. O(n). */
+    private fun pairsInvolvingRect(state: LocalSearchState, r: Int, ov: Int, nv: Int): Int {
+        val xr = rx(state, r, ov, nv)
+        val yr = ry(state, r, ov, nv)
+        val wr = rw(state, r, ov, nv)
+        val hr = rh(state, r, ov, nv)
+        var bad = 0
+        for (j in 0 until n) {
+            if (j == r) continue
+            if (overlaps(
+                    xr,
+                    yr,
+                    wr,
+                    hr,
+                    rx(state, j, ov, nv),
+                    ry(state, j, ov, nv),
+                    rw(state, j, ov, nv),
+                    rh(state, j, ov, nv),
+                )
+            ) {
+                bad++
+            }
+        }
+        return bad
+    }
+
     /** Count of overlapping pairs under the current assignment. */
     private class State(var overlappingPairs: Int)
 
@@ -115,12 +162,23 @@ class Diffn(
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         (state.refPayload[factorId] as State).overlappingPairs > 0
 
-    /** Brute-force delta: simulate the move (which may be on a position OR a size var),
-     *  recount overlaps. O(n²) — acceptable for typical diffn sizes (n ≤ ~50). */
+    /** Affected-pair delta: a single-var move (position OR size) only changes the overlap
+     *  status of pairs that include the moved rectangle, so the new total is
+     *  `overlappingPairs − oldPairsInvolving(r) + newPairsInvolving(r)` in O(n). The stored
+     *  [State.overlappingPairs] is kept exact by [applyIntSet]'s full recount, so this fast
+     *  path needs no drift correction. Falls back to the O(n²) recount when the moved var is
+     *  shared across rectangles (`varToRect == -1`). */
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val wasViolated = s.overlappingPairs > 0
-        val willViolate = countOverlaps(state, intVar, newValue) > 0
+        val r = varToRect[intVar]
+        val willViolate = if (r == null || r < 0) {
+            countOverlaps(state, intVar, newValue) > 0
+        } else {
+            val oldPairsR = pairsInvolvingRect(state, r, ov = -1, nv = 0)
+            val newPairsR = pairsInvolvingRect(state, r, ov = intVar, nv = newValue)
+            s.overlappingPairs - oldPairsR + newPairsR > 0
+        }
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
