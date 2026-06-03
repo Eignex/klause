@@ -8,10 +8,9 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
 /**
- * `result = arr[idx]` — the element constraint, native to local search instead of the old
- * per-index reified-linear + indicator-clause decomposition (which exploded one constraint
- * into ~5·len factors and 2·len aux bools, gave CBLS no gradient, and built a tightly-coupled
- * indicator web single-variable moves couldn't navigate — see issue #37).
+ * `result = arr[idx]` — the element constraint, native to local search rather than a
+ * per-index reified-linear + indicator-clause decomposition (which would explode one
+ * constraint into ~5·len factors and 2·len aux bools and give CBLS no gradient).
  *
  * [arr] is either a constant table ([arrIsVars] = false; entries are literal values) or an
  * array of int-var ids ([arrIsVars] = true; the element value is the *current value* of the

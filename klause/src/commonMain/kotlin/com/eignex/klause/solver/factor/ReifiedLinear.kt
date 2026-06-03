@@ -178,8 +178,7 @@ class ReifiedLinear private constructor(
      * Compose aux-pin antecedents as per-bound atom-lits over the involved vars. For each
      * var with `min` tighter than its initial domain, emit `¬[v ≥ d.min]`; similarly for
      * the `max` side. The implicit clause `(⋀ premise atom-lits) → aux` resolves cleanly
-     * through 1UIP / self-subsuming minimization with finer granularity than the older
-     * bool-lit union would have given.
+     * through 1UIP / self-subsuming minimization at per-bound granularity.
      */
     private fun composeAuxAntecedents(state: PropagationState): IntArray? = state.composeIntVarAtomAntecedents(vars)
 

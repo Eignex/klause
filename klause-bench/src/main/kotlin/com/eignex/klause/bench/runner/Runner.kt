@@ -27,7 +27,7 @@ data class Budget(val timeoutMillis: Long = 10_000L)
 /**
  * Resolves a [ProblemRef] into a [ResolvedProblem]. The runner axis is *how a problem becomes
  * a klause `Problem`*: [InProcessRunner] parses an in-process format (or runs an `InCode`
- * builder); `MiniZincRunner` (phase 2) compiles `.mzn`→`.fzn` via the `minizinc` CLI first.
+ * builder); `MiniZincRunner` compiles `.mzn`→`.fzn` via the `minizinc` CLI first.
  * Solving the resulting `Problem` is then uniform across runners (see the solver axis).
  */
 interface Runner {

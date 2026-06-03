@@ -57,7 +57,6 @@ class FlatZincLexerTest {
     @Test
     fun `double-colon punct`() {
         val tokens = FlatZincLexer("var int: x :: output_var = 0;").tokenize().dropLast(1)
-        // Find the `::` token
         assertTrue(tokens.any { it is FznToken.Punct && it.symbol == "::" })
     }
 

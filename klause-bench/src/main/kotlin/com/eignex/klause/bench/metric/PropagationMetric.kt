@@ -16,8 +16,7 @@ data class PropagationTimings(
 
 /**
  * Microbenchmark targeted at the propagation hot path, isolated from LS / SAT-solver
- * overhead: bake-time, one-shot with assumptions, and incremental (session) pinning. Ports
- * the legacy `PropagationBench`.
+ * overhead: bake-time, one-shot with assumptions, and incremental (session) pinning.
  */
 object PropagationMetric {
     fun bench(

@@ -187,8 +187,6 @@ class SmtSession(override val solver: SmtSolver, initialParams: SmtParams = SmtP
         }
     }
 
-    // ---- helpers ----
-
     private inline fun <T> withScope(call: Assumptions, body: () -> T): T {
         prover.push()
         try {

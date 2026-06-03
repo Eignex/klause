@@ -62,16 +62,7 @@ internal data class LocalSearchWorkerConfig(
          *  for coverage: adaptive probSAT for clausal SAT, WalkSAT+configuration-checking for
          *  structured SAT, and simulated annealing for rugged escape. The first [count] entries
          *  are taken (wrapping when `count` exceeds the palette), so small portfolios get the
-         *  highest-value workers first.
-         *
-         *  #66: the former large-move `vnd/ils-linkage` worker (`Cbls.vnd(maxNeighborhood = 3)`)
-         *  was DROPPED from the default palette. The CBLS×VND merge investigation produced a
-         *  decisive negative result on CP-shaped optimisation: large coordinated moves *thrash*
-         *  the coupled #54 plateaus (bacp plateau cost 8 → 104–113) and scored 0/3 feasibility
-         *  @8s on every tested miss — it burned a core for negative value. The `Cbls.vnd(...)`
-         *  factory and the `maxNeighborhood` ladder knob remain available as opt-in research
-         *  infra (dormant at the default `maxNeighborhood = 1`); this only removes it as a
-         *  default-palette worker. */
+         *  highest-value workers first. */
         fun diverse(count: Int): List<LocalSearchWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val cblsTabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)

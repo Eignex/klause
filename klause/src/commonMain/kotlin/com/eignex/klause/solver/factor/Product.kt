@@ -83,9 +83,7 @@ class Product(
         //     `(r-endpoint, d-endpoint)` pairs, ceiling for the lower bound and flooring
         //     for the upper. Both are monotonic in their inputs — tightening either
         //     operand can only shrink the computed target range — so worklist iteration
-        //     reaches fixpoint cleanly without the bit-blast feedback that destabilised
-        //     the earlier general-interval attempt (which used a different signed-division
-        //     formulation susceptible to non-monotone updates on zero-crossing inputs).
+        //     reaches fixpoint cleanly.
         val dr = state.intDomains[result]
         val dbAfter = state.intDomains[b]
         if (!reverseNarrow(state, target = a, divisorDomain = dbAfter, r = dr)) return false

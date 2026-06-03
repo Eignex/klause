@@ -175,7 +175,6 @@ class OrToolsModel private constructor(
                 model.addLinearExpressionInDomain(sum, d.complement()).onlyEnforceIf(aux.not())
             }
 
-            // ---- expanded coverage ----
             is AllEqual -> for (i in 1 until f.xs.size) model.addEquality(intVars[f.xs[i]], intVars[f.xs[0]])
 
             is AllDifferentExceptZero -> postDistinctExcept(f.xs, intArrayOf(0))

@@ -16,9 +16,6 @@ import java.util.concurrent.TimeUnit
  * `.mzn`(+`.dzn`) → `.fzn` against klause's redefinition library; the resulting FlatZinc is
  * then parsed in-process (`parseFlatZinc`) into a klause [com.eignex.klause.solver.Problem].
  * No external solver is invoked — solving is uniform across runners via the solver axis.
- *
- * This is the same compile invocation the legacy `MznParity` used, minus the reference-solver
- * subprocess and the `klause-fzn-cli` install dependency.
  */
 class MiniZincRunner(
     private val timeoutSec: Int = System.getProperty("klause.bench.mzn.timeoutSec")?.toIntOrNull() ?: 60,

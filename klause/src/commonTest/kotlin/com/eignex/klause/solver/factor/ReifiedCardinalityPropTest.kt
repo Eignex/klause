@@ -11,8 +11,7 @@ import kotlin.test.assertIs
 
 /**
  * Coverage for [ReifiedCardinality]'s propagator with focus on the `¬aux` branch (body
- * must NOT hold) — historically a no-op, now full forcing when one of the two escape
- * directions is uniquely feasible.
+ * must NOT hold): full forcing when one of the two escape directions is uniquely feasible.
  */
 class ReifiedCardinalityPropTest {
 

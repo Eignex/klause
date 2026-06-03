@@ -19,8 +19,7 @@ import kotlinx.serialization.Serializable
  * Differential parity: solve each problem with **klause** (complete backtracking) and an
  * in-process [Reference] solver (Choco or OR-Tools) on the same
  * [com.eignex.klause.solver.Problem], then check both against each other and against the
- * recorded [Expected] oracle. Replaces the legacy `MznParity`'s "klause vs Gecode via the
- * minizinc CLI" with an in-process comparison — no external solver binary.
+ * recorded [Expected] oracle. The comparison is in-process — no external solver binary.
  *
  *  - satisfaction problems compare feasibility (SAT/UNSAT) three ways (klause, reference, expected);
  *  - optimization problems additionally compare the optimal objective value.

@@ -19,9 +19,9 @@ import kotlinx.serialization.Serializable
  *  3. optional `klause-fzn-cli` ingest smoke (short wall-clock cap) — confirms klause parses
  *     the FZN and starts searching without crashing.
  *
- * Aggregated per problem family; emits JSON + Markdown. Parallel across instances. Ports the
- * legacy `LsCompileAudit`. The ingest smoke needs `:klause-fzn-cli:installDist`; if the binary
- * is absent it is skipped (reported as `ingest=skipped`).
+ * Aggregated per problem family; emits JSON + Markdown. Parallel across instances. The ingest
+ * smoke needs `:klause-fzn-cli:installDist`; if the binary is absent it is skipped (reported as
+ * `ingest=skipped`).
  */
 @Serializable
 data class AuditRow(

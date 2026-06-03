@@ -7,15 +7,14 @@ import com.eignex.klause.util.IntIntMap
 
 /*
  * Shared violation math and helpers for the weighted-sum factor family — Linear, ReifiedLinear,
- * PseudoBoolean, ReifiedPseudoBoolean. Previously each factor carried its own copy of
- * holds/violates/degree/residual/distance, snapTarget, a local floorDiv/ceilDiv, and the
- * signedWeightByVar build; that duplication is collapsed here (issue #100) so the running-sum
- * arithmetic lives in a single place.
+ * PseudoBoolean, ReifiedPseudoBoolean. Centralising holds/violates/degree/residual/distance,
+ * snapTarget, floorDiv/ceilDiv, and the signedWeightByVar build keeps the running-sum arithmetic
+ * in a single place.
  *
  * Critically, every running sum is a Long: with coefficients/weights near 2^20 and domains near
  * 2^12 the weighted total exceeds 32 bits, so a 32-bit accumulator would wrap and make
- * isViolated / violationDegree silently wrong (issue #72). Keeping the math here means that
- * widening is applied once rather than four times.
+ * isViolated / violationDegree silently wrong. Keeping the math here means that widening is
+ * applied once rather than four times.
  */
 
 /* ------------------------------------------------------------------ *

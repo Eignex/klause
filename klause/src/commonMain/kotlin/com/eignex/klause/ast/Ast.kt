@@ -636,7 +636,7 @@ data class MddExpr(
     /** Prefix-sum index into [transitions] per layer. */
     val layerStarts: List<Int>,
     /** Flat `(srcState, value, dstState)` triples per layer. */
-    val transitions: List<Int>, // flat: src0,val0,dst0, src1,val1,dst1, ...
+    val transitions: List<Int>,
     /** Start state. */
     val initial: Int,
     /** Accepting states at the final layer. */
@@ -667,9 +667,9 @@ data class CostRegularExpr(
     /** Number of input symbols. */
     val numSymbols: Int,
     /** `Q × S` row-major transition table; 0 means no transition. */
-    val transitions: List<Int>, // Q × S row-major; 0 means no transition
+    val transitions: List<Int>,
     /** `Q × S` row-major edge weights. */
-    val weights: List<Int>, // Q × S row-major edge weights
+    val weights: List<Int>,
     /** Initial state. */
     val initial: Int,
     /** Accepting states. */
@@ -700,7 +700,7 @@ data class CostMddExpr(
     /** Prefix-sum index into [transitions] per layer. */
     val layerStarts: List<Int>,
     /** Flat `(src, val, dst, weight)` quadruples per layer. */
-    val transitions: List<Int>, // flat: src,val,dst,weight ×N
+    val transitions: List<Int>,
     /** Start state. */
     val initial: Int,
     /** Accepting states at the final layer. */

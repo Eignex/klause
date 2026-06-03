@@ -20,8 +20,7 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Coverage report against the XCSP3 competition library (and the SMT-LIB QF_LIA set): how
  * many instances **parse** into a klause [Problem], how many **solve** within a budget, and
- * which **unsupported constructs** account for the rest. This is the report called for by
- * issues #2 / #3.
+ * which **unsupported constructs** account for the rest.
  *
  * The collections are fetched on demand by [CorpusFetcher]; XCSP3 instances are individually
  * `*.xml.lzma`-compressed and decompressed on the fly (no multi-GB expansion on disk).

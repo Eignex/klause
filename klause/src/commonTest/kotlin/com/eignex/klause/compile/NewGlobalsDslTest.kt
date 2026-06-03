@@ -220,7 +220,6 @@ class NewGlobalsDslTest {
                 )
             }
         }
-        // The layerStarts list above is wrong (12 elements / 3 = 4 transitions, but I declared 6&12). Fix.
         val schema = S()
         val compiled = schema.compile()
         val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()

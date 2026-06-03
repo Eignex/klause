@@ -348,13 +348,6 @@ class LocalSearchState(
         }
     }
 
-    /*
-     * Net change in the violated-factor count that would result from applying [move]. Used
-     * by [TabuFilter]'s [AspirationCriterion.OrImproving] to decide whether a tabu move
-     * is improving enough to override the tabu. Walks the affected var's occurrence list
-     * once; same O(arity) cost as [breakScore].
-     */
-
     /**
      * Synthesize a value-driven move that sets [intVar] to [newValue] and coordinately
      * flips all indicator bools of sibling **reified single-var equality** factors on the

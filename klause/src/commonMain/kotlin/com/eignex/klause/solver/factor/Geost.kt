@@ -29,9 +29,6 @@ import kotlin.math.min
  * force an overlap on d too — a global conflict. We collect those forbidden intervals,
  * union them, and tighten origin_i.d to avoid the union (advance min past leading intervals,
  * retract max past trailing intervals; report failure if min > max).
- *
- * The earlier "forced single-dim" pairwise scan is subsumed by the case where all but one
- * dim's M-intervals are already exhausted.
  */
 class Geost(
     /** Number of spatial dimensions. */

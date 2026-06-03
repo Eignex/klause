@@ -21,7 +21,6 @@ class IntDivModTest {
         val program = parseFlatZinc(src)
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        // Find q's value via its name → int var id.
         val qId = program.intVarsByName.getValue("q")
         assertEquals(2, sat.assignment.ints[qId], "7 / 3 truncated = 2")
     }

@@ -24,8 +24,8 @@ data class Target(
 )
 
 object Targets {
-    /** Suites resolvable fully in-process today (everything except the MiniZinc smoke set,
-     *  which needs the phase-2 `minizinc` compile step). */
+    /** Suites resolvable fully in-process (everything except the MiniZinc smoke set, which
+     *  needs the `minizinc` compile step). */
     private val IN_PROCESS_CORE = listOf(
         "handwritten-core", "dimacs-core", "opb-core", "schema-core", "flatzinc-core",
     )

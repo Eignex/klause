@@ -35,7 +35,6 @@ class MddIncrementalTest {
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
             factors = arrayOf<Factor>(factor),
         )
-        // First propagate.
         val r1 = problem.propagate(Assumptions.None)
         assertTrue(r1 is PropagationResult.Implied, "first fire should reach fixpoint; got $r1")
         // Pinning seq[0] = 1 narrows domain; re-propagate — must still succeed and prune nothing further.

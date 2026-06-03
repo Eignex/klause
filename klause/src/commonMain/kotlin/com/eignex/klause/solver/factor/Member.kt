@@ -147,7 +147,7 @@ class Member(
             }
         }
         // Union-hull on y: y = some xs[i], so every y-value that no candidate domain contains
-        // is unsupported. Generalises the old all-singleton special case to arbitrary domains.
+        // is unsupported.
         val toRemove = IntArrayList()
         state.intDomains[y].forEach { v ->
             var supported = false

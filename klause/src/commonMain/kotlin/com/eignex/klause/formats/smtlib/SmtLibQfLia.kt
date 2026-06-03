@@ -633,7 +633,6 @@ object SmtLibQfLia {
 
                     "to_real", "to_int" -> linearTerm(args[0])
 
-                    // identity over the integer domain
                     "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$h'")
 
                     "let" -> withLet(args[0]) { linearTerm(args[1]) }

@@ -117,8 +117,6 @@ class LogicNGSolver(override val problem: Problem) : Solver<LogicNGParams> {
         }
     }
 
-    // ---- helpers ----
-
     private fun buildSolver(): Pair<FormulaFactory, SATSolver> {
         val factory = FormulaFactory()
         val solver = MiniSat.miniSat(factory)

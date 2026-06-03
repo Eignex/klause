@@ -96,8 +96,6 @@ interface LocalSearchFactor : Factor {
      * models.
      */
     fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        // Default no-op. See class doc; factors that participate in objective descent
-        // override.
     }
 
     /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]

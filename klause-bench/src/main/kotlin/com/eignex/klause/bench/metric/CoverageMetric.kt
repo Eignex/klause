@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * Native-predicate coverage: compile each MiniZinc instance to FlatZinc against klause's
  * redefinitions, then measure what fraction of the surviving constraint predicates klause
  * handles **natively** (vs decomposed by MiniZinc's standard library). The headline number to
- * push toward 100%. Ported from the legacy `MznParity` coverage computation.
+ * push toward 100%.
  *
  * "Native" = every predicate declared in klause's `redefinitions.mzn` plus every constraint
  * name the `klause-fzn-cli` FlatZinc parser dispatches on (read from `FlatZincConstraints.kt`).
