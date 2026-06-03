@@ -247,8 +247,9 @@ private fun reginTryAugment(
 
 /** Iterative Tarjan SCC over [adj] (adjacency lists on `0 until total`). Returns per-vertex
  *  component id. Iterative to avoid recursion-depth blowup on large graphs. SCC membership is
- *  reversal-invariant, so the forward orientation is used here. */
-private fun reginTarjanScc(adj: Array<IntArrayList>, total: Int): IntArray {
+ *  reversal-invariant, so the forward orientation is used here. Shared with [GlobalCardinality],
+ *  which materialises its residual graph and delegates here (#99). */
+internal fun reginTarjanScc(adj: Array<IntArrayList>, total: Int): IntArray {
     val sccId = IntArray(total) { -1 }
     val index = IntArray(total) { -1 }
     val lowlink = IntArray(total)

@@ -581,68 +581,23 @@ class GlobalCardinality(
             return total
         }
 
-        /** Tarjan SCC over the residual subgraph induced by nodes `[0, limit)`. Edges
-         *  with positive remaining capacity (forward residuals + already-used reverses)
-         *  define the directed graph. */
+        /** Tarjan SCC over the residual subgraph induced by nodes `[0, limit)`. Edges with
+         *  positive remaining capacity (forward residuals + already-used reverses) define the
+         *  directed graph. Materialises that residual adjacency (a static snapshot once the flow
+         *  is fixed) and delegates to the shared [reginTarjanScc] (#99). SCC ids are only ever
+         *  compared for equality, so component numbering is irrelevant. */
         fun computeSccResidual(limit: Int, sccId: IntArray) {
-            val index = IntArray(limit) { -1 }
-            val lowlink = IntArray(limit)
-            val onStack = BooleanArray(limit)
-            val tarjanStack = IntArray(limit)
-            var stackTop = 0
-            var nextIndex = 0
-            var nextScc = 0
-            val callStack = IntArray(limit + 1)
-            val iterStack = IntArray(limit + 1)
-            for (start in 0 until limit) {
-                if (index[start] != -1) continue
-                var depth = 0
-                callStack[depth] = start
-                iterStack[depth] = 0
-                index[start] = nextIndex
-                lowlink[start] = nextIndex
-                nextIndex++
-                tarjanStack[stackTop++] = start
-                onStack[start] = true
-                while (depth >= 0) {
-                    val v = callStack[depth]
-                    val neigh = adj[v]
-                    val it = iterStack[depth]
-                    if (it < neigh.size) {
-                        iterStack[depth] = it + 1
-                        val eIdx = neigh[it]
-                        val w = edgeTo[eIdx]
-                        if (w >= limit || cap[eIdx] <= 0) continue
-                        if (index[w] == -1) {
-                            depth++
-                            callStack[depth] = w
-                            iterStack[depth] = 0
-                            index[w] = nextIndex
-                            lowlink[w] = nextIndex
-                            nextIndex++
-                            tarjanStack[stackTop++] = w
-                            onStack[w] = true
-                        } else if (onStack[w]) {
-                            if (index[w] < lowlink[v]) lowlink[v] = index[w]
-                        }
-                    } else {
-                        if (lowlink[v] == index[v]) {
-                            while (true) {
-                                val w = tarjanStack[--stackTop]
-                                onStack[w] = false
-                                sccId[w] = nextScc
-                                if (w == v) break
-                            }
-                            nextScc++
-                        }
-                        depth--
-                        if (depth >= 0) {
-                            val parent = callStack[depth]
-                            if (lowlink[v] < lowlink[parent]) lowlink[parent] = lowlink[v]
-                        }
-                    }
+            val nodeAdj = Array(limit) { IntArrayList() }
+            for (v in 0 until limit) {
+                val neigh = adj[v]
+                for (k in 0 until neigh.size) {
+                    val eIdx = neigh[k]
+                    val w = edgeTo[eIdx]
+                    if (w < limit && cap[eIdx] > 0) nodeAdj[v].add(w)
                 }
             }
+            val res = reginTarjanScc(nodeAdj, limit)
+            for (i in 0 until limit) sccId[i] = res[i]
         }
     }
 
