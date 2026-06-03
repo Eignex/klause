@@ -228,8 +228,17 @@ class LexLess(
             if (dx.min > dy.max) return false
             // Bound tightening: xs`i` ≤ ys`i` is necessary for the relation to hold,
             // since position i would otherwise decide the comparison against us.
-            val antFromY = state.composeIntVarAtomAntecedents(intArrayOf(ys[i]))
-            val antFromX = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))
+            // This deduction holds only because the prefix xs[0..i-1] = ys[0..i-1] is
+            // pinned equal — index i is the deciding position precisely because of it.
+            // Cite the prefix bound atoms alongside the deciding-index bounds so a learned
+            // clause carries the prefix-equality premises and stays sound (#75).
+            val prefixVars = IntArray(2 * i)
+            for (j in 0 until i) {
+                prefixVars[j] = xs[j]
+                prefixVars[i + j] = ys[j]
+            }
+            val antFromY = state.composeIntVarAtomAntecedents(prefixVars + ys[i])
+            val antFromX = state.composeIntVarAtomAntecedents(prefixVars + xs[i])
             if (!state.tightenIntMax(xs[i], dy.max, antFromY)) return false
             if (!state.tightenIntMin(ys[i], dx.min, antFromX)) return false
             // Re-read after the tightening.
