@@ -52,4 +52,37 @@ class AllEqualTest {
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }
+
+    @Test
+    fun `holey domains intersect to common members only`() {
+        // v0,v1 ∈ {0,2}, v2 ∈ {0,1,2}: the only feasible shared values are 0 and 2 (never 1),
+        // which a bounds-only intersection would miss. Exercises hole pruning end-to-end.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(
+                IntDomain(0, 2).excludeValue(1),
+                IntDomain(0, 2).excludeValue(1),
+                IntDomain(0, 2),
+            ),
+            factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1, 2))),
+        )
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        val v = sat.assignment.ints[0]
+        assertTrue(v == 0 || v == 2, "shared value $v is not a common member")
+        for (i in 1..2) assertTrue(sat.assignment.ints[i] == v)
+    }
+
+    @Test
+    fun `empty hole-intersection is Unsat`() {
+        // dom(v0) = {0,2}, dom(v1) = {1}: overlapping bounds but no common member. The
+        // hole-aware conflict reason must drive a sound UNSAT, not a bounds-only pin to 1.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(1, 1)),
+            factors = arrayOf<Factor>(AllEqual(intArrayOf(0, 1))),
+        )
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+    }
 }

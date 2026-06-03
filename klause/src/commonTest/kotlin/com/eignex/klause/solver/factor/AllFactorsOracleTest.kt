@@ -739,4 +739,40 @@ class AllFactorsOracleTest {
             gac = false,
         )
     }
+
+    @Test fun allEqualHoley() {
+        // x0,x1 ∈ {0,2}; x2 ∈ {0,1,2}. all-equal ⟹ common value ∈ {0,2}, so x2's 1 is
+        // unsupported. AllEqual documents intersection filtering, so assert full GAC (#82).
+        val f = AllEqual(xs = intArrayOf(0, 1, 2))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), holey(0, 2, 1), IntDomain(0, 2)),
+            "AllEqual.holey",
+            gac = true,
+        )
+    }
+
+    @Test fun allEqualHoleyEmpty() {
+        // dom(x0) = {0,2}, dom(x1) = {1}: the true intersection is empty ⟹ UNSAT (#82). The
+        // bounds-only intersection would pin both to [1,1] without this being caught.
+        val f = AllEqual(xs = intArrayOf(0, 1))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), IntDomain(1, 1)),
+            "AllEqual.holey-empty",
+            gac = true,
+        )
+    }
+
+    @Test fun allEqualHoleyDisjointInterior() {
+        // dom(x0) = {0,3}, dom(x1) = {1,2}: overlapping bounds [0,3]/[1,2] but disjoint
+        // members ⟹ UNSAT even though commonMin ≤ commonMax.
+        val f = AllEqual(xs = intArrayOf(0, 1))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 3, 1, 2), holey(1, 2)),
+            "AllEqual.holey-disjoint",
+            gac = true,
+        )
+    }
 }
