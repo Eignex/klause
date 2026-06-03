@@ -484,9 +484,9 @@ class OrToolsModel private constructor(
             val picks = Array(f.bins.size) { reifyEq(intVars[f.bins[it]], b + f.binOffset) as LinearArgument }
             val load = LinearExpr.weightedSum(picks, f.weights.longs())
             when (f.mode) {
-                BinPacking.Mode.LoadVars -> model.addEquality(intVars[f.loadVars!![b]], load)
+                BinPacking.Mode.LoadVars -> model.addEquality(intVars[requireNotNull(f.loadVars)[b]], load)
                 BinPacking.Mode.UniformCapacity -> model.addLessOrEqual(load, f.uniformCapacity.toLong())
-                BinPacking.Mode.PerBinCapacity -> model.addLessOrEqual(load, f.capacities!![b].toLong())
+                BinPacking.Mode.PerBinCapacity -> model.addLessOrEqual(load, requireNotNull(f.capacities)[b].toLong())
             }
         }
     }
@@ -595,7 +595,7 @@ class OrToolsModel private constructor(
             val cols: Array<LinearArgument> =
                 if (cost4) {
                     val w = model.newIntVar(wLo.toLong(), wHi.toLong(), "mddw$i")
-                    wVars!!.add(w)
+                    requireNotNull(wVars).add(w)
                     arrayOf(q[i], intVars[f.seq[i]], q[i + 1], w)
                 } else {
                     arrayOf(q[i], intVars[f.seq[i]], q[i + 1])

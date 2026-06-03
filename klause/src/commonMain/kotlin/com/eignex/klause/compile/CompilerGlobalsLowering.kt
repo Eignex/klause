@@ -843,8 +843,8 @@ internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
 //  helpers
 // ----------------------------------------------------------------------------
 
-/** Look up the var-name for an int var id. */
-internal fun Compiler.Build.intVarNameById(id: Int): String = intVarIdByName.entries.first { it.value == id }.key
+/** Look up the var-name for an int var id (O(1) via the reverse index, #97). */
+internal fun Compiler.Build.intVarNameById(id: Int): String = idToIntName.getValue(id)
 
 /**
  * Materialise `name = Σ bools[i] (cast to int)` as a fresh int var (range [0, k]) plus a
@@ -854,7 +854,7 @@ internal fun Compiler.Build.materializeIntFromSumOfBools(name: String, bools: Li
     val k = bools.size
     val varName = "__sumb_${name}_${auxIntCounter++}"
     val id = newIntVar(IntDomain(0, k))
-    intVarIdByName[varName] = id
+    bindIntName(varName, id)
     if (bools.isEmpty()) {
         // Force to 0.
         assertExpr(IntCompare(IntRef(varName), IntCmpOp.EQ, IntLit(0)))
@@ -865,7 +865,7 @@ internal fun Compiler.Build.materializeIntFromSumOfBools(name: String, bools: Li
         for (b in bools) {
             val aname = "__b2i_${auxIntCounter++}"
             val aid = newIntVar(IntDomain(0, 1))
-            intVarIdByName[aname] = aid
+            bindIntName(aname, aid)
             // b ↔ aux = 1.
             assertExpr(Iff(b, IntCompare(IntRef(aname), IntCmpOp.EQ, IntLit(1))))
             terms += IntScale(-1, IntRef(aname))

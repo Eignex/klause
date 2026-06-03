@@ -30,19 +30,28 @@ enum class LinearOp {
  * variable, the integer value that on its own would put the sum on the right side of [bound],
  * clamped to the variable's domain.
  */
-class Linear(
-    /** Coefficients, parallel to [vars]. */
-    val coeffs: IntArray,
-    /** Integer variable ids, parallel to [coeffs]. */
-    val vars: IntArray,
+class Linear private constructor(
+    terms: CoalescedTerms,
     /** Relation between the weighted sum and [bound]. */
     val op: LinearOp,
     /** Right-hand-side bound. */
     val bound: Int,
 ) : LocalSearchFactor {
 
+    /** Integer variable ids, parallel to [coeffs]; each variable appears at most once. */
+    val vars: IntArray = terms.vars
+
+    /** Coefficients, parallel to [vars]. */
+    val coeffs: IntArray = terms.coeffs
+
+    /**
+     * `Σ coeffs[i] * vars[i] ⟨op⟩ bound`. Duplicate variables are coalesced (their coefficients
+     * summed) so the local-search payload stays consistent regardless of caller (issue #84).
+     */
+    constructor(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
+        this(coalesceLinearTerms(vars, coeffs), op, bound)
+
     init {
-        require(coeffs.size == vars.size) { "coeffs/vars length mismatch" }
         require(coeffs.isNotEmpty()) { "Linear must have at least one term" }
     }
 

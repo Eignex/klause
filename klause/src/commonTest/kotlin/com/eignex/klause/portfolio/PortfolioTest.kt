@@ -138,6 +138,36 @@ class PortfolioTest {
     }
 
     @Test
+    fun `minimize returns a sample consistent with the reported bound`() = runTest {
+        // #81 regression: the reported objectiveValue and the returned sample must agree. The fix
+        // swaps (bound, sample) in one CAS so they can never desync under a worker race; here we
+        // race several workers on a problem with multiple improving steps and verify the returned
+        // sample actually realises the reported bound (x + 2y, optimum 3 at x=3,y=0).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val workers = List(6) { i ->
+            PortfolioWorker.of(
+                "bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = i.toLong()), objective = obj,
+            ) { params, supplier ->
+                params.copy(objectiveBoundSupplier = supplier)
+            }
+        }
+        Portfolio(workers).use { p ->
+            val r = p.minimize()
+            val ws = assertIs<WithSample>(r)
+            val realised = ws.sample.ints[0] * 1.0 + ws.sample.ints[1] * 2.0
+            assertEquals(ws.objectiveValue, realised, "reported bound ${ws.objectiveValue} must match the sample's objective $realised")
+        }
+    }
+
+    @Test
     fun `builder minimize wires a per-worker objective across a mixed pool`() = runTest {
         // minimize x + 2y subject to x + y >= 3 — same as above, but built through
         // PortfolioBuilder with BOTH a per-worker LS objective and a backtrack (linear) objective

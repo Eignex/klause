@@ -82,6 +82,13 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
         val factors = mutableListOf<Factor>()
         val boolVarIdByName = mutableMapOf<String, Int>()
         val intVarIdByName = mutableMapOf<String, Int>()
+
+        // Reverse indices (id → name), kept in lock-step with the two forward maps via
+        // [bindIntName] / [bindBoolName]. They turn the per-node/per-edge reverse lookups in the
+        // global/set lowering from O(n) entry scans into O(1), so that lowering is no longer
+        // O(n²) in model size (#97).
+        val idToIntName = mutableMapOf<Int, String>()
+        val idToBoolName = mutableMapOf<Int, String>()
         val intDomains = mutableListOf<IntDomain>()
         val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
@@ -115,9 +122,9 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
         fun run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             for ((name, entry) in def.entries) {
                 when (entry) {
-                    is BoolSpec -> boolVarIdByName[name] = newBoolVar()
+                    is BoolSpec -> bindBoolName(name, newBoolVar())
 
-                    is PresenceSpec -> boolVarIdByName[name] = newBoolVar()
+                    is PresenceSpec -> bindBoolName(name, newBoolVar())
 
                     is NominalSpec -> {
                         val ids = LinkedHashMap<String, Int>()
@@ -129,7 +136,7 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
                         factors += Cardinality.exactlyOne(lits)
                     }
 
-                    is IntSpec -> intVarIdByName[name] = newIntVar(IntDomain(entry.min, entry.max))
+                    is IntSpec -> bindIntName(name, newIntVar(IntDomain(entry.min, entry.max)))
 
                     is SetSpec -> {
                         // Allocate one indicator bool per universe element. Universe is
@@ -157,7 +164,7 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
                         // backing) lands in [Problem.floatMetadata] so native-real backends
                         // (Z3) can use it.
                         val intId = newIntVar(IntDomain(0, entry.buckets - 1))
-                        intVarIdByName[name] = intId
+                        bindIntName(name, intId)
                         floatDecoders[name] = entry
                         val fid = floatMetaIntervals.size
                         floatVarIdByName[name] = fid
@@ -268,6 +275,22 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
         fun newIntVar(domain: IntDomain): Int {
             val id = numIntVars++
             intDomains += domain
+            return id
+        }
+
+        /** Register `name → id` for an int/float var and the reverse `id → name`. Every write to
+         *  [intVarIdByName] must go through here so [idToIntName] stays consistent (#97). */
+        fun bindIntName(name: String, id: Int): Int {
+            intVarIdByName[name] = id
+            idToIntName[id] = name
+            return id
+        }
+
+        /** Register `name → id` for a bool var and the reverse `id → name`. Every write to
+         *  [boolVarIdByName] must go through here so [idToBoolName] stays consistent (#97). */
+        fun bindBoolName(name: String, id: Int): Int {
+            boolVarIdByName[name] = id
+            idToBoolName[id] = name
             return id
         }
 
