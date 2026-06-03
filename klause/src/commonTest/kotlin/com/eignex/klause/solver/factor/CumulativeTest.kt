@@ -408,4 +408,26 @@ class CumulativeTest {
         )
         assertTrue(problem.propagate(Assumptions.None) is PropagationResult.Unsat)
     }
+
+    @Test
+    fun `edge-finding does not push a task that can run before the cluster`() {
+        // Regression guard for the unsound env(Θ)+e_i detection. Capacity 1. Task 0 is fixed
+        // at t=1 (dur 1, res 1) → busy [1, 2). Task 1 (dur 1, res 1, dom [0, 3]) can legitimately
+        // run at t=0, before task 0. The flat detection would force task 1 after task 0
+        // (start ≥ 2); the sound env(Θ ∪ {i}) insertion must leave t=0 feasible.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1),
+            durations = intArrayOf(1, 1),
+            resources = intArrayOf(1, 1),
+            capacity = 1,
+        )
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(1, 1), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val ok = problem.propagate(Assumptions(ints = mapOf(1 to 0)))
+        assertTrue(ok is PropagationResult.Implied, "task 1 at t=0 (before task 0) must stay feasible; got $ok")
+    }
 }

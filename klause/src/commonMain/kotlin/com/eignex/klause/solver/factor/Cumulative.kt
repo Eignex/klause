@@ -633,14 +633,17 @@ class Cumulative(
      * EST); it is checked for every τ including the full active set.
      *
      * **Edge-finding:** the rule
-     *   env(Θ_τ) + e_i > C · τ   ⇒   est(i) ≥ ⌈(env(Θ_τ) − (C − c_i) · τ) / c_i⌉
+     *   env(Θ_τ ∪ {i}) > C · τ   ⇒   est(i) ≥ ⌈(env(Θ_τ) − (C − c_i) · τ) / c_i⌉
      * for every task i with `lct(i) > τ`. The derivation is the standard
      * energy-conservation argument over `[est(Ω), τ]`: if Ω's energy plus i's full
      * energy would exceed the rectangle's capacity-area, i must end after Ω, which
      * forces i's earliest start up by however much room c_i leaves outside Ω's anchor.
+     * The detection inserts i into the tree (`env(Θ_τ ∪ {i})`) rather than flat-adding
+     * `e_i`, so a task whose est lets it run *before* Ω is not wrongly forced after it.
      *
-     * Cost is O(m²) where m = active task count (tasks with positive duration and
-     * resource): one inner sweep over outside tasks per distinct LCT value.
+     * Cost is O(m² log m) where m = active task count (tasks with positive duration and
+     * resource): one inner sweep over outside tasks per distinct LCT value, each probing
+     * the tree with an O(log m) insert/remove of the candidate.
      */
     private fun edgeFindingPass(state: PropagationState, effDur: IntArray, effRes: IntArray, effCap: Int): Boolean {
         if (n < 2 || effCap == 0) return true
@@ -692,7 +695,14 @@ class Cumulative(
                 val i = lctOrder[ki]
                 val eI = energies[i]
                 val cI = cs[i]
-                if (envTheta + eI <= capTau) continue
+                // Detection: env(Θ_τ ∪ {i}) > C·τ. Insert i (it is inactive — lct(i) > τ) so the
+                // envelope folds i's own est into the anchor, read it, then restore the tree.
+                // The flat `envTheta + e_i` upper-bounds env(Θ∪{i}) and over-detects when
+                // est_i < est(Ω) — wrongly forcing a task that could run before Θ to come after.
+                tree.activate(i, ests[i], eI)
+                val envWith = tree.envOfTheta()
+                tree.deactivate(i)
+                if (envWith <= capTau) continue
                 val numerator = envTheta - (effCap - cI).toLong() * tau.toLong()
                 if (numerator <= 0L) continue
                 val newEstL = (numerator + cI - 1L) / cI.toLong()
