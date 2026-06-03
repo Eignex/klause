@@ -119,6 +119,48 @@ class DimacsTest {
     }
 
     @Test
+    fun `old wcnf without top treats max-weight clause as hard`() {
+        // #86: header omits `top`. The Long.MAX_VALUE-weighted clause must be hard (not demoted to
+        // soft); the normal-weight clause stays soft.
+        val text = """
+            p wcnf 3 2
+            9223372036854775807 1 2 0
+            1 -1 0
+        """.trimIndent()
+        val w = Dimacs.parseWcnf(text)
+        assertEquals(3, w.numOriginalBoolVars)
+        // Only the single soft clause allocates a relaxation bool → 3 original + 1.
+        assertEquals(4, w.problem.numBoolVars)
+        // 1 hard clause + 1 relaxed soft clause.
+        assertEquals(2, w.problem.factors.size)
+        // The relaxation bool for the soft clause carries weight 1; no relaxation bool for the hard.
+        assertEquals(1.0, w.objective.boolWeights[3])
+    }
+
+    @Test
+    fun `old wcnf without top keeps normal-weight clauses soft`() {
+        // Sanity: a non-sentinel weight with no `top` stays soft (plain MaxSAT, no hard clauses).
+        val w = Dimacs.parseWcnf("p wcnf 2 1\n5 -1 0\n")
+        assertEquals(2, w.numOriginalBoolVars)
+        assertEquals(3, w.problem.numBoolVars) // 2 original + 1 relaxation bool
+        assertEquals(5.0, w.objective.boolWeights[2])
+    }
+
+    @Test
+    fun `wcnf rejects trailing tokens after the 0 terminator`() {
+        assertFails {
+            Dimacs.parseWcnf("p wcnf 2 1\n1 -1 0 99\n")
+        }
+    }
+
+    @Test
+    fun `wcnf rejects clause not terminated by 0`() {
+        assertFails {
+            Dimacs.parseWcnf("p wcnf 2 1\n1 -1 -2\n")
+        }
+    }
+
+    @Test
     fun `parses new maxsat format with h prefix`() {
         val text = """
             h 1 2 0

@@ -474,10 +474,10 @@ private fun Compiler.Build.indicatorBoolExpr(boolId: Int): BoolExpr {
     // The bool var already exists in [boolVarIdByName] indirectly via the set layout —
     // but the table is keyed by name, not id. Synthesise a name and register the
     // back-link on demand so [lowerToLit]/[BoolRef] work uniformly.
-    val name = boolVarIdByName.entries.firstOrNull { it.value == boolId }?.key
+    val name = idToBoolName[boolId]
         ?: run {
             val synth = "__set_ind_$boolId"
-            boolVarIdByName[synth] = boolId
+            bindBoolName(synth, boolId)
             synth
         }
     return BoolRef(name)

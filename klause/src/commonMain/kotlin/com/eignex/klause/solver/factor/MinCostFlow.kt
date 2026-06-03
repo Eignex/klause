@@ -126,16 +126,18 @@ class MinCostFlow(
             if (inMax - outMin < balN) return false
             for (a in inArcs[n]) {
                 val d = state.intDomains[flow[a]]
-                val maxAllowed = (outMax + balN - (inMin - d.min)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                // Clamp both ways before toInt(): a bound that overflows Int in either direction
+                // would otherwise wrap and tighten to a wrong (possibly unsound) value.
+                val maxAllowed = (outMax + balN - (inMin - d.min)).coerceIn(INT_MIN_L, INT_MAX_L).toInt()
                 if (!state.tightenIntMax(flow[a], maxAllowed, ant)) return false
-                val minRequired = (outMin + balN - (inMax - d.max)).coerceAtLeast(Int.MIN_VALUE.toLong()).toInt()
+                val minRequired = (outMin + balN - (inMax - d.max)).coerceIn(INT_MIN_L, INT_MAX_L).toInt()
                 if (!state.tightenIntMin(flow[a], minRequired, ant)) return false
             }
             for (a in outArcs[n]) {
                 val d = state.intDomains[flow[a]]
-                val maxAllowed = (inMax - balN - (outMin - d.min)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                val maxAllowed = (inMax - balN - (outMin - d.min)).coerceIn(INT_MIN_L, INT_MAX_L).toInt()
                 if (!state.tightenIntMax(flow[a], maxAllowed, ant)) return false
-                val minRequired = (inMin - balN - (outMax - d.max)).coerceAtLeast(Int.MIN_VALUE.toLong()).toInt()
+                val minRequired = (inMin - balN - (outMax - d.max)).coerceIn(INT_MIN_L, INT_MAX_L).toInt()
                 if (!state.tightenIntMin(flow[a], minRequired, ant)) return false
             }
         }
@@ -203,7 +205,11 @@ class MinCostFlow(
             // Now we need to route net = `supply` (positive = source, negative = sink), where
             // arc residual capacity is (ub - lb) at cost ww`a`. Sum supply must be 0 per
             // component (checked above).
-            val (feasible, sspCost, potential) = ssp(supply, ww, ub, lb)
+            // null ⇒ a negative-cost residual cycle was detected (always possible on pass 1, where
+            // weights are negated, whenever the graph has a directed cycle). SSP's bound and
+            // potentials are then unsound, so skip the entire SSP tightening: the trivial linear
+            // cost bounds already applied above remain valid, and doing less tightening is sound.
+            val (feasible, sspCost, potential) = ssp(supply, ww, ub, lb) ?: return true
             if (!feasible) return false
             val totalLb = (fixed + sspCost).coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
             if (pass == 0) {
@@ -244,8 +250,12 @@ class MinCostFlow(
      * negative = sink). Uses SPFA (Bellman-Ford in FIFO form) for shortest paths to support
      * negative weights. Returns (feasible, cost, finalPotentials). finalPotentials are valid
      * dual potentials yielding reduced costs ≥ 0 on every residual arc with leftover cap.
+     *
+     * Returns null if SPFA detects a negative-cost residual cycle (a node relaxed more than
+     * [numNodes] times): SSP is only sound on graphs without negative cycles, so the caller must
+     * skip its tightening rather than trust a wrong bound or loop forever.
      */
-    private fun ssp(supply: IntArray, w: IntArray, ub: IntArray, lb: IntArray): Triple<Boolean, Long, LongArray> {
+    private fun ssp(supply: IntArray, w: IntArray, ub: IntArray, lb: IntArray): Triple<Boolean, Long, LongArray>? {
         val n = numNodes
         val m = flow.size
         // Build per-node adjacency to residual arcs. For each original arc a we maintain a
@@ -277,6 +287,9 @@ class MinCostFlow(
             val prevArc = IntArray(n) { -1 }
             val prevNode = IntArray(n) { -1 }
             val inQueue = BooleanArray(n)
+            // SPFA negative-cycle guard: a node can be relaxed at most n-1 times in a graph with no
+            // negative cycle. More than n relaxations of any node proves a negative-cost cycle.
+            val relaxCount = IntArray(n)
             dist[src] = 0L
             val q = ArrayDeque<Int>()
             q.addLast(src)
@@ -305,6 +318,7 @@ class MinCostFlow(
                         prevArc[v] = e
                         prevNode[v] = u
                         if (!inQueue[v]) {
+                            if (++relaxCount[v] > n) return null // negative-cost residual cycle
                             q.addLast(v)
                             inQueue[v] = true
                         }
@@ -355,5 +369,10 @@ class MinCostFlow(
             for (i in 0 until n) if (dist[i] < inf) potential[i] += dist[i]
         }
         return Triple(true, totalCost, potential)
+    }
+
+    private companion object {
+        private const val INT_MIN_L: Long = Int.MIN_VALUE.toLong()
+        private const val INT_MAX_L: Long = Int.MAX_VALUE.toLong()
     }
 }
