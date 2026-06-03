@@ -7,15 +7,12 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SatisfyResult
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.satisfyUnderAssumptions
-import com.eignex.klause.util.IntArrayList
 
 /**
  * Totalizer-encoded core-guided MaxSAT optimiser for **unweighted** problems. Builds
@@ -68,11 +65,13 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
 
     fun minimize(softs: List<Soft>, params: BacktrackParams = BacktrackParams()): Result {
         if (softs.isEmpty()) {
-            return when (val r = BacktrackSolver(baseProblem).solve(params)) {
-                is SolveResult.Sat -> Result.Optimal(r.assignment, 0L)
-                is SolveResult.Unsat -> Result.Infeasible()
-                is SolveResult.Unknown -> Result.Unknown(r.reason, 0L)
-            }
+            return Oll.solveHardOnly(
+                baseProblem,
+                params,
+                onSat = { Result.Optimal(it, 0L) },
+                onUnsat = { Result.Infeasible() },
+                onUnknown = { Result.Unknown(it, 0L) },
+            )
         }
         val n = softs.size
         var nextBoolId = baseProblem.numBoolVars
@@ -86,7 +85,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
         // Relaxer clause per soft: (origLit ∨ selector). Setting selector=true relaxes
         // the soft (allowing origLit false); selector=false forces origLit true.
         for (i in 0 until n) {
-            factors.add(Clause(intArrayOf(softs[i].lit, Lit.make(selectors[i], positive = true))))
+            factors.add(Oll.relaxerClause(softs[i].lit, selectors[i]))
         }
         // Threshold reifications. min=k, max=n encodes "sum ≥ k": the aux bit is true
         // iff the count of relaxations meets or exceeds k.
@@ -108,6 +107,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
             factors = factors,
         )
         val solver = BacktrackSolver(problem)
+        val costSofts = softs.map { Oll.Soft(it.lit) }
 
         var lb = 0L
         while (lb <= n) {
@@ -120,7 +120,8 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
                 Assumptions.None
             }
             when (val r = solver.satisfyUnderAssumptions(assumptions, params)) {
-                is SatisfyResult.Sat -> return Result.Optimal(r.sample, lb)
+                is SatisfyResult.Sat ->
+                    return Result.Optimal(Oll.recoverOptimalSample(baseProblem, costSofts, r.sample, lb, params), lb)
 
                 is SatisfyResult.GloballyUnsat -> return Result.Infeasible()
 
@@ -139,80 +140,98 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
     }
 
     /**
-     * Weighted MaxSAT via a pseudo-Boolean threshold chain. For each integer threshold
-     * `k = 1..totalWeight`, a [ReifiedPseudoBoolean] reifies `aux_k ↔ (Σ wᵢ·rᵢ ≥ k)`;
-     * the OLL loop assumes `aux_{lb+1} = false` and bumps `lb` by the core's min weight
-     * each unsat. Termination: SAT under the current threshold-bit assumption.
+     * Weighted MaxSAT via a pseudo-Boolean threshold chain. Each threshold value `k` gets
+     * a [ReifiedPseudoBoolean] reifying `aux_k ↔ (Σ wᵢ·rᵢ ≥ k)`; the OLL loop assumes
+     * `aux_{lb+1} = false` (cost ≤ lb) and bumps `lb` by the core's min weight each unsat.
+     * Termination: SAT under the current threshold-bit assumption.
      *
-     * **Scope.** The encoding allocates one aux + one PB factor per integer ≤ total
-     * weight, so bake cost is `O(totalWeight · |softs|)`. Suitable for moderate weights;
-     * for sparse-large-weight instances (e.g. weights in the millions), prefer the
-     * Fu-Malik / RC2 path in [CoreGuidedOptimizer], which pays per-core rather than per
-     * threshold value.
+     * **Lazy thresholds (#91).** Only the `aux_{lb+1}` the loop actually assumes are
+     * materialised — one per OLL round as `lb` rises, so `O(#cores)` reifications rather
+     * than the `O(totalWeight)` up-front bake the chain would otherwise need. The solver is
+     * rebuilt when a fresh threshold is added (lb advances monotonically, so each round
+     * needs at most one new reification); the rebuild cost mirrors the per-core rebuild in
+     * [CoreGuidedOptimizer] and is far cheaper than baking thousands of unused PB factors.
      */
     fun minimizeWeighted(softs: List<WeightedSoft>, params: BacktrackParams = BacktrackParams()): Result {
         if (softs.isEmpty()) {
-            return when (val r = BacktrackSolver(baseProblem).solve(params)) {
-                is SolveResult.Sat -> Result.Optimal(r.assignment, 0L)
-                is SolveResult.Unsat -> Result.Infeasible()
-                is SolveResult.Unknown -> Result.Unknown(r.reason, 0L)
-            }
+            return Oll.solveHardOnly(
+                baseProblem,
+                params,
+                onSat = { Result.Optimal(it, 0L) },
+                onUnsat = { Result.Infeasible() },
+                onUnknown = { Result.Unknown(it, 0L) },
+            )
         }
         val n = softs.size
         val totalWeight = softs.sumOf { it.weight }
         require(totalWeight <= Int.MAX_VALUE) {
             "minimizeWeighted: sum of weights exceeds Int.MAX_VALUE — use CoreGuidedOptimizer for very large weights"
         }
-        val totalWeightInt = totalWeight.toInt()
         var nextBoolId = baseProblem.numBoolVars
         val selectors = IntArray(n) { nextBoolId++ }
-        // Threshold aux bits A_k = "weighted sum ≥ k" for k = 1..totalWeight.
-        val thresholds = IntArray(totalWeightInt) { nextBoolId++ }
 
-        val factors = ArrayList<Factor>(baseProblem.factors.size + n + totalWeightInt)
-        for (f in baseProblem.factors) factors.add(f)
-        for (i in 0 until n) {
-            factors.add(Clause(intArrayOf(softs[i].lit, Lit.make(selectors[i], positive = true))))
-        }
+        // Fixed factors: hard constraints + one relaxer clause per soft. Threshold
+        // reifications are appended lazily below as `lb` rises (#91).
+        val baseFactors = ArrayList<Factor>(baseProblem.factors.size + n)
+        for (f in baseProblem.factors) baseFactors.add(f)
+        for (i in 0 until n) baseFactors.add(Oll.relaxerClause(softs[i].lit, selectors[i]))
+
         val selectorLits = IntArray(n) { Lit.make(selectors[it], positive = true) }
         val weightsInt = IntArray(n) { softs[it].weight.toInt() }
-        for (k in 1..totalWeightInt) {
-            factors.add(
-                ReifiedPseudoBoolean(
-                    auxBoolVar = thresholds[k - 1],
-                    weights = weightsInt,
-                    literals = selectorLits,
-                    op = PbOp.GE,
-                    bound = k,
-                ),
-            )
+        val selectorToSoft = HashMap<Int, Int>(n).apply {
+            for (i in 0 until n) put(selectors[i], i)
         }
-        val problem = Problem(
-            numBoolVars = nextBoolId,
-            numIntVars = baseProblem.numIntVars,
-            intDomains = baseProblem.intDomains,
-            factors = factors,
-        )
-        val solver = BacktrackSolver(problem)
+        val costSofts = softs.map { Oll.Soft(it.lit, it.weight) }
+
+        // Materialised threshold reifications keyed by k (= "Σ wᵢrᵢ ≥ k"); `solver` is
+        // rebuilt (set null) whenever a new one is appended.
+        val thresholdVarForK = HashMap<Int, Int>()
+        val thresholdFactors = ArrayList<Factor>()
+        var solver: BacktrackSolver? = null
 
         // Soft selectors we still assume "= false" (don't relax). When a core mentions
         // some, we drop them — their relaxation can be claimed via the threshold bump.
         val activeSofts = BooleanArray(n) { true }
-        // Map selector var id → soft index, so we can project an assumption-core's
-        // selector lits back to soft indices when computing the per-core min weight.
-        val selectorToSoft = HashMap<Int, Int>(n).apply {
-            for (i in 0 until n) put(selectors[i], i)
-        }
 
         var lb = 0L
         while (lb <= totalWeight) {
-            val assumptions = buildWeightedAssumptions(
-                selectors = selectors,
-                activeSofts = activeSofts,
-                thresholdVar = if (lb < totalWeight) thresholds[lb.toInt()] else null,
-            )
-            when (val r = solver.satisfyUnderAssumptions(assumptions, params)) {
-                is SatisfyResult.Sat -> return Result.Optimal(r.sample, lb)
+            val thresholdVar: Int? = if (lb < totalWeight) {
+                // Need aux for k = lb+1 ("sum ≥ lb+1"); assuming it false bounds cost ≤ lb.
+                val k = (lb + 1).toInt()
+                thresholdVarForK.getOrPut(k) {
+                    val aux = nextBoolId++
+                    thresholdFactors.add(
+                        ReifiedPseudoBoolean(
+                            auxBoolVar = aux,
+                            weights = weightsInt,
+                            literals = selectorLits,
+                            op = PbOp.GE,
+                            bound = k,
+                        ),
+                    )
+                    solver = null // a fresh factor + bool var were added — force a rebuild
+                    aux
+                }
+            } else {
+                null
+            }
+            val activeSolver = solver ?: run {
+                val factors = ArrayList<Factor>(baseFactors.size + thresholdFactors.size)
+                factors.addAll(baseFactors)
+                factors.addAll(thresholdFactors)
+                BacktrackSolver(
+                    Problem(
+                        numBoolVars = nextBoolId,
+                        numIntVars = baseProblem.numIntVars,
+                        intDomains = baseProblem.intDomains,
+                        factors = factors,
+                    ),
+                ).also { solver = it }
+            }
+            val assumptions = buildWeightedAssumptions(selectors, activeSofts, thresholdVar)
+            when (val r = activeSolver.satisfyUnderAssumptions(assumptions, params)) {
+                is SatisfyResult.Sat ->
+                    return Result.Optimal(Oll.recoverOptimalSample(baseProblem, costSofts, r.sample, lb, params), lb)
 
                 is SatisfyResult.GloballyUnsat -> return Result.Infeasible()
 
@@ -220,7 +239,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
 
                 is SatisfyResult.UnsatUnderAssumptions -> {
                     // Project the assumption core back to soft indices.
-                    val coreSofts = projectCoreToSofts(r.core, selectorToSoft)
+                    val coreSofts = Oll.projectCoreToSofts(r.core, selectorToSoft)
                     if (coreSofts.isEmpty()) {
                         // Core involves only the threshold bit — bump lb by 1 (we
                         // can't derive a wMin without soft-level info, so the smallest
@@ -249,17 +268,5 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
         for (i in selectors.indices) if (activeSofts[i]) bools[selectors[i]] = false
         if (thresholdVar != null) bools[thresholdVar] = false
         return Assumptions(bools = bools)
-    }
-
-    private fun projectCoreToSofts(core: Assumptions, selectorToSoft: HashMap<Int, Int>): IntArray {
-        val out = IntArrayList()
-        for (i in core.boolKeys.indices) {
-            val id = core.boolKeys[i]
-            val softIdx = selectorToSoft[id] ?: continue
-            // Only count selectors that the core pins to `false` — that matches our
-            // "soft satisfied (selector = false)" assumption shape.
-            if (!core.boolValues[i]) out.add(softIdx)
-        }
-        return out.toIntArray()
     }
 }
