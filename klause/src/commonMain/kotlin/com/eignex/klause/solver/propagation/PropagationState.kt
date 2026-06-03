@@ -660,6 +660,51 @@ class PropagationState(
     fun atomCurrentTruth(atomId: Int): Boolean? =
         atomTruthOf(atomIntVar[atomId], atomKind[atomId], atomThreshold[atomId])
 
+    /**
+     * Decision level at which atom [atomId]'s **current** truth was established on the
+     * **current** search path — recomputed from the bound-change history
+     * ([minLevelForGe] / [maxLevelForLe]) rather than read off the drifted [atomLevel].
+     *
+     * [undoTo] re-derives an atom's truth from the restored domains but deliberately leaves
+     * [atomLevel] / [atomAntecedents] to drift (advisory, like watches). For a leaf atom that
+     * is harmless, but the [ConflictAnalyzer] reads the level of every atom it keeps or
+     * resolves through; a stale-from-a-deeper-path [atomLevel] there yields a wrong backjump
+     * level / LBD / asserting flag and an unsound learned clause (#76). The bound-change
+     * history, by contrast, is truncated on every undo and re-pushed on every tighten, so it
+     * always reflects the current path. The antecedents are not similarly recomputed because
+     * they are only read when an atom is resolved through — which happens only at its
+     * establishment level, where the truth-flip that established it already refreshed them via
+     * [propagateAtomsForVar].
+     *
+     * Falls back to the advisory [atomLevel] only when the atom is undetermined or its
+     * value sits in an interior hole with no bound history to consult.
+     */
+    internal fun atomLevelForConflict(atomId: Int): Int {
+        val v = atomIntVar[atomId]
+        val k = atomThreshold[atomId]
+        val truth = atomCurrentTruth(atomId) ?: return atomLevel[atomId]
+        return when (atomKind[atomId]) {
+            0 -> if (truth) minLevelForGe(v, k) else maxLevelForLe(v, k - 1)
+
+            // v ≥ k
+            1 -> if (truth) maxLevelForLe(v, k) else minLevelForGe(v, k + 1)
+
+            // v ≤ k
+            2 -> if (truth) { // v = k : true when the later of the two bounds reached k
+                maxOf(minLevelForGe(v, k), maxLevelForLe(v, k))
+            } else { // v ≠ k : established at the level k left the domain
+                val d = intDomains[v]
+                when {
+                    k < d.min -> minLevelForGe(v, k + 1)
+                    k > d.max -> maxLevelForLe(v, k - 1)
+                    else -> atomLevel[atomId] // interior hole — no bound history
+                }
+            }
+
+            else -> atomLevel[atomId]
+        }
+    }
+
     /** Unified truth lookup over bool literals and atom-lit literals. Returns `null`
      *  when undetermined. Pair with [Lit.evaluate] / explicit polarity branching to
      *  reason about literal truth. */
