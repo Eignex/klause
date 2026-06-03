@@ -85,6 +85,30 @@ class FloatArithmeticTest {
     }
 
     @Test
+    fun `strict less-than admits a bucket below a non-integral scaled bound`() {
+        // #83: 0.5 (bucket 10) satisfies 0.5 < 0.5000005, but a non-integral scaled bound
+        // (500000.5) lowered as floor(B)-1 wrongly excludes it. ceil(B)-1 keeps it.
+        class S : VariableSchema() {
+            val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
+
+            val c by constraint { rate lt 0.5000005 }
+        }
+        val schema = S()
+        val compiled = schema.compile()
+        val solver = LocalSearchSolver(compiled.problem)
+        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(50).toList()
+        assertTrue(samples.isNotEmpty())
+        for (s in samples) {
+            val rate = compiled.decode(schema.rate, s)
+            assertTrue(rate < 0.5000005, "rate=$rate admitted over the strict bound rate < 0.5000005")
+        }
+        assertTrue(
+            samples.any { compiled.decode(schema.rate, it) >= 0.5 - 1e-9 },
+            "bucket 0.5 satisfies 0.5 < 0.5000005 but was excluded by the strict lowering",
+        )
+    }
+
+    @Test
     fun `negative coefficient flips comparison`() {
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)

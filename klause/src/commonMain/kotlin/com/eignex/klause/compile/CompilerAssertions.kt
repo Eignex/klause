@@ -58,6 +58,8 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
+import kotlin.math.ceil
+import kotlin.math.floor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.Circuit as CircuitFactor
 import com.eignex.klause.solver.factor.Count as CountFactor
@@ -261,15 +263,15 @@ internal fun Compiler.Build.assertFloatLinear(c: FloatLinearConstraint) {
         intVarIds[i] = floatMetaIntVarIds[fid]
         scaledBound -= c.coeffs[i] * interval.lo
     }
-    // The scaled sum is integer-valued, so a strict `< bound` (resp. `>`) is exactly `≤ bound − 1`
-    // (resp. `≥ bound + 1`) in scaled-int units — nudge the rounded bound by one ULP of the scale so
-    // a solution sitting exactly on the boundary is correctly excluded (#83). Non-strict ops keep
-    // the rounded bound.
-    var scaledBoundLong = (scaledBound * scale).toLong()
-    when (c.op) {
-        IntCmpOp.LT -> scaledBoundLong -= 1
-        IntCmpOp.GT -> scaledBoundLong += 1
-        else -> {}
+    // The scaled sum is integer-valued, so for a real bound B (= scaledBound * scale) a strict
+    // `< B` is exactly `≤ ceil(B) − 1` and `> B` is `≥ floor(B) + 1`. Using ceil/floor (rather than
+    // truncate-then-±1) is correct when B is non-integral and for either sign (#83). Non-strict ops
+    // keep the truncated bound.
+    val scaledReal = scaledBound * scale
+    val scaledBoundLong = when (c.op) {
+        IntCmpOp.LT -> ceil(scaledReal).toLong() - 1
+        IntCmpOp.GT -> floor(scaledReal).toLong() + 1
+        else -> scaledReal.toLong()
     }
     val scaledBoundInt = scaledBoundLong.toInt()
     factors += Linear(scaledCoeffs, intVarIds, realOp, scaledBoundInt)
