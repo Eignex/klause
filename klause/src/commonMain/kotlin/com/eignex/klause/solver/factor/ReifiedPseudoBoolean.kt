@@ -44,39 +44,26 @@ class ReifiedPseudoBoolean(
     override val intVars: IntArray = EmptyIntArray
 
     /** Per-var signed weight (excluding [auxBoolVar]); aux flips don't shift the body sum. */
-    private val signedWeightByVar: IntIntMap = run {
-        val signs = HashMap<Int, Int>()
-        for (i in literals.indices) {
-            val v = Lit.variable(literals[i])
-            if (v == auxBoolVar) continue
-            val s = if (Lit.isPositive(literals[i])) weights[i] else -weights[i]
-            signs[v] = (signs[v] ?: 0) + s
-        }
-        IntIntMap.build(
-            keys = signs.keys.toIntArray(),
-            values = signs.values.toIntArray(),
-            absent = 0,
-        )
-    }
+    private val signedWeightByVar: IntIntMap = buildSignedWeightByVar(weights, literals, exclude = auxBoolVar)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0
+        var sum = 0L
         for (i in literals.indices) {
             if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
-                sum += weights[i]
+                sum += weights[i].toLong()
             }
         }
-        state.intPayload[factorId] = sum
+        state.longPayload[factorId] = sum
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val aux = state.assignment.boolValue(auxBoolVar)
-        return aux != predHolds(state.intPayload[factorId])
+        return aux != predHolds(state.longPayload[factorId])
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         val wasViolated = aux != predHolds(sum)
         if (boolVar == auxBoolVar) {
             return if (wasViolated) -1 else +1
@@ -89,14 +76,14 @@ class ReifiedPseudoBoolean(
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val oldSum = state.intPayload[factorId]
+        val oldSum = state.longPayload[factorId]
         if (boolVar == auxBoolVar) {
             val nowViolated = aux != predHolds(oldSum)
             return if (nowViolated) +1 else -1
         }
         val change = changeOnFlip(state, boolVar, current = false)
         val newSum = oldSum + change
-        state.intPayload[factorId] = newSum
+        state.longPayload[factorId] = newSum
         val wasViolated = aux != predHolds(oldSum)
         val nowViolated = aux != predHolds(newSum)
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
@@ -222,7 +209,7 @@ class ReifiedPseudoBoolean(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         if (aux == predHolds(sum)) return
         sink.addBoolFlip(auxBoolVar)
         val auxFlip = BoolFlip(auxBoolVar)
@@ -247,17 +234,9 @@ class ReifiedPseudoBoolean(
         }
     }
 
-    private fun predHolds(sum: Int): Boolean = when (op) {
-        PbOp.LE -> sum <= bound
-        PbOp.GE -> sum >= bound
-        PbOp.EQ -> sum == bound
-    }
+    private fun predHolds(sum: Long): Boolean = pbHolds(sum, op, bound)
 
-    private fun distanceToInRange(sum: Int): Int = when (op) {
-        PbOp.LE -> if (sum > bound) sum - bound else 0
-        PbOp.GE -> if (sum < bound) bound - sum else 0
-        PbOp.EQ -> if (sum >= bound) sum - bound else bound - sum
-    }
+    private fun distanceToInRange(sum: Long): Long = pbDistance(sum, op, bound)
 
     private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
         val signed = signedWeightByVar[boolVar]
@@ -273,10 +252,10 @@ class ReifiedPseudoBoolean(
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val newSum = state.intPayload[factorId]
+        val newSum = state.longPayload[factorId]
         val newAux = state.assignment.boolValue(auxBoolVar)
         val oldAux: Boolean
-        val oldSum: Int
+        val oldSum: Long
         if (flippedVar == auxBoolVar) {
             oldAux = !newAux
             oldSum = newSum

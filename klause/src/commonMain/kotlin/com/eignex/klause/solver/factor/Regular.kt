@@ -154,7 +154,10 @@ class Regular(
         setBit(forward, 0, q0 - 1)
         for (i in 0 until n) {
             // forward[i] empty ⇒ the prefix seq[0 until i] alone drove every state dead.
-            if (isLayerEmpty(forward, i)) { conflictVars = seq.copyOfRange(0, i); return false }
+            if (isLayerEmpty(forward, i)) {
+                conflictVars = seq.copyOfRange(0, i)
+                return false
+            }
             val d = state.intDomains[seq[i]]
             d.forEach { s ->
                 forEachStateInLayer(forward, i) { q ->

@@ -38,14 +38,14 @@ class ReifiedLinear(
     private val coeffLookup: CoeffLookup = CoeffLookup.build(vars, coeffs)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0
-        for (i in vars.indices) sum += coeffs[i] * state.assignment.intValue(vars[i])
-        state.intPayload[factorId] = sum
+        var sum = 0L
+        for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
+        state.longPayload[factorId] = sum
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val holds = holds(state.intPayload[factorId])
+        val holds = holds(state.longPayload[factorId])
         return aux != holds
     }
 
@@ -56,54 +56,37 @@ class ReifiedLinear(
      *  but the linear holds, the natural one-step repair is to flip the indicator, so the
      *  degree is 1 (pushing the sum out of the satisfied region is rarely the right move). */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeFor(state.intPayload[factorId], state.assignment.boolValue(auxBoolVar))
+        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar))
 
-    private fun degreeFor(sum: Int, aux: Boolean): Int {
+    private fun degreeFor(sum: Long, aux: Boolean): Int {
         val h = holds(sum)
         return when {
             aux == h -> 0
 
-            aux -> residual(sum)
+            // indicator wants it to hold; grade by how far off (shared residual)
+            aux -> linearResidual(sum, op, bound)
 
-            // indicator wants it to hold; grade by how far off
             else -> 1 // indicator wants it false but it holds; flip the aux
         }
     }
 
-    /** Distance the sum must move to satisfy the comparison, given it currently does not —
-     *  run through [compressViolation] so far-off reified linears don't dominate the cost. */
-    private fun residual(sum: Int): Int = when (op) {
-        LinearOp.LE -> compressViolation(sum.toLong() - bound)
-
-        // sum > bound
-        LinearOp.GE -> compressViolation(bound.toLong() - sum)
-
-        // sum < bound
-        LinearOp.EQ -> {
-            val d = sum.toLong() - bound
-            compressViolation(if (d < 0) -d else d)
-        }
-
-        LinearOp.NE -> 1 // sum == bound; one step off
-    }
-
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
         return degreeFor(sum, !aux) - degreeFor(sum, aux)
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         val coeff = coeffOf(intVar)
-        val newSum = sum + coeff * (newValue - state.assignment.intValue(intVar))
+        val newSum = sum + coeff.toLong() * (newValue - state.assignment.intValue(intVar))
         return degreeFor(newSum, aux) - degreeFor(sum, aux)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         // aux already flipped in the assignment; report Δdegree (cost is reconciled by the engine).
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
         return degreeFor(sum, aux) - degreeFor(sum, !aux)
     }
@@ -111,9 +94,9 @@ class ReifiedLinear(
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val coeff = coeffOf(intVar)
-        val oldSum = state.intPayload[factorId]
-        val newSum = oldSum + coeff * (state.assignment.intValue(intVar) - oldValue)
-        state.intPayload[factorId] = newSum
+        val oldSum = state.longPayload[factorId]
+        val newSum = oldSum + coeff.toLong() * (state.assignment.intValue(intVar) - oldValue)
+        state.longPayload[factorId] = newSum
         return degreeFor(newSum, aux) - degreeFor(oldSum, aux)
     }
 
@@ -192,7 +175,7 @@ class ReifiedLinear(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         if (aux == holds(sum)) return
         sink.addBoolFlip(auxBoolVar)
         val auxFlipMove = BoolFlip(auxBoolVar)
@@ -201,7 +184,7 @@ class ReifiedLinear(
             val c = coeffs[i]
             if (c == 0) continue
             val cur = state.assignment.intValue(v)
-            val sumWithout = sum - c * cur
+            val sumWithout = sum - c.toLong() * cur
             // Same-aux snap: shift body so the predicate matches the current aux. Routed
             // through the channeling-aware sink helper so any sibling reified-eq factors
             // on this var get their indicators flipped atomically — without this, LS sets
@@ -209,8 +192,8 @@ class ReifiedLinear(
             // which is the cascade that stalls course-period style decompositions.
             val targetSame = snapTarget(c, sumWithout, aux)
             if (targetSame != null) {
-                val clamped = state.problem.intDomains[v].clamp(targetSame)
-                if (clamped != cur && aux == holds(sumWithout + c * clamped)) {
+                val clamped = state.problem.intDomains[v].clampLong(targetSame)
+                if (clamped != cur && aux == holds(sumWithout + c.toLong() * clamped)) {
                     sink.addChannelingIntSet(state, v, clamped)
                 }
             }
@@ -219,75 +202,20 @@ class ReifiedLinear(
             // reification side benefit from atomic transitions to the other side.
             val targetOpp = snapTarget(c, sumWithout, !aux)
             if (targetOpp != null) {
-                val clamped = state.problem.intDomains[v].clamp(targetOpp)
-                if (clamped != cur && !aux == holds(sumWithout + c * clamped)) {
+                val clamped = state.problem.intDomains[v].clampLong(targetOpp)
+                if (clamped != cur && !aux == holds(sumWithout + c.toLong() * clamped)) {
                     sink.addCompound(listOf(auxFlipMove, IntSet(v, clamped)))
                 }
             }
         }
     }
 
-    private fun holds(sum: Int): Boolean = when (op) {
-        LinearOp.LE -> sum <= bound
-        LinearOp.EQ -> sum == bound
-        LinearOp.GE -> sum >= bound
-        LinearOp.NE -> sum != bound
-    }
+    private fun holds(sum: Long): Boolean = linearHolds(sum, op, bound)
 
     private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
 
-    private fun snapTarget(coeff: Int, sumWithout: Int, wantHolds: Boolean): Int? {
-        // For the canonical "want sum_with_v op bound" direction (wantHolds=true) the snap is
-        // the integer value that makes the equality hold. When wantHolds=false we snap to a
-        // value that violates the predicate by one unit.
-        val numerator = bound - sumWithout
-        if (coeff == 0) return null
-        val targetEq = numerator / coeff
-        return when (op) {
-            LinearOp.EQ -> when {
-                wantHolds && numerator % coeff != 0 -> null
-
-                // no integer satisfies coeff·v = numerator
-                wantHolds -> targetEq
-
-                else -> targetEq + 1
-            }
-
-            LinearOp.LE -> if (wantHolds) {
-                if (coeff > 0) floorDiv(numerator, coeff) else ceilDiv(numerator, coeff)
-            } else {
-                if (coeff > 0) floorDiv(numerator, coeff) + 1 else ceilDiv(numerator, coeff) - 1
-            }
-
-            LinearOp.GE -> if (wantHolds) {
-                if (coeff > 0) ceilDiv(numerator, coeff) else floorDiv(numerator, coeff)
-            } else {
-                if (coeff > 0) ceilDiv(numerator, coeff) - 1 else floorDiv(numerator, coeff) + 1
-            }
-
-            LinearOp.NE -> when {
-                // wantHolds (sum ≠ bound): bump var to either side of the equality value.
-                wantHolds -> if (numerator % coeff == 0) targetEq + 1 else null
-
-                // !wantHolds (sum == bound): only feasible if numerator divisible by coeff.
-                numerator % coeff == 0 -> targetEq
-
-                else -> null
-            }
-        }
-    }
-
-    private fun floorDiv(a: Int, b: Int): Int {
-        val q = a / b
-        val r = a % b
-        return if (r != 0 && (r xor b) < 0) q - 1 else q
-    }
-
-    private fun ceilDiv(a: Int, b: Int): Int {
-        val q = a / b
-        val r = a % b
-        return if (r != 0 && (r xor b) >= 0) q + 1 else q
-    }
+    private fun snapTarget(coeff: Int, sumWithout: Long, wantHolds: Boolean): Long? =
+        snapLinearTarget(op, bound, coeff, sumWithout, wantHolds)
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
@@ -295,7 +223,7 @@ class ReifiedLinear(
      *  aux always toggles violation (sum unchanged), so the aux's own contribution simply
      *  swaps between break and make. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val nowViolated = state.assignment.boolValue(auxBoolVar) != holds(state.intPayload[factorId])
+        val nowViolated = state.assignment.boolValue(auxBoolVar) != holds(state.longPayload[factorId])
         if (nowViolated) {
             state.boolBreakCount[auxBoolVar]--
             state.boolMakeCount[auxBoolVar]++
@@ -310,10 +238,10 @@ class ReifiedLinear(
     /** Aux's break/make contribution depends only on `holds(sum)` and `aux`. An int set
      *  may flip `holds`, in which case the aux's contribution swaps; otherwise no change. */
     override fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {
-        val newSum = state.intPayload[factorId]
+        val newSum = state.longPayload[factorId]
         val coeff = coeffOf(intVar)
         val newValue = state.assignment.intValue(intVar)
-        val oldSum = newSum - coeff * (newValue - oldValue)
+        val oldSum = newSum - coeff.toLong() * (newValue - oldValue)
         val oldHolds = holds(oldSum)
         val newHolds = holds(newSum)
         if (oldHolds == newHolds) return // aux contribution unchanged

@@ -44,43 +44,31 @@ class PseudoBoolean(
     /** Sum of `weight`i` * sign(literals`i`)` per Boolean variable. Flipping `v` shifts
      *  the running sum by `(if v_was_true then -signed[v] else +signed[v])`, computed in
      *  O(1) instead of scanning every literal in the factor. */
-    private val signedWeightByVar: IntIntMap = run {
-        val signs = HashMap<Int, Int>()
-        for (i in literals.indices) {
-            val v = Lit.variable(literals[i])
-            val s = if (Lit.isPositive(literals[i])) weights[i] else -weights[i]
-            signs[v] = (signs[v] ?: 0) + s
-        }
-        IntIntMap.build(
-            keys = signs.keys.toIntArray(),
-            values = signs.values.toIntArray(),
-            absent = 0,
-        )
-    }
+    private val signedWeightByVar: IntIntMap = buildSignedWeightByVar(weights, literals)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0
+        var sum = 0L
         for (i in literals.indices) {
             if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
-                sum += weights[i]
+                sum += weights[i].toLong()
             }
         }
-        state.intPayload[factorId] = sum
+        state.longPayload[factorId] = sum
     }
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violates(state.intPayload[factorId])
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violates(state.longPayload[factorId])
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val change = changeOnFlip(state, boolVar, current = true)
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         return (if (violates(sum + change)) 1 else 0) - (if (violates(sum)) 1 else 0)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val change = changeOnFlip(state, boolVar, current = false)
-        val oldSum = state.intPayload[factorId]
+        val oldSum = state.longPayload[factorId]
         val newSum = oldSum + change
-        state.intPayload[factorId] = newSum
+        state.longPayload[factorId] = newSum
         return (if (violates(newSum)) 1 else 0) - (if (violates(oldSum)) 1 else 0)
     }
 
@@ -96,7 +84,7 @@ class PseudoBoolean(
         pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = 0)
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         if (!violates(sum)) return
         val curDist = distance(sum)
         for (i in literals.indices) {
@@ -124,7 +112,7 @@ class PseudoBoolean(
      *  GE. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (literals.size < 2) return
-        val sum = state.intPayload[factorId]
+        val sum = state.longPayload[factorId]
         // Group literals by their (effective weight, current truth value). Effective
         // weight: positive lit → +weights`i`; negative lit → -weights`i`.
         // Sum-preserving swap: true-effwt-W + false-effwt-W. Equivalently match on
@@ -160,9 +148,9 @@ class PseudoBoolean(
         val slack = when (op) {
             PbOp.LE -> bound - sum
             PbOp.GE -> sum - bound
-            PbOp.EQ -> 0
+            PbOp.EQ -> 0L
         }
-        if (slack > 0) {
+        if (slack > 0L) {
             for (i in literals.indices) {
                 val lit = literals[i]
                 val v = Lit.variable(lit)
@@ -179,17 +167,9 @@ class PseudoBoolean(
         }
     }
 
-    private fun violates(sum: Int): Boolean = when (op) {
-        PbOp.LE -> sum > bound
-        PbOp.GE -> sum < bound
-        PbOp.EQ -> sum != bound
-    }
+    private fun violates(sum: Long): Boolean = !pbHolds(sum, op, bound)
 
-    private fun distance(sum: Int): Int = when (op) {
-        PbOp.LE -> if (sum > bound) sum - bound else 0
-        PbOp.GE -> if (sum < bound) bound - sum else 0
-        PbOp.EQ -> if (sum >= bound) sum - bound else bound - sum
-    }
+    private fun distance(sum: Long): Long = pbDistance(sum, op, bound)
 
     private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
         val signed = signedWeightByVar[boolVar]
@@ -214,7 +194,7 @@ class PseudoBoolean(
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val signedFlipped = signedWeightByVar[flippedVar]
         if (signedFlipped == 0) return
-        val newSum = state.intPayload[factorId]
+        val newSum = state.longPayload[factorId]
         val flippedPost = state.assignment.boolValue(flippedVar)
         val changeV = if (flippedPost) signedFlipped else -signedFlipped
         val oldSum = newSum - changeV

@@ -228,23 +228,47 @@ internal fun Compiler.Build.domainOf(expr: IntExpr): IntDomain = when (expr) {
     is IntLit -> IntDomain(expr.value, expr.value)
 
     is IntScale -> {
-        val c = expr.coeff
+        val c = expr.coeff.toLong()
         val d = domainOf(expr.child)
-        if (c >= 0) IntDomain(c * d.min, c * d.max) else IntDomain(c * d.max, c * d.min)
+        // Widen the constant fold to Long and require it fits Int — a wide coefficient times a
+        // wide domain otherwise wraps a 32-bit endpoint into a garbage domain (issue #73).
+        val lo: Long
+        val hi: Long
+        if (c >= 0) {
+            lo = c * d.min
+            hi = c * d.max
+        } else {
+            lo = c * d.max
+            hi = c * d.min
+        }
+        IntDomain(
+            checkedInt(lo) { "IntScale domain min ($c · ${d.min})" },
+            checkedInt(hi) { "IntScale domain max ($c · ${d.max})" },
+        )
     }
 
     is IntSum -> {
-        var lo = 0
-        var hi = 0
+        var lo = 0L
+        var hi = 0L
         for (ch in expr.children) {
             val d = domainOf(ch)
             lo += d.min
             hi += d.max
         }
-        IntDomain(lo, hi)
+        IntDomain(checkedInt(lo) { "IntSum domain min" }, checkedInt(hi) { "IntSum domain max" })
     }
 
     else -> error("domainOf called on non-affine expression: $expr")
+}
+
+/** Narrow a `Long` lowering intermediate to `Int`, throwing a clear compile error when it
+ *  doesn't fit — mirrors the overflow discipline already enforced in [liftMul] / [liftDivMod]
+ *  so an out-of-range scale/sum fails loudly instead of wrapping into a garbage value. */
+internal fun checkedInt(value: Long, what: () -> String): Int {
+    require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+        "Compiler lowering overflows Int: ${what()} = $value"
+    }
+    return value.toInt()
 }
 
 // Affine canonical form: Σ coeffs[name] * name + constant.
@@ -256,32 +280,47 @@ internal fun Compiler.Build.affine(expr: IntExpr): Affine = when (expr) {
     is IntLit -> Affine(emptyMap(), expr.value)
 
     is IntScale -> {
+        // Accumulate coefficients / constant in Long and narrow once, so a large literal or a
+        // wide coefficient can't wrap the Int product silently (issue #73).
         val a = affine(expr.child)
+        val c = expr.coeff.toLong()
         val coeffs = HashMap<String, Int>(a.coeffs.size)
-        for ((k, v) in a.coeffs) coeffs[k] = v * expr.coeff
-        Affine(coeffs, a.constant * expr.coeff)
+        for ((k, v) in a.coeffs) coeffs[k] = checkedInt(v * c) { "affine coeff for '$k' ($v · $c)" }
+        Affine(coeffs, checkedInt(a.constant * c) { "affine constant (${a.constant} · $c)" })
     }
 
     is IntSum -> {
-        val coeffs = HashMap<String, Int>()
-        var constant = 0
+        val coeffs = HashMap<String, Long>()
+        var constant = 0L
         for (c in expr.children) {
             val a = affine(c)
             constant += a.constant
-            for ((k, v) in a.coeffs) coeffs[k] = (coeffs[k] ?: 0) + v
+            for ((k, v) in a.coeffs) coeffs[k] = (coeffs[k] ?: 0L) + v
         }
-        coeffs.entries.removeAll { it.value == 0 }
-        Affine(coeffs, constant)
+        Affine(narrowCoeffs(coeffs), checkedInt(constant) { "affine sum constant" })
     }
 
     else -> error("affine() called on non-affine expression — caller must lift first: $expr")
 }
 
+/** Drop zero coefficients and narrow each surviving `Long` coefficient back to `Int`,
+ *  failing loudly on overflow (issue #73). */
+private fun narrowCoeffs(coeffs: Map<String, Long>): Map<String, Int> {
+    val out = HashMap<String, Int>(coeffs.size)
+    for ((k, v) in coeffs) {
+        if (v != 0L) out[k] = checkedInt(v) { "affine coeff for '$k'" }
+    }
+    return out
+}
+
 internal fun Compiler.Build.subtract(left: Affine, right: Affine): Affine {
-    val coeffs = HashMap(left.coeffs)
-    for ((k, v) in right.coeffs) coeffs[k] = (coeffs[k] ?: 0) - v
-    coeffs.entries.removeAll { it.value == 0 }
-    return Affine(coeffs, left.constant - right.constant)
+    val coeffs = HashMap<String, Long>(left.coeffs.size)
+    for ((k, v) in left.coeffs) coeffs[k] = v.toLong()
+    for ((k, v) in right.coeffs) coeffs[k] = (coeffs[k] ?: 0L) - v
+    return Affine(
+        narrowCoeffs(coeffs),
+        checkedInt(left.constant.toLong() - right.constant) { "affine subtract constant" },
+    )
 }
 
 internal fun Compiler.Build.coeffsToArrays(coeffs: Map<String, Int>): Pair<IntArray, IntArray> {

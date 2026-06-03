@@ -67,7 +67,7 @@ class IntFactorTest {
         state.assignment.setInt(1, 8)
         state.recompute()
         assertTrue(factor.isViolated(state, 0))
-        assertEquals(16, state.intPayload[0])
+        assertEquals(16L, state.longPayload[0])
 
         val sink = MoveSink()
         factor.proposeRepairMoves(state, 0, sink)

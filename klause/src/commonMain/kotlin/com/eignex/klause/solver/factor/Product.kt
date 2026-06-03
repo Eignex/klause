@@ -31,18 +31,18 @@ class Product(
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        return av * bv != rv
+        return av.toLong() * bv != rv.toLong()
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
-        val rv = state.assignment.intValue(result)
-        val was = av * bv != rv
+        val rv = state.assignment.intValue(result).toLong()
+        val was = av.toLong() * bv != rv
         val will = when (intVar) {
-            a -> newValue * bv != rv
-            b -> av * newValue != rv
-            result -> av * bv != newValue
+            a -> newValue.toLong() * bv != rv
+            b -> av.toLong() * newValue != rv
+            result -> av.toLong() * bv != newValue.toLong()
             else -> return 0
         }
         return (if (will) 1 else 0) - (if (was) 1 else 0)
@@ -51,12 +51,12 @@ class Product(
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
-        val rv = state.assignment.intValue(result)
-        val now = av * bv != rv
+        val rv = state.assignment.intValue(result).toLong()
+        val now = av.toLong() * bv != rv
         val was = when (intVar) {
-            a -> oldValue * bv != rv
-            b -> av * oldValue != rv
-            result -> av * bv != oldValue
+            a -> oldValue.toLong() * bv != rv
+            b -> av.toLong() * oldValue != rv
+            result -> av.toLong() * bv != oldValue.toLong()
             else -> return 0
         }
         return (if (now) 1 else 0) - (if (was) 1 else 0)
@@ -183,12 +183,12 @@ class Product(
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        if (av * bv == rv) return
+        if (av.toLong() * bv == rv.toLong()) return
         // Candidate 1: snap result = a*b.
-        val rTarget = av * bv
+        val rTarget = av.toLong() * bv
         val rDomain = state.problem.intDomains[result]
-        val rClamped = rDomain.clamp(rTarget)
-        if (rClamped == rTarget && rClamped != rv) sink.addChannelingIntSet(state, result, rClamped)
+        val rClamped = rDomain.clampLong(rTarget)
+        if (rClamped.toLong() == rTarget && rClamped != rv) sink.addChannelingIntSet(state, result, rClamped)
         // Candidate 2: if b ≠ 0 and result divisible by b, snap a = result/b.
         if (bv != 0 && rv % bv == 0) {
             val aTarget = rv / bv
