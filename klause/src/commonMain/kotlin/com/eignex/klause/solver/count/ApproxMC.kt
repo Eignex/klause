@@ -45,10 +45,8 @@ internal object ApproxMC {
             }
         }
         if (estimates.isEmpty()) {
-            // No iteration found a sub-threshold cell even at the finest hash level (e.g. every run
-            // hit the per-cell decision budget). Surface "unknown" — a lower bound of base.count with
-            // an unbounded upper and zero confidence — rather than fabricating base.count (≈thresh) as
-            // a point estimate for a count that may be astronomically larger (#79).
+            // No usable cell in any run (e.g. every run hit the per-cell decision budget). Surface
+            // "unknown" rather than fabricate base.count (≈thresh) as a point estimate (#79).
             val lo = base.count.toLong()
             return Count(estimate = lo, lower = lo, upper = Long.MAX_VALUE, exact = false, confidence = 0.0)
         }
@@ -63,16 +61,14 @@ internal object ApproxMC {
     private data class CoreResult(val estimate: Long, val mStar: Int)
 
     /**
-     * One ApproxMC iteration over a single nested hash sequence (prefix of length `m` gives the
-     * `m`-hash cell, `H_1 ⊂ … ⊂ H_n`). Because the cell count is non-increasing in `m`, "cell ≤
-     * thresh" flips false→true exactly once; a galloping + bisection search seeded from [startM]
-     * (the previous iteration's transition) finds that smallest fitting `m` in `O(log n)` solves
-     * instead of the `O(n)` linear scan (#92).
+     * One ApproxMC2 iteration over a nested hash sequence (`H_1 ⊂ … ⊂ H_n`). The cell count is
+     * non-increasing in `m`, so "cell ≤ thresh" flips false→true exactly once; a galloping +
+     * bisection search seeded from [startM] (the previous iteration's transition) finds the smallest
+     * fitting `m` in `O(log n)` solves instead of the `O(n)` linear scan (#92).
      *
-     * Returns the cell estimate `count · 2^m` at that `m`; if the cell over-split to empty there, it
-     * recovers with `thresh · 2^(m-1)` from the level just below (whose cell exceeded `thresh`)
-     * rather than discarding the run, which would bias the surviving median upward (#79). Returns
-     * `null` only when no prefix in `[1, n]` is sub-threshold.
+     * Returns `count · 2^m` at that `m`; on an empty (over-split) cell it recovers with
+     * `thresh · 2^(m-1)` from the level below rather than discarding the run, which would bias the
+     * median upward (#79). `null` only when no prefix in `[1, n]` is sub-threshold.
      */
     private fun core(ctx: CellContext, thresh: Int, seed: Long, startM: Int): CoreResult? {
         val n = ctx.hashDomain.size
@@ -80,12 +76,10 @@ internal object ApproxMC {
         val cache = HashMap<Int, CellResult>()
         fun cellAt(m: Int): CellResult = cache.getOrPut(m) { cellCount(ctx, allHashes.subList(0, m), cap = thresh) }
 
-        // fits(m): the m-hash cell holds ≤ thresh projections. Monotone non-decreasing in m. fits(0)
-        // is false by construction — the caller only invokes core when the un-hashed base is capped.
+        // fits(m): the m-hash cell holds ≤ thresh projections; fits(0) is false (caller checked base).
         fun fits(m: Int): Boolean = !cellAt(m).capped
 
-        // Bracket the transition with lo (largest known non-fitting) < hi (smallest known fitting),
-        // galloping out from the pivot so a good startM converges in a couple of solves.
+        // Gallop out from the pivot to bracket lo (largest known non-fitting) < hi (smallest fitting).
         val pivot = startM.coerceIn(1, n)
         val lo: Int
         var hi: Int
@@ -98,7 +92,7 @@ internal object ApproxMC {
                 step *= 2
                 probe -= step
             }
-            lo = probe.coerceAtLeast(0) // probe < 1 ⇒ bottomed out at the base (non-fitting)
+            lo = probe.coerceAtLeast(0)
         } else {
             var probe = pivot
             var step = 1
@@ -108,7 +102,7 @@ internal object ApproxMC {
                 step *= 2
                 hi += step
             }
-            if (hi > n) return null // even the finest cell stays over thresh — no usable estimate
+            if (hi > n) return null // finest cell still over thresh
             lo = probe
         }
         // Bisect (lo, hi]: !fits(lo), fits(hi).
@@ -122,9 +116,7 @@ internal object ApproxMC {
 
         val cell = cellAt(mStar)
         if (cell.count > 0) return CoreResult(cell.count.toLong() shl mStar, mStar)
-        // Empty cell: this prefix over-split. Recover from level mStar-1 (cell > thresh), estimating
-        // thresh · 2^(mStar-1); at mStar == 1 that degenerates to thresh (the base bound).
-        return CoreResult(thresh.toLong() shl (mStar - 1), mStar)
+        return CoreResult(thresh.toLong() shl (mStar - 1), mStar) // empty cell: recover from mStar-1
     }
 
     /** `thresh = 1 + 9.84·(1 + ε/(1+ε))·(1 + 1/ε)²`, rounded up. */
