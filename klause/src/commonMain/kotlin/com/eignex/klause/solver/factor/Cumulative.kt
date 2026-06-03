@@ -590,41 +590,16 @@ class Cumulative(
             }
         }
         if (!edgeFindingPass(state, effDur, effRes, effCap)) return false
-        val events = ArrayList<IntArray>(n * 2)
+        val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
             if (d == 0 || r == 0) continue
             val dom = state.intDomains[starts[i]]
-            val lst = dom.max
-            val ect = dom.min + d
-            if (lst < ect) {
-                events.add(intArrayOf(lst, +r))
-                events.add(intArrayOf(ect, -r))
-            }
+            profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
         }
-        events.sortWith(compareBy({ it[0] }, { -it[1] }))
-        val segFrom = IntArray(events.size)
-        val segTo = IntArray(events.size)
-        val segLevel = IntArray(events.size)
-        var segCount = 0
-        var level = 0
-        var cursor = if (events.isEmpty()) 0 else events[0][0]
-        for ((idx, ev) in events.withIndex()) {
-            val t = ev[0]
-            if (t > cursor && level > 0) {
-                segFrom[segCount] = cursor
-                segTo[segCount] = t
-                segLevel[segCount] = level
-                segCount++
-            }
-            level += ev[1]
-            cursor = t
-            if (idx == events.size - 1 || events[idx + 1][0] != t) {
-                if (level > effCap) return false
-            }
-        }
+        if (!profile.build(effCap)) return false
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
@@ -638,11 +613,7 @@ class Cumulative(
             val ownsMandatory = lstI < ectI
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
-                if (overloadsAt(
-                        segFrom, segTo, segLevel, segCount,
-                        newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI,
-                    )
-                ) {
+                if (profile.overloadsAt(newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI)) {
                     newMin++
                 } else {
                     break
@@ -653,11 +624,7 @@ class Cumulative(
             if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
-                if (overloadsAt(
-                        segFrom, segTo, segLevel, segCount,
-                        newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI,
-                    )
-                ) {
+                if (profile.overloadsAt(newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI)) {
                     newMax--
                 } else {
                     break
@@ -667,40 +634,6 @@ class Cumulative(
             if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
         }
         return true
-    }
-
-    /**
-     * Returns true iff placing a task (resource `r`, occupying `[s, s + d)`) anywhere in
-     * the mandatory-profile segments would push that segment over [capacity] — after
-     * subtracting the task's own already-contributed mandatory part on overlapping segments.
-     */
-    private fun overloadsAt(
-        segFrom: IntArray,
-        segTo: IntArray,
-        segLevel: IntArray,
-        segCount: Int,
-        s: Int,
-        sPlusD: Int,
-        r: Int,
-        cap: Int,
-        ownsMandatory: Boolean,
-        lstI: Int,
-        ectI: Int,
-    ): Boolean {
-        for (k in 0 until segCount) {
-            val from = segFrom[k]
-            val to = segTo[k]
-            val lvl = segLevel[k]
-            if (to <= s || from >= sPlusD) continue
-            var effective = lvl
-            if (ownsMandatory) {
-                val ovFrom = max(from, lstI)
-                val ovTo = min(to, ectI)
-                if (ovFrom < ovTo) effective -= r
-            }
-            if (effective + r > cap) return true
-        }
-        return false
     }
 
     /**

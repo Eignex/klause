@@ -128,39 +128,16 @@ class Disjunctive(
      *  level > 1; shave any non-fixed task's start endpoints if placement would create
      *  an additional unit-overlap with the mandatory profile. */
     private fun timeTable(state: PropagationState, effDur: IntArray): Boolean {
-        val events = ArrayList<IntArray>(n * 2)
+        // Capacity-1, unit-resource specialization of the shared mandatory profile.
+        val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             if (d == 0) continue
             val dom = state.intDomains[starts[i]]
-            val lst = dom.max
-            val ect = dom.min + d
-            if (lst < ect) {
-                events.add(intArrayOf(lst, +1))
-                events.add(intArrayOf(ect, -1))
-            }
+            profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1)
         }
-        events.sortWith(compareBy({ it[0] }, { -it[1] }))
-        // Sweep; capture segments where level > 0 (mandatory occupied).
-        val segFrom = IntArray(events.size)
-        val segTo = IntArray(events.size)
-        var segCount = 0
-        var level = 0
-        var cursor = if (events.isEmpty()) 0 else events[0][0]
-        for ((idx, ev) in events.withIndex()) {
-            val t = ev[0]
-            if (t > cursor && level > 0) {
-                segFrom[segCount] = cursor
-                segTo[segCount] = t
-                segCount++
-            }
-            level += ev[1]
-            cursor = t
-            if (idx == events.size - 1 || events[idx + 1][0] != t) {
-                if (level > 1) return false
-            }
-        }
+        if (!profile.build(cap = 1)) return false
         // Shave non-fixed tasks against the mandatory profile. Only definitely-present
         // tasks get tightened — unpinned-presence tasks might still vanish.
         for (i in 0 until n) {
@@ -176,7 +153,7 @@ class Disjunctive(
             // Tighten dom.min upward.
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
-                if (mandatoryConflicts(segFrom, segTo, segCount, newMin, newMin + d, ownsMandatory, lstI, ectI)) {
+                if (profile.overloadsAt(newMin, newMin + d, r = 1, cap = 1, ownsMandatory, lstI, ectI)) {
                     newMin++
                 } else {
                     break
@@ -187,7 +164,7 @@ class Disjunctive(
             // Tighten dom.max downward.
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
-                if (mandatoryConflicts(segFrom, segTo, segCount, newMax, newMax + d, ownsMandatory, lstI, ectI)) {
+                if (profile.overloadsAt(newMax, newMax + d, r = 1, cap = 1, ownsMandatory, lstI, ectI)) {
                     newMax--
                 } else {
                     break
@@ -204,34 +181,6 @@ class Disjunctive(
             }
         }
         return true
-    }
-
-    /** True iff placing a task `[s, sPlusD)` would coincide with any existing mandatory
-     *  segment (subtracting the task's own already-counted mandatory contribution). */
-    private fun mandatoryConflicts(
-        segFrom: IntArray,
-        segTo: IntArray,
-        segCount: Int,
-        s: Int,
-        sPlusD: Int,
-        ownsMandatory: Boolean,
-        lstI: Int,
-        ectI: Int,
-    ): Boolean {
-        for (k in 0 until segCount) {
-            val from = segFrom[k]
-            val to = segTo[k]
-            if (to <= s || from >= sPlusD) continue
-            if (ownsMandatory) {
-                // The task's own mandatory part shadows the segment; the placement only
-                // *adds* extra occupancy if the segment extends past this task's own
-                // mandatory window.
-                val outsideOwn = (from < lstI) || (to > ectI)
-                if (!outsideOwn) continue
-            }
-            return true
-        }
-        return false
     }
 
     /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
