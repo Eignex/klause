@@ -2248,7 +2248,12 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
     val dom = intDomains[xVar]
     val membershipLits = ArrayList<Int>()
     for (v in values) {
-        if (v < dom.min || v > dom.max) continue
+        // Skip values not in x's domain — including interior holes, not just values
+        // outside [min, max]. A hole value can never make x ∈ S true, so it contributes
+        // no membership literal; emitting a chan + ReifiedLinear(chan ↔ x = hole) for it
+        // is at best dead weight and accumulating many such forced-false reifications has
+        // tripped a false-UNSAT in the engine (klause `is/1YHXeG1xYs`).
+        if (v !in dom) continue
         val chan = allocBool("__set_in_lit_chan_${xVar}_$v")
         factors.add(
             ReifiedLinear(

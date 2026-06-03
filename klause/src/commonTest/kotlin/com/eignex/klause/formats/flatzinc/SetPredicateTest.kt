@@ -34,6 +34,28 @@ class SetPredicateTest {
     }
 
     @Test
+    fun `set_in over a hole domain skips hole values and stays satisfiable`() {
+        // Regression: set_in(x, lo..hi) lowers to one ReifiedLinear(chan = x==v) per value v
+        // in the range, OR-ed via atLeastOne. Values that are interior holes of x's domain
+        // can never satisfy x==v and must contribute no chan. They used to be emitted anyway
+        // (only out-of-[min,max] values were skipped); accumulating those forced-false
+        // reifications across several vars wrongly drove the engine to UNSAT — a false UNSAT
+        // on the MiniZinc Challenge `is/1YHXeG1xYs` instance. Each var below is independently
+        // satisfiable (only 31 lies in both the domain {0,31,32,33,34} and the range 1..31),
+        // so the conjunction is trivially SAT with every var = 31.
+        val decls = (0 until 6).joinToString("\n") { "var {0,31,32,33,34}: a$it;" }
+        val cons = (0 until 6).joinToString("\n") { "constraint set_in(a$it,1..31);" }
+        val src = "$decls\n$cons\nsolve satisfy;"
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        for (i in 0 until 6) {
+            val v = program.intVarsByName.getValue("a$i")
+            assertEquals(31, sat.assignment.ints[v], "a$i must be forced to 31")
+        }
+    }
+
+    @Test
     fun `set_in_reif channels bool to indicator`() {
         val src = """
             var bool: r;
