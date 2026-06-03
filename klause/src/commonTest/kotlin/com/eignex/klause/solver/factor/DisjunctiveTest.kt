@@ -97,6 +97,43 @@ class DisjunctiveTest {
     }
 
     @Test
+    fun `edge-finding pins a task forced to come first by tightening its latest start`() {
+        // Mirror of the "forced last" case, exercising the reflected-timeline (start.max)
+        // sweep. Three duration-2 tasks. Tasks 0 and 1 occupy the late cluster dom [1, 4]
+        // (est 1, lct 6, sum_dur 4 — fits [1, 6] with slack 1). Task 2 (dom [0, 4]) added to
+        // the union overflows the window, so it must end before all of {0, 1}, forcing
+        // start_2.max ≤ lct({0,1}) − sum_dur({0,1}) − dur_2 = 6 − 4 − 2 = 0. With dom_2 =
+        // [0, 4] task 2 collapses to {0}.
+        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(2, 2, 2))
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 4), IntDomain(1, 4), IntDomain(0, 4)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val result = problem.propagate(Assumptions.None)
+        assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
+        assertEquals(0, result.ints[2], "edge-finding should pin task 2's start to 0; implied=${result.ints}")
+    }
+
+    @Test
+    fun `edge-finding does not push a task that can run before the cluster`() {
+        // Regression guard for the unsound Env(Θ)+e_i shortcut: task 0 is pinned to t=1
+        // (mandatory part [1, 2)), task 1 (dur 1, dom [0, 3]) can legitimately run at t=0,
+        // before task 0. A flat-add detection would wrongly force task 1 after task 0
+        // (start ≥ 2); the sound Env(Θ ∪ {i}) insertion must leave t=0 reachable.
+        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(1, 1))
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(1, 1), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val ok = problem.propagate(Assumptions(ints = mapOf(1 to 0)))
+        assertTrue(ok is PropagationResult.Implied, "task 1 at t=0 (before task 0) must stay feasible; got $ok")
+    }
+
+    @Test
     fun `BacktrackSolver enumerates exactly the 6 disjunctive schedules of three unit tasks`() {
         val problem = threeUnitTasks()
         val solver = BacktrackSolver(problem)
