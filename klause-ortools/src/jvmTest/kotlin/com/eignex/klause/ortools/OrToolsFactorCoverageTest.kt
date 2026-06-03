@@ -142,21 +142,16 @@ class OrToolsFactorCoverageTest {
     }
 
     @Test fun `cumulative is satisfiable with a wide horizon`() {
+        // durations/resources are constants (not var ids). Two unit-demand tasks of duration 3
+        // under capacity 1 must not overlap; starts in [0,5] leave room (e.g. 0 and 3) → SAT.
         sat(
             problem(
-                6,
-                arrayOf(
-                    IntDomain(0, 5),
-                    IntDomain(0, 5),
-                    IntDomain(3, 3),
-                    IntDomain(3, 3),
-                    IntDomain(1, 1),
-                    IntDomain(1, 1),
-                ),
+                2,
+                arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
                 Cumulative(
                     starts = intArrayOf(0, 1),
-                    durations = intArrayOf(2, 3),
-                    resources = intArrayOf(4, 5),
+                    durations = intArrayOf(3, 3),
+                    resources = intArrayOf(1, 1),
                     capacity = 1,
                 ),
             ),
@@ -164,24 +159,37 @@ class OrToolsFactorCoverageTest {
     }
 
     @Test fun `cumulative is unsat when tasks cannot fit`() {
+        // Same tasks, but starts pinned to {0,1} force the two duration-3 tasks to overlap, so
+        // their combined demand 2 exceeds capacity 1 → UNSAT.
         val p = problem(
-            6,
-            arrayOf(
-                IntDomain(0, 1),
-                IntDomain(0, 1),
-                IntDomain(3, 3),
-                IntDomain(3, 3),
-                IntDomain(1, 1),
-                IntDomain(1, 1),
-            ),
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
             Cumulative(
                 starts = intArrayOf(0, 1),
-                durations = intArrayOf(2, 3),
-                resources = intArrayOf(4, 5),
+                durations = intArrayOf(3, 3),
+                resources = intArrayOf(1, 1),
                 capacity = 1,
             ),
         )
         assertTrue(OrToolsSolver(p).solve(OrToolsParams()) is SolveResult.Unsat)
+    }
+
+    @Test fun `cumulative constant durations and resources are not indexed as int vars`() {
+        // Regression for #119: durations/resources/capacity are constants. A constant value
+        // larger than the int-var count (here duration 7, demand 3 with a single start var) must
+        // be posted as a fixed value, not used to index the int-var array.
+        sat(
+            problem(
+                1,
+                arrayOf(IntDomain(0, 10)),
+                Cumulative(
+                    starts = intArrayOf(0),
+                    durations = intArrayOf(7),
+                    resources = intArrayOf(3),
+                    capacity = 5,
+                ),
+            ),
+        )
     }
 
     private fun boolProblem(numBool: Int, vararg fs: Factor) =

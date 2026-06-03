@@ -439,15 +439,28 @@ class OrToolsModel private constructor(
     }
 
     private fun postCumulative(f: Cumulative) {
-        val cc = model.addCumulative(f.capacity.toLong())
+        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
+        // durations/resources/capacity are constants; their var forms live in the *Vars arrays
+        // (empty = use the constant). Indexing intVars with the constant values is the #119 crash.
+        val durVars = f.durationVars.takeIf { it.isNotEmpty() }
+        val resVars = f.resourceVars.takeIf { it.isNotEmpty() }
+        val capacity = if (f.capacityVar >= 0) intVars[f.capacityVar] else LinearExpr.constant(f.capacity.toLong())
+        val cc = model.addCumulative(capacity)
         for (i in f.starts.indices) {
             val start = intVars[f.starts[i]]
-            val dur = intVars[f.durations[i]]
             val sd = problem.intDomains[f.starts[i]]
-            val dd = problem.intDomains[f.durations[i]]
-            val end = model.newIntVar((sd.min + dd.min).toLong(), (sd.max + dd.max).toLong(), "end$i")
-            val interval = model.newIntervalVar(start, dur, end, "task$i")
-            cc.addDemand(interval, intVars[f.resources[i]])
+            val interval = if (durVars != null) {
+                val dur = intVars[durVars[i]]
+                val dd = problem.intDomains[durVars[i]]
+                val end = model.newIntVar((sd.min + dd.min).toLong(), (sd.max + dd.max).toLong(), "end$i")
+                model.newIntervalVar(start, dur, end, "task$i")
+            } else {
+                val durConst = f.durations[i]
+                val end = model.newIntVar((sd.min + durConst).toLong(), (sd.max + durConst).toLong(), "end$i")
+                model.newIntervalVar(start, LinearExpr.constant(durConst.toLong()), end, "task$i")
+            }
+            val demand = if (resVars != null) intVars[resVars[i]] else LinearExpr.constant(f.resources[i].toLong())
+            cc.addDemand(interval, demand)
         }
     }
 
