@@ -54,11 +54,12 @@ object ParityMetric {
         val ref = System.getProperty("klause.bench.parity.reference")?.let { Reference.byId(it) } ?: Reference.of(reference)
         println()
         println("=== parity (klause backtrack vs ${ref.name} reference; checked against recorded expected) ===")
-        val rows = entries.map { row(it, budget, ref) }
-        for (r in rows) {
+        val rows = entries.map { entry ->
+            val r = row(entry, budget, ref)
             val mark = if (r.verdict == "OK") "ok " else "!! "
             println("$mark[${r.name}] ${r.kind} klause=${r.klause} ${r.referenceSolver}=${r.reference} expected=${r.expected}" +
                 if (r.detail.isNotEmpty()) " — ${r.detail}" else "")
+            r
         }
         val results = ParityResults(Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(), rows)
         Reports.writeJson("build/parity-report.json", results)
@@ -136,8 +137,14 @@ object ParityMetric {
         is MinimizeResult.Unknown -> "?"
     }
 
-    private fun errorRow(entry: ResolvedProblem, kind: String, verdict: String, ref: Reference, t: Throwable) = ParityRow(
-        entry.name, kind, verdict, "-", "-", ref.name, entry.ref.expected.toString(),
-        t.message?.take(160) ?: t::class.simpleName ?: "error",
-    )
+    private fun errorRow(entry: ResolvedProblem, kind: String, verdict: String, ref: Reference, t: Throwable): ParityRow {
+        if (System.getProperty("klause.bench.parity.trace")?.toBoolean() == true) {
+            System.err.println(">>> $verdict on ${entry.name}:")
+            t.printStackTrace()
+        }
+        return ParityRow(
+            entry.name, kind, verdict, "-", "-", ref.name, entry.ref.expected.toString(),
+            t.message?.take(160) ?: t::class.simpleName ?: "error",
+        )
+    }
 }
