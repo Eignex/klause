@@ -150,6 +150,7 @@ object AnytimeMetric {
             }
         } catch (e: Exception) {
             System.err.println("[anytime] solver aborted on this instance: ${e.message}")
+            if (System.getProperty("klause.bench.anytime.trace")?.toBoolean() == true) e.printStackTrace()
         }
         return Anytime(if (firstMs < 0) -1L else firstMs, if (bestMs < 0) -1L else bestMs, best, solutions, provedOptimal)
     }
