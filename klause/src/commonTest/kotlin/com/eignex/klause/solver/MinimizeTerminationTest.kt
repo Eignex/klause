@@ -3,7 +3,9 @@ package com.eignex.klause.solver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class MinimizeTerminationTest {
 
@@ -29,5 +31,62 @@ class MinimizeTerminationTest {
         ).assignment
         // Any feasible assignment is acceptable; we just verify it returned at all.
         assertNotNull(sample)
+    }
+
+    /**
+     * Regression (#94): cancellation fired *during* an objective-descent step must be
+     * honored promptly. A single greedy descent pass is O(numVars); on a large
+     * constraint-free problem (always feasible, so the descent runs every iteration) the
+     * inner per-var poll plus the per-step outer check must stop the search after probing
+     * far fewer than `numVars` candidates — not after a full scan, and not after spinning
+     * many bounded steps. With `maxFlips = MAX_VALUE` only cancellation can end the run.
+     */
+    @Test
+    fun `minimize honors cancellation fired mid-descent on a large objective`() {
+        val n = 4000
+        val problem = Problem(
+            numBoolVars = n,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = emptyArray(),
+        )
+        val solver = LocalSearchSolver(problem)
+        var deltaCalls = 0
+        // Incremental linear objective (weight 1 on every bool) that counts per-move probes,
+        // so we can observe how far the descent scanned before bailing.
+        val objective = object : IncrementalObjective {
+            override fun evaluate(sample: Sample): Double {
+                var total = 0.0
+                for (b in sample.bools) if (b) total += 1.0
+                return total
+            }
+
+            override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
+                deltaCalls++
+                return when (move) {
+                    is Move.BoolFlip -> if (assignment.boolValue(move.varId)) -1.0 else 1.0
+                    is Move.IntSet -> 0.0
+                    is Move.Compound -> move.parts.sumOf { deltaIfApplied(assignment, it) }
+                }
+            }
+        }
+        // Trip only once the descent has actually probed some moves — so the cancellation is
+        // observed *inside* the per-var descent loop (via its in-loop poll), independent of
+        // the exact poll call-ordering. Stays false through the pre-descent outer checks
+        // (deltaCalls == 0 until greedy descent starts probing).
+        val cancellation = Cancellation { deltaCalls >= 100 }
+        val result = solver.minimize(
+            objective,
+            LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 7L, cancellation = cancellation),
+        )
+        assertEquals(
+            TerminationReason.Cancelled,
+            (result as MinimizeResult.BestFound).reason,
+            "minimize should report Cancelled",
+        )
+        assertTrue(
+            deltaCalls in 1 until n,
+            "descent should bail mid-scan: expected 1..<$n probes, got $deltaCalls",
+        )
     }
 }
