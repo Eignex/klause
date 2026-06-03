@@ -521,12 +521,15 @@ class Cumulative(
      * with planning horizons in the tens of thousands.
      */
 
-    /** Conflict reason: starts-bound atoms of every task. Cumulative is bound-only
-     *  (sweep-line time-tabling tightens start mins/maxes, never excludes interior
-     *  start values), so citing the current bound atoms of every task captures the
-     *  full cause of any capacity-overload conflict. */
+    /** Conflict reason: bound atoms of every int var the propagator reads. The sweep is
+     *  bound-only over the *starts* (it tightens start mins/maxes, never excludes interior
+     *  start values), but [propagate] also snapshots and requires the fixed durations,
+     *  resources, and capacity — an overload/edge-finding failure can be driven by those
+     *  fixed values, so the reason must cite them too or the learned nogood is unsound and
+     *  can prune feasible space on backtrack. [intVars] is starts plus any
+     *  duration / resource / capacity vars. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, starts, excludeIdx = -1, extraLit = 0)
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
@@ -598,7 +601,9 @@ class Cumulative(
                 }
             }
             if (newMin > state.intDomains[v].max) return false
-            val ant = state.composeIntVarAtomAntecedents(starts)
+            // Cite all read int vars (starts + fixed durations/resources/capacity), not just
+            // starts — the shave can be driven by those fixed values (see [conflictReason]).
+            val ant = state.composeIntVarAtomAntecedents(intVars)
             if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
@@ -665,7 +670,9 @@ class Cumulative(
         val tree = CumulativeThetaTree(n = m, capacity = effCap)
         tree.setLeafOrder(leafPos)
         val capL = effCap.toLong()
-        val ant = state.composeIntVarAtomAntecedents(starts)
+        // Cite all read int vars — edge-finding deductions depend on the fixed durations /
+        // resources / capacity, not just the start bounds (see [conflictReason]).
+        val ant = state.composeIntVarAtomAntecedents(intVars)
 
         var k = 0
         while (k < m) {
