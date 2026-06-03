@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 
 /**
@@ -148,33 +149,100 @@ class Subcircuit(
             if (newHi != d.max && !state.tightenIntMax(v, newHi)) return false
         }
         if (n == 1) return true // single node: self-loop is the only choice, no constraint.
-        // 2. Pigeonhole on non-self-loop singletons: if succ[i] is fixed to j (j ≠ i),
-        //    then no other var can take j as its successor (the cycle has one entry per
-        //    node). Self-loop singletons (succ[i] = i, i.e. excluded) don't take a value
-        //    from other vars' domains.
-        val taker = IntArray(n) { -1 }
+        // Every prune below is global (Hamiltonian-over-included reasoning depends on the joint
+        // state of all succ vars), so union the antecedents once.
+        val ant = state.composeIntVarAtomAntecedents(succ)
+        // 2. Collect singletons. A fixed non-self successor (succ[i] = j ≠ i) claims target j — no
+        //    other var may also point at j (one entry per node). A self-loop (succ[i] = i) excludes
+        //    i and ALSO claims index i, because an excluded node has no predecessor in the cycle:
+        //    nobody else may point at it. A second claim on any value — including a successor aimed
+        //    at an excluded node — is a conflict (#90: the point-to-excluded case was previously
+        //    only graded in LS, never propagated).
+        val claimed = IntArray(n) { -1 }
+        val pred = IntArray(n) { -1 } // pred[target] = node whose fixed (non-self) successor is target
         for (i in succ.indices) {
-            val v = succ[i]
-            val d = state.intDomains[v]
-            if (d.min == d.max) {
-                val target = d.min
-                if (target == i) continue // self-loop → excluded; doesn't claim a target
-                if (taker[target] != -1) return false // two non-self singletons → same target
-                taker[target] = i
-            }
+            val d = state.intDomains[succ[i]]
+            if (d.min != d.max) continue
+            val target = d.min
+            if (claimed[target] != -1) return false
+            claimed[target] = i
+            if (target != i) pred[target] = i
         }
+        // 3. Shave every claimed value off the other vars' domain endpoints (pigeonhole + the
+        //    excluded-target rule fold together: both forbid pointing at a claimed index).
         for (i in succ.indices) {
             val v = succ[i]
             val d = state.intDomains[v]
             if (d.min == d.max) continue
             var newMin = d.min
-            while (newMin < d.max && taker[newMin] != -1 && taker[newMin] != i) newMin++
+            while (newMin < d.max && claimed[newMin] != -1 && claimed[newMin] != i) newMin++
             var newMax = d.max
-            while (newMax > newMin && taker[newMax] != -1 && taker[newMax] != i) newMax--
+            while (newMax > newMin && claimed[newMax] != -1 && claimed[newMax] != i) newMax--
             if (newMin > newMax) return false
-            val ant = state.composeIntVarAtomAntecedents(succ)
             if (newMin != d.min && !state.tightenIntMin(v, newMin, ant)) return false
             if (newMax != d.max && !state.tightenIntMax(v, newMax, ant)) return false
+        }
+        // 4. Count definitely-included nodes: a node whose domain excludes its own index can never
+        //    self-loop, so it must lie on the cycle. Re-read domains — step 3 may have tightened.
+        var includedCount = 0
+        for (i in succ.indices) {
+            val d = state.intDomains[succ[i]]
+            if (i < d.min || i > d.max) includedCount++
+        }
+        // 5. Closed fixed-edge sub-cycle: walk the singleton-successor graph. A closed cycle of
+        //    length L is a *complete* circuit over its L nodes; if more nodes are definitely
+        //    included they can never join it, so the assignment is infeasible. Catches premature
+        //    fully-pinned cycles, including two disjoint pinned cycles.
+        val visited = BooleanArray(n)
+        for (s in 0 until n) {
+            if (visited[s]) continue
+            val path = IntArrayList()
+            val onPath = BooleanArray(n)
+            var cur = s
+            while (cur in 0 until n && !visited[cur] && !onPath[cur]) {
+                val d = state.intDomains[succ[cur]]
+                if (d.min != d.max || d.min == cur) break // non-singleton or self-loop ends the chain
+                path.add(cur)
+                onPath[cur] = true
+                cur = d.min
+            }
+            if (cur in 0 until n && onPath[cur]) {
+                val cycleLen = path.size - path.indexOf(cur)
+                if (includedCount > cycleLen) return false
+            }
+            for (k in 0 until path.size) visited[path[k]] = true
+        }
+        // 6. Chain-walk forbid: for each open (non-singleton) node, follow its fixed-predecessor
+        //    chain back to the start. Closing succ[i] onto that start would seal a cycle of
+        //    `chainNodes` nodes; if more nodes are definitely included, sealing strands them, so
+        //    forbid the start value at the relevant domain endpoint.
+        for (i in succ.indices) {
+            val v = succ[i]
+            val d = state.intDomains[v]
+            if (d.min == d.max) continue
+            var start = i
+            var chainNodes = 1
+            var cur = i
+            while (true) {
+                val prev = pred[cur]
+                if (prev == -1 || prev == start) break // chain start, or a fixed cycle (handled in 5)
+                start = prev
+                chainNodes++
+                cur = prev
+                if (chainNodes > n) break
+            }
+            // start == i means the chain is just i (closing it is a self-loop = exclusion, always
+            // legal); only forbid when sealing a real cycle would strand included nodes.
+            if (start != i && includedCount > chainNodes) {
+                if (start == d.min && d.min < d.max) {
+                    if (!state.tightenIntMin(v, d.min + 1, ant)) return false
+                } else if (start == d.max && d.min < d.max) {
+                    if (!state.tightenIntMax(v, d.max - 1, ant)) return false
+                } else if (d.min == d.max && d.min == start) {
+                    return false
+                }
+                // interior start: a contiguous IntDomain can't punch a hole — left for LS / search.
+            }
         }
         return true
     }

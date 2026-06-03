@@ -216,7 +216,7 @@ internal fun Compiler.Build.liftAbs(child: IntExpr): IntExpr {
 
 internal fun Compiler.Build.newAuxIntVar(domain: IntDomain): String {
     val name = "__aux_int_${auxIntCounter++}"
-    intVarIdByName[name] = newIntVar(domain)
+    bindIntName(name, newIntVar(domain))
     return name
 }
 
