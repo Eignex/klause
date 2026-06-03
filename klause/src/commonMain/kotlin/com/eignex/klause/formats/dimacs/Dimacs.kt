@@ -16,6 +16,10 @@ import kotlin.math.abs
  */
 object Dimacs {
 
+    /** Hard-clause weight sentinel used when a `.wcnf` header omits `top`: a weight at or above
+     *  this is treated as a hard clause (the conventional very-large-weight encoding). */
+    private const val HARD_WEIGHT_SENTINEL: Long = Long.MAX_VALUE
+
     /** DIMACS CNF serialization. Empty clauses (compile-time false) are emitted as `0`. */
     fun write(cnf: CnfProblem): String {
         val sb = StringBuilder()
@@ -101,9 +105,10 @@ object Dimacs {
 
     /**
      * Parse `.wcnf` (Weighted Partial MaxSAT). Header is `p wcnf <nvars> <nclauses> [<top>]`.
-     * Each clause line: `<weight> <lit>* 0`. Clauses with weight equal to `top` (or any clause
-     * when `top` is absent and the weight is `Long.MAX_VALUE`-ish) are treated as hard. The 2014+
-     * "new" MaxSAT format with leading `h` for hard clauses is also accepted: `h <lit>* 0`.
+     * Each clause line: `<weight> <lit>* 0`. Clauses with weight ≥ `top` are hard; when `top` is
+     * absent (header omits it) the [HARD_WEIGHT_SENTINEL] (`Long.MAX_VALUE`) is used as the
+     * threshold, so a clause encoded with that sentinel weight stays hard. The 2014+ "new" MaxSAT
+     * format with leading `h` for hard clauses is also accepted: `h <lit>* 0`.
      */
     fun parseWcnf(text: String): WcnfProblem {
         var numVars = -1
@@ -140,22 +145,33 @@ object Dimacs {
             } else {
                 weight = tokens[0].toLongOrNull()
                     ?: error("Unparseable wcnf weight: '${tokens[0]}'")
-                isHard = top != null && weight >= top
+                // When the header declares `top`, weights ≥ top are hard. When it doesn't (old
+                // format with no top field, or a stray weighted line), fall back to the documented
+                // Long.MAX_VALUE hard sentinel so an explicitly-hard clause is still honoured rather
+                // than silently demoted to soft (#86).
+                isHard = weight >= (top ?: HARD_WEIGHT_SENTINEL)
                 litStart = 1
             }
             val lits = mutableListOf<Int>()
-            for (i in litStart until tokens.size) {
+            // Track that the loop actually reached the `0` terminator (and that nothing follows it)
+            // rather than re-scanning the tail for any "0" token, which let trailing garbage past.
+            var terminated = false
+            var i = litStart
+            while (i < tokens.size) {
                 val tok = tokens[i]
                 val lit = tok.toIntOrNull() ?: error("Unparseable wcnf literal: '$tok'")
-                if (lit == 0) break
+                i++
+                if (lit == 0) {
+                    terminated = true
+                    break
+                }
                 val v = abs(lit) - 1
                 if (!hasOldHeader && v + 1 > numVars) numVars = v + 1
                 require(v >= 0) { "Literal $lit out of range" }
                 lits.add(Lit.make(v, positive = lit > 0))
             }
-            require(tokens.subList(litStart, tokens.size).any { it == "0" }) {
-                "wcnf clause not terminated by 0: '$rawLine'"
-            }
+            require(terminated) { "wcnf clause not terminated by 0: '$rawLine'" }
+            require(i == tokens.size) { "wcnf clause has trailing tokens after 0: '$rawLine'" }
             if (isHard) {
                 hardClauses.add(Clause(lits.toIntArray()))
             } else {
