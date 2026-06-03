@@ -96,9 +96,15 @@ class ChocoModel private constructor(
 
             is Cardinality -> postCount(litVars(f.literals), f.min, f.max)
 
-            is Linear -> model.scalar(intVarsOf(f.vars), f.coeffs, opStr(f.op), f.bound).post()
+            is Linear -> {
+                requireScalarRepresentable(f, intScalarRange(f.vars, f.coeffs))
+                model.scalar(intVarsOf(f.vars), f.coeffs, opStr(f.op), f.bound).post()
+            }
 
-            is PseudoBoolean -> model.scalar(litVars(f.literals), f.weights, pbStr(f.op), f.bound).post()
+            is PseudoBoolean -> {
+                requireScalarRepresentable(f, weightScalarRange(f.weights))
+                model.scalar(litVars(f.literals), f.weights, pbStr(f.op), f.bound).post()
+            }
 
             is Xor -> postParity(litVars(f.literals), f.targetParity)
 
@@ -106,11 +112,15 @@ class ChocoModel private constructor(
 
             is Product -> model.times(intVars[f.a], intVars[f.b], intVars[f.result]).post()
 
-            is ReifiedLinear ->
+            is ReifiedLinear -> {
+                requireScalarRepresentable(f, intScalarRange(f.vars, f.coeffs))
                 model.scalar(intVarsOf(f.vars), f.coeffs, opStr(f.op), f.bound).reifyWith(boolVars[f.auxBoolVar])
+            }
 
-            is ReifiedPseudoBoolean ->
+            is ReifiedPseudoBoolean -> {
+                requireScalarRepresentable(f, weightScalarRange(f.weights))
                 model.scalar(litVars(f.literals), f.weights, pbStr(f.op), f.bound).reifyWith(boolVars[f.auxBoolVar])
+            }
 
             is ReifiedCardinality ->
                 countConstraint(litVars(f.literals), f.min, f.max).reifyWith(boolVars[f.auxBoolVar])
@@ -215,6 +225,42 @@ class ChocoModel private constructor(
     private fun postCount(vars: Array<IntVar>, min: Int, max: Int) {
         if (min > 0) model.sum(vars, ">=", min).post()
         if (max < vars.size) model.sum(vars, "<=", max).post()
+    }
+
+    /** Reachable `[lo, hi]` of `sum(coeffs[i] * intVars[vars[i]])` over the variables' domains. */
+    private fun intScalarRange(vars: IntArray, coeffs: IntArray): LongRange {
+        var lo = 0L
+        var hi = 0L
+        for (k in vars.indices) {
+            val d = problem.intDomains[vars[k]]
+            val c = coeffs[k].toLong()
+            val a = c * d.min
+            val b = c * d.max
+            lo += minOf(a, b)
+            hi += maxOf(a, b)
+        }
+        return lo..hi
+    }
+
+    /** Reachable `[lo, hi]` of a pseudo-Boolean weighted sum (each literal contributes 0 or its weight). */
+    private fun weightScalarRange(weights: IntArray): LongRange {
+        var lo = 0L
+        var hi = 0L
+        for (w in weights) {
+            if (w >= 0) hi += w.toLong() else lo += w.toLong()
+        }
+        return lo..hi
+    }
+
+    /** Choco materializes a scalar/lin-comb through an intermediate int var; it rejects any var
+     *  whose bound hits the int extremes or whose span reaches `Integer.MAX_VALUE` (#120). When
+     *  the reachable sum range exceeds that, the reference cannot faithfully model the factor, so
+     *  raise the explicit unsupported signal rather than letting Choco throw mid-build. */
+    private fun requireScalarRepresentable(f: Factor, range: LongRange) {
+        val limit = Int.MAX_VALUE.toLong()
+        if (range.first <= Int.MIN_VALUE.toLong() || range.last >= limit || range.last - range.first >= limit) {
+            throw UnsupportedFactorException(f)
+        }
     }
 
     /** A single reifiable constraint capturing `min <= sum(vars) <= max`, via a sum var. */
@@ -479,6 +525,10 @@ class ChocoModel private constructor(
 
     /** Factory for building a [ChocoModel] from a klause [Problem]. */
     companion object {
+        /** Contiguous int domains at least this wide are built as bounded (interval) Choco vars
+         *  rather than enumerated bitsets, which Choco rejects past a few tens of thousands. */
+        private const val MAX_ENUMERATED_SPAN = 1 shl 16
+
         /** Translate [problem] into a [ChocoModel] by posting every factor as a Choco constraint. */
         fun build(problem: Problem): ChocoModel {
             val model = Model("klause-choco")
@@ -487,7 +537,11 @@ class ChocoModel private constructor(
                 val d = problem.intDomains[i]
                 // Use explicit value enumeration when the domain has interior holes.
                 if (d.size == d.max - d.min + 1) {
-                    model.intVar("i$i", d.min, d.max)
+                    // A wide contiguous range as an enumerated bitset trips Choco's "too large
+                    // domain" guard (#120). Use the bounded (interval) representation instead —
+                    // sound here because there are no holes to track.
+                    val bounded = d.max.toLong() - d.min.toLong() >= MAX_ENUMERATED_SPAN
+                    model.intVar("i$i", d.min, d.max, bounded)
                 } else {
                     val values = ArrayList<Int>(d.size)
                     d.forEach { values.add(it) }
