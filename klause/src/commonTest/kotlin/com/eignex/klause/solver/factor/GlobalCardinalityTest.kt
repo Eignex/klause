@@ -29,7 +29,7 @@ class GlobalCardinalityTest {
      * enumeration must equal brute force; an unsound reason drops a feasible assignment.
      */
     @Test
-    fun `backtrack learning enumerates exactly the brute-force solution set (low-up)`() {
+    fun `backtrack learning enumerates exactly the brute-force solution set with low-up bounds`() {
         val instances = listOf(
             LowUpInst(listOf(0 to 1, 0 to 1, 0 to 1), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(1, 1), false),
             LowUpInst(listOf(0 to 2, 0 to 2, 0 to 2), intArrayOf(0, 1, 2), intArrayOf(1, 1, 1), intArrayOf(1, 1, 1), false),
@@ -90,7 +90,7 @@ class GlobalCardinalityTest {
 
     /** Soundness gate for the count-var (`countVars[k] = #{xs=cover[k]}`) form. */
     @Test
-    fun `backtrack learning enumerates exactly the brute-force solution set (count vars)`() {
+    fun `backtrack learning enumerates exactly the brute-force solution set with count vars`() {
         val n = 3
         val cover = intArrayOf(0, 1)
         val m = cover.size
