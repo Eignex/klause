@@ -564,31 +564,9 @@ class Cumulative(
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             if (effDur[i] > 0 && effRes[i] > effCap) return false
         }
-        // Overload check (Vilím 2002 / Schutt-Feydy-Stuckey 2009 simplified). For each
-        // anchor LCT τ, let Ω(τ) = { j : LCT(j) ≤ τ }; if Σ_{j∈Ω} dur(j)·res(j) exceeds
-        // capacity · (τ − EST(Ω)), the instance is infeasible.
-        run {
-            val idx = IntArray(n) { it }
-            val lcts = IntArray(n) { i ->
-                val d = state.intDomains[starts[i]]
-                d.max + effDur[i]
-            }
-            val ests = IntArray(n) { i -> state.intDomains[starts[i]].min }
-            val sorted = idx.sortedBy { lcts[it] }.toIntArray()
-            var totalEnergy = 0L
-            var minEst = Int.MAX_VALUE
-            for (k in 0 until n) {
-                val j = sorted[k]
-                if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
-                val e = effDur[j].toLong() * effRes[j].toLong()
-                if (e == 0L) continue
-                totalEnergy += e
-                if (ests[j] < minEst) minEst = ests[j]
-                val tau = lcts[j]
-                val slack = (tau.toLong() - minEst.toLong()) * effCap.toLong()
-                if (totalEnergy > slack) return false
-            }
-        }
+        // Overload + edge-finding, both driven off the Θ-tree max-envelope (the overload
+        // failure test is the envelope check `env(Θ_τ) > C·τ`, strictly tighter than the
+        // old scalar full-prefix sweep — it catches every energy-concentrated sub-window).
         if (!edgeFindingPass(state, effDur, effRes, effCap)) return false
         val profile = MandatoryProfile()
         for (i in 0 until n) {
@@ -637,12 +615,19 @@ class Cumulative(
     }
 
     /**
-     * Vilím cumulative edge-finding using [CumulativeThetaTree].
+     * Vilím cumulative overload + edge-finding using [CumulativeThetaTree].
      *
      * For each LCT threshold τ (swept in ascending order), the tree's active set Θ_τ
      * contains every task j with `lct(j) ≤ τ`, and the root envelope
      *   env(Θ_τ) = max_{Ω ⊆ Θ_τ, Ω ≠ ∅} (C · est(Ω) + e(Ω))
-     * captures the worst-case energy concentration at any anchor inside Θ_τ. The rule:
+     * captures the worst-case energy concentration at any anchor inside Θ_τ.
+     *
+     * **Overload:** `env(Θ_τ) > C · τ` means some Ω's energy can't fit in `[est(Ω), τ]` at
+     * capacity C — the instance is infeasible. This single envelope test subsumes the
+     * weaker scalar full-prefix sweep it replaced (which only anchored at the global min
+     * EST); it is checked for every τ including the full active set.
+     *
+     * **Edge-finding:** the rule
      *   env(Θ_τ) + e_i > C · τ   ⇒   est(i) ≥ ⌈(env(Θ_τ) − (C − c_i) · τ) / c_i⌉
      * for every task i with `lct(i) > τ`. The derivation is the standard
      * energy-conservation argument over `[est(Ω), τ]`: if Ω's energy plus i's full
@@ -690,9 +675,12 @@ class Cumulative(
                 tree.activate(j, ests[j], energies[j])
                 k++
             }
-            if (k >= m) break
             val envTheta = tree.envOfTheta()
             val capTau = capL * tau.toLong()
+            // Overload: env(Θ_τ) = max_{Ω⊆Θ_τ} (C·est(Ω) + e(Ω)); if it exceeds C·τ some
+            // subset's energy can't fit in [est(Ω), τ] at capacity C — infeasible. Runs for
+            // every τ including the full set (k == m), where edge-finding below is a no-op.
+            if (envTheta > capTau) return false
             for (ki in k until m) {
                 val i = lctOrder[ki]
                 val eI = energies[i]

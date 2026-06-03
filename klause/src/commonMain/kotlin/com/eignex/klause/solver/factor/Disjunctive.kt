@@ -34,8 +34,14 @@ import kotlin.math.min
  *     all of `Ω`, so `start_i.min ≥ est(Ω) + sum_dur(Ω)`. Symmetric pass on est-sorted
  *     suffixes tightens `start_i.max ≤ lct(Ω) − sum_dur(Ω) − dur_i`.
  *
- * Together (1)+(2)+(3) match Choco's `disjunctive(default)` strength on classical JSP
- * benchmarks.
+ * Together (1)+(2)+(3) catch the JSP / RCPSP disjunctive patterns SMT scheduling
+ * decompositions lean on, but the edge-finding pass (3) is the Carlier-Pinson "lite"
+ * relaxation — it always pushes to `est(Ω) + sum_dur(Ω)` rather than the Θ-tree
+ * maximum-over-subsets bound (see the note on [edgeFinding]) — so this is *not* full
+ * Θ-tree-tight unary reasoning and does not match Choco's `disjunctive(default)` in all
+ * cases. Routing (3) through a unary Θ-Λ tree (the sound envelope edge-finder; the plain
+ * [CumulativeThetaTree] `Env(Θ)+e_i` shortcut over-detects when `est_i < est(Ω)`) is the
+ * remaining tightening.
  *
  * Variable durations aren't supported yet (matches [Cumulative]). All complexity figures
  * are per propagator call; the deductive engine iterates to fixpoint via the worklist.
