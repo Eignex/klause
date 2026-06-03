@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -167,8 +168,24 @@ class Inverse(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, conflictVars ?: intVars)
 
+    /** Cached domain refs (f then g) at the last successful propagate. The O(n²) value-removal
+     *  sweep reprocesses only rows/columns whose domain reference changed since this baseline;
+     *  unchanged pairs were already consistent and stay so. A var pruned during a call has its
+     *  cache entry nulled so its row/column is rechecked next fire — cascades are caught across
+     *  fires (the engine re-queues on any prune), reaching the same fixpoint as the full sweep.
+     *  Backtrack-safe via [snapshotCopy]. */
+    private class InverseCache(val refs: Array<IntDomain?>) : PropagationState.SnapshottablePayload {
+        override fun snapshotCopy(): InverseCache = InverseCache(refs.copyOf())
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         conflictVars = null // stale-guard; set at each failure point below.
+        val cache = (state.refPayload[factorId] as? InverseCache) ?: run {
+            val fresh = InverseCache(arrayOfNulls(intVars.size))
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        val entryRefs = Array(intVars.size) { state.intDomains[intVars[it]] }
         // Range tightens are structural (no input antecedents). A failure means that one var
         // alone cannot reach the legal index span, so it is the sole reason.
         val gLo = gOffset
@@ -236,29 +253,48 @@ class Inverse(
         // Bidirectional value removal: for each (i, gIdx) where gIdx is in range, the
         // channel forces "j+gOffset in dom(f[i])  iff  i+fOffset in dom(g[gIdx])".
         // Whichever side has the value missing, remove from the other. A wipe-out failure
-        // implicates exactly the channel pair (f[i], g[gIdx]).
-        for (i in f.indices) {
-            val df = state.intDomains[f[i]]
-            for (gIdx in g.indices) {
-                val jVal = gIdx + gOffset // value f[i] would take to point to g[gIdx]
-                val iVal = i + fOffset // value g[gIdx] would take to point back to f[i]
-                val dg = state.intDomains[g[gIdx]]
-                val fHas = jVal in df
-                val gHas = iVal in dg
-                if (fHas && !gHas) {
-                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
-                    if (!state.excludeIntValue(f[i], jVal, ant)) {
-                        conflictVars = intArrayOf(f[i], g[gIdx])
-                        return false
-                    }
-                } else if (!fHas && gHas) {
-                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
-                    if (!state.excludeIntValue(g[gIdx], iVal, ant)) {
-                        conflictVars = intArrayOf(f[i], g[gIdx])
-                        return false
-                    }
+        // implicates exactly the channel pair (f[i], g[gIdx]). Incremental: a pair only needs
+        // reprocessing when one of its two endpoints' domains changed vs the cached baseline,
+        // so we sweep only changed rows and changed columns (each pair once).
+        val fn = f.size
+        fun fChanged(i: Int) = cache.refs[i] !== state.intDomains[f[i]]
+        fun gChanged(j: Int) = cache.refs[fn + j] !== state.intDomains[g[j]]
+        fun pair(i: Int, gIdx: Int): Boolean {
+            val jVal = gIdx + gOffset // value f[i] would take to point to g[gIdx]
+            val iVal = i + fOffset // value g[gIdx] would take to point back to f[i]
+            val fHas = jVal in state.intDomains[f[i]]
+            val gHas = iVal in state.intDomains[g[gIdx]]
+            if (fHas && !gHas) {
+                val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
+                if (!state.excludeIntValue(f[i], jVal, ant)) {
+                    conflictVars = intArrayOf(f[i], g[gIdx])
+                    return false
+                }
+            } else if (!fHas && gHas) {
+                val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
+                if (!state.excludeIntValue(g[gIdx], iVal, ant)) {
+                    conflictVars = intArrayOf(f[i], g[gIdx])
+                    return false
                 }
             }
+            return true
+        }
+        for (i in f.indices) {
+            if (!fChanged(i)) continue
+            for (gIdx in g.indices) if (!pair(i, gIdx)) return false
+        }
+        for (gIdx in g.indices) {
+            if (!gChanged(gIdx)) continue
+            for (i in f.indices) {
+                if (fChanged(i)) continue // already handled in the changed-row sweep
+                if (!pair(i, gIdx)) return false
+            }
+        }
+        // Record the post-prune baseline. A var pruned this call (ref differs from entry) is
+        // nulled so its row/column is rechecked next fire, propagating cascades to fixpoint.
+        for (k in intVars.indices) {
+            val cur = state.intDomains[intVars[k]]
+            cache.refs[k] = if (entryRefs[k] !== cur) null else cur
         }
         return true
     }

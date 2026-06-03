@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -150,8 +151,32 @@ class ArgSort(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
+    /** Cached domain refs at the last successful propagate. When no participating domain's
+     *  reference changed, the previous fixpoint still holds and the (matching-based) sweep is
+     *  skipped — the rebuild is the expensive part. Backtrack-safe via [snapshotCopy]. */
+    private class ArgSortState(val cached: Array<IntDomain?>) : PropagationState.SnapshottablePayload {
+        override fun snapshotCopy(): ArgSortState = ArgSortState(cached.copyOf())
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = perm.size
+        // Incremental fast path (cf. Mdd): skip the whole sweep — including the Régin rebuild
+        // below — when nothing changed since the last fire.
+        val payload = (state.refPayload[factorId] as? ArgSortState) ?: run {
+            val fresh = ArgSortState(arrayOfNulls(intVars.size))
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        var changed = payload.cached[0] == null
+        if (!changed) {
+            for (k in intVars.indices) {
+                if (payload.cached[k] !== state.intDomains[intVars[k]]) {
+                    changed = true
+                    break
+                }
+            }
+        }
+        if (!changed) return true
         val ant = state.composeIntVarAtomAntecedents(intVars)
         // perm entries in range.
         for (p in perm) {
@@ -210,6 +235,8 @@ class ArgSort(
                 }
             }
         }
+        // Record post-prune refs so the next fire can detect a true fixpoint.
+        for (k in intVars.indices) payload.cached[k] = state.intDomains[intVars[k]]
         return true
     }
 
