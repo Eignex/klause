@@ -22,6 +22,7 @@ import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.SetBitsetDisjoint
 import com.eignex.klause.solver.factor.SetBitsetEq
 import com.eignex.klause.solver.factor.SetBitsetSubset
+import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import kotlin.test.Test
@@ -205,6 +206,13 @@ class ChocoFactorCoverageTest {
         )
         assertFailsWith<UnsupportedFactorException> { ChocoSolver(p).solve(ChocoParams()) }
     }
+
+    @Test fun `sliding sum bounds every window`() = assertEquals(
+        // Three 0/1 vars, each adjacent pair summing to exactly 1, forces the two alternations
+        // (0,1,0) and (1,0,1).
+        2,
+        count(problem(3, dom(3, 0, 1), SlidingSum(low = 1, up = 1, seq = 2, vs = intArrayOf(0, 1, 2)))),
+    )
 
     private fun boolProblem(numBool: Int, vararg fs: Factor) =
         Problem(numBoolVars = numBool, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf(*fs))
