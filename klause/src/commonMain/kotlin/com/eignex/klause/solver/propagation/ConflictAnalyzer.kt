@@ -483,7 +483,30 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         for (lit in reason) {
             val v = Lit.variable(lit)
             if (v >= universe) continue // atom allocated after analyzer started; shouldn't happen
-            if (seen[v] || resolved[v]) continue // already in the frontier, or resolved out (cycle guard)
+            if (seen[v]) continue // already in the frontier
+            if (resolved[v]) {
+                // Resolved out as a pivot already. The bool implication graph is acyclic, so a
+                // resolved bool never legitimately recurs and is safely skipped. Atom antecedents
+                // have no trail order and can form same-level cycles (see [resolved]); a resolved
+                // atom can recur as a genuine premise — typically the opposite-polarity bound of
+                // the same int var. Skipping it then drops a literal the nogood needs, producing an
+                // unsound clause that prunes feasible solutions and over-proves optimality (#132).
+                // Keep that literal instead (deduped). Re-resolving the atom would risk the
+                // ping-pong the guard prevents; merely adding a literal only weakens the clause, so
+                // it stays sound. A second current-level literal makes the clause non-asserting,
+                // which [finalizeClause] flags so the engine backtracks chronologically.
+                if (v >= numBoolVars) {
+                    var present = false
+                    for (i in 0 until learned.size) {
+                        if (learned[i] == lit) {
+                            present = true;
+                            break
+                        }
+                    }
+                    if (!present) learned.add(lit)
+                }
+                continue
+            }
             val lvl = levelOf(v)
             if (lvl <= 0) continue
             seen[v] = true
