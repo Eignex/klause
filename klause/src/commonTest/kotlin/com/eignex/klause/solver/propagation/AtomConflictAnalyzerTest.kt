@@ -40,12 +40,15 @@ import kotlin.test.assertTrue
 class AtomConflictAnalyzerTest {
 
     /**
-     * Build a state with [n] int vars over `[0, 10]`, each tightened so `v ≥ 5` holds, and
-     * allocate the `v ≥ 5` atom for each. With `numBoolVars = 0` and allocation in var
-     * order, the atom's virtual var id equals its int var index — so atom `i` is var `i`
-     * and `Lit.make(i, false)` is the literal `¬(varᵢ ≥ 5)`.
+     * Build a state with one int var per entry of [levels] over `[0, 10]`, each tightened so
+     * `v ≥ 5` holds and recorded at the given decision level (the tighten runs with
+     * `currentLevel = levels[v]`, so the bound-change history — which the analyzer now reads
+     * for atom levels, see #76 — places the bound at that level). Allocates the `v ≥ 5` atom
+     * for each. With `numBoolVars = 0` and allocation in var order, the atom's virtual var id
+     * equals its int var index — so atom `i` is var `i` and `Lit.make(i, false)` is `¬(varᵢ ≥ 5)`.
      */
-    private fun atomGeState(n: Int): PropagationState {
+    private fun atomGeState(levels: IntArray): PropagationState {
+        val n = levels.size
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,
@@ -55,6 +58,7 @@ class AtomConflictAnalyzerTest {
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         for (v in 0 until n) {
+            state.currentLevel = levels[v]
             check(state.tightenIntMin(v, 5)) { "tighten v$v failed" }
             val atomVar = state.atomVarGe(v, 5)
             check(atomVar == v) { "expected atom var id $v, got $atomVar" }
@@ -72,11 +76,7 @@ class AtomConflictAnalyzerTest {
         // Two leaf atoms: ax at level 1, ay at level 2 (the conflict level). The conflict
         // clause forbids both holding. 1UIP keeps ay as the asserting UIP, ax drops to the
         // learned clause as a lower-level literal → backjump to level 1.
-        val state = atomGeState(2)
-        state.atomLevel[0] = 1
-        state.atomAntecedents[0] = null
-        state.atomLevel[1] = 2
-        state.atomAntecedents[1] = null
+        val state = atomGeState(intArrayOf(1, 2)) // ax @1, ay @2
         state.currentLevel = 2
         val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
 
@@ -90,18 +90,34 @@ class AtomConflictAnalyzerTest {
     }
 
     @Test
+    fun `backjump level uses bound history not a drifted atomLevel`() {
+        // #76 regression: ax's bound was genuinely established at level 1 on this path (its
+        // history records level 1), but atomLevel drifted stale-high to 5 from a deeper path
+        // that has since been popped. The analyzer must take ax's level from the history (1),
+        // not the drifted atomLevel (5). With the drifted value, backjumpLevelOf would discard
+        // ax entirely (5 is not below the conflict level 2) and compute backjumpLevel = 0 —
+        // popping past level 1 and unsoundly asserting a clause that isn't unit there.
+        val state = atomGeState(intArrayOf(1, 2)) // ax established @1, ay @2
+        state.atomLevel[0] = 5 // simulate undo-induced drift (advisory field, left stale)
+        state.currentLevel = 2
+        val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
+        assertEquals(setOf(0, 1), varsOf(learned.literals))
+        assertEquals(1, learned.backjumpLevel, "backjump must reflect ax's true level 1, not the drifted 5")
+        assertEquals(2, learned.lbd, "two true levels {1, 2}, not {5, 2}")
+        assertTrue(learned.asserting)
+    }
+
+    @Test
     fun `1UIP resolves through an implied atom pivot via its atom antecedents`() {
         // ax leaf @1, az leaf @2, ay implied @2 with antecedent ¬ax. Seed forbids ay ∧ az.
         // The loop resolves ay (current level, has antecedents) out through ¬ax, leaving az
         // as the lone current-level UIP. ay must NOT survive in the learned clause; ax (its
         // antecedent) takes its place at level 1. Exercises antecedentsOf's atom branch.
-        val state = atomGeState(3) // 0 = ax, 1 = ay, 2 = az
-        state.atomLevel[0] = 1
-        state.atomAntecedents[0] = null
-        state.atomLevel[1] = 2
+        val state = atomGeState(intArrayOf(1, 2, 2)) // ax @1, ay @2, az @2
+        // ay is the implied pivot: override its antecedent to ¬ax (a leaf at level 1).
         state.atomAntecedents[1] = intArrayOf(negAtom(0))
-        state.atomLevel[2] = 2
-        state.atomAntecedents[2] = null
         state.currentLevel = 2
         val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(1), negAtom(2))), lbd = 2)
 
@@ -122,11 +138,7 @@ class AtomConflictAnalyzerTest {
         // shape: a pin contributes two same-level bound atoms 1UIP cannot collapse). The
         // learned clause keeps both at the conflict level, so it is not unit after any
         // backjump → asserting = false, signalling the engine to backtrack chronologically.
-        val state = atomGeState(2)
-        state.atomLevel[0] = 2
-        state.atomAntecedents[0] = null
-        state.atomLevel[1] = 2
-        state.atomAntecedents[1] = null
+        val state = atomGeState(intArrayOf(2, 2)) // both atoms established at the conflict level
         state.currentLevel = 2
         val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 1)
 
@@ -254,9 +266,13 @@ class AtomConflictAnalyzerTest {
 }
 
 /** Re-derives the analyzer's private level lookup for assertions, mirroring
- *  [ConflictAnalyzer.levelOf]: bool vars via [PropagationState.boolLevel], atoms via
- *  [PropagationState.atomLevel]. */
+ *  [ConflictAnalyzer]'s `levelOf`: bool vars via [PropagationState.boolLevel], atoms via the
+ *  bound-history-derived [PropagationState.atomLevelForConflict] (#76). */
 internal object ConflictAnalyzerTestAccess {
     fun levelOf(state: PropagationState, v: Int): Int =
-        if (v < state.problem.numBoolVars) state.boolLevel[v] else state.atomLevel[v - state.problem.numBoolVars]
+        if (v < state.problem.numBoolVars) {
+            state.boolLevel[v]
+        } else {
+            state.atomLevelForConflict(v - state.problem.numBoolVars)
+        }
 }

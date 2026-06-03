@@ -182,10 +182,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 }
             }
             if (pivot < 0) {
-                // Look for an atom pivot at currentLevel.
+                // Look for an atom pivot at currentLevel. Use the bound-history-derived level
+                // (not the drifted [atomLevel]) so a stale level can't hide a genuine
+                // current-level pivot or surface a spurious one (#76).
                 for (id in 0 until atomCount) {
                     val v = numBoolVars + id
-                    if (seen[v] && state.atomLevel[id] == currentLevel) {
+                    if (seen[v] && state.atomLevelForConflict(id) == currentLevel) {
                         pivot = v
                         break
                     }
@@ -351,13 +353,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /** Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
-     *  and atom vars (via [PropagationState.atomLevel]). */
+     *  and atom vars. Atom levels come from [PropagationState.atomLevelForConflict] — the
+     *  bound-history-derived level on the current path — never the drifted [atomLevel],
+     *  which would yield an unsound backjump level / LBD / asserting flag (#76). */
     private fun levelOf(v: Int): Int {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
             state.boolLevel[v]
         } else {
-            state.atomLevel[v - numBoolVars]
+            state.atomLevelForConflict(v - numBoolVars)
         }
     }
 
