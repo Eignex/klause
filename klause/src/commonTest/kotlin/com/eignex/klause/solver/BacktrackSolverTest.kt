@@ -10,6 +10,7 @@ import com.eignex.klause.solver.backtrack.VarRef
 import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationResult.Unsat
@@ -52,6 +53,38 @@ class BacktrackSolverTest {
             ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    @Test
+    fun `tight cumulative packing solves without overflowing conflict-clause minimization`() {
+        // Regression for #118 / #119: a tight unary-resource cumulative drives many conflicts
+        // whose atom antecedents form deep (and occasionally cyclic) implication chains. The
+        // self-subsuming-resolution minimization used to recurse over them — overflowing the
+        // stack on deep chains and indexing past the atom-antecedent array. Six duration-2
+        // tasks at capacity 1 must pack back-to-back into the horizon [0, 12); the start
+        // domains [0, 10] just admit the even-slot schedule, so the search is forced through
+        // heavy conflict analysis. It must return a valid non-overlapping witness, not crash.
+        val n = 6
+        val factor = Cumulative(
+            starts = IntArray(n) { it },
+            durations = IntArray(n) { 2 },
+            resources = IntArray(n) { 1 },
+            capacity = 1,
+        )
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, 10) },
+            factors = arrayOf<Factor>(factor),
+        )
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
+        val starts = sat.assignment.ints
+        for (i in 0 until n) {
+            for (j in i + 1 until n) {
+                val noOverlap = starts[i] + 2 <= starts[j] || starts[j] + 2 <= starts[i]
+                assertTrue(noOverlap, "tasks $i@${starts[i]} and $j@${starts[j]} overlap under capacity 1")
+            }
+        }
     }
 
     @Test
