@@ -35,32 +35,88 @@ internal object ApproxMC {
         val t = iterationCount(config.delta)
         val baseSeed = config.seed ?: Random.Default.nextLong()
         val estimates = ArrayList<Long>(t)
+        // Seed each iteration's m-search from the previous iteration's transition point (ApproxMC2).
+        var prevM = 1
         for (i in 0 until t) {
-            val est = core(ctx, thresh, seed = baseSeed + i.toLong())
-            if (est != null) estimates.add(est)
+            val res = core(ctx, thresh, seed = baseSeed + i.toLong(), startM = prevM)
+            if (res != null) {
+                estimates.add(res.estimate)
+                prevM = res.mStar
+            }
         }
-        val estimate = if (estimates.isEmpty()) base.count.toLong() else median(estimates)
+        if (estimates.isEmpty()) {
+            // No usable cell in any run (e.g. every run hit the per-cell decision budget). Surface
+            // "unknown" rather than fabricate base.count (≈thresh) as a point estimate (#79).
+            val lo = base.count.toLong()
+            return Count(estimate = lo, lower = lo, upper = Long.MAX_VALUE, exact = false, confidence = 0.0)
+        }
+        val estimate = median(estimates)
         // The (ε, δ) guarantee: the true count lies in [estimate/(1+ε), estimate·(1+ε)] w.p. ≥ 1-δ.
         val lower = floor(estimate / (1.0 + eps)).toLong()
         val upper = ceil(estimate * (1.0 + eps)).toLong()
         return Count(estimate = estimate, lower = lower, upper = upper, exact = false, confidence = 1.0 - config.delta)
     }
 
-    /** One ApproxMC iteration: returns the cell estimate, or `null` for a failed (empty-cell) run. */
-    private fun core(ctx: CellContext, thresh: Int, seed: Long): Long? {
+    /** A finished iteration: its cell [estimate] and the transition prefix length [mStar] (to seed the next). */
+    private data class CoreResult(val estimate: Long, val mStar: Int)
+
+    /**
+     * One ApproxMC2 iteration over a nested hash sequence (`H_1 ⊂ … ⊂ H_n`). The cell count is
+     * non-increasing in `m`, so "cell ≤ thresh" flips false→true exactly once; a galloping +
+     * bisection search seeded from [startM] (the previous iteration's transition) finds the smallest
+     * fitting `m` in `O(log n)` solves instead of the `O(n)` linear scan (#92).
+     *
+     * Returns `count · 2^m` at that `m`; on an empty (over-split) cell it recovers with
+     * `thresh · 2^(m-1)` from the level below rather than discarding the run, which would bias the
+     * median upward (#79). `null` only when no prefix in `[1, n]` is sub-threshold.
+     */
+    private fun core(ctx: CellContext, thresh: Int, seed: Long, startM: Int): CoreResult? {
         val n = ctx.hashDomain.size
-        // A single nested hash sequence; prefix of length m gives the m-hash cell (H_1 ⊂ … ⊂ H_n).
         val allHashes = XorHashFamily(ctx.hashDomain, seed).draw(n)
-        var m = 1
-        while (m <= n) {
-            val cell = cellCount(ctx, allHashes.subList(0, m), cap = thresh)
-            if (!cell.capped) { // cell.count ≤ thresh: small enough
-                if (cell.count == 0) return null // unlucky split emptied the cell — failed run
-                return cell.count.toLong() shl m
+        val cache = HashMap<Int, CellResult>()
+        fun cellAt(m: Int): CellResult = cache.getOrPut(m) { cellCount(ctx, allHashes.subList(0, m), cap = thresh) }
+
+        // fits(m): the m-hash cell holds ≤ thresh projections; fits(0) is false (caller checked base).
+        fun fits(m: Int): Boolean = !cellAt(m).capped
+
+        // Gallop out from the pivot to bracket lo (largest known non-fitting) < hi (smallest fitting).
+        val pivot = startM.coerceIn(1, n)
+        val lo: Int
+        var hi: Int
+        if (fits(pivot)) {
+            hi = pivot
+            var step = 1
+            var probe = pivot - 1
+            while (probe >= 1 && fits(probe)) {
+                hi = probe
+                step *= 2
+                probe -= step
             }
-            m++
+            lo = probe.coerceAtLeast(0)
+        } else {
+            var probe = pivot
+            var step = 1
+            hi = pivot + 1
+            while (hi <= n && !fits(hi)) {
+                probe = hi
+                step *= 2
+                hi += step
+            }
+            if (hi > n) return null // finest cell still over thresh
+            lo = probe
         }
-        return null
+        // Bisect (lo, hi]: !fits(lo), fits(hi).
+        var low = lo
+        var high = hi
+        while (high - low > 1) {
+            val mid = low + (high - low) / 2
+            if (fits(mid)) high = mid else low = mid
+        }
+        val mStar = high
+
+        val cell = cellAt(mStar)
+        if (cell.count > 0) return CoreResult(cell.count.toLong() shl mStar, mStar)
+        return CoreResult(thresh.toLong() shl (mStar - 1), mStar) // empty cell: recover from mStar-1
     }
 
     /** `thresh = 1 + 9.84·(1 + ε/(1+ε))·(1 + 1/ε)²`, rounded up. */
