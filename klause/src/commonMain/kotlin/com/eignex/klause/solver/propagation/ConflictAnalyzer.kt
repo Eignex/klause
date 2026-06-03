@@ -106,14 +106,33 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /**
-     * Run analysis from a conflict triggered by factor [conflictFactorId]. The state's
-     * current level (`state.currentLevel`) is taken as the conflict level — the level
-     * the failing factor was firing at.
+     * Run analysis from a conflict triggered by factor [conflictFactorId]. The conflict
+     * level is the deepest decision level among the seed reason's own literals, read through
+     * the bound-history-accurate [levelOf] (#76/#77) — not `state.currentLevel`, which
+     * runToFixpoint sets from `maxLevelForVars` over *all* of the failing factor's variables
+     * (a superset of the reason) and, for atom-lit clauses, off the drifted `atomLevel`. That
+     * attribution can name a level no reason literal actually sits at, which makes the 1UIP
+     * loop find no pivot at the conflict level and degenerate into a non-asserting clause
+     * (lost learning) or mis-target backjumpLevelOf. Taking the max over the reason's own
+     * literals pins the conflict level exactly at its deepest literal. (The engine's levelling
+     * is max-antecedent based, so no reason literal — nor any antecedent resolved in below —
+     * sits above this, keeping the asserting/backjump computation sound.)
      */
     fun analyze(conflictFactorId: Int): AnalysisResult {
         val factor = state.factorAt(conflictFactorId)
         val seedReason = factor.conflictReason(state, conflictFactorId) ?: return AnalysisResult.NotApplicable
-        return analyzeFromSeed(seedReason)
+        return analyzeFromSeed(seedReason, conflictLevelOf(seedReason))
+    }
+
+    /** Deepest accurate decision level among [reason]'s literals — the conflict level for a
+     *  factor-seeded analysis (see [analyze]). */
+    private fun conflictLevelOf(reason: IntArray): Int {
+        var max = 0
+        for (lit in reason) {
+            val l = levelOf(Lit.variable(lit))
+            if (l > max) max = l
+        }
+        return max
     }
 
     /**
@@ -123,6 +142,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      *   `(prior pin's antecedents) ∨ Lit.make(v, !prior_value)`
      * — every literal currently false in the state, exactly matching the analyzer's
      * "seed reason" contract. Falls through to the same 1UIP loop as [analyze].
+     *
+     * The conflict level here is `state.currentLevel` — the just-attempted decision level —
+     * not the seed's literal max: the conflicted var's own [PropagationState.boolLevel] is the
+     * *prior* (shallower) pin, so the seed cannot reveal the decision depth that is genuinely
+     * the conflict level. Holding the conflict level above the seed literals also lets the
+     * minimiser resolve the decision lit away into the stronger underlying nogood.
      */
     fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult {
         val priorValue = state.boolValues[conflictedVar] ?: return AnalysisResult.NotApplicable
@@ -138,11 +163,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 it[priorAnt.size] = decisionLit
             }
         }
-        return analyzeFromSeed(seed)
+        return analyzeFromSeed(seed, state.currentLevel)
     }
 
-    private fun analyzeFromSeed(seedReason: IntArray): AnalysisResult {
-        val currentLevel = state.currentLevel
+    private fun analyzeFromSeed(seedReason: IntArray, currentLevel: Int): AnalysisResult {
         if (currentLevel <= 0) return AnalysisResult.NotApplicable
 
         // Standard 1UIP loop with bool + atom support. The `seen` array spans
@@ -182,10 +206,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 }
             }
             if (pivot < 0) {
-                // Look for an atom pivot at currentLevel.
+                // Look for an atom pivot at currentLevel. Use the bound-history-derived level
+                // (not the drifted [atomLevel]) so a stale level can't hide a genuine
+                // current-level pivot or surface a spurious one (#76).
                 for (id in 0 until atomCount) {
                     val v = numBoolVars + id
-                    if (seen[v] && state.atomLevel[id] == currentLevel) {
+                    if (seen[v] && state.atomLevelForConflict(id) == currentLevel) {
                         pivot = v
                         break
                     }
@@ -351,13 +377,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /** Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
-     *  and atom vars (via [PropagationState.atomLevel]). */
+     *  and atom vars. Atom levels come from [PropagationState.atomLevelForConflict] — the
+     *  bound-history-derived level on the current path — never the drifted [atomLevel],
+     *  which would yield an unsound backjump level / LBD / asserting flag (#76). */
     private fun levelOf(v: Int): Int {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
             state.boolLevel[v]
         } else {
-            state.atomLevel[v - numBoolVars]
+            state.atomLevelForConflict(v - numBoolVars)
         }
     }
 
