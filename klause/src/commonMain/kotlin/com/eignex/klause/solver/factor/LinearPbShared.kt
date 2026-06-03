@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 
 /*
@@ -130,4 +131,55 @@ internal fun buildSignedWeightByVar(weights: IntArray, literals: IntArray, exclu
         values = signs.values.toIntArray(),
         absent = 0,
     )
+}
+
+/* ------------------------------------------------------------------ *
+ *  Duplicate-variable coalescing for the int-weighted-sum factors
+ * ------------------------------------------------------------------ */
+
+/** A `(vars, coeffs)` term list with each variable appearing at most once. */
+internal class CoalescedTerms(val vars: IntArray, val coeffs: IntArray)
+
+/**
+ * Sum coefficients per distinct variable, preserving first-occurrence order, so the int-weighted
+ * sum is carried by one entry per variable. The MiniZinc compiler already coalesces (via
+ * `coeffsToArrays`), but the XCSP3 and direct-API construction paths can hand the same variable
+ * twice (`2x + 3x ≤ b`). Left split, the local-search payload desyncs: [Linear.initialize] sums
+ * every index (`5·x`) while the O(1) [CoeffLookup] returns a single entry's coefficient (`3`), so
+ * a move on `x` shifts the payload by only `3·Δ` and `isViolated` / `violationDegree` go silently
+ * wrong (issue #84). Coalescing in the [Linear] / [ReifiedLinear] constructor makes the factor
+ * robust regardless of caller.
+ *
+ * Returns the inputs unchanged (same arrays) when no variable repeats, so the common distinct-var
+ * path allocates nothing. The summed coefficient is accumulated in `Long` and required to fit
+ * `Int` — consistent with the rest of the family's overflow discipline (issue #72).
+ */
+internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTerms {
+    require(vars.size == coeffs.size) { "coeffs/vars length mismatch" }
+    val seen = HashSet<Int>(vars.size)
+    var hasDuplicate = false
+    for (v in vars) {
+        if (!seen.add(v)) {
+            hasDuplicate = true
+            break
+        }
+    }
+    if (!hasDuplicate) return CoalescedTerms(vars, coeffs)
+
+    val order = IntArrayList(vars.size)
+    val sums = HashMap<Int, Long>(vars.size)
+    for (i in vars.indices) {
+        val v = vars[i]
+        if (v !in sums) order.add(v)
+        sums[v] = (sums[v] ?: 0L) + coeffs[i].toLong()
+    }
+    val outVars = order.toIntArray()
+    val outCoeffs = IntArray(outVars.size) { idx ->
+        val s = sums.getValue(outVars[idx])
+        require(s in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+            "coalesced coefficient overflow for var ${outVars[idx]}: $s"
+        }
+        s.toInt()
+    }
+    return CoalescedTerms(outVars, outCoeffs)
 }
