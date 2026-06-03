@@ -55,29 +55,6 @@ tasks.register<JavaExec>("bench") {
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
-/** Print vendored suites + external collections (with license and cache status). */
-tasks.register<JavaExec>("listCorpus") {
-    group = "bench"
-    description = "List catalog suites and external problem collections."
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.tools.CorpusCli")
-    args("list")
-    val workspaceRoot = rootDir.absolutePath
-    doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
-}
-
-/** Pre-fetch external problem collections into the cache. `--args="warm <id|all>"`. */
-tasks.register<JavaExec>("warmCorpus") {
-    group = "bench"
-    description = "Fetch external problem collections into the cache. Use --args=\"warm <id|all>\"."
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.tools.CorpusCli")
-    notCompatibleWithConfigurationCache("ProcessBuilder git/tar calls inside CorpusFetcher")
-    val workspaceRoot = rootDir.absolutePath
-    doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
-}
-
-
 tasks.register("dumpSchema", JavaExec::class) {
     group = "tools"
     description = "Regenerate bundled JSON SchemaDef sample at corpus/schema/campaign.json."

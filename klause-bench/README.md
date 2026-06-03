@@ -11,7 +11,6 @@ No external solver binaries are used. The minizinc CLI only compiles models to F
   ./gradlew :klause-bench:bench --args="list"            targets, suites, metrics, usage
   ./gradlew :klause-bench:bench --args="parity-core"     klause vs Choco on the in-process core
   ./gradlew :klause-bench:bench --args="mzn-coverage-smoke"   percent native-predicate coverage
-  ./gradlew :klause-bench:listCorpus                     suites + external collections
 
 Tune any knob with -Dklause.* properties (all forwarded to the run), e.g. -Dklause.bench.mzn.timeoutSec=30.
 
@@ -42,7 +41,7 @@ Suites and problems are declared in catalog/Suites.kt with a small DSL. To add a
 
 ## Corpus and fetching
 
-Vendored problems live in corpus/ (see corpus/PROVENANCE.md). Non-redistributable collections (MiniZinc Challenge benchmarks, libminizinc tests, hakank, SATLIB) are fetched on first use into build/corpus-cache/ and declared with their license and reason in ExternalCollections. The large MiniZinc corpora are exposed as discovered suites (mzn-bench, libminizinc-tests, hakank) whose instances are selected by the family-aware machinery in source/CorpusSelection.kt (per-family interleave, caps, deterministic seeded sampling, pickPrimaryMzn, dzn pairing). Control selection with the per-family, max, and seed filters or the matching -Dklause.bench.select.* properties. Use warmCorpus to pre-fetch.
+Vendored problems live in corpus/ (see corpus/PROVENANCE.md). Non-redistributable collections (MiniZinc Challenge benchmarks, libminizinc tests, hakank, SATLIB) are fetched on first use into build/corpus-cache/ and declared with their license and reason in ExternalCollections. The large MiniZinc corpora are exposed as discovered suites (mzn-bench, libminizinc-tests, hakank) whose instances are selected by the family-aware machinery in source/CorpusSelection.kt (per-family interleave, caps, deterministic seeded sampling, pickPrimaryMzn, dzn pairing). Control selection with the per-family, max, and seed filters or the matching -Dklause.bench.select.* properties. Collections are fetched automatically the first time a run needs them.
 
 ## Reference solvers
 
