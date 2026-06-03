@@ -236,11 +236,13 @@ internal fun Compiler.Build.assertFloatLinear(c: FloatLinearConstraint) {
 
         IntCmpOp.NE -> LinearOp.NE
     }
+    val strict = c.op == IntCmpOp.LT || c.op == IntCmpOp.GT
     floatMetaConstraints += RealLinearConstraint(
         coeffs = c.coeffs.copyOf(),
         floatVarIds = realIds,
         op = realOp,
         bound = c.bound,
+        strict = strict,
     )
 
     // Bucketed-int rewrite for the factor list. Reuses the same SCALE
@@ -259,7 +261,17 @@ internal fun Compiler.Build.assertFloatLinear(c: FloatLinearConstraint) {
         intVarIds[i] = floatMetaIntVarIds[fid]
         scaledBound -= c.coeffs[i] * interval.lo
     }
-    val scaledBoundInt = (scaledBound * scale).toLong().toInt()
+    // The scaled sum is integer-valued, so a strict `< bound` (resp. `>`) is exactly `≤ bound − 1`
+    // (resp. `≥ bound + 1`) in scaled-int units — nudge the rounded bound by one ULP of the scale so
+    // a solution sitting exactly on the boundary is correctly excluded (#83). Non-strict ops keep
+    // the rounded bound.
+    var scaledBoundLong = (scaledBound * scale).toLong()
+    when (c.op) {
+        IntCmpOp.LT -> scaledBoundLong -= 1
+        IntCmpOp.GT -> scaledBoundLong += 1
+        else -> {}
+    }
+    val scaledBoundInt = scaledBoundLong.toInt()
     factors += Linear(scaledCoeffs, intVarIds, realOp, scaledBoundInt)
 }
 
