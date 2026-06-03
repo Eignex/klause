@@ -110,13 +110,19 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
 
     fun minimize(softs: List<Soft>, params: BacktrackParams = BacktrackParams(), stratify: Boolean = true): Result {
         if (softs.isEmpty()) {
-            return when (val r = BacktrackSolver(baseProblem).solve(params)) {
-                is SolveResult.Sat -> Result.Optimal(r.assignment, 0L, 0)
-                is SolveResult.Unsat -> Result.Infeasible(0)
-                is SolveResult.Unknown -> Result.Unknown(r.reason, 0, 0L)
-            }
+            return Oll.solveHardOnly(
+                baseProblem,
+                params,
+                onSat = { Result.Optimal(it, 0L, 0) },
+                onUnsat = { Result.Infeasible(0) },
+                onUnknown = { Result.Unknown(it, 0, 0L) },
+            )
         }
 
+        // Original softs in the shared cost vocabulary, used to verify/recover the final
+        // sample's true cost (#80). Weights are split across cores below, so the genuine
+        // per-soft cost can only be measured against these originals, not the workings.
+        val costSofts = softs.map { Oll.Soft(it.lit, it.weight) }
         var nextBoolId = baseProblem.numBoolVars
         val workings = ArrayList<Working>().apply {
             for (s in softs) add(Working(s.lit, s.weight, initialSelector = nextBoolId++))
@@ -139,14 +145,14 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
                     threshold = strata.removeFirst()
                     continue
                 }
-                return finalSolve(baseProblem, workings, exactly1Lits, nextBoolId, params, lb, cores)
+                return finalSolve(baseProblem, workings, exactly1Lits, nextBoolId, params, costSofts, lb, cores)
             }
             val problem = buildProblem(baseProblem, workings, exactly1Lits, nextBoolId)
             val assumptions = buildAssumptions(workings, activeIdx)
             val solver = BacktrackSolver(problem)
             when (val r = solver.satisfyUnderAssumptions(assumptions, params)) {
                 is SatisfyResult.Sat -> {
-                    if (strata.isEmpty()) return Result.Optimal(r.sample, lb, cores)
+                    if (strata.isEmpty()) return optimal(r.sample, costSofts, lb, cores, params)
                     threshold = strata.removeFirst()
                 }
 
@@ -260,12 +266,11 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
     }
 
     private fun projectCoreToSofts(workings: List<Working>, activeIdx: IntArray, core: Assumptions): IntArray {
-        val out = IntArrayList()
-        for (i in activeIdx) {
-            val w = workings[i]
-            if (core.boolValueOrNull(w.initialSelector) == false) out.add(i)
-        }
-        return out.toIntArray()
+        // Map each active soft's initial selector back to its working index, then defer to
+        // the shared core projection so both drivers agree on what a core "covers".
+        val selectorToSoft = HashMap<Int, Int>(activeIdx.size)
+        for (i in activeIdx) selectorToSoft[workings[i].initialSelector] = i
+        return Oll.projectCoreToSofts(core, selectorToSoft)
     }
 
     private fun finalSolve(
@@ -274,14 +279,29 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
         exactly1s: List<IntArray>,
         totalBoolVars: Int,
         params: BacktrackParams,
+        costSofts: List<Oll.Soft>,
         lb: Long,
         cores: Int,
     ): Result {
         val problem = buildProblem(base, workings, exactly1s, totalBoolVars)
         return when (val r = BacktrackSolver(problem).solve(params)) {
-            is SolveResult.Sat -> Result.Optimal(r.assignment, lb, cores)
+            is SolveResult.Sat -> optimal(r.assignment, costSofts, lb, cores, params)
             is SolveResult.Unsat -> Result.Infeasible(cores)
             is SolveResult.Unknown -> Result.Unknown(r.reason, cores, lb)
         }
+    }
+
+    /** Wrap a terminal SAT witness as [Result.Optimal] after recovering a sample whose
+     *  *true* soft cost equals [lb] (#80): a spent soft can be relaxed for free by another
+     *  core's blocker, leaving the raw witness over-relaxed relative to the bound. */
+    private fun optimal(
+        sample: Sample,
+        costSofts: List<Oll.Soft>,
+        lb: Long,
+        cores: Int,
+        params: BacktrackParams,
+    ): Result {
+        val recovered = Oll.recoverOptimalSample(baseProblem, costSofts, sample, lb, params)
+        return Result.Optimal(recovered, lb, cores)
     }
 }
