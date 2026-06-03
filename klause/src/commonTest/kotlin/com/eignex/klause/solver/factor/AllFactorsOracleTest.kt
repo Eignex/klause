@@ -141,7 +141,26 @@ class AllFactorsOracleTest {
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
             exactProbe = true,
+            gac = true,
         )
+    }
+
+    @Test fun countForceIn() {
+        // count_eq(xs, v=1) with xs ∈ {0,1}; n pinned to 2 = possible ⟹ both forced to 1.
+        val f = Count(xs = intArrayOf(0, 1), v = 1, op = Count.Op.Eq, n = 2)
+        check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 2)), gac = true)
+    }
+
+    @Test fun countForceOut() {
+        // count_eq(xs, v=1) with xs ∈ {0,1}; n pinned to 0 = definite ⟹ both forced to 0.
+        val f = Count(xs = intArrayOf(0, 1), v = 1, op = Count.Op.Eq, n = 2)
+        check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0)), gac = true)
+    }
+
+    @Test fun countGeForce() {
+        // count_ge(xs, v=2) with xs ∈ {1,2,3}; n pinned to 2 = possible ⟹ both swing vars ≥ 2.
+        val f = Count(xs = intArrayOf(0, 1), v = 2, op = Count.Op.Ge, n = 2)
+        check(f, intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(2, 2)), gac = true)
     }
 
     @Test fun among() {
@@ -151,6 +170,27 @@ class AllFactorsOracleTest {
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
             exactProbe = true,
+            gac = true,
+        )
+    }
+
+    @Test fun amongForceIn() {
+        // S = {1}; xs ∈ {0,1}; n pinned to 2 = possible ⟹ both swing vars forced to match (=1).
+        val f = Among(n = 2, xs = intArrayOf(0, 1), values = intArrayOf(1))
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 2)),
+            gac = true,
+        )
+    }
+
+    @Test fun amongForceOut() {
+        // S = {1}; xs ∈ {0,1}; n pinned to 0 = definite ⟹ no swing var may match (both → 0).
+        val f = Among(n = 2, xs = intArrayOf(0, 1), values = intArrayOf(1))
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0)),
+            gac = true,
         )
     }
 
