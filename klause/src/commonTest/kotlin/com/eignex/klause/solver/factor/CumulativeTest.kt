@@ -367,4 +367,45 @@ class CumulativeTest {
         state.recompute()
         assertTrue(state.cost > 0, "extending d0 to 3 overlaps task 1 at t=2")
     }
+
+    @Test
+    fun `single task never overloads`() {
+        // One task, dur 2 res 1, capacity 1 — always fits, no false failure or tightening.
+        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(2), resources = intArrayOf(1), capacity = 1)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 4)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val result = problem.propagate(Assumptions.None)
+        assertTrue(result is PropagationResult.Implied, "single task is always feasible; got $result")
+    }
+
+    @Test
+    fun `zero-duration task contributes no usage`() {
+        // A duration-0 task occupies no time, so it never loads the resource — feasible even
+        // when its resource demand exceeds capacity.
+        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(0), resources = intArrayOf(5), capacity = 1)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 4)),
+            factors = arrayOf<Factor>(factor),
+        )
+        assertTrue(problem.propagate(Assumptions.None) is PropagationResult.Implied)
+    }
+
+    @Test
+    fun `zero capacity with a positive task is infeasible`() {
+        // dur 1, res 1 task cannot run on a capacity-0 resource: per-task feasibility fails.
+        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(1), resources = intArrayOf(1), capacity = 0)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 4)),
+            factors = arrayOf<Factor>(factor),
+        )
+        assertTrue(problem.propagate(Assumptions.None) is PropagationResult.Unsat)
+    }
 }
