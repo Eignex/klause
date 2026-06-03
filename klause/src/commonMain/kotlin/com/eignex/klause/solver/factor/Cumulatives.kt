@@ -594,40 +594,15 @@ class Cumulatives(
                 if (d > 0 && r > 0) members.add(i)
             }
             if (members.isEmpty()) continue
-            // Mandatory-profile events.
-            val events = ArrayList<IntArray>()
+            // Mandatory profile for machine k.
+            val profile = MandatoryProfile()
             for (i in members) {
                 val d = requireNotNull(fixedDur(state, i))
                 val r = requireNotNull(fixedRes(state, i))
                 val dom = state.intDomains[starts[i]]
-                val lst = dom.max
-                val ect = dom.min + d
-                if (lst < ect) {
-                    events.add(intArrayOf(lst, +r))
-                    events.add(intArrayOf(ect, -r))
-                }
+                profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
             }
-            events.sortWith(compareBy({ it[0] }, { -it[1] }))
-            val segFrom = IntArray(events.size)
-            val segTo = IntArray(events.size)
-            val segLevel = IntArray(events.size)
-            var segCount = 0
-            var level = 0
-            var cursor = if (events.isEmpty()) 0 else events[0][0]
-            for ((idx, ev) in events.withIndex()) {
-                val t = ev[0]
-                if (t > cursor && level > 0) {
-                    segFrom[segCount] = cursor
-                    segTo[segCount] = t
-                    segLevel[segCount] = level
-                    segCount++
-                }
-                level += ev[1]
-                cursor = t
-                if (idx == events.size - 1 || events[idx + 1][0] != t) {
-                    if (level > cap) return false
-                }
-            }
+            if (!profile.build(cap)) return false
             // Tighten each member's start against overloading placements.
             for (i in members) {
                 val d = requireNotNull(fixedDur(state, i))
@@ -644,7 +619,7 @@ class Cumulatives(
                 val ant = state.composeIntVarAtomAntecedents(intVars)
                 var newMin = dom.min
                 while (newMin <= state.intDomains[v].max &&
-                    overloadsAt(segFrom, segTo, segLevel, segCount, newMin, newMin + d, r, cap, owns, lstI, ectI)
+                    profile.overloadsAt(newMin, newMin + d, r, cap, owns, lstI, ectI)
                 ) {
                     newMin++
                 }
@@ -652,7 +627,7 @@ class Cumulatives(
                 if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
                 var newMax = state.intDomains[v].max
                 while (newMax >= state.intDomains[v].min &&
-                    overloadsAt(segFrom, segTo, segLevel, segCount, newMax, newMax + d, r, cap, owns, lstI, ectI)
+                    profile.overloadsAt(newMax, newMax + d, r, cap, owns, lstI, ectI)
                 ) {
                     newMax--
                 }
@@ -661,38 +636,6 @@ class Cumulatives(
             }
         }
         return true
-    }
-
-    /** True iff placing a task `[s, s+d)` with resource [r] anywhere over the mandatory
-     *  segments would push a segment over [cap], after discounting the task's own already-
-     *  counted mandatory part. Mirrors [Cumulative.overloadsAt]. */
-    private fun overloadsAt(
-        segFrom: IntArray,
-        segTo: IntArray,
-        segLevel: IntArray,
-        segCount: Int,
-        s: Int,
-        sPlusD: Int,
-        r: Int,
-        cap: Int,
-        owns: Boolean,
-        lstI: Int,
-        ectI: Int,
-    ): Boolean {
-        for (kk in 0 until segCount) {
-            val from = segFrom[kk]
-            val to = segTo[kk]
-            val lvl = segLevel[kk]
-            if (to <= s || from >= sPlusD) continue
-            var effective = lvl
-            if (owns) {
-                val ovFrom = max(from, lstI)
-                val ovTo = min(to, ectI)
-                if (ovFrom < ovTo) effective -= r
-            }
-            if (effective + r > cap) return true
-        }
-        return false
     }
 
     /** Lower-bound (minimum load) coverage check, only once every relevant var is fixed. */
