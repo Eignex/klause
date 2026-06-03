@@ -788,6 +788,18 @@ class AllFactorsOracleTest {
         )
     }
 
+    @Test fun memberHoley() {
+        // y over a full range against holey candidate domains — exercises the union-hull and
+        // unique-support rules under the brute oracle (sound-only).
+        val f = Member(xs = intArrayOf(0, 1), y = 2)
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 3, 1), holey(0, 3, 2), IntDomain(0, 3)),
+            "Member.holey",
+            gac = false,
+        )
+    }
+
     @Test fun valuePrecedeHoley() {
         // s=1, t=2 with interior holes at 1 in the first two positions — exercises the
         // hole-aware "no premature t" rule under the brute oracle (sound-only; not GAC).
