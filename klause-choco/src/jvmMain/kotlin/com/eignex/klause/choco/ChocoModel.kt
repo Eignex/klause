@@ -40,6 +40,7 @@ import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.SetBitsetDisjoint
 import com.eignex.klause.solver.factor.SetBitsetEq
 import com.eignex.klause.solver.factor.SetBitsetSubset
+import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
@@ -201,6 +202,8 @@ class ChocoModel private constructor(
             is Sort -> model.sort(intVarsOf(f.xs), intVarsOf(f.ys)).post()
 
             is Sequence -> postSequence(f)
+
+            is SlidingSum -> postSlidingSum(f)
 
             is Regular -> model.regular(intVarsOf(f.seq), automatonOf(f)).post()
 
@@ -383,6 +386,17 @@ class ChocoModel private constructor(
             val window = Array(f.k) { intVars[f.xs[start + it]] }
             val nb = model.intVar(f.low, f.high)
             model.among(nb, window, f.values).post()
+        }
+    }
+
+    private fun postSlidingSum(f: SlidingSum) {
+        // Dual of Sequence: every length-seq window of vs must sum into [low, up]. Choco has no
+        // sliding-sum global, so post one bounded sum per window (|vs| - seq + 1 windows).
+        if (f.seq <= 0) return
+        for (start in 0..f.vs.size - f.seq) {
+            val window = Array(f.seq) { intVars[f.vs[start + it]] }
+            model.sum(window, ">=", f.low).post()
+            model.sum(window, "<=", f.up).post()
         }
     }
 
