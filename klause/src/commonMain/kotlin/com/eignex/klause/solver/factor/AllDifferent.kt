@@ -233,8 +233,11 @@ class AllDifferent(
         val filteredVars = IntArray(n) { vars[filtered[it]] }
 
         // Régin matching / reverse-reachability / SCC / Hall pruning, shared with the
-        // alldifferent_except family via [reginFilter]. No excepted values here.
-        val hall = reginFilter(state, filteredVars, emptySet())
+        // alldifferent_except family via [reginFilter]. No excepted values here. The cache
+        // warm-starts the matching across calls (#96).
+        val cache = (state.refPayload[factorId] as? ReginCache)
+            ?: ReginCache().also { state.refPayload[factorId] = it }
+        val hall = reginFilter(state, filteredVars, emptySet(), cache)
         if (hall != null) {
             conflictHallVars = hall
             return false

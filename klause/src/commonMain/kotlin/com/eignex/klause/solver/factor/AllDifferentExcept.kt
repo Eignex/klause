@@ -131,10 +131,11 @@ class AllDifferentExcept(
                 }
             }
         }
-        // Phase 2: Régin-style matching-and-SCC pruning. Runs only on the residual
-        // (var, non-except value) bipartite graph. Vars whose domain intersects `except`
-        // get an "escape" via a virtual exception sink, so they don't have to match.
-        val hall = reginFilter(state, xs, exceptSet)
+        // Phase 2: shared Régin matching-and-SCC pruning ([reginFilter]); excepted values are
+        // modelled as capacity-n copies. The cache warm-starts the matching across calls (#96).
+        val cache = (state.refPayload[factorId] as? ReginCache)
+            ?: ReginCache().also { state.refPayload[factorId] = it }
+        val hall = reginFilter(state, xs, exceptSet, cache)
         if (hall != null) {
             conflictHallVars = hall
             return false

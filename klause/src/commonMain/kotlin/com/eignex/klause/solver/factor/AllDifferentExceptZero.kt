@@ -147,7 +147,9 @@ class AllDifferentExceptZero(
         // Régin matching-and-SCC pruning (except = {0}), shared with [AllDifferentExcept] via
         // [reginFilter]. This is the stronger filtering the zero-variant previously lacked:
         // singleton-take above misses Hall sets that the matching pass catches.
-        val hall = reginFilter(state, xs, ZERO_EXCEPT_SET)
+        val cache = (state.refPayload[factorId] as? ReginCache)
+            ?: ReginCache().also { state.refPayload[factorId] = it }
+        val hall = reginFilter(state, xs, ZERO_EXCEPT_SET, cache)
         if (hall != null) {
             conflictVars = hall
             return false

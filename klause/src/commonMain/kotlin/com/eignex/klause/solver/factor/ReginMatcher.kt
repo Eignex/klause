@@ -28,7 +28,12 @@ import com.eignex.klause.util.IntArrayList
  * Returns `null` on success (after pruning in place), or the Hall-violator variable ids on
  * infeasibility — the caller stores them as its conflict reason.
  */
-internal fun reginFilter(state: PropagationState, filteredVars: IntArray, exceptSet: Set<Int>): IntArray? {
+internal fun reginFilter(
+    state: PropagationState,
+    filteredVars: IntArray,
+    exceptSet: Set<Int>,
+    cache: ReginCache? = null,
+): IntArray? {
     val n = filteredVars.size
     if (n < 2) return null
 
@@ -67,7 +72,33 @@ internal fun reginFilter(state: PropagationState, filteredVars: IntArray, except
     val matchVar = IntArray(n) { -1 }
     val matchVal = IntArray(numValues) { -1 }
     val visited = BooleanArray(numValues)
+    // Warm start (#96): reuse the previous matching for edges still valid after domain
+    // shrinkage; only the now-unmatched vars need augmenting. The completed matching is still
+    // maximum and Régin pruning is matching-independent, so this changes speed, not results.
+    if (cache != null) {
+        for (i in 0 until n) {
+            val prev = cache.matchedValue[filteredVars[i]] ?: continue
+            if (prev !in state.intDomains[filteredVars[i]]) continue // edge broke
+            if (prev in exceptSet) {
+                val base = exceptBase[prev] ?: continue
+                for (c in 0 until n) {
+                    if (matchVal[base + c] == -1) {
+                        matchVar[i] = base + c
+                        matchVal[base + c] = i
+                        break
+                    }
+                }
+            } else {
+                val id = valueId[prev] ?: continue
+                if (matchVal[id] == -1) {
+                    matchVar[i] = id
+                    matchVal[id] = i
+                }
+            }
+        }
+    }
     for (i in 0 until n) {
+        if (matchVar[i] != -1) continue // already seeded from the warm-start matching
         for (j in visited.indices) visited[j] = false
         if (!reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)) {
             // Augment failed: the saturated values plus their occupants and i form a Hall
@@ -168,7 +199,28 @@ internal fun reginFilter(state: PropagationState, filteredVars: IntArray, except
             }
         }
     }
+    // Persist the matching as the next call's warm-start seed.
+    if (cache != null) {
+        cache.matchedValue.clear()
+        for (i in 0 until n) {
+            if (matchVar[i] != -1) cache.matchedValue[filteredVars[i]] = idToValue[matchVar[i]]
+        }
+    }
     return null
+}
+
+/** Per-factor warm-start state for [reginFilter]: the previous maximum matching as
+ *  `variable id → matched value`. A seed only — [reginFilter] revalidates every edge against
+ *  the current domains and completes to a maximum matching, so a stale cache never affects
+ *  correctness, only the number of augmenting searches. Backtrack-safe via [snapshotCopy]. */
+internal class ReginCache : PropagationState.SnapshottablePayload {
+    val matchedValue = HashMap<Int, Int>()
+
+    override fun snapshotCopy(): ReginCache {
+        val c = ReginCache()
+        c.matchedValue.putAll(matchedValue)
+        return c
+    }
 }
 
 /** Augmenting-path search for maximum bipartite matching. Returns true iff variable [i] can be
