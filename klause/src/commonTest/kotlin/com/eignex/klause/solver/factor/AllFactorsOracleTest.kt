@@ -209,6 +209,14 @@ class AllFactorsOracleTest {
         )
     }
 
+    @Test fun nValueAtMostIndependentSet() {
+        // AtMost: n ≥ distinct(xs). x0 ∈ {0,1}, x1 ∈ {2,3} are domain-disjoint, so distinct is
+        // always 2 ⟹ n ≥ 2. Exercises the greedy independent-set lower bound (sound-only;
+        // nvalue is not GAC).
+        val f = NValue(n = 0, xs = intArrayOf(1, 2), mode = NValue.Mode.AtMost)
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 1), IntDomain(2, 3)))
+    }
+
     @Test fun globalCardinality() {
         // count[0]=#zeros, count[1]=#ones across xs=(2,3,4), all ∈ {0,1}; counts ∈ [0,3].
         val f = GlobalCardinality(

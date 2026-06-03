@@ -198,9 +198,10 @@ class NValue(
     /*
      * Bounds on `n`:
      *  - upper: number of distinct values in union of all xs domains.
-     *  - lower: count of distinct singleton-pinned values.
-     *
-     * Stronger inference (Hall-style under [Mode.AtMost]) lands in the next propagation pass.
+     *  - lower: a greedy maximal set of present vars with pairwise-disjoint domains. Each such
+     *    var is forced to a value no other selected var can take, so the distinct count is at
+     *    least the set size — a Hall-style bound that subsumes the distinct-singleton count
+     *    (singletons are size-1 disjoint domains) and strengthens [Mode.AtMost] / [Mode.Eq].
      */
 
     /** Distinct-count repair: snap `n` to current `distinctCount`, plus per-mode moves
@@ -255,10 +256,11 @@ class NValue(
         }
     }
 
-    /** Reason on conflict: bound atoms of every participating var. NValue tightens
-     *  only the count var `n`; conflicts are implied by the current bound facts. */
+    /** Reason on conflict: bounds *and* interior holes of every participating var. The
+     *  independent-set lower bound turns on whether domains are disjoint, which holey domains
+     *  decide — so the reason must cite holes, not just bounds. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        collectHoleAndBoundAntecedents(state, intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Upper bound: |∪ dom(xs[i])| for indices that aren't definitely absent.
@@ -268,15 +270,25 @@ class NValue(
             state.intDomains[xs[i]].forEach { unionValues.add(it) }
         }
         val maxDistinct = unionValues.size
-        // Lower bound: count of distinct singleton values among definitely-present entries.
-        val singletons = HashSet<Int>()
-        for (i in xs.indices) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val d = state.intDomains[xs[i]]
-            if (d.min == d.max) singletons.add(d.min)
+        // Lower bound: greedy maximal independent set in the domain-overlap graph over
+        // definitely-present entries. Process smallest domains first (more constrained, more
+        // likely to stay disjoint); a var joins the set when its domain shares no value with
+        // any already-selected var. Pairwise-disjoint domains force pairwise-distinct values.
+        val present = ArrayList<Int>(xs.size)
+        for (i in xs.indices) if (OptPresence.isDefinitelyPresent(presents, i, state)) present.add(xs[i])
+        present.sortBy { state.intDomains[it].size }
+        val covered = HashSet<Int>()
+        var minDistinct = 0
+        for (xi in present) {
+            val d = state.intDomains[xi]
+            var disjoint = true
+            d.forEach { if (it in covered) disjoint = false }
+            if (disjoint) {
+                minDistinct++
+                d.forEach { covered.add(it) }
+            }
         }
-        val minDistinct = singletons.size
-        val ant = state.composeIntVarAtomAntecedents(xs)
+        val ant = collectHoleAndBoundAntecedents(state, xs)
         when (mode) {
             Mode.Eq -> {
                 if (!state.tightenIntMin(n, minDistinct, ant)) return false
