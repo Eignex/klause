@@ -110,6 +110,27 @@ class AtomConflictAnalyzerTest {
     }
 
     @Test
+    fun `factor conflict level comes from the seed reason not the firing-factor attribution`() {
+        // #77 regression: the conflict's literals are ax @1 and ay @2 (their bound histories),
+        // so the conflict level is 2 and ay is the lone level-2 UIP → an asserting clause that
+        // backjumps to level 1. But state.currentLevel carries the failing factor's attribution
+        // (here a stale-high 5, as maxLevelForClause would read off a drifted atomLevel for an
+        // atom-lit clause). The analyzer must take the conflict level from the seed reason's own
+        // literals (max = 2), not that attribution: were it to trust currentLevel = 5, no literal
+        // sits at level 5, the 1UIP loop finds no pivot, and the clause degenerates to a
+        // non-asserting nogood (lost learning) with a mis-targeted backjump.
+        val state = atomGeState(intArrayOf(1, 2)) // ax @1, ay @2
+        state.currentLevel = 5 // failing-factor attribution overshoots every reason literal
+        val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
+        assertEquals(setOf(0, 1), varsOf(learned.literals))
+        assertTrue(learned.asserting, "conflict level 2 (from the seed) → ay is the lone UIP → asserting")
+        assertEquals(1, learned.backjumpLevel, "backjump to level 1, not derived from the stale currentLevel 5")
+        assertEquals(2, learned.lbd)
+    }
+
+    @Test
     fun `1UIP resolves through an implied atom pivot via its atom antecedents`() {
         // ax leaf @1, az leaf @2, ay implied @2 with antecedent ¬ax. Seed forbids ay ∧ az.
         // The loop resolves ay (current level, has antecedents) out through ¬ax, leaving az
