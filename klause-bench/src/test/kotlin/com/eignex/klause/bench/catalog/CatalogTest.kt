@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** Phase-1 catalog + in-process resolution coverage (replaces the old per-loader tests). */
+/** Catalog + in-process resolution coverage. */
 class CatalogTest {
 
     private fun ref(suite: String, name: String): ProblemRef =

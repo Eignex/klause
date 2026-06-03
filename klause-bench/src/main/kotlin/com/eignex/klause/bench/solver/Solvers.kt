@@ -28,8 +28,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
  * its params; [Solvers.build] turns a config into an [InProcessSolver] bound to a problem.
  *
  * All backends run **in-process** — there are no external solver binaries. The native klause
- * engines (LS, backtrack) plus the SAT/CP side-door adapters (LogicNG now; Choco and
- * OscaR.cbls reference adapters wired in phase 2) all implement the same shape.
+ * engines (LS, backtrack) plus the SAT/CP side-door adapters all implement the same shape.
  */
 enum class Backend {
     /** klause local-search engine (stochastic sampling, large domains). */
@@ -214,8 +213,8 @@ object Solvers {
         Backend.KLAUSE_PORTFOLIO -> PortfolioBench(problem)
     }
 
-    /** The default in-process portfolio, mirroring the legacy `defaultSolvers`: LS +
-     *  backtrack + LogicNG, plus brute force only when the space fits.
+    /** The default in-process portfolio: LS + backtrack + LogicNG, plus brute force only when
+     *  the space fits.
      *
      *  Set `-Dklause.bench.portfolio=true` to also include the unified [Backend.KLAUSE_PORTFOLIO]
      *  parallel pool as a backend (#64) — opt-in because it spawns a multi-thread pool per

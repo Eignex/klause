@@ -17,9 +17,8 @@ import java.time.Instant
 import kotlinx.serialization.Serializable
 
 /**
- * Solver-config tuning for a **mixed (satisfaction + optimization) workload** — the purpose
- * the legacy `SolverSweep` served, reframed to run over catalog suites (via the corpus-selection
- * machinery) instead of a raw `.fzn` directory. Every [TuneConfig] runs on every instance over
+ * Solver-config tuning for a **mixed (satisfaction + optimization) workload**, run over catalog
+ * suites (via the corpus-selection machinery). Every [TuneConfig] runs on every instance over
  * several seeds; the headline is each config's OVERALL average rank (per-instance dense rank,
  * averaged), with per-goal (sat / opt) ranks alongside — used to pick good klause CBLS params
  * for a Challenge-like mix.

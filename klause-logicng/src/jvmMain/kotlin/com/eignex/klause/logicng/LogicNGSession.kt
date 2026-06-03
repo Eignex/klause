@@ -101,8 +101,6 @@ class LogicNGSession(override val solver: LogicNGSolver) : Session<LogicNGParams
         }
     }
 
-    // ---- helpers ----
-
     private fun drawDiverseSample(baseLits: List<Literal>, rng: Random): Sample? {
         val cnf = solver.cnf
         val pinCount = minOf(cnf.numVars / 2, RANDOM_PIN_COUNT_CAP)

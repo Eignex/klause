@@ -465,11 +465,8 @@ class Cbls(
     }
 
     /**
-     * Build one coordinated depth-[k] move and add it to [sink]. PLACEHOLDER (increment 1):
-     * a primitive k-factor concatenation ported from the legacy `Vnd.sampleCompound` — pick
-     * `k` random violated factors and staple one random repair from each. This is the *weak*
-     * neighborhood ("vnd is primitive"); increment 2 replaces it with a coupling-following
-     * ejection chain that walks the factor↔variable graph so the parts actually coordinate.
+     * Build one coordinated depth-[k] move and add it to [sink]: a primitive k-factor
+     * concatenation — pick `k` random violated factors and staple one random repair from each.
      */
     private fun couplingChain(state: LocalSearchState, k: Int, sink: MoveSink) {
         // Per-factor repairs are proposed into a private scratch sink, never the accumulation

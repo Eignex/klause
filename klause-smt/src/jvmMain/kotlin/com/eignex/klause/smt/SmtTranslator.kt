@@ -245,7 +245,6 @@ internal object SmtTranslator {
                 )
             }
 
-            // ---- expanded coverage ----
             is AllEqual -> {
                 val first = iv(factor.xs[0])
                 bmgr.and(factor.xs.drop(1).map { eqV(first, iv(it)) })

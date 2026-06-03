@@ -74,7 +74,6 @@ class LogicNGSessionTest {
         val models = session.enumerate(LogicNGParams(maxModels = 10)).toList()
         // 3 distinct exactly-one models.
         assertEquals(3, models.size, "expected 3 models for exactly-one on 3 bools, got ${models.size}")
-        // All distinct.
         val asTuples = models.map { it.bools.toList() }.toSet()
         assertEquals(3, asTuples.size, "models should be distinct, got $asTuples")
     }

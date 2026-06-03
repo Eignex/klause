@@ -156,8 +156,7 @@ class Subcircuit(
         //    other var may also point at j (one entry per node). A self-loop (succ[i] = i) excludes
         //    i and ALSO claims index i, because an excluded node has no predecessor in the cycle:
         //    nobody else may point at it. A second claim on any value — including a successor aimed
-        //    at an excluded node — is a conflict (#90: the point-to-excluded case was previously
-        //    only graded in LS, never propagated).
+        //    at an excluded node — is a conflict.
         val claimed = IntArray(n) { -1 }
         val pred = IntArray(n) { -1 } // pred[target] = node whose fixed (non-self) successor is target
         for (i in succ.indices) {

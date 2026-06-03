@@ -150,8 +150,7 @@ class Knapsack(
      * Both equalities are bound-propagated via the shared [propagateLinearBounds] routine,
      * which not only tightens [w] / [p] from per-element coefficient ranges but also
      * propagates back: knowing `w`'s upper bound prunes high-end values of each `xs[i]`
-     * whose minimum forced contribution exceeds the remaining slack. This subsumes the
-     * old one-way bound-tighten-only behaviour.
+     * whose minimum forced contribution exceeds the remaining slack.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = xs.size

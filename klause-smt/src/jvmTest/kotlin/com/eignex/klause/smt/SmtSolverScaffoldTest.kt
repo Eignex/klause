@@ -38,7 +38,6 @@ class SmtSolverScaffoldTest {
 
     @Test
     fun `unsat instance returns Unsat`() {
-        // AtMost(0) AND AtLeast(1) — contradictory.
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -50,10 +49,7 @@ class SmtSolverScaffoldTest {
                 ),
             ),
         )
-        // The atMost(1) over {x0, x1, ¬x0, ¬x1} forces at most one to be true; but
-        // x0 + ¬x0 = 1 always, so the atMost-1 is already satisfied. atLeast(1) on
-        // x0 ∨ x1 just needs one true. So this isn't actually unsat; pick a simpler test.
-        // Simpler unsat: a + b = 0 and a + b = 2.
+        // Unsat: a + b = 0 and a + b = 2.
         val factor1 = com.eignex.klause.solver.factor.PseudoBoolean(
             weights = intArrayOf(1, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),

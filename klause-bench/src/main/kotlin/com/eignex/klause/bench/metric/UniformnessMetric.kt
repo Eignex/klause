@@ -44,8 +44,7 @@ data class UniformnessResults(
 )
 
 /** Draws independent samples per backend and measures distinctness / Hamming spread /
- *  entropy, adding coverage + KL-from-uniform when the feasible space is enumerable. Ports
- *  the legacy `UniformnessBench` + `UniformnessBenchMain`. */
+ *  entropy, adding coverage + KL-from-uniform when the feasible space is enumerable. */
 object UniformnessMetric {
     private const val ORACLE_MAX_MODELS = 4096
     private const val DEFAULT_SAMPLE_COUNT = 200

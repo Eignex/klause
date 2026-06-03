@@ -46,7 +46,6 @@ class VariableObjectiveTest {
         val objective = compiled.minimize(schema.cost)
         val sample = LocalSearchSolver(compiled.problem)
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
-        // assertNotNull merged into !!
         assertEquals(3, compiled.decode(schema.cost, sample))
     }
 
@@ -61,7 +60,6 @@ class VariableObjectiveTest {
         val objective = compiled.maximize(schema.cost)
         val sample = LocalSearchSolver(compiled.problem)
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
-        // assertNotNull merged into !!
         assertEquals(7, compiled.decode(schema.cost, sample))
     }
 
@@ -80,7 +78,6 @@ class VariableObjectiveTest {
         val objective = compiled.minimize(schema.a)
         val sample = LocalSearchSolver(compiled.problem)
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
-        // asserted non-null via !!
         // `a` should not be set if either b or c can carry the at-least-one.
         assertEquals(false, compiled.decode(schema.a, sample))
     }
@@ -114,7 +111,6 @@ class VariableObjectiveTest {
         val objective = compiled.minimize(schema.temp)
         val sample = LocalSearchSolver(compiled.problem)
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
-        // asserted non-null via !!
         val decoded = compiled.decode(schema.temp, sample)
         val objValue = objective.evaluate(sample)
         // Objective value should match the decoded real value (modulo float rounding) —
@@ -134,7 +130,6 @@ class VariableObjectiveTest {
         val objective = compiled.maximize(schema.temp)
         val sample = LocalSearchSolver(compiled.problem)
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
-        // asserted non-null via !!
         val decoded = compiled.decode(schema.temp, sample)
         // Optimum should be the max bucket (decoded ≈ 30.0).
         assertTrue(decoded > 29.5, "expected maximum near 30, got $decoded")

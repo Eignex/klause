@@ -196,8 +196,6 @@ class AllFactorsOracleTest {
 
     @Test fun nValue() {
         val f = NValue(n = 0, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.Eq)
-        // n is an int var (index 0 in problem ordering after xs? actually xs is intVars[0..2], n is intVars[3])
-        // Need to know NValue's intVars layout. Build per its constructor — xs are indices into int var space.
         check(
             f,
             intDomains = arrayOf(

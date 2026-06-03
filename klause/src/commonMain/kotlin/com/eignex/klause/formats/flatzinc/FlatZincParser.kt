@@ -34,8 +34,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         if (peek() is FznToken.Kw && (peek() as FznToken.Kw).keyword == "output") {
             output = parseOutput()
         }
-        // Some FlatZinc emitters put the output item BEFORE the solve directive.
-        // (Re-handle if encountered after solve was peeked.)
         return FznModel(decls, constraints, solve, output)
     }
 

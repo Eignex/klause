@@ -27,10 +27,9 @@ import kotlinx.serialization.Serializable
 /**
  * Anytime optimization comparison: run klause's local-search engine and an in-process
  * [Reference] (OR-Tools by default, or Choco) on each optimization instance under the same
- * wall-clock budget, recording time-to-first-incumbent and best objective reached. Replaces
- * the legacy `LsBench`'s klause-LS-vs-Yuck comparison (Yuck is unavailable as a JVM
- * dependency). Only optimization entries (those with an [Objective]) participate. Override the
- * reference with `-Dklause.bench.anytime.reference=choco|ortools`.
+ * wall-clock budget, recording time-to-first-incumbent and best objective reached. Only
+ * optimization entries (those with an [Objective]) participate. Override the reference with
+ * `-Dklause.bench.anytime.reference=choco|ortools`.
  */
 @Serializable
 data class AnytimeRow(

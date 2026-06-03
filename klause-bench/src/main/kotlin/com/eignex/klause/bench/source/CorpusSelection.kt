@@ -10,8 +10,7 @@ import java.io.File
 import kotlin.random.Random
 
 /**
- * First-class, reusable corpus-selection machinery — the new-architecture home for the logic
- * the legacy `MznParityCorpus` carried inline. It discovers `(model, optional data)` instances
+ * First-class, reusable corpus-selection machinery. It discovers `(model, optional data)` instances
  * from a corpus root under a known [Layout], then applies family-aware selection so a capped
  * run yields a spread across problem families rather than all of the first family:
  *
@@ -139,7 +138,7 @@ object CorpusSelection {
 
     /** Pick the canonical `.mzn` for [familyName] from [candidates]: exact basename, then
      *  `<family>_model` / `model` / `main`, then a family-prefixed non-`mznc` name, else
-     *  sorted-first. Ported from the legacy heuristic. */
+     *  sorted-first. */
     fun pickPrimaryMzn(familyName: String, candidates: List<File>): File {
         val lower = familyName.lowercase()
         val priorities = listOf<(File) -> Boolean>(

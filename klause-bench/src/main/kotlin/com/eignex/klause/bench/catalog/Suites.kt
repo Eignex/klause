@@ -17,14 +17,12 @@ import com.eignex.klause.solver.factor.Xor
 
 /**
  * Catalog content: every [Suite] the bench knows about, grouped by where the instances come
- * from. This is the curated, in-source replacement for problems formerly pulled from
- * hard-coded `Portfolio` entries, classpath resources, and ad-hoc build-time downloads.
+ * from.
  *
  *  - [handwrittenCore] — small SAT/CSP instances built directly in Kotlin (`InCode`).
  *  - [dimacsCore]/[opbCore]/[schemaCore]/[flatzincCore] — vendored under `klause-bench/corpus/`.
  *  - [mznSmoke] — the in-tree `klause-mzn-lib/test-models/` smoke set (referenced, not copied).
- *  - external MiniZinc/SAT collections (fetched on demand) are declared in [ExternalCollections]
- *    and wired into suites in phase 2.
+ *  - external MiniZinc/SAT collections (fetched on demand) are declared in [ExternalCollections].
  */
 object Suites {
 
@@ -109,7 +107,7 @@ object Suites {
         }
     }
 
-    // --- In-code SAT/CSP (ported from the former Portfolio) ---
+    // --- In-code SAT/CSP ---
 
     private val handwrittenCore = suite("handwritten-core", "Small hand-built SAT/CSP instances") {
         license = "internal"
@@ -293,8 +291,6 @@ object Suites {
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
     }
 
-    // --- In-tree MiniZinc smoke set (referenced from klause-mzn-lib/test-models/) ---
-
     // --- External SAT collection (auto-fetched SATLIB tarball) ---
 
     private val satlibUf20 = suite("satlib-uf20", "SATLIB uf20-91 SAT instances (auto-fetched sample)") {
@@ -349,7 +345,6 @@ object Suites {
 /**
  * Non-vendored problem collections, fetched on demand by `source.CorpusFetcher`. Declared
  * here so the "where did this come from / why isn't it in the repo" answer is auditable.
- * Wired into suites in phase 2.
  */
 object ExternalCollections {
     val minizincBenchmarks = ExternalCollection(

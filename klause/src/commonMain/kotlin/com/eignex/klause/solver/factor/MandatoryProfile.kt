@@ -15,11 +15,10 @@ import kotlin.math.min
  * the capacity proves infeasibility, and a candidate placement that would push any
  * segment over capacity can be shaved.
  *
- * This consolidates three previously copy-pasted bodies — the event build, the
- * `(time asc, delta desc)` sort, the segment-build sweep, and the `ownsMandatory`
- * discount in [overloadsAt] — into one place, so the subtle own-part discount no longer
- * has to be kept in sync by hand. Disjunctive is the capacity-1, unit-resource
- * specialization (`build(cap = 1)`, `overloadsAt(..., r = 1, cap = 1, ...)`).
+ * Consolidating the event build, the `(time asc, delta desc)` sort, the segment-build
+ * sweep, and the `ownsMandatory` discount in [overloadsAt] into one place keeps the subtle
+ * own-part discount from having to be kept in sync by hand. Disjunctive is the capacity-1,
+ * unit-resource specialization (`build(cap = 1)`, `overloadsAt(..., r = 1, cap = 1, ...)`).
  *
  * One instance covers a single profile (build once, then query); callers needing several
  * profiles (e.g. one per machine in [Cumulatives]) allocate one instance each.

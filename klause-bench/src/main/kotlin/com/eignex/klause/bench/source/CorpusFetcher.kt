@@ -14,9 +14,6 @@ import java.net.URI
  *    [ExternalCollection]; the collection is fetched **on first use** (automatically and
  *    transparently, with a clear log line) into [cacheRoot] and reused thereafter.
  *  - [ProblemSource.InCode] has no file and is resolved by the solver layer, not here.
- *
- * This replaces the old build-time `downloadMzn*`/`downloadSatlib` Gradle tasks and the
- * ad-hoc directory walking in the former `MznParityCorpus` / `SatlibLoader`.
  */
 object CorpusFetcher {
 

@@ -22,8 +22,7 @@ private class BackendTimings(
 /**
  * Wall-time bench for `solve` / `samples` / `enumerate` per backend per problem, plus the
  * propagation microbench. Output goes to `build/bench-time.json` and is compared against
- * `bench-baseline.json` for regression detection. Ports the legacy `Benchmarker` +
- * `TimeBenchMain`.
+ * `bench-baseline.json` for regression detection.
  */
 object TimeMetric {
     private const val RESULTS_PATH = "build/bench-time.json"

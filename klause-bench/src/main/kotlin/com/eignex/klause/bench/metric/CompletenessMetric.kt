@@ -14,7 +14,7 @@ import kotlinx.serialization.Serializable
 /**
  * Per-backend enumeration completeness for one problem: how many distinct SAT assignments
  * each backend reaches inside a sequence of wall-time budgets, optionally as a fraction of
- * the brute-force oracle total. Ports the legacy `CompletenessBench` + `CompletenessBenchMain`.
+ * the brute-force oracle total.
  */
 @Serializable
 data class CompletenessReport(

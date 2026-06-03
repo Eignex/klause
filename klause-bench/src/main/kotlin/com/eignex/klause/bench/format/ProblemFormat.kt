@@ -52,7 +52,7 @@ object FlatZincFormat : ProblemFormat {
     override val format = Format.FLATZINC
     override val inProcess = true
     // Objective extraction from the solve directive is deferred to the MiniZinc optimization
-    // path (phase 2); satisfaction FZN is handled here.
+    // path; satisfaction FZN is handled here.
     override fun ingest(file: File) = Ingested(parseFlatZinc(file.readText()).problem)
 }
 

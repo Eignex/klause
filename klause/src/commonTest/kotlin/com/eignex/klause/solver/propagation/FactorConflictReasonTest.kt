@@ -546,8 +546,7 @@ class FactorConflictReasonTest {
             problem,
             Assumptions.None,
         )
-        // Allocate atoms. Both currently undetermined (5 ∈ [0,9], 7 ∈ [0,9]).
-        // Wait — atom truth derives from currentTruth(): [v0 ≥ 5] is true iff v0.min ≥ 5.
+        // Atom truth derives from currentTruth(): [v0 ≥ 5] is true iff v0.min ≥ 5.
         // With dom [0,9], v0.min = 0, so atom is currently false. Similarly [v1 ≥ 7].
         val atomV0Ge5 = state.atomVarGe(0, 5)
         val atomV1Ge7 = state.atomVarGe(1, 7)

@@ -115,7 +115,6 @@ class ChocoModel private constructor(
             is ReifiedCardinality ->
                 countConstraint(litVars(f.literals), f.min, f.max).reifyWith(boolVars[f.auxBoolVar])
 
-            // ---- expanded coverage ----
             is AllEqual -> model.allEqual(*intVarsOf(f.xs)).post()
 
             is AllDifferentExceptZero -> model.allDifferentExcept0(intVarsOf(f.xs)).post()
