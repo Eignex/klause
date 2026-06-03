@@ -196,6 +196,26 @@ class BinPacking(
                 }
             }
         }
+        // Capacity pruning (UniformCapacity / PerBinCapacity): an item provably cannot go in
+        // a bin whose already-committed load leaves no room for it. For each not-yet-fixed
+        // item i and each bin k still in its domain, if `definiteLoads[k] + weights[i] > cap`
+        // remove k from item i's bin domain — the standard cheap bin_packing_capa filtering
+        // that makes the constraint propagate rather than only check at a leaf.
+        if (mode == Mode.UniformCapacity || mode == Mode.PerBinCapacity) {
+            val ant = state.composeIntVarAtomAntecedents(bins)
+            for (i in bins.indices) {
+                val w = weights[i]
+                if (w == 0) continue
+                val d = state.intDomains[bins[i]]
+                if (d.min == d.max) continue // fixed: its load is already in definiteLoads
+                for (k in 0 until numBins) {
+                    val binValue = k + binOffset
+                    if (binValue !in d) continue
+                    val cap = if (mode == Mode.UniformCapacity) uniformCapacity else requireNotNull(capacities)[k]
+                    if (definiteLoads[k] + w > cap && !state.excludeIntValue(bins[i], binValue, ant)) return false
+                }
+            }
+        }
         return true
     }
 
