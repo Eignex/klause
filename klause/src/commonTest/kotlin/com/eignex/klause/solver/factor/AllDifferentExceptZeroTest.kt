@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -7,6 +8,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -92,6 +94,48 @@ class AllDifferentExceptZeroTest {
                 .map { it.ints.toList() }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
+    }
+
+    @Test
+    fun `Régin detects a non-zero Hall violation that singleton-take misses`() {
+        // Three vars over {1,2} with no zero available: 3 distinct non-zero values needed from
+        // a 2-value set ⟹ UNSAT. No var is singleton, so singleton-take can't see it; the
+        // shared Régin matching pass does. Asserted at propagation time (root).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 2)),
+            factors = arrayOf<Factor>(AllDifferentExceptZero(intArrayOf(0, 1, 2))),
+        )
+        assertIs<PropagationResult.Unsat>(problem.propagate(Assumptions.None))
+    }
+
+    @Test
+    fun `Régin prunes Hall-set values from a free var`() {
+        // x0,x1 ∈ {1,2} (no zero) cover {1,2}; x2 ∈ {1,2,3} must therefore take 3. Pure Régin
+        // inference — singleton-take alone prunes nothing here.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 3)),
+            factors = arrayOf<Factor>(AllDifferentExceptZero(intArrayOf(0, 1, 2))),
+        )
+        val impl = assertIs<PropagationResult.Implied>(problem.propagate(Assumptions.None))
+        assertEquals(3, impl.intValueOrNull(2), "x2 must be pruned to 3 by the Hall set {1,2}")
+    }
+
+    @Test
+    fun `zeros stay shareable under Régin`() {
+        // Régin must NOT prune the excepted value 0: three vars can all be 0.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(AllDifferentExceptZero(intArrayOf(0, 1, 2))),
+        )
+        val impl = assertIs<PropagationResult.Implied>(problem.propagate(Assumptions.None))
+        // x2 keeps 0 (sharing zero is allowed); it is not forced off 0.
+        assertEquals(null, impl.intValueOrNull(2), "x2 should not be pinned; 0 stays available")
     }
 
     @Test
