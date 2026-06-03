@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult.Optimal
+import com.eignex.klause.solver.MinimizeResult.WithSample
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -123,14 +124,47 @@ class PortfolioTest {
             intCoefficients = doubleArrayOf(1.0, 2.0),
         )
         val workers = List(3) { i ->
-            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L)) { params, supplier ->
+            PortfolioWorker.of(
+                "bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L), objective = obj,
+            ) { params, supplier ->
                 params.copy(objectiveBoundSupplier = supplier)
             }
         }
         Portfolio(workers).use { p ->
-            val r = p.minimize(obj)
+            val r = p.minimize()
             val optimal = assertIs<Optimal>(r)
             assertEquals(3.0, optimal.objectiveValue)
+        }
+    }
+
+    @Test
+    fun `builder minimize wires a per-worker objective across a mixed pool`() = runTest {
+        // minimize x + 2y subject to x + y >= 3 — same as above, but built through
+        // PortfolioBuilder with BOTH a per-worker LS objective and a backtrack (linear) objective
+        // (#63). LS workers descend lsObjective, backtrack workers bound linearObjective; the
+        // shared scalar bound stays comparable, so the mixed pool still proves the optimum (3).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        PortfolioBuilder.build(
+            problem,
+            PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
+            lsObjective = obj,
+            linearObjective = obj,
+        ).use { p ->
+            // The builder's LS workers carry no flip budget — under shared-bound the backtrack
+            // workers report BestFound (not Optimal), so nothing self-cancels the pool. Every real
+            // driver (CLI/bench) bounds it with a deadline; do the same here. Backtrack finds the
+            // optimum (3) almost immediately; the deadline just stops the unbounded LS workers.
+            val deadline = TimeSource.Monotonic.markNow() + kotlin.time.Duration.parse("3s")
+            val r = p.minimize(cancellation = { deadline.hasPassedNow() })
+            assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
         }
     }
 

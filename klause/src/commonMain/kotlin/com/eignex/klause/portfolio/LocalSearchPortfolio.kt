@@ -60,9 +60,18 @@ internal data class LocalSearchWorkerConfig(
          *  general strategy — constraint-violation gradient with int-aware moves and weight
          *  learning, best on the CP shape MiniZinc produces), followed by orthogonal members
          *  for coverage: adaptive probSAT for clausal SAT, WalkSAT+configuration-checking for
-         *  structured SAT, simulated annealing for rugged escape, and VND+ILS for coordinated
-         *  multi-variable moves. The first [count] entries are taken, so small portfolios get
-         *  the highest-value workers first. */
+         *  structured SAT, and simulated annealing for rugged escape. The first [count] entries
+         *  are taken (wrapping when `count` exceeds the palette), so small portfolios get the
+         *  highest-value workers first.
+         *
+         *  #66: the former large-move `vnd/ils-linkage` worker (`Cbls.vnd(maxNeighborhood = 3)`)
+         *  was DROPPED from the default palette. The CBLS×VND merge investigation produced a
+         *  decisive negative result on CP-shaped optimisation: large coordinated moves *thrash*
+         *  the coupled #54 plateaus (bacp plateau cost 8 → 104–113) and scored 0/3 feasibility
+         *  @8s on every tested miss — it burned a core for negative value. The `Cbls.vnd(...)`
+         *  factory and the `maxNeighborhood` ladder knob remain available as opt-in research
+         *  infra (dormant at the default `maxNeighborhood = 1`); this only removes it as a
+         *  default-palette worker. */
         fun diverse(count: Int): List<LocalSearchWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val cblsTabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
@@ -107,17 +116,6 @@ internal data class LocalSearchWorkerConfig(
                     "sa/fixed",
                     SimulatedAnnealing(),
                     FixedCadenceRestart(maxFlipsBeforeRestart = 50_000),
-                ),
-                // VND + linkage-aware ILS: coordinated multi-variable (compound) moves with
-                // restart-layer shaking — the "shake + descent" framework.
-                LocalSearchWorkerConfig(
-                    "vnd/ils-linkage",
-                    Cbls.vnd(maxNeighborhood = 3, skewAlpha = 0.2),
-                    IteratedLocalSearchRestart(
-                        populationSize = 5,
-                        crossoverRate = 0.4,
-                        linkageAware = true,
-                    ),
                 ),
             )
             return List(count) { palette[it % palette.size] }

@@ -4,7 +4,6 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.TerminationReason
@@ -30,12 +29,12 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * Usage:
  * ```
  * val workers = listOf(
- *     PortfolioWorker.of("cbls", lsSession, LocalSearchParams(randomSeed = 1)),
- *     PortfolioWorker.of("bt", btSession, BacktrackParams(randomSeed = 2)) { p, s ->
+ *     PortfolioWorker.of("cbls", lsSession, LocalSearchParams(randomSeed = 1), objective = functional),
+ *     PortfolioWorker.of("bt", btSession, BacktrackParams(randomSeed = 2), objective = linear) { p, s ->
  *         p.copy(objectiveBoundSupplier = s)
  *     },
  * )
- * val result = runBlocking { Portfolio(workers).minimize(objective) }
+ * val result = runBlocking { Portfolio(workers).minimize() }
  * ```
  *
  * Cancellation is wired through each worker's params (via the worker's captured
@@ -50,6 +49,8 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * dispatcher; JS / WASM interleave cooperatively on one thread (correct, no wall-clock speedup).
  */
 class Portfolio(
+    /** The configured engine instances raced in parallel; each carries its own params and (for
+     *  optimisation) its own objective representation. */
     val workers: List<PortfolioWorker>,
     private val strategy: PortfolioStrategy = PortfolioStrategy.RaceFirstFeasible,
 ) : AutoCloseable {
@@ -90,75 +91,77 @@ class Portfolio(
 
     /**
      * Parallel branch-and-bound minimisation with a shared best bound. Each worker streams its
-     * own improvements; new incumbents fold into a shared bound exposed back to every worker
-     * through the bound supplier its [PortfolioWorker.of] `withBound` wired in (backtrack prunes
-     * on it; LS ignores it). A worker proving Optimal cancels the rest; otherwise the global
-     * incumbent is returned as BestFound, or Optimal if every worker terminated cleanly.
+     * own improvements **against the objective representation it was built with** (#63: LS
+     * descends the functional/gradient objective, backtrack bounds the linear one); new
+     * incumbents fold into a shared bound exposed back to every worker through the bound supplier
+     * its [PortfolioWorker.of] `withBound` wired in (backtrack prunes on it; LS ignores it). The
+     * shared bound is a single scalar all workers agree on — they minimise the same objective
+     * var. A worker proving Optimal cancels the rest; otherwise the global incumbent is returned
+     * as BestFound, or Optimal if every worker terminated cleanly.
      */
-    suspend fun minimize(objective: Objective, cancellation: Cancellation = Cancellation.Never): MinimizeResult =
-        coroutineScope {
-            // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity equality
-            // and CAS would fail spuriously on autoboxed Doubles.
-            val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
-            val bestSample = AtomicReference<Sample?>(null)
-            val cancelled = AtomicBoolean(false)
-            val token: Cancellation = { cancelled.load() || cancellation() }
+    suspend fun minimize(cancellation: Cancellation = Cancellation.Never): MinimizeResult = coroutineScope {
+        // AtomicLong stores bit-encoded Double — AtomicReference<Double> uses identity equality
+        // and CAS would fail spuriously on autoboxed Doubles.
+        val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
+        val bestSample = AtomicReference<Sample?>(null)
+        val cancelled = AtomicBoolean(false)
+        val token: Cancellation = { cancelled.load() || cancellation() }
 
-            fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
+        fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
 
-            val deferreds = workers.map { worker ->
-                async {
-                    var local: MinimizeResult = MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-                    for (r in worker.improvements(objective, ::readBound, token)) {
-                        when (r) {
-                            is MinimizeResult.BestFound -> {
-                                updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
-                                local = r
-                            }
-
-                            is MinimizeResult.Optimal -> {
-                                updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
-                                cancelled.store(true)
-                                local = r
-                                break
-                            }
-
-                            is MinimizeResult.Infeasible -> local = r
-
-                            is MinimizeResult.Unknown -> local = r
+        val deferreds = workers.map { worker ->
+            async {
+                var local: MinimizeResult = MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                for (r in worker.improvements(::readBound, token)) {
+                    when (r) {
+                        is MinimizeResult.BestFound -> {
+                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                            local = r
                         }
+
+                        is MinimizeResult.Optimal -> {
+                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                            cancelled.store(true)
+                            local = r
+                            break
+                        }
+
+                        is MinimizeResult.Infeasible -> local = r
+
+                        is MinimizeResult.Unknown -> local = r
                     }
-                    local
                 }
-            }
-            val results = deferreds.awaitAll()
-
-            // Reduce verdicts. A direct Optimal claim is only honoured from a worker that didn't run
-            // under external bound sharing (the engine downgrades to BestFound when shared); single-
-            // worker / unshared portfolios still produce direct Optimal here.
-            val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
-            if (directOptimal != null) return@coroutineScope directOptimal
-
-            // "Dirty" Unknown = ran out of budget / timed out / cancelled before fully exploring.
-            // SearchExhausted is clean — the worker's space was fully covered.
-            val anyDirtyUnknown = results.any { r ->
-                r is MinimizeResult.Unknown && r.reason != TerminationReason.SearchExhausted
-            }
-            val sample = bestSample.load()
-            val finalBound = readBound()
-            if (sample != null) {
-                return@coroutineScope if (anyDirtyUnknown) {
-                    MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted)
-                } else {
-                    MinimizeResult.Optimal(sample, finalBound)
-                }
-            }
-            if (anyDirtyUnknown) {
-                MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-            } else {
-                MinimizeResult.Infeasible()
+                local
             }
         }
+        val results = deferreds.awaitAll()
+
+        // Reduce verdicts. A direct Optimal claim is only honoured from a worker that didn't run
+        // under external bound sharing (the engine downgrades to BestFound when shared); single-
+        // worker / unshared portfolios still produce direct Optimal here.
+        val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
+        if (directOptimal != null) return@coroutineScope directOptimal
+
+        // "Dirty" Unknown = ran out of budget / timed out / cancelled before fully exploring.
+        // SearchExhausted is clean — the worker's space was fully covered.
+        val anyDirtyUnknown = results.any { r ->
+            r is MinimizeResult.Unknown && r.reason != TerminationReason.SearchExhausted
+        }
+        val sample = bestSample.load()
+        val finalBound = readBound()
+        if (sample != null) {
+            return@coroutineScope if (anyDirtyUnknown) {
+                MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted)
+            } else {
+                MinimizeResult.Optimal(sample, finalBound)
+            }
+        }
+        if (anyDirtyUnknown) {
+            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+        } else {
+            MinimizeResult.Infeasible()
+        }
+    }
 
     private fun updateSharedBound(
         boundBits: AtomicLong,
@@ -181,27 +184,27 @@ class Portfolio(
      * Streaming branch-and-bound: fan in every worker's improving incumbents into one flow,
      * emitting only those that strictly beat the shared global best (so the consumer sees a
      * monotonically-improving sequence). The shared bound is exposed to bound-pruning workers
-     * exactly as in [minimize]. Collector cancellation (and [cancellation]) stops all workers.
-     * This is the anytime entry point the bench's optimisation metric consumes.
+     * exactly as in [minimize]. Each worker streams against its own objective representation
+     * (#63). Collector cancellation (and [cancellation]) stops all workers. This is the anytime
+     * entry point the bench's optimisation metric consumes.
      */
-    fun improvements(objective: Objective, cancellation: Cancellation = Cancellation.Never): Flow<MinimizeResult> =
-        channelFlow {
-            val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
-            val bestSample = AtomicReference<Sample?>(null)
-            fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
-            for (worker in workers) {
-                launch {
-                    val job = requireNotNull(coroutineContext[Job])
-                    val token: Cancellation = { !job.isActive || cancellation() }
-                    for (r in worker.improvements(objective, ::readBound, token)) {
-                        if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
-                            updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
-                            send(r)
-                        }
+    fun improvements(cancellation: Cancellation = Cancellation.Never): Flow<MinimizeResult> = channelFlow {
+        val sharedBoundBits = AtomicLong(Double.POSITIVE_INFINITY.toRawBits())
+        val bestSample = AtomicReference<Sample?>(null)
+        fun readBound(): Double = Double.fromBits(sharedBoundBits.load())
+        for (worker in workers) {
+            launch {
+                val job = requireNotNull(coroutineContext[Job])
+                val token: Cancellation = { !job.isActive || cancellation() }
+                for (r in worker.improvements(::readBound, token)) {
+                    if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
+                        updateSharedBound(sharedBoundBits, bestSample, r.objectiveValue, r.sample)
+                        send(r)
                     }
                 }
             }
         }
+    }
 
     /**
      * Stream samples in parallel across all workers, fanning in to a single flow. Each worker

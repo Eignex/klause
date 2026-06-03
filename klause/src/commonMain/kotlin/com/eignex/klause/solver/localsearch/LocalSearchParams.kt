@@ -47,10 +47,10 @@ data class LocalSearchParams(
      * point found by the CP/backtrack solver to LS (the #54 misses reach feasibility trivially
      * under CP but never under LS). Size-mismatched samples are ignored.
      *
-     * **Competition note:** this MUST stay `null` for the MiniZinc *local-search* competition,
-     * which forbids CP seeding — the pure-LS entry point ([com.eignex.klause] FZN CLI
-     * `runWithLocalSearch`) never sets it, so the default is competition-safe. Only the bench /
-     * hybrid driver populates it. Ignored by `solve` / `samples` / `enumerate`.
+     * Defaults to `null`: the pure-LS entry point ([com.eignex.klause] FZN CLI
+     * `runWithLocalSearch`) never sets it, keeping pure local search free of any CP dependency.
+     * Only the bench / hybrid driver populates it, behind an explicit opt-in. Ignored by
+     * `solve` / `samples` / `enumerate`.
      */
     val initialAssignment: Sample? = null,
 ) : SolverParams {
