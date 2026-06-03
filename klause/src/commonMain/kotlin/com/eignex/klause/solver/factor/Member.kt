@@ -12,8 +12,11 @@ import com.eignex.klause.util.IntArrayList
  * `member_int(xs, y)` — `y` equals at least one of the `xs[i]`. The dual of
  * disjunction-of-equalities: `(y = xs[0]) ∨ (y = xs[1]) ∨ … ∨ (y = xs[n-1])`.
  *
- * Propagation: when every `xs[i]`'s domain is disjoint from `y`'s domain, fail; when
- * `xs` has length 1, force `y = xs[0]`.
+ * Propagation:
+ *  - **union-hull on `y`**: `y` must equal some candidate, so every `y`-value that no `xs[i]`
+ *    domain contains is pruned (an empty result fails).
+ *  - **unique-support channeling**: once `y` is pinned to `v`, if exactly one candidate can
+ *    still take `v` it is forced to `v` (it is the only possible witness); zero candidates fail.
  */
 class Member(
     /** The candidate variable ids. */
@@ -143,22 +146,46 @@ class Member(
                 return false
             }
         }
-        // Singleton-xs[i]: if every xs[i] is singleton, y must equal one of them.
-        var allSingleton = true
-        for (x in xs) {
-            if (state.intDomains[x].min != state.intDomains[x].max) {
-                allSingleton = false
-                break
+        // Union-hull on y: y = some xs[i], so every y-value that no candidate domain contains
+        // is unsupported. Generalises the old all-singleton special case to arbitrary domains.
+        val toRemove = IntArrayList()
+        state.intDomains[y].forEach { v ->
+            var supported = false
+            for (x in xs) {
+                if (v in state.intDomains[x]) {
+                    supported = true
+                    break
+                }
             }
+            if (!supported) toRemove.add(v)
         }
-        if (allSingleton) {
-            val values = HashSet<Int>()
-            for (x in xs) values.add(state.intDomains[x].min)
-            // Restrict y's domain to the value set.
-            val toRemove = IntArrayList()
-            dy.forEach { if (it !in values) toRemove.add(it) }
-            val ant = state.composeIntVarAtomAntecedents(xs)
+        if (toRemove.size > 0) {
+            val ant = collectHoleAndBoundAntecedents(state, xs)
             for (k in 0 until toRemove.size) if (!state.excludeIntValue(y, toRemove[k], ant)) return false
+        }
+        // Unique-support channeling: if y is now pinned to yv and exactly one candidate can
+        // take yv, that candidate is the only possible witness and must equal yv.
+        val dyNow = state.intDomains[y]
+        if (dyNow.min == dyNow.max) {
+            val yv = dyNow.min
+            var witness = -1
+            var count = 0
+            for (x in xs) {
+                if (yv in state.intDomains[x]) {
+                    count++
+                    witness = x
+                }
+            }
+            if (count == 0) return false // no candidate left (defensive; hull prune should catch)
+            if (count == 1) {
+                val d = state.intDomains[witness]
+                if (!(d.min == d.max && d.min == yv)) {
+                    val drop = IntArrayList()
+                    d.forEach { if (it != yv) drop.add(it) }
+                    val ant = collectHoleAndBoundAntecedents(state, intVars)
+                    for (k in 0 until drop.size) if (!state.excludeIntValue(witness, drop[k], ant)) return false
+                }
+            }
         }
         return true
     }

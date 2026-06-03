@@ -201,9 +201,11 @@ class BruteForceSolver(override val problem: Problem) :
             when (dim.kind) {
                 DimKind.BOOL -> state.assignment.setBool(dim.varId, digit == 1)
 
+                // `digit` is an ordinal into the present values, not an offset from min:
+                // holey domains (e.g. {0,2}) must enumerate real members, never the hole.
                 DimKind.INT -> state.assignment.setInt(
                     dim.varId,
-                    problem.intDomains[dim.varId].min + digit,
+                    problem.intDomains[dim.varId].valueAt(digit),
                 )
             }
         }

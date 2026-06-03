@@ -7,6 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -44,5 +45,36 @@ class ValuePrecedeTest {
             factors = arrayOf<Factor>(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    @Test
+    fun `forced t makes the sole earlier candidate take s`() {
+        // x1 is pinned to t=2; only x0 can be s=1 before it ⟹ x0 must become 1.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(2, 2)),
+            factors = arrayOf<Factor>(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1))),
+        )
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertEquals(1, sat.assignment.ints[0], "sole pre-t candidate must take s")
+    }
+
+    @Test
+    fun `holey domains prune premature t`() {
+        // s=1 first becomes possible only at index 2 (x0,x1 ∈ {0,2} have a hole at 1), so t=2
+        // is barred from indices 0..2 ⟹ x0=x1=0, x2=1. Exercises hole-aware rule 1.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(
+                IntDomain(0, 2).excludeValue(1),
+                IntDomain(0, 2).excludeValue(1),
+                IntDomain(1, 2),
+            ),
+            factors = arrayOf<Factor>(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))),
+        )
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertEquals(listOf(0, 0, 1), sat.assignment.ints.toList(), "premature t not pruned")
     }
 }

@@ -297,7 +297,7 @@ class Linear private constructor(
 
 /**
  * Hole-aware antecedent collection for propagators that prune interior values (AllDifferent,
- * GlobalCardinality, Regular, AllDifferentExceptZero, Inverse, Member). Cites:
+ * GlobalCardinality, Regular, AllDifferentExceptZero, Inverse, Member, AllEqual). Cites:
  *   - bound atoms when current min/max are tighter than initial,
  *   - `[v ≠ value]` atom-lits for every value in the original domain that's currently
  *     excluded from the live domain.

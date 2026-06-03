@@ -141,7 +141,26 @@ class AllFactorsOracleTest {
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
             exactProbe = true,
+            gac = true,
         )
+    }
+
+    @Test fun countForceIn() {
+        // count_eq(xs, v=1) with xs ∈ {0,1}; n pinned to 2 = possible ⟹ both forced to 1.
+        val f = Count(xs = intArrayOf(0, 1), v = 1, op = Count.Op.Eq, n = 2)
+        check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 2)), gac = true)
+    }
+
+    @Test fun countForceOut() {
+        // count_eq(xs, v=1) with xs ∈ {0,1}; n pinned to 0 = definite ⟹ both forced to 0.
+        val f = Count(xs = intArrayOf(0, 1), v = 1, op = Count.Op.Eq, n = 2)
+        check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0)), gac = true)
+    }
+
+    @Test fun countGeForce() {
+        // count_ge(xs, v=2) with xs ∈ {1,2,3}; n pinned to 2 = possible ⟹ both swing vars ≥ 2.
+        val f = Count(xs = intArrayOf(0, 1), v = 2, op = Count.Op.Ge, n = 2)
+        check(f, intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(2, 2)), gac = true)
     }
 
     @Test fun among() {
@@ -151,6 +170,27 @@ class AllFactorsOracleTest {
             f,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
             exactProbe = true,
+            gac = true,
+        )
+    }
+
+    @Test fun amongForceIn() {
+        // S = {1}; xs ∈ {0,1}; n pinned to 2 = possible ⟹ both swing vars forced to match (=1).
+        val f = Among(n = 2, xs = intArrayOf(0, 1), values = intArrayOf(1))
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 2)),
+            gac = true,
+        )
+    }
+
+    @Test fun amongForceOut() {
+        // S = {1}; xs ∈ {0,1}; n pinned to 0 = definite ⟹ no swing var may match (both → 0).
+        val f = Among(n = 2, xs = intArrayOf(0, 1), values = intArrayOf(1))
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0)),
+            gac = true,
         )
     }
 
@@ -169,6 +209,14 @@ class AllFactorsOracleTest {
         )
     }
 
+    @Test fun nValueAtMostIndependentSet() {
+        // AtMost: n ≥ distinct(xs). x0 ∈ {0,1}, x1 ∈ {2,3} are domain-disjoint, so distinct is
+        // always 2 ⟹ n ≥ 2. Exercises the greedy independent-set lower bound (sound-only;
+        // nvalue is not GAC).
+        val f = NValue(n = 0, xs = intArrayOf(1, 2), mode = NValue.Mode.AtMost)
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 1), IntDomain(2, 3)))
+    }
+
     @Test fun globalCardinality() {
         // count[0]=#zeros, count[1]=#ones across xs=(2,3,4), all ∈ {0,1}; counts ∈ [0,3].
         val f = GlobalCardinality(
@@ -185,6 +233,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 1),
                 IntDomain(0, 1),
             ),
+            gac = true,
         )
     }
 
@@ -192,7 +241,7 @@ class AllFactorsOracleTest {
 
     @Test fun allDifferent() {
         val f = AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 1, domainSize = 3)
-        check(f, intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)))
+        check(f, intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)), gac = true)
     }
 
     @Test fun allDifferentExcept() {
@@ -602,6 +651,9 @@ class AllFactorsOracleTest {
      * `exactProbe`: set true for factors migrated to graded violation — asserts their
      *   `deltaIf*` probe exactly predicts the cost change (accurate CBLS gradient). Left false
      *   for factors with approximate-by-design probes (cost-tracking is still verified).
+     * `gac`: set true for factors that document full GAC (e.g. Régin / max-flow filtering) —
+     *   asserts [FactorPropagationOracle.assertGac] (completeness: every unsupported value is
+     *   pruned), not just soundness. Leave false for weaker-than-GAC propagators.
      */
     private fun check(
         factor: Factor,
@@ -609,6 +661,7 @@ class AllFactorsOracleTest {
         intDomains: Array<IntDomain> = emptyArray(),
         label: String? = null,
         exactProbe: Boolean = false,
+        gac: Boolean = false,
     ) {
         val name = label ?: factor::class.simpleName ?: "factor"
         val problem = Problem(
@@ -617,8 +670,181 @@ class AllFactorsOracleTest {
             intDomains = intDomains,
             factors = listOf(factor),
         )
-        FactorPropagationOracle.assertSound(problem, name)
+        if (gac) FactorPropagationOracle.assertGac(problem, name) else FactorPropagationOracle.assertSound(problem, name)
         MoveSetOracle.assertRepairsCoverImproving(problem, name, iters = 40, requireImprovement = false)
         DegreeConsistencyOracle.assertConsistent(problem, name, exactProbe = exactProbe)
+    }
+
+    // ---- Holey-domain propagation guard ------------------------------------------
+    //
+    // The matching/Régin/max-flow factors must stay sound — and, where they claim GAC,
+    // complete — when per-var domains carry *interior holes* (e.g. {0,2}). The prior
+    // false-UNSAT bug was exactly a holey-domain free-value-reachability defect, and every
+    // case above uses contiguous IntDomain(a,b), so without these the regression net has a
+    // hole-shaped gap. These run the propagation oracle only (the move-set / degree-probe
+    // oracles are exercised by the contiguous cases above).
+
+    /** Build a holey domain `[lo..hi]` minus each value in [holes]. */
+    private fun holey(lo: Int, hi: Int, vararg holes: Int): IntDomain {
+        var d = IntDomain(lo, hi)
+        for (h in holes) d = d.excludeValue(h)
+        return d
+    }
+
+    private fun checkPropagation(
+        factor: Factor,
+        intDomains: Array<IntDomain>,
+        label: String,
+        gac: Boolean,
+    ) {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = intDomains.size,
+            intDomains = intDomains,
+            factors = listOf(factor),
+        )
+        if (gac) FactorPropagationOracle.assertGac(problem, label) else FactorPropagationOracle.assertSound(problem, label)
+    }
+
+    @Test fun allDifferentHoley() {
+        // x0,x1 ∈ {0,2} between them must take {0,2}, forcing x2 ∈ {0,1,2} to 1 (GAC prune).
+        val f = AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), holey(0, 2, 1), IntDomain(0, 2)),
+            "AllDifferent.holey-forced",
+            gac = true,
+        )
+    }
+
+    @Test fun allDifferentHoleyUnsat() {
+        // Three distinct vars all confined to the two-value set {0,2} — a Hall violation
+        // (false-UNSAT-class probe: a reachability-orientation bug must not over- or under-call it).
+        val f = AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), holey(0, 2, 1), holey(0, 2, 1)),
+            "AllDifferent.holey-unsat",
+            gac = true,
+        )
+    }
+
+    @Test fun globalCardinalityHoley() {
+        // count[0]=#zeros, count[1]=#twos across xs=(2,3,4) ∈ {0,2}; counts ∈ [0,3].
+        val f = GlobalCardinality(
+            xs = intArrayOf(2, 3, 4),
+            cover = intArrayOf(0, 2),
+            countVars = intArrayOf(0, 1),
+        )
+        checkPropagation(
+            f,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3), holey(0, 2, 1), holey(0, 2, 1), holey(0, 2, 1)),
+            "GlobalCardinality.holey",
+            gac = true,
+        )
+    }
+
+    @Test fun allDifferentExceptHoley() {
+        // alldifferent_except({0}) with interior holes; weaker-than-GAC, soundness only.
+        val f = AllDifferentExcept(xs = intArrayOf(0, 1, 2), except = intArrayOf(0))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 3, 1), holey(0, 3, 2), IntDomain(0, 3)),
+            "AllDifferentExcept.holey",
+            gac = false,
+        )
+    }
+
+    @Test fun allDifferentExceptZeroHoley() {
+        val f = AllDifferentExceptZero(xs = intArrayOf(0, 1, 2))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 3, 1), holey(0, 3, 2), IntDomain(0, 3)),
+            "AllDifferentExceptZero.holey",
+            gac = false,
+        )
+    }
+
+    @Test fun symmetricAllDifferentHoley() {
+        val f = SymmetricAllDifferent(xs = intArrayOf(0, 1, 2, 3))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 3, 1), holey(0, 3, 2), IntDomain(0, 3), IntDomain(0, 3)),
+            "SymmetricAllDifferent.holey",
+            gac = false,
+        )
+    }
+
+    @Test fun inverseHoley() {
+        val f = Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))
+        checkPropagation(
+            f,
+            arrayOf(
+                holey(0, 2, 1), IntDomain(0, 2), IntDomain(0, 2),
+                IntDomain(0, 2), holey(0, 2, 1), IntDomain(0, 2),
+            ),
+            "Inverse.holey",
+            gac = false,
+        )
+    }
+
+    @Test fun memberHoley() {
+        // y over a full range against holey candidate domains — exercises the union-hull and
+        // unique-support rules under the brute oracle (sound-only).
+        val f = Member(xs = intArrayOf(0, 1), y = 2)
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 3, 1), holey(0, 3, 2), IntDomain(0, 3)),
+            "Member.holey",
+            gac = false,
+        )
+    }
+
+    @Test fun valuePrecedeHoley() {
+        // s=1, t=2 with interior holes at 1 in the first two positions — exercises the
+        // hole-aware "no premature t" rule under the brute oracle (sound-only; not GAC).
+        val f = ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), holey(0, 2, 1), IntDomain(0, 2)),
+            "ValuePrecede.holey",
+            gac = false,
+        )
+    }
+
+    @Test fun allEqualHoley() {
+        // x0,x1 ∈ {0,2}; x2 ∈ {0,1,2}. all-equal ⟹ common value ∈ {0,2}, so x2's 1 is
+        // unsupported. AllEqual documents intersection filtering, so assert full GAC (#82).
+        val f = AllEqual(xs = intArrayOf(0, 1, 2))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), holey(0, 2, 1), IntDomain(0, 2)),
+            "AllEqual.holey",
+            gac = true,
+        )
+    }
+
+    @Test fun allEqualHoleyEmpty() {
+        // dom(x0) = {0,2}, dom(x1) = {1}: the true intersection is empty ⟹ UNSAT (#82). The
+        // bounds-only intersection would pin both to [1,1] without this being caught.
+        val f = AllEqual(xs = intArrayOf(0, 1))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 2, 1), IntDomain(1, 1)),
+            "AllEqual.holey-empty",
+            gac = true,
+        )
+    }
+
+    @Test fun allEqualHoleyDisjointInterior() {
+        // dom(x0) = {0,3}, dom(x1) = {1,2}: overlapping bounds [0,3]/[1,2] but disjoint
+        // members ⟹ UNSAT even though commonMin ≤ commonMax.
+        val f = AllEqual(xs = intArrayOf(0, 1))
+        checkPropagation(
+            f,
+            arrayOf(holey(0, 3, 1, 2), holey(1, 2)),
+            "AllEqual.holey-disjoint",
+            gac = true,
+        )
     }
 }

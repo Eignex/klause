@@ -9,9 +9,11 @@ import com.eignex.klause.solver.propagation.PropagationState
 /**
  * `all_equal_int(xs)` — every `xs[i]` takes the same value. Trivially equivalent to a
  * chain of pairwise `xs[i] = xs[0]` equalities, but the dedicated factor lets the
- * engine propagate the intersection of domains in one pass: pick the max of every
- * `xs[i].min` as the common lower bound and the min of every `xs[i].max` as the
- * common upper bound, then push back to every operand.
+ * engine propagate the full domain intersection in one pass: pick the max of every
+ * `xs[i].min` as the common lower bound and the min of every `xs[i].max` as the common
+ * upper bound, push those back to every operand, then (when any operand carries interior
+ * holes) drop every value not present in *all* operands so the surviving domain is exactly
+ * `∩ dom(xs)` — hole-aware GAC, not merely bounds.
  */
 class AllEqual(
     /** Integer variable ids required to all take the same value. */
@@ -70,9 +72,11 @@ class AllEqual(
         }
     }
 
-    /** Bound-only conflict reason. */
+    /** Hole-aware conflict reason: cites the filtered bounds *and* interior holes of every
+     *  operand, since an empty intersection can be driven by a hole (e.g. {0,2} ∩ {1}) and
+     *  not just by crossed bounds. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
+        collectHoleAndBoundAntecedents(state, xs)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Common domain = ∩ dom(xs[i]) — implement as [maxOfMins, minOfMaxes]. Track which
@@ -103,6 +107,40 @@ class AllEqual(
         for (v in xs) {
             if (!state.tightenIntMin(v, commonMin, minAnt)) return false
             if (!state.tightenIntMax(v, commonMax, maxAnt)) return false
+        }
+        // Bounds intersection alone leaves interior holes that aren't common to every operand
+        // (e.g. {0,2} ∩ {0,1,2} keeps the unsupported 1 in the second var). Since AllEqual ⟹
+        // every operand takes the *same* value, the feasible common values are exactly
+        // ∩ dom(xs); drop every value missing from some operand. Skip the scan when every
+        // operand is contiguous over [commonMin, commonMax] — the bound tighten above already
+        // produced the exact intersection, keeping the common contiguous path O(N).
+        var anyHole = false
+        for (v in xs) {
+            val d = state.intDomains[v]
+            if (d.size != d.max - d.min + 1) {
+                anyHole = true
+                break
+            }
+        }
+        if (anyHole) {
+            // Hall-style reason: the filtered domains of all operands jointly justify why a
+            // value can't be the shared assignment. Mirrors AllDifferent's hole pruning.
+            val holeAnt = collectHoleAndBoundAntecedents(state, xs)
+            for (value in commonMin..commonMax) {
+                var inAll = true
+                for (v in xs) {
+                    if (value !in state.intDomains[v]) {
+                        inAll = false
+                        break
+                    }
+                }
+                if (inAll) continue
+                for (v in xs) {
+                    if (value in state.intDomains[v] && !state.excludeIntValue(v, value, holeAnt)) {
+                        return false
+                    }
+                }
+            }
         }
         return true
     }

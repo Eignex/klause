@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -7,6 +8,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -127,5 +129,21 @@ class InverseTest {
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(0, sat.assignment.ints[5], "g[2] (= var 5) must equal 0")
+    }
+
+    @Test
+    fun `value removal and its cascade still fire after incremental rewrite`() {
+        // n=2, 0-based. g[0] (var 2) pinned to 1, so g[0] ≠ 0 ⟹ remove 0 from f[0] (f[0]=1),
+        // which in turn forces g[1] (var 3) = 0. Completeness guard for the incremental
+        // row/column value-removal sweep.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1)),
+            factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1), g = intArrayOf(2, 3))),
+        )
+        val impl = assertIs<PropagationResult.Implied>(problem.propagate(Assumptions.None))
+        assertEquals(1, impl.intValueOrNull(0), "f[0] must lose 0 (g[0]≠0) and pin to 1")
+        assertEquals(0, impl.intValueOrNull(3), "cascade: f[0]=1 ⟹ g[1]=0")
     }
 }

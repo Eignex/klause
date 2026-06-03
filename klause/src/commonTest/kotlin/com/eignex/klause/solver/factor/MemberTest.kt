@@ -80,6 +80,33 @@ class MemberTest {
     }
 
     @Test
+    fun `union hull prunes y to values some candidate can take`() {
+        // xs domains {2,3} ∪ {7,8}; y ∈ [0,10] must land in {2,3,7,8}.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(2, 3), IntDomain(7, 8), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(Member(xs = intArrayOf(0, 1), y = 2)),
+        )
+        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(50).forEach { sample ->
+            assertTrue(sample.ints[2] in setOf(2, 3, 7, 8), "y = ${sample.ints[2]} outside union hull")
+        }
+    }
+
+    @Test
+    fun `unique support forces the only candidate that can match y`() {
+        // y pinned to 5; only x1 can be 5 (x0,x2 exclude it) ⟹ x1 forced to 5.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(4, 5), IntDomain(0, 1), IntDomain(5, 5)),
+            factors = arrayOf<Factor>(Member(xs = intArrayOf(0, 1, 2), y = 3)),
+        )
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertEquals(5, sat.assignment.ints[1], "the unique candidate for y=5 must be forced to 5")
+    }
+
+    @Test
     fun `singleton y forces some xs to match`() {
         // y pinned to 5; xs are free. Some xs[i] must take value 5.
         val problem = Problem(

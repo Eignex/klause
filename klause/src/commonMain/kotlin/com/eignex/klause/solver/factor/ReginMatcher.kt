@@ -1,0 +1,311 @@
+package com.eignex.klause.solver.factor
+
+import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
+
+/**
+ * Shared Régin domain-consistency filtering for the alldifferent family — [AllDifferent],
+ * [AllDifferentExcept], and [AllDifferentExceptZero] all route their matching pass through
+ * here, so the bipartite matching / reverse-graph free-value reachability / Tarjan SCC / Hall
+ * pruning machinery lives once rather than being copy-pasted (and drifting) per variant.
+ *
+ * The graph: variables on the left, distinct in-domain values on the right (matched
+ * value→var, unmatched var→value). A value with no support after matching is pruned from the
+ * variable's domain. Reachability is walked over the **reverse** graph from free (unmatched)
+ * values — a free value is a sink in the forward orientation, so a forward walk would reach
+ * nothing and wrongly prune every slack edge (this was the historical false-UNSAT defect).
+ *
+ * `alldifferent_except`: each value in [exceptSet] may be shared by any number of variables.
+ * It is modelled as `n` capacity-1 copies (distinct value-ids over the same value), turning
+ * `alldifferent_except` into a *pure* alldifferent over the expanded value universe — so the
+ * exact proven matching/reachability/SCC machinery applies unchanged. Except values are never
+ * pruned (there is always a free copy), and copies inflate the value count so the pigeonhole
+ * shortcut never misfires.
+ *
+ * Prune antecedents are the sharp Hall set (forward-reachable vars from the pruned value-node)
+ * with hole-aware [collectHoleAndBoundAntecedents], so learned clauses stay sound under holes.
+ *
+ * Returns `null` on success (after pruning in place), or the Hall-violator variable ids on
+ * infeasibility — the caller stores them as its conflict reason.
+ */
+internal fun reginFilter(
+    state: PropagationState,
+    filteredVars: IntArray,
+    exceptSet: Set<Int>,
+    cache: ReginCache? = null,
+): IntArray? {
+    val n = filteredVars.size
+    if (n < 2) return null
+
+    // Compact value-id mapping + per-var value-id lists (hole-aware). Non-except values get one
+    // id; each except value gets `n` capacity-1 copies (contiguous ids) so up to n vars share it.
+    val valueId = HashMap<Int, Int>() // non-except value → id
+    val exceptBase = HashMap<Int, Int>() // except value → first of its n copy ids
+    val idToValue = IntArrayList()
+    val valuesPerVar = Array(n) { i ->
+        val d = state.intDomains[filteredVars[i]]
+        val list = IntArrayList()
+        d.forEach { v ->
+            if (v in exceptSet) {
+                val base = exceptBase.getOrPut(v) {
+                    val b = idToValue.size
+                    repeat(n) { idToValue.add(v) }
+                    b
+                }
+                for (c in 0 until n) list.add(base + c)
+            } else {
+                val id = valueId.getOrPut(v) {
+                    idToValue.add(v)
+                    idToValue.size - 1
+                }
+                list.add(id)
+            }
+        }
+        list.toIntArray()
+    }
+    val numValues = idToValue.size
+    // Pigeonhole: n vars confined to < n distinct values cannot all differ. (Except copies
+    // inflate numValues to ≥ n, so this only fires when no excepted value is available.)
+    if (numValues < n) return filteredVars
+
+    // ---- Maximum bipartite matching via successive augmenting paths. O(n · |E|). ----
+    val matchVar = IntArray(n) { -1 }
+    val matchVal = IntArray(numValues) { -1 }
+    val visited = BooleanArray(numValues)
+    // Warm start (#96): reuse the previous matching for edges still valid after domain
+    // shrinkage; only the now-unmatched vars need augmenting. The completed matching is still
+    // maximum and Régin pruning is matching-independent, so this changes speed, not results.
+    if (cache != null) {
+        for (i in 0 until n) {
+            val prev = cache.matchedValue[filteredVars[i]] ?: continue
+            if (prev !in state.intDomains[filteredVars[i]]) continue // edge broke
+            if (prev in exceptSet) {
+                val base = exceptBase[prev] ?: continue
+                for (c in 0 until n) {
+                    if (matchVal[base + c] == -1) {
+                        matchVar[i] = base + c
+                        matchVal[base + c] = i
+                        break
+                    }
+                }
+            } else {
+                val id = valueId[prev] ?: continue
+                if (matchVal[id] == -1) {
+                    matchVar[i] = id
+                    matchVal[id] = i
+                }
+            }
+        }
+    }
+    for (i in 0 until n) {
+        if (matchVar[i] != -1) continue // already seeded from the warm-start matching
+        for (j in visited.indices) visited[j] = false
+        if (!reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)) {
+            // Augment failed: the saturated values plus their occupants and i form a Hall
+            // violator (every one of those vars' domains lies within the visited value set).
+            val hall = IntArrayList()
+            hall.add(filteredVars[i])
+            for (vid in 0 until numValues) {
+                if (visited[vid] && matchVal[vid] >= 0) hall.add(filteredVars[matchVal[vid]])
+            }
+            return hall.toIntArray()
+        }
+    }
+
+    // ---- Oriented graph: matched value→var, unmatched var→value (vars 0..n-1, values after). ----
+    val total = n + numValues
+    val adj = Array(total) { IntArrayList() }
+    val radj = Array(total) { IntArrayList() } // reverse of adj
+    for (i in 0 until n) {
+        for (vid in valuesPerVar[i]) {
+            if (matchVar[i] == vid) {
+                adj[n + vid].add(i)
+                radj[i].add(n + vid)
+            } else {
+                adj[i].add(n + vid)
+                radj[n + vid].add(i)
+            }
+        }
+    }
+
+    // ---- Reachability from free (unmatched) values over the REVERSE graph. ----
+    val reachedFromFree = BooleanArray(total)
+    val queue = IntArray(total)
+    var qHead = 0
+    var qTail = 0
+    for (vid in 0 until numValues) {
+        if (matchVal[vid] == -1) {
+            reachedFromFree[n + vid] = true
+            queue[qTail++] = n + vid
+        }
+    }
+    while (qHead < qTail) {
+        val u = queue[qHead++]
+        val r = radj[u]
+        for (k in 0 until r.size) {
+            val w = r[k]
+            if (!reachedFromFree[w]) {
+                reachedFromFree[w] = true
+                queue[qTail++] = w
+            }
+        }
+    }
+
+    val sccId = reginTarjanScc(adj, total)
+
+    // ---- Prune: a non-matched var→value edge with no support (different SCC and not reachable
+    // from a free value) cannot extend to a feasible matching. Except values are never pruned
+    // (their copies always leave slack). Antecedents cite the sharp Hall set forward-reachable
+    // from the value-node (memoised per value-SCC), hole-aware. ----
+    val sccHallVars = HashMap<Int, IntArray>()
+    fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
+        val vis = BooleanArray(total)
+        val bfs = IntArray(total)
+        var qh = 0
+        var qt = 0
+        vis[valNode] = true
+        bfs[qt++] = valNode
+        val acc = IntArrayList()
+        while (qh < qt) {
+            val u = bfs[qh++]
+            if (u < n) acc.add(filteredVars[u])
+            val a = adj[u]
+            for (k in 0 until a.size) {
+                val w = a[k]
+                if (!vis[w]) {
+                    vis[w] = true
+                    bfs[qt++] = w
+                }
+            }
+        }
+        acc.toIntArray()
+    }
+    for (i in 0 until n) {
+        for (vid in valuesPerVar[i]) {
+            if (matchVar[i] == vid) continue
+            val value = idToValue[vid]
+            if (value in exceptSet) continue // excepted values stay shareable, never pruned
+            val valNode = n + vid
+            if (sccId[i] == sccId[valNode]) continue
+            if (reachedFromFree[valNode]) continue
+            val hall = hallVarsFor(valNode)
+            val ant = collectHoleAndBoundAntecedents(state, hall)
+            if (!state.excludeIntValue(filteredVars[i], value, ant)) {
+                // Excluding the value emptied var i's domain: the Hall set forced out i's last
+                // feasible value. Reason = the Hall set plus i.
+                val withI = hall.copyOf(hall.size + 1)
+                withI[hall.size] = filteredVars[i]
+                return withI
+            }
+        }
+    }
+    // Persist the matching as the next call's warm-start seed.
+    if (cache != null) {
+        cache.matchedValue.clear()
+        for (i in 0 until n) {
+            if (matchVar[i] != -1) cache.matchedValue[filteredVars[i]] = idToValue[matchVar[i]]
+        }
+    }
+    return null
+}
+
+/** Per-factor warm-start state for [reginFilter]: the previous maximum matching as
+ *  `variable id → matched value`. A seed only — [reginFilter] revalidates every edge against
+ *  the current domains and completes to a maximum matching, so a stale cache never affects
+ *  correctness, only the number of augmenting searches. Backtrack-safe via [snapshotCopy]. */
+internal class ReginCache : PropagationState.SnapshottablePayload {
+    val matchedValue = HashMap<Int, Int>()
+
+    override fun snapshotCopy(): ReginCache {
+        val c = ReginCache()
+        c.matchedValue.putAll(matchedValue)
+        return c
+    }
+}
+
+/** Augmenting-path search for maximum bipartite matching. Returns true iff variable [i] can be
+ *  matched (possibly re-routing earlier matches). */
+private fun reginTryAugment(
+    i: Int,
+    valuesPerVar: Array<IntArray>,
+    matchVar: IntArray,
+    matchVal: IntArray,
+    visited: BooleanArray,
+): Boolean {
+    for (vid in valuesPerVar[i]) {
+        if (visited[vid]) continue
+        visited[vid] = true
+        val holder = matchVal[vid]
+        if (holder == -1 || reginTryAugment(holder, valuesPerVar, matchVar, matchVal, visited)) {
+            matchVar[i] = vid
+            matchVal[vid] = i
+            return true
+        }
+    }
+    return false
+}
+
+/** Iterative Tarjan SCC over [adj] (adjacency lists on `0 until total`). Returns per-vertex
+ *  component id. Iterative to avoid recursion-depth blowup on large graphs. SCC membership is
+ *  reversal-invariant, so the forward orientation is used here. Shared with [GlobalCardinality],
+ *  which materialises its residual graph and delegates here (#99). */
+internal fun reginTarjanScc(adj: Array<IntArrayList>, total: Int): IntArray {
+    val sccId = IntArray(total) { -1 }
+    val index = IntArray(total) { -1 }
+    val lowlink = IntArray(total)
+    val onStack = BooleanArray(total)
+    val tarjanStack = IntArray(total)
+    var stackTop = 0
+    var nextIndex = 0
+    var nextScc = 0
+    val callStack = IntArray(total)
+    val iterStack = IntArray(total)
+    for (start in 0 until total) {
+        if (index[start] != -1) continue
+        var depth = 0
+        callStack[depth] = start
+        iterStack[depth] = 0
+        index[start] = nextIndex
+        lowlink[start] = nextIndex
+        nextIndex++
+        tarjanStack[stackTop++] = start
+        onStack[start] = true
+        while (depth >= 0) {
+            val v = callStack[depth]
+            val it = iterStack[depth]
+            val neigh = adj[v]
+            if (it < neigh.size) {
+                iterStack[depth] = it + 1
+                val w = neigh[it]
+                if (index[w] == -1) {
+                    depth++
+                    callStack[depth] = w
+                    iterStack[depth] = 0
+                    index[w] = nextIndex
+                    lowlink[w] = nextIndex
+                    nextIndex++
+                    tarjanStack[stackTop++] = w
+                    onStack[w] = true
+                } else if (onStack[w]) {
+                    if (index[w] < lowlink[v]) lowlink[v] = index[w]
+                }
+            } else {
+                if (lowlink[v] == index[v]) {
+                    while (true) {
+                        val w = tarjanStack[--stackTop]
+                        onStack[w] = false
+                        sccId[w] = nextScc
+                        if (w == v) break
+                    }
+                    nextScc++
+                }
+                depth--
+                if (depth >= 0) {
+                    val parent = callStack[depth]
+                    if (lowlink[v] < lowlink[parent]) lowlink[parent] = lowlink[v]
+                }
+            }
+        }
+    }
+    return sccId
+}

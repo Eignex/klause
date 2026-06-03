@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `among(n, xs, S)` — `n = #{i : xs[i] ∈ S}` where [values] is a constant set. Generalises
@@ -128,9 +129,10 @@ class Among(
         }
     }
 
-    /** Bound-only conflict reason: cite bound atoms of every participating var. */
+    /** Hole-aware conflict reason: reverse forcing prunes interior values, so cite the
+     *  filtered domains (bounds + holes) of every participating var, not just bounds. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        collectHoleAndBoundAntecedents(state, intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         var definite = 0
@@ -152,6 +154,33 @@ class Among(
         val ant = state.composeIntVarAtomAntecedents(xs)
         if (!state.tightenIntMin(n, definite, ant)) return false
         if (!state.tightenIntMax(n, possible, ant)) return false
+        // Reverse forcing: count ∈ [definite, possible], contributed by the `possible-definite`
+        // "swing" vars (those with both a matching and a non-matching value). When n is pinned
+        // to an extreme, every swing var's class is forced:
+        //   n == possible → all swing vars must match  (drop their non-matching values)
+        //   n == definite → no swing var may match     (drop their matching values)
+        val nDom = state.intDomains[n]
+        val forceIn = nDom.min >= possible
+        val forceOut = nDom.max <= definite
+        if ((forceIn || forceOut) && definite < possible) {
+            val ant2 = collectHoleAndBoundAntecedents(state, intVars)
+            val drop = IntArrayList()
+            for (x in xs) {
+                val d = state.intDomains[x]
+                var allIn = true
+                var anyIn = false
+                d.forEach { if (matches(it)) anyIn = true else allIn = false }
+                if (!(anyIn && !allIn)) continue // not a swing var
+                drop.clear()
+                d.forEach { value ->
+                    val m = matches(value)
+                    if ((forceIn && !m) || (forceOut && m)) drop.add(value)
+                }
+                for (i in 0 until drop.size) {
+                    if (!state.excludeIntValue(x, drop[i], ant2)) return false
+                }
+            }
+        }
         return true
     }
 }
