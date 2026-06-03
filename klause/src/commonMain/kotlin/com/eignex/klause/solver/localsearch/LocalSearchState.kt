@@ -301,6 +301,24 @@ class LocalSearchState(
         return shapingLambda * delta
     }
 
+    /**
+     * Raw per-move objective delta `evaluate(applyMove(current)) − evaluate(current)`,
+     * computed against the current assignment WITHOUT committing the move — O(arity) for a
+     * [LinearObjective], the objective's own cost for an [IncrementalObjective]. Returns
+     * `null` for objectives with no incremental path, signalling the caller to fall back to
+     * `apply` + full [Objective.evaluate].
+     *
+     * Distinct from [shapedObjectiveDelta], which multiplies by [shapingLambda] (zero on the
+     * feasibility-gated descent path) for pre-feasibility shaping; this returns the unscaled
+     * delta the optimize-side descent steps score candidates by, paired with [netDelta] for
+     * the feasibility/cost side.
+     */
+    fun objectiveDelta(obj: Objective, move: Move): Double? = when (obj) {
+        is LinearObjective -> linearObjectiveDelta(move, obj)
+        is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
+        else -> null
+    }
+
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double = when (move) {
         is Move.BoolFlip -> {
             val v = move.varId
