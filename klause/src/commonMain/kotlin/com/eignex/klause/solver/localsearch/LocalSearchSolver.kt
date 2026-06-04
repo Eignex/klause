@@ -79,6 +79,11 @@ class LocalSearchSolver(
      *  hand-repairing definitional channels. Wired by FlatZinc-facing callers from
      *  `FlatZincProgram.definitionalSweep`; null = behavior unchanged. */
     val definitionalSweep: DefinitionalSweep? = null,
+    /** Per-move one-way invariants (issue #153, opt-in): maintain [definitionalSweep]'s
+     *  definitions incrementally after every applied move and exclude defined vars from move
+     *  generation entirely — the move space shrinks to true decision variables. Requires
+     *  [definitionalSweep]; the restart-time sweep stays active as the full (re)initializer. */
+    val perMoveInvariants: Boolean = false,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
 
@@ -105,6 +110,13 @@ class LocalSearchSolver(
                 state.recompute()
             }
         }
+    }
+
+    /** Install the per-move invariant index on a fresh state when enabled (issue #153). */
+    private fun installInvariants(state: LocalSearchState) {
+        if (!perMoveInvariants) return
+        val sweep = definitionalSweep ?: return
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
     }
 
     override fun solve(params: LocalSearchParams): SolveResult = solveInternal(params, warm = null)
@@ -244,6 +256,7 @@ class LocalSearchSolver(
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         return sequence {
             val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
+            installInvariants(state)
             warm?.applyTo(state)
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
@@ -328,6 +341,7 @@ class LocalSearchSolver(
     ) {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
+        installInvariants(state)
         warm?.applyTo(state)
         // Plumb shaping into the state so strategies (e.g. WalkSat) consulting
         // shapedBreakScore see the objective during pre-feasibility moves too. Only

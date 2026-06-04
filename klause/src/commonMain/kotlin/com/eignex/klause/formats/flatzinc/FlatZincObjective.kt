@@ -94,9 +94,9 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
         val c = byIntDef[id] ?: return // free var: a sweep input, not a node
         visitedInt.add(id)
         val built = buildIntSweepNode(c, id) ?: return // unbuildable: stays a searched factor
-        for (inId in built.intIns) visitInt(inId)
-        for (inId in built.boolIns) visitBoolRef?.invoke(inId)
-        nodes.add(built.node)
+        for (inId in built.intInputs) visitInt(inId)
+        for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
+        nodes.add(built)
     }
 
     fun visitBool(id: Int) {
@@ -104,9 +104,9 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
         val c = byBoolDef[id] ?: return
         visitedBool.add(id)
         val built = buildBoolSweepNode(c, id) ?: return
-        for (inId in built.intIns) visitInt(inId)
-        for (inId in built.boolIns) visitBoolRef?.invoke(inId)
-        nodes.add(built.node)
+        for (inId in built.intInputs) visitInt(inId)
+        for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
+        nodes.add(built)
     }
     visitBoolRef = ::visitBool
     for (id in byIntDef.keys.sorted()) visitInt(id)
@@ -114,13 +114,6 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
     if (nodes.isEmpty()) return null
     return DefinitionalSweep(nodes)
 }
-
-/** A built sweep node plus the typed input vars the topo walk must visit first. */
-private class BuiltSweepNode(
-    val node: DefinitionalSweep.SweepNode,
-    val intIns: List<Int> = emptyList(),
-    val boolIns: List<Int> = emptyList(),
-)
 
 /** Bool var id for [e] (a positive bool literal), else null. */
 private fun FlatZincCompiler.boolIdOrNull(e: FznExpr): Int? = try {
@@ -131,11 +124,11 @@ private fun FlatZincCompiler.boolIdOrNull(e: FznExpr): Int? = try {
 }
 
 /** Int-defined sweep node: the [buildObjNode] algebra, `bool2int`, and element access. */
-private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int): BuiltSweepNode? {
+private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int): DefinitionalSweep.SweepNode? {
     when (c.name) {
         "bool2int" -> {
             val b = boolIdOrNull(c.args[0]) ?: return null
-            return BuiltSweepNode(DefinitionalSweep.SweepNode.Bool2Int(definedId, b), boolIns = listOf(b))
+            return DefinitionalSweep.SweepNode.Bool2Int(definedId, b)
         }
 
         "array_int_element", "array_var_int_element" -> {
@@ -146,34 +139,28 @@ private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int)
                 } catch (_: Exception) {
                     return null
                 }
-                BuiltSweepNode(
-                    DefinitionalSweep.SweepNode.ElementDef(definedId, idx, null, consts, offset = 1),
-                    intIns = listOf(idx),
-                )
+                DefinitionalSweep.SweepNode.ElementDef(definedId, idx, null, consts, offset = 1)
             } else {
                 val arr = try {
                     evalIntVarArray(c.args[1])
                 } catch (_: Exception) {
                     return null
                 }
-                BuiltSweepNode(
-                    DefinitionalSweep.SweepNode.ElementDef(definedId, idx, arr, null, offset = 1),
-                    intIns = listOf(idx) + arr.toList(),
-                )
+                DefinitionalSweep.SweepNode.ElementDef(definedId, idx, arr, null, offset = 1)
             }
         }
 
         else -> {
             val node = buildObjNode(c, definedId) ?: return null
-            return BuiltSweepNode(DefinitionalSweep.SweepNode.IntDef(node), intIns = nodeInputVarIds(node))
+            return DefinitionalSweep.SweepNode.IntDef(node, nodeInputVarIds(node).toIntArray())
         }
     }
 }
 
 /** Bool-defined sweep node: comparison reifications, literal set membership, bool folds. */
 @Suppress("CyclomaticComplexMethod")
-private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int): BuiltSweepNode? {
-    fun cmp(opName: String, lin: Boolean): BuiltSweepNode? {
+private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int): DefinitionalSweep.SweepNode? {
+    fun cmp(opName: String, lin: Boolean): DefinitionalSweep.SweepNode? {
         val coeffs = ArrayList<Long>()
         val vars = ArrayList<Int>()
         var rhs: Long
@@ -225,10 +212,7 @@ private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int
             "gt" -> LinearOp.GE to rhs + 1
             else -> return null
         }
-        return BuiltSweepNode(
-            DefinitionalSweep.SweepNode.CmpReif(definedId, coeffs.toLongArray(), vars.toIntArray(), finalRhs, op),
-            intIns = vars.toList(),
-        )
+        return DefinitionalSweep.SweepNode.CmpReif(definedId, coeffs.toLongArray(), vars.toIntArray(), finalRhs, op)
     }
     return when (c.name) {
         "int_eq_reif" -> cmp("eq", lin = false)
@@ -256,7 +240,7 @@ private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int
             } catch (_: Exception) {
                 return null
             }
-            BuiltSweepNode(DefinitionalSweep.SweepNode.SetInReif(definedId, x, values), intIns = listOf(x))
+            DefinitionalSweep.SweepNode.SetInReif(definedId, x, values)
         }
 
         "array_bool_and", "array_bool_or" -> {
@@ -265,10 +249,7 @@ private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int
             } catch (_: Exception) {
                 return null
             }
-            BuiltSweepNode(
-                DefinitionalSweep.SweepNode.BoolFold(definedId, ins, isAnd = c.name == "array_bool_and"),
-                boolIns = ins.map { Lit.variable(it) },
-            )
+            DefinitionalSweep.SweepNode.BoolFold(definedId, ins, isAnd = c.name == "array_bool_and")
         }
 
         else -> null
