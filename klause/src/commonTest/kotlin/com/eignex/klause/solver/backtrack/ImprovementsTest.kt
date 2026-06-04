@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
@@ -78,6 +79,15 @@ class ImprovementsTest {
         val params = BacktrackParams(randomSeed = 0L, variableHeuristic = InputOrder, valueHeuristic = IndomainMin)
         val viaMinimize = solver.minimize(obj, params)
         val viaImprovements = solver.improvements(obj, params).last()
-        assertEquals(viaMinimize, viaImprovements)
+        // Two separate runs report their own wall-clock stats; the verdicts must agree.
+        assertEquals(viaMinimize.withoutStats(), viaImprovements.withoutStats())
     }
+}
+
+/** Strip the per-run stats sidecar so verdicts from separate runs compare structurally. */
+private fun MinimizeResult.withoutStats(): MinimizeResult = when (this) {
+    is MinimizeResult.Optimal -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.BestFound -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Infeasible -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Unknown -> copy(stats = SolveStats.EMPTY)
 }

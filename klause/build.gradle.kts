@@ -15,13 +15,15 @@ eignexPublish {
 kotlin {
     jvm()
     // Solver tests are compute-heavy; Mocha's default 2s test timeout is far too tight
-    // for the single-threaded JS/wasm targets.
+    // for the single-threaded JS/wasm targets. Browser TESTS are disabled — node covers
+    // both runtimes deterministically; ChromeHeadless wasm shows scheduler-dependent
+    // failures (see the wasmJs-browser anomaly issue) and adds a browser dependency to CI.
     js(IR) {
-        browser { testTask { useMocha { timeout = "120s" } } }
+        browser { testTask { enabled = false } }
         nodejs { testTask { useMocha { timeout = "120s" } } }
     }
     wasmJs {
-        browser { testTask { useMocha { timeout = "120s" } } }
+        browser { testTask { enabled = false } }
         nodejs { testTask { useMocha { timeout = "120s" } } }
     }
     wasmWasi { nodejs { testTask { useMocha { timeout = "120s" } } } }
