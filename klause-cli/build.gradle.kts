@@ -9,7 +9,6 @@ repositories {
 
 dependencies {
     implementation(project(":klause"))
-    implementation(project(":klause-logicng"))
     // runBlocking bridge for the suspend Portfolio API from the (synchronous) CLI.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     testImplementation(kotlin("test"))

@@ -21,7 +21,7 @@ fun main(args: Array<String>) {
  *  positional input path without misreading a flag value as the path. */
 private val valueFlags = setOf(
     "-n", "-t", "--time-limit", "-r", "-e", "--engine", "--ozn",
-    "--unbounded-int-lo", "--unbounded-int-hi", "--format",
+    "--unbounded-int-lo", "--unbounded-int-hi", "--format", "-p", "--param",
 )
 
 private fun routeToXcsp(args: Array<String>): Boolean {

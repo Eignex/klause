@@ -39,26 +39,37 @@ FlatZinc path (MiniZinc-standard plus klause extras):
 - `-a` / `--all-solutions`, `-n <count>` — enumeration controls (satisfy).
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
 - `-e <engine>` / `--engine <engine>` — `backtrack` (default), `ls`,
-  `portfolio`, `logicng`, `brute`. Also settable via the
-  `klause.fzn.engine` system property.
+  `portfolio`. Also settable via the `klause.fzn.engine` system property.
+- `-p <key>=<value>` / `--param <key>=<value>` — repeatable engine params:
+  - `backtrack`: `seed`, `max-decisions`, `luby`, `phase-saving`,
+    `max-learned`, `lbd-glue`, `var-heuristic`
+    (`vsids|random|smallest-domain|input-order`), `val-heuristic`
+    (`random|min|max|middle`)
+  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
+  - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`
+
+  Unknown or malformed keys are a usage error (exit 2).
 - `--ozn FILE` — render output with klause's native `.ozn` applier instead
   of MiniZinc's `solns2out`.
 - `--unbounded-int-lo N` / `--unbounded-int-hi N` — default domain for
   unbounded `var int` declarations.
 - `--cp-seed` — opt-in hybrid CP-seeding for the `ls` engine: a short
   backtrack solve warm-starts local search.
-- Portfolio worker counts: `-Dklause.fzn.portfolio.ls` /
-  `-Dklause.fzn.portfolio.bt` (defaults 4 / 2).
+- Portfolio worker counts default to 4 LS / 2 backtrack; override with
+  `-p ls=N -p bt=N` (or the `klause.fzn.portfolio.ls` / `.bt` system
+  properties).
 
 XCSP3 / SMT-LIB path:
 
 - `--format xcsp3|smtlib` — override extension-based detection.
-- `-e backtrack|ls|brute` (default backtrack), `-t <ms>`, `-r <seed>`.
+- `-e backtrack|ls|portfolio` (default backtrack), `-t <ms>`, `-r <seed>`,
+  `-p key=value` engine params (same keys as above).
 - `--coverage <dir>` — corpus coverage report.
 - `-Dklause.xcsp.printSolution=true` — print the satisfying assignment.
 
 ## Dependencies
 
-`:klause` (parsers for all formats live there), `:klause-logicng` (the
-`logicng` engine), and kotlinx-coroutines (bridges the suspend Portfolio API
-from the synchronous CLI).
+`:klause` (parsers and all three engines live there) and kotlinx-coroutines
+(bridges the suspend Portfolio API from the synchronous CLI). Other adapter
+modules (`klause-logicng`, `klause-smt`, `klause-choco`, `klause-ortools`)
+are library/bench side doors and are not wired into the CLI.
