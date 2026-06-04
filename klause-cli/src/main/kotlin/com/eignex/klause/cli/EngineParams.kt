@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.IndomainMax
 import com.eignex.klause.solver.backtrack.IndomainMiddle
@@ -12,7 +13,6 @@ import com.eignex.klause.solver.backtrack.ValueHeuristic
 import com.eignex.klause.solver.backtrack.VariableHeuristic
 import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.portfolio.PortfolioSpec
 import kotlin.system.exitProcess
 
 /**
