@@ -13,10 +13,13 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /**
  * Parallel portfolio of klause solver workers. Each [PortfolioWorker] is a single-threaded
@@ -182,22 +185,35 @@ class Portfolio(
      * (#63). Collector cancellation (and [cancellation]) stops all workers. This is the anytime
      * entry point the bench's optimisation metric consumes.
      */
-    fun improvements(cancellation: Cancellation = Cancellation.Never): Flow<MinimizeResult> = channelFlow {
-        val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
-        fun readBound(): Double = incumbent.load().bound
-        for (worker in workers) {
-            launch {
-                val job = requireNotNull(coroutineContext[Job])
-                val token: Cancellation = { !job.isActive || cancellation() }
-                for (r in worker.improvements(::readBound, token)) {
-                    if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
-                        updateSharedBound(incumbent, r.objectiveValue, r.sample)
-                        send(r)
+    fun improvements(cancellation: Cancellation = Cancellation.Never): Flow<MinimizeResult> =
+        improvementsAttributed(cancellation).map { it.result }
+
+    /**
+     * [improvements] with per-worker attribution: each strict global improvement is tagged with
+     * the producing [PortfolioWorker.label] and the elapsed time since collection began. Because
+     * only strict improvements are emitted, the stream *is* the credit log: the first element is
+     * the first global incumbent (which config reached feasibility first), the last element's
+     * owner holds the final best, and per-label counts measure each config's contribution — the
+     * signal palette-tuning campaigns use to rank worker configs.
+     */
+    fun improvementsAttributed(cancellation: Cancellation = Cancellation.Never): Flow<AttributedImprovement> =
+        channelFlow {
+            val start = TimeSource.Monotonic.markNow()
+            val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
+            fun readBound(): Double = incumbent.load().bound
+            for (worker in workers) {
+                launch {
+                    val job = requireNotNull(coroutineContext[Job])
+                    val token: Cancellation = { !job.isActive || cancellation() }
+                    for (r in worker.improvements(::readBound, token)) {
+                        if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
+                            updateSharedBound(incumbent, r.objectiveValue, r.sample)
+                            send(AttributedImprovement(worker.label, start.elapsedNow(), r))
+                        }
                     }
                 }
             }
         }
-    }
 
     /**
      * Stream samples in parallel across all workers, fanning in to a single flow. Each worker
@@ -224,6 +240,17 @@ class Portfolio(
  *  the best sample are swapped together in a single CAS — they can never desync under a worker race
  *  (#81). `bound` is the objective value; `sample` is null only before the first incumbent. */
 private class Incumbent(val bound: Double, val sample: Sample?)
+
+/** One strict global improvement from [Portfolio.improvementsAttributed], tagged with the
+ *  producing worker's label and the elapsed time since collection began. */
+data class AttributedImprovement(
+    /** [PortfolioWorker.label] of the worker that produced this incumbent. */
+    val workerLabel: String,
+    /** Time since the attributed stream started collecting. */
+    val elapsed: Duration,
+    /** The strict global improvement itself (always a [MinimizeResult.WithSample]). */
+    val result: MinimizeResult,
+)
 
 /** Strategy knobs for [Portfolio]. Affects `solve` only; `samples` always fans in from every
  *  worker and `minimize` always shares the global bound (race honoured via cancellation on

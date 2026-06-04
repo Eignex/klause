@@ -160,7 +160,13 @@ object AnytimeMetric {
 
     /** Build a [com.eignex.klause.portfolio.Portfolio] from the `<ls>:<bt>` spec and bridge its
      *  fanned-in incumbents (a coroutine [kotlinx.coroutines.flow.Flow]) into the synchronous
-     *  [Sequence] the anytime harness consumes, via a daemon collector thread + blocking queue. */
+     *  [Sequence] the anytime harness consumes, via a daemon collector thread + blocking queue.
+     *
+     *  Worker selection: `-Dklause.anytime.portfolio.configs=all` (the whole named pool) or a
+     *  comma-separated label list overrides the `<ls>` count with explicit configs — the
+     *  palette-tuning campaign knob. Per-worker credit is printed after each instance as a
+     *  `[portfolio-stats]` line: which worker produced the first global incumbent (and when),
+     *  which held the final best, and each worker's strict-improvement count. */
     private fun portfolioImprovements(
         entry: ResolvedProblem,
         prop: String,
@@ -171,26 +177,52 @@ object AnytimeMetric {
         val parts = prop.split(":", ",")
         val ls = parts.getOrNull(0)?.toIntOrNull() ?: 4
         val bt = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        val configsProp = System.getProperty("klause.anytime.portfolio.configs")
+            ?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }
         // Per-worker objectives (#63): the LS workers descend the functional/gradient objective
         // (klauseObj), the backtrack workers bound the linear one (linearObj). A mixed pool no
         // longer collapses the LS workers onto the linear objective and loses the gradient.
         val portfolio = PortfolioBuilder.build(
-            entry.problem, PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L),
+            entry.problem,
+            PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L, lsConfigLabels = configsProp),
             lsObjective = klauseObj, linearObjective = linearObj,
         )
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }
         val queue = java.util.concurrent.LinkedBlockingQueue<Any>()
         kotlin.concurrent.thread(isDaemon = true, name = "portfolio-anytime") {
+            // Credit accumulation happens inside the (sequential) collector, so plain locals
+            // suffice; the summary line prints once the stream ends.
+            var first: String? = null
+            var firstMs = -1L
+            var last: String? = null
+            val contrib = LinkedHashMap<String, Int>()
             try {
                 // Dispatchers.Default → the channelFlow's per-worker launches get real OS threads
                 // and run in parallel; plain runBlocking is single-threaded and CPU-bound workers
                 // (which never suspend) would starve each other.
                 kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.Default) {
-                    portfolio.improvements(cancel).collect { queue.put(it) }
+                    portfolio.improvementsAttributed(cancel).collect { a ->
+                        if (first == null) {
+                            first = a.workerLabel
+                            firstMs = a.elapsed.inWholeMilliseconds
+                        }
+                        last = a.workerLabel
+                        contrib[a.workerLabel] = (contrib[a.workerLabel] ?: 0) + 1
+                        queue.put(a.result)
+                    }
                 }
             } finally {
                 portfolio.close()
+                if (first != null) {
+                    println(
+                        "[portfolio-stats] ${entry.name} workers=${portfolio.workers.size} " +
+                            "first=$first@${firstMs}ms best=$last " +
+                            "contrib=${contrib.entries.joinToString(",") { "${it.key}:${it.value}" }}",
+                    )
+                } else {
+                    println("[portfolio-stats] ${entry.name} workers=${portfolio.workers.size} first=none")
+                }
                 queue.put(streamDone)
             }
         }
