@@ -216,14 +216,59 @@ class LocalSearchState(
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 
-    /** Apply [move], updating cost and payloads incrementally. */
-    fun apply(move: Move): Unit = when (move) {
+    /**
+     * Per-move one-way invariant index (issue #153), set by the engine when enabled. After
+     * every applied move, [apply] re-evaluates the affected definitional cone in topological
+     * order through the same incremental primitives, so defined vars track their inputs and
+     * payload/break-make state stays maintained. Null = no propagation (default behavior).
+     */
+    var invariants: com.eignex.klause.solver.InvariantNetwork? = null
+        set(value) {
+            field = value
+            moveSink.setInvariants(value)
+        }
+
+    /** Apply [move], updating cost and payloads incrementally; when [invariants] is set, the
+     *  affected definitional cone is propagated afterwards through the same primitives. */
+    fun apply(move: Move) {
+        applyCore(move)
+        val net = invariants ?: return
+        propagateInvariants(net, move)
+    }
+
+    private fun applyCore(move: Move): Unit = when (move) {
         is Move.BoolFlip -> applyBoolFlip(move.varId)
 
         is Move.IntSet -> applyIntSet(move.varId, move.newValue)
 
         is Move.Compound -> {
-            for (p in move.parts) apply(p)
+            for (p in move.parts) applyCore(p)
+        }
+    }
+
+    /** Re-evaluate the definitional cone the [move]'s touched vars feed, in topological order,
+     *  writing changes through the incremental primitives (no full recompute). */
+    private fun propagateInvariants(net: com.eignex.klause.solver.InvariantNetwork, move: Move) {
+        val ints = ArrayList<Int>(2)
+        val bools = ArrayList<Int>(2)
+        fun collect(m: Move) {
+            when (m) {
+                is Move.BoolFlip -> bools.add(m.varId)
+                is Move.IntSet -> ints.add(m.varId)
+                is Move.Compound -> for (p in m.parts) collect(p)
+            }
+        }
+        collect(move)
+        val affected = net.affectedNodes(ints.toIntArray(), bools.toIntArray())
+        for (idx in affected) {
+            val n = net.node(idx)
+            val v = n.eval(assignment, problem.intDomains)
+            if (v == com.eignex.klause.solver.DefinitionalSweep.SweepNode.NO_WRITE) continue
+            if (n.outIsBool) {
+                if (assignment.boolValue(n.out) != (v != 0L)) applyBoolFlip(n.out)
+            } else {
+                if (assignment.intValue(n.out) != v.toInt()) applyIntSet(n.out, v.toInt())
+            }
         }
     }
 
