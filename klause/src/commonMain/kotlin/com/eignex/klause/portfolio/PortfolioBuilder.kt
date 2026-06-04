@@ -30,10 +30,19 @@ data class PortfolioSpec(
     val seed: Long = 0L,
     /** Objective-shaping λ for the LS workers' optimize phase (mirrors the CLI's CBLS λ=1.0). */
     val lsLambda: Double = 1.0,
+    /**
+     * Explicit LS worker-config selection by pool label (see `LocalSearchWorkerConfig.poolLabels`;
+     * the magic value `["all"]` selects the entire pool). When non-null this overrides
+     * [localSearchWorkers]/the curated palette — the campaign knob for measuring arbitrary
+     * config mixes with per-worker attribution.
+     */
+    val lsConfigLabels: List<String>? = null,
 ) {
     init {
         require(localSearchWorkers >= 0 && backtrackWorkers >= 0) { "worker counts must be ≥ 0" }
-        require(localSearchWorkers + backtrackWorkers >= 1) { "a portfolio needs at least one worker" }
+        require(localSearchWorkers + backtrackWorkers >= 1 || !lsConfigLabels.isNullOrEmpty()) {
+            "a portfolio needs at least one worker"
+        }
     }
 }
 
@@ -68,8 +77,14 @@ object PortfolioBuilder {
         // objective (matches the shipped CLI LS config). Each descends the functional/gradient
         // objective when the model provides one (falling back to the linear form otherwise).
         val lsObj = lsObjective ?: linearObjective
-        if (spec.localSearchWorkers > 0) {
-            LocalSearchWorkerConfig.diverse(spec.localSearchWorkers).forEachIndexed { i, cfg ->
+        val lsConfigs = when {
+            spec.lsConfigLabels != null && spec.lsConfigLabels == listOf("all") -> LocalSearchWorkerConfig.pool()
+            spec.lsConfigLabels != null -> spec.lsConfigLabels.map { LocalSearchWorkerConfig.byLabel(it) }
+            spec.localSearchWorkers > 0 -> LocalSearchWorkerConfig.diverse(spec.localSearchWorkers)
+            else -> emptyList()
+        }
+        if (lsConfigs.isNotEmpty()) {
+            lsConfigs.forEachIndexed { i, cfg ->
                 val session = LocalSearchSolver(
                     problem,
                     strategy = cfg.strategy,

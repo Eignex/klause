@@ -5,6 +5,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
+import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.solver.localsearch.LocalSearchSession
@@ -14,6 +15,7 @@ import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.Strategy
@@ -56,74 +58,151 @@ internal data class LocalSearchWorkerConfig(
     val optimizeStrategy: Strategy? = null,
 ) {
     companion object {
-        /** A diverse default palette of [count] worker configs. CBLS leads (the strongest
-         *  general strategy — constraint-violation gradient with int-aware moves and weight
-         *  learning, best on the CP shape MiniZinc produces), followed by orthogonal members
-         *  for coverage: adaptive probSAT for clausal SAT, WalkSAT+configuration-checking for
-         *  structured SAT, and simulated annealing for rugged escape. The first [count] entries
-         *  are taken (wrapping when `count` exceeds the palette), so small portfolios get the
-         *  highest-value workers first. */
-        fun diverse(count: Int): List<LocalSearchWorkerConfig> {
-            require(count >= 1) { "count must be ≥ 1" }
-            val cblsTabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
-            val palette = listOf(
-                // The constraint-based workhorse: strongest on CP-shaped satisfaction and
-                // optimization. optimizeStrategy set so minimize runs CBLS's unified path.
-                LocalSearchWorkerConfig(
-                    "cbls/fixed",
-                    strategy = Cbls(tabu = cblsTabu),
-                    restartPolicy = FixedCadenceRestart(),
-                    optimizeStrategy = Cbls(tabu = cblsTabu),
-                ),
-                // CBLS with probabilistic smoothing (weight forgetting) + basin-hopping
-                // perturbation — diversifies the long-run weight trajectory on plateau-heavy
-                // landscapes where the bump-only schedule ossifies.
-                LocalSearchWorkerConfig(
-                    "cbls-smooth/ils-basin",
-                    strategy = Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu),
-                    restartPolicy = IteratedLocalSearchRestart(
-                        populationSize = 3,
-                        crossoverRate = 0.25,
-                        perturbationKind = PerturbationKind.BasinHopping,
-                        acceptance = AcceptanceCriterion.Improving,
-                    ),
-                    optimizeStrategy = Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu),
-                ),
-                // Adaptive probSAT: SOTA for the pure-Boolean / clausal SAT shape.
+        private fun cblsTabu() = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
+
+        private fun ilsBasin() = IteratedLocalSearchRestart(
+            populationSize = 3,
+            crossoverRate = 0.25,
+            perturbationKind = PerturbationKind.BasinHopping,
+            acceptance = AcceptanceCriterion.Improving,
+        )
+
+        /** A CBLS worker with the unified minimize path: [make] is invoked twice so the satisfy
+         *  and optimize strategies are independent instances (Cbls carries per-search state). */
+        private fun cblsWorker(label: String, restart: RestartPolicy, make: () -> Cbls) =
+            LocalSearchWorkerConfig(label, make(), restart, optimizeStrategy = make())
+
+        /**
+         * The named pool of worker configs, **ordered by measured credit** so `diverse(n)` is
+         * simply the first `n` entries — the `-p <n>` competition semantics. Factories, not
+         * instances: strategies carry mutable per-search state (Cbls stall trackers, sinks), so
+         * every portfolio slot must get fresh objects; sharing one config across two parallel
+         * workers is a data race.
+         *
+         * Ranking source: the 2026-06-04 all-pool credit campaign — every config raced on every
+         * mzn-bench optimization instance (10 s, 20 workers, per-worker attribution via
+         * [com.eignex.klause.portfolio.Portfolio.improvementsAttributed]); credit = instances
+         * where a config produced the first global incumbent / held the final best / was the
+         * sole contributor (first/best/sole below). cbls/fixed stays first despite mid-pack
+         * optimization credit: the campaign measured optimization only and CBLS remains the
+         * across-the-board satisfy winner (see the CLI's strategy notes). Configs that earned
+         * no credit (cbls/luby, cbls-tenure25, cbls-vnd, cbls-stallfast) were dropped.
+         */
+        private val poolFactories: List<Pair<String, () -> LocalSearchWorkerConfig>> = listOf(
+            // The constraint-based workhorse; fastest first-incumbent (median 4 ms; 5/1/1).
+            "cbls/fixed" to { cblsWorker("cbls/fixed", FixedCadenceRestart()) { Cbls(tabu = cblsTabu()) } },
+            // Adaptive probSAT: top campaign credit (7 first / 9 best / 646 improvements) — many
+            // flattened Challenge models expose a large boolean core.
+            "adaptive-probsat/fixed" to {
                 LocalSearchWorkerConfig(
                     "adaptive-probsat/fixed",
-                    ProbSat.adaptive(tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)),
+                    ProbSat.adaptive(tabu = cblsTabu()),
                     FixedCadenceRestart(),
-                ),
-                // WalkSAT + configuration checking: cycle-breaking for tightly-coupled
-                // (structured) constraint networks, paired with Luby restarts.
-                LocalSearchWorkerConfig(
-                    "walksat-cc/luby",
-                    WalkSat(configurationChecking = true, tabu = TabuFilter(tenure = 5)),
-                    LubyRestart(unit = 200),
-                ),
-                // Simulated annealing: temperature-driven drift through worse regions.
+                )
+            },
+            // Annealing + adaptive perturbation: the strongest closer (7 final-bests).
+            "sa/adaptive-perturb" to {
+                LocalSearchWorkerConfig("sa/adaptive-perturb", SimulatedAnnealing(), AdaptivePerturbationRestart())
+            },
+            // Plateau-buster ([Cbls.stallSwapCap]) on the ILS basin-hopping restart: the best
+            // plateau variant overall (2/5, 342 improvements).
+            "cbls-plateau/ils-basin" to {
+                cblsWorker("cbls-plateau/ils-basin", ilsBasin()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
+            },
+            // Tabu-free CBLS: surprisingly strong all-rounder (4/3, 247 improvements).
+            "cbls-notabu/fixed" to {
+                cblsWorker("cbls-notabu/fixed", FixedCadenceRestart()) { Cbls(tabu = TabuFilter.Disabled) }
+            },
+            // Weight forgetting + basin hopping (3/3 + a sole win).
+            "cbls-smooth/ils-basin" to {
+                cblsWorker("cbls-smooth/ils-basin", ilsBasin()) {
+                    Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu())
+                }
+            },
+            // Plateau-buster on the fixed cadence: slower to first (median 1.5 s) but holds a
+            // sole win (the bacp class) the ILS variant doesn't cover (4/2/1).
+            "cbls-plateau/fixed" to {
+                cblsWorker("cbls-plateau/fixed", FixedCadenceRestart()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
+            },
+            // Plain annealing: frequent fast opener (5 firsts), never closes.
+            "sa/fixed" to {
                 LocalSearchWorkerConfig(
                     "sa/fixed",
                     SimulatedAnnealing(),
                     FixedCadenceRestart(maxFlipsBeforeRestart = 50_000),
-                ),
-                // CBLS plateau-buster: stall-gated same-domain pair swaps (score-only) +
-                // primitive-only stalled noise (see [Cbls.stallSwapCap]). Closes the
-                // reification plateaus on assignment-shaped instances (bacp/curriculum
-                // class) that the flat repair pool never escapes; not the single-config
-                // default because the hot-noise restriction costs feasibility on landscapes
-                // that rely on randomly-taken factor compounds. Appended last so existing
-                // small-portfolio mixes are unchanged; promoting it in palette order is a
-                // measured follow-up.
+                )
+            },
+            // Patient stall cadence (2/3 + a sole win).
+            "cbls-stallslow/fixed" to {
+                cblsWorker("cbls-stallslow/fixed", FixedCadenceRestart()) {
+                    Cbls(frontierAfterStall = 160, stallNoise = 0.2, tabu = cblsTabu())
+                }
+            },
+            // Plateau-buster + smoothing (2/2 + a sole win).
+            "cbls-plateau-smooth/fixed" to {
+                cblsWorker("cbls-plateau-smooth/fixed", FixedCadenceRestart()) {
+                    Cbls(stallSwapCap = 16, smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu())
+                }
+            },
+            // WalkSAT + configuration checking (2/2 + a sole win on structured SAT).
+            "walksat-cc/luby" to {
                 LocalSearchWorkerConfig(
-                    "cbls-plateau/fixed",
-                    strategy = Cbls(stallSwapCap = 16, tabu = cblsTabu),
-                    restartPolicy = FixedCadenceRestart(),
-                    optimizeStrategy = Cbls(stallSwapCap = 16, tabu = cblsTabu),
-                ),
-            )
-            return List(count) { palette[it % palette.size] }
+                    "walksat-cc/luby",
+                    WalkSat(configurationChecking = true, tabu = TabuFilter(tenure = 5)),
+                    LubyRestart(unit = 200),
+                )
+            },
+            // Cold noise (1/3).
+            "cbls-lonoise/fixed" to {
+                cblsWorker(
+                    "cbls-lonoise/fixed",
+                    FixedCadenceRestart(),
+                ) { Cbls(noiseProbability = 0.01, tabu = cblsTabu()) }
+            },
+            // Aggressive swap cap (1/2, 191 improvements).
+            "cbls-plateau64/fixed" to {
+                cblsWorker("cbls-plateau64/fixed", FixedCadenceRestart()) { Cbls(stallSwapCap = 64, tabu = cblsTabu()) }
+            },
+            // Raw (unweighted) scoring (2/1).
+            "cbls-raw/fixed" to {
+                cblsWorker(
+                    "cbls-raw/fixed",
+                    FixedCadenceRestart(),
+                ) { Cbls(scoring = MoveScoring.Raw, tabu = cblsTabu()) }
+            },
+            // Short tabu tenure (2/0, 127 improvements).
+            "cbls-tenure3/fixed" to {
+                cblsWorker("cbls-tenure3/fixed", FixedCadenceRestart()) {
+                    Cbls(tabu = TabuFilter(tenure = 3, aspiration = AspirationCriterion.OrImproving))
+                }
+            },
+            // Hot noise (2/1, thin improvement stream).
+            "cbls-hinoise/fixed" to {
+                cblsWorker(
+                    "cbls-hinoise/fixed",
+                    FixedCadenceRestart(),
+                ) { Cbls(noiseProbability = 0.15, tabu = cblsTabu()) }
+            },
+        )
+
+        /** Labels of every config in the pool, in credit order. */
+        val poolLabels: List<String> get() = poolFactories.map { it.first }
+
+        /** Construct a fresh instance of the pool config named [label]. */
+        fun byLabel(label: String): LocalSearchWorkerConfig =
+            requireNotNull(poolFactories.firstOrNull { it.first == label }) {
+                "unknown worker config '$label' (have ${poolFactories.map { it.first }})"
+            }.second()
+
+        /** One fresh instance of every pool config, in credit order. */
+        fun pool(): List<LocalSearchWorkerConfig> = poolFactories.map { it.second() }
+
+        /** The top-[count] prefix of the credit-ordered pool (wrapping past the pool size) —
+         *  `-p <n>` maps straight onto this, so small portfolios get the measured-best workers
+         *  first. Every slot is a fresh instance even when labels repeat. */
+        fun diverse(count: Int): List<LocalSearchWorkerConfig> {
+            require(count >= 1) { "count must be ≥ 1" }
+            return List(count) { poolFactories[it % poolFactories.size].second() }
         }
     }
 }
