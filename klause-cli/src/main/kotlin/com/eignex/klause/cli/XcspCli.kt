@@ -35,7 +35,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *                                            unsupported counts (the XCSP3 competition-library
  *                                            coverage report).
  *
- * Flags: `--format xcsp3|smtlib` (default: by extension), `--engine backtrack|ls|portfolio`
+ * Flags: `--format xcsp3|smtlib` (default: by extension), `--engine cp|ls|portfolio`
  * (default backtrack), `-t <ms>` time budget, `-r <seed>`, `-p <n>` parallel workers
  * (routes to the portfolio, palette from `-e`), repeatable `--param key=value` engine
  * params (see [EngineParams]).
@@ -281,7 +281,7 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
                 "xcsp3", "xcsp" -> Format.XCSP3; "smtlib", "smt", "smt2" -> Format.SMTLIB
                 else -> usage("unknown format ${args[i]}") }; i++ }
             "-e", "--engine" -> { engine = when (args[++i].lowercase()) {
-                "backtrack", "bt" -> Engine.BACKTRACK; "ls", "localsearch" -> Engine.LS
+                "cp", "backtrack", "bt" -> Engine.BACKTRACK; "ls", "localsearch" -> Engine.LS
                 "portfolio", "pf" -> Engine.PORTFOLIO
                 else -> usage("unknown engine ${args[i]}") }; i++ }
             "-t", "--time-limit" -> { timeMs = args[++i].toLong(); i++ }
@@ -300,6 +300,6 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
 
 private fun usage(msg: String): Nothing {
     System.err.println("klause-cli: $msg")
-    System.err.println("usage: klause-cli [--format xcsp3|smtlib] [-e backtrack|ls|portfolio] [-t ms] [-r seed] [-p threads] [--param key=value ...] [--coverage] <file|dir>")
+    System.err.println("usage: klause-cli [--format xcsp3|smtlib] [-e cp|ls|portfolio] [-t ms] [-r seed] [-p threads] [--param key=value ...] [--coverage] <file|dir>")
     exitProcess(2)
 }

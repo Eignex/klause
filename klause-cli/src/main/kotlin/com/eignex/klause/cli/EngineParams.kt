@@ -22,7 +22,7 @@ import kotlin.system.exitProcess
  * hard usage error (exit 2) so typos never silently fall back to defaults.
  *
  * Keys per engine:
- *  - `backtrack`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`,
+ *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`,
  *    `lbd-glue`, `var-heuristic` (`vsids|random|smallest-domain|input-order`),
  *    `val-heuristic` (`random|min|max|middle`)
  *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
@@ -93,7 +93,7 @@ internal class EngineParams(pairs: List<String>) {
     }
 }
 
-/** Apply `--param` overrides for the backtrack engine on top of [base]. */
+/** Apply `--param` overrides for the cp engine on top of [base]. */
 internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
@@ -105,7 +105,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.varHeuristic("var-heuristic")?.let { out = out.copy(variableHeuristic = it) }
     p.valHeuristic("val-heuristic")?.let { out = out.copy(valueHeuristic = it) }
     p.finish(
-        "backtrack",
+        "cp",
         "seed, max-decisions, luby, phase-saving, max-learned, lbd-glue, var-heuristic, val-heuristic",
     )
     return out
