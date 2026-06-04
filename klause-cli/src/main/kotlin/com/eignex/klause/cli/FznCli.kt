@@ -106,15 +106,24 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: FznOptions) {
     // optimization alike: the VSIDS/Luby × branch-and-bound regression (#47) is fixed in the
     // core ([BacktrackSolver.improvements] suppresses Luby restarts on the optimization path),
     // so one config serves both goals with no satisfy/optimize split.
-    val base = program.defaultBacktrackParams ?: BacktrackParams(
+    // `-f` (free search): ignore the model's search annotations and use the CLI default.
+    val annotated = if (opts.freeSearch) null else program.defaultBacktrackParams
+    val base = annotated ?: BacktrackParams(
         randomSeed = 1L,
         variableHeuristic = com.eignex.klause.solver.backtrack.Vsids(),
         phaseSaving = true,
         lubyRestartBase = 100L,
         maxLearnedClauses = 20_000,
     )
+    // Honor `-t` inside the engine, not just between yielded solutions: without a
+    // cancellation a backtrack run that never yields (hard UNSAT proof, stuck optimality
+    // proof) would ignore the time limit entirely.
+    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val cancellation = if (deadline != null)
+        com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
+    else com.eignex.klause.solver.Cancellation.Never
     val params = applyBacktrackParams(
-        base.copy(randomSeed = opts.randomSeed ?: base.randomSeed),
+        base.copy(randomSeed = opts.randomSeed ?: base.randomSeed, cancellation = cancellation),
         EngineParams(opts.engineParams),
     )
     runGeneric(BacktrackSolver(program.problem), params, program, opts, complete = true)
@@ -312,9 +321,11 @@ private fun <P : SolverParams> runSatisfy(
     }
 
     if (produced == 0L) {
-        // No solution found: only a complete search proves unsatisfiability; an incomplete
-        // (local-search) run that emptied its budget can only report UNKNOWN.
-        println(if (complete) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
+        // No solution found: only a complete search that ran to completion proves
+        // unsatisfiability. An incomplete (local-search) budget exhaustion — or a `-t`
+        // cancellation that emptied the enumeration — can only report UNKNOWN.
+        val timedOut = deadline != null && System.currentTimeMillis() > deadline
+        println(if (complete && !timedOut) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
     }
@@ -440,12 +451,15 @@ private data class FznOptions(
     val engineParams: List<String>,
     /** MiniZinc-standard `-p N`: number of parallel workers; N > 1 routes to the portfolio. */
     val parallel: Int?,
+    /** MiniZinc-standard `-f`: ignore the model's `solve :: *_search(...)` strategy and use
+     *  the engine's own default search. (Challenge FREE/PAR classes require accepting it.) */
+    val freeSearch: Boolean,
 )
 
 /**
  * Parses the MiniZinc-standard FZN solver flags we claim in `klause.msc` (-a, -n, -s, -v,
- * -t, -r, -p) plus our `--engine` / `-e` selector and repeatable `--param key=value` engine
- * params. Unknown flags are tolerated (printed to
+ * -t, -r, -p, -i, -f) plus our `--engine` / `-e` selector and repeatable `--param key=value`
+ * engine params. Unknown flags are tolerated (printed to
  * stderr) to stay forward-compatible with MiniZinc additions we don't recognise.
  */
 private fun parseFznArgs(args: Array<String>): FznOptions {
@@ -461,12 +475,17 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
     var unboundedIntLo: Int? = null
     var unboundedIntHi: Int? = null
     var cpSeed = false
+    var freeSearch = false
     val engineParams = mutableListOf<String>()
     var parallel: Int? = null
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
             "-a", "--all-solutions" -> { allSolutions = true; i++ }
+            // Improving incumbents are streamed on the optimization path unconditionally,
+            // which is exactly `-i` semantics — accept the flag as a no-op.
+            "-i", "--intermediate", "--intermediate-solutions" -> i++
+            "-f", "--free-search" -> { freeSearch = true; i++ }
             "-n" -> { solutionCap = args[++i].toLong(); i++ }
             "-s", "--statistics" -> { statistics = true; i++ }
             "-v", "--verbose" -> { verbose = true; i++ }
@@ -495,5 +514,5 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
         System.err.println("usage: klause-cli [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed, engineParams, parallel)
+    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed, engineParams, parallel, freeSearch)
 }
