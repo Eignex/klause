@@ -499,7 +499,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     var present = false
                     for (i in 0 until learned.size) {
                         if (learned[i] == lit) {
-                            present = true;
+                            present = true
                             break
                         }
                     }

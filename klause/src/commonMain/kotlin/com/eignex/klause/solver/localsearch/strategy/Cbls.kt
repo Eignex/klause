@@ -74,6 +74,25 @@ class Cbls(
     /** Effective [noiseProbability] while stalled past [frontierAfterStall] — a random-walk
      *  diversification over the broadened pool that lets strict local minima be escaped. */
     val stallNoise: Double = 0.4,
+    /** **Plateau-buster** (opt-in, `0` = off = exact default behavior): cap on stall-gated
+     *  int-pair swap moves injected per stalled [pickMove]. The feasibility fight's repair
+     *  pool is otherwise single-set moves (plus ±1 frontier steps), and on assignment-shaped
+     *  instances (bacp/curriculum-style course→period with load bounds) every single int-set
+     *  breaks an equal-coefficient sum — the reification plateau where the best single repair
+     *  is Δ ≥ 0. A swap (`u ← value(w)`, `w ← value(u)`) between same-domain vars fixes
+     *  ordering/channel violations while *preserving* those sums — the move class the
+     *  engine's [LocalSearchSolver] pair-swap only offers after feasibility.
+     *
+     *  Enabling this also switches the *stalled* noise draw to primitive moves only — the
+     *  two are a package: measured on bacp (diag, 3 seeds × 3M flips), baseline plateaus at
+     *  cost 7, swaps alone thrash to 67 (hot stall noise randomly fires destructive 2-var
+     *  perturbations), the noise change alone drifts to 32, and the pair solves 3/3 (and
+     *  curriculum 3/3, mqueens at 10 s). Kept off by default because the same hot-noise
+     *  restriction starves instances whose diversification relies on randomly-taken factor
+     *  compounds (spot5/tpp/java-auto-gen lose feasibility): a corpus sweep measured net
+     *  −2 feasible with it on everywhere. Use via the portfolio's plateau worker or set
+     *  explicitly on permutation/assignment-shaped problems. */
+    val stallSwapCap: Int = 0,
     val tabu: TabuFilter = TabuFilter.Disabled,
     /** Move-scoring basis. [MoveScoring.Weighted] (default) scores by the per-factor
      *  [LocalSearchState.factorWeights] gradient — the CBLS signal. [MoveScoring.Raw] scores by
@@ -109,6 +128,7 @@ class Cbls(
         require(frontierAfterStall >= 0) { "frontierAfterStall ≥ 0, got $frontierAfterStall" }
         require(frontierMoveCap >= 1) { "frontierMoveCap ≥ 1, got $frontierMoveCap" }
         require(stallNoise in 0.0..1.0) { "stallNoise ∈ [0, 1], got $stallNoise" }
+        require(stallSwapCap >= 0) { "stallSwapCap ≥ 0, got $stallSwapCap" }
         require(maxNeighborhood >= 1) { "maxNeighborhood ≥ 1, got $maxNeighborhood" }
         require(candidatesPerLevel >= 1) { "candidatesPerLevel ≥ 1, got $candidatesPerLevel" }
         require(skewAlpha >= 0.0) { "skewAlpha ≥ 0, got $skewAlpha" }
@@ -170,8 +190,19 @@ class Cbls(
         sampleFromSatisfied(state, sink)
         seedObjectiveMoves(state, sink)
 
+        // Stall swaps live in a private sink: they compete on *score only*, never in the
+        // noise draw. Random-picking a 2-var swap is a large destructive perturbation
+        // (measured on bacp: min 7 → 67); score-picked, the same swaps are exactly the
+        // coordinated escape the reification plateaus need (bacp/curriculum solve). All
+        // other candidates — including factor-proposed compounds — keep the original
+        // noise-eligible behavior; restricting those too regressed the instances whose
+        // diversification relied on them (rcpsp-wet, spot5, tpp).
+        swapSink.clear()
+        if (stalled) sampleStallSwaps(state, swapSink)
+        val swaps = swapSink.list
+
         val raw = sink.list
-        if (raw.isEmpty()) return null
+        if (raw.isEmpty() && swaps.isEmpty()) return null
         val filtered = tabu.filter(state, raw)
         // While stalled, never let tabu starve the pool into a null move (which forces a
         // full restart and discards plateau progress): fall back to the unfiltered candidates
@@ -184,26 +215,43 @@ class Cbls(
         }
 
         val effectiveNoise = if (stalled) stallNoise else noiseProbability
-        if (state.rng.nextDouble() < effectiveNoise) {
-            return moves[state.rng.nextInt(moves.size)]
+        if (moves.isNotEmpty() && state.rng.nextDouble() < effectiveNoise) {
+            // Plateau-buster half 2 (see [stallSwapCap]): while stalled, draw noise from
+            // primitive moves only. Stalled noise runs hot (stallNoise = 0.4) and at that
+            // rate random compound picks are a large destructive perturbation — measured on
+            // bacp they thrash the plateau — while the same compounds score-picked are the
+            // escape mechanism. Gated with the swaps because alone it starves landscapes
+            // whose diversification relies on randomly-taken factor compounds.
+            val pool = if (stalled && stallSwapCap > 0) {
+                moves.filterNot { it is Move.Compound }.ifEmpty { moves }
+            } else {
+                moves
+            }
+            return pool[state.rng.nextInt(pool.size)]
         }
 
-        var bestMove: Move = moves[0]
-        var bestScore = score(state, bestMove)
-        var tieCount = 1
-        for (i in 1 until moves.size) {
-            val s = score(state, moves[i])
-            if (s < bestScore) {
-                bestMove = moves[i]
-                bestScore = s
-                tieCount = 1
-            } else if (s == bestScore) {
-                tieCount++
-                if (state.rng.nextInt(tieCount) == 0) bestMove = moves[i]
+        var bestMove: Move? = null
+        var bestScore = Double.POSITIVE_INFINITY
+        var tieCount = 0
+        for (pool in arrayOf(moves, swaps)) {
+            for (m in pool) {
+                val s = score(state, m)
+                if (s < bestScore) {
+                    bestMove = m
+                    bestScore = s
+                    tieCount = 1
+                } else if (s == bestScore) {
+                    tieCount++
+                    if (state.rng.nextInt(tieCount) == 0) bestMove = m
+                }
             }
         }
         return bestMove
     }
+
+    /** Private sink for stall-swap candidates — kept out of [LocalSearchState.moveSink] so
+     *  swaps are excluded from the noise draw by construction (see [pickMove]). */
+    private val swapSink: MoveSink = MoveSink()
 
     /** Score a candidate move. **Feasibility-first**: the objective component is gated
      *  behind `state.cost == 0`. At infeasibility we ignore the objective entirely so the
@@ -319,6 +367,55 @@ class Cbls(
             b--
         }
         return b
+    }
+
+    /** Stall-gated int-pair swap proposals (see [stallSwapCap]). Randomized draws: pick a
+     *  violated factor, take one of its int vars `u`, and pair it with either another var of
+     *  the same factor or a var of a frontier (variable-sharing) factor. A legal swap needs
+     *  differing values and cross-compatible domains; the [MoveSink] handles frozen-var
+     *  filtering and dedup. Scored like any candidate — a swap that repairs the violated
+     *  factor while preserving its satisfied neighbours scores strictly negative, which is
+     *  exactly the signal the single-set pool can't produce on these plateaus. */
+    private fun sampleStallSwaps(state: LocalSearchState, sink: MoveSink) {
+        if (stallSwapCap <= 0 || state.violated.isEmpty()) return
+        val rng = state.rng
+        val problem = state.problem
+        var budget = stallSwapCap
+        // Randomized rejection sampling; most draws on bool-only or single-var factors miss,
+        // so allow a few attempts per requested swap before giving up.
+        var attempts = stallSwapCap * ATTEMPTS_PER_SWAP
+        while (budget > 0 && attempts-- > 0) {
+            val fid = state.violated.random(rng)
+            val vars = state.factors[fid].intVars
+            if (vars.isEmpty()) continue
+            val u = vars[rng.nextInt(vars.size)]
+            val w = if (vars.size >= 2 && rng.nextBoolean()) {
+                vars[rng.nextInt(vars.size)]
+            } else {
+                val occ = problem.intOccurrences[u]
+                if (occ.isEmpty()) continue
+                val nvars = state.factors[occ[rng.nextInt(occ.size)]].intVars
+                if (nvars.isEmpty()) continue
+                nvars[rng.nextInt(nvars.size)]
+            }
+            if (w == u) continue
+            // The private swap sink bypasses the state sink's assumption filtering — check
+            // frozen vars explicitly (mirrors the engine's post-feasibility pairSwapStep).
+            if (state.assumptions.isFrozenInt(u) || state.assumptions.isFrozenInt(w)) continue
+            val du = problem.intDomains[u]
+            val dw = problem.intDomains[w]
+            // Same-shaped domains only: swaps target permutation/assignment structure
+            // (course→period style vars sharing one value range). Cross-domain swaps (e.g. a
+            // decision var against a derived load/count var) are semantically meaningless and
+            // measured to thrash the plateau rather than walk it.
+            if (du.min != dw.min || du.max != dw.max) continue
+            val vu = state.assignment.intValue(u)
+            val vw = state.assignment.intValue(w)
+            if (vu == vw) continue
+            if (vw !in du || vu !in dw) continue
+            sink.addCompound(listOf(Move.IntSet(u, vw), Move.IntSet(w, vu)))
+            budget--
+        }
     }
 
     private fun sampleFromSatisfied(state: LocalSearchState, sink: MoveSink) {
@@ -506,6 +603,9 @@ class Cbls(
     companion object {
         /** Largest geometric step seeded per leaf var during functional-objective descent. */
         private const val OBJ_SEED_MAX_STEP = 4096
+
+        /** Rejection-sampling attempts allowed per requested stall swap (see [sampleStallSwaps]). */
+        private const val ATTEMPTS_PER_SWAP = 4
 
         /**
          * Classical Variable-Neighbourhood-Descent as a [Cbls] preset (the unified strategy

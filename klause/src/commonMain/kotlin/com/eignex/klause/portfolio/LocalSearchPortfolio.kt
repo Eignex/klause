@@ -108,6 +108,20 @@ internal data class LocalSearchWorkerConfig(
                     SimulatedAnnealing(),
                     FixedCadenceRestart(maxFlipsBeforeRestart = 50_000),
                 ),
+                // CBLS plateau-buster: stall-gated same-domain pair swaps (score-only) +
+                // primitive-only stalled noise (see [Cbls.stallSwapCap]). Closes the
+                // reification plateaus on assignment-shaped instances (bacp/curriculum
+                // class) that the flat repair pool never escapes; not the single-config
+                // default because the hot-noise restriction costs feasibility on landscapes
+                // that rely on randomly-taken factor compounds. Appended last so existing
+                // small-portfolio mixes are unchanged; promoting it in palette order is a
+                // measured follow-up.
+                LocalSearchWorkerConfig(
+                    "cbls-plateau/fixed",
+                    strategy = Cbls(stallSwapCap = 16, tabu = cblsTabu),
+                    restartPolicy = FixedCadenceRestart(),
+                    optimizeStrategy = Cbls(stallSwapCap = 16, tabu = cblsTabu),
+                ),
             )
             return List(count) { palette[it % palette.size] }
         }
