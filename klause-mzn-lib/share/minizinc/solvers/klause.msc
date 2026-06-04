@@ -6,7 +6,7 @@
   "mznlib": "../klause",
   "executable": "../../../bin/klause-fzn",
   "tags": ["cp", "int", "finite-domain"],
-  "stdFlags": ["-a", "-n", "-s", "-v", "-t", "-r"],
+  "stdFlags": ["-a", "-n", "-s", "-v", "-t", "-r", "-p"],
   "supportsMzn": false,
   "supportsFzn": true,
   "needsSolns2Out": true,
