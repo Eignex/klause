@@ -57,6 +57,7 @@ class DefinitionalSweep internal constructor(
             if (outIsBool) assignment.setBool(out, v != 0L) else assignment.setInt(out, v.toInt())
         }
 
+        /** Shared [SweepNode] constants. */
         companion object {
             /** Sentinel: the definition cannot fire; leave the output untouched. */
             const val NO_WRITE: Long = Long.MIN_VALUE
@@ -196,8 +197,7 @@ class DefinitionalSweep internal constructor(
     val size: Int get() = nodes.size
 
     /** Build the per-move invariant index over these nodes (issue #153). */
-    fun network(numIntVars: Int, numBoolVars: Int): InvariantNetwork =
-        InvariantNetwork(nodes, numIntVars, numBoolVars)
+    fun network(numIntVars: Int, numBoolVars: Int): InvariantNetwork = InvariantNetwork(nodes, numIntVars, numBoolVars)
 
     /**
      * Evaluate every defined var bottom-up from the current values in [assignment] — then

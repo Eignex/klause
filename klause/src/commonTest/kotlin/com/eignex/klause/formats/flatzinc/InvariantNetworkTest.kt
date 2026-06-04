@@ -77,10 +77,9 @@ class InvariantNetworkTest {
         sink.addIntSet(iv.getValue("x"), 3) // free: kept
         assertEquals(1, sink.list.size, "defined-var move must be filtered at the sink")
         sink.clear()
-        // Compound: the defined part drops, the free part survives.
+        // Compound: the defined part drops; the lone survivor demotes to a primitive move.
         sink.addCompound(listOf(Move.IntSet(iv.getValue("s"), 3), Move.IntSet(iv.getValue("x"), 4)))
-        val kept = sink.list.single() as Move.Compound
-        assertEquals(1, kept.parts.size)
-        assertEquals(iv.getValue("x"), (kept.parts[0] as Move.IntSet).varId)
+        val kept = sink.list.single() as Move.IntSet
+        assertEquals(iv.getValue("x"), kept.varId)
     }
 }
