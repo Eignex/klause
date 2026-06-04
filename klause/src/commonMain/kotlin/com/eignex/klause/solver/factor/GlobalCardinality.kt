@@ -256,10 +256,38 @@ class GlobalCardinality(
         return out
     }
 
+    /** Clause-form literals for every pinned presence: the conclusion rests on which xs are
+     *  in and which are out, so each pinned presence literal joins the premise set as its
+     *  currently-false form. Empty for the non-opt fast path. */
+    private fun presencePremiseLits(state: PropagationState): IntArray {
+        if (presents.isEmpty()) return EmptyIntArray
+        val out = IntArrayList()
+        for (i in presents.indices) {
+            when {
+                OptPresence.isDefinitelyPresent(presents, i, state) -> out.add(Lit.negate(presents[i]))
+                OptPresence.isDefinitelyAbsent(presents, i, state) -> out.add(presents[i])
+            }
+        }
+        return out.toIntArray()
+    }
+
+    private fun withPresencePremises(state: PropagationState, base: IntArray?): IntArray? {
+        val pres = presencePremiseLits(state)
+        if (pres.isEmpty()) return base
+        if (base == null) return pres
+        val out = IntArray(base.size + pres.size)
+        base.copyInto(out)
+        pres.copyInto(out, base.size)
+        return out
+    }
+
     /** Hole-aware conflict reason, sharpened to the pigeonhole subset captured by [propagate];
-     *  falls back to all vars when no subset was recorded. */
+     *  falls back to all vars when no subset was recorded. Presence pins join the premises:
+     *  without them a conflict derived among the present xs reads as if it held for every
+     *  assignment, and the learned clause prunes feasible solutions that simply mark some
+     *  of those xs absent. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, conflictVars ?: intVars)
+        withPresencePremises(state, collectHoleAndBoundAntecedents(state, conflictVars ?: intVars))
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         conflictVars = null // stale-guard; set at each pigeonhole failure point below.
@@ -282,9 +310,31 @@ class GlobalCardinality(
         val n = effectiveXs.size
         val m = cover.size
         val coverSet = coverIndexByValue.keys
-        // LCG antecedents: the union of every effectiveXs var's int trail. Same coarse
-        // approach as AllDifferent — analyzer minimization shrinks redundant pieces.
-        val gccAntecedents = state.composeIntVarAtomAntecedents(effectiveXs)
+        // Maybe-present xs: presence undecided. They contribute no definite count and take
+        // no pruning, but they remain potential takers of any cover value, so every
+        // upper-bound argument must include them.
+        val maybeXs: IntArray = if (presents.isEmpty()) {
+            EmptyIntArray
+        } else {
+            val acc = IntArrayList()
+            for (i in xs.indices) {
+                if (!OptPresence.isDefinitelyPresent(presents, i, state) &&
+                    !OptPresence.isDefinitelyAbsent(presents, i, state)
+                ) {
+                    acc.add(xs[i])
+                }
+            }
+            acc.toIntArray()
+        }
+        // LCG antecedents: the union of every involved var's int trail plus the presence
+        // pins. Count vars join the set — every flow-shaped conclusion rests on their
+        // current bounds (the demand side), and composing emits nothing for a count var
+        // still at its root domain. Same coarse approach as AllDifferent — analyzer
+        // minimization shrinks redundant pieces.
+        val gccAntecedents = withPresencePremises(
+            state,
+            state.composeIntVarAtomAntecedents(effectiveXs + maybeXs + (countVars ?: EmptyIntArray)),
+        )
         if (closed) {
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
@@ -310,6 +360,11 @@ class GlobalCardinality(
                 val d = state.intDomains[x]
                 if (d.min == d.max && d.min == target) definite[k]++
                 if (target in d) possible[k]++
+            }
+            // A maybe-present x can still become present and take the value: it counts
+            // toward the possible takers (never toward the definite ones).
+            for (x in maybeXs) {
+                if (target in state.intDomains[x]) possible[k]++
             }
             if (countVars != null) {
                 // More vars pinned to cover[k] than countVars[k]'s max: the pinned vars plus
@@ -342,6 +397,12 @@ class GlobalCardinality(
                 hi[k] = requireNotNull(countHigh)[k]
             }
         }
+
+        // The flow model below assumes the present set is exact: a maybe-present x is
+        // potential supply for any lower bound and potential demand on any upper bound,
+        // and neither role fits a fixed-node flow soundly. Defer GAC until every
+        // presence is decided; the count tightening above already ran.
+        if (maybeXs.isNotEmpty()) return true
 
         // Detect whether any xᵢ has an out-of-cover value reachable (drives "other" arc).
         val hasOtherVar = BooleanArray(n)
@@ -442,7 +503,12 @@ class GlobalCardinality(
             val reach = flow.residualReachable(superSource)
             val resp = IntArrayList()
             for (i in 0 until n) if (reach[varNode[i]]) resp.add(effectiveXs[i])
-            if (countVars != null) for (k in 0 until m) if (reach[covNode[k]]) resp.add(countVars[k])
+            // Every count var joins the citation: the deficit is supply (the vars above)
+            // against demand, and the demand is the count vars' search-derived bounds —
+            // the demand-side cover nodes are generally NOT residual-reachable, so
+            // filtering by the cut would drop exactly the premises that matter. A count
+            // var still at its root domain contributes no literal.
+            if (countVars != null) for (k in 0 until m) resp.add(countVars[k])
             if (resp.size > 0) conflictVars = resp.toIntArray()
             return false
         }

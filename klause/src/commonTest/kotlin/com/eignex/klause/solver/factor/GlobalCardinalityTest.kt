@@ -1,15 +1,20 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class GlobalCardinalityTest {
@@ -239,4 +244,48 @@ class GlobalCardinalityTest {
             )
         }
     }
+
+    /**
+     * Flow-deficiency conflicts must cite the count vars whose search-derived lower bounds
+     * form the unmet demand. Two values each demand one taker (count mins raised at search
+     * levels) while only one var can still serve either — per-value counts stay locally
+     * consistent, so only the Régin flow detects the deficit. The demand-side cover nodes
+     * are not residual-reachable from the cut, and a reach-filtered citation drops exactly
+     * the count premises — the learned clause then claims the var bounds alone are
+     * contradictory and prunes feasible assignments (surfaced as a false UNSAT on
+     * oocsp_racks).
+     */
+    @Test
+    fun `flow deficiency conflict cites the count var demand bounds`() {
+        // ints: xs = 0,1 over 0..2; countVars 2 (value 1) and 3 (value 2) over 0..2.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(
+                GlobalCardinality(xs = intArrayOf(0, 1), cover = intArrayOf(1, 2), countVars = intArrayOf(2, 3)),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(2, 1)) { "count-1 demand failed" }
+        state.currentLevel = 2
+        check(state.tightenIntMin(3, 1)) { "count-2 demand failed" }
+        state.currentLevel = 3
+        check(state.tightenIntMax(1, 0)) { "x1 restriction failed" }
+
+        val gcc = problem.factors[0]
+        assertFalse(gcc.propagate(state, 0), "demand 2 vs supply 1 must conflict")
+        val reason = gcc.conflictReason(state, 0)
+        assertNotNull(reason, "flow-deficiency conflict must carry a reason")
+        val citedInts = buildSet {
+            for (lit in reason) {
+                val v = Lit.variable(lit)
+                if (v >= problem.numBoolVars) add(state.atomIntVar[v - problem.numBoolVars])
+            }
+        }
+        assertTrue(2 in citedInts && 3 in citedInts, "reason must cite both count vars; cited $citedInts")
+    }
+
 }
