@@ -190,7 +190,12 @@ class Element(
             }
         }
         if (unionLo > unionHi) return false // no reachable position — infeasible
-        val antIdx = state.composeIntVarAtomAntecedents(
+        // The union ranges over idx's *surviving* values, so the deduction depends on idx's
+        // interior holes, not just its bounds — e.g. when the excluded positions carried the
+        // extreme element values. A bounds-only reason under-cites and the learned clause
+        // over-prunes, so cite hole-aware antecedents instead.
+        val antIdx = collectHoleAndBoundAntecedents(
+            state,
             if (arrIsVars) intArrayOf(idx) + arr else intArrayOf(idx),
         )
         if (!state.tightenIntMin(result, unionLo, antIdx)) return false
