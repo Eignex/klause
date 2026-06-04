@@ -112,6 +112,7 @@ object PortfolioCreditMetric {
             PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L, lsConfigLabels = configs),
             lsObjective = entry.lsObjective ?: entry.objective,
             linearObjective = entry.objective,
+            definitionalSweep = entry.definitionalSweep,
         )
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }

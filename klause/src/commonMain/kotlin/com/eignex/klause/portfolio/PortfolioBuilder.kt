@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -69,6 +70,9 @@ object PortfolioBuilder {
         spec: PortfolioSpec,
         lsObjective: Objective? = null,
         linearObjective: Objective? = null,
+        /** Definitional sweep threaded into every LS worker (see
+         *  [com.eignex.klause.solver.DefinitionalSweep]); null = unchanged behavior. */
+        definitionalSweep: DefinitionalSweep? = null,
     ): Portfolio {
         val workers = ArrayList<PortfolioWorker>(spec.localSearchWorkers + spec.backtrackWorkers)
 
@@ -90,6 +94,7 @@ object PortfolioBuilder {
                     strategy = cfg.strategy,
                     optimizeStrategy = cfg.optimizeStrategy,
                     restartPolicy = cfg.restartPolicy,
+                    definitionalSweep = definitionalSweep,
                 ).session()
                 val params = LocalSearchParams(
                     randomSeed = spec.seed + i,

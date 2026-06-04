@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.FunctionalObjective
 import com.eignex.klause.solver.FunctionalObjective.Operand
 
@@ -51,6 +52,38 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
     val leaves = LinkedHashSet<Int>()
     for (n in nodes) for (inId in nodeInputVarIds(n)) if (inId !in defined) leaves.add(inId)
     return FunctionalObjective(objId, minimize, nodes, leaves.toIntArray())
+}
+
+/**
+ * Build the model-wide [DefinitionalSweep] from every `defines_var` constraint whose shape
+ * [buildObjNode] can mirror (abs / min / max / times / plus / lin_eq). Unhandled shapes are
+ * skipped — their definitions simply stay ordinary searched factors. Returns null when nothing
+ * is buildable. Same node machinery as [buildFunctionalObjective], but rooted at *all* defined
+ * vars rather than the objective cone.
+ */
+internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
+    val byDef = HashMap<Int, FznConstraint>()
+    for (c in model.constraints) {
+        val ann = c.annotations.firstOrNull { it.name == "defines_var" } ?: continue
+        val defId = varIdOrNull(ann.args.firstOrNull() ?: continue) ?: continue
+        if (defId !in byDef) byDef[defId] = c
+    }
+    if (byDef.isEmpty()) return null
+    val nodes = ArrayList<FunctionalObjective.Node>(byDef.size)
+    val visited = HashSet<Int>()
+    fun visit(id: Int) {
+        if (id in visited) return
+        val c = byDef[id] ?: return // free var (or unannotated): a sweep input, not a node
+        visited.add(id)
+        // Unbuildable shape: skip the node (it stays a searched factor); inputs of OTHER nodes
+        // referencing this var read its current assignment value, which is sound.
+        val node = buildObjNode(c, id) ?: return
+        for (inId in nodeInputVarIds(node)) visit(inId)
+        nodes.add(node) // post-order ⇒ inputs precede this node (topological)
+    }
+    for (id in byDef.keys.sorted()) visit(id)
+    if (nodes.isEmpty()) return null
+    return DefinitionalSweep(nodes)
 }
 
 /** Int var id for [e], or null if it's a constant / bool / float / unresolvable. */

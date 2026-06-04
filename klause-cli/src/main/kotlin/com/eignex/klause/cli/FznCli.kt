@@ -148,6 +148,7 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
         strategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
         optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
         pairSwapBudget = setup.pairSwapBudget,
+        definitionalSweep = program.definitionalSweep,
     )
     // CBLS scores moves by `Σ weight·Δviolated + λ·Δobjective`. Without a non-zero λ at
     // the params level the objective contribution is zero and the strategy never feels
@@ -252,6 +253,7 @@ private fun runWithPortfolio(
     val (lsObjective, linearObjective) = portfolioObjectives(program)
     val portfolio = com.eignex.klause.portfolio.PortfolioBuilder.build(
         program.problem, spec, lsObjective = lsObjective, linearObjective = linearObjective,
+        definitionalSweep = program.definitionalSweep,
     )
     try {
         when (val solve = program.solve) {

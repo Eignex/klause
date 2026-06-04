@@ -101,6 +101,7 @@ object AnytimeMetric {
             strategy = Cbls(tabu = tabu),
             optimizeStrategy = Cbls(tabu = tabu),
             pairSwapBudget = 1024,
+            definitionalSweep = entry.definitionalSweep,
         )
         val klauseObj = entry.lsObjective ?: obj
         // Optional portfolio mode: -Dklause.anytime.portfolio=<ls>:<bt> runs a multi-core
@@ -186,6 +187,7 @@ object AnytimeMetric {
             entry.problem,
             PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L, lsConfigLabels = configsProp),
             lsObjective = klauseObj, linearObjective = linearObj,
+            definitionalSweep = entry.definitionalSweep,
         )
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }

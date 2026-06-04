@@ -17,6 +17,9 @@ data class ResolvedProblem(
      *  decomposed objectives, when the model provides one. Reference/complete backends use
      *  [objective]; the LS engine prefers this. Null ⇒ fall back to [objective]. */
     val lsObjective: Objective? = null,
+    /** Definitional sweep for the LS engine (see [com.eignex.klause.solver.DefinitionalSweep]);
+     *  carried from `FlatZincProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
+    val definitionalSweep: com.eignex.klause.solver.DefinitionalSweep? = null,
 ) {
     val name: String get() = ref.name
 }

@@ -117,6 +117,7 @@ internal class FlatZincCompiler(
                 is SolveDirective.Maximize -> buildFunctionalObjective(solveDirective.objVar, minimize = false)
                 else -> null
             },
+            definitionalSweep = buildDefinitionalSweep(),
         )
     }
 

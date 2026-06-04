@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.IncrementalObjective
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
@@ -70,8 +71,40 @@ class LocalSearchSolver(
      *  violation contribution. Idempotent and bounded by [Problem.numBoolVars +
      *  numIntVars]. */
     val greedyRepairOnRestart: Boolean = true,
+    /** Optional definitional sweep (see [com.eignex.klause.solver.DefinitionalSweep]): after
+     *  every restart's randomization, defined (aux) vars are *evaluated* bottom-up from the
+     *  free decision vars instead of left random — decomposed models start each restart at
+     *  the "only real constraints violated" frontier rather than spending millions of flips
+     *  hand-repairing definitional channels. Wired by FlatZinc-facing callers from
+     *  `FlatZincProgram.definitionalSweep`; null = behavior unchanged. */
+    val definitionalSweep: DefinitionalSweep? = null,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
+
+    /** The restart policy actually driven by the engine: when a [definitionalSweep] is
+     *  present, every restart is followed by the sweep + a state recompute, so all restart
+     *  call sites (satisfy loop, optimize loop, streaming) get swept uniformly. */
+    private val restarts: RestartPolicy = if (definitionalSweep == null) {
+        restartPolicy
+    } else {
+        object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
+                restartPolicy.shouldRestart(stepsSinceLastRestart)
+
+            override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) =
+                restartPolicy.onLocalOptimum(state, sample, objective)
+
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                restartPolicy.restart(state, bestSoFar)
+                definitionalSweep.sweep(
+                    state.assignment,
+                    problem.intDomains,
+                    problem.factors,
+                ) { state.assumptions.isFrozenBool(it) }
+                state.recompute()
+            }
+        }
+    }
 
     override fun solve(params: LocalSearchParams): SolveResult = solveInternal(params, warm = null)
 
@@ -214,7 +247,7 @@ class LocalSearchSolver(
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
             // random restart.
-            restartPolicy.restart(state, bestSoFar = null)
+            restarts.restart(state, bestSoFar = null)
             var flipsSinceRestart = 0
             // Best-cost-so-far snapshot (even while infeasible): an [IteratedLocalSearchRestart]
             // perturbs from this instead of full-randomising, so a long descent/plateau-escape
@@ -242,20 +275,20 @@ class LocalSearchSolver(
                         warm?.captureFrom(state)
                         yield(snap)
                         flipsSinceYield = 0
-                        restartPolicy.restart(state, bestSoFar = null)
+                        restarts.restart(state, bestSoFar = null)
                         bestCost = state.cost
                         bestSnap = state.assignment.snapshot()
                         flipsSinceRestart = 0
                         continue
                     }
-                    if (restartPolicy.shouldRestart(flipsSinceRestart)) {
-                        restartPolicy.restart(state, bestSoFar = bestSnap)
+                    if (restarts.shouldRestart(flipsSinceRestart)) {
+                        restarts.restart(state, bestSoFar = bestSnap)
                         flipsSinceRestart = 0
                         continue
                     }
                     val move = strategy.pickMove(state)
                     if (move == null) {
-                        restartPolicy.restart(state, bestSoFar = bestSnap)
+                        restarts.restart(state, bestSoFar = bestSnap)
                         flipsSinceRestart = 0
                         continue
                     }
@@ -307,7 +340,7 @@ class LocalSearchSolver(
         // [LocalSearchParams.initialAssignment].
         val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
         // No bestSample yet — first restart is always full random (unless we seeded above).
-        if (!seeded) restartPolicy.restart(state, bestSoFar = null)
+        if (!seeded) restarts.restart(state, bestSoFar = null)
         // Greedy-repair is gated on problem size: on tiny problems the LS engine reaches
         // feasibility in microseconds and the repair pass is pure overhead; the gating
         // also avoids changing observable convergence on the existing small unit tests.
@@ -419,15 +452,15 @@ class LocalSearchSolver(
                     totalFlips++
                     continue
                 }
-                restartPolicy.onLocalOptimum(state, snap, obj)
-                restartPolicy.restart(state, bestSample)
+                restarts.onLocalOptimum(state, snap, obj)
+                restarts.restart(state, bestSample)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
                 flipsSinceRestart = 0
                 totalFlips++
                 continue
             }
-            if (restartPolicy.shouldRestart(flipsSinceRestart)) {
-                restartPolicy.restart(state, bestSample ?: bestCostSnap)
+            if (restarts.shouldRestart(flipsSinceRestart)) {
+                restarts.restart(state, bestSample ?: bestCostSnap)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
                 flipsSinceRestart = 0
                 totalFlips++
@@ -439,7 +472,7 @@ class LocalSearchSolver(
             // behavior to ProbSat plus better multi-flip handling.
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restartPolicy.restart(state, bestSample ?: bestCostSnap)
+                restarts.restart(state, bestSample ?: bestCostSnap)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
                 flipsSinceRestart = 0
                 totalFlips++
