@@ -19,6 +19,7 @@ import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
 
 /**
@@ -466,9 +467,31 @@ class BacktrackSolver(override val problem: Problem) :
         // backend-specific `maxDecisions` knob.
         var decisionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
 
+        // Failsafe against repeat-learning livelock: count identical re-derivations per
+        // clause (order-free literal-set hash). Healthy re-learning happens after
+        // forgetting or restarts, but an unbounded streak means the backjump + assert
+        // cycle is not progressing — past the threshold those conflicts are handled
+        // chronologically. The count surfaces as the `relearned` solve stat under -s.
+        val relearnCounts = HashMap<Long, Int>()
+        val relearnTripped: (Learned) -> Boolean = { learned ->
+            var h = 0L
+            for (lit in learned.literals) h += splitmix64(lit.toLong())
+            val n = (relearnCounts[h] ?: 0) + 1
+            relearnCounts[h] = n
+            if (n > 1) sink?.observeRelearn()
+            n > RELEARN_FALLBACK_THRESHOLD
+        }
+
         // Outer restart loop. Each iteration is one Luby-bounded DFS run from the root.
         // When `lubyRestartBase` is null the loop runs exactly once with infinite per-run
         // budget — same as the pre-restart behaviour.
+        // Assignment of the most recently yielded leaf, pending a blocking nogood. Without it
+        // the DFS only steps past a found solution chronologically, and a later backjump that
+        // pops those frames re-opens the leaf — the search can then revisit and re-yield it,
+        // potentially forever. The nogood spans the full assignment (not the decisions) so the
+        // same solution reached through a different decision order is excluded too. It is
+        // registered at the root on the next backtrack (or restart) and kept permanently.
+        var pendingBlock: Sample? = null
         var lubyIdx = 1L
         outer@ while (true) {
             val perRunBudget: Long = params.lubyRestartBase?.let { base ->
@@ -496,6 +519,25 @@ class BacktrackSolver(override val problem: Problem) :
                         session.popLast()
                         trail.removeAt(trail.size - 1)
                     }
+                    val restartBlock = pendingBlock
+                    if (restartBlock != null) {
+                        pendingBlock = null
+                        if (restartBlock.bools.isNotEmpty() || restartBlock.ints.isNotEmpty()) {
+                            // All decisions are popped; register the nogood so the restarted run
+                            // cannot re-yield the same leaf. A root-level contradiction here
+                            // proves the remaining space empty.
+                            val nogood = session.assignmentNogood(restartBlock.bools, restartBlock.ints)
+                            val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                            if (res is PropagationResult.Unsat) {
+                                yield(
+                                    SearchOutcome.Exhausted(
+                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                                    ),
+                                )
+                                return@sequence
+                            }
+                        }
+                    }
                     params.variableHeuristic.onRestart()
                     params.valueHeuristic.onRestart()
                     // LCG learned-clause forgetting: at each restart, prune the database
@@ -516,6 +558,7 @@ class BacktrackSolver(override val problem: Problem) :
                         // the incumbent before the engine continues with the next yield.
                         params.variableHeuristic.onSolution(snap)
                         params.valueHeuristic.onSolution(snap)
+                        pendingBlock = snap
                         yield(SearchOutcome.Found(snap))
                         descend = false
                         continue@inner
@@ -524,7 +567,16 @@ class BacktrackSolver(override val problem: Problem) :
                     val ordered = applyPhase(varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                     val node = makeNode(varRef, ordered)
                     val decsBefore = decisionsLeft
-                    val out = advance(node, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- }, sink)
+                    val out = advance(
+                        node,
+                        session,
+                        params,
+                        pruneIf,
+                        { decisionsLeft },
+                        { decisionsLeft-- },
+                        sink,
+                        relearnTripped,
+                    )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
                         AdvanceOutcome.Success -> {
@@ -579,6 +631,31 @@ class BacktrackSolver(override val problem: Problem) :
                         }
                     }
                 } else {
+                    val rootBlock = pendingBlock
+                    if (rootBlock != null) {
+                        // Apply the pending blocking nogood at the root, where it can neither
+                        // conflict nor assert mid-trail; a root contradiction proves the
+                        // remaining space empty.
+                        pendingBlock = null
+                        while (trail.isNotEmpty()) {
+                            session.popLast()
+                            trail.removeAt(trail.size - 1)
+                        }
+                        val nogood = session.assignmentNogood(rootBlock.bools, rootBlock.ints)
+                        if (nogood.isNotEmpty()) {
+                            val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                            if (res is PropagationResult.Unsat) {
+                                yield(
+                                    SearchOutcome.Exhausted(
+                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                                    ),
+                                )
+                                return@sequence
+                            }
+                        }
+                        descend = true
+                        continue@inner
+                    }
                     if (trail.isEmpty()) {
                         yield(
                             SearchOutcome.Exhausted(
@@ -590,7 +667,16 @@ class BacktrackSolver(override val problem: Problem) :
                     val top = trail.last()
                     session.popLast()
                     val decsBefore = decisionsLeft
-                    val out = advance(top, session, params, pruneIf, { decisionsLeft }, { decisionsLeft-- }, sink)
+                    val out = advance(
+                        top,
+                        session,
+                        params,
+                        pruneIf,
+                        { decisionsLeft },
+                        { decisionsLeft-- },
+                        sink,
+                        relearnTripped,
+                    )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
                         AdvanceOutcome.Success -> {
@@ -767,6 +853,7 @@ class BacktrackSolver(override val problem: Problem) :
         decisionsRemaining: () -> Long,
         decrement: () -> Unit,
         sink: SolveStatsSink? = null,
+        relearnTripped: ((Learned) -> Boolean)? = null,
     ): AdvanceOutcome {
         while (true) {
             if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
@@ -797,7 +884,19 @@ class BacktrackSolver(override val problem: Problem) :
                 // 1UIP cannot collapse) would never become unit, so asserting it is a no-op
                 // and the search would re-make the same decision forever. Fall through to
                 // chronological within-node value enumeration instead, which is complete.
-                if (learned != null && learned.asserting) return AdvanceOutcome.Backjump(learned)
+                // Two guards before taking the backjump: a clause carrying an
+                // already-true literal (a kept resolved-atom literal can be) is satisfied,
+                // so the assert would be a no-op and the popped frames' untried values
+                // lost for nothing; and a clause re-derived identically past the relearn
+                // threshold signals a cycle the backjump isn't breaking. Either way the
+                // conflict falls through to chronological within-node enumeration.
+                if (learned != null &&
+                    learned.asserting &&
+                    learned.literals.none { session.litTruth(it) == true } &&
+                    relearnTripped?.invoke(learned) != true
+                ) {
+                    return AdvanceOutcome.Backjump(learned)
+                }
                 continue
             }
             if (pruneIf != null && pruneIf(session)) {
@@ -839,7 +938,7 @@ class BacktrackSolver(override val problem: Problem) :
         val nonGlue = ArrayList<IntArray>(learnedSize) // [lbd, index] pairs
         for (i in 0 until learnedSize) {
             val lbd = session.learnedClauseLbd(i)
-            if (lbd > glueThreshold) nonGlue.add(intArrayOf(lbd, i))
+            if (lbd > glueThreshold && !session.learnedClausePermanent(i)) nonGlue.add(intArrayOf(lbd, i))
         }
         // If all are glue, nothing to forget.
         if (nonGlue.isEmpty()) return
@@ -850,7 +949,7 @@ class BacktrackSolver(override val problem: Problem) :
         val kept = HashSet<Int>(remainingCap)
         for (k in 0 until remainingCap) kept.add(nonGlue[k][1])
         session.forgetLearnedClauses { idx, lbd ->
-            lbd <= glueThreshold || idx in kept
+            lbd <= glueThreshold || session.learnedClausePermanent(idx) || idx in kept
         }
         val dropped = nonGlue.size - remainingCap
         params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
@@ -957,5 +1056,11 @@ class BacktrackSolver(override val problem: Problem) :
         /** Cap on cascading CDB backjumps within a single search step. Defensive; under
          *  a well-formed analyzer the loop terminates well before this. */
         const val MAX_CASCADING_BACKJUMPS: Int = 64
+
+        /** After this many identical re-derivations of one clause, its conflicts are
+         *  handled chronologically instead of by backjump — a repeat-learning streak this
+         *  long means the backjump + assert cycle is not progressing. Generous enough that
+         *  healthy re-learning (after forgetting or restarts) never trips it. */
+        const val RELEARN_FALLBACK_THRESHOLD: Int = 8
     }
 }

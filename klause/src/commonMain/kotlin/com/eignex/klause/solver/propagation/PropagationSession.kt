@@ -2,6 +2,7 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.util.IntArrayList
@@ -67,6 +68,18 @@ class PropagationSession(
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
     private fun trailIsBool(enc: Int): Boolean = enc < problem.numBoolVars
+
+    /** The clause forbidding the exact total assignment `(bools, ints)`: one literal per
+     *  variable demanding it differ. Blocking a found solution's full assignment (rather than
+     *  the decisions that led to it) is order-independent — the same assignment reached later
+     *  through a different decision sequence is still excluded. */
+    fun assignmentNogood(bools: BooleanArray, ints: IntArray): IntArray {
+        val out = IntArray(bools.size + ints.size)
+        var j = 0
+        for (v in bools.indices) out[j++] = Lit.make(v, !bools[v])
+        for (v in ints.indices) out[j++] = Lit.make(state.atomVarEq(v, ints[v]), false)
+        return out
+    }
 
     /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
      *  All session operations short-circuit to this result. */
@@ -195,12 +208,17 @@ class PropagationSession(
      * learned clause is a constraint over existing variables, not a decision. So no
      * snapshot is pushed and no decision counter is bumped.
      */
-    fun addLearnedClause(clause: Clause, lbd: Int): PropagationResult {
+    fun addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        val newFid = state.addLearnedClause(clause, lbd)
+        val newFid = state.addLearnedClause(clause, lbd, permanent)
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid)
         if (conflict != null) return revertAndUnsat(conflict)
+        // The asserted facts are implied by the decisions up to the current level, so they
+        // join the level's baseline: re-snapshot the top mark. Otherwise the next failed
+        // pin's revert — which restores to the top mark — silently rewinds them while the
+        // clause stays registered, and the search can re-derive the same conflict forever.
+        levelStates[levelTop - 1] = state.mark()
         return impliedSince(base)
     }
 
@@ -210,12 +228,18 @@ class PropagationSession(
         state.forgetLearnedClauses(keep)
     }
 
+    /** Unified truth of a bool or atom literal — null when undetermined. */
+    fun litTruth(lit: Int): Boolean? = state.litTruth(lit)
+
     /** Current learned-clause count. Used by the engine to decide whether to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
     val learnedClauseCount: Int get() = state.learnedClauses.size
 
     /** LBD of the learned clause at [learnedIndex]. */
     fun learnedClauseLbd(learnedIndex: Int): Int = state.learnedClauseLbd(learnedIndex)
+
+    /** True iff learned clause [learnedIndex] survives every forgetting pass. */
+    fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
         val want = if (value) 1 else 0
