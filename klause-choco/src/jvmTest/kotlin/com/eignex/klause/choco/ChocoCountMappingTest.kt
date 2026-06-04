@@ -27,14 +27,20 @@ class ChocoCountMappingTest {
             numBoolVars = 0,
             numIntVars = 6,
             intDomains = arrayOf(
-                IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
-                IntDomain(0, 1), IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
                 IntDomain(0, 3),
             ),
             factors = arrayOf<Factor>(Count(xs = intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = nId)),
         )
         val r = ChocoSolver(problem).solve(ChocoParams())
-        val sat = assertIs<SolveResult.Sat>(r, "count_eq must stay satisfiable; got $r (false UNSAT = id-as-constant bug)")
+        val sat = assertIs<SolveResult.Sat>(
+            r,
+            "count_eq must stay satisfiable; got $r (false UNSAT = id-as-constant bug)",
+        )
         // n must equal the actual number of xs fixed to 1.
         val actual = (0..2).count { sat.assignment.ints[it] == 1 }
         assertEquals(actual, sat.assignment.ints[nId], "n must hold the match count")

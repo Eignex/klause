@@ -62,7 +62,7 @@ class BinarySearchTest {
         val rng = Random(7)
         repeat(500) {
             val n = rng.nextInt(0, 40)
-            val a = IntArray(n) { rng.nextInt(-20, 20) }.also { it.sort() }
+            val a = IntArray(n) { rng.nextInt(-20, 20) }.apply { sort() }
             val probe = rng.nextInt(-25, 25)
             val idx = a.binarySearchInt(probe)
             val refIdx = reference(a, probe, 0, n)

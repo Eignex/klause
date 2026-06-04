@@ -24,7 +24,7 @@ class CircuitBruteTest {
         val n = next.size
         val visited = BooleanArray(n)
         var cur = 0
-        for (step in 0 until n) {
+        repeat(n) {
             if (next[cur] == cur) return false // self-loop
             if (visited[cur]) return false
             visited[cur] = true
@@ -44,10 +44,10 @@ class CircuitBruteTest {
             var i = 0
             while (i < n) {
                 if (cur[i] < his[i]) {
-                    cur[i]++;
+                    cur[i]++
                     break
                 }
-                cur[i] = los[i];
+                cur[i] = los[i]
                 i++
             }
             if (i == n) break
@@ -74,8 +74,8 @@ class CircuitBruteTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(los[it], his[it]) },
-                factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it })),
+                intDomains = Array(n) { v -> IntDomain(los[v], his[v]) },
+                factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { v -> v })),
             )
             val result = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L))
             checked++

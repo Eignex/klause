@@ -100,34 +100,34 @@ class IndexedMaxHeapTest {
                 val id = rng.nextInt(cap)
                 when (rng.nextInt(5)) {
                     0 -> if (!present[id]) {
-                        val k = rng.nextDouble();
+                        val k = rng.nextDouble()
                         h.insert(
-                        id,
-                        k,
-                    );
-                    key[id] = k;
-                    present[id] = true;
-                    everSeen[id] = true
+                            id,
+                            k,
+                        )
+                        key[id] = k
+                        present[id] = true
+                        everSeen[id] = true
                     }
 
                     1 -> if (present[id]) {
-                        val k = rng.nextDouble();
-                        h.updateKey(id, k);
+                        val k = rng.nextDouble()
+                        h.updateKey(id, k)
                         key[id] = k
                     }
 
                     2 -> if (present[id]) {
-                        h.remove(id);
+                        h.remove(id)
                         present[id] = false
                     }
 
                     3 -> if (!present[id] && everSeen[id]) {
-                        h.restore(id);
+                        h.restore(id)
                         present[id] = true
                     }
 
                     4 -> if (h.size > 0) {
-                        val expectedMax = (0 until cap).filter { present[it] }.maxByOrNull { key[it] }!!
+                        val expectedMax = (0 until cap).filter { id -> present[id] }.maxByOrNull { id -> key[id] }!!
                         val top = h.extractMax()
                         assertTrue(present[top], "extractMax returned an absent id")
                         assertEquals(key[expectedMax], key[top], "extractMax must return a max-key id")
@@ -136,7 +136,7 @@ class IndexedMaxHeapTest {
                 }
                 assertEquals(present.count { it }, h.size)
                 if (h.size > 0) {
-                    val maxId = (0 until cap).filter { present[it] }.maxByOrNull { key[it] }!!
+                    val maxId = (0 until cap).filter { id -> present[id] }.maxByOrNull { id -> key[id] }!!
                     assertEquals(key[maxId], key[h.peekMax()], "peekMax must expose a max-key id")
                 }
             }

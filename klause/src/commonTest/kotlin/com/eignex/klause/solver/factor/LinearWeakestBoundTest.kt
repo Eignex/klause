@@ -63,7 +63,8 @@ class LinearWeakestBoundTest {
             ),
             // Deep tighten chain that then conflicts (exercises stored per-tighten antecedents
             // being resolved through during conflict analysis).
-            Inst(4, 0, 3, listOf(Con(intArrayOf(2, 2, 2, 2), LinearOp.EQ, 9))), // odd RHS, even coeffs → tightenings + UNSAT
+            // odd RHS, even coeffs → tightenings + UNSAT
+            Inst(4, 0, 3, listOf(Con(intArrayOf(2, 2, 2, 2), LinearOp.EQ, 9))),
             Inst(
                 4,
                 0,
@@ -82,7 +83,7 @@ class LinearWeakestBoundTest {
                     return
                 }
                 for (v in inst.lo..inst.hi) {
-                    acc[p] = v;
+                    acc[p] = v
                     rec(p + 1)
                 }
             }

@@ -48,12 +48,12 @@ class InverseTest {
             }
             fun rec(p: Int) {
                 if (p == k) {
-                    if (ok()) brute.add(acc.toList());
+                    if (ok()) brute.add(acc.toList())
                     return
                 }
                 val range = if (p < n) fr[p] else gr[p - n]
                 for (v in range.first..range.second) {
-                    acc[p] = v;
+                    acc[p] = v
                     rec(p + 1)
                 }
             }
