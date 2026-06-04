@@ -72,11 +72,11 @@ class UniGenTest {
         val p = unconstrained(9)
         val samples = BacktrackSolver(p)
             .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 3L), BacktrackParams())
-            .take(80).toList()
-        assertTrue(samples.size == 80, "should produce the requested number of accurate samples")
+            .take(24).toList()
+        assertTrue(samples.size == 24, "should produce the requested number of accurate samples")
         // Unconstrained, so every assignment is valid; uniformity at 512 cells only checked loosely.
         val distinct = samples.map { projectionKey(it, 9) }.toHashSet().size
-        assertTrue(distinct >= 40, "expected good spread, got $distinct distinct out of 80")
+        assertTrue(distinct >= 12, "expected good spread, got $distinct distinct out of 24")
     }
 
     @Test

@@ -1,11 +1,14 @@
 package com.eignex.klause.smt
 
+import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.PseudoBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -32,34 +35,23 @@ class SmtSolverScaffoldTest {
         val result = SmtSolver(problem).solve(SmtParams())
         val sat = result as? SolveResult.Sat
         assertNotNull(sat, "expected SAT verdict, got $result")
-        val trueCount = sat!!.assignment.bools.count { it }
+        val trueCount = sat.assignment.bools.count { it }
         assertEquals(1, trueCount, "exactly-one should hold; got assignment ${sat.assignment.bools.toList()}")
     }
 
     @Test
     fun `unsat instance returns Unsat`() {
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Cardinality.atMostOne(
-                    intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(0, false), Lit.make(1, false)),
-                ),
-            ),
-        )
         // Unsat: a + b = 0 and a + b = 2.
-        val factor1 = com.eignex.klause.solver.factor.PseudoBoolean(
+        val factor1 = PseudoBoolean(
             weights = intArrayOf(1, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-            op = com.eignex.klause.ast.PbOp.EQ,
+            op = PbOp.EQ,
             bound = 0,
         )
-        val factor2 = com.eignex.klause.solver.factor.PseudoBoolean(
+        val factor2 = PseudoBoolean(
             weights = intArrayOf(1, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-            op = com.eignex.klause.ast.PbOp.EQ,
+            op = PbOp.EQ,
             bound = 2,
         )
         val unsatProblem = Problem(
@@ -81,8 +73,8 @@ class SmtSolverScaffoldTest {
             numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, true))),
-                com.eignex.klause.solver.factor.Clause(intArrayOf(Lit.make(0, false))),
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
         val result = SmtSolver(problem).solve(SmtParams())
@@ -117,7 +109,7 @@ class SmtSolverScaffoldTest {
         )
         val sat = result as? SolveResult.Sat
         assertNotNull(sat)
-        assertEquals(true, sat!!.assignment.bools[2])
+        assertEquals(true, sat.assignment.bools[2])
         assertEquals(false, sat.assignment.bools[0])
         assertEquals(false, sat.assignment.bools[1])
     }

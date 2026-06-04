@@ -65,9 +65,9 @@ class ReifiedAtomCycleTest {
         for (x0 in 0..2) {
             for (x1 in 0..2) {
                 for (x2 in 0..2) {
-            val a = intArrayOf(x0, x1, x2)
-            if (ok(a)) brute.add(a.toList())
-        }
+                    val a = intArrayOf(x0, x1, x2)
+                    if (ok(a)) brute.add(a.toList())
+                }
             }
         }
 

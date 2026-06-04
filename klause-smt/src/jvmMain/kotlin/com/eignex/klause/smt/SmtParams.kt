@@ -5,7 +5,7 @@ import com.eignex.klause.solver.SolverParams
 import org.sosy_lab.java_smt.SolverContextFactory
 
 /**
- * Per-call params for [SmtSolver]. Mirrors [com.eignex.klause.logicng.LogicNGParams] in
+ * Per-call params for [SmtSolver]. Mirrors `LogicNGParams` (klause-logicng) in
  * shape so the cross-backend harness can hand each backend its own typed params and stay
  * symmetric.
  *

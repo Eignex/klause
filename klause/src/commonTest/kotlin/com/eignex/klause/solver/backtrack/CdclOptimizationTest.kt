@@ -34,9 +34,11 @@ class CdclOptimizationTest {
         for (mask in 0 until (1 shl n)) {
             var w = 0
             var v = 0
-            for (i in 0 until n) if ((mask shr i) and 1 == 1) {
-                w += weights[i];
-                v += values[i]
+            for (i in 0 until n) {
+                if ((mask shr i) and 1 == 1) {
+                    w += weights[i]
+                    v += values[i]
+                }
             }
             if (w <= cap && v > bestValue) bestValue = v
         }

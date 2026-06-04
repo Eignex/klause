@@ -670,9 +670,9 @@ class AllFactorsOracleTest {
         )
         if (gac) {
             FactorPropagationOracle.assertGac(
-            problem,
-            name,
-        )
+                problem,
+                name,
+            )
         } else {
             FactorPropagationOracle.assertSound(problem, name)
         }
@@ -705,9 +705,9 @@ class AllFactorsOracleTest {
         )
         if (gac) {
             FactorPropagationOracle.assertGac(
-            problem,
-            label,
-        )
+                problem,
+                label,
+            )
         } else {
             FactorPropagationOracle.assertSound(problem, label)
         }
