@@ -10,12 +10,15 @@ package com.eignex.klause.util
  * which [element] would be inserted to keep the array sorted. Caller code that uses
  * `if (idx >= 0)` / `val insert = -(idx + 1)` works identically.
  *
+ * Hybrid: binary search narrows the range, then a linear scan finishes once it drops
+ * below [LINEAR_SCAN_THRESHOLD]; small ranges skip the binary loop entirely.
+ *
  * Assumes [this] is sorted ascending in `[fromIndex, toIndex)`.
  */
 internal fun IntArray.binarySearchInt(element: Int, fromIndex: Int = 0, toIndex: Int = size): Int {
     var lo = fromIndex
     var hi = toIndex - 1
-    while (lo <= hi) {
+    while (hi - lo >= LINEAR_SCAN_THRESHOLD) {
         val mid = (lo + hi) ushr 1
         val midVal = this[mid]
         when {
@@ -24,5 +27,13 @@ internal fun IntArray.binarySearchInt(element: Int, fromIndex: Int = 0, toIndex:
             else -> return mid
         }
     }
+    while (lo <= hi) {
+        val v = this[lo]
+        if (v >= element) return if (v == element) lo else -(lo + 1)
+        lo++
+    }
     return -(lo + 1)
 }
+
+/** Range width below which a linear scan beats the binary loop's data-dependent branches. */
+private const val LINEAR_SCAN_THRESHOLD = 8
