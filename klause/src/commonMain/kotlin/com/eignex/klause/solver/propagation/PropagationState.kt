@@ -886,17 +886,12 @@ class PropagationState(
      * truth flipped get their level / antecedents updated, and watchers on the now-false
      * atom-lit are scheduled to fire.
      *
-     * Antecedent precision: a move carries two reason sets. [antNear] justifies the bound
-     * the requester asked for; [antFar] additionally carries the hole-crossing chain when
-     * the landed bound snapped further (they alias when no snap happened). Each flipped
-     * atom takes the weakest set that still implies its truth — an atom already decided by
-     * the requested bound must not inherit the snap chain (over-citing is sound but
-     * weakens learned clauses), and an atom that exists only because of the snap must
-     * (citing just the requested move would be unsound). [reqMin] / [reqMax] are the
-     * requested bounds; a side the move didn't touch passes its current bound. An eq atom
-     * flipping TRUE is special: `v = k` needs BOTH endpoint premises, and the move only
-     * supplied one side — cite the two bound atoms instead (the analyzer resolves through
-     * them into each bound's own recorded reason).
+     * A move carries two reason sets: [antNear] justifies the requested bound, [antFar]
+     * additionally carries the hole-crossing chain when the landed bound snapped further
+     * (they alias without a snap). Each flipped atom takes the weakest set that still
+     * implies its truth, split by threshold against the requested [reqMin] / [reqMax].
+     * An eq atom flipping TRUE needs BOTH endpoint premises while the move supplied one,
+     * so it cites the two bound atoms instead.
      */
     private fun propagateAtomsForVar(
         v: Int,
@@ -1366,9 +1361,8 @@ class PropagationState(
         // domains this is functionally identical to `IntDomain(lo, d.max)`.
         val newDomain = d.withMinAtLeast(lo)
         // A landing value inside a hole snaps the min further. The snapped bound rests on
-        // the requested bound itself plus the crossed holes — the requested-bound atom must
-        // join the chain or the requester's contribution (a decision especially, whose
-        // reason is otherwise empty) vanishes from conflict analysis.
+        // the requested bound plus the crossed holes; without the requested-bound atom in
+        // the chain a decision's contribution vanishes from conflict analysis.
         val ant = if (newDomain.min > lo) {
             appendPriorBound(
                 Lit.make(atomVarGe(v, lo), false),
@@ -1481,12 +1475,9 @@ class PropagationState(
         }
         intDomains[v] = newDomain
         intLevel[v] = maxOf(intLevel[v], currentLevel)
-        // History upkeep mirrors the tighten paths: an edge carve is a bound move and
-        // joins the bound history (this path bypasses tightenInt*Impl, which would
-        // otherwise record it); an interior carve joins the hole history. Without the
-        // record, minLevelForGe / maxLevelForLe / holeLevelFor mis-attribute the change
-        // to a stale level and the conflict analyzer builds non-asserting "asserting"
-        // clauses.
+        // History upkeep mirrors the tighten paths: an edge carve joins the bound history
+        // (this path bypasses tightenInt*Impl), an interior carve the hole history —
+        // without the record the level lookups mis-attribute the change.
         if (undoLogging) {
             when {
                 newDomain.min != d.min -> pushMinHist(v, newDomain.min, currentLevel)
@@ -1783,24 +1774,16 @@ class PropagationState(
         for ((fid, payload) in mark.snapshottablePayloads) {
             _refPayload[fid] = payload.snapshotCopy()
         }
-        // Atoms allocated after the mark survive the pop. Their identity (var, kind,
-        // threshold) is path-independent, the dedupe table keeps them unique, and the
-        // table size is bounded by the distinct atoms the session ever references —
-        // whereas removing them would orphan the watcher registrations of any retained
-        // clause (learned nogoods especially) that mentions their literals, silently
-        // disabling the clause. Instead, reconcile each atom's stored (truth, level,
-        // antecedent) triple against the truth the restored domains imply:
-        //  - stored truth still matches → keep the triple. The journal replay above
-        //    restored it to path-accurate values for every logged mutation.
-        //  - now undetermined → wipe to the unknown sentinel; the next determination
-        //    via [propagateAtomsForVar] stamps fresh level + antecedents.
-        //  - determined but the stored truth disagrees (an alloc-time or logging-off
-        //    initialization the journal never saw) → set the derived truth with a null
-        //    antecedent and a history-derived level. A null antecedent makes the
-        //    analyzer keep the literal instead of resolving through it — sound, since
-        //    re-deriving from the var's *latest* bound reason here could cite a
-        //    bound-chained premise that presupposes this very atom (circular), which
-        //    minimization would then collapse into an over-strong clause.
+        // Atoms allocated after the mark survive the pop: their identity is
+        // path-independent, the dedupe table bounds their count, and removing them would
+        // orphan the watcher registrations of any retained clause that mentions their
+        // literals. Instead, reconcile each atom's stored triple against the restored
+        // domains: an unchanged truth keeps its journal-restored values; a now-undetermined
+        // atom is wiped to the unknown sentinel; a determined atom whose stored truth
+        // disagrees (an initialization the journal never saw) gets the derived truth with a
+        // null antecedent — re-deriving from the latest bound reason could cite a premise
+        // that presupposes this very atom, and minimization would collapse the circle into
+        // an over-strong clause.
         for (atomId in 0 until atomIntVar.size) {
             val t = atomCurrentTruth(atomId)
             val raw = if (t == null) {
