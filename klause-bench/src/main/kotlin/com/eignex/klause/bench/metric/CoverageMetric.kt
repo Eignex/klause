@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
  * push toward 100%.
  *
  * "Native" = every predicate declared in klause's `redefinitions.mzn` plus every constraint
- * name the `klause-fzn-cli` FlatZinc parser dispatches on (read from `FlatZincConstraints.kt`).
+ * name the `klause-cli` FlatZinc parser dispatches on (read from `FlatZincConstraints.kt`).
  */
 @Serializable
 data class CoverageRow(

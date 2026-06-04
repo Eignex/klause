@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# MiniZinc-facing wrapper for klause-fzn-cli.
+# MiniZinc-facing wrapper for klause-cli.
 #
 # MiniZinc invokes:
 #   ${executable from klause.msc} [flags] /path/to/model.fzn
 #
 # We delegate to the gradle-built distribution. Configure via:
 #   - KLAUSE_HOME: path to the klause repo (default: dirname of this script's parent)
-#   - KLAUSE_JAR : direct path to the klause-fzn-cli distribution jar (overrides KLAUSE_HOME)
+#   - KLAUSE_JAR : direct path to the klause-cli distribution jar (overrides KLAUSE_HOME)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KLAUSE_HOME="${KLAUSE_HOME:-$(cd "$HERE/../.." && pwd)}"
 
-# Use the gradle-installed app bundle. Run `./gradlew :klause-fzn-cli:installDist` once
-# to build it; produces klause-fzn-cli/build/install/klause-fzn-cli/bin/klause-fzn-cli.
-DIST_LAUNCHER="$KLAUSE_HOME/klause-fzn-cli/build/install/klause-fzn-cli/bin/klause-fzn-cli"
+# Use the gradle-installed app bundle. Run `./gradlew :klause-cli:installDist` once
+# to build it; produces klause-cli/build/install/klause-cli/bin/klause-cli.
+DIST_LAUNCHER="$KLAUSE_HOME/klause-cli/build/install/klause-cli/bin/klause-cli"
 
 if [[ ! -x "$DIST_LAUNCHER" ]]; then
   echo "klause-fzn: distribution not found at $DIST_LAUNCHER" >&2
-  echo "klause-fzn: build it with './gradlew :klause-fzn-cli:installDist' (from $KLAUSE_HOME)" >&2
+  echo "klause-fzn: build it with './gradlew :klause-cli:installDist' (from $KLAUSE_HOME)" >&2
   exit 3
 fi
 
