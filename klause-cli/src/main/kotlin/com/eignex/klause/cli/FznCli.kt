@@ -5,8 +5,6 @@ import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.formats.minizinc.OznApplier
-import com.eignex.klause.logicng.LogicNGParams
-import com.eignex.klause.logicng.LogicNGSolver
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
@@ -16,8 +14,6 @@ import com.eignex.klause.solver.maximizeInt
 import com.eignex.klause.solver.minimizeInt
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.brute.BruteForceParams
-import com.eignex.klause.solver.brute.BruteForceSolver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import java.io.File
@@ -34,8 +30,9 @@ import kotlin.system.exitProcess
  *
  * Backend is chosen with `--engine NAME` (or `-e NAME`), or via the `klause.fzn.engine`
  * system property. Recognised names: `backtrack` (default), `ls` / `localsearch`,
- * `logicng`, `brute`. Each backend honors `-t` (time limit) and `-r` (seed); the
- * `-a` / `-n` flags apply to the satisfy path.
+ * `portfolio`. Each backend honors `-t` (time limit), `-r` (seed), and repeatable
+ * `-p key=value` engine params (see [EngineParams]); the `-a` / `-n` flags apply to the
+ * satisfy path.
  */
 internal fun runFzn(args: Array<String>) {
     // Translate env vars / system properties into the central config once, up front, and
@@ -73,11 +70,9 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions)
         "backtrack", "bt" -> runWithBacktrack(program, opts)
         "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
         "portfolio", "pf" -> runWithPortfolio(program, opts)
-        "logicng" -> runWithLogicNG(program, opts)
-        "brute", "bruteforce", "brute-force" -> runWithBrute(program, opts)
         else -> {
             System.err.println("klause-cli: unknown engine `$engine`; expected one of " +
-                "backtrack, ls, portfolio, logicng, brute")
+                "backtrack, ls, portfolio")
             exitProcess(2)
         }
     }
@@ -98,14 +93,17 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: FznOptions) {
         lubyRestartBase = 100L,
         maxLearnedClauses = 20_000,
     )
-    val params = base.copy(randomSeed = opts.randomSeed ?: base.randomSeed)
+    val params = applyBacktrackParams(
+        base.copy(randomSeed = opts.randomSeed ?: base.randomSeed),
+        EngineParams(opts.engineParams),
+    )
     runGeneric(BacktrackSolver(program.problem), params, program, opts, complete = true)
 }
 
 private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
-    val params = LocalSearchParams(randomSeed = opts.randomSeed)
+    val (params, setup) = applyLsParams(LocalSearchParams(randomSeed = opts.randomSeed), EngineParams(opts.engineParams))
     val tabu = com.eignex.klause.solver.localsearch.strategy.TabuFilter(
-        tenure = 10,
+        tenure = setup.tabuTenure,
         aspiration = com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImproving,
     )
     // CBLS throughout — both the satisfy fight (`strategy`) and the objective descent
@@ -120,7 +118,7 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
         program.problem,
         strategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
         optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
-        pairSwapBudget = 1024,
+        pairSwapBudget = setup.pairSwapBudget,
     )
     // CBLS scores moves by `Σ weight·Δviolated + λ·Δobjective`. Without a non-zero λ at
     // the params level the objective contribution is zero and the strategy never feels
@@ -141,7 +139,7 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
     // so the shipped pure-LS entry point stays free of any CP dependency.
     val initial = if (opts.cpSeed) cpFeasibleSeed(program, deadline) else null
     val cblsParams = params.copy(
-        costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = 1.0),
+        costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = setup.lambda),
         cancellation = cancellation,
         initialAssignment = initial,
     )
@@ -167,23 +165,10 @@ private fun cpFeasibleSeed(program: FlatZincProgram, overallDeadline: Long?): Sa
     return (r as? com.eignex.klause.solver.SolveResult.Sat)?.assignment
 }
 
-private fun runWithLogicNG(program: FlatZincProgram, opts: FznOptions) {
-    val params = LogicNGParams(
-        randomSeed = opts.randomSeed,
-        timeoutMillis = opts.timeLimitMs,
-    )
-    runGeneric(LogicNGSolver(program.problem), params, program, opts, complete = true)
-}
-
-private fun runWithBrute(program: FlatZincProgram, opts: FznOptions) {
-    val params = BruteForceParams(randomSeed = opts.randomSeed)
-    runGeneric(BruteForceSolver(program.problem), params, program, opts, complete = true)
-}
-
 /**
  * Unified per-engine entry: dispatches between satisfy and optimize on the solve goal.
  *
- * [complete] is true only for solvers that exhaustively search (backtrack, brute, LogicNG):
+ * [complete] is true only for solvers that exhaustively search (here: backtrack):
  * for them, an enumeration that ends without a solution *proves* unsatisfiability. The local-
  * search backend is incomplete — it exhausts a flip/restart budget, never the solution space —
  * so a fruitless run is `UNKNOWN`, never `UNSATISFIABLE`.
@@ -219,18 +204,14 @@ private fun portfolioObjectives(
 }
 
 private fun runWithPortfolio(program: FlatZincProgram, opts: FznOptions) {
-    val ls = System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4
-    val bt = System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2
-    val spec = com.eignex.klause.portfolio.PortfolioSpec(
-        localSearchWorkers = ls, backtrackWorkers = bt, seed = opts.randomSeed ?: 1L,
-    )
+    val spec = buildPortfolioSpec(EngineParams(opts.engineParams), opts.randomSeed)
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
     val cancel = if (deadline != null)
         com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
     else com.eignex.klause.solver.Cancellation.Never
     val applier = loadOznApplier(opts)
     // Only a backtrack worker can *prove* UNSAT / optimality; a pure-LS pool reports UNKNOWN.
-    val complete = bt > 0
+    val complete = spec.backtrackWorkers > 0
     // Build per-worker objectives up front (#63): the LS workers descend the functional/gradient
     // objective, the backtrack workers bound the linear one. For satisfy there is no objective —
     // both stay null and the portfolio is solve-only.
@@ -430,11 +411,13 @@ private data class FznOptions(
      *  feasible point that warm-starts LS. Default false — the default keeps the pure-LS path free
      *  of any CP dependency; CP-seeding is strictly an explicit opt-in. */
     val cpSeed: Boolean,
+    /** Raw repeatable `-p key=value` engine params; interpreted per engine (see [EngineParams]). */
+    val engineParams: List<String>,
 )
 
 /**
  * Parses the MiniZinc-standard FZN solver flags we claim in `klause.msc` (-a, -n, -s, -v,
- * -t, -r) plus our `--engine` / `-e` selector. Unknown flags are tolerated (printed to
+ * -t, -r) plus our `--engine` / `-e` selector and repeatable `-p key=value` engine params. Unknown flags are tolerated (printed to
  * stderr) to stay forward-compatible with MiniZinc additions we don't recognise.
  */
 private fun parseFznArgs(args: Array<String>): FznOptions {
@@ -450,6 +433,7 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
     var unboundedIntLo: Int? = null
     var unboundedIntHi: Int? = null
     var cpSeed = false
+    val engineParams = mutableListOf<String>()
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
@@ -464,6 +448,7 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
             "--unbounded-int-lo" -> { unboundedIntLo = args[++i].toInt(); i++ }
             "--unbounded-int-hi" -> { unboundedIntHi = args[++i].toInt(); i++ }
             "--cp-seed" -> { cpSeed = true; i++ }
+            "-p", "--param" -> { engineParams.add(args[++i]); i++ }
             else -> {
                 if (a.startsWith("-")) {
                     System.err.println("klause-cli: ignoring unknown flag $a")
@@ -480,5 +465,5 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
         System.err.println("usage: klause-cli [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed)
+    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed, engineParams)
 }
