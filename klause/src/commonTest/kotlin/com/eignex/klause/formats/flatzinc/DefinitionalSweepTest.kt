@@ -83,6 +83,43 @@ class DefinitionalSweepTest {
     }
 
     @Test
+    fun `bool-shaped definitions evaluate reifs bool2int and element`() {
+        // The prize-collecting pattern: a comparison reification feeding bool2int feeding a sum,
+        // plus a var-index element access.
+        val src2 = """
+            var 1..3: u;
+            var 1..3: v;
+            var bool: r;
+            var 0..1: ri;
+            var 0..10: t;
+            var 1..3: i;
+            var 0..9: e;
+            constraint int_eq_reif(u, v, r) :: defines_var(r);
+            constraint bool2int(r, ri) :: defines_var(ri);
+            constraint int_lin_eq([1, 1, -1], [u, ri, t], 0) :: defines_var(t);
+            constraint array_int_element(i, [7, 8, 9], e) :: defines_var(e);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src2)
+        val sweep = assertNotNull(program.definitionalSweep)
+        assertEquals(4, sweep.size, "reif + bool2int + lin + element must all build")
+        val state = com.eignex.klause.solver.localsearch.LocalSearchState(program.problem, kotlin.random.Random(2))
+        val iv = program.intVarsByName
+        state.assignment.setInt(iv.getValue("u"), 2)
+        state.assignment.setInt(iv.getValue("v"), 2) // r = true, ri = 1, t = u + ri = 3
+        state.assignment.setInt(iv.getValue("i"), 3) // e = 9
+        sweep.sweep(state.assignment, program.problem.intDomains, program.problem.factors)
+        assertEquals(1, state.assignment.intValue(iv.getValue("ri")))
+        assertEquals(3, state.assignment.intValue(iv.getValue("t")))
+        assertEquals(9, state.assignment.intValue(iv.getValue("e")))
+        // Flip v so the reif goes false and the chain re-evaluates.
+        state.assignment.setInt(iv.getValue("v"), 1)
+        sweep.sweep(state.assignment, program.problem.intDomains, program.problem.factors)
+        assertEquals(0, state.assignment.intValue(iv.getValue("ri")))
+        assertEquals(2, state.assignment.intValue(iv.getValue("t")))
+    }
+
+    @Test
     fun `model without defines_var yields no sweep`() {
         val plain = """
             var 0..3: x;
