@@ -4,8 +4,12 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.Cardinality
+import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -52,8 +56,8 @@ class SmtOptimizerTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(),
         )
-        val objective = object : com.eignex.klause.solver.Objective {
-            override fun evaluate(sample: com.eignex.klause.solver.Sample): Double = 0.0
+        val objective = object : Objective {
+            override fun evaluate(sample: Sample): Double = 0.0
         }
         assertFailsWith<IllegalArgumentException> {
             SmtSolver(problem).minimize(objective, SmtParams())
@@ -74,7 +78,7 @@ class SmtOptimizerTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(),
         )
-        val opt: com.eignex.klause.solver.Optimizer<SmtParams> = SmtSolver(problem)
+        val opt: Optimizer<SmtParams> = SmtSolver(problem)
         assertNotNull(opt)
         // Calling minimize on an empty problem with SMTInterpol still throws on opt env.
         assertFailsWith<UnsupportedOperationException> {
@@ -86,7 +90,7 @@ class SmtOptimizerTest {
             opt.improvements(LinearObjective(), SmtParams()).toList()
         }
         // Sanity: returned type is MinimizeResult-typed when it does return.
-        val expected: kotlin.reflect.KClass<MinimizeResult> = MinimizeResult::class
-        assertIs<kotlin.reflect.KClass<MinimizeResult>>(expected)
+        val expected: KClass<MinimizeResult> = MinimizeResult::class
+        assertIs<KClass<MinimizeResult>>(expected)
     }
 }

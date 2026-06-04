@@ -171,7 +171,7 @@ internal object SmtTranslator {
     }
 
     /**
-     * Per-translation encoder. Holds the [encoding] plus a fresh-variable counter so
+     * Per-translation encoder. Holds the [SmtEncoding] plus a fresh-variable counter so
      * decompositions that need auxiliary integers / booleans (Regular state vars, Circuit
      * order vars, …) can mint uniquely-named ones. Auxiliary vars are existentially
      * quantified simply by being free symbols the SMT core may assign freely.
