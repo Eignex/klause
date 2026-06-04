@@ -34,11 +34,13 @@ class SearchEventTest {
         val events = mutableListOf<SearchEvent>()
         // The decision cap, not the UNSAT proof, bounds the test: a tiny deterministic Luby
         // schedule redoes near-identical runs and converges only through learned clauses, so
-        // proving UNSAT here can take unbounded time. Restart events fire either way.
+        // proving UNSAT here can take unbounded time. Restart events fire either way. The
+        // budget is a single decision per first run — the UNSAT proof needs more than one
+        // decision, so at least one restart always fires before it completes.
         BacktrackSolver(pigeonhole()).solve(
             BacktrackParams(
                 randomSeed = 1L,
-                lubyRestartBase = 8L,
+                lubyRestartBase = 1L,
                 maxDecisions = 50_000,
                 variableHeuristic = InputOrder,
                 valueHeuristic = IndomainMin,
