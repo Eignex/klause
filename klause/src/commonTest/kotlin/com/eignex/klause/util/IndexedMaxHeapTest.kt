@@ -134,7 +134,7 @@ class IndexedMaxHeapTest {
                         present[top] = false
                     }
                 }
-                assertEquals(present.count { it }, h.size)
+                assertEquals(present.count { p -> p }, h.size)
                 if (h.size > 0) {
                     val maxId = (0 until cap).filter { id -> present[id] }.maxByOrNull { id -> key[id] }!!
                     assertEquals(key[maxId], key[h.peekMax()], "peekMax must expose a max-key id")

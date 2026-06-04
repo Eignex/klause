@@ -14,9 +14,17 @@ eignexPublish {
 
 kotlin {
     jvm()
-    js(IR) { browser(); nodejs() }
-    wasmJs { browser(); nodejs() }
-    wasmWasi { nodejs() }
+    // Solver tests are compute-heavy; Mocha's default 2s test timeout is far too tight
+    // for the single-threaded JS/wasm targets.
+    js(IR) {
+        browser { testTask { useMocha { timeout = "120s" } } }
+        nodejs { testTask { useMocha { timeout = "120s" } } }
+    }
+    wasmJs {
+        browser { testTask { useMocha { timeout = "120s" } } }
+        nodejs { testTask { useMocha { timeout = "120s" } } }
+    }
+    wasmWasi { nodejs { testTask { useMocha { timeout = "120s" } } } }
     linuxX64(); linuxArm64()
     macosX64(); macosArm64(); mingwX64()
     iosX64(); iosArm64(); iosSimulatorArm64()
