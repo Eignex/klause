@@ -209,6 +209,7 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
         strategy = Cbls(tabu = tabu),
         optimizeStrategy = Cbls(tabu = tabu),
         pairSwapBudget = setup.pairSwapBudget,
+        definitionalSweep = program.definitionalSweep,
     )
     // CBLS scores moves by `Σ weight·Δviolated + λ·Δobjective`. Without a non-zero λ at
     // the params level the objective contribution is zero and the strategy never feels
@@ -314,6 +315,7 @@ private fun runWithPortfolio(
         spec,
         lsObjective = lsObjective,
         linearObjective = linearObjective,
+        definitionalSweep = program.definitionalSweep,
         onEvent = portfolioVerboseListener(opts.verbose),
     )
     try {

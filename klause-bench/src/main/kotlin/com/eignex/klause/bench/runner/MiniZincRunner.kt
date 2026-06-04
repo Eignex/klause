@@ -31,7 +31,10 @@ class MiniZincRunner(
             is SolveDirective.Maximize -> program.intVarsByName[s.objVar]?.let { program.problem.maximizeInt(it) }
             is SolveDirective.Satisfy -> null
         }
-        return ResolvedProblem(ref, program.problem, objective, lsObjective = program.lsObjective)
+        return ResolvedProblem(
+            ref, program.problem, objective,
+            lsObjective = program.lsObjective, definitionalSweep = program.definitionalSweep,
+        )
     }
 
     /** Compile [ref]'s `.mzn`(+`.dzn`) to FlatZinc and return the `.fzn` file (used by the

@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
@@ -75,6 +76,9 @@ object PortfolioBuilder {
         spec: PortfolioSpec,
         lsObjective: Objective? = null,
         linearObjective: Objective? = null,
+        /** Definitional sweep threaded into every LS worker (see
+         *  [com.eignex.klause.solver.DefinitionalSweep]); null = unchanged behavior. */
+        definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): Portfolio {
         val workers = ArrayList<PortfolioWorker>(spec.localSearchWorkers + spec.backtrackWorkers)
@@ -97,6 +101,7 @@ object PortfolioBuilder {
                     strategy = cfg.strategy,
                     optimizeStrategy = cfg.optimizeStrategy,
                     restartPolicy = cfg.restartPolicy,
+                    definitionalSweep = definitionalSweep,
                 ).session()
                 val label = "ls/${cfg.label}"
                 val params = LocalSearchParams(

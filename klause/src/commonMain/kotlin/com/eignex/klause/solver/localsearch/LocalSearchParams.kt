@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.localsearch
 
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
@@ -36,11 +37,11 @@ data class LocalSearchParams(
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**
-     * Optional live-event listener; see [com.eignex.klause.solver.SearchEvent]. Called
+     * Optional live-event listener; see [SearchEvent]. Called
      * inline on the search thread at coarse points only (restarts, learned-DB sweeps,
      * incumbents). `null` (default) disables observation entirely.
      */
-    val onEvent: ((com.eignex.klause.solver.SearchEvent) -> Unit)? = null,
+    val onEvent: ((SearchEvent) -> Unit)? = null,
     /** How [LocalSearchSolver.minimize] combines constraint violations with the objective
      *  for greedy descent. Defaults to two-phase feasibility-first behaviour; switch to
      *  [CostShaping.linear] or [CostShaping.saturating] on tight problems where the
