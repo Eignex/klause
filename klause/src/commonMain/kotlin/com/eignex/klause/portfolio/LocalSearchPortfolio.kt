@@ -189,8 +189,24 @@ internal data class LocalSearchWorkerConfig(
             },
         )
 
+        /**
+         * Pool order by **cross-seed combined marginal credit** (2026-06-04, two campaigns at
+         * seeds 11/42 on post-#150 main, score = Σ uncovered + 0.5·Σ best-held; cbls/fixed
+         * anchored first as the satisfy workhorse). Re-derive by re-running `bench run credit`
+         * at two seeds (`-Dklause.bench.credit.seed`) and editing this one list. Notable: the
+         * single-seed post-#148 tenure3/raw promotion did NOT replicate across seeds;
+         * cbls-stallslow's rise (#2-adder in both seeds) did.
+         */
+        private val rankedOrder = listOf(
+            "cbls/fixed", "adaptive-probsat/fixed", "cbls-stallslow/fixed", "sa/adaptive-perturb",
+            "cbls-smooth/ils-basin", "cbls-plateau64/fixed", "cbls-hinoise/fixed",
+            "cbls-plateau/ils-basin", "cbls-plateau-smooth/fixed", "walksat-cc/luby",
+            "sa/fixed", "cbls-tenure3/fixed", "cbls-plateau/fixed", "cbls-lonoise/fixed",
+            "cbls-notabu/fixed", "cbls-raw/fixed",
+        )
+
         /** Labels of every config in the pool, in credit order. */
-        val poolLabels: List<String> get() = poolFactories.map { it.first }
+        val poolLabels: List<String> get() = rankedOrder
 
         /** Construct a fresh instance of the pool config named [label]. */
         fun byLabel(label: String): LocalSearchWorkerConfig =
@@ -199,14 +215,14 @@ internal data class LocalSearchWorkerConfig(
             }.second()
 
         /** One fresh instance of every pool config, in credit order. */
-        fun pool(): List<LocalSearchWorkerConfig> = poolFactories.map { it.second() }
+        fun pool(): List<LocalSearchWorkerConfig> = rankedOrder.map { byLabel(it) }
 
         /** The top-[count] prefix of the credit-ordered pool (wrapping past the pool size) —
          *  `-p <n>` maps straight onto this, so small portfolios get the measured-best workers
          *  first. Every slot is a fresh instance even when labels repeat. */
         fun diverse(count: Int): List<LocalSearchWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
-            return List(count) { poolFactories[it % poolFactories.size].second() }
+            return List(count) { byLabel(rankedOrder[it % rankedOrder.size]) }
         }
     }
 }
