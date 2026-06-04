@@ -15,8 +15,7 @@ class ApproxMCTest {
     private fun unconstrained(n: Int) =
         Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
 
-    private fun exactCount(p: Problem): Long =
-        BacktrackSolver(p).enumerate(BacktrackParams()).count().toLong()
+    private fun exactCount(p: Problem): Long = BacktrackSolver(p).enumerate(BacktrackParams()).count().toLong()
 
     @Test
     fun `small problem is counted exactly without hashing`() {

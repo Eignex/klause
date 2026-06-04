@@ -70,7 +70,8 @@ class PortfolioTest {
         val problem = exactlyOneOver(5)
         val workers = List(4) { i ->
             PortfolioWorker.of(
-                "ls#$i", LocalSearchSolver(problem).session(),
+                "ls#$i",
+                LocalSearchSolver(problem).session(),
                 LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = i.toLong()),
             )
         }
@@ -95,7 +96,9 @@ class PortfolioTest {
     fun `portfolio with one worker behaves like the underlying session`() = runTest {
         val problem = exactlyOneOver(3)
         val solo = PortfolioWorker.of(
-            "ls", LocalSearchSolver(problem).session(), LocalSearchParams(maxFlips = 5_000, randomSeed = 0L),
+            "ls",
+            LocalSearchSolver(problem).session(),
+            LocalSearchParams(maxFlips = 5_000, randomSeed = 0L),
         )
         Portfolio(listOf(solo)).use { p ->
             val samples = p.samples()
@@ -129,7 +132,10 @@ class PortfolioTest {
         )
         val workers = List(3) { i ->
             PortfolioWorker.of(
-                "bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L), objective = obj,
+                "bt#$i",
+                BacktrackSolver(problem).session(),
+                BacktrackParams(randomSeed = 0L),
+                objective = obj,
             ) { params, supplier ->
                 params.copy(objectiveBoundSupplier = supplier)
             }
@@ -158,7 +164,10 @@ class PortfolioTest {
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
         val workers = List(6) { i ->
             PortfolioWorker.of(
-                "bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = i.toLong()), objective = obj,
+                "bt#$i",
+                BacktrackSolver(problem).session(),
+                BacktrackParams(randomSeed = i.toLong()),
+                objective = obj,
             ) { params, supplier ->
                 params.copy(objectiveBoundSupplier = supplier)
             }
@@ -167,7 +176,11 @@ class PortfolioTest {
             val r = p.minimize()
             val ws = assertIs<WithSample>(r)
             val realised = ws.sample.ints[0] * 1.0 + ws.sample.ints[1] * 2.0
-            assertEquals(ws.objectiveValue, realised, "reported bound ${ws.objectiveValue} must match the sample's objective $realised")
+            assertEquals(
+                ws.objectiveValue,
+                realised,
+                "reported bound ${ws.objectiveValue} must match the sample's objective $realised",
+            )
         }
     }
 
@@ -254,7 +267,8 @@ class PortfolioTest {
     fun `builder makes a mixed LS plus backtrack portfolio that solves`() = runTest {
         val problem = exactlyOneOver(4)
         PortfolioBuilder.build(
-            problem, PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
+            problem,
+            PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
         ).use { p ->
             val r = p.solve()
             assertTrue(r is SolveResult.Sat, "mixed LS+backtrack portfolio should solve exactly-one; got $r")

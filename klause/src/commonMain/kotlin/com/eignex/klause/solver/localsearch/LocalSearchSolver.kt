@@ -11,8 +11,8 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SampleResult
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolveStatsSink
 import com.eignex.klause.solver.Solver
@@ -223,12 +223,16 @@ class LocalSearchSolver(
         params: LocalSearchParams,
         warm: WarmState?,
     ): Sequence<MinimizeResult> = sequence {
+        // Wall-time-only stats, matching solveInternal's level of detail for this backend.
+        val sink = SolveStatsSink(backend = "ls")
+        sink.start()
         val eff = effectiveAssumptions(params.assumptions)
         if (eff == null) {
-            yield(MinimizeResult.Infeasible())
+            sink.stop()
+            yield(MinimizeResult.Infeasible(stats = sink.snapshot()))
             return@sequence
         }
-        runMinimizeStream(objective, params, eff, warm)
+        runMinimizeStream(objective, params, eff, warm, sink)
     }
 
     /** Solve once and return a [SolveResult]. */
@@ -338,6 +342,7 @@ class LocalSearchSolver(
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
         warm: WarmState?,
+        sink: SolveStatsSink,
     ) {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
@@ -504,11 +509,13 @@ class LocalSearchSolver(
         }
         warm?.captureFrom(state)
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
+        sink.stop()
+        sink.timedOut = reason == TerminationReason.BudgetExhausted
         yield(
             if (bestSample != null) {
-                MinimizeResult.BestFound(bestSample, bestObj, reason)
+                MinimizeResult.BestFound(bestSample, bestObj, reason, sink.snapshot())
             } else {
-                MinimizeResult.Unknown(reason)
+                MinimizeResult.Unknown(reason, sink.snapshot())
             },
         )
     }

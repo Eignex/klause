@@ -30,14 +30,31 @@ class ReifiedHoleChainTest {
         for (seed in 0 until 12) {
             val rnd = Random(seed)
             val numDrivers = 2
+
             // bool layout: drivers d0,d1 then channels cx_v, cy_v.
             fun cx(v: Int) = numDrivers + (v - lo)
             fun cy(v: Int) = numDrivers + span + (v - lo)
             val numBool = numDrivers + 2 * span
             val factors = ArrayList<Factor>()
             for (v in lo..hi) {
-                factors.add(ReifiedLinear(auxBoolVar = cx(v), coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = v))
-                factors.add(ReifiedLinear(auxBoolVar = cy(v), coeffs = intArrayOf(1), vars = intArrayOf(1), op = LinearOp.EQ, bound = v))
+                factors.add(
+                    ReifiedLinear(
+                        auxBoolVar = cx(v),
+                        coeffs = intArrayOf(1),
+                        vars = intArrayOf(0),
+                        op = LinearOp.EQ,
+                        bound = v,
+                    ),
+                )
+                factors.add(
+                    ReifiedLinear(
+                        auxBoolVar = cy(v),
+                        coeffs = intArrayOf(1),
+                        vars = intArrayOf(1),
+                        op = LinearOp.EQ,
+                        bound = v,
+                    ),
+                )
             }
             val clauses = ArrayList<IntArray>()
             repeat(10) {
@@ -58,7 +75,8 @@ class ReifiedHoleChainTest {
             // Brute-force optimum of x + 2y over the feasible set (channels are functions of
             // x and y; the two drivers are free).
             var bruteBest: Int? = null
-            for (x in lo..hi) for (y in lo..hi) {
+            for (x in lo..hi) {
+                for (y in lo..hi) {
                 for (mask in 0 until (1 shl numDrivers)) {
                     val bools = BooleanArray(numBool)
                     for (d in 0 until numDrivers) bools[d] = (mask shr d) and 1 == 1
@@ -76,6 +94,7 @@ class ReifiedHoleChainTest {
                     }
                 }
             }
+            }
 
             // A decision cap keeps seeds that trip the engine's known search livelock from
             // hanging the test; a capped run returns BestFound and is skipped below. The guarded
@@ -92,7 +111,11 @@ class ReifiedHoleChainTest {
             val best = bruteBest
             when (result) {
                 is MinimizeResult.Optimal ->
-                    assertEquals(best?.toDouble(), result.objective, "seed $seed: proven optimum must match brute force")
+                    assertEquals(
+                        best?.toDouble(),
+                        result.objective,
+                        "seed $seed: proven optimum must match brute force",
+                    )
 
                 is MinimizeResult.Infeasible ->
                     assertEquals(null, best, "seed $seed: claimed infeasible but brute found $best")

@@ -29,7 +29,15 @@ class ReifiedLinearHoleTest {
         val values = intArrayOf(0, 1, 2, 3)
         val factors = ArrayList<Factor>()
         for (k in values.indices) {
-            factors.add(ReifiedLinear(auxBoolVar = k, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = values[k]))
+            factors.add(
+                ReifiedLinear(
+                    auxBoolVar = k,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = values[k],
+                ),
+            )
         }
         val p = Problem(
             numBoolVars = values.size,
@@ -62,7 +70,15 @@ class ReifiedLinearHoleTest {
         for (i in 0 until nVars) {
             val chans = IntArray(perVar) { i * perVar + it }
             for (k in 0 until perVar) {
-                factors.add(ReifiedLinear(auxBoolVar = chans[k], coeffs = intArrayOf(1), vars = intArrayOf(i), op = LinearOp.EQ, bound = 1 + k))
+                factors.add(
+                    ReifiedLinear(
+                        auxBoolVar = chans[k],
+                        coeffs = intArrayOf(1),
+                        vars = intArrayOf(i),
+                        op = LinearOp.EQ,
+                        bound = 1 + k,
+                    ),
+                )
             }
             factors.add(Cardinality(IntArray(perVar) { Lit.make(chans[it], true) }, min = 1, max = perVar))
         }
@@ -79,7 +95,15 @@ class ReifiedLinearHoleTest {
         val values = intArrayOf(3, 4, 5, 6, 7) // every candidate is a hole
         val factors = ArrayList<Factor>()
         for (k in values.indices) {
-            factors.add(ReifiedLinear(auxBoolVar = k, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = values[k]))
+            factors.add(
+                ReifiedLinear(
+                    auxBoolVar = k,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = values[k],
+                ),
+            )
         }
         factors.add(Cardinality(IntArray(values.size) { Lit.make(it, true) }, min = 1, max = values.size))
         val p = Problem(values.size, 1, arrayOf(dom), factors.toTypedArray())

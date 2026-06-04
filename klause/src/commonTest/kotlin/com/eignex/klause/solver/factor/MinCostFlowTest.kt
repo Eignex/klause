@@ -79,7 +79,11 @@ class MinCostFlowTest {
             numBoolVars = 0,
             numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0, 1), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(-1000, 1000),
+                IntDomain(0, 1),
+                IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(-1000, 1000),
             ),
             factors = arrayOf<Factor>(factor),
         )

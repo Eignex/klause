@@ -668,7 +668,14 @@ class AllFactorsOracleTest {
             intDomains = intDomains,
             factors = listOf(factor),
         )
-        if (gac) FactorPropagationOracle.assertGac(problem, name) else FactorPropagationOracle.assertSound(problem, name)
+        if (gac) {
+            FactorPropagationOracle.assertGac(
+            problem,
+            name,
+        )
+        } else {
+            FactorPropagationOracle.assertSound(problem, name)
+        }
         MoveSetOracle.assertRepairsCoverImproving(problem, name, iters = 40, requireImprovement = false)
         DegreeConsistencyOracle.assertConsistent(problem, name, exactProbe = exactProbe)
     }
@@ -689,19 +696,21 @@ class AllFactorsOracleTest {
         return d
     }
 
-    private fun checkPropagation(
-        factor: Factor,
-        intDomains: Array<IntDomain>,
-        label: String,
-        gac: Boolean,
-    ) {
+    private fun checkPropagation(factor: Factor, intDomains: Array<IntDomain>, label: String, gac: Boolean) {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = intDomains.size,
             intDomains = intDomains,
             factors = listOf(factor),
         )
-        if (gac) FactorPropagationOracle.assertGac(problem, label) else FactorPropagationOracle.assertSound(problem, label)
+        if (gac) {
+            FactorPropagationOracle.assertGac(
+            problem,
+            label,
+        )
+        } else {
+            FactorPropagationOracle.assertSound(problem, label)
+        }
     }
 
     @Test fun allDifferentHoley() {
@@ -778,8 +787,12 @@ class AllFactorsOracleTest {
         checkPropagation(
             f,
             arrayOf(
-                holey(0, 2, 1), IntDomain(0, 2), IntDomain(0, 2),
-                IntDomain(0, 2), holey(0, 2, 1), IntDomain(0, 2),
+                holey(0, 2, 1),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                holey(0, 2, 1),
+                IntDomain(0, 2),
             ),
             "Inverse.holey",
             gac = false,
