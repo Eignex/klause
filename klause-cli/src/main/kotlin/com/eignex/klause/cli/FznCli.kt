@@ -29,9 +29,9 @@ import kotlin.system.exitProcess
  * `=====UNKNOWN=====` when the budget runs out before either is proven.
  *
  * Backend is chosen with `--engine NAME` (or `-e NAME`), or via the `klause.fzn.engine`
- * system property. Recognised names: `backtrack` (default), `ls` / `localsearch`,
- * `portfolio`. Each backend honors `-t` (time limit), `-r` (seed), and repeatable
- * `--param key=value` engine params (see [EngineParams]); the `-a` / `-n` flags apply to
+ * system property. Recognised names: `cp` (default; complete CDCL search — `backtrack`
+ * accepted as an alias), `ls` / `localsearch`, `portfolio`. Each backend honors `-t`
+ * (time limit), `-r` (seed), and repeatable `--param key=value` engine params (see [EngineParams]); the `-a` / `-n` flags apply to
  * the satisfy path. The MiniZinc-standard `-p N` (parallelism) routes to the portfolio
  * sized to N workers, with an explicitly chosen engine as the worker palette.
  */
@@ -51,7 +51,7 @@ internal fun runFzn(args: Array<String>) {
         unboundedIntLo = unboundedLo,
         unboundedIntHi = unboundedHi,
     )
-    val engine = opts.engine ?: System.getProperty("klause.fzn.engine") ?: "backtrack"
+    val engine = opts.engine ?: System.getProperty("klause.fzn.engine") ?: "cp"
     dispatch(engine.lowercase(), program, opts)
 }
 
@@ -69,7 +69,7 @@ private fun renderSolution(
 private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions) {
     // MiniZinc-standard `-p N` (parallelism, declared in klause.msc): N > 1 means a
     // portfolio of N workers. An explicitly chosen engine picks the worker palette —
-    // `-e ls -p N` is a pure-LS pool (no CP dependency), `-e backtrack -p N` is N
+    // `-e ls -p N` is a pure-LS pool (no CP dependency), `-e cp -p N` is N
     // complete workers sharing the objective bound — and otherwise the default mixed
     // pool is sized to N (≈2:1 LS:backtrack, at least one backtrack worker so UNSAT /
     // optimality stay provable). Explicit `--param ls=/bt=` still win over the split.
@@ -77,7 +77,7 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions)
     if (threads > 1) {
         val (ls, bt) = when (engine) {
             "ls", "localsearch", "local-search" -> threads to 0
-            "backtrack", "bt" -> 0 to threads
+            "cp", "backtrack", "bt" -> 0 to threads
             else -> {
                 val b = maxOf(1, threads / 3)
                 (threads - b) to b
@@ -87,12 +87,12 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions)
         return
     }
     when (engine) {
-        "backtrack", "bt" -> runWithBacktrack(program, opts)
+        "cp", "backtrack", "bt" -> runWithBacktrack(program, opts)
         "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
         "portfolio", "pf" -> runWithPortfolio(program, opts)
         else -> {
             System.err.println("klause-cli: unknown engine `$engine`; expected one of " +
-                "backtrack, ls, portfolio")
+                "cp, ls, portfolio")
             exitProcess(2)
         }
     }

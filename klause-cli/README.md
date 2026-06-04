@@ -40,11 +40,11 @@ FlatZinc path (MiniZinc-standard plus klause extras):
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
 - `-p <n>` — MiniZinc-standard parallelism. `n > 1` runs a portfolio of `n`
   workers; an explicit `-e` picks the palette (`-e ls -p 4` = pure-LS pool,
-  `-e backtrack -p 4` = 4 complete workers, default = ≈2:1 LS:backtrack mix).
-- `-e <engine>` / `--engine <engine>` — `backtrack` (default), `ls`,
-  `portfolio`. Also settable via the `klause.fzn.engine` system property.
+  `-e cp -p 4` = 4 complete workers, default = ≈2:1 LS:cp mix).
+- `-e <engine>` / `--engine <engine>` — `cp` (default; complete CDCL search,
+  `backtrack` accepted as an alias), `ls`, `portfolio`. Also settable via the `klause.fzn.engine` system property.
 - `--param <key>=<value>` — repeatable engine params:
-  - `backtrack`: `seed`, `max-decisions`, `luby`, `phase-saving`,
+  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`,
     `max-learned`, `lbd-glue`, `var-heuristic`
     (`vsids|random|smallest-domain|input-order`), `val-heuristic`
     (`random|min|max|middle`)
@@ -65,7 +65,7 @@ FlatZinc path (MiniZinc-standard plus klause extras):
 XCSP3 / SMT-LIB path:
 
 - `--format xcsp3|smtlib` — override extension-based detection.
-- `-e backtrack|ls|portfolio` (default backtrack), `-t <ms>`, `-r <seed>`,
+- `-e cp|ls|portfolio` (default cp), `-t <ms>`, `-r <seed>`,
   `-p <n>` parallel workers, `--param key=value` engine params (same keys
   as above).
 - `--coverage <dir>` — corpus coverage report.
