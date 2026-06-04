@@ -299,8 +299,8 @@ class Linear private constructor(
  * Hole-aware antecedent collection for propagators that prune interior values (AllDifferent,
  * GlobalCardinality, Regular, AllDifferentExceptZero, Inverse, Member, AllEqual). Cites:
  *   - bound atoms when current min/max are tighter than initial,
- *   - `[v ≠ value]` atom-lits for every value in the original domain that's currently
- *     excluded from the live domain.
+ *   - positive `[v == value]` atom-lits (the negation of the `v ≠ value` premise) for every
+ *     value in the original domain that's currently excluded from the live domain.
  *
  * Together these literals describe the exact filtered domains the propagator reasoned over,
  * so the resulting conflict clause is a Hall-style reason rather than a bound-only one.
@@ -341,7 +341,13 @@ internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntAr
         val hi = minOf(d.max, orig.max)
         for (value in lo..hi) {
             if (value in orig && value !in d) {
-                val lit = state.atomLitNe(v, value)
+                // Antecedent literals are the implication-clause form: the *negation* of each
+                // currently-true premise, so each is currently false — exactly like the bound
+                // entries above (¬[v ≥ min] / ¬[v ≤ max]). The hole premise is `v ≠ value`, so
+                // the clause literal is the positive eq atom `[v == value]`. Storing the premise
+                // itself (atomLitNe, currently true) would invert the recorded implication for
+                // any consumer that reads the stored polarity directly.
+                val lit = Lit.make(state.atomVarEq(v, value), true)
                 if (seen.add(lit)) out.add(lit)
             }
         }
