@@ -91,7 +91,7 @@ class Portfolio(
         val stats = results.fold(SolveStats.EMPTY) { acc, r -> acc.mergedWith(r.stats) }
         when (
             val winner = results.firstOrNull { it is SolveResult.Sat }
-            ?: results.firstOrNull { it is SolveResult.Unsat }
+                ?: results.firstOrNull { it is SolveResult.Unsat }
         ) {
             is SolveResult.Sat -> winner.copy(stats = stats)
             is SolveResult.Unsat -> winner.copy(stats = stats)
