@@ -24,11 +24,13 @@ class RegularTest {
         // alphabet {1,2}; states {1,2}; q0=1; F={1,2}. δ: (1,1)→2 (1,2)→1 (2,1)→0(dead) (2,2)→1.
         // Accepts exactly the strings with no two consecutive 1s.
         val transitions = intArrayOf(2, 1, 0, 1)
-        fun delta(q: Int, s: Int): Int =
-            if (q in 1..2 && s in 1..2) transitions[(q - 1) * 2 + (s - 1)] else 0
+        fun delta(q: Int, s: Int): Int = if (q in 1..2 && s in 1..2) transitions[(q - 1) * 2 + (s - 1)] else 0
         fun accepts(vals: IntArray): Boolean {
             var q = 1
-            for (s in vals) { q = delta(q, s); if (q == 0) return false }
+            for (s in vals) {
+                q = delta(q, s);
+                if (q == 0) return false
+            }
             return q == 1 || q == 2
         }
         // Each instance: per-position symbol range over {1,2}.
@@ -43,8 +45,14 @@ class RegularTest {
             val brute = HashSet<List<Int>>()
             val acc = IntArray(n)
             fun rec(p: Int) {
-                if (p == n) { if (accepts(acc)) brute.add(acc.toList()); return }
-                for (v in ranges[p].first..ranges[p].second) { acc[p] = v; rec(p + 1) }
+                if (p == n) {
+                    if (accepts(acc)) brute.add(acc.toList());
+                    return
+                }
+                for (v in ranges[p].first..ranges[p].second) {
+                    acc[p] = v;
+                    rec(p + 1)
+                }
             }
             rec(0)
 

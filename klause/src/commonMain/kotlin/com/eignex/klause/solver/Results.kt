@@ -87,6 +87,11 @@ sealed interface MinimizeResult {
     /** Underlying assignment if Optimal / BestFound, else `null`. */
     val assignment: Sample?
 
+    /** Solver-side counters for the run; populated on TERMINAL verdicts by backends that
+     *  opt in ([SolveStats.EMPTY] otherwise, including on streamed intermediate
+     *  incumbents — totals belong to the verdict that ends the run). */
+    val stats: SolveStats
+
     /** Objective value at the [assignment] if any, else `null`. */
     val objectiveValue: Double?
 
@@ -102,7 +107,11 @@ sealed interface MinimizeResult {
     }
 
     /** A proven-optimal solution. */
-    data class Optimal(override val sample: Sample, override val objective: Double) : WithSample
+    data class Optimal(
+        override val sample: Sample,
+        override val objective: Double,
+        override val stats: SolveStats = SolveStats.EMPTY,
+    ) : WithSample
 
     /** Best solution found before the search stopped. */
     data class BestFound(
@@ -110,10 +119,12 @@ sealed interface MinimizeResult {
         override val objective: Double,
         /** Why the search stopped before proving optimality. */
         val reason: TerminationReason,
+        override val stats: SolveStats = SolveStats.EMPTY,
     ) : WithSample
 
     /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
-    data class Infeasible(val core: UnsatCore? = null) : MinimizeResult {
+    data class Infeasible(val core: UnsatCore? = null, override val stats: SolveStats = SolveStats.EMPTY) :
+        MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null
     }
@@ -122,6 +133,7 @@ sealed interface MinimizeResult {
     data class Unknown(
         /** Why optimisation ended without a definitive answer. */
         val reason: TerminationReason,
+        override val stats: SolveStats = SolveStats.EMPTY,
     ) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null

@@ -34,7 +34,10 @@ class CdclOptimizationTest {
         for (mask in 0 until (1 shl n)) {
             var w = 0
             var v = 0
-            for (i in 0 until n) if ((mask shr i) and 1 == 1) { w += weights[i]; v += values[i] }
+            for (i in 0 until n) if ((mask shr i) and 1 == 1) {
+                w += weights[i];
+                v += values[i]
+            }
             if (w <= cap && v > bestValue) bestValue = v
         }
 
@@ -42,7 +45,9 @@ class CdclOptimizationTest {
             numBoolVars = 0,
             numIntVars = n,
             intDomains = Array(n) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(Linear(coeffs = weights, vars = IntArray(n) { it }, op = LinearOp.LE, bound = cap)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = weights, vars = IntArray(n) { it }, op = LinearOp.LE, bound = cap),
+            ),
         )
         val obj = LinearObjective(intCoefficients = DoubleArray(n) { -values[it].toDouble() })
         // The previously-regressing config: VSIDS + Luby restarts + LBD learning.

@@ -4,6 +4,7 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.factor.Cardinality
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,7 +74,8 @@ class LocalSearchImprovementsTest {
         val params = LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L)
         val viaMinimize = solver.minimize(obj, params)
         val viaImprovementsLast = solver.improvements(obj, params).last()
-        assertEquals(viaMinimize, viaImprovementsLast)
+        // Two separate runs report their own wall-clock stats; the verdicts must agree.
+        assertEquals(viaMinimize.withoutStats(), viaImprovementsLast.withoutStats())
     }
 
     @Test
@@ -99,4 +101,12 @@ class LocalSearchImprovementsTest {
         ).first()
         assertIs<MinimizeResult.BestFound>(first)
     }
+}
+
+/** Strip the per-run stats sidecar so verdicts from separate runs compare structurally. */
+private fun MinimizeResult.withoutStats(): MinimizeResult = when (this) {
+    is MinimizeResult.Optimal -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.BestFound -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Infeasible -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Unknown -> copy(stats = SolveStats.EMPTY)
 }

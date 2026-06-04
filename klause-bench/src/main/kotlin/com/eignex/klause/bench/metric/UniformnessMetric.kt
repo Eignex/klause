@@ -9,6 +9,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
+import com.eignex.kumulant.stat.cardinality.HyperLogLogStat
+import com.eignex.kumulant.stat.quantile.TDigestStat
+import com.eignex.kumulant.stat.summary.MeanStat
 import java.time.Instant
 import kotlin.math.ln
 import kotlinx.serialization.Serializable
@@ -25,6 +28,10 @@ data class UniformnessReport(
     val sampleCount: Int,
     val distinctCount: Int,
     val distinctnessRatio: Double,
+    /** HyperLogLog estimate of [distinctCount] from streamed sample hashes — the scale-out
+     *  path for sample counts where exact distinct-tracking stops being feasible; reported
+     *  alongside the exact count so the estimator stays validated at exact-trackable sizes. */
+    val distinctEstimate: Double? = null,
     val meanPairwiseHamming: Double,
     val pairwiseHammingP5: Double,
     val pairwiseHammingP95: Double,
@@ -48,6 +55,8 @@ data class UniformnessResults(
 object UniformnessMetric {
     private const val ORACLE_MAX_MODELS = 4096
     private const val DEFAULT_SAMPLE_COUNT = 200
+    private const val P_LO = 0.05
+    private const val P_HI = 0.95
 
     fun run(entries: List<ResolvedProblem>) {
         val sampleCount = System.getProperty("klause.bench.uniformness.samples")?.toIntOrNull() ?: DEFAULT_SAMPLE_COUNT
@@ -77,29 +86,41 @@ object UniformnessMetric {
     fun analyse(entryName: String, backend: InProcessSolver, sampleCount: Int = DEFAULT_SAMPLE_COUNT): UniformnessReport {
         val samples = backend.samplesSequence().take(sampleCount).toList()
         val n = samples.size
-        val distinct = samples.toSet()
         val counts: Map<Sample, Int> = samples.groupingBy { it }.eachCount()
+        val hll = HyperLogLogStat()
+        samples.forEach { hll.update(it.hashCode().toLong()) }
         val entropy = counts.values.sumOf { c ->
             val p = c.toDouble() / n
             if (p <= 0.0) 0.0 else -p * ln(p)
         }
-        val hammings = ArrayList<Int>(distinct.size * (distinct.size - 1) / 2 + 1)
-        val distinctList = distinct.toList()
+        // Pairwise Hamming spread, streamed into a t-digest + mean: O(1) memory where the old
+        // hand-rolled percentile materialised every pair, and proper interpolated quantiles
+        // instead of a floor-indexed nearest rank.
+        val digest = TDigestStat(probabilities = doubleArrayOf(P_LO, P_HI))
+        val meanStat = MeanStat()
+        var pairs = 0L
+        val distinctList = counts.keys.toList()
         for (i in distinctList.indices) {
-            for (j in (i + 1) until distinctList.size) hammings += hamming(distinctList[i], distinctList[j])
+            for (j in (i + 1) until distinctList.size) {
+                val d = distinctList[i].hammingDistanceTo(distinctList[j]).toDouble()
+                digest.update(d)
+                meanStat.update(d)
+                pairs++
+            }
         }
-        val meanH = if (hammings.isEmpty()) 0.0 else hammings.average()
+        val quantiles = digest.read().quantiles
         val (coverage, kl, oracleSize) = oracleStats(backend.problem, counts, n)
 
         return UniformnessReport(
             entryName = entryName,
             backendName = backend.name,
             sampleCount = n,
-            distinctCount = distinct.size,
-            distinctnessRatio = if (n == 0) 0.0 else distinct.size.toDouble() / n,
-            meanPairwiseHamming = meanH,
-            pairwiseHammingP5 = percentile(hammings, 5.0),
-            pairwiseHammingP95 = percentile(hammings, 95.0),
+            distinctCount = distinctList.size,
+            distinctnessRatio = if (n == 0) 0.0 else distinctList.size.toDouble() / n,
+            distinctEstimate = if (n == 0) null else hll.read().estimate,
+            meanPairwiseHamming = if (pairs == 0L) 0.0 else meanStat.read().mean,
+            pairwiseHammingP5 = if (pairs == 0L) 0.0 else quantiles[0],
+            pairwiseHammingP95 = if (pairs == 0L) 0.0 else quantiles[1],
             sampleEntropy = entropy,
             coverageFraction = coverage,
             klFromUniform = kl,
@@ -126,17 +147,5 @@ object UniformnessMetric {
         return Triple(coverage, kl, total)
     }
 
-    private fun hamming(a: Sample, b: Sample): Int {
-        var d = 0
-        for (i in a.bools.indices) if (a.bools[i] != b.bools[i]) d++
-        for (i in a.ints.indices) if (a.ints[i] != b.ints[i]) d++
-        return d
-    }
 
-    private fun percentile(values: List<Int>, p: Double): Double {
-        if (values.isEmpty()) return 0.0
-        val sorted = values.sorted()
-        val idx = ((p / 100.0) * (sorted.size - 1)).toInt().coerceIn(0, sorted.size - 1)
-        return sorted[idx].toDouble()
-    }
 }

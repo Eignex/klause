@@ -32,19 +32,37 @@ class GlobalCardinalityTest {
     fun `backtrack learning enumerates exactly the brute-force solution set with low-up bounds`() {
         val instances = listOf(
             LowUpInst(listOf(0 to 1, 0 to 1, 0 to 1), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(1, 1), false),
-            LowUpInst(listOf(0 to 2, 0 to 2, 0 to 2), intArrayOf(0, 1, 2), intArrayOf(1, 1, 1), intArrayOf(1, 1, 1), false),
+            LowUpInst(
+                listOf(0 to 2, 0 to 2, 0 to 2),
+                intArrayOf(0, 1, 2),
+                intArrayOf(1, 1, 1),
+                intArrayOf(1, 1, 1),
+                false,
+            ),
             LowUpInst(
                 listOf(0 to 2, 0 to 2, 0 to 2, 0 to 2),
-                intArrayOf(0, 1, 2), intArrayOf(0, 0, 0), intArrayOf(2, 2, 2), false,
+                intArrayOf(0, 1, 2),
+                intArrayOf(0, 0, 0),
+                intArrayOf(2, 2, 2),
+                false,
             ),
             LowUpInst(listOf(0 to 3, 0 to 3, 0 to 3), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(3, 3), true),
-            LowUpInst(listOf(0 to 2, 0 to 2, 1 to 2), intArrayOf(0, 1, 2), intArrayOf(0, 0, 1), intArrayOf(1, 2, 2), false),
+            LowUpInst(
+                listOf(0 to 2, 0 to 2, 1 to 2),
+                intArrayOf(0, 1, 2),
+                intArrayOf(0, 0, 1),
+                intArrayOf(1, 2, 2),
+                false,
+            ),
             // alldiff-like (each value ≤ 1): v0,v1 confined to {0,1} form a tight Hall set, so
             // pinning v2/v3 into {0,1} during search fires the Régin flow-deficiency path on a
             // problem that is satisfiable overall — probes the min-cut reason for soundness.
             LowUpInst(
                 listOf(0 to 1, 0 to 1, 0 to 3, 0 to 3),
-                intArrayOf(0, 1, 2, 3), intArrayOf(0, 0, 0, 0), intArrayOf(1, 1, 1, 1), false,
+                intArrayOf(0, 1, 2, 3),
+                intArrayOf(0, 0, 0, 0),
+                intArrayOf(1, 1, 1, 1),
+                false,
             ),
         )
         for ((idx, inst) in instances.withIndex()) {
@@ -54,7 +72,9 @@ class GlobalCardinalityTest {
                 val counts = IntArray(inst.cover.size)
                 for (i in 0 until n) {
                     val ci = coverIdx[acc[i]]
-                    if (ci != null) counts[ci]++ else if (inst.closed) return false
+                    if (ci != null) counts[ci]++ else if (inst.closed) {
+                        return false
+                    }
                 }
                 for (kk in inst.cover.indices) if (counts[kk] < inst.low[kk] || counts[kk] > inst.high[kk]) return false
                 return true
@@ -62,8 +82,14 @@ class GlobalCardinalityTest {
             val brute = HashSet<List<Int>>()
             val acc = IntArray(n)
             fun rec(p: Int) {
-                if (p == n) { if (ok(acc)) brute.add(acc.toList()); return }
-                for (v in inst.xsRanges[p].first..inst.xsRanges[p].second) { acc[p] = v; rec(p + 1) }
+                if (p == n) {
+                    if (ok(acc)) brute.add(acc.toList());
+                    return
+                }
+                for (v in inst.xsRanges[p].first..inst.xsRanges[p].second) {
+                    acc[p] = v;
+                    rec(p + 1)
+                }
             }
             rec(0)
 
@@ -107,9 +133,15 @@ class GlobalCardinalityTest {
             return true
         }
         fun rec(p: Int) {
-            if (p == k) { if (ok()) brute.add(acc.toList()); return }
+            if (p == k) {
+                if (ok()) brute.add(acc.toList());
+                return
+            }
             val r = if (p < n) xsRange else cvRange
-            for (v in r.first..r.second) { acc[p] = v; rec(p + 1) }
+            for (v in r.first..r.second) {
+                acc[p] = v;
+                rec(p + 1)
+            }
         }
         rec(0)
 

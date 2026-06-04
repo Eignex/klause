@@ -29,9 +29,12 @@ class BoundHistoryLevelTest {
     fun `minLevelForGe returns the level the min first reached the threshold`() {
         val s = state()
         // min rises 0 → 3 (lvl 1) → 7 (lvl 2) → 12 (lvl 4)
-        s.currentLevel = 1; s.tightenIntMin(0, 3)
-        s.currentLevel = 2; s.tightenIntMin(0, 7)
-        s.currentLevel = 4; s.tightenIntMin(0, 12)
+        s.currentLevel = 1;
+        s.tightenIntMin(0, 3)
+        s.currentLevel = 2;
+        s.tightenIntMin(0, 7)
+        s.currentLevel = 4;
+        s.tightenIntMin(0, 12)
 
         assertEquals(0, s.minLevelForGe(0, 0), "≤ root min → global fact")
         assertEquals(1, s.minLevelForGe(0, 1), "first min ≥ 1 reached at level 1 (min went 0→3)")
@@ -47,9 +50,12 @@ class BoundHistoryLevelTest {
     fun `maxLevelForLe returns the level the max first reached the threshold`() {
         val s = state()
         // max falls 20 → 15 (lvl 1) → 9 (lvl 3) → 5 (lvl 4)
-        s.currentLevel = 1; s.tightenIntMax(0, 15)
-        s.currentLevel = 3; s.tightenIntMax(0, 9)
-        s.currentLevel = 4; s.tightenIntMax(0, 5)
+        s.currentLevel = 1;
+        s.tightenIntMax(0, 15)
+        s.currentLevel = 3;
+        s.tightenIntMax(0, 9)
+        s.currentLevel = 4;
+        s.tightenIntMax(0, 5)
 
         assertEquals(0, s.maxLevelForLe(0, 20), "≥ root max → global fact")
         assertEquals(1, s.maxLevelForLe(0, 19), "first max ≤ 19 reached at level 1 (max went 20→15)")

@@ -25,6 +25,9 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             // KMP logger for `-v` progress output (custom stderr writer).
             implementation("co.touchlab:kermit:2.1.0")
+            // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to
+            // render them as %%%mzn-stat lines.
+            implementation("com.eignex:kumulant:0.2.0")
         }
     }
 }

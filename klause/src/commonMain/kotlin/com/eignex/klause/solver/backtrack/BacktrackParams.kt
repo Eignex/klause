@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
 
 /**

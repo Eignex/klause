@@ -3,6 +3,8 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.FunctionalObjective
 import com.eignex.klause.solver.FunctionalObjective.Operand
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.factor.LinearOp
 
 /**
  * Build a [FunctionalObjective] for `solve minimize/maximize <objName>` from the MiniZinc
@@ -55,35 +57,222 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
 }
 
 /**
- * Build the model-wide [DefinitionalSweep] from every `defines_var` constraint whose shape
- * [buildObjNode] can mirror (abs / min / max / times / plus / lin_eq). Unhandled shapes are
- * skipped — their definitions simply stay ordinary searched factors. Returns null when nothing
- * is buildable. Same node machinery as [buildFunctionalObjective], but rooted at *all* defined
- * vars rather than the objective cone.
+ * Build the model-wide [DefinitionalSweep] from every `defines_var` constraint whose shape a
+ * sweep node can mirror. Int definitions reuse the [buildObjNode] algebra plus `bool2int` and
+ * element access; bool definitions cover the comparison reifications (`int_*_reif`,
+ * `int_lin_*_reif`), literal `set_in_reif`, and `array_bool_and`/`or`. Unhandled shapes are
+ * skipped — their definitions simply stay ordinary searched factors. The visit is a post-order
+ * walk across *both* value spaces (a bool reification reads int vars; `bool2int` feeds int
+ * chains), so emitted nodes are topologically ordered. Returns null when nothing is buildable.
  */
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
-    val byDef = HashMap<Int, FznConstraint>()
+    val byIntDef = HashMap<Int, FznConstraint>()
+    val byBoolDef = HashMap<Int, FznConstraint>()
     for (c in model.constraints) {
         val ann = c.annotations.firstOrNull { it.name == "defines_var" } ?: continue
-        val defId = varIdOrNull(ann.args.firstOrNull() ?: continue) ?: continue
-        if (defId !in byDef) byDef[defId] = c
+        val arg = ann.args.firstOrNull() ?: continue
+        val intId = varIdOrNull(arg)
+        if (intId != null) {
+            if (intId !in byIntDef) byIntDef[intId] = c
+            continue
+        }
+        val boolId = boolIdOrNull(arg) ?: continue
+        if (boolId !in byBoolDef) byBoolDef[boolId] = c
     }
-    if (byDef.isEmpty()) return null
-    val nodes = ArrayList<FunctionalObjective.Node>(byDef.size)
-    val visited = HashSet<Int>()
-    fun visit(id: Int) {
-        if (id in visited) return
-        val c = byDef[id] ?: return // free var (or unannotated): a sweep input, not a node
-        visited.add(id)
-        // Unbuildable shape: skip the node (it stays a searched factor); inputs of OTHER nodes
-        // referencing this var read its current assignment value, which is sound.
-        val node = buildObjNode(c, id) ?: return
-        for (inId in nodeInputVarIds(node)) visit(inId)
-        nodes.add(node) // post-order ⇒ inputs precede this node (topological)
+    if (byIntDef.isEmpty() && byBoolDef.isEmpty()) return null
+
+    val nodes = ArrayList<DefinitionalSweep.SweepNode>(byIntDef.size + byBoolDef.size)
+    val visitedInt = HashSet<Int>()
+    val visitedBool = HashSet<Int>()
+    // Bool definitions read int vars and vice versa (bool2int), so the two visits are
+    // mutually recursive; a local holder breaks the forward reference without shared state.
+    var visitBoolRef: ((Int) -> Unit)? = null
+
+    fun visitInt(id: Int) {
+        if (id in visitedInt) return
+        val c = byIntDef[id] ?: return // free var: a sweep input, not a node
+        visitedInt.add(id)
+        val built = buildIntSweepNode(c, id) ?: return // unbuildable: stays a searched factor
+        for (inId in built.intIns) visitInt(inId)
+        for (inId in built.boolIns) visitBoolRef?.invoke(inId)
+        nodes.add(built.node)
     }
-    for (id in byDef.keys.sorted()) visit(id)
+
+    fun visitBool(id: Int) {
+        if (id in visitedBool) return
+        val c = byBoolDef[id] ?: return
+        visitedBool.add(id)
+        val built = buildBoolSweepNode(c, id) ?: return
+        for (inId in built.intIns) visitInt(inId)
+        for (inId in built.boolIns) visitBoolRef?.invoke(inId)
+        nodes.add(built.node)
+    }
+    visitBoolRef = ::visitBool
+    for (id in byIntDef.keys.sorted()) visitInt(id)
+    for (id in byBoolDef.keys.sorted()) visitBool(id)
     if (nodes.isEmpty()) return null
     return DefinitionalSweep(nodes)
+}
+
+/** A built sweep node plus the typed input vars the topo walk must visit first. */
+private class BuiltSweepNode(
+    val node: DefinitionalSweep.SweepNode,
+    val intIns: List<Int> = emptyList(),
+    val boolIns: List<Int> = emptyList(),
+)
+
+/** Bool var id for [e] (a positive bool literal), else null. */
+private fun FlatZincCompiler.boolIdOrNull(e: FznExpr): Int? = try {
+    val lit = resolveBoolLit(e)
+    if (Lit.isPositive(lit)) Lit.variable(lit) else null
+} catch (_: Exception) {
+    null
+}
+
+/** Int-defined sweep node: the [buildObjNode] algebra, `bool2int`, and element access. */
+private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int): BuiltSweepNode? {
+    when (c.name) {
+        "bool2int" -> {
+            val b = boolIdOrNull(c.args[0]) ?: return null
+            return BuiltSweepNode(DefinitionalSweep.SweepNode.Bool2Int(definedId, b), boolIns = listOf(b))
+        }
+
+        "array_int_element", "array_var_int_element" -> {
+            val idx = varIdOrNull(c.args[0]) ?: return null
+            return if (c.name == "array_int_element") {
+                val consts = try {
+                    evalIntConstArray(c.args[1])
+                } catch (_: Exception) {
+                    return null
+                }
+                BuiltSweepNode(
+                    DefinitionalSweep.SweepNode.ElementDef(definedId, idx, null, consts, offset = 1),
+                    intIns = listOf(idx),
+                )
+            } else {
+                val arr = try {
+                    evalIntVarArray(c.args[1])
+                } catch (_: Exception) {
+                    return null
+                }
+                BuiltSweepNode(
+                    DefinitionalSweep.SweepNode.ElementDef(definedId, idx, arr, null, offset = 1),
+                    intIns = listOf(idx) + arr.toList(),
+                )
+            }
+        }
+
+        else -> {
+            val node = buildObjNode(c, definedId) ?: return null
+            return BuiltSweepNode(DefinitionalSweep.SweepNode.IntDef(node), intIns = nodeInputVarIds(node))
+        }
+    }
+}
+
+/** Bool-defined sweep node: comparison reifications, literal set membership, bool folds. */
+@Suppress("CyclomaticComplexMethod")
+private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int): BuiltSweepNode? {
+    fun cmp(opName: String, lin: Boolean): BuiltSweepNode? {
+        val coeffs = ArrayList<Long>()
+        val vars = ArrayList<Int>()
+        var rhs: Long
+        if (lin) {
+            val cs = try {
+                evalIntConstArray(c.args[0])
+            } catch (_: Exception) {
+                return null
+            }
+            val ops = arrayOperands(c.args[1]) ?: return null
+            if (cs.size != ops.size) return null
+            rhs = try {
+                evalIntConst(c.args[2])
+            } catch (_: Exception) {
+                return null
+            }
+            for (k in ops.indices) {
+                val o = ops[k]
+                if (o.varId >= 0) {
+                    coeffs.add(cs[k].toLong())
+                    vars.add(o.varId)
+                } else {
+                    rhs -= cs[k].toLong() * o.const
+                }
+            }
+        } else {
+            val a = operandOf(c.args[0]) ?: return null
+            val b = operandOf(c.args[1]) ?: return null
+            rhs = 0L
+            if (a.varId >= 0) {
+                coeffs.add(1L)
+                vars.add(a.varId)
+            } else {
+                rhs -= a.const
+            }
+            if (b.varId >= 0) {
+                coeffs.add(-1L)
+                vars.add(b.varId)
+            } else {
+                rhs += b.const
+            }
+        }
+        val (op, finalRhs) = when (opName) {
+            "eq" -> LinearOp.EQ to rhs
+            "ne" -> LinearOp.NE to rhs
+            "le" -> LinearOp.LE to rhs
+            "lt" -> LinearOp.LE to rhs - 1
+            "ge" -> LinearOp.GE to rhs
+            "gt" -> LinearOp.GE to rhs + 1
+            else -> return null
+        }
+        return BuiltSweepNode(
+            DefinitionalSweep.SweepNode.CmpReif(definedId, coeffs.toLongArray(), vars.toIntArray(), finalRhs, op),
+            intIns = vars.toList(),
+        )
+    }
+    return when (c.name) {
+        "int_eq_reif" -> cmp("eq", lin = false)
+
+        "int_ne_reif" -> cmp("ne", lin = false)
+
+        "int_le_reif" -> cmp("le", lin = false)
+
+        "int_lt_reif" -> cmp("lt", lin = false)
+
+        "int_ge_reif" -> cmp("ge", lin = false)
+
+        "int_gt_reif" -> cmp("gt", lin = false)
+
+        "int_lin_eq_reif" -> cmp("eq", lin = true)
+
+        "int_lin_ne_reif" -> cmp("ne", lin = true)
+
+        "int_lin_le_reif" -> cmp("le", lin = true)
+
+        "set_in_reif" -> {
+            val x = varIdOrNull(c.args[0]) ?: return null
+            val values = try {
+                resolveSetLiteral(c.args[1])
+            } catch (_: Exception) {
+                return null
+            }
+            BuiltSweepNode(DefinitionalSweep.SweepNode.SetInReif(definedId, x, values), intIns = listOf(x))
+        }
+
+        "array_bool_and", "array_bool_or" -> {
+            val ins = try {
+                evalBoolVarArray(c.args[0])
+            } catch (_: Exception) {
+                return null
+            }
+            BuiltSweepNode(
+                DefinitionalSweep.SweepNode.BoolFold(definedId, ins, isAnd = c.name == "array_bool_and"),
+                boolIns = ins.map { Lit.variable(it) },
+            )
+        }
+
+        else -> null
+    }
 }
 
 /** Int var id for [e], or null if it's a constant / bool / float / unresolvable. */
