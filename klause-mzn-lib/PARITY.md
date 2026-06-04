@@ -24,7 +24,7 @@ reliably converge within budget; these show up as `KLAUSE_TIMEOUT` or
 
 ```bash
 # One-time setup
-./gradlew :klause-cli:installDist
+./gradlew :klause-cli:installJvmDist
 ./gradlew :klause-bench:downloadMzn          # ~250 MB, MiniZinc Challenge benchmarks
 
 # Smoke (runs in CI; covers klause-mzn-lib/test-models/)

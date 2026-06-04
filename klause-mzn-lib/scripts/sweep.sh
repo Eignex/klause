@@ -8,7 +8,7 @@
 # Prereqs:
 #   - MiniZinc installed (`minizinc --version`).
 #   - `./gradlew :klause-bench:downloadMzn` already run.
-#   - `./gradlew :klause-cli:installDist` already run.
+#   - `./gradlew :klause-cli:installJvmDist` already run.
 
 set -uo pipefail
 

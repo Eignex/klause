@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
  *     the FZN and starts searching without crashing.
  *
  * Aggregated per problem family; emits JSON + Markdown. Parallel across instances. The ingest
- * smoke needs `:klause-cli:installDist`; if the binary is absent it is skipped (reported as
+ * smoke needs `:klause-cli:installJvmDist`; if the binary is absent it is skipped (reported as
  * `ingest=skipped`).
  */
 @Serializable
@@ -65,7 +65,7 @@ object CompileAuditMetric {
 
         println()
         println("=== compile audit (compile→FZN, classify native|decomposed, ingest smoke; ${refs.size} instances) ===")
-        if (skipIngest) println("(ingest smoke skipped — ${if (fznCli == null) "klause-cli not installed (run :klause-cli:installDist)" else "disabled"})")
+        if (skipIngest) println("(ingest smoke skipped — ${if (fznCli == null) "klause-cli not installed (run :klause-cli:installJvmDist)" else "disabled"})")
 
         val pool = Executors.newFixedThreadPool(parallelism)
         val rows = try {

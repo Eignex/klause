@@ -28,7 +28,7 @@ logic in `commonMain`, a small platform seam (`Platform.kt`) with JVM and POSIX 
 JVM distribution:
 
 ```
-./gradlew :klause-cli:installDist
+./gradlew :klause-cli:installJvmDist
 klause-cli/build/install/klause-cli-jvm/bin/klause-cli [flags] <file>
 ```
 
