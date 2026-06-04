@@ -100,6 +100,7 @@ object BenchCli {
         "audit" -> MetricKind.AUDIT
         "tuning", "tune" -> MetricKind.TUNING
         "search" -> MetricKind.SEARCH
+        "credit" -> MetricKind.CREDIT
         else -> error("unknown metric '$name' (have ${MetricKind.entries.map { it.name.lowercase() }})")
     }
 
