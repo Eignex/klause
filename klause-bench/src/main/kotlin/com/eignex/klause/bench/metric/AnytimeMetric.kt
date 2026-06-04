@@ -140,8 +140,9 @@ object AnytimeMetric {
             optimizeStrategy = Cbls(tabu = tabu),
             pairSwapBudget = 1024,
             definitionalSweep = entry.definitionalSweep,
-            // #153 A/B knob: per-move invariant maintenance instead of restart-only sweeping.
-            perMoveInvariants = System.getProperty("klause.anytime.invariants")?.toBoolean() == true,
+            // #153: per-move invariant maintenance (default on, mirroring the shipped CLI);
+            // -Dklause.anytime.invariants=false reverts to restart-only sweeping for A/B runs.
+            perMoveInvariants = System.getProperty("klause.anytime.invariants")?.toBoolean() != false,
         )
         val klauseObj = entry.lsObjective ?: obj
         // Optional portfolio mode: -Dklause.anytime.portfolio=<ls>:<bt> runs a multi-core
