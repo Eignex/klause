@@ -850,6 +850,7 @@ class PropagationState(
             val oldRaw = atomValue[atomId]
             val newRaw = if (newT) 1 else 0
             if (oldRaw == newRaw) continue // already at this truth
+            if (undoLogging) logAtomChange(atomId)
             // Truth changed (either from the sentinel "unknown" or from the opposite
             // boolean value). Update the snapshot and fire the now-false lit's watchers.
             atomValue[atomId] = newRaw
@@ -959,6 +960,23 @@ class PropagationState(
         undoMaxHistLen.add(maxHistVal[v]?.size ?: 0)
     }
 
+    /** Capture atom [atomId]'s prior (truth, level, antecedent) triple. Must be called
+     *  *before* the mutation, mirroring [logIntChange]. Reuses the parallel undo arrays:
+     *  [undoLevel] holds the prior atom level, [undoMinReason] the prior truth snapshot and
+     *  [undoMinAnt] the prior antecedent; the remaining slots stay at neutral values. */
+    private fun logAtomChange(atomId: Int) {
+        undoTag.add(2)
+        undoVar.add(atomId)
+        undoLevel.add(atomLevel[atomId])
+        undoMinReason.add(atomValue[atomId])
+        undoMaxReason.add(0)
+        undoDomain.add(null)
+        undoMinAnt.add(atomAntecedents[atomId])
+        undoMaxAnt.add(null)
+        undoMinHistLen.add(0)
+        undoMaxHistLen.add(0)
+    }
+
     private fun truncateUndo(n: Int) {
         undoTag.truncateTo(n)
         undoVar.truncateTo(n)
@@ -983,6 +1001,9 @@ class PropagationState(
 
     /** True iff undo record [i] is a bool pin (vs. an int-domain change). */
     fun undoIsBoolAt(i: Int): Boolean = undoTag[i] == 0
+
+    /** True iff undo record [i] is an atom-state change (vs. a bool pin or int-domain change). */
+    fun undoIsAtomAt(i: Int): Boolean = undoTag[i] == 2
 
     init {
         for (fid in 0 until problem.numFactors) {
@@ -1197,6 +1218,42 @@ class PropagationState(
         return true
     }
 
+    /** Append the prior bound atom's clause-form literal to [base] when the prior bound was
+     *  itself search-derived ([cite]); a root-level bound is a global fact and needs none. */
+    private fun appendPriorBound(priorLit: Int, cite: Boolean, base: IntArray?): IntArray? {
+        if (!cite) return base
+        if (base != null && base.contains(priorLit)) return base
+        val out = IntArray((base?.size ?: 0) + 1)
+        base?.copyInto(out)
+        out[out.size - 1] = priorLit
+        return out
+    }
+
+    /**
+     * Antecedents for a bound move that snapped past interior holes. The supplied [base] reason
+     * justifies the *requested* bound only; when the hole-aware domain update lands the endpoint
+     * further (because the values in between are excluded), the deduction additionally rests on
+     * those exclusions. Each value in [crossed] that exists in the root domain was carved out
+     * during search, so its positive eq-atom literal joins the reason — omitting it makes the
+     * recorded implication stronger than what was actually derived, and clauses learned through
+     * it can prune feasible assignments. Values absent from the root domain are global facts and
+     * need no citation.
+     */
+    private fun antecedentsAcrossHoles(v: Int, crossed: IntRange, base: IntArray?): IntArray? {
+        var out: IntArrayList? = null
+        val orig = problem.intDomains[v]
+        for (value in crossed) {
+            if (value in orig) {
+                val o = out ?: IntArrayList().also { fresh ->
+                    out = fresh
+                    base?.forEach { fresh.add(it) }
+                }
+                o.add(Lit.make(atomVarEq(v, value), true))
+            }
+        }
+        return out?.toIntArray() ?: base
+    }
+
     private fun tightenIntMinImpl(v: Int, lo: Int, antecedents: IntArray?): Boolean {
         val d = intDomains[v]
         if (lo <= d.min) return true
@@ -1213,13 +1270,23 @@ class PropagationState(
         if (currentFactor >= 0) propagations++
         // Preserve interior holes via the sparse-aware constructor path. For contiguous
         // domains this is functionally identical to `IntDomain(lo, d.max)`.
-        intDomains[v] = d.withMinAtLeast(lo)
+        val newDomain = d.withMinAtLeast(lo)
+        val ant = if (newDomain.min > lo) {
+            antecedentsAcrossHoles(
+                v,
+                lo until newDomain.min,
+                antecedents,
+            )
+        } else {
+            antecedents
+        }
+        intDomains[v] = newDomain
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMinReason[v] = currentFactor
-        intMinAntecedents[v] = antecedents
+        intMinAntecedents[v] = ant
         if (undoLogging) pushMinHist(v, lo, currentLevel)
         dirtyInts.addLast(v)
-        propagateAtomsForVar(v, antecedents)
+        propagateAtomsForVar(v, ant)
         return true
     }
 
@@ -1234,13 +1301,23 @@ class PropagationState(
         }
         if (undoLogging) logIntChange(v)
         if (currentFactor >= 0) propagations++
-        intDomains[v] = d.withMaxAtMost(hi)
+        val newDomain = d.withMaxAtMost(hi)
+        val ant = if (newDomain.max < hi) {
+            antecedentsAcrossHoles(
+                v,
+                (newDomain.max + 1)..hi,
+                antecedents,
+            )
+        } else {
+            antecedents
+        }
+        intDomains[v] = newDomain
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         intMaxReason[v] = currentFactor
-        intMaxAntecedents[v] = antecedents
+        intMaxAntecedents[v] = ant
         if (undoLogging) pushMaxHist(v, hi, currentLevel)
         dirtyInts.addLast(v)
-        propagateAtomsForVar(v, antecedents)
+        propagateAtomsForVar(v, ant)
         return true
     }
 
@@ -1269,6 +1346,27 @@ class PropagationState(
         if (undoLogging) logIntChange(v)
         if (currentFactor >= 0) propagations++
         val newDomain = d.excludeValue(value)
+        // An edge exclusion advances the endpoint: the new bound rests on the *prior* bound, the
+        // exclusion itself, and any further holes crossed on the way. The supplied reason only
+        // justifies the exclusion, so the prior bound atom and the crossed values' exclusions
+        // must join the recorded reason (see [antecedentsAcrossHoles]) — without them the
+        // implication is stronger than what was derived and learned clauses can prune feasible
+        // assignments.
+        val ant = when {
+            newDomain.min != d.min -> appendPriorBound(
+                Lit.make(atomVarGe(v, d.min), false),
+                d.min > problem.intDomains[v].min,
+                antecedentsAcrossHoles(v, (value + 1) until newDomain.min, antecedents),
+            )
+
+            newDomain.max != d.max -> appendPriorBound(
+                Lit.make(atomVarLe(v, d.max), false),
+                d.max < problem.intDomains[v].max,
+                antecedentsAcrossHoles(v, (newDomain.max + 1) until value, antecedents),
+            )
+
+            else -> antecedents
+        }
         intDomains[v] = newDomain
         intLevel[v] = maxOf(intLevel[v], currentLevel)
         // Reason attribution: which side (min/max) "moved" depends on where the hole
@@ -1277,14 +1375,14 @@ class PropagationState(
         // walking back through this variable.
         if (newDomain.min != d.min) {
             intMinReason[v] = currentFactor
-            intMinAntecedents[v] = antecedents
+            intMinAntecedents[v] = ant
         }
         if (newDomain.max != d.max) {
             intMaxReason[v] = currentFactor
-            intMaxAntecedents[v] = antecedents
+            intMaxAntecedents[v] = ant
         }
         dirtyInts.addLast(v)
-        propagateAtomsForVar(v, antecedents)
+        propagateAtomsForVar(v, ant)
         return true
     }
 
@@ -1519,7 +1617,7 @@ class PropagationState(
                     boolAntecedents[v] = null
                 }
 
-                else -> { // int change — restore the full recorded prior int-var state
+                1 -> { // int change — restore the full recorded prior int-var state
                     val v = undoVar[i]
                     intDomains[v] = requireNotNull(undoDomain[i])
                     intLevel[v] = undoLevel[i]
@@ -1533,6 +1631,13 @@ class PropagationState(
                     minHistLvl[v]?.truncateTo(undoMinHistLen[i])
                     maxHistVal[v]?.truncateTo(undoMaxHistLen[i])
                     maxHistLvl[v]?.truncateTo(undoMaxHistLen[i])
+                }
+
+                else -> { // atom change — restore the (truth, level, antecedent) triple
+                    val id = undoVar[i]
+                    atomValue[id] = undoMinReason[i]
+                    atomLevel[id] = undoLevel[i]
+                    atomAntecedents[id] = undoMinAnt[i]
                 }
             }
             i--
@@ -1569,9 +1674,10 @@ class PropagationState(
             atomLevel.truncateTo(id)
             atomAntecedents.removeAt(atomAntecedents.size - 1)
         }
-        // Re-derive surviving atoms' truth from the now-restored int domains. atomLevel /
-        // atomAntecedents are left to drift (advisory, like watches) — same as the old
-        // snapshot scheme, which never restored them either.
+        // Re-derive surviving atoms' truth from the now-restored int domains. The journal
+        // replay above already restored the (truth, level, antecedent) triples for journaled
+        // mutations; this sweep additionally normalizes truths mutated while undo logging was
+        // off (the root-level fixpoint, which is never popped).
         for (atomId in 0 until atomIntVar.size) {
             val t = atomCurrentTruth(atomId) ?: continue
             atomValue[atomId] = if (t) 1 else 0
