@@ -81,18 +81,21 @@ internal data class LocalSearchWorkerConfig(
          *
          * Ranking source: the 2026-06-04 all-pool credit campaign — every config raced on every
          * mzn-bench optimization instance (10 s, 20 workers, per-worker attribution via
-         * [com.eignex.klause.portfolio.Portfolio.improvementsAttributed]); credit = instances
-         * where a config produced the first global incumbent / held the final best / was the
-         * sole contributor (first/best/sole below). cbls/fixed stays first despite mid-pack
-         * optimization credit: the campaign measured optimization only and CBLS remains the
-         * across-the-board satisfy winner (see the CLI's strategy notes). Configs that earned
-         * no credit (cbls/luby, cbls-tenure25, cbls-vnd, cbls-stallfast) were dropped.
+         * [com.eignex.klause.portfolio.Portfolio.improvementsAttributed]) — refined by a greedy
+         * **marginal-contribution** pass: slots are awarded by how many instances a config adds
+         * coverage on (`+uncovered`) given the slots above it, then by final-bests it would hold
+         * (`+best`). Marginal beats raw credit: sa/fixed had 5 raw firsts and cbls-notabu 247 raw
+         * improvements, but every instance either touched was already covered — both sit in the
+         * tail. cbls/fixed stays first despite mid-pack optimization credit: the campaign
+         * measured optimization only and CBLS remains the across-the-board satisfy winner (see
+         * the CLI's strategy notes). Configs that earned no credit at all (cbls/luby,
+         * cbls-tenure25, cbls-vnd, cbls-stallfast) were dropped.
          */
         private val poolFactories: List<Pair<String, () -> LocalSearchWorkerConfig>> = listOf(
-            // The constraint-based workhorse; fastest first-incumbent (median 4 ms; 5/1/1).
+            // The constraint-based workhorse; fastest first-incumbent (median 4 ms).
             "cbls/fixed" to { cblsWorker("cbls/fixed", FixedCadenceRestart()) { Cbls(tabu = cblsTabu()) } },
-            // Adaptive probSAT: top campaign credit (7 first / 9 best / 646 improvements) — many
-            // flattened Challenge models expose a large boolean core.
+            // Adaptive probSAT: biggest marginal adder (+16 uncovered, +9 best) — many flattened
+            // Challenge models expose a large boolean core.
             "adaptive-probsat/fixed" to {
                 LocalSearchWorkerConfig(
                     "adaptive-probsat/fixed",
@@ -100,51 +103,46 @@ internal data class LocalSearchWorkerConfig(
                     FixedCadenceRestart(),
                 )
             },
-            // Annealing + adaptive perturbation: the strongest closer (7 final-bests).
-            "sa/adaptive-perturb" to {
-                LocalSearchWorkerConfig("sa/adaptive-perturb", SimulatedAnnealing(), AdaptivePerturbationRestart())
-            },
             // Plateau-buster ([Cbls.stallSwapCap]) on the ILS basin-hopping restart: the best
-            // plateau variant overall (2/5, 342 improvements).
+            // plateau variant (+9 uncovered, +5 best).
             "cbls-plateau/ils-basin" to {
                 cblsWorker("cbls-plateau/ils-basin", ilsBasin()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
             },
-            // Tabu-free CBLS: surprisingly strong all-rounder (4/3, 247 improvements).
-            "cbls-notabu/fixed" to {
-                cblsWorker("cbls-notabu/fixed", FixedCadenceRestart()) { Cbls(tabu = TabuFilter.Disabled) }
-            },
-            // Weight forgetting + basin hopping (3/3 + a sole win).
-            "cbls-smooth/ils-basin" to {
-                cblsWorker("cbls-smooth/ils-basin", ilsBasin()) {
-                    Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu())
-                }
-            },
-            // Plateau-buster on the fixed cadence: slower to first (median 1.5 s) but holds a
-            // sole win (the bacp class) the ILS variant doesn't cover (4/2/1).
-            "cbls-plateau/fixed" to {
-                cblsWorker("cbls-plateau/fixed", FixedCadenceRestart()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
-            },
-            // Plain annealing: frequent fast opener (5 firsts), never closes.
-            "sa/fixed" to {
-                LocalSearchWorkerConfig(
-                    "sa/fixed",
-                    SimulatedAnnealing(),
-                    FixedCadenceRestart(maxFlipsBeforeRestart = 50_000),
-                )
-            },
-            // Patient stall cadence (2/3 + a sole win).
-            "cbls-stallslow/fixed" to {
-                cblsWorker("cbls-stallslow/fixed", FixedCadenceRestart()) {
-                    Cbls(frontierAfterStall = 160, stallNoise = 0.2, tabu = cblsTabu())
-                }
-            },
-            // Plateau-buster + smoothing (2/2 + a sole win).
+            // Plateau-buster + smoothing (+5 uncovered, +2 best).
             "cbls-plateau-smooth/fixed" to {
                 cblsWorker("cbls-plateau-smooth/fixed", FixedCadenceRestart()) {
                     Cbls(stallSwapCap = 16, smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu())
                 }
             },
-            // WalkSAT + configuration checking (2/2 + a sole win on structured SAT).
+            // Plateau-buster on the fixed cadence (+3 uncovered incl. the bacp-class sole win).
+            "cbls-plateau/fixed" to {
+                cblsWorker("cbls-plateau/fixed", FixedCadenceRestart()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
+            },
+            // Weight forgetting + basin hopping (+2 uncovered, +3 best).
+            "cbls-smooth/ils-basin" to {
+                cblsWorker("cbls-smooth/ils-basin", ilsBasin()) {
+                    Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu())
+                }
+            },
+            // Annealing + adaptive perturbation: the quality closer — adds no coverage but holds
+            // the final best on 7 instances, the second-highest in the pool.
+            "sa/adaptive-perturb" to {
+                LocalSearchWorkerConfig("sa/adaptive-perturb", SimulatedAnnealing(), AdaptivePerturbationRestart())
+            },
+            // Patient stall cadence (+1 uncovered, +3 best, one sole win).
+            "cbls-stallslow/fixed" to {
+                cblsWorker("cbls-stallslow/fixed", FixedCadenceRestart()) {
+                    Cbls(frontierAfterStall = 160, stallNoise = 0.2, tabu = cblsTabu())
+                }
+            },
+            // Cold noise (+1 uncovered, +3 best).
+            "cbls-lonoise/fixed" to {
+                cblsWorker(
+                    "cbls-lonoise/fixed",
+                    FixedCadenceRestart(),
+                ) { Cbls(noiseProbability = 0.01, tabu = cblsTabu()) }
+            },
+            // WalkSAT + configuration checking (+1 uncovered, +2 best; structured-SAT niche).
             "walksat-cc/luby" to {
                 LocalSearchWorkerConfig(
                     "walksat-cc/luby",
@@ -152,36 +150,42 @@ internal data class LocalSearchWorkerConfig(
                     LubyRestart(unit = 200),
                 )
             },
-            // Cold noise (1/3).
-            "cbls-lonoise/fixed" to {
+            // Hot noise (+1 uncovered, +1 best).
+            "cbls-hinoise/fixed" to {
                 cblsWorker(
-                    "cbls-lonoise/fixed",
+                    "cbls-hinoise/fixed",
                     FixedCadenceRestart(),
-                ) { Cbls(noiseProbability = 0.01, tabu = cblsTabu()) }
+                ) { Cbls(noiseProbability = 0.15, tabu = cblsTabu()) }
             },
-            // Aggressive swap cap (1/2, 191 improvements).
+            // --- tail: raw credit only; marginally redundant given the slots above ---
+            // Tabu-free CBLS: high raw credit (4 firsts / 247 improvements) but +0 uncovered.
+            "cbls-notabu/fixed" to {
+                cblsWorker("cbls-notabu/fixed", FixedCadenceRestart()) { Cbls(tabu = TabuFilter.Disabled) }
+            },
+            // Plain annealing: 5 raw firsts, all on instances the slots above also solve.
+            "sa/fixed" to {
+                LocalSearchWorkerConfig(
+                    "sa/fixed",
+                    SimulatedAnnealing(),
+                    FixedCadenceRestart(maxFlipsBeforeRestart = 50_000),
+                )
+            },
+            // Aggressive swap cap (raw 1/2, 191 improvements).
             "cbls-plateau64/fixed" to {
                 cblsWorker("cbls-plateau64/fixed", FixedCadenceRestart()) { Cbls(stallSwapCap = 64, tabu = cblsTabu()) }
             },
-            // Raw (unweighted) scoring (2/1).
+            // Raw (unweighted) scoring (raw 2/1).
             "cbls-raw/fixed" to {
                 cblsWorker(
                     "cbls-raw/fixed",
                     FixedCadenceRestart(),
                 ) { Cbls(scoring = MoveScoring.Raw, tabu = cblsTabu()) }
             },
-            // Short tabu tenure (2/0, 127 improvements).
+            // Short tabu tenure (raw 2/0, 127 improvements).
             "cbls-tenure3/fixed" to {
                 cblsWorker("cbls-tenure3/fixed", FixedCadenceRestart()) {
                     Cbls(tabu = TabuFilter(tenure = 3, aspiration = AspirationCriterion.OrImproving))
                 }
-            },
-            // Hot noise (2/1, thin improvement stream).
-            "cbls-hinoise/fixed" to {
-                cblsWorker(
-                    "cbls-hinoise/fixed",
-                    FixedCadenceRestart(),
-                ) { Cbls(noiseProbability = 0.15, tabu = cblsTabu()) }
             },
         )
 

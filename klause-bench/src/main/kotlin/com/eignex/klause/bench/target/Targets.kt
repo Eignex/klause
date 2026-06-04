@@ -4,7 +4,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
 
 /** Which measurement a target runs. */
-enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY, ANYTIME, COVERAGE, AUDIT, TUNING, SEARCH }
+enum class MetricKind { TIME, UNIFORMNESS, COMPLETENESS, VERIFY, PARITY, ANYTIME, COVERAGE, AUDIT, TUNING, SEARCH, CREDIT }
 
 /**
  * A pre-configured bench: a set of catalog suites bound to a [metric] (and a [budget]). The
@@ -49,6 +49,12 @@ object Targets {
             listOf("handwritten-core", "flatzinc-core", "opb-core", "smtlib-core", "xcsp3-core"), MetricKind.TUNING, Budget(timeoutMillis = 2_000)),
         Target("search-slack-alldiff", "Complete-search effort (conflicts/nodes) over slack all_different instances",
             listOf("slack-alldiff"), MetricKind.SEARCH, Budget(timeoutMillis = 30_000)),
+        // Portfolio credit campaigns: per-worker attribution (first/best/sole + marginal
+        // ranking) over the Challenge corpus. Composition via -Dklause.bench.credit.portfolio
+        // (<ls>:<bt>; ls/cp/mixed all supported) and -Dklause.bench.credit.configs (named LS
+        // pool selection, e.g. `all`); the targets below bind the common shapes.
+        Target("mzn-credit-ls", "LS portfolio credit campaign (top-8 palette prefix) over the MiniZinc Challenge benchmarks",
+            listOf("mzn-bench"), MetricKind.CREDIT, Budget(timeoutMillis = 10_000)),
         // OR-Tools-referenced variants (same suites, OR-Tools CP-SAT as the trusted reference).
         Target("parity-core-ortools", "Differential parity (klause vs OR-Tools) over the in-process core", IN_PROCESS_CORE, MetricKind.PARITY, reference = Backend.ORTOOLS),
         Target("mzn-parity-ortools", "Differential parity (klause vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY, reference = Backend.ORTOOLS),
