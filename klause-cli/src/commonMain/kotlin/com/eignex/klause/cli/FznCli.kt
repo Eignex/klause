@@ -106,6 +106,7 @@ internal fun printMznStats(stats: SolveStats, solveTimeMs: Long, solutions: Long
         println("%%%mzn-stat: failures=${stats.fails.sum.toLong()}")
         println("%%%mzn-stat: restarts=${stats.restarts.sum.toLong()}")
         println("%%%mzn-stat: propagations=${stats.propagations.sum.toLong()}")
+        println("%%%mzn-stat: relearned=${stats.relearned.sum.toLong()}")
         if (stats.peakDepth.max.isFinite()) println("%%%mzn-stat: peakDepth=${stats.peakDepth.max.toLong()}")
     }
     println("%%%mzn-stat-end")

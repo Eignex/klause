@@ -41,6 +41,8 @@ data class SolveStats(
     val restarts: SumResult = ZERO_COUNT,
     val propagations: SumResult = ZERO_COUNT,
     val learnedClauses: SumResult = ZERO_COUNT,
+    /** Clauses conflict analysis re-derived identically — a livelock indicator when large. */
+    val relearned: SumResult = ZERO_COUNT,
     val peakDepth: MaxResult = NO_MAX,
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     val wallMs: Long = 0L,
@@ -70,6 +72,7 @@ internal class SolveStatsSink(val backend: String) {
     val restarts: CountStat = CountStat()
     val propagations: CountStat = CountStat()
     val learnedClauses: CountStat = CountStat()
+    val relearned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
 
@@ -116,6 +119,12 @@ internal class SolveStatsSink(val backend: String) {
         }
     }
 
+    /** Conflict analysis re-derived a clause identical to one it already produced — a
+     *  livelock indicator when it grows large relative to [learnedClauses]. */
+    fun observeRelearn() {
+        relearned.update(1.0)
+    }
+
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
      *  uses the most recent [start] / [stop] window; if [stop] hasn't been called yet, we
      *  read the elapsed time from now. */
@@ -130,6 +139,7 @@ internal class SolveStatsSink(val backend: String) {
             restarts = restarts.read(),
             propagations = propagations.read(),
             learnedClauses = learnedClauses.read(),
+            relearned = relearned.read(),
             peakDepth = peakDepth.read(),
             depthMean = depthMean.read(),
             wallMs = elapsedMs,
