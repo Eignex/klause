@@ -210,7 +210,10 @@ class PortfolioTest {
             // workers report BestFound (not Optimal), so nothing self-cancels the pool. Every real
             // driver (CLI/bench) bounds it with a deadline; do the same here. Backtrack finds the
             // optimum (3) almost immediately; the deadline just stops the unbounded LS workers.
-            val deadline = TimeSource.Monotonic.markNow() + Duration.parse("3s")
+            // 500ms, not seconds: backtrack proves the optimum in ms and LS incumbents land
+            // within tens of ms; long uninterrupted busy loops get the page killed on
+            // wasm-browser test runs (#164), so the stop only needs to outlive the slow CI case.
+            val deadline = TimeSource.Monotonic.markNow() + Duration.parse("500ms")
             val r = p.minimize(cancellation = { deadline.hasPassedNow() })
             assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
             // Worker stats fold into the verdict: a mixed pool degrades the backend tag.
@@ -246,7 +249,10 @@ class PortfolioTest {
                 }
             },
         ).use { p ->
-            val deadline = TimeSource.Monotonic.markNow() + Duration.parse("3s")
+            // 500ms, not seconds: backtrack proves the optimum in ms and LS incumbents land
+            // within tens of ms; long uninterrupted busy loops get the page killed on
+            // wasm-browser test runs (#164), so the stop only needs to outlive the slow CI case.
+            val deadline = TimeSource.Monotonic.markNow() + Duration.parse("500ms")
             p.minimize(cancellation = { deadline.hasPassedNow() })
         }
         val incumbents = events.load().filter { it.second is SearchEvent.Incumbent }
