@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -50,6 +51,34 @@ data class AnytimeRow(
 
 /** Outcome of driving one anytime stream. */
 private data class Anytime(val firstMs: Long, val bestMs: Long, val best: Double?, val solutions: Int, val provedOptimal: Boolean)
+
+/**
+ * Engine-side incumbent timing recorded straight off the [SearchEvent] seam (#140). The
+ * harness otherwise stamps incumbents when it pulls them off the stream, which folds in
+ * consumer latency — in portfolio mode a whole thread + queue bridge. Events fire inside the
+ * engine at the moment of improvement; portfolio workers fire concurrently, hence the lock.
+ */
+internal class EngineTimes {
+    private val t0 = System.currentTimeMillis()
+    var firstMs = -1L
+        private set
+    var bestMs = -1L
+        private set
+    private var bestObj = Double.POSITIVE_INFINITY
+
+    val listener: (SearchEvent) -> Unit = { e ->
+        if (e is SearchEvent.Incumbent) {
+            val now = System.currentTimeMillis() - t0
+            synchronized(this) {
+                if (firstMs < 0) firstMs = now
+                if (e.objective < bestObj) {
+                    bestObj = e.objective
+                    bestMs = now
+                }
+            }
+        }
+    }
+}
 
 @Serializable
 data class AnytimeResults(
@@ -115,10 +144,15 @@ object AnytimeMetric {
         // shipped pure-LS CLI path never sets initialAssignment; only this opt-in and the
         // diag:cpseed probe do.
         val cpseed = System.getProperty("klause.anytime.cpseed")?.toBoolean() == true
+        // Engine-side timing for the klause stream (#140); the reference adapters have no
+        // event seam, so their timestamps stay consumer-side (the latency there is a plain
+        // in-process sequence pull, not the portfolio's queue bridge).
+        val engine = EngineTimes()
         val k = when {
-            portfolioProp != null -> anytime { portfolioImprovements(entry, portfolioProp, klauseObj, obj, budget) }
-            cpseed -> anytime { cpSeededImprovements(entry, solver, klauseObj, budget) }
-            else -> anytime { solver.improvements(klauseObj, lsParams(budget)) }
+            portfolioProp != null ->
+                anytime(engine) { portfolioImprovements(entry, portfolioProp, klauseObj, obj, budget, engine.listener) }
+            cpseed -> anytime(engine) { cpSeededImprovements(entry, solver, klauseObj, budget, engine.listener) }
+            else -> anytime(engine) { solver.improvements(klauseObj, lsParams(budget, engine.listener)) }
         }
         val r = anytime { ref.improvements(entry.problem, obj, budget) }
         val gap = if (k.best != null && r.best != null) k.best - r.best else null
@@ -128,7 +162,7 @@ object AnytimeMetric {
 
     /** Drive an anytime [MinimizeResult] stream, timing the first + best incumbent, counting
      *  solutions seen, and noting whether optimality was proven. */
-    private fun anytime(stream: () -> Sequence<MinimizeResult>): Anytime {
+    private fun anytime(engine: EngineTimes? = null, stream: () -> Sequence<MinimizeResult>): Anytime {
         val t0 = System.currentTimeMillis()
         var firstMs = -1L
         var bestMs = -1L
@@ -153,7 +187,11 @@ object AnytimeMetric {
             System.err.println("[anytime] solver aborted on this instance: ${e.message}")
             if (System.getProperty("klause.bench.anytime.trace")?.toBoolean() == true) e.printStackTrace()
         }
-        return Anytime(if (firstMs < 0) -1L else firstMs, if (bestMs < 0) -1L else bestMs, best, solutions, provedOptimal)
+        // Prefer engine-side stamps when the SearchEvent seam recorded any (#140); fall back
+        // to the consumer-side ones for streams without a listener (the reference adapters).
+        val first = engine?.firstMs?.takeIf { it >= 0 } ?: firstMs
+        val bestAt = engine?.bestMs?.takeIf { it >= 0 } ?: bestMs
+        return Anytime(if (first < 0) -1L else first, if (bestAt < 0) -1L else bestAt, best, solutions, provedOptimal)
     }
 
     /** Sentinel marking the end of the bridged portfolio stream. */
@@ -174,6 +212,7 @@ object AnytimeMetric {
         klauseObj: Objective,
         linearObj: Objective,
         budget: Budget,
+        onEvent: ((SearchEvent) -> Unit)? = null,
     ): Sequence<MinimizeResult> {
         val parts = prop.split(":", ",")
         val ls = parts.getOrNull(0)?.toIntOrNull() ?: 4
@@ -188,6 +227,7 @@ object AnytimeMetric {
             PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L, lsConfigLabels = configsProp),
             lsObjective = klauseObj, linearObjective = linearObj,
             definitionalSweep = entry.definitionalSweep,
+            onEvent = onEvent?.let { sink -> { _, e -> sink(e) } },
         )
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }
@@ -244,6 +284,7 @@ object AnytimeMetric {
         solver: LocalSearchSolver,
         klauseObj: Objective,
         budget: Budget,
+        onEvent: ((SearchEvent) -> Unit)? = null,
     ): Sequence<MinimizeResult> {
         val overallDeadline = System.currentTimeMillis() + budget.timeoutMillis
         val cpMs = System.getProperty("klause.anytime.cpseed.ms")?.toLong() ?: 1000L
@@ -256,11 +297,12 @@ object AnytimeMetric {
             maxFlips = Long.MAX_VALUE, randomSeed = 1L,
             costShaping = shapingFromProps(),
             initialAssignment = seed,
+            onEvent = onEvent,
         ).withCancellation(Cancellation { System.currentTimeMillis() > overallDeadline }) as LocalSearchParams
         return solver.improvements(klauseObj, params)
     }
 
-    private fun lsParams(budget: Budget): LocalSearchParams {
+    private fun lsParams(budget: Budget, onEvent: ((SearchEvent) -> Unit)? = null): LocalSearchParams {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         // λ=1.0 cost shaping folds the objective delta into move scoring — without it CBLS is
         // objective-blind and only descends opportunistically via constraint repair (mirrors
@@ -269,6 +311,7 @@ object AnytimeMetric {
         return LocalSearchParams(
             maxFlips = Long.MAX_VALUE, randomSeed = 1L,
             costShaping = shapingFromProps(),
+            onEvent = onEvent,
         ).withCancellation(Cancellation { System.currentTimeMillis() > deadline }) as LocalSearchParams
     }
 
