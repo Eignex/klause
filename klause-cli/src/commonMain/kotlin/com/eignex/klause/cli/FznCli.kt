@@ -339,38 +339,50 @@ private fun runWithPortfolio(
         definitionalSweep = program.definitionalSweep,
         onEvent = portfolioVerboseListener(opts.verbose),
     )
+    val t0 = nowMillis()
     try {
         when (program.solve) {
             is SolveDirective.Satisfy -> {
-                when (val r = runBlockingBridge { portfolio.solve(cancel) }) {
+                val r = runBlockingBridge { portfolio.solve(cancel) }
+                var produced = 0L
+                when (r) {
                     is SolveResult.Sat -> {
                         print(renderSolution(applier, program, r.assignment))
                         println("==========")
+                        produced = 1L
                     }
 
                     is SolveResult.Unsat -> println("=====UNSATISFIABLE=====")
 
                     else -> println("=====UNKNOWN=====")
                 }
+                if (opts.statistics) printMznStats(r.stats, nowMillis() - t0, produced)
             }
 
             is SolveDirective.Minimize, is SolveDirective.Maximize -> {
                 // Per-worker objectives were wired into the builder above (#63): each worker
                 // streams against its own representation; the portfolio only shares the scalar
                 // bound. No single objective is passed to minimize any more.
-                when (val r = runBlockingBridge { portfolio.minimize(cancel) }) {
+                val r = runBlockingBridge { portfolio.minimize(cancel) }
+                var produced = 0L
+                when (r) {
                     is MinimizeResult.Optimal -> {
                         print(renderSolution(applier, program, r.sample))
                         println("==========")
+                        produced = 1L
                     }
 
-                    is MinimizeResult.BestFound -> print(renderSolution(applier, program, r.sample))
+                    is MinimizeResult.BestFound -> {
+                        print(renderSolution(applier, program, r.sample))
+                        produced = 1L
+                    }
 
                     is MinimizeResult.Infeasible ->
                         println(if (complete) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
 
                     is MinimizeResult.Unknown -> println("=====UNKNOWN=====")
                 }
+                if (opts.statistics) printMznStats(r.stats, nowMillis() - t0, produced)
             }
         }
     } finally {
