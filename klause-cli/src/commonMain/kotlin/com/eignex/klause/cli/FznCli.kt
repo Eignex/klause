@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.config.installKlauseConfigFromEnv
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
@@ -27,9 +26,6 @@ import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.maximizeInt
 import com.eignex.klause.solver.minimizeInt
-import kotlinx.coroutines.runBlocking
-import java.io.File
-import kotlin.system.exitProcess
 
 /**
  * Minimal MiniZinc-compatible FlatZinc path of the unified klause CLI.
@@ -51,9 +47,9 @@ import kotlin.system.exitProcess
 internal fun runFzn(args: Array<String>) {
     // Translate env vars / system properties into the central config once, up front, and
     // install it as the process-wide ambient config so the compiler picks it up.
-    val config = installKlauseConfigFromEnv()
+    val config = installCliConfig()
     val opts = parseFznArgs(args)
-    val source = File(opts.fznPath).readText()
+    val source = readTextFile(opts.fznPath)
     // Unbounded `var int` declarations get a default domain. Resolution order:
     //   CLI flag → KlauseConfig (env var / system property) → built-in default.
     // Built-in defaults match Gecode/Chuffed.
@@ -64,7 +60,7 @@ internal fun runFzn(args: Array<String>) {
         unboundedIntLo = unboundedLo,
         unboundedIntHi = unboundedHi,
     )
-    val engine = opts.engine ?: System.getProperty("klause.fzn.engine") ?: "cp"
+    val engine = opts.engine ?: cliProp("klause.fzn.engine") ?: "cp"
     cliLogger(opts.verbose).v {
         "parsed ${opts.fznPath}: bools=${program.problem.numBoolVars} ints=${program.problem.numIntVars} " +
             "factors=${program.problem.numFactors}"
@@ -77,9 +73,9 @@ internal fun runFzn(args: Array<String>) {
 private fun verboseListener(opts: FznOptions): ((SearchEvent) -> Unit)? {
     if (!opts.verbose) return null
     val log = cliLogger(verbose = true)
-    val start = System.currentTimeMillis()
+    val start = nowMillis()
     return { e ->
-        val t = System.currentTimeMillis() - start
+        val t = nowMillis() - start
         log.v {
             when (e) {
                 is SearchEvent.Restart ->
@@ -97,7 +93,7 @@ private fun verboseListener(opts: FznOptions): ((SearchEvent) -> Unit)? {
 
 /** Lazily-loaded .ozn applier when [FznOptions.oznPath] is set; lets klause render the
  *  human-readable MZN output natively (drop-in for MiniZinc's `solns2out`). */
-private fun loadOznApplier(opts: FznOptions): OznApplier? = opts.oznPath?.let { OznApplier(File(it).readText()) }
+private fun loadOznApplier(opts: FznOptions): OznApplier? = opts.oznPath?.let { OznApplier(readTextFile(it)) }
 
 /** Render one solution: prefer the .ozn applier when supplied; otherwise fall back to
  *  the standard FZN solution writer (the `--no-ozn` / `needsSolns2Out: true` path). */
@@ -134,11 +130,11 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions)
         "portfolio", "pf" -> runWithPortfolio(program, opts)
 
         else -> {
-            System.err.println(
+            errPrintln(
                 "klause-cli: unknown engine `$engine`; expected one of " +
                     "cp, ls, portfolio",
             )
-            exitProcess(2)
+            exitCli(2)
         }
     }
 }
@@ -163,9 +159,9 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: FznOptions) {
     // Honor `-t` inside the engine, not just between yielded solutions: without a
     // cancellation a backtrack run that never yields (hard UNSAT proof, stuck optimality
     // proof) would ignore the time limit entirely.
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
     val cancellation = if (deadline != null) {
-        Cancellation { System.currentTimeMillis() > deadline }
+        Cancellation { nowMillis() > deadline }
     } else {
         Cancellation.Never
     }
@@ -215,9 +211,9 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
     // itself, so without this it would run unbounded on instances it can't close; the LS
     // engine checks `cancellation` inside its flip loop, so this stops both the satisfy
     // fight and the objective descent mid-search at the budget.
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
     val cancellation = if (deadline != null) {
-        Cancellation { System.currentTimeMillis() > deadline }
+        Cancellation { nowMillis() > deadline }
     } else {
         Cancellation.Never
     }
@@ -245,13 +241,13 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
  * (LS then runs cold). Only reached when the explicit `--cp-seed` flag is set.
  */
 private fun cpFeasibleSeed(program: FlatZincProgram, overallDeadline: Long?): Sample? {
-    val cpMs = System.getProperty("klause.fzn.cpseed.ms")?.toLong() ?: 2000L
-    var cpDeadline = System.currentTimeMillis() + cpMs
+    val cpMs = cliProp("klause.fzn.cpseed.ms")?.toLong() ?: 2000L
+    var cpDeadline = nowMillis() + cpMs
     if (overallDeadline != null) cpDeadline = minOf(cpDeadline, overallDeadline)
     val r = BacktrackSolver(program.problem).solve(
         BacktrackParams(
             randomSeed = 1L,
-            cancellation = Cancellation { System.currentTimeMillis() > cpDeadline },
+            cancellation = Cancellation { nowMillis() > cpDeadline },
         ),
     )
     return (r as? SolveResult.Sat)?.assignment
@@ -288,13 +284,13 @@ private fun portfolioObjectives(program: FlatZincProgram): Pair<Objective?, Obje
 private fun runWithPortfolio(
     program: FlatZincProgram,
     opts: FznOptions,
-    defaultLs: Int = System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
-    defaultBt: Int = System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
+    defaultLs: Int = cliProp("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
+    defaultBt: Int = cliProp("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
 ) {
     val spec = buildPortfolioSpec(EngineParams(opts.engineParams), opts.randomSeed, defaultLs, defaultBt)
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
     val cancel = if (deadline != null) {
-        Cancellation { System.currentTimeMillis() > deadline }
+        Cancellation { nowMillis() > deadline }
     } else {
         Cancellation.Never
     }
@@ -314,7 +310,7 @@ private fun runWithPortfolio(
     try {
         when (program.solve) {
             is SolveDirective.Satisfy -> {
-                when (val r = runBlocking { portfolio.solve(cancel) }) {
+                when (val r = runBlockingBridge { portfolio.solve(cancel) }) {
                     is SolveResult.Sat -> {
                         print(renderSolution(applier, program, r.assignment))
                         println("==========")
@@ -330,7 +326,7 @@ private fun runWithPortfolio(
                 // Per-worker objectives were wired into the builder above (#63): each worker
                 // streams against its own representation; the portfolio only shares the scalar
                 // bound. No single objective is passed to minimize any more.
-                when (val r = runBlocking { portfolio.minimize(cancel) }) {
+                when (val r = runBlockingBridge { portfolio.minimize(cancel) }) {
                     is MinimizeResult.Optimal -> {
                         print(renderSolution(applier, program, r.sample))
                         println("==========")
@@ -383,10 +379,10 @@ private fun <P : SolverParams> runSatisfy(
     val applier = loadOznApplier(opts)
     val limit = if (opts.allSolutions) opts.solutionCap ?: Long.MAX_VALUE else 1L
     var produced = 0L
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
 
     for (sample in solver.enumerate(params)) {
-        if (deadline != null && System.currentTimeMillis() > deadline) {
+        if (deadline != null && nowMillis() > deadline) {
             println("=====UNKNOWN=====")
             return
         }
@@ -399,7 +395,7 @@ private fun <P : SolverParams> runSatisfy(
         // No solution found: only a complete search that ran to completion proves
         // unsatisfiability. An incomplete (local-search) budget exhaustion — or a `-t`
         // cancellation that emptied the enumeration — can only report UNKNOWN.
-        val timedOut = deadline != null && System.currentTimeMillis() > deadline
+        val timedOut = deadline != null && nowMillis() > deadline
         println(if (complete && !timedOut) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
@@ -487,9 +483,9 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     val applier = loadOznApplier(opts)
     var best: Sample? = null
     var bestObj = if (maximize) Int.MIN_VALUE else Int.MAX_VALUE
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
     for (sample in solver.enumerate(params)) {
-        if (deadline != null && System.currentTimeMillis() > deadline) break
+        if (deadline != null && nowMillis() > deadline) break
         val v = sample.ints[objVarId]
         val improved = if (maximize) v > bestObj else v < bestObj
         if (improved) {
@@ -501,7 +497,7 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     if (best == null) {
         // Nothing feasible found. A complete search that ran to completion proves
         // unsatisfiability; a deadline hit or an incomplete (LS) budget exhaustion is UNKNOWN.
-        val timedOut = deadline != null && System.currentTimeMillis() > deadline
+        val timedOut = deadline != null && nowMillis() > deadline
         println(if (complete && !timedOut) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
@@ -640,7 +636,7 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
 
             else -> {
                 if (a.startsWith("-")) {
-                    System.err.println("klause-cli: ignoring unknown flag $a")
+                    errPrintln("klause-cli: ignoring unknown flag $a")
                     i++
                 } else {
                     if (fznPath != null) error("multiple FZN paths supplied: $fznPath, $a")
@@ -651,8 +647,8 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
         }
     }
     val path = fznPath ?: run {
-        System.err.println("usage: klause-cli [-e engine] [flags] file.fzn")
-        exitProcess(2)
+        errPrintln("usage: klause-cli [-e engine] [flags] file.fzn")
+        exitCli(2)
     }
     return FznOptions(
         path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics,

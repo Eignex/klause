@@ -1,30 +1,30 @@
 plugins {
-    kotlin("jvm") version "2.3.0"
-    application
-    // Shared Eignex detekt/ktlint setup (same rules the library modules run via com.eignex.kmp).
-    id("com.eignex.lint") version "1.2.2"
+    // kbuild CLI conventions: KMP + lint + kover, JVM dist + native executables,
+    // and the `releaseAssets` packaging task.
+    id("com.eignex.cli") version "1.2.3"
 }
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    implementation(project(":klause"))
-    // runBlocking bridge for the suspend Portfolio API from the (synchronous) CLI.
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    // KMP logger for `-v` progress output (custom stderr writer; survives the planned
-    // KMP conversion of this module).
-    implementation("co.touchlab:kermit:2.1.0")
-    testImplementation(kotlin("test"))
-}
-
-application {
+eignexCli {
     mainClass.set("com.eignex.klause.cli.MainKt")
+    entryPoint.set("com.eignex.klause.cli.main")
 }
 
 kotlin {
-    // 21, not 24: MiniZinc invokes the installDist launcher through the klause-mzn-lib
-    // wrappers on the *system* JVM, so the bytecode must stay runnable there.
-    jvmToolchain(21)
+    jvm()
+    // Host-linkable native executables; Windows is served by the JVM dist for now
+    // (MinGW needs its own filesystem actuals).
+    linuxX64()
+    linuxArm64()
+    macosX64()
+    macosArm64()
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(project(":klause"))
+            // runBlocking bridge for the suspend Portfolio API from the (synchronous) CLI.
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            // KMP logger for `-v` progress output (custom stderr writer).
+            implementation("co.touchlab:kermit:2.1.0")
+        }
+    }
 }

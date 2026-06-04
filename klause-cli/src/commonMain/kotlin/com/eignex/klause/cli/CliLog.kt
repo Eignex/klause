@@ -15,8 +15,8 @@ import co.touchlab.kermit.StaticConfig
  */
 private class StderrCommentWriter : LogWriter() {
     override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
-        System.err.println("% $message")
-        throwable?.let { System.err.println("% ${it.stackTraceToString()}") }
+        errPrintln("% $message")
+        throwable?.let { errPrintln("% ${it.stackTraceToString()}") }
     }
 }
 

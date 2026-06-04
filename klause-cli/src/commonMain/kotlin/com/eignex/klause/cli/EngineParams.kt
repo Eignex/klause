@@ -13,7 +13,6 @@ import com.eignex.klause.solver.backtrack.ValueHeuristic
 import com.eignex.klause.solver.backtrack.VariableHeuristic
 import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
-import kotlin.system.exitProcess
 
 /**
  * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
@@ -29,7 +28,7 @@ import kotlin.system.exitProcess
  *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
  */
 internal class EngineParams(pairs: List<String>) {
-    private val map: MutableMap<String, String> = LinkedHashMap()
+    private val map: MutableMap<String, String> = mutableMapOf()
 
     init {
         for (pair in pairs) {
@@ -88,8 +87,8 @@ internal class EngineParams(pairs: List<String>) {
     }
 
     private fun fail(msg: String): Nothing {
-        System.err.println("klause-cli: $msg")
-        exitProcess(2)
+        errPrintln("klause-cli: $msg")
+        exitCli(2)
     }
 }
 
