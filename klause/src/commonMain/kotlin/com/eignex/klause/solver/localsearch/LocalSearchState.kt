@@ -2,7 +2,9 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.IncrementalObjective
+import com.eignex.klause.solver.InvariantNetwork
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Objective
@@ -222,7 +224,7 @@ class LocalSearchState(
      * order through the same incremental primitives, so defined vars track their inputs and
      * payload/break-make state stays maintained. Null = no propagation (default behavior).
      */
-    var invariants: com.eignex.klause.solver.InvariantNetwork? = null
+    var invariants: InvariantNetwork? = null
         set(value) {
             field = value
             moveSink.setInvariants(value)
@@ -248,7 +250,7 @@ class LocalSearchState(
 
     /** Re-evaluate the definitional cone the [move]'s touched vars feed, in topological order,
      *  writing changes through the incremental primitives (no full recompute). */
-    private fun propagateInvariants(net: com.eignex.klause.solver.InvariantNetwork, move: Move) {
+    private fun propagateInvariants(net: InvariantNetwork, move: Move) {
         val ints = ArrayList<Int>(2)
         val bools = ArrayList<Int>(2)
         fun collect(m: Move) {
@@ -263,7 +265,7 @@ class LocalSearchState(
         for (idx in affected) {
             val n = net.node(idx)
             val v = n.eval(assignment, problem.intDomains)
-            if (v == com.eignex.klause.solver.DefinitionalSweep.SweepNode.NO_WRITE) continue
+            if (v == DefinitionalSweep.SweepNode.NO_WRITE) continue
             if (n.outIsBool) {
                 if (assignment.boolValue(n.out) != (v != 0L)) applyBoolFlip(n.out)
             } else {

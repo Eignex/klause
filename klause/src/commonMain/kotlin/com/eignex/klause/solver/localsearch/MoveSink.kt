@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.InvariantNetwork
 import com.eignex.klause.solver.Move
 
 /**
@@ -35,13 +36,13 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         assumptions = a
     }
 
-    private var invariants: com.eignex.klause.solver.InvariantNetwork? = null
+    private var invariants: InvariantNetwork? = null
 
     /** Install the per-move invariant index (issue #153): defined vars are determined, not
      *  searched, so moves targeting them are filtered at the sink — the single choke point all
      *  candidate sources go through. Compound parts on defined vars are dropped individually
      *  (propagation recomputes them); a compound whose parts all drop is skipped. */
-    fun setInvariants(net: com.eignex.klause.solver.InvariantNetwork?) {
+    fun setInvariants(net: InvariantNetwork?) {
         invariants = net
     }
 
@@ -88,6 +89,16 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             }
         }
         if (kept.isEmpty()) return
+        if (kept.size == 1) {
+            // A compound reduced to one survivor is just a primitive move (Compound requires
+            // two parts); the part already passed the frozen/defined filters above.
+            when (val p = kept[0]) {
+                is Move.BoolFlip -> addBoolFlip(p.varId)
+                is Move.IntSet -> addIntSet(p.varId, p.newValue)
+                is Move.Compound -> error("unreachable: parts are primitive")
+            }
+            return
+        }
         val side = compounds ?: ArrayList<Move.Compound>(2).also { compounds = it }
         side.add(Move.Compound(kept))
         cachedList = null
