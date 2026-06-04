@@ -96,10 +96,10 @@ class ReifiedHoleChainTest {
             }
             }
 
-            // A decision cap keeps seeds that trip the engine's known search livelock from
-            // hanging the test; a capped run returns BestFound and is skipped below. The guarded
-            // property is the soundness one: whenever the engine *claims* a proven optimum or
-            // infeasibility, brute force must agree.
+            // Defensive decision cap: a capped run returns BestFound and makes no optimality
+            // claim, which the check below then skips. The guarded property is the soundness
+            // one: whenever the engine *claims* a proven optimum or infeasibility, brute force
+            // must agree.
             val params = BacktrackParams(
                 randomSeed = seed.toLong(),
                 variableHeuristic = Vsids(),
