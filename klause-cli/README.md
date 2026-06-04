@@ -22,9 +22,28 @@ The path is chosen per invocation:
 
 ## Build and run
 
+The module is Kotlin Multiplatform (via the `com.eignex.cli` kbuild plugin): shared CLI
+logic in `commonMain`, a small platform seam (`Platform.kt`) with JVM and POSIX actuals.
+
+JVM distribution:
+
 ```
 ./gradlew :klause-cli:installDist
-klause-cli/build/install/klause-cli/bin/klause-cli [flags] <file>
+klause-cli/build/install/klause-cli-jvm/bin/klause-cli [flags] <file>
+```
+
+Standalone native executable (no JVM, instant startup):
+
+```
+./gradlew :klause-cli:linkReleaseExecutableLinuxX64
+klause-cli/build/bin/linuxX64/releaseExecutable/klause-cli.kexe [flags] <file>
+```
+
+Release packaging — stripped per-OS binaries, the JVM dist zip, and SHA256SUMS in
+`klause-cli/build/release-assets/`:
+
+```
+./gradlew :klause-cli:releaseAssets
 ```
 
 MiniZinc integration goes through `klause-mzn-lib` (see its README): the

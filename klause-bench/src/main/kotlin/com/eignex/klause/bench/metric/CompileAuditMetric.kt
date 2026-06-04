@@ -119,6 +119,6 @@ object CompileAuditMetric {
     }
 
     private fun fznCliBinary(): File? =
-        File(CorpusFetcher.workspaceRoot(), "klause-cli/build/install/klause-cli/bin/klause-cli")
+        File(CorpusFetcher.workspaceRoot(), "klause-cli/build/install/klause-cli-jvm/bin/klause-cli")
             .takeIf { it.canExecute() }
 }

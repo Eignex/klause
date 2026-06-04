@@ -21,9 +21,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import kotlinx.coroutines.runBlocking
-import java.io.File
-import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -49,19 +46,19 @@ internal fun runXcsp(args: Array<String>) {
 // --- single-instance solve ---
 
 private fun solveOne(opts: XcspOptions) {
-    val file = File(opts.path)
+    val file = opts.path
     val ing = try {
         ingest(file, opts.format)
     } catch (e: UnsupportedXcsp3Exception) {
-        System.err.println(e.message)
-        exitProcess(3)
+        errPrintln(e.message ?: "unsupported")
+        exitCli(3)
     } catch (e: UnsupportedSmtException) {
-        System.err.println(e.message)
-        exitProcess(3)
+        errPrintln(e.message ?: "unsupported")
+        exitCli(3)
     }
     val p = ing.problem
     println(
-        "parsed ${file.name}: bool=${p.numBoolVars} int=${p.numIntVars} factors=${p.numFactors}" +
+        "parsed ${fileName(file)}: bool=${p.numBoolVars} int=${p.numIntVars} factors=${p.numFactors}" +
             (if (ing.objective != null) " (optimization)" else " (satisfaction)"),
     )
 
@@ -90,7 +87,7 @@ private fun solveOne(opts: XcspOptions) {
 }
 
 private fun printAssignment(ints: IntArray, bools: BooleanArray) {
-    if (!System.getProperty("klause.xcsp.printSolution").toBoolean()) return
+    if (cliProp("klause.xcsp.printSolution")?.toBoolean() != true) return
     if (bools.isNotEmpty()) println("bools: " + bools.joinToString(" "))
     if (ints.isNotEmpty()) println("ints: " + ints.joinToString(" "))
 }
@@ -99,45 +96,38 @@ private fun printAssignment(ints: IntArray, bools: BooleanArray) {
 
 @Suppress("TooGenericExceptionCaught", "SwallowedException") // corpus walk: any parse/solve crash is a per-file verdict
 private fun coverage(opts: XcspOptions) {
-    val root = File(opts.path)
-    val files = (if (root.isDirectory) root.walkTopDown().filter { it.isFile } else sequenceOf(root))
+    val root = opts.path
+    val files = walkFiles(root)
         .filter { detectFormat(it, opts.format) != null }
-        .sortedBy { it.path }
-        .toList()
+        .sorted()
     if (files.isEmpty()) {
-        System.err.println("no XCSP3/SMT-LIB files under ${root.path}")
-        exitProcess(2)
+        errPrintln("no XCSP3/SMT-LIB files under $root")
+        exitCli(2)
     }
 
     var parsed = 0
     var solved = 0
     var unsupported = 0
     var failed = 0
-    val reasons = HashMap<String, Int>()
+    val reasons = mutableMapOf<String, Int>()
     for (f in files) {
         val ing = try {
             ingest(f, opts.format)
         } catch (e: UnsupportedXcsp3Exception) {
             unsupported++
-            reasons.merge(
-                reason(e.message),
-                1,
-                Int::plus,
-            )
-            println("UNSUPPORTED  ${f.name}  — ${reason(e.message)}")
+            val r = reason(e.message)
+            reasons[r] = (reasons[r] ?: 0) + 1
+            println("UNSUPPORTED  ${fileName(f)}  — ${reason(e.message)}")
             continue
         } catch (e: UnsupportedSmtException) {
             unsupported++
-            reasons.merge(
-                reason(e.message),
-                1,
-                Int::plus,
-            )
-            println("UNSUPPORTED  ${f.name}  — ${reason(e.message)}")
+            val r = reason(e.message)
+            reasons[r] = (reasons[r] ?: 0) + 1
+            println("UNSUPPORTED  ${fileName(f)}  — ${reason(e.message)}")
             continue
         } catch (e: Exception) {
             failed++
-            println("PARSE-ERROR  ${f.name}  — ${e.message?.take(80)}")
+            println("PARSE-ERROR  ${fileName(f)}  — ${e.message?.take(80)}")
             continue
         }
         parsed++
@@ -154,7 +144,7 @@ private fun coverage(opts: XcspOptions) {
             Verdict.Unknown -> "UNKNOWN"
         }
         if (verdict != Verdict.Unknown) solved++
-        println("PARSED       ${f.name}  — $tag")
+        println("PARSED       ${fileName(f)}  — $tag")
     }
 
     println()
@@ -183,15 +173,15 @@ private fun reason(msg: String?): String = (msg ?: "unknown").substringAfter(": 
 /** A parsed instance ready to solve. */
 private class Parsed(val problem: Problem, val objective: Objective?)
 
-private fun ingest(file: File, forced: Format?): Parsed = when (
+private fun ingest(file: String, forced: Format?): Parsed = when (
     detectFormat(file, forced)
-        ?: throw IllegalArgumentException("cannot detect format of ${file.name}; pass --format")
+        ?: throw IllegalArgumentException("cannot detect format of ${fileName(file)}; pass --format")
 ) {
-    Format.XCSP3 -> Xcsp3.parse(file.readText()).let { Parsed(it.problem, it.objective) }
-    Format.SMTLIB -> SmtLibQfLia.parse(file.readText()).let { Parsed(it.problem, it.objective) }
+    Format.XCSP3 -> Xcsp3.parse(readTextFile(file)).let { Parsed(it.problem, it.objective) }
+    Format.SMTLIB -> SmtLibQfLia.parse(readTextFile(file)).let { Parsed(it.problem, it.objective) }
 }
 
-private fun detectFormat(file: File, forced: Format?): Format? = forced ?: when (file.extension.lowercase()) {
+private fun detectFormat(file: String, forced: Format?): Format? = forced ?: when (fileExtension(file).lowercase()) {
     "xml", "xcsp", "xcsp3" -> Format.XCSP3
     "smt2", "smt" -> Format.SMTLIB
     else -> null
@@ -272,7 +262,7 @@ private fun runPortfolio(
     )
     try {
         if (ing.objective != null) {
-            return when (val r = runBlocking { portfolio.minimize(cancellation) }) {
+            return when (val r = runBlockingBridge { portfolio.minimize(cancellation) }) {
                 is MinimizeResult.Optimal -> Verdict.Optimal(r.objective, r.sample.ints, r.sample.bools)
 
                 is MinimizeResult.BestFound -> Verdict.BestFound(r.objective, r.sample.ints, r.sample.bools)
@@ -283,7 +273,7 @@ private fun runPortfolio(
                 is MinimizeResult.Unknown -> Verdict.Unknown
             }
         }
-        return when (val r = runBlocking { portfolio.solve(cancellation) }) {
+        return when (val r = runBlockingBridge { portfolio.solve(cancellation) }) {
             is SolveResult.Sat -> Verdict.Sat(r.assignment.ints, r.assignment.bools)
             is SolveResult.Unsat -> Verdict.Unsat
             is SolveResult.Unknown -> Verdict.Unknown
@@ -389,7 +379,7 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
 
             else -> {
                 if (a.startsWith("-")) {
-                    System.err.println("klause-cli: ignoring unknown flag $a")
+                    errPrintln("klause-cli: ignoring unknown flag $a")
                 } else {
                     if (path != null) usage("multiple paths: $path, $a")
                     path = a
@@ -411,10 +401,10 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
 }
 
 private fun usage(msg: String): Nothing {
-    System.err.println("klause-cli: $msg")
-    System.err.println(
+    errPrintln("klause-cli: $msg")
+    errPrintln(
         "usage: klause-cli [--format xcsp3|smtlib] [-e cp|ls|portfolio] [-t ms] [-r seed] " +
             "[-p threads] [--param key=value ...] [--coverage] <file|dir>",
     )
-    exitProcess(2)
+    exitCli(2)
 }

@@ -5,7 +5,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KLAUSE_HOME="${KLAUSE_HOME:-$(cd "$HERE/../.." && pwd)}"
-DIST_LAUNCHER="$KLAUSE_HOME/klause-cli/build/install/klause-cli/bin/klause-cli"
+DIST_LAUNCHER="$KLAUSE_HOME/klause-cli/build/install/klause-cli-jvm/bin/klause-cli"
 
 if [[ ! -x "$DIST_LAUNCHER" ]]; then
   echo "klause-fzn-ls: distribution not found at $DIST_LAUNCHER" >&2
