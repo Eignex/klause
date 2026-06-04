@@ -12,7 +12,7 @@ import com.eignex.klause.solver.Sample
  *
  * This is the klause-side analogue of MiniZinc's `solns2out`: take the .ozn template,
  * a solver-produced solution, and produce the human-readable string. Pair with
- * [klause-fzn-cli]'s `--ozn FILE` option to drop the `needsSolns2Out: true` dependency
+ * [klause-cli]'s `--ozn FILE` option to drop the `needsSolns2Out: true` dependency
  * on MiniZinc at runtime.
  */
 class OznApplier(oznSource: String) {

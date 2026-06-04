@@ -11,7 +11,7 @@ MiniZinc solver library and CLI integration for klause.
   table, element, lex, gcc, nvalue, ...) into combinations of the
   predicates we do support.
 - `bin/klause-fzn` — wrapper script MiniZinc invokes. Delegates to the
-  installed gradle distribution of `klause-fzn-cli`.
+  installed gradle distribution of `klause-cli`.
 - `test-models/` — small MiniZinc smoke tests.
 
 ## Setup
@@ -19,10 +19,10 @@ MiniZinc solver library and CLI integration for klause.
 1. Build the CLI distribution from the repo root:
 
    ```
-   ./gradlew :klause-fzn-cli:installDist
+   ./gradlew :klause-cli:installDist
    ```
 
-   This produces `klause-fzn-cli/build/install/klause-fzn-cli/bin/klause-fzn-cli`.
+   This produces `klause-cli/build/install/klause-cli/bin/klause-cli`.
    The wrapper at `klause-mzn-lib/bin/klause-fzn` finds it via `$KLAUSE_HOME`
    (defaults to two directories above the wrapper script).
 

@@ -924,7 +924,7 @@ internal class FlatZincCompiler(
 /** Default lower bound for unbounded `var int` declarations. Wide enough to absorb
  *  typical CP arithmetic without overflow in factor coefficient × value products; matches
  *  the convention used by Gecode / Chuffed. Override at the CLI boundary via the
- *  `unboundedIntLo` parameter of [parseFlatZinc] — `klause-fzn-cli` wires the
+ *  `unboundedIntLo` parameter of [parseFlatZinc] — `klause-cli` wires the
  *  `KLAUSE_FZN_UNBOUNDED_INT_LO` env var / `--unbounded-int-lo` flag through. */
 const val DEFAULT_UNBOUNDED_INT_LO: Int = -10_000_000
 

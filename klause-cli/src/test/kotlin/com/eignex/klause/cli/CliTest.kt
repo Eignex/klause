@@ -1,4 +1,4 @@
-package com.eignex.klause.xcsp
+package com.eignex.klause.cli
 
 import java.io.ByteArrayOutputStream
 import java.io.File

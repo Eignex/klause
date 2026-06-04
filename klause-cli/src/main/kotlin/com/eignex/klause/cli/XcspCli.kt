@@ -1,4 +1,4 @@
-package com.eignex.klause.xcsp
+package com.eignex.klause.cli
 
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
@@ -23,27 +23,26 @@ import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Solve CLI for the net-new klause frontends: **XCSP3** (`.xml`) and **SMT-LIB QF_LIA**
- * (`.smt2`). Reuses the parsers shipped in `klause-bench` and hands the resulting klause
- * [com.eignex.klause.solver.Problem] to a chosen backend.
+ * XCSP3 / SMT-LIB path of the unified klause CLI: **XCSP3** (`.xml`) and **SMT-LIB QF_LIA**
+ * (`.smt2`). Hands the parsed klause [com.eignex.klause.solver.Problem] to a chosen backend.
  *
  * Usage:
- *   `klause-xcsp [flags] <file>`        — parse and solve one instance.
- *   `klause-xcsp --coverage [flags] <dir>` — walk a corpus and report parsed / solved /
+ *   `klause-cli [flags] <file>`        — parse and solve one instance.
+ *   `klause-cli --coverage [flags] <dir>` — walk a corpus and report parsed / solved /
  *                                            unsupported counts (the XCSP3 competition-library
  *                                            coverage report).
  *
  * Flags: `--format xcsp3|smtlib` (default: by extension), `--engine backtrack|ls|brute`
  * (default backtrack), `-t <ms>` time budget, `-r <seed>`.
  */
-fun main(args: Array<String>) {
-    val opts = parseArgs(args)
+internal fun runXcsp(args: Array<String>) {
+    val opts = parseXcspArgs(args)
     if (opts.coverage) coverage(opts) else solveOne(opts)
 }
 
 // --- single-instance solve ---
 
-private fun solveOne(opts: Options) {
+private fun solveOne(opts: XcspOptions) {
     val file = File(opts.path)
     val ing = try {
         ingest(file, opts.format)
@@ -73,7 +72,7 @@ private fun printAssignment(ints: IntArray, bools: BooleanArray) {
 
 // --- coverage report over a corpus ---
 
-private fun coverage(opts: Options) {
+private fun coverage(opts: XcspOptions) {
     val root = File(opts.path)
     val files = (if (root.isDirectory) root.walkTopDown().filter { it.isFile } else sequenceOf(root))
         .filter { detectFormat(it, opts.format) != null }
@@ -145,7 +144,7 @@ private sealed interface Verdict {
     data object Unknown : Verdict
 }
 
-private fun run(ing: Parsed, opts: Options): Verdict {
+private fun run(ing: Parsed, opts: XcspOptions): Verdict {
     val cancellation = opts.timeMs?.let { Cancellation.after(it.milliseconds) } ?: Cancellation.Never
     return when (opts.engine) {
         Engine.BACKTRACK -> runOn(BacktrackSolver(ing.problem), BacktrackParams(randomSeed = opts.seed ?: 0L, cancellation = cancellation), ing)
@@ -179,7 +178,7 @@ private fun fmt(d: Double): String = if (d == d.toLong().toDouble()) d.toLong().
 private enum class Format { XCSP3, SMTLIB }
 private enum class Engine { BACKTRACK, LS, BRUTE }
 
-private data class Options(
+private data class XcspOptions(
     val path: String,
     val format: Format?,
     val engine: Engine,
@@ -188,7 +187,7 @@ private data class Options(
     val coverage: Boolean,
 )
 
-private fun parseArgs(args: Array<String>): Options {
+private fun parseXcspArgs(args: Array<String>): XcspOptions {
     var format: Format? = null
     var engine = Engine.BACKTRACK
     var timeMs: Long? = null
@@ -208,16 +207,16 @@ private fun parseArgs(args: Array<String>): Options {
             "-r" -> { seed = args[++i].toLong(); i++ }
             "--coverage" -> { coverage = true; i++ }
             else -> {
-                if (a.startsWith("-")) { System.err.println("klause-xcsp: ignoring unknown flag $a"); i++ }
+                if (a.startsWith("-")) { System.err.println("klause-cli: ignoring unknown flag $a"); i++ }
                 else { if (path != null) usage("multiple paths: $path, $a"); path = a; i++ }
             }
         }
     }
-    return Options(path ?: usage("no input file/dir given"), format, engine, timeMs, seed, coverage)
+    return XcspOptions(path ?: usage("no input file/dir given"), format, engine, timeMs, seed, coverage)
 }
 
 private fun usage(msg: String): Nothing {
-    System.err.println("klause-xcsp: $msg")
-    System.err.println("usage: klause-xcsp [--format xcsp3|smtlib] [-e backtrack|ls|brute] [-t ms] [-r seed] [--coverage] <file|dir>")
+    System.err.println("klause-cli: $msg")
+    System.err.println("usage: klause-cli [--format xcsp3|smtlib] [-e backtrack|ls|brute] [-t ms] [-r seed] [--coverage] <file|dir>")
     exitProcess(2)
 }

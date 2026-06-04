@@ -1,4 +1,4 @@
-package com.eignex.klause.fzn
+package com.eignex.klause.cli
 
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
@@ -24,9 +24,9 @@ import java.io.File
 import kotlin.system.exitProcess
 
 /**
- * Minimal MiniZinc-compatible FlatZinc CLI.
+ * Minimal MiniZinc-compatible FlatZinc path of the unified klause CLI.
  *
- * Invocation: `klause-fzn [flags] file.fzn`. Reads the FlatZinc model, hands it to the
+ * Invocation: `klause-cli [flags] file.fzn`. Reads the FlatZinc model, hands it to the
  * requested klause backend, prints solutions in MiniZinc's standard FZN output format:
  * each solution terminated by `----------`, the entire stream terminated by `==========`
  * for completed search, `=====UNSATISFIABLE=====` when no solution exists, or
@@ -37,11 +37,11 @@ import kotlin.system.exitProcess
  * `logicng`, `brute`. Each backend honors `-t` (time limit) and `-r` (seed); the
  * `-a` / `-n` flags apply to the satisfy path.
  */
-fun main(args: Array<String>) {
+internal fun runFzn(args: Array<String>) {
     // Translate env vars / system properties into the central config once, up front, and
     // install it as the process-wide ambient config so the compiler picks it up.
     val config = com.eignex.klause.config.installKlauseConfigFromEnv()
-    val opts = parseArgs(args)
+    val opts = parseFznArgs(args)
     val source = File(opts.fznPath).readText()
     // Unbounded `var int` declarations get a default domain. Resolution order:
     //   CLI flag → KlauseConfig (env var / system property) → built-in default.
@@ -57,9 +57,9 @@ fun main(args: Array<String>) {
     dispatch(engine.lowercase(), program, opts)
 }
 
-/** Lazily-loaded .ozn applier when [Options.oznPath] is set; lets klause render the
+/** Lazily-loaded .ozn applier when [FznOptions.oznPath] is set; lets klause render the
  *  human-readable MZN output natively (drop-in for MiniZinc's `solns2out`). */
-private fun loadOznApplier(opts: Options): OznApplier? =
+private fun loadOznApplier(opts: FznOptions): OznApplier? =
     opts.oznPath?.let { OznApplier(File(it).readText()) }
 
 /** Render one solution: prefer the .ozn applier when supplied; otherwise fall back to
@@ -68,7 +68,7 @@ private fun renderSolution(
     applier: OznApplier?, program: FlatZincProgram, sample: com.eignex.klause.solver.Sample,
 ): String = applier?.render(program, sample) ?: writeFlatZincSolution(program, sample)
 
-private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
+private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions) {
     when (engine) {
         "backtrack", "bt" -> runWithBacktrack(program, opts)
         "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
@@ -76,14 +76,14 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: Options) {
         "logicng" -> runWithLogicNG(program, opts)
         "brute", "bruteforce", "brute-force" -> runWithBrute(program, opts)
         else -> {
-            System.err.println("klause-fzn: unknown engine `$engine`; expected one of " +
+            System.err.println("klause-cli: unknown engine `$engine`; expected one of " +
                 "backtrack, ls, portfolio, logicng, brute")
             exitProcess(2)
         }
     }
 }
 
-private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
+private fun runWithBacktrack(program: FlatZincProgram, opts: FznOptions) {
     // Default complete-search config when the model carries no `solve :: *_search(...)`: the
     // full CDCL setup — VSIDS + phase-saving + Luby restarts + LBD clause learning — under a
     // FIXED seed so the CLI is deterministic (a null seed makes optimality proofs flakily blow
@@ -102,7 +102,7 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: Options) {
     runGeneric(BacktrackSolver(program.problem), params, program, opts, complete = true)
 }
 
-private fun runWithLocalSearch(program: FlatZincProgram, opts: Options) {
+private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
     val params = LocalSearchParams(randomSeed = opts.randomSeed)
     val tabu = com.eignex.klause.solver.localsearch.strategy.TabuFilter(
         tenure = 10,
@@ -167,7 +167,7 @@ private fun cpFeasibleSeed(program: FlatZincProgram, overallDeadline: Long?): Sa
     return (r as? com.eignex.klause.solver.SolveResult.Sat)?.assignment
 }
 
-private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {
+private fun runWithLogicNG(program: FlatZincProgram, opts: FznOptions) {
     val params = LogicNGParams(
         randomSeed = opts.randomSeed,
         timeoutMillis = opts.timeLimitMs,
@@ -175,7 +175,7 @@ private fun runWithLogicNG(program: FlatZincProgram, opts: Options) {
     runGeneric(LogicNGSolver(program.problem), params, program, opts, complete = true)
 }
 
-private fun runWithBrute(program: FlatZincProgram, opts: Options) {
+private fun runWithBrute(program: FlatZincProgram, opts: FznOptions) {
     val params = BruteForceParams(randomSeed = opts.randomSeed)
     runGeneric(BruteForceSolver(program.problem), params, program, opts, complete = true)
 }
@@ -218,7 +218,7 @@ private fun portfolioObjectives(
     return (program.lsObjective ?: linear) to linear
 }
 
-private fun runWithPortfolio(program: FlatZincProgram, opts: Options) {
+private fun runWithPortfolio(program: FlatZincProgram, opts: FznOptions) {
     val ls = System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4
     val bt = System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2
     val spec = com.eignex.klause.portfolio.PortfolioSpec(
@@ -273,7 +273,7 @@ private fun <P : SolverParams> runGeneric(
     solver: Solver<P>,
     params: P,
     program: FlatZincProgram,
-    opts: Options,
+    opts: FznOptions,
     complete: Boolean,
 ) {
     when (val solve = program.solve) {
@@ -287,7 +287,7 @@ private fun <P : SolverParams> runSatisfy(
     solver: Solver<P>,
     params: P,
     program: FlatZincProgram,
-    opts: Options,
+    opts: FznOptions,
     complete: Boolean,
 ) {
     val applier = loadOznApplier(opts)
@@ -319,7 +319,7 @@ private fun <P : SolverParams> runOptimize(
     params: P,
     program: FlatZincProgram,
     solve: SolveDirective,
-    opts: Options,
+    opts: FznOptions,
     complete: Boolean,
 ) {
     val (objName, maximize) = when (solve) {
@@ -381,7 +381,7 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     program: FlatZincProgram,
     objVarId: Int,
     maximize: Boolean,
-    opts: Options,
+    opts: FznOptions,
     complete: Boolean,
 ) {
     val applier = loadOznApplier(opts)
@@ -408,7 +408,7 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     }
 }
 
-private data class Options(
+private data class FznOptions(
     val fznPath: String,
     val engine: String?,
     val allSolutions: Boolean,
@@ -437,7 +437,7 @@ private data class Options(
  * -t, -r) plus our `--engine` / `-e` selector. Unknown flags are tolerated (printed to
  * stderr) to stay forward-compatible with MiniZinc additions we don't recognise.
  */
-private fun parseArgs(args: Array<String>): Options {
+private fun parseFznArgs(args: Array<String>): FznOptions {
     var engine: String? = null
     var allSolutions = false
     var solutionCap: Long? = null
@@ -466,7 +466,7 @@ private fun parseArgs(args: Array<String>): Options {
             "--cp-seed" -> { cpSeed = true; i++ }
             else -> {
                 if (a.startsWith("-")) {
-                    System.err.println("klause-fzn: ignoring unknown flag $a")
+                    System.err.println("klause-cli: ignoring unknown flag $a")
                     i++
                 } else {
                     if (fznPath != null) error("multiple FZN paths supplied: $fznPath, $a")
@@ -477,8 +477,8 @@ private fun parseArgs(args: Array<String>): Options {
         }
     }
     val path = fznPath ?: run {
-        System.err.println("usage: klause-fzn [-e engine] [flags] file.fzn")
+        System.err.println("usage: klause-cli [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return Options(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed)
+    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed)
 }

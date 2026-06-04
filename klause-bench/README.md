@@ -31,7 +31,7 @@ Example: bench run parity suite=handwritten-core category=UNSAT reference=ortool
 
 time measures wall-time for solve/sample/enumerate per backend plus a propagation microbench, with regression detection against bench-baseline.json. uniformness measures sampling distinctness, Hamming spread, and entropy, adding coverage and KL when the space is enumerable. completeness counts distinct SAT assignments reached under wall-time budgets. verify is the cross-backend SAT/UNSAT agreement and sample-validity gate. search runs the complete backtracker under a fixed deterministic CDCL config and reports the engine's own search-size counters (nodes, conflicts, learned clauses) plus solve-rate, so a clause-learning or explanation change can be A/B'd by holding the suite fixed and comparing conflicts; the slack-alldiff suite of Golomb rulers is the Hall-prone workload for that.
 
-parity solves klause against a reference (Choco or OR-Tools) on the same Problem and checks both against the recorded Expected oracle. anytime pits klause-LS against a reference, recording time-to-first, time-to-best, best objective, and solutions seen. coverage reports the percent of constraint predicates klause handles natively vs MiniZinc-decomposed. audit is a compile-only sweep classifying native vs decomposed per family plus a klause-fzn-cli ingest smoke. tuning ranks klause solver configs over a mixed sat+opt workload by averaged dense rank.
+parity solves klause against a reference (Choco or OR-Tools) on the same Problem and checks both against the recorded Expected oracle. anytime pits klause-LS against a reference, recording time-to-first, time-to-best, best objective, and solutions seen. coverage reports the percent of constraint predicates klause handles natively vs MiniZinc-decomposed. audit is a compile-only sweep classifying native vs decomposed per family plus a klause-cli ingest smoke. tuning ranks klause solver configs over a mixed sat+opt workload by averaged dense rank.
 
 Parity defaults to the Choco reference, anytime to OR-Tools; override per run with reference= or the -Dklause.bench.parity.reference / -Dklause.bench.anytime.reference properties. Metrics write JSON (and Markdown where useful) under build/.
 
@@ -52,4 +52,4 @@ klause-choco and klause-ortools map a klause Problem into Choco and OR-Tools CP-
   ./gradlew :klause-bench:test                               unit, parser, and selection tests
   ./gradlew :klause-bench:bench --args="verify-core"         cross-backend agreement gate
   ./gradlew :klause-bench:bench --args="parity-core"         klause vs Choco, vs recorded Expected
-  ./gradlew :klause-fzn-cli:installDist && ./gradlew :klause-bench:bench --args="mzn-audit-smoke"
+  ./gradlew :klause-cli:installDist && ./gradlew :klause-bench:bench --args="mzn-audit-smoke"
