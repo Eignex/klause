@@ -24,8 +24,8 @@ class Problem(
     val numBoolVars: Int,
     /** Number of integer variables; ids occupy `[0, numIntVars)`. */
     val numIntVars: Int,
-    /** Domain (bounds) of each integer variable, indexed by int var id. */
-    val intDomains: Array<IntDomain>,
+    /** Domain (bounds) of each integer variable as declared by the caller. */
+    intDomains: Array<IntDomain>,
     /** The constraints over the variables. */
     val factors: Array<Factor>,
     /** Optional real-valued sidecar for native-float backends; ignored by others. */
@@ -80,6 +80,18 @@ class Problem(
      */
     val probeSeed: Long = 0L,
 ) {
+    /**
+     * Domain (bounds) of each integer variable, indexed by int var id. A defensive copy of
+     * the constructor input, strengthened at construction by folding in the root-level
+     * deductions from [baked]: bound tightenings, interior holes and pins derived by one
+     * propagation fixpoint over the factors become the problem's own domains. Loosely
+     * declared variables (e.g. unbounded ints flattened to machine-int spans) thus present
+     * finite domains to every consumer — search engines start from a stronger root and
+     * reference backends can represent constraints whose raw reachable ranges would
+     * overflow their variable limits.
+     */
+    val intDomains: Array<IntDomain> = intDomains.copyOf()
+
     init {
         require(intDomains.size == numIntVars) {
             "intDomains size ${intDomains.size} != numIntVars $numIntVars"
@@ -157,8 +169,27 @@ class Problem(
      * residual problem with no per-call propagation cost, and trivially-Unsat problems surface
      * here instead of after a full search budget. May be [PropagationResult.Unsat] for
      * trivially-infeasible problems; callers that want fail-fast behavior can check this.
+     *
+     * The deductions recorded here are also folded back into [intDomains], so the diff is
+     * expressed relative to the constructor-input domains rather than the tightened ones.
+     * Re-seeding it on an already-tightened domain is a no-op, so existing consumers that
+     * replay [baked] as assumptions are unaffected.
      */
-    val baked: PropagationResult = computeBaked()
+    val baked: PropagationResult = computeBaked().also(::foldIntoDomains)
+
+    /** Folds the root-level int deductions of a successful bake into [intDomains] so the
+     *  tightened bounds are part of the problem itself rather than transient solver state.
+     *  Bounds are applied before holes so every recorded hole is interior to the final
+     *  bounds; pins collapse the domain to a singleton via the same hole-aware paths. */
+    private fun foldIntoDomains(result: PropagationResult) {
+        if (result !is PropagationResult.Implied) return
+        result.forEachInt { v, value ->
+            intDomains[v] = intDomains[v].withMinAtLeast(value).withMaxAtMost(value)
+        }
+        result.forEachIntMin { v, lo -> intDomains[v] = intDomains[v].withMinAtLeast(lo) }
+        result.forEachIntMax { v, hi -> intDomains[v] = intDomains[v].withMaxAtMost(hi) }
+        result.forEachIntHole { v, value -> intDomains[v] = intDomains[v].excludeValue(value) }
+    }
 
     private fun computeBaked(): PropagationResult {
         val initial = propagate(Assumptions.None)

@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -36,7 +35,7 @@ class GeostTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         assertTrue(r is PropagationResult.Implied, "expected propagation success; got $r")
         // M_{0,1; y} = [b1.y.max + 1 − s0.y, b1.y.min + s1.y − 1] = [-1, 1] → b0.y must avoid → ≥ 2.
         assertEquals(2, r.intMinOrNullCompat(1), "b0.y.min should be pushed to 2 by kernel sweep")
@@ -62,7 +61,7 @@ class GeostTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         assertTrue(r is PropagationResult.Unsat, "co-located identical boxes must conflict; got $r")
     }
 }

@@ -9,6 +9,27 @@ import kotlin.test.assertEquals
 
 class SignedProductCoverageTest {
 
+    /** Bit pins fixing every int var to the corresponding value, or `null` when a value
+     *  has no code in the blasted encoding (problem construction tightens domains, so
+     *  values pruned at the root are unrepresentable — semantically unsat). */
+    private fun pinAll(cnf: CnfProblem, values: IntArray): IntArray? {
+        val pins = mutableListOf<Int>()
+        for (idx in values.indices) {
+            val bits = cnf.intVarBits[idx]
+            val offset = values[idx] - cnf.intVarMin[idx]
+            val capacity = if (bits.size >= 31) Int.MAX_VALUE else (1 shl bits.size) - 1
+            if (offset < 0 || offset > capacity) return null
+            for (i in bits.indices) {
+                pins += bits[i]
+                pins += (offset shr i) and 1
+            }
+        }
+        return pins.toIntArray()
+    }
+
+    private fun isSat(cnf: CnfProblem, pins: IntArray?): Boolean =
+        pins != null && SatCheck.isSat(cnf.numVars, cnf.clauses, pins)
+
     @Test
     fun `signed product at most negative boundary matches enumeration`() {
         val factor = Product(a = 0, b = 1, result = 2)
@@ -23,18 +44,7 @@ class SignedProductCoverageTest {
             for (bv in -4..3) {
                 for (rv in -16..16) {
                     val expected = (av * bv == rv)
-                    val pins = mutableListOf<Int>()
-                    val values = listOf(av, bv, rv)
-                    val mins = listOf(-4, -4, -16)
-                    for (idx in 0..2) {
-                        val bits = cnf.intVarBits[idx]
-                        val offset = values[idx] - mins[idx]
-                        for (i in bits.indices) {
-                            pins += bits[i]
-                            pins += (offset shr i) and 1
-                        }
-                    }
-                    val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
+                    val sat = isSat(cnf, pinAll(cnf, intArrayOf(av, bv, rv)))
                     assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
                 }
             }
@@ -55,18 +65,7 @@ class SignedProductCoverageTest {
             for (bv in -2..2) {
                 for (rv in -4..4) {
                     val expected = (av * bv == rv)
-                    val pins = mutableListOf<Int>()
-                    val values = listOf(av, bv, rv)
-                    val mins = listOf(-2, -2, -4)
-                    for (idx in 0..2) {
-                        val bits = cnf.intVarBits[idx]
-                        val offset = values[idx] - mins[idx]
-                        for (i in bits.indices) {
-                            pins += bits[i]
-                            pins += (offset shr i) and 1
-                        }
-                    }
-                    val sat = SatCheck.isSat(cnf.numVars, cnf.clauses, pins.toIntArray())
+                    val sat = isSat(cnf, pinAll(cnf, intArrayOf(av, bv, rv)))
                     assertEquals(expected, sat, "a=$av b=$bv r=$rv expected=$expected got=$sat")
                 }
             }

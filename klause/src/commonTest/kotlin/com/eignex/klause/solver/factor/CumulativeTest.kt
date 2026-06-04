@@ -169,7 +169,7 @@ class CumulativeTest {
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.propagate(Assumptions.None)
+        val result = problem.baked
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
         assertEquals(4, result.ints[1], "task 1 must be pinned to t=4 after time-tabling shaves earlier starts")
     }
@@ -251,7 +251,7 @@ class CumulativeTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 10)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.propagate(Assumptions.None)
+        val result = problem.baked
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
         assertEquals(
             3,
@@ -274,7 +274,7 @@ class CumulativeTest {
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.propagate(Assumptions.None)
+        val result = problem.baked
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
         assertEquals(null, result.intMinOrNullCompat(0))
         assertEquals(null, result.intMinOrNullCompat(1))
@@ -378,7 +378,7 @@ class CumulativeTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.propagate(Assumptions.None)
+        val result = problem.baked
         assertTrue(result is PropagationResult.Implied, "single task is always feasible; got $result")
     }
 
@@ -393,7 +393,7 @@ class CumulativeTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        assertTrue(problem.propagate(Assumptions.None) is PropagationResult.Implied)
+        assertTrue(problem.baked is PropagationResult.Implied)
     }
 
     @Test
@@ -406,7 +406,7 @@ class CumulativeTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        assertTrue(problem.propagate(Assumptions.None) is PropagationResult.Unsat)
+        assertTrue(problem.baked is PropagationResult.Unsat)
     }
 
     @Test

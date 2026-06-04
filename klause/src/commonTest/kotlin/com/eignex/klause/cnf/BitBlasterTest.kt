@@ -16,11 +16,17 @@ import kotlin.test.assertTrue
 
 class BitBlasterTest {
 
-    private fun isSat(cnf: CnfProblem, fixed: IntArray): Boolean = SatCheck.isSat(cnf.numVars, cnf.clauses, fixed)
+    private fun isSat(cnf: CnfProblem, fixed: IntArray?): Boolean =
+        fixed != null && SatCheck.isSat(cnf.numVars, cnf.clauses, fixed)
 
-    private fun pinInt(cnf: CnfProblem, intVar: Int, value: Int): IntArray {
+    /** Bit pins fixing [intVar] to [value], or `null` when the value has no code in the
+     *  blasted encoding (problem construction tightens domains, so values pruned at the
+     *  root are unrepresentable — semantically unsat rather than pinnable). */
+    private fun pinInt(cnf: CnfProblem, intVar: Int, value: Int): IntArray? {
         val bits = cnf.intVarBits[intVar]
         val offset = value - cnf.intVarMin[intVar]
+        val capacity = if (bits.size >= 31) Int.MAX_VALUE else (1 shl bits.size) - 1
+        if (offset < 0 || offset > capacity) return null
         val pins = IntArray(bits.size * 2)
         for (i in bits.indices) {
             pins[i * 2] = bits[i]
@@ -28,6 +34,9 @@ class BitBlasterTest {
         }
         return pins
     }
+
+    private fun combine(a: IntArray?, b: IntArray?): IntArray? =
+        if (a == null || b == null) null else a + b
 
     @Test
     fun `int leq matches original semantics`() {
@@ -83,7 +92,7 @@ class BitBlasterTest {
         for (x in 0..3) {
             for (y in 0..3) {
                 val expectedSat = x + y <= 3
-                val pins = pinInt(cnf, 0, x) + pinInt(cnf, 1, y)
+                val pins = combine(pinInt(cnf, 0, x), pinInt(cnf, 1, y))
                 assertEquals(expectedSat, isSat(cnf, pins), "x=$x y=$y")
             }
         }
@@ -97,7 +106,7 @@ class BitBlasterTest {
         for (x in 0..3) {
             for (y in 0..3) {
                 val expectedSat = x <= y
-                val pins = pinInt(cnf, 0, x) + pinInt(cnf, 1, y)
+                val pins = combine(pinInt(cnf, 0, x), pinInt(cnf, 1, y))
                 assertEquals(expectedSat, isSat(cnf, pins), "x=$x y=$y")
             }
         }
@@ -113,7 +122,7 @@ class BitBlasterTest {
                 val want = (x <= 1)
                 val expectedSat = (auxVal == 1) == want
                 val auxPin = intArrayOf(cnf.boolVarToCnfVar[0], auxVal)
-                val pins = auxPin + pinInt(cnf, 0, x)
+                val pins = combine(auxPin, pinInt(cnf, 0, x))
                 assertEquals(expectedSat, isSat(cnf, pins), "aux=$auxVal x=$x")
             }
         }
