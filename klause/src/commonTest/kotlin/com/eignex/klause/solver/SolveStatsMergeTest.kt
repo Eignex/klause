@@ -26,7 +26,7 @@ class SolveStatsMergeTest {
     }
 
     @Test
-    fun `counters add while peaks max and means weight-combine and backends mix`() {
+    fun `counters add peaks max means weight-combine wall maxes backends mix`() {
         val a = stats("backtrack", nodes = 10.0, peak = 4.0, weights = 10.0, mean = 2.0, wallMs = 7L)
         val b = stats("ls", nodes = 5.0, peak = 9.0, weights = 30.0, mean = 6.0, wallMs = 3L)
         val m = a.mergedWith(b)

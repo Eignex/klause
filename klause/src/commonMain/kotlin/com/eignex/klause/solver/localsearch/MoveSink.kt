@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.InvariantNetwork
 import com.eignex.klause.solver.Move
 
 /**
@@ -35,9 +36,20 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         assumptions = a
     }
 
+    private var invariants: InvariantNetwork? = null
+
+    /** Install the per-move invariant index (issue #153): defined vars are determined, not
+     *  searched, so moves targeting them are filtered at the sink — the single choke point all
+     *  candidate sources go through. Compound parts on defined vars are dropped individually
+     *  (propagation recomputes them); a compound whose parts all drop is skipped. */
+    fun setInvariants(net: InvariantNetwork?) {
+        invariants = net
+    }
+
     /** Queue a Boolean-flip move on [boolVar]. */
     fun addBoolFlip(varId: Int) {
         if (assumptions.isFrozenBool(varId)) return
+        if (invariants?.isDefinedBool(varId) == true) return
         ensureCapacity()
         lane[laneSize++] = encodeBoolFlip(varId)
         cachedList = null
@@ -46,6 +58,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     /** Queue an int-set move on [intVar]. */
     fun addIntSet(varId: Int, newValue: Int) {
         if (assumptions.isFrozenInt(varId)) return
+        if (invariants?.isDefinedInt(varId) == true) return
         ensureCapacity()
         lane[laneSize++] = encodeIntSet(varId, newValue)
         cachedList = null
@@ -61,8 +74,33 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
                 is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet)")
             }
         }
+        // Under per-move invariants, parts targeting defined vars are redundant (propagation
+        // recomputes them) — drop them individually rather than the whole compound.
+        val net = invariants
+        val kept = if (net == null) {
+            parts
+        } else {
+            parts.filter { p ->
+                when (p) {
+                    is Move.BoolFlip -> !net.isDefinedBool(p.varId)
+                    is Move.IntSet -> !net.isDefinedInt(p.varId)
+                    is Move.Compound -> true
+                }
+            }
+        }
+        if (kept.isEmpty()) return
+        if (kept.size == 1) {
+            // A compound reduced to one survivor is just a primitive move (Compound requires
+            // two parts); the part already passed the frozen/defined filters above.
+            when (val p = kept[0]) {
+                is Move.BoolFlip -> addBoolFlip(p.varId)
+                is Move.IntSet -> addIntSet(p.varId, p.newValue)
+                is Move.Compound -> error("unreachable: parts are primitive")
+            }
+            return
+        }
         val side = compounds ?: ArrayList<Move.Compound>(2).also { compounds = it }
-        side.add(Move.Compound(parts))
+        side.add(Move.Compound(kept))
         cachedList = null
     }
 
