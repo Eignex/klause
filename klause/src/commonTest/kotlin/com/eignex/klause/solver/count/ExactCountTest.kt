@@ -30,7 +30,9 @@ class ExactCountTest {
     fun `exact count matches enumeration on a constrained problem`() {
         // (x0 ∨ x1) over 3 bools → 8 - 1 (all-false) = 7 models.
         val p = Problem(
-            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val truth = BacktrackSolver(p).enumerate(BacktrackParams()).count().toLong()
@@ -50,8 +52,10 @@ class ExactCountTest {
     @Test
     fun `exact projected count over integer variables`() {
         val p = Problem(
-            numBoolVars = 0, numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), factors = arrayOf<Factor>(),
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(),
         )
         val r = BacktrackSolver(p).exactCount().last()
         assertTrue(r.exact)
@@ -61,7 +65,9 @@ class ExactCountTest {
     @Test
     fun `unsat problem counts exactly zero`() {
         val p = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false))),

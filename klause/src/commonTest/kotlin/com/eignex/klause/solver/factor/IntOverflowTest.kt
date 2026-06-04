@@ -72,7 +72,13 @@ class IntOverflowTest {
     @Test
     fun `ReifiedLinear body sum is Long-clean`() {
         // aux(bool 0) ↔ (BIG·x ≤ 1000); x=WIDE makes the body 2^32 (does not hold).
-        val factor = ReifiedLinear(auxBoolVar = 0, coeffs = intArrayOf(BIG), vars = intArrayOf(0), op = LinearOp.LE, bound = 1000)
+        val factor = ReifiedLinear(
+            auxBoolVar = 0,
+            coeffs = intArrayOf(BIG),
+            vars = intArrayOf(0),
+            op = LinearOp.LE,
+            bound = 1000,
+        )
         val state = stateFor(1, arrayOf(IntDomain(0, WIDE)), factor)
         state.assignment.setBool(0, true) // aux demands the body hold
         state.assignment.setInt(0, WIDE)
@@ -100,7 +106,13 @@ class IntOverflowTest {
         val n = WIDE
         val weights = IntArray(n) { BIG }
         val literals = IntArray(n) { Lit.make(it + 1, true) }
-        val factor = ReifiedPseudoBoolean(auxBoolVar = 0, weights = weights, literals = literals, op = PbOp.LE, bound = 1000)
+        val factor = ReifiedPseudoBoolean(
+            auxBoolVar = 0,
+            weights = weights,
+            literals = literals,
+            op = PbOp.LE,
+            bound = 1000,
+        )
         val state = stateFor(n + 1, emptyArray(), factor)
         state.assignment.setBool(0, true) // aux demands the relation hold
         for (v in 1..n) state.assignment.setBool(v, true)

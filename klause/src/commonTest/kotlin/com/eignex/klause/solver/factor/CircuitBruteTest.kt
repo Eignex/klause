@@ -25,7 +25,7 @@ class CircuitBruteTest {
         val visited = BooleanArray(n)
         var cur = 0
         for (step in 0 until n) {
-            if (next[cur] == cur) return false          // self-loop
+            if (next[cur] == cur) return false // self-loop
             if (visited[cur]) return false
             visited[cur] = true
             cur = next[cur]
@@ -43,8 +43,12 @@ class CircuitBruteTest {
             // increment mixed-radix over [los[i]..his[i]]
             var i = 0
             while (i < n) {
-                if (cur[i] < his[i]) { cur[i]++; break }
-                cur[i] = los[i]; i++
+                if (cur[i] < his[i]) {
+                    cur[i]++;
+                    break
+                }
+                cur[i] = los[i];
+                i++
             }
             if (i == n) break
         }
@@ -56,7 +60,7 @@ class CircuitBruteTest {
         val rng = Random(20260603)
         var checked = 0
         repeat(4000) {
-            val n = rng.nextInt(3, 6)               // 3..5 nodes
+            val n = rng.nextInt(3, 6) // 3..5 nodes
             val los = IntArray(n)
             val his = IntArray(n)
             for (i in 0 until n) {

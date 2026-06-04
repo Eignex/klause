@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
 
 /**

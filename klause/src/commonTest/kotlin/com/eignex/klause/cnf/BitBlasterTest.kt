@@ -35,8 +35,7 @@ class BitBlasterTest {
         return pins
     }
 
-    private fun combine(a: IntArray?, b: IntArray?): IntArray? =
-        if (a == null || b == null) null else a + b
+    private fun combine(a: IntArray?, b: IntArray?): IntArray? = if (a == null || b == null) null else a + b
 
     @Test
     fun `int leq matches original semantics`() {

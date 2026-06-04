@@ -99,10 +99,33 @@ class IndexedMaxHeapTest {
             repeat(400) {
                 val id = rng.nextInt(cap)
                 when (rng.nextInt(5)) {
-                    0 -> if (!present[id]) { val k = rng.nextDouble(); h.insert(id, k); key[id] = k; present[id] = true; everSeen[id] = true }
-                    1 -> if (present[id]) { val k = rng.nextDouble(); h.updateKey(id, k); key[id] = k }
-                    2 -> if (present[id]) { h.remove(id); present[id] = false }
-                    3 -> if (!present[id] && everSeen[id]) { h.restore(id); present[id] = true }
+                    0 -> if (!present[id]) {
+                        val k = rng.nextDouble();
+                        h.insert(
+                        id,
+                        k,
+                    );
+                    key[id] = k;
+                    present[id] = true;
+                    everSeen[id] = true
+                    }
+
+                    1 -> if (present[id]) {
+                        val k = rng.nextDouble();
+                        h.updateKey(id, k);
+                        key[id] = k
+                    }
+
+                    2 -> if (present[id]) {
+                        h.remove(id);
+                        present[id] = false
+                    }
+
+                    3 -> if (!present[id] && everSeen[id]) {
+                        h.restore(id);
+                        present[id] = true
+                    }
+
                     4 -> if (h.size > 0) {
                         val expectedMax = (0 until cap).filter { present[it] }.maxByOrNull { key[it] }!!
                         val top = h.extractMax()

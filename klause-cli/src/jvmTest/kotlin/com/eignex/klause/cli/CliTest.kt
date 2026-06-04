@@ -62,6 +62,29 @@ class CliTest {
     }
 
     @Test
+    fun `-s prints mzn-stat lines for satisfy and optimize verdicts`() {
+        val sat = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        val opt = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..9: x;\nsolve maximize x;\n")
+            deleteOnExit()
+        }
+        val satOut = capture { main(arrayOf("-s", sat.absolutePath)) }
+        assertTrue("%%%mzn-stat: solveTime=" in satOut, satOut)
+        assertTrue("%%%mzn-stat: solutions=1" in satOut, satOut)
+        assertTrue("%%%mzn-stat: nodes=" in satOut, satOut)
+        assertTrue("%%%mzn-stat-end" in satOut, satOut)
+        // The stats block must come after the protocol terminator, not between solutions.
+        assertTrue(satOut.indexOf("==========") < satOut.indexOf("%%%mzn-stat:"), satOut)
+
+        val optOut = capture { main(arrayOf("-s", opt.absolutePath)) }
+        assertTrue("%%%mzn-stat: solutions=" in optOut, optOut)
+        assertTrue("%%%mzn-stat-end" in optOut, optOut)
+    }
+
+    @Test
     fun `coverage report counts parsed, solved and unsupported`() {
         val dir = File.createTempFile("xcsp-cov", "").let {
             it.delete()
