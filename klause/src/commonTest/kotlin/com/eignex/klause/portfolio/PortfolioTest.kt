@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult.Optimal
 import com.eignex.klause.solver.MinimizeResult.WithSample
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -19,12 +20,15 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.TimeSource
 
+@OptIn(ExperimentalAtomicApi::class)
 class PortfolioTest {
 
     @Test
@@ -196,6 +200,42 @@ class PortfolioTest {
             val r = p.minimize(cancellation = { deadline.hasPassedNow() })
             assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
         }
+    }
+
+    @Test
+    fun `builder threads labeled onEvent through to workers`() = runTest {
+        // Same mixed-pool minimize as above, with the SearchEvent seam attached: each worker's
+        // incumbent improvements arrive tagged with its label. Workers run concurrently, so the
+        // collection is locked.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val events = AtomicReference<List<Pair<String, SearchEvent>>>(emptyList())
+        PortfolioBuilder.build(
+            problem,
+            PortfolioSpec(localSearchWorkers = 1, backtrackWorkers = 1, seed = 1L),
+            lsObjective = obj,
+            linearObjective = obj,
+            onEvent = { worker, e ->
+                while (true) {
+                    val cur = events.load()
+                    if (events.compareAndSet(cur, cur + (worker to e))) break
+                }
+            },
+        ).use { p ->
+            val deadline = TimeSource.Monotonic.markNow() + kotlin.time.Duration.parse("3s")
+            p.minimize(cancellation = { deadline.hasPassedNow() })
+        }
+        val incumbents = events.load().filter { it.second is SearchEvent.Incumbent }
+        assertTrue(incumbents.isNotEmpty(), "expected labeled incumbent events, got ${events.load()}")
+        val labels = incumbents.map { it.first }.toSet()
+        assertTrue(labels.all { it.startsWith("ls/") || it.startsWith("backtrack#") }, "labels: $labels")
     }
 
     @Test

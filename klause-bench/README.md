@@ -52,4 +52,4 @@ klause-choco and klause-ortools map a klause Problem into Choco and OR-Tools CP-
   ./gradlew :klause-bench:test                               unit, parser, and selection tests
   ./gradlew :klause-bench:bench --args="verify-core"         cross-backend agreement gate
   ./gradlew :klause-bench:bench --args="parity-core"         klause vs Choco, vs recorded Expected
-  ./gradlew :klause-cli:installDist && ./gradlew :klause-bench:bench --args="mzn-audit-smoke"
+  ./gradlew :klause-cli:installJvmDist && ./gradlew :klause-bench:bench --args="mzn-audit-smoke"

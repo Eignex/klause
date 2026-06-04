@@ -259,6 +259,7 @@ private fun runPortfolio(
         spec,
         lsObjective = ing.objective,
         linearObjective = ing.objective,
+        onEvent = portfolioVerboseListener(opts.verbose),
     )
     try {
         if (ing.objective != null) {
@@ -319,6 +320,8 @@ private data class XcspOptions(
     val params: List<String>,
     /** `-p N`: number of parallel workers; N > 1 routes to the portfolio. */
     val parallel: Int?,
+    /** `-v`: live progress on stderr (portfolio worker events). */
+    val verbose: Boolean,
 )
 
 private fun parseXcspArgs(args: Array<String>): XcspOptions {
@@ -329,6 +332,7 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
     var coverage = false
     val params = mutableListOf<String>()
     var parallel: Int? = null
+    var verbose = false
     var path: String? = null
     var i = 0
     while (i < args.size) {
@@ -367,6 +371,11 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
                 i++
             }
 
+            "-v", "--verbose" -> {
+                verbose = true
+                i++
+            }
+
             "--param" -> {
                 params.add(args[++i])
                 i++
@@ -397,6 +406,7 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
         coverage,
         params,
         parallel,
+        verbose,
     )
 }
 

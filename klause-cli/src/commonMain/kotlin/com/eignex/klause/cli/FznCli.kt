@@ -68,6 +68,16 @@ internal fun runFzn(args: Array<String>) {
     dispatch(engine.lowercase(), program, opts)
 }
 
+/** Render one [SearchEvent] as a `-v` line; [worker] tags portfolio workers. */
+internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): String {
+    val who = worker?.let { " $it" }.orEmpty()
+    return when (e) {
+        is SearchEvent.Restart -> "[$t ms]$who restart #${e.index} after ${e.steps} decisions"
+        is SearchEvent.LearnedDbSweep -> "[$t ms]$who learned-DB sweep: kept ${e.kept}, dropped ${e.dropped}"
+        is SearchEvent.Incumbent -> "[$t ms]$who incumbent objective ${e.objective}"
+    }
+}
+
 /** Live-event listener for `-v`, wired into the engine params ([SearchEvent] seam, #140);
  *  null when not verbose so the engines skip observation entirely. */
 private fun verboseListener(opts: FznOptions): ((SearchEvent) -> Unit)? {
@@ -76,19 +86,17 @@ private fun verboseListener(opts: FznOptions): ((SearchEvent) -> Unit)? {
     val start = nowMillis()
     return { e ->
         val t = nowMillis() - start
-        log.v {
-            when (e) {
-                is SearchEvent.Restart ->
-                    "[$t ms] restart #${e.index} after ${e.steps} decisions"
-
-                is SearchEvent.LearnedDbSweep ->
-                    "[$t ms] learned-DB sweep: kept ${e.kept}, dropped ${e.dropped}"
-
-                is SearchEvent.Incumbent ->
-                    "[$t ms] incumbent objective ${e.objective}"
-            }
-        }
+        log.v { describeEvent(e, t) }
     }
+}
+
+/** Per-worker `-v` listener for the portfolio paths ([SearchEvent] seam, #140). Workers run
+ *  concurrently; the logger writes whole lines, which is the only shared state. */
+internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) -> Unit)? {
+    if (!verbose) return null
+    val log = cliLogger(verbose = true)
+    val start = nowMillis()
+    return { worker, e -> log.v { describeEvent(e, nowMillis() - start, worker) } }
 }
 
 /** Lazily-loaded .ozn applier when [FznOptions.oznPath] is set; lets klause render the
@@ -306,6 +314,7 @@ private fun runWithPortfolio(
         spec,
         lsObjective = lsObjective,
         linearObjective = linearObjective,
+        onEvent = portfolioVerboseListener(opts.verbose),
     )
     try {
         when (program.solve) {

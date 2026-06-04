@@ -9,7 +9,7 @@ DIST_LAUNCHER="$KLAUSE_HOME/klause-cli/build/install/klause-cli-jvm/bin/klause-c
 
 if [[ ! -x "$DIST_LAUNCHER" ]]; then
   echo "klause-fzn-ls: distribution not found at $DIST_LAUNCHER" >&2
-  echo "klause-fzn-ls: build it with './gradlew :klause-cli:installDist' (from $KLAUSE_HOME)" >&2
+  echo "klause-fzn-ls: build it with './gradlew :klause-cli:installJvmDist' (from $KLAUSE_HOME)" >&2
   exit 3
 fi
 
