@@ -6,7 +6,7 @@ import java.io.File
 /**
  * Shared FlatZinc-predicate analysis used by the coverage and compile-audit metrics: count
  * the constraint predicates in a `.fzn`, and load the set klause handles natively (the
- * `redefinitions.mzn` declarations plus the names the `klause-fzn-cli` parser dispatches on).
+ * `redefinitions.mzn` declarations plus the names the `klause-cli` FlatZinc parser dispatches on).
  */
 object FznPredicates {
     private val constraintHead = Regex("""^\s*constraint\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(""")

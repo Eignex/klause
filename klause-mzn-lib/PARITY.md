@@ -24,7 +24,7 @@ reliably converge within budget; these show up as `KLAUSE_TIMEOUT` or
 
 ```bash
 # One-time setup
-./gradlew :klause-fzn-cli:installDist
+./gradlew :klause-cli:installDist
 ./gradlew :klause-bench:downloadMzn          # ~250 MB, MiniZinc Challenge benchmarks
 
 # Smoke (runs in CI; covers klause-mzn-lib/test-models/)
@@ -100,7 +100,7 @@ Smoke-test-only knob:
 
 The smoke test (`MznParitySmokeTest`) runs as part of the regular
 `:klause-bench:test` task. It silently skips when `minizinc` isn't on PATH or
-`klause-fzn-cli` hasn't been installed, so it tolerates bare CI images. When the
+`klause-cli` hasn't been installed, so it tolerates bare CI images. When the
 toolchain is present, it fails on real correctness deviations
 (`SAT_DISAGREEMENT`, `OPT_VALUE_MISMATCH`, `COMPILE_ERROR`, and so on); allows
 known LS-strength or engine-bug instances on a small `KNOWN_LS_DIFFICULT`

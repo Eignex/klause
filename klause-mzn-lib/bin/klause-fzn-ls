@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# MiniZinc-facing wrapper for klause-fzn-cli, locked to the LocalSearch backend.
+# MiniZinc-facing wrapper for klause-cli, locked to the LocalSearch backend.
 # Mirrors klause-fzn but injects `-e ls` so the MSC for LS-mode dispatch is fixed.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KLAUSE_HOME="${KLAUSE_HOME:-$(cd "$HERE/../.." && pwd)}"
-DIST_LAUNCHER="$KLAUSE_HOME/klause-fzn-cli/build/install/klause-fzn-cli/bin/klause-fzn-cli"
+DIST_LAUNCHER="$KLAUSE_HOME/klause-cli/build/install/klause-cli/bin/klause-cli"
 
 if [[ ! -x "$DIST_LAUNCHER" ]]; then
   echo "klause-fzn-ls: distribution not found at $DIST_LAUNCHER" >&2
-  echo "klause-fzn-ls: build it with './gradlew :klause-fzn-cli:installDist' (from $KLAUSE_HOME)" >&2
+  echo "klause-fzn-ls: build it with './gradlew :klause-cli:installDist' (from $KLAUSE_HOME)" >&2
   exit 3
 fi
 

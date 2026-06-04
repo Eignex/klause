@@ -19,7 +19,7 @@ fi
 
 KLAUSE_FZN="$REPO_ROOT/klause-mzn-lib/bin/klause-fzn"
 if [[ ! -x "$KLAUSE_FZN" ]]; then
-  echo "verify-ozn: klause-fzn not built; run :klause-fzn-cli:installDist first" >&2
+  echo "verify-ozn: klause-fzn not built; run :klause-cli:installDist first" >&2
   exit 2
 fi
 

@@ -1,4 +1,4 @@
-package com.eignex.klause.xcsp
+package com.eignex.klause.cli
 
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -14,6 +14,47 @@ class CliTest {
         System.setOut(PrintStream(buf))
         try { block() } finally { System.setOut(old) }
         return buf.toString()
+    }
+
+    @Test
+    fun `engine params reach the cp and ls engines`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        for (engineArgs in listOf(
+            arrayOf("-e", "cp", "--param", "seed=7", "--param", "val-heuristic=max", "--param", "luby=50"),
+            arrayOf("-e", "ls", "--param", "seed=7", "--param", "tabu-tenure=5", "--param", "lambda=2.0", "-t", "5000"),
+        )) {
+            val out = capture { main(engineArgs + fzn.absolutePath) }
+            assertTrue("x = " in out, out)
+            assertTrue("----------" in out, out)
+        }
+    }
+
+    @Test
+    fun `portfolio engine solves with explicit worker counts`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        val out = capture {
+            main(arrayOf("-e", "portfolio", "--param", "ls=1", "--param", "bt=1", "-t", "10000", fzn.absolutePath))
+        }
+        assertTrue("x = " in out, out)
+    }
+
+    @Test
+    fun `minizinc standard -p routes to a parallel portfolio`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        // No -e: mixed pool sized to 2. With -e ls: pure-LS pool, still solves.
+        for (engineArgs in listOf(arrayOf("-p", "2"), arrayOf("-e", "ls", "-p", "2"))) {
+            val out = capture { main(engineArgs + arrayOf("-t", "10000", fzn.absolutePath)) }
+            assertTrue("x = " in out, out)
+        }
     }
 
     @Test

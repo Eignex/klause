@@ -16,11 +16,11 @@ import kotlinx.serialization.Serializable
  * Compile-only audit over a MiniZinc suite — no solve. Per instance:
  *  1. compile `.mzn`→`.fzn` against klause's redefinitions (records compile failures);
  *  2. tally surviving constraint predicates as native (preserved) vs decomposed;
- *  3. optional `klause-fzn-cli` ingest smoke (short wall-clock cap) — confirms klause parses
+ *  3. optional `klause-cli` ingest smoke (short wall-clock cap) — confirms klause parses
  *     the FZN and starts searching without crashing.
  *
  * Aggregated per problem family; emits JSON + Markdown. Parallel across instances. The ingest
- * smoke needs `:klause-fzn-cli:installDist`; if the binary is absent it is skipped (reported as
+ * smoke needs `:klause-cli:installDist`; if the binary is absent it is skipped (reported as
  * `ingest=skipped`).
  */
 @Serializable
@@ -65,7 +65,7 @@ object CompileAuditMetric {
 
         println()
         println("=== compile audit (compile→FZN, classify native|decomposed, ingest smoke; ${refs.size} instances) ===")
-        if (skipIngest) println("(ingest smoke skipped — ${if (fznCli == null) "klause-fzn-cli not installed (run :klause-fzn-cli:installDist)" else "disabled"})")
+        if (skipIngest) println("(ingest smoke skipped — ${if (fznCli == null) "klause-cli not installed (run :klause-cli:installDist)" else "disabled"})")
 
         val pool = Executors.newFixedThreadPool(parallelism)
         val rows = try {
@@ -108,7 +108,7 @@ object CompileAuditMetric {
         return AuditRow(ref.name, family, "OK", nativeCount, decomposedCount, coverage, ingest, decomposed)
     }
 
-    /** Run klause-fzn-cli on [fzn] with a short cap. "ok" if it ran to the cap (still
+    /** Run klause-cli on [fzn] with a short cap. "ok" if it ran to the cap (still
      *  searching) or exited cleanly; "crashed" if it exited non-zero before the cap. */
     private fun ingestSmoke(bin: File, fzn: File, capSec: Int): String {
         val proc = ProcessBuilder(bin.absolutePath, fzn.absolutePath).redirectErrorStream(true).start()
@@ -119,6 +119,6 @@ object CompileAuditMetric {
     }
 
     private fun fznCliBinary(): File? =
-        File(CorpusFetcher.workspaceRoot(), "klause-fzn-cli/build/install/klause-fzn-cli/bin/klause-fzn-cli")
+        File(CorpusFetcher.workspaceRoot(), "klause-cli/build/install/klause-cli/bin/klause-cli")
             .takeIf { it.canExecute() }
 }
