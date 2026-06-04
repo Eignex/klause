@@ -5,7 +5,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -147,7 +146,7 @@ class DiffnTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         val implied = assertIs<PropagationResult.Implied>(r)
         assertEquals(2, implied.intMinOrNullCompat(3), "rect 1 y.min must be pushed to 2 (above rect 0)")
     }

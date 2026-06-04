@@ -294,6 +294,24 @@ class IntDomain private constructor(
         }
     }
 
+    /**
+     * Iterate every excluded value strictly between [min] and [max] in ascending order.
+     * No-op for contiguous domains. Lets consumers that encode domains by `[min..max]`
+     * span (e.g. bit-blasting) re-impose interior holes explicitly.
+     */
+    inline fun forEachHole(action: (Int) -> Unit) {
+        val bs = bitset
+        if (bs != null) {
+            for (v in (min + 1) until max) {
+                val off = v - bitsetLo
+                if ((bs[off ushr 6] ushr (off and 63)) and 1L == 0L) action(v)
+            }
+            return
+        }
+        val h = holes ?: return
+        for (i in h.indices) action(h[i])
+    }
+
     override fun equals(other: Any?): Boolean {
         if (other !is IntDomain) return false
         if (min != other.min || max != other.max) return false

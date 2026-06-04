@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -41,7 +40,7 @@ class CumulativesFactorTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         val implied = assertIs<PropagationResult.Implied>(r)
         assertEquals(2, implied.intMinOrNullCompat(1), "task 1 start must be pushed past machine 0's mandatory part")
     }
@@ -64,7 +63,7 @@ class CumulativesFactorTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 0)),
             factors = arrayOf<Factor>(factor),
         )
-        assertIs<PropagationResult.Implied>(problem.propagate(Assumptions.None))
+        assertIs<PropagationResult.Implied>(problem.baked)
     }
 
     @Test
@@ -86,7 +85,7 @@ class CumulativesFactorTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 0)),
             factors = arrayOf<Factor>(factor),
         )
-        assertIs<PropagationResult.Implied>(problem.propagate(Assumptions.None))
+        assertIs<PropagationResult.Implied>(problem.baked)
     }
 
     @Test
@@ -108,6 +107,6 @@ class CumulativesFactorTest {
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0)),
             factors = arrayOf<Factor>(factor),
         )
-        assertIs<PropagationResult.Unsat>(problem.propagate(Assumptions.None))
+        assertIs<PropagationResult.Unsat>(problem.baked)
     }
 }

@@ -86,7 +86,11 @@ object BitBlaster {
         val boolMap = IntArray(problem.numBoolVars) { b.newVar() }
         val intBits = Array(problem.numIntVars) { i ->
             val d = problem.intDomains[i]
-            val width = bitWidth(d.size - 1).coerceAtLeast(1)
+            // Width covers the full [min..max] span: values are encoded as `value - min`
+            // offsets, so a domain with interior holes still needs span-many codes (the
+            // holes are excluded by explicit clauses below, not by shrinking the width).
+            val span = (d.max.toLong() - d.min.toLong()).coerceAtMost(Int.MAX_VALUE.toLong())
+            val width = bitWidth(span.toInt()).coerceAtLeast(1)
             IntArray(width) { b.newVar() }
         }
         val intMin = IntArray(problem.numIntVars) { problem.intDomains[it].min }
@@ -94,11 +98,20 @@ object BitBlaster {
         for (i in 0 until problem.numIntVars) {
             val bits = intBits[i]
             val d = problem.intDomains[i]
-            val maxOffset = d.size - 1
+            val maxOffset = (d.max.toLong() - d.min.toLong()).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             val capacity = if (bits.size >= 31) Int.MAX_VALUE else (1 shl bits.size) - 1
             if (maxOffset < capacity) {
                 val ok = b.constantLeq(bitsToLits(bits), maxOffset)
                 b.addClause(intArrayOf(ok))
+            }
+            // Forbid each interior hole: at least one bit must differ from the hole's offset.
+            d.forEachHole { value ->
+                val offset = value - d.min
+                b.addClause(
+                    IntArray(bits.size) { bit ->
+                        Lit.make(bits[bit], positive = (offset ushr bit) and 1 == 0)
+                    },
+                )
             }
         }
 

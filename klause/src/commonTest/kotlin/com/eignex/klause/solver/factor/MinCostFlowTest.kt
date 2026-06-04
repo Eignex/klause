@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -31,7 +30,7 @@ class MinCostFlowTest {
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 100)),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         assertTrue(r is PropagationResult.Implied, "expected propagation success; got $r")
         // LP min = 3 (route through arc 0). LP max = 5 (route through arc 1).
         assertEquals(3, r.intMinOrNullCompat(2), "cost.min should match SSP LP lower bound")
@@ -56,7 +55,7 @@ class MinCostFlowTest {
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 100)),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         assertTrue(r is PropagationResult.Unsat, "tiny arc cap can't satisfy balance demand; got $r")
     }
 
@@ -84,7 +83,7 @@ class MinCostFlowTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         // Must terminate and stay sound: the unit is forced onto arc 0 (cost 1) by balance.
         assertTrue(r is PropagationResult.Implied, "expected propagation success; got $r")
         assertEquals(1, r.intValueOrNull(0), "the single supply unit must flow on arc 0")
@@ -108,7 +107,7 @@ class MinCostFlowTest {
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(3, 3)),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.propagate(Assumptions.None)
+        val r = problem.baked
         assertTrue(r is PropagationResult.Implied, "expected propagation success; got $r")
         // The cheaper arc (flow[0]) gets the unit; the dearer arc (flow[1]) goes to 0.
         assertEquals(1, r.ints[0], "cheaper arc must carry the unit")
