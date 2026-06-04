@@ -1,7 +1,7 @@
 plugins {
     // kbuild CLI conventions: KMP + lint + kover, JVM dist + native executables,
     // and the `releaseAssets` packaging task.
-    id("com.eignex.cli") version "1.2.3"
+    id("com.eignex.cli") version "1.2.4"
 }
 
 eignexCli {
@@ -27,7 +27,7 @@ kotlin {
             implementation("co.touchlab:kermit:2.1.0")
             // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to
             // render them as %%%mzn-stat lines.
-            implementation("com.eignex:kumulant:0.2.0")
+            implementation("com.eignex:kumulant:0.3.2")
         }
     }
 }

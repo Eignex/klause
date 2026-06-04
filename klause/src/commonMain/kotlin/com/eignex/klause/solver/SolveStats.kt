@@ -46,6 +46,39 @@ data class SolveStats(
     val wallMs: Long = 0L,
     val timedOut: Boolean = false,
 ) {
+    /**
+     * Combine two run snapshots: counters add, peak depth maxes, depth means weight-combine,
+     * wall time takes the max (runs are concurrent, not sequential), and timed-out ORs.
+     * [EMPTY] is the identity. Backend tags survive when equal and degrade to `"mixed"`
+     * otherwise — the portfolio folds heterogeneous worker snapshots through this.
+     */
+    fun mergedWith(other: SolveStats): SolveStats {
+        if (this == EMPTY) return other
+        if (other == EMPTY) return this
+        val weights = depthMean.totalWeights + other.depthMean.totalWeights
+        val mean = when {
+            depthMean.totalWeights == 0.0 -> other.depthMean.mean
+
+            other.depthMean.totalWeights == 0.0 -> depthMean.mean
+
+            else ->
+                (depthMean.mean * depthMean.totalWeights + other.depthMean.mean * other.depthMean.totalWeights) /
+                    weights
+        }
+        return SolveStats(
+            backend = if (backend == other.backend) backend else "mixed",
+            nodes = SumResult(nodes.sum + other.nodes.sum),
+            fails = SumResult(fails.sum + other.fails.sum),
+            restarts = SumResult(restarts.sum + other.restarts.sum),
+            propagations = SumResult(propagations.sum + other.propagations.sum),
+            learnedClauses = SumResult(learnedClauses.sum + other.learnedClauses.sum),
+            peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
+            depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
+            wallMs = maxOf(wallMs, other.wallMs),
+            timedOut = timedOut || other.timedOut,
+        )
+    }
+
     /** Shared empty/default [SolveStats] instances. */
     companion object {
         internal val ZERO_COUNT: SumResult = SumResult(sum = 0.0)
