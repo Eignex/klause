@@ -89,6 +89,12 @@ data class BacktrackParams(
     val objectiveBoundSupplier: (() -> Double)? = null,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
+    /**
+     * Optional live-event listener; see [com.eignex.klause.solver.SearchEvent]. Called
+     * inline on the search thread at coarse points only (restarts, learned-DB sweeps,
+     * incumbents). `null` (default) disables observation entirely.
+     */
+    val onEvent: ((com.eignex.klause.solver.SearchEvent) -> Unit)? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

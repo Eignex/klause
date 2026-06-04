@@ -30,7 +30,10 @@ private fun routeToXcsp(args: Array<String>): Boolean {
         val a = args[i]
         when {
             a == "--format" || a == "--coverage" -> return true
-            a in valueFlags -> i++ // skip the flag's value
+
+            a in valueFlags -> i++
+
+            // skip the flag's value
             !a.startsWith("-") ->
                 return a.substringAfterLast('.').lowercase() in
                     setOf("xml", "xcsp", "xcsp3", "smt2", "smt")
