@@ -38,9 +38,12 @@ FlatZinc path (MiniZinc-standard plus klause extras):
 
 - `-a` / `--all-solutions`, `-n <count>` — enumeration controls (satisfy).
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
+- `-p <n>` — MiniZinc-standard parallelism. `n > 1` runs a portfolio of `n`
+  workers; an explicit `-e` picks the palette (`-e ls -p 4` = pure-LS pool,
+  `-e backtrack -p 4` = 4 complete workers, default = ≈2:1 LS:backtrack mix).
 - `-e <engine>` / `--engine <engine>` — `backtrack` (default), `ls`,
   `portfolio`. Also settable via the `klause.fzn.engine` system property.
-- `-p <key>=<value>` / `--param <key>=<value>` — repeatable engine params:
+- `--param <key>=<value>` — repeatable engine params:
   - `backtrack`: `seed`, `max-decisions`, `luby`, `phase-saving`,
     `max-learned`, `lbd-glue`, `var-heuristic`
     (`vsids|random|smallest-domain|input-order`), `val-heuristic`
@@ -55,15 +58,16 @@ FlatZinc path (MiniZinc-standard plus klause extras):
   unbounded `var int` declarations.
 - `--cp-seed` — opt-in hybrid CP-seeding for the `ls` engine: a short
   backtrack solve warm-starts local search.
-- Portfolio worker counts default to 4 LS / 2 backtrack; override with
-  `-p ls=N -p bt=N` (or the `klause.fzn.portfolio.ls` / `.bt` system
-  properties).
+- Portfolio worker counts default to 4 LS / 2 backtrack (or the `-p` split);
+  override with `--param ls=N --param bt=N` (or the `klause.fzn.portfolio.ls`
+  / `.bt` system properties).
 
 XCSP3 / SMT-LIB path:
 
 - `--format xcsp3|smtlib` — override extension-based detection.
 - `-e backtrack|ls|portfolio` (default backtrack), `-t <ms>`, `-r <seed>`,
-  `-p key=value` engine params (same keys as above).
+  `-p <n>` parallel workers, `--param key=value` engine params (same keys
+  as above).
 - `--coverage <dir>` — corpus coverage report.
 - `-Dklause.xcsp.printSolution=true` — print the satisfying assignment.
 

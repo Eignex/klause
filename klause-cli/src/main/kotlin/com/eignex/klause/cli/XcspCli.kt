@@ -36,8 +36,9 @@ import kotlin.time.Duration.Companion.milliseconds
  *                                            coverage report).
  *
  * Flags: `--format xcsp3|smtlib` (default: by extension), `--engine backtrack|ls|portfolio`
- * (default backtrack), `-t <ms>` time budget, `-r <seed>`, repeatable `-p key=value`
- * engine params (see [EngineParams]).
+ * (default backtrack), `-t <ms>` time budget, `-r <seed>`, `-p <n>` parallel workers
+ * (routes to the portfolio, palette from `-e`), repeatable `--param key=value` engine
+ * params (see [EngineParams]).
  */
 internal fun runXcsp(args: Array<String>) {
     val opts = parseXcspArgs(args)
@@ -150,6 +151,20 @@ private sealed interface Verdict {
 
 private fun run(ing: Parsed, opts: XcspOptions): Verdict {
     val cancellation = opts.timeMs?.let { Cancellation.after(it.milliseconds) } ?: Cancellation.Never
+    // `-p N` parallelism mirrors the FlatZinc path: a portfolio of N workers whose palette
+    // follows the explicitly chosen engine (pure-LS / pure-backtrack / default mix).
+    val threads = opts.parallel ?: 1
+    if (threads > 1) {
+        val (ls, bt) = when (opts.engine) {
+            Engine.LS -> threads to 0
+            Engine.BACKTRACK -> 0 to threads
+            Engine.PORTFOLIO -> {
+                val b = maxOf(1, threads / 3)
+                (threads - b) to b
+            }
+        }
+        return runPortfolio(ing, opts, cancellation, defaultLs = ls, defaultBt = bt)
+    }
     return when (opts.engine) {
         Engine.BACKTRACK -> {
             val params = applyBacktrackParams(
@@ -181,8 +196,14 @@ private fun run(ing: Parsed, opts: XcspOptions): Verdict {
 
 /** Multi-core portfolio (LS + backtrack workers). The single parsed objective serves as
  *  both per-worker representations; only a complete (backtrack) worker can prove UNSAT. */
-private fun runPortfolio(ing: Parsed, opts: XcspOptions, cancellation: Cancellation): Verdict {
-    val spec = buildPortfolioSpec(EngineParams(opts.params), opts.seed)
+private fun runPortfolio(
+    ing: Parsed,
+    opts: XcspOptions,
+    cancellation: Cancellation,
+    defaultLs: Int = 4,
+    defaultBt: Int = 2,
+): Verdict {
+    val spec = buildPortfolioSpec(EngineParams(opts.params), opts.seed, defaultLs, defaultBt)
     val portfolio = PortfolioBuilder.build(
         ing.problem, spec, lsObjective = ing.objective, linearObjective = ing.objective,
     )
@@ -238,8 +259,10 @@ private data class XcspOptions(
     val timeMs: Long?,
     val seed: Long?,
     val coverage: Boolean,
-    /** Raw repeatable `-p key=value` engine params; interpreted per engine (see [EngineParams]). */
+    /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
     val params: List<String>,
+    /** `-p N`: number of parallel workers; N > 1 routes to the portfolio. */
+    val parallel: Int?,
 )
 
 private fun parseXcspArgs(args: Array<String>): XcspOptions {
@@ -249,6 +272,7 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
     var seed: Long? = null
     var coverage = false
     val params = mutableListOf<String>()
+    var parallel: Int? = null
     var path: String? = null
     var i = 0
     while (i < args.size) {
@@ -263,18 +287,19 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
             "-t", "--time-limit" -> { timeMs = args[++i].toLong(); i++ }
             "-r" -> { seed = args[++i].toLong(); i++ }
             "--coverage" -> { coverage = true; i++ }
-            "-p", "--param" -> { params.add(args[++i]); i++ }
+            "--param" -> { params.add(args[++i]); i++ }
+            "-p" -> { parallel = args[++i].toIntOrNull() ?: usage("-p expects an integer"); i++ }
             else -> {
                 if (a.startsWith("-")) { System.err.println("klause-cli: ignoring unknown flag $a"); i++ }
                 else { if (path != null) usage("multiple paths: $path, $a"); path = a; i++ }
             }
         }
     }
-    return XcspOptions(path ?: usage("no input file/dir given"), format, engine, timeMs, seed, coverage, params)
+    return XcspOptions(path ?: usage("no input file/dir given"), format, engine, timeMs, seed, coverage, params, parallel)
 }
 
 private fun usage(msg: String): Nothing {
     System.err.println("klause-cli: $msg")
-    System.err.println("usage: klause-cli [--format xcsp3|smtlib] [-e backtrack|ls|portfolio] [-t ms] [-r seed] [-p key=value ...] [--coverage] <file|dir>")
+    System.err.println("usage: klause-cli [--format xcsp3|smtlib] [-e backtrack|ls|portfolio] [-t ms] [-r seed] [-p threads] [--param key=value ...] [--coverage] <file|dir>")
     exitProcess(2)
 }

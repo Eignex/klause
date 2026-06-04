@@ -31,8 +31,9 @@ import kotlin.system.exitProcess
  * Backend is chosen with `--engine NAME` (or `-e NAME`), or via the `klause.fzn.engine`
  * system property. Recognised names: `backtrack` (default), `ls` / `localsearch`,
  * `portfolio`. Each backend honors `-t` (time limit), `-r` (seed), and repeatable
- * `-p key=value` engine params (see [EngineParams]); the `-a` / `-n` flags apply to the
- * satisfy path.
+ * `--param key=value` engine params (see [EngineParams]); the `-a` / `-n` flags apply to
+ * the satisfy path. The MiniZinc-standard `-p N` (parallelism) routes to the portfolio
+ * sized to N workers, with an explicitly chosen engine as the worker palette.
  */
 internal fun runFzn(args: Array<String>) {
     // Translate env vars / system properties into the central config once, up front, and
@@ -66,6 +67,25 @@ private fun renderSolution(
 ): String = applier?.render(program, sample) ?: writeFlatZincSolution(program, sample)
 
 private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions) {
+    // MiniZinc-standard `-p N` (parallelism, declared in klause.msc): N > 1 means a
+    // portfolio of N workers. An explicitly chosen engine picks the worker palette —
+    // `-e ls -p N` is a pure-LS pool (no CP dependency), `-e backtrack -p N` is N
+    // complete workers sharing the objective bound — and otherwise the default mixed
+    // pool is sized to N (≈2:1 LS:backtrack, at least one backtrack worker so UNSAT /
+    // optimality stay provable). Explicit `--param ls=/bt=` still win over the split.
+    val threads = opts.parallel ?: 1
+    if (threads > 1) {
+        val (ls, bt) = when (engine) {
+            "ls", "localsearch", "local-search" -> threads to 0
+            "backtrack", "bt" -> 0 to threads
+            else -> {
+                val b = maxOf(1, threads / 3)
+                (threads - b) to b
+            }
+        }
+        runWithPortfolio(program, opts, defaultLs = ls, defaultBt = bt)
+        return
+    }
     when (engine) {
         "backtrack", "bt" -> runWithBacktrack(program, opts)
         "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
@@ -203,8 +223,13 @@ private fun portfolioObjectives(
     return (program.lsObjective ?: linear) to linear
 }
 
-private fun runWithPortfolio(program: FlatZincProgram, opts: FznOptions) {
-    val spec = buildPortfolioSpec(EngineParams(opts.engineParams), opts.randomSeed)
+private fun runWithPortfolio(
+    program: FlatZincProgram,
+    opts: FznOptions,
+    defaultLs: Int = System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
+    defaultBt: Int = System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
+) {
+    val spec = buildPortfolioSpec(EngineParams(opts.engineParams), opts.randomSeed, defaultLs, defaultBt)
     val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
     val cancel = if (deadline != null)
         com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
@@ -411,13 +436,16 @@ private data class FznOptions(
      *  feasible point that warm-starts LS. Default false — the default keeps the pure-LS path free
      *  of any CP dependency; CP-seeding is strictly an explicit opt-in. */
     val cpSeed: Boolean,
-    /** Raw repeatable `-p key=value` engine params; interpreted per engine (see [EngineParams]). */
+    /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
     val engineParams: List<String>,
+    /** MiniZinc-standard `-p N`: number of parallel workers; N > 1 routes to the portfolio. */
+    val parallel: Int?,
 )
 
 /**
  * Parses the MiniZinc-standard FZN solver flags we claim in `klause.msc` (-a, -n, -s, -v,
- * -t, -r) plus our `--engine` / `-e` selector and repeatable `-p key=value` engine params. Unknown flags are tolerated (printed to
+ * -t, -r, -p) plus our `--engine` / `-e` selector and repeatable `--param key=value` engine
+ * params. Unknown flags are tolerated (printed to
  * stderr) to stay forward-compatible with MiniZinc additions we don't recognise.
  */
 private fun parseFznArgs(args: Array<String>): FznOptions {
@@ -434,6 +462,7 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
     var unboundedIntHi: Int? = null
     var cpSeed = false
     val engineParams = mutableListOf<String>()
+    var parallel: Int? = null
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
@@ -448,7 +477,8 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
             "--unbounded-int-lo" -> { unboundedIntLo = args[++i].toInt(); i++ }
             "--unbounded-int-hi" -> { unboundedIntHi = args[++i].toInt(); i++ }
             "--cp-seed" -> { cpSeed = true; i++ }
-            "-p", "--param" -> { engineParams.add(args[++i]); i++ }
+            "--param" -> { engineParams.add(args[++i]); i++ }
+            "-p" -> { parallel = args[++i].toInt(); i++ }
             else -> {
                 if (a.startsWith("-")) {
                     System.err.println("klause-cli: ignoring unknown flag $a")
@@ -465,5 +495,5 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
         System.err.println("usage: klause-cli [-e engine] [flags] file.fzn")
         exitProcess(2)
     }
-    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed, engineParams)
+    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed, engineParams, parallel)
 }

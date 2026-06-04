@@ -16,7 +16,8 @@ import com.eignex.klause.portfolio.PortfolioSpec
 import kotlin.system.exitProcess
 
 /**
- * Engine tuning knobs passed as repeatable `-p key=value` / `--param key=value` flags.
+ * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
+ * alias: it is the MiniZinc-standard parallelism flag.)
  * Each engine consumes the keys it understands; an unrecognised or malformed key is a
  * hard usage error (exit 2) so typos never silently fall back to defaults.
  *
@@ -92,7 +93,7 @@ internal class EngineParams(pairs: List<String>) {
     }
 }
 
-/** Apply `-p` overrides for the backtrack engine on top of [base]. */
+/** Apply `--param` overrides for the backtrack engine on top of [base]. */
 internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
@@ -113,7 +114,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
 /** Constructor-level LS knobs (the rest ride on [LocalSearchParams]). */
 internal class LsSetup(val tabuTenure: Int, val pairSwapBudget: Int, val lambda: Double)
 
-/** Split `-p` overrides for the ls engine into constructor knobs and per-call params. */
+/** Split `--param` overrides for the ls engine into constructor knobs and per-call params. */
 internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<LocalSearchParams, LsSetup> {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
@@ -127,13 +128,13 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
     return out to setup
 }
 
-/** Apply `-p` overrides for the portfolio engine. [fallbackSeed] is the `-r` flag. */
-internal fun buildPortfolioSpec(p: EngineParams, fallbackSeed: Long?): PortfolioSpec {
+/** Apply `--param` overrides for the portfolio engine on top of the worker-count defaults
+ *  the caller derived (from `-p N` parallelism or its own fallbacks). [fallbackSeed] is the
+ *  `-r` flag. */
+internal fun buildPortfolioSpec(p: EngineParams, fallbackSeed: Long?, defaultLs: Int, defaultBt: Int): PortfolioSpec {
     val spec = PortfolioSpec(
-        localSearchWorkers = p.int("ls")
-            ?: System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
-        backtrackWorkers = p.int("bt")
-            ?: System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
+        localSearchWorkers = p.int("ls") ?: defaultLs,
+        backtrackWorkers = p.int("bt") ?: defaultBt,
         seed = p.long("seed") ?: fallbackSeed ?: 1L,
         lsLambda = p.double("lambda") ?: 1.0,
     )
