@@ -4,6 +4,7 @@ import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
@@ -12,7 +13,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.CostShaping
@@ -21,8 +21,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import java.io.File
-import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -48,63 +46,105 @@ internal fun runXcsp(args: Array<String>) {
 // --- single-instance solve ---
 
 private fun solveOne(opts: XcspOptions) {
-    val file = File(opts.path)
+    val file = opts.path
     val ing = try {
         ingest(file, opts.format)
     } catch (e: UnsupportedXcsp3Exception) {
-        System.err.println(e.message); exitProcess(3)
+        errPrintln(e.message ?: "unsupported")
+        exitCli(3)
     } catch (e: UnsupportedSmtException) {
-        System.err.println(e.message); exitProcess(3)
+        errPrintln(e.message ?: "unsupported")
+        exitCli(3)
     }
     val p = ing.problem
-    println("parsed ${file.name}: bool=${p.numBoolVars} int=${p.numIntVars} factors=${p.numFactors}" +
-        (if (ing.objective != null) " (optimization)" else " (satisfaction)"))
+    println(
+        "parsed ${fileName(file)}: bool=${p.numBoolVars} int=${p.numIntVars} factors=${p.numFactors}" +
+            (if (ing.objective != null) " (optimization)" else " (satisfaction)"),
+    )
 
     when (val r = run(ing, opts)) {
-        is Verdict.Sat -> { println("SAT"); printAssignment(r.ints, r.bools) }
-        is Verdict.Optimal -> { println("OPTIMUM ${fmt(r.value)}"); printAssignment(r.ints, r.bools) }
-        is Verdict.BestFound -> { println("SUBOPTIMAL ${fmt(r.value)} (budget exhausted)"); printAssignment(r.ints, r.bools) }
+        is Verdict.Sat -> {
+            println("SAT")
+            printAssignment(r.ints, r.bools)
+        }
+
+        is Verdict.Optimal -> {
+            println("OPTIMUM ${fmt(r.value)}")
+            printAssignment(r.ints, r.bools)
+        }
+
+        is Verdict.BestFound -> {
+            println(
+                "SUBOPTIMAL ${fmt(r.value)} (budget exhausted)",
+            )
+            printAssignment(r.ints, r.bools)
+        }
+
         Verdict.Unsat -> println("UNSATISFIABLE")
+
         Verdict.Unknown -> println("UNKNOWN")
     }
 }
 
 private fun printAssignment(ints: IntArray, bools: BooleanArray) {
-    if (!System.getProperty("klause.xcsp.printSolution").toBoolean()) return
+    if (cliProp("klause.xcsp.printSolution")?.toBoolean() != true) return
     if (bools.isNotEmpty()) println("bools: " + bools.joinToString(" "))
     if (ints.isNotEmpty()) println("ints: " + ints.joinToString(" "))
 }
 
 // --- coverage report over a corpus ---
 
+@Suppress("TooGenericExceptionCaught", "SwallowedException") // corpus walk: any parse/solve crash is a per-file verdict
 private fun coverage(opts: XcspOptions) {
-    val root = File(opts.path)
-    val files = (if (root.isDirectory) root.walkTopDown().filter { it.isFile } else sequenceOf(root))
+    val root = opts.path
+    val files = walkFiles(root)
         .filter { detectFormat(it, opts.format) != null }
-        .sortedBy { it.path }
-        .toList()
-    if (files.isEmpty()) { System.err.println("no XCSP3/SMT-LIB files under ${root.path}"); exitProcess(2) }
+        .sorted()
+    if (files.isEmpty()) {
+        errPrintln("no XCSP3/SMT-LIB files under $root")
+        exitCli(2)
+    }
 
-    var parsed = 0; var solved = 0; var unsupported = 0; var failed = 0
-    val reasons = HashMap<String, Int>()
+    var parsed = 0
+    var solved = 0
+    var unsupported = 0
+    var failed = 0
+    val reasons = mutableMapOf<String, Int>()
     for (f in files) {
         val ing = try {
             ingest(f, opts.format)
         } catch (e: UnsupportedXcsp3Exception) {
-            unsupported++; reasons.merge(reason(e.message), 1, Int::plus); println("UNSUPPORTED  ${f.name}  — ${reason(e.message)}"); continue
+            unsupported++
+            val r = reason(e.message)
+            reasons[r] = (reasons[r] ?: 0) + 1
+            println("UNSUPPORTED  ${fileName(f)}  — ${reason(e.message)}")
+            continue
         } catch (e: UnsupportedSmtException) {
-            unsupported++; reasons.merge(reason(e.message), 1, Int::plus); println("UNSUPPORTED  ${f.name}  — ${reason(e.message)}"); continue
+            unsupported++
+            val r = reason(e.message)
+            reasons[r] = (reasons[r] ?: 0) + 1
+            println("UNSUPPORTED  ${fileName(f)}  — ${reason(e.message)}")
+            continue
         } catch (e: Exception) {
-            failed++; println("PARSE-ERROR  ${f.name}  — ${e.message?.take(80)}"); continue
+            failed++
+            println("PARSE-ERROR  ${fileName(f)}  — ${e.message?.take(80)}")
+            continue
         }
         parsed++
-        val verdict = try { run(ing, opts) } catch (e: Exception) { Verdict.Unknown }
+        val verdict = try {
+            run(ing, opts)
+        } catch (e: Exception) {
+            Verdict.Unknown
+        }
         val tag = when (verdict) {
-            is Verdict.Sat -> "SAT"; is Verdict.Optimal -> "OPT ${fmt(verdict.value)}"
-            is Verdict.BestFound -> "BEST ${fmt(verdict.value)}"; Verdict.Unsat -> "UNSAT"; Verdict.Unknown -> "UNKNOWN"
+            is Verdict.Sat -> "SAT"
+            is Verdict.Optimal -> "OPT ${fmt(verdict.value)}"
+            is Verdict.BestFound -> "BEST ${fmt(verdict.value)}"
+            Verdict.Unsat -> "UNSAT"
+            Verdict.Unknown -> "UNKNOWN"
         }
         if (verdict != Verdict.Unknown) solved++
-        println("PARSED       ${f.name}  — $tag")
+        println("PARSED       ${fileName(f)}  — $tag")
     }
 
     println()
@@ -117,7 +157,11 @@ private fun coverage(opts: XcspOptions) {
     println("parse-error     : $failed")
     if (reasons.isNotEmpty()) {
         println("--- unsupported constructs ---")
-        reasons.entries.sortedByDescending { it.value }.forEach { (k, v) -> println("  %4d  %s".format(v, k)) }
+        reasons.entries.sortedByDescending { it.value }.forEach { (k, v) ->
+            println(
+                "  ${v.toString().padStart(4)}  $k",
+            )
+        }
     }
 }
 
@@ -129,13 +173,15 @@ private fun reason(msg: String?): String = (msg ?: "unknown").substringAfter(": 
 /** A parsed instance ready to solve. */
 private class Parsed(val problem: Problem, val objective: Objective?)
 
-private fun ingest(file: File, forced: Format?): Parsed = when (detectFormat(file, forced)
-    ?: throw IllegalArgumentException("cannot detect format of ${file.name}; pass --format")) {
-    Format.XCSP3 -> Xcsp3.parse(file.readText()).let { Parsed(it.problem, it.objective) }
-    Format.SMTLIB -> SmtLibQfLia.parse(file.readText()).let { Parsed(it.problem, it.objective) }
+private fun ingest(file: String, forced: Format?): Parsed = when (
+    detectFormat(file, forced)
+        ?: throw IllegalArgumentException("cannot detect format of ${fileName(file)}; pass --format")
+) {
+    Format.XCSP3 -> Xcsp3.parse(readTextFile(file)).let { Parsed(it.problem, it.objective) }
+    Format.SMTLIB -> SmtLibQfLia.parse(readTextFile(file)).let { Parsed(it.problem, it.objective) }
 }
 
-private fun detectFormat(file: File, forced: Format?): Format? = forced ?: when (file.extension.lowercase()) {
+private fun detectFormat(file: String, forced: Format?): Format? = forced ?: when (fileExtension(file).lowercase()) {
     "xml", "xcsp", "xcsp3" -> Format.XCSP3
     "smt2", "smt" -> Format.SMTLIB
     else -> null
@@ -157,7 +203,9 @@ private fun run(ing: Parsed, opts: XcspOptions): Verdict {
     if (threads > 1) {
         val (ls, bt) = when (opts.engine) {
             Engine.LS -> threads to 0
+
             Engine.BACKTRACK -> 0 to threads
+
             Engine.PORTFOLIO -> {
                 val b = maxOf(1, threads / 3)
                 (threads - b) to b
@@ -173,6 +221,7 @@ private fun run(ing: Parsed, opts: XcspOptions): Verdict {
             )
             runOn(BacktrackSolver(ing.problem), params, ing)
         }
+
         Engine.LS -> {
             // Same CBLS setup as the FlatZinc path — the across-the-board winner of the
             // strategy bench sweep — so `-p tabu-tenure/pair-swap-budget/lambda` mean the
@@ -190,6 +239,7 @@ private fun run(ing: Parsed, opts: XcspOptions): Verdict {
             )
             runOn(solver, base.copy(costShaping = CostShaping.Linear(lambda = setup.lambda)), ing)
         }
+
         Engine.PORTFOLIO -> runPortfolio(ing, opts, cancellation)
     }
 }
@@ -205,19 +255,26 @@ private fun runPortfolio(
 ): Verdict {
     val spec = buildPortfolioSpec(EngineParams(opts.params), opts.seed, defaultLs, defaultBt)
     val portfolio = PortfolioBuilder.build(
-        ing.problem, spec, lsObjective = ing.objective, linearObjective = ing.objective,
+        ing.problem,
+        spec,
+        lsObjective = ing.objective,
+        linearObjective = ing.objective,
+        onEvent = portfolioVerboseListener(opts.verbose),
     )
     try {
         if (ing.objective != null) {
-            return when (val r = kotlinx.coroutines.runBlocking { portfolio.minimize(cancellation) }) {
+            return when (val r = runBlockingBridge { portfolio.minimize(cancellation) }) {
                 is MinimizeResult.Optimal -> Verdict.Optimal(r.objective, r.sample.ints, r.sample.bools)
+
                 is MinimizeResult.BestFound -> Verdict.BestFound(r.objective, r.sample.ints, r.sample.bools)
+
                 is MinimizeResult.Infeasible ->
                     if (spec.backtrackWorkers > 0) Verdict.Unsat else Verdict.Unknown
+
                 is MinimizeResult.Unknown -> Verdict.Unknown
             }
         }
-        return when (val r = kotlinx.coroutines.runBlocking { portfolio.solve(cancellation) }) {
+        return when (val r = runBlockingBridge { portfolio.solve(cancellation) }) {
             is SolveResult.Sat -> Verdict.Sat(r.assignment.ints, r.assignment.bools)
             is SolveResult.Unsat -> Verdict.Unsat
             is SolveResult.Unknown -> Verdict.Unknown
@@ -263,6 +320,8 @@ private data class XcspOptions(
     val params: List<String>,
     /** `-p N`: number of parallel workers; N > 1 routes to the portfolio. */
     val parallel: Int?,
+    /** `-v`: live progress on stderr (portfolio worker events). */
+    val verbose: Boolean,
 )
 
 private fun parseXcspArgs(args: Array<String>): XcspOptions {
@@ -273,33 +332,89 @@ private fun parseXcspArgs(args: Array<String>): XcspOptions {
     var coverage = false
     val params = mutableListOf<String>()
     var parallel: Int? = null
+    var verbose = false
     var path: String? = null
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
-            "--format" -> { format = when (args[++i].lowercase()) {
-                "xcsp3", "xcsp" -> Format.XCSP3; "smtlib", "smt", "smt2" -> Format.SMTLIB
-                else -> usage("unknown format ${args[i]}") }; i++ }
-            "-e", "--engine" -> { engine = when (args[++i].lowercase()) {
-                "cp", "backtrack", "bt" -> Engine.BACKTRACK; "ls", "localsearch" -> Engine.LS
-                "portfolio", "pf" -> Engine.PORTFOLIO
-                else -> usage("unknown engine ${args[i]}") }; i++ }
-            "-t", "--time-limit" -> { timeMs = args[++i].toLong(); i++ }
-            "-r" -> { seed = args[++i].toLong(); i++ }
-            "--coverage" -> { coverage = true; i++ }
-            "--param" -> { params.add(args[++i]); i++ }
-            "-p" -> { parallel = args[++i].toIntOrNull() ?: usage("-p expects an integer"); i++ }
+            "--format" -> {
+                format = when (args[++i].lowercase()) {
+                    "xcsp3", "xcsp" -> Format.XCSP3
+                    "smtlib", "smt", "smt2" -> Format.SMTLIB
+                    else -> usage("unknown format ${args[i]}")
+                }
+                i++
+            }
+
+            "-e", "--engine" -> {
+                engine = when (args[++i].lowercase()) {
+                    "cp", "backtrack", "bt" -> Engine.BACKTRACK
+                    "ls", "localsearch" -> Engine.LS
+                    "portfolio", "pf" -> Engine.PORTFOLIO
+                    else -> usage("unknown engine ${args[i]}")
+                }
+                i++
+            }
+
+            "-t", "--time-limit" -> {
+                timeMs = args[++i].toLong()
+                i++
+            }
+
+            "-r" -> {
+                seed = args[++i].toLong()
+                i++
+            }
+
+            "--coverage" -> {
+                coverage = true
+                i++
+            }
+
+            "-v", "--verbose" -> {
+                verbose = true
+                i++
+            }
+
+            "--param" -> {
+                params.add(args[++i])
+                i++
+            }
+
+            "-p" -> {
+                parallel = args[++i].toIntOrNull() ?: usage("-p expects an integer")
+                i++
+            }
+
             else -> {
-                if (a.startsWith("-")) { System.err.println("klause-cli: ignoring unknown flag $a"); i++ }
-                else { if (path != null) usage("multiple paths: $path, $a"); path = a; i++ }
+                if (a.startsWith("-")) {
+                    errPrintln("klause-cli: ignoring unknown flag $a")
+                } else {
+                    if (path != null) usage("multiple paths: $path, $a")
+                    path = a
+                }
+                i++
             }
         }
     }
-    return XcspOptions(path ?: usage("no input file/dir given"), format, engine, timeMs, seed, coverage, params, parallel)
+    return XcspOptions(
+        path ?: usage("no input file/dir given"),
+        format,
+        engine,
+        timeMs,
+        seed,
+        coverage,
+        params,
+        parallel,
+        verbose,
+    )
 }
 
 private fun usage(msg: String): Nothing {
-    System.err.println("klause-cli: $msg")
-    System.err.println("usage: klause-cli [--format xcsp3|smtlib] [-e cp|ls|portfolio] [-t ms] [-r seed] [-p threads] [--param key=value ...] [--coverage] <file|dir>")
-    exitProcess(2)
+    errPrintln("klause-cli: $msg")
+    errPrintln(
+        "usage: klause-cli [--format xcsp3|smtlib] [-e cp|ls|portfolio] [-t ms] [-r seed] " +
+            "[-p threads] [--param key=value ...] [--coverage] <file|dir>",
+    )
+    exitCli(2)
 }

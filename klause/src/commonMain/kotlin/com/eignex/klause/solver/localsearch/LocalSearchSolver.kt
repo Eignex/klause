@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SampleResult
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolveStatsSink
@@ -399,6 +400,7 @@ class LocalSearchSolver(
                 if (obj < bestObj) {
                     bestObj = obj
                     bestSample = snap
+                    params.onEvent?.invoke(SearchEvent.Incumbent(obj))
                     // Yield each strict improvement as the inner loop discovers it.
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }

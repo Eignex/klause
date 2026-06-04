@@ -5,19 +5,27 @@ import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.formats.minizinc.OznApplier
+import com.eignex.klause.portfolio.PortfolioBuilder
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchEvent
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.maximizeInt
-import com.eignex.klause.solver.minimizeInt
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import java.io.File
-import kotlin.system.exitProcess
+import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
+import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.solver.maximizeInt
+import com.eignex.klause.solver.minimizeInt
 
 /**
  * Minimal MiniZinc-compatible FlatZinc path of the unified klause CLI.
@@ -31,16 +39,17 @@ import kotlin.system.exitProcess
  * Backend is chosen with `--engine NAME` (or `-e NAME`), or via the `klause.fzn.engine`
  * system property. Recognised names: `cp` (default; complete CDCL search — `backtrack`
  * accepted as an alias), `ls` / `localsearch`, `portfolio`. Each backend honors `-t`
- * (time limit), `-r` (seed), and repeatable `--param key=value` engine params (see [EngineParams]); the `-a` / `-n` flags apply to
- * the satisfy path. The MiniZinc-standard `-p N` (parallelism) routes to the portfolio
- * sized to N workers, with an explicitly chosen engine as the worker palette.
+ * (time limit), `-r` (seed), and repeatable `--param key=value` engine params (see
+ * [EngineParams]); the `-a` / `-n` flags apply to the satisfy path. The MiniZinc-standard
+ * `-p N` (parallelism) routes to the portfolio sized to N workers, with an explicitly
+ * chosen engine as the worker palette.
  */
 internal fun runFzn(args: Array<String>) {
     // Translate env vars / system properties into the central config once, up front, and
     // install it as the process-wide ambient config so the compiler picks it up.
-    val config = com.eignex.klause.config.installKlauseConfigFromEnv()
+    val config = installCliConfig()
     val opts = parseFznArgs(args)
-    val source = File(opts.fznPath).readText()
+    val source = readTextFile(opts.fznPath)
     // Unbounded `var int` declarations get a default domain. Resolution order:
     //   CLI flag → KlauseConfig (env var / system property) → built-in default.
     // Built-in defaults match Gecode/Chuffed.
@@ -51,20 +60,53 @@ internal fun runFzn(args: Array<String>) {
         unboundedIntLo = unboundedLo,
         unboundedIntHi = unboundedHi,
     )
-    val engine = opts.engine ?: System.getProperty("klause.fzn.engine") ?: "cp"
+    val engine = opts.engine ?: cliProp("klause.fzn.engine") ?: "cp"
+    cliLogger(opts.verbose).v {
+        "parsed ${opts.fznPath}: bools=${program.problem.numBoolVars} ints=${program.problem.numIntVars} " +
+            "factors=${program.problem.numFactors}"
+    }
     dispatch(engine.lowercase(), program, opts)
+}
+
+/** Render one [SearchEvent] as a `-v` line; [worker] tags portfolio workers. */
+internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): String {
+    val who = worker?.let { " $it" }.orEmpty()
+    return when (e) {
+        is SearchEvent.Restart -> "[$t ms]$who restart #${e.index} after ${e.steps} decisions"
+        is SearchEvent.LearnedDbSweep -> "[$t ms]$who learned-DB sweep: kept ${e.kept}, dropped ${e.dropped}"
+        is SearchEvent.Incumbent -> "[$t ms]$who incumbent objective ${e.objective}"
+    }
+}
+
+/** Live-event listener for `-v`, wired into the engine params ([SearchEvent] seam, #140);
+ *  null when not verbose so the engines skip observation entirely. */
+private fun verboseListener(opts: FznOptions): ((SearchEvent) -> Unit)? {
+    if (!opts.verbose) return null
+    val log = cliLogger(verbose = true)
+    val start = nowMillis()
+    return { e ->
+        val t = nowMillis() - start
+        log.v { describeEvent(e, t) }
+    }
+}
+
+/** Per-worker `-v` listener for the portfolio paths ([SearchEvent] seam, #140). Workers run
+ *  concurrently; the logger writes whole lines, which is the only shared state. */
+internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) -> Unit)? {
+    if (!verbose) return null
+    val log = cliLogger(verbose = true)
+    val start = nowMillis()
+    return { worker, e -> log.v { describeEvent(e, nowMillis() - start, worker) } }
 }
 
 /** Lazily-loaded .ozn applier when [FznOptions.oznPath] is set; lets klause render the
  *  human-readable MZN output natively (drop-in for MiniZinc's `solns2out`). */
-private fun loadOznApplier(opts: FznOptions): OznApplier? =
-    opts.oznPath?.let { OznApplier(File(it).readText()) }
+private fun loadOznApplier(opts: FznOptions): OznApplier? = opts.oznPath?.let { OznApplier(readTextFile(it)) }
 
 /** Render one solution: prefer the .ozn applier when supplied; otherwise fall back to
  *  the standard FZN solution writer (the `--no-ozn` / `needsSolns2Out: true` path). */
-private fun renderSolution(
-    applier: OznApplier?, program: FlatZincProgram, sample: com.eignex.klause.solver.Sample,
-): String = applier?.render(program, sample) ?: writeFlatZincSolution(program, sample)
+private fun renderSolution(applier: OznApplier?, program: FlatZincProgram, sample: Sample): String =
+    applier?.render(program, sample) ?: writeFlatZincSolution(program, sample)
 
 private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions) {
     // MiniZinc-standard `-p N` (parallelism, declared in klause.msc): N > 1 means a
@@ -77,7 +119,9 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions)
     if (threads > 1) {
         val (ls, bt) = when (engine) {
             "ls", "localsearch", "local-search" -> threads to 0
+
             "cp", "backtrack", "bt" -> 0 to threads
+
             else -> {
                 val b = maxOf(1, threads / 3)
                 (threads - b) to b
@@ -88,12 +132,17 @@ private fun dispatch(engine: String, program: FlatZincProgram, opts: FznOptions)
     }
     when (engine) {
         "cp", "backtrack", "bt" -> runWithBacktrack(program, opts)
+
         "ls", "localsearch", "local-search" -> runWithLocalSearch(program, opts)
+
         "portfolio", "pf" -> runWithPortfolio(program, opts)
+
         else -> {
-            System.err.println("klause-cli: unknown engine `$engine`; expected one of " +
-                "cp, ls, portfolio")
-            exitProcess(2)
+            errPrintln(
+                "klause-cli: unknown engine `$engine`; expected one of " +
+                    "cp, ls, portfolio",
+            )
+            exitCli(2)
         }
     }
 }
@@ -110,7 +159,7 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: FznOptions) {
     val annotated = if (opts.freeSearch) null else program.defaultBacktrackParams
     val base = annotated ?: BacktrackParams(
         randomSeed = 1L,
-        variableHeuristic = com.eignex.klause.solver.backtrack.Vsids(),
+        variableHeuristic = Vsids(),
         phaseSaving = true,
         lubyRestartBase = 100L,
         maxLearnedClauses = 20_000,
@@ -118,22 +167,34 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: FznOptions) {
     // Honor `-t` inside the engine, not just between yielded solutions: without a
     // cancellation a backtrack run that never yields (hard UNSAT proof, stuck optimality
     // proof) would ignore the time limit entirely.
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
-    val cancellation = if (deadline != null)
-        com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
-    else com.eignex.klause.solver.Cancellation.Never
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
+    val cancellation = if (deadline != null) {
+        Cancellation { nowMillis() > deadline }
+    } else {
+        Cancellation.Never
+    }
     val params = applyBacktrackParams(
-        base.copy(randomSeed = opts.randomSeed ?: base.randomSeed, cancellation = cancellation),
+        base.copy(
+            randomSeed = opts.randomSeed ?: base.randomSeed,
+            cancellation = cancellation,
+            onEvent = verboseListener(opts),
+        ),
         EngineParams(opts.engineParams),
     )
+    cliLogger(
+        opts.verbose,
+    ).v { "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}" }
     runGeneric(BacktrackSolver(program.problem), params, program, opts, complete = true)
 }
 
 private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
-    val (params, setup) = applyLsParams(LocalSearchParams(randomSeed = opts.randomSeed), EngineParams(opts.engineParams))
-    val tabu = com.eignex.klause.solver.localsearch.strategy.TabuFilter(
+    val (params, setup) = applyLsParams(
+        LocalSearchParams(randomSeed = opts.randomSeed),
+        EngineParams(opts.engineParams),
+    )
+    val tabu = TabuFilter(
         tenure = setup.tabuTenure,
-        aspiration = com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImproving,
+        aspiration = AspirationCriterion.OrImproving,
     )
     // CBLS throughout — both the satisfy fight (`strategy`) and the objective descent
     // (`optimizeStrategy`, unified). A bench sweep (FocusedLs/probSAT vs CBLS over planted
@@ -143,10 +204,10 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
     // library default leaves these alone for backward-compat; the CLI is one-shot per
     // invocation, so it picks the across-the-board winner. (FocusedLs/probSAT/SA remain in
     // the multi-core portfolio for trajectory diversity, just not as the single default.)
-    val solver = com.eignex.klause.solver.localsearch.LocalSearchSolver(
+    val solver = LocalSearchSolver(
         program.problem,
-        strategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
-        optimizeStrategy = com.eignex.klause.solver.localsearch.strategy.Cbls(tabu = tabu),
+        strategy = Cbls(tabu = tabu),
+        optimizeStrategy = Cbls(tabu = tabu),
         pairSwapBudget = setup.pairSwapBudget,
         definitionalSweep = program.definitionalSweep,
     )
@@ -159,20 +220,26 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
     // itself, so without this it would run unbounded on instances it can't close; the LS
     // engine checks `cancellation` inside its flip loop, so this stops both the satisfy
     // fight and the objective descent mid-search at the budget.
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
-    val cancellation = if (deadline != null)
-        com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
-    else com.eignex.klause.solver.Cancellation.Never
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
+    val cancellation = if (deadline != null) {
+        Cancellation { nowMillis() > deadline }
+    } else {
+        Cancellation.Never
+    }
     // CP-seeding (#65): OFF unless `--cp-seed` is passed. When on, a short backtrack solve finds
     // a feasible point that warm-starts LS (the #54 misses reach feasibility trivially under CP
     // but never under cold LS). EXPLICIT OPT-IN: the default path leaves initialAssignment null,
     // so the shipped pure-LS entry point stays free of any CP dependency.
     val initial = if (opts.cpSeed) cpFeasibleSeed(program, deadline) else null
     val cblsParams = params.copy(
-        costShaping = com.eignex.klause.solver.localsearch.CostShaping.Linear(lambda = setup.lambda),
+        costShaping = CostShaping.Linear(lambda = setup.lambda),
         cancellation = cancellation,
         initialAssignment = initial,
+        onEvent = verboseListener(opts),
     )
+    cliLogger(
+        opts.verbose,
+    ).v { "engine ls: seed=${cblsParams.randomSeed} tabu-tenure=${setup.tabuTenure} lambda=${setup.lambda}" }
     runGeneric(solver, cblsParams, program, opts, complete = false)
 }
 
@@ -183,44 +250,25 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
  * (LS then runs cold). Only reached when the explicit `--cp-seed` flag is set.
  */
 private fun cpFeasibleSeed(program: FlatZincProgram, overallDeadline: Long?): Sample? {
-    val cpMs = System.getProperty("klause.fzn.cpseed.ms")?.toLong() ?: 2000L
-    var cpDeadline = System.currentTimeMillis() + cpMs
+    val cpMs = cliProp("klause.fzn.cpseed.ms")?.toLong() ?: 2000L
+    var cpDeadline = nowMillis() + cpMs
     if (overallDeadline != null) cpDeadline = minOf(cpDeadline, overallDeadline)
     val r = BacktrackSolver(program.problem).solve(
         BacktrackParams(
             randomSeed = 1L,
-            cancellation = com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > cpDeadline },
+            cancellation = Cancellation { nowMillis() > cpDeadline },
         ),
     )
-    return (r as? com.eignex.klause.solver.SolveResult.Sat)?.assignment
+    return (r as? SolveResult.Sat)?.assignment
 }
 
-/**
- * Unified per-engine entry: dispatches between satisfy and optimize on the solve goal.
- *
- * [complete] is true only for solvers that exhaustively search (here: backtrack):
- * for them, an enumeration that ends without a solution *proves* unsatisfiability. The local-
- * search backend is incomplete — it exhausts a flip/restart budget, never the solution space —
- * so a fruitless run is `UNKNOWN`, never `UNSATISFIABLE`.
- */
-/**
- * Multi-core portfolio engine: a [com.eignex.klause.portfolio.Portfolio] of diverse local-search
- * workers and/or backtrack workers, racing on satisfaction and sharing the objective bound on
- * optimisation. Worker counts come from `-Dklause.fzn.portfolio.ls` / `.bt` (defaults 4 / 2).
- *
- * A pure-LS pool (`-Dklause.fzn.portfolio.bt=0`) involves no CP and never seeds the LS — a
- * self-contained local-search pool with no CP dependency. The hybrid default (bt>0) is for
- * general use.
- */
 /**
  * Build the two per-worker objective representations for a portfolio (#63): the functional
  * (gradient-bearing) objective the LS workers descend, and the [com.eignex.klause.solver.LinearObjective]
  * the backtrack workers bound-prune on. Returns `(null, null)` for satisfaction models. They stay
  * comparable because both score the same FlatZinc objective var.
  */
-private fun portfolioObjectives(
-    program: FlatZincProgram,
-): Pair<com.eignex.klause.solver.Objective?, com.eignex.klause.solver.Objective?> {
+private fun portfolioObjectives(program: FlatZincProgram): Pair<Objective?, Objective?> {
     val (objName, maximize) = when (val solve = program.solve) {
         is SolveDirective.Minimize -> solve.objVar to false
         is SolveDirective.Maximize -> solve.objVar to true
@@ -228,22 +276,33 @@ private fun portfolioObjectives(
     }
     val objVarId = program.intVarsByName[objName]
         ?: error("objective variable '$objName' not found in int var map")
-    val linear = if (maximize) program.problem.maximizeInt(objVarId)
-                 else program.problem.minimizeInt(objVarId)
+    val linear = if (maximize) {
+        program.problem.maximizeInt(objVarId)
+    } else {
+        program.problem.minimizeInt(objVarId)
+    }
     return (program.lsObjective ?: linear) to linear
 }
 
+/**
+ * Multi-core portfolio engine: a [com.eignex.klause.portfolio.Portfolio] of diverse local-search
+ * workers and/or backtrack workers, racing on satisfaction and sharing the objective bound on
+ * optimisation. Worker counts default from `-Dklause.fzn.portfolio.ls` / `.bt` (4 / 2) or the
+ * `-p` parallelism split; a pure-LS pool (`bt=0`) involves no CP and never seeds the LS.
+ */
 private fun runWithPortfolio(
     program: FlatZincProgram,
     opts: FznOptions,
-    defaultLs: Int = System.getProperty("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
-    defaultBt: Int = System.getProperty("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
+    defaultLs: Int = cliProp("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
+    defaultBt: Int = cliProp("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
 ) {
     val spec = buildPortfolioSpec(EngineParams(opts.engineParams), opts.randomSeed, defaultLs, defaultBt)
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
-    val cancel = if (deadline != null)
-        com.eignex.klause.solver.Cancellation { System.currentTimeMillis() > deadline }
-    else com.eignex.klause.solver.Cancellation.Never
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
+    val cancel = if (deadline != null) {
+        Cancellation { nowMillis() > deadline }
+    } else {
+        Cancellation.Never
+    }
     val applier = loadOznApplier(opts)
     // Only a backtrack worker can *prove* UNSAT / optimality; a pure-LS pool reports UNKNOWN.
     val complete = spec.backtrackWorkers > 0
@@ -251,32 +310,44 @@ private fun runWithPortfolio(
     // objective, the backtrack workers bound the linear one. For satisfy there is no objective —
     // both stay null and the portfolio is solve-only.
     val (lsObjective, linearObjective) = portfolioObjectives(program)
-    val portfolio = com.eignex.klause.portfolio.PortfolioBuilder.build(
-        program.problem, spec, lsObjective = lsObjective, linearObjective = linearObjective,
+    val portfolio = PortfolioBuilder.build(
+        program.problem,
+        spec,
+        lsObjective = lsObjective,
+        linearObjective = linearObjective,
         definitionalSweep = program.definitionalSweep,
+        onEvent = portfolioVerboseListener(opts.verbose),
     )
     try {
-        when (val solve = program.solve) {
+        when (program.solve) {
             is SolveDirective.Satisfy -> {
-                when (val r = kotlinx.coroutines.runBlocking { portfolio.solve(cancel) }) {
-                    is com.eignex.klause.solver.SolveResult.Sat -> {
-                        print(renderSolution(applier, program, r.assignment)); println("==========")
+                when (val r = runBlockingBridge { portfolio.solve(cancel) }) {
+                    is SolveResult.Sat -> {
+                        print(renderSolution(applier, program, r.assignment))
+                        println("==========")
                     }
-                    is com.eignex.klause.solver.SolveResult.Unsat -> println("=====UNSATISFIABLE=====")
+
+                    is SolveResult.Unsat -> println("=====UNSATISFIABLE=====")
+
                     else -> println("=====UNKNOWN=====")
                 }
             }
+
             is SolveDirective.Minimize, is SolveDirective.Maximize -> {
                 // Per-worker objectives were wired into the builder above (#63): each worker
                 // streams against its own representation; the portfolio only shares the scalar
                 // bound. No single objective is passed to minimize any more.
-                when (val r = kotlinx.coroutines.runBlocking { portfolio.minimize(cancel) }) {
+                when (val r = runBlockingBridge { portfolio.minimize(cancel) }) {
                     is MinimizeResult.Optimal -> {
-                        print(renderSolution(applier, program, r.sample)); println("==========")
+                        print(renderSolution(applier, program, r.sample))
+                        println("==========")
                     }
+
                     is MinimizeResult.BestFound -> print(renderSolution(applier, program, r.sample))
+
                     is MinimizeResult.Infeasible ->
                         println(if (complete) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
+
                     is MinimizeResult.Unknown -> println("=====UNKNOWN=====")
                 }
             }
@@ -286,6 +357,14 @@ private fun runWithPortfolio(
     }
 }
 
+/**
+ * Unified per-engine entry: dispatches between satisfy and optimize on the solve goal.
+ *
+ * [complete] is true only for solvers that exhaustively search (here: backtrack): for them,
+ * an enumeration that ends without a solution *proves* unsatisfiability. The local-search
+ * backend is incomplete — it exhausts a flip/restart budget, never the solution space — so
+ * a fruitless run is `UNKNOWN`, never `UNSATISFIABLE`.
+ */
 private fun <P : SolverParams> runGeneric(
     solver: Solver<P>,
     params: P,
@@ -295,6 +374,7 @@ private fun <P : SolverParams> runGeneric(
 ) {
     when (val solve = program.solve) {
         is SolveDirective.Satisfy -> runSatisfy(solver, params, program, opts, complete)
+
         is SolveDirective.Minimize, is SolveDirective.Maximize ->
             runOptimize(solver, params, program, solve, opts, complete)
     }
@@ -310,10 +390,10 @@ private fun <P : SolverParams> runSatisfy(
     val applier = loadOznApplier(opts)
     val limit = if (opts.allSolutions) opts.solutionCap ?: Long.MAX_VALUE else 1L
     var produced = 0L
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
 
     for (sample in solver.enumerate(params)) {
-        if (deadline != null && System.currentTimeMillis() > deadline) {
+        if (deadline != null && nowMillis() > deadline) {
             println("=====UNKNOWN=====")
             return
         }
@@ -326,7 +406,7 @@ private fun <P : SolverParams> runSatisfy(
         // No solution found: only a complete search that ran to completion proves
         // unsatisfiability. An incomplete (local-search) budget exhaustion — or a `-t`
         // cancellation that emptied the enumeration — can only report UNKNOWN.
-        val timedOut = deadline != null && System.currentTimeMillis() > deadline
+        val timedOut = deadline != null && nowMillis() > deadline
         println(if (complete && !timedOut) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
@@ -357,14 +437,20 @@ private fun <P : SolverParams> runOptimize(
     }
     val applier = loadOznApplier(opts)
     // Streaming branch-and-bound: yield each improving incumbent, then a terminal verdict.
-    val linear = if (maximize) program.problem.maximizeInt(objVarId)
-                 else program.problem.minimizeInt(objVarId)
+    val linear = if (maximize) {
+        program.problem.maximizeInt(objVarId)
+    } else {
+        program.problem.minimizeInt(objVarId)
+    }
     // Local search descends a *decomposed* objective only with a per-move gradient to the
     // decision vars; use the functional objective (cone of `defines_var` aux vars) when the
     // model provides one. Complete backends keep the LinearObjective (needed for bounding).
-    val objective: com.eignex.klause.solver.Objective =
-        if (solver is com.eignex.klause.solver.localsearch.LocalSearchSolver) (program.lsObjective ?: linear)
-        else linear
+    val objective: Objective =
+        if (solver is LocalSearchSolver) {
+            (program.lsObjective ?: linear)
+        } else {
+            linear
+        }
     var produced = 0
     for (step in optimizer.improvements(objective, params)) {
         when (step) {
@@ -376,10 +462,12 @@ private fun <P : SolverParams> runOptimize(
                     return
                 }
             }
+
             is MinimizeResult.Infeasible -> {
                 println("=====UNSATISFIABLE=====")
                 return
             }
+
             is MinimizeResult.Unknown -> {
                 println("=====UNKNOWN=====")
                 return
@@ -406,9 +494,9 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     val applier = loadOznApplier(opts)
     var best: Sample? = null
     var bestObj = if (maximize) Int.MIN_VALUE else Int.MAX_VALUE
-    val deadline = opts.timeLimitMs?.let { System.currentTimeMillis() + it }
+    val deadline = opts.timeLimitMs?.let { nowMillis() + it }
     for (sample in solver.enumerate(params)) {
-        if (deadline != null && System.currentTimeMillis() > deadline) break
+        if (deadline != null && nowMillis() > deadline) break
         val v = sample.ints[objVarId]
         val improved = if (maximize) v > bestObj else v < bestObj
         if (improved) {
@@ -420,7 +508,7 @@ private fun <P : SolverParams> runOptimizeViaEnumerate(
     if (best == null) {
         // Nothing feasible found. A complete search that ran to completion proves
         // unsatisfiability; a deadline hit or an incomplete (LS) budget exhaustion is UNKNOWN.
-        val timedOut = deadline != null && System.currentTimeMillis() > deadline
+        val timedOut = deadline != null && nowMillis() > deadline
         println(if (complete && !timedOut) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
@@ -483,26 +571,83 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
     var i = 0
     while (i < args.size) {
         when (val a = args[i]) {
-            "-a", "--all-solutions" -> { allSolutions = true; i++ }
+            "-a", "--all-solutions" -> {
+                allSolutions = true
+                i++
+            }
+
             // Improving incumbents are streamed on the optimization path unconditionally,
             // which is exactly `-i` semantics — accept the flag as a no-op.
             "-i", "--intermediate", "--intermediate-solutions" -> i++
-            "-f", "--free-search" -> { freeSearch = true; i++ }
-            "-n" -> { solutionCap = args[++i].toLong(); i++ }
-            "-s", "--statistics" -> { statistics = true; i++ }
-            "-v", "--verbose" -> { verbose = true; i++ }
-            "-t", "--time-limit" -> { timeLimitMs = args[++i].toLong(); i++ }
-            "-r" -> { randomSeed = args[++i].toLong(); i++ }
-            "-e", "--engine" -> { engine = args[++i]; i++ }
-            "--ozn" -> { oznPath = args[++i]; i++ }
-            "--unbounded-int-lo" -> { unboundedIntLo = args[++i].toInt(); i++ }
-            "--unbounded-int-hi" -> { unboundedIntHi = args[++i].toInt(); i++ }
-            "--cp-seed" -> { cpSeed = true; i++ }
-            "--param" -> { engineParams.add(args[++i]); i++ }
-            "-p" -> { parallel = args[++i].toInt(); i++ }
+
+            "-f", "--free-search" -> {
+                freeSearch = true
+                i++
+            }
+
+            "-n" -> {
+                solutionCap = args[++i].toLong()
+                i++
+            }
+
+            "-s", "--statistics" -> {
+                statistics = true
+                i++
+            }
+
+            "-v", "--verbose" -> {
+                verbose = true
+                i++
+            }
+
+            "-t", "--time-limit" -> {
+                timeLimitMs = args[++i].toLong()
+                i++
+            }
+
+            "-r" -> {
+                randomSeed = args[++i].toLong()
+                i++
+            }
+
+            "-e", "--engine" -> {
+                engine = args[++i]
+                i++
+            }
+
+            "--ozn" -> {
+                oznPath = args[++i]
+                i++
+            }
+
+            "--unbounded-int-lo" -> {
+                unboundedIntLo = args[++i].toInt()
+                i++
+            }
+
+            "--unbounded-int-hi" -> {
+                unboundedIntHi = args[++i].toInt()
+                i++
+            }
+
+            "--cp-seed" -> {
+                cpSeed = true
+                i++
+            }
+
+            "--param" -> {
+                engineParams.add(args[++i])
+                i++
+            }
+
+            "-p" -> {
+                parallel = args[++i].toInt()
+                i++
+            }
+
             else -> {
                 if (a.startsWith("-")) {
-                    System.err.println("klause-cli: ignoring unknown flag $a")
+                    errPrintln("klause-cli: ignoring unknown flag $a")
                     i++
                 } else {
                     if (fznPath != null) error("multiple FZN paths supplied: $fznPath, $a")
@@ -513,8 +658,11 @@ private fun parseFznArgs(args: Array<String>): FznOptions {
         }
     }
     val path = fznPath ?: run {
-        System.err.println("usage: klause-cli [-e engine] [flags] file.fzn")
-        exitProcess(2)
+        errPrintln("usage: klause-cli [-e engine] [flags] file.fzn")
+        exitCli(2)
     }
-    return FznOptions(path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics, oznPath, unboundedIntLo, unboundedIntHi, cpSeed, engineParams, parallel, freeSearch)
+    return FznOptions(
+        path, engine, allSolutions, solutionCap, timeLimitMs, randomSeed, verbose, statistics,
+        oznPath, unboundedIntLo, unboundedIntHi, cpSeed, engineParams, parallel, freeSearch,
+    )
 }

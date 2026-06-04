@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveStatsSink
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
@@ -207,6 +208,7 @@ class BacktrackSolver(override val problem: Problem) :
                     if (o < bestObj) {
                         bestObj = o
                         best = outcome.sample
+                        params.onEvent?.invoke(SearchEvent.Incumbent(o))
                         // Yield each new incumbent eagerly — consumers can react to it
                         // before search continues toward the bound. The reason here is
                         // a hint ("more might come"); the terminal yield carries the
@@ -488,6 +490,7 @@ class BacktrackSolver(override val problem: Problem) :
                     forgetIfOverCap(session, params)
                     lubyIdx++
                     sink?.observeRestart()
+                    params.onEvent?.invoke(SearchEvent.Restart(lubyIdx - 1, decisionsThisRun))
                     continue@outer
                 }
                 if (descend) {
@@ -834,6 +837,8 @@ class BacktrackSolver(override val problem: Problem) :
         session.forgetLearnedClauses { idx, lbd ->
             lbd <= glueThreshold || idx in kept
         }
+        val dropped = nonGlue.size - remainingCap
+        params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
     }
 
     /** How [backjumpAndLearn] terminated. */

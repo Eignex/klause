@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
@@ -64,6 +65,11 @@ object PortfolioBuilder {
      * Either objective may be null: pass both null for a satisfaction-only portfolio ([solve]),
      * or just one if the model only provides that form (each engine falls back to the other when
      * its preferred representation is absent).
+     *
+     * [onEvent] threads the [SearchEvent] seam through to every worker, tagged with the worker's
+     * label (`ls/<config>` or `backtrack#<i>`). Workers run concurrently, so the listener is
+     * invoked from multiple threads — it must be thread-safe and cheap. `null` (default) leaves
+     * every worker unobserved.
      */
     fun build(
         problem: Problem,
@@ -73,6 +79,7 @@ object PortfolioBuilder {
         /** Definitional sweep threaded into every LS worker (see
          *  [com.eignex.klause.solver.DefinitionalSweep]); null = unchanged behavior. */
         definitionalSweep: DefinitionalSweep? = null,
+        onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): Portfolio {
         val workers = ArrayList<PortfolioWorker>(spec.localSearchWorkers + spec.backtrackWorkers)
 
@@ -96,11 +103,13 @@ object PortfolioBuilder {
                     restartPolicy = cfg.restartPolicy,
                     definitionalSweep = definitionalSweep,
                 ).session()
+                val label = "ls/${cfg.label}"
                 val params = LocalSearchParams(
                     randomSeed = spec.seed + i,
                     costShaping = CostShaping.Linear(lambda = spec.lsLambda),
+                    onEvent = onEvent?.let { sink -> { e -> sink(label, e) } },
                 )
-                workers += PortfolioWorker.of("ls/${cfg.label}", session, params, objective = lsObj)
+                workers += PortfolioWorker.of(label, session, params, objective = lsObj)
             }
         }
 
@@ -111,17 +120,20 @@ object PortfolioBuilder {
         val btObj = linearObjective ?: lsObjective
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
+            val label = "backtrack#$i"
+            val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(label, e) } }
             val params = if (i % 2 == 0) {
                 BacktrackParams(
                     randomSeed = spec.seed + 1000L + i,
                     variableHeuristic = Vsids(),
                     phaseSaving = true,
                     lubyRestartBase = 100L,
+                    onEvent = workerEvent,
                 )
             } else {
-                BacktrackParams(randomSeed = spec.seed + 1000L + i)
+                BacktrackParams(randomSeed = spec.seed + 1000L + i, onEvent = workerEvent)
             }
-            workers += PortfolioWorker.of("backtrack#$i", session, params, objective = btObj) { p, supplier ->
+            workers += PortfolioWorker.of(label, session, params, objective = btObj) { p, supplier ->
                 p.copy(objectiveBoundSupplier = supplier)
             }
         }

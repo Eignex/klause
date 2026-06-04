@@ -19,10 +19,10 @@ MiniZinc solver library and CLI integration for klause.
 1. Build the CLI distribution from the repo root:
 
    ```
-   ./gradlew :klause-cli:installDist
+   ./gradlew :klause-cli:installJvmDist
    ```
 
-   This produces `klause-cli/build/install/klause-cli/bin/klause-cli`.
+   This produces `klause-cli/build/install/klause-cli-jvm/bin/klause-cli`.
    The wrapper at `klause-mzn-lib/bin/klause-fzn` finds it via `$KLAUSE_HOME`
    (defaults to two directories above the wrapper script).
 
