@@ -50,6 +50,9 @@ object CblsDiag {
             } else {
                 com.eignex.klause.solver.localsearch.strategy.MoveScoring.Weighted
             }
+            // Defaults to the shipped Cbls default (0 = plateau-buster off); override with
+            // -Dklause.cblsdiag.swapcap=16 to probe the stall-swap configuration.
+            val swapCap = System.getProperty("klause.cblsdiag.swapcap")?.toInt() ?: 0
             val strat = Cbls(
                 noiseProbability = noise,
                 tabu = if (noTabu) TabuFilter.Disabled
@@ -57,6 +60,7 @@ object CblsDiag {
                 maxNeighborhood = maxNbhd,
                 skewAlpha = skew,
                 scoring = scoring,
+                stallSwapCap = swapCap,
             )
             var minCost = state.cost
             var flipsToMin = 0L
