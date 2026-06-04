@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.TerminationReason
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -86,9 +87,16 @@ class Portfolio(
             }
         }.awaitAll()
 
-        results.firstOrNull { it is SolveResult.Sat }
+        // Fold every worker's counters into the verdict — the pool's cost, not the winner's.
+        val stats = results.fold(SolveStats.EMPTY) { acc, r -> acc.mergedWith(r.stats) }
+        when (
+            val winner = results.firstOrNull { it is SolveResult.Sat }
             ?: results.firstOrNull { it is SolveResult.Unsat }
-            ?: SolveResult.Unknown(TerminationReason.Cancelled)
+        ) {
+            is SolveResult.Sat -> winner.copy(stats = stats)
+            is SolveResult.Unsat -> winner.copy(stats = stats)
+            else -> SolveResult.Unknown(TerminationReason.Cancelled, stats)
+        }
     }
 
     /**
@@ -136,12 +144,16 @@ class Portfolio(
             }
         }
         val results = deferreds.awaitAll()
+        // Fold every worker's terminal counters into the verdict — the pool's cost.
+        val stats = results.fold(SolveStats.EMPTY) { acc, r -> acc.mergedWith(r.stats) }
 
         // Reduce verdicts. A direct Optimal claim is only honoured from a worker that didn't run
         // under external bound sharing (the engine downgrades to BestFound when shared); single-
         // worker / unshared portfolios still produce direct Optimal here.
         val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
-        if (directOptimal != null) return@coroutineScope directOptimal
+        if (directOptimal != null) {
+            return@coroutineScope (directOptimal as MinimizeResult.Optimal).copy(stats = stats)
+        }
 
         // "Dirty" Unknown = ran out of budget / timed out / cancelled before fully exploring.
         // SearchExhausted is clean — the worker's space was fully covered.
@@ -153,15 +165,15 @@ class Portfolio(
         val finalBound = snapshot.bound
         if (sample != null) {
             return@coroutineScope if (anyDirtyUnknown) {
-                MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted)
+                MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted, stats)
             } else {
-                MinimizeResult.Optimal(sample, finalBound)
+                MinimizeResult.Optimal(sample, finalBound, stats)
             }
         }
         if (anyDirtyUnknown) {
-            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+            MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
         } else {
-            MinimizeResult.Infeasible()
+            MinimizeResult.Infeasible(stats = stats)
         }
     }
 

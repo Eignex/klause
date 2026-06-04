@@ -212,6 +212,9 @@ class PortfolioTest {
             val deadline = TimeSource.Monotonic.markNow() + kotlin.time.Duration.parse("3s")
             val r = p.minimize(cancellation = { deadline.hasPassedNow() })
             assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
+            // Worker stats fold into the verdict: a mixed pool degrades the backend tag.
+            assertEquals("mixed", r.stats.backend)
+            assertTrue(r.stats.wallMs >= 0L)
         }
     }
 
