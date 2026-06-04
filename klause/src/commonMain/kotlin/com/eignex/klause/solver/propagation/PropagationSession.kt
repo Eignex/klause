@@ -214,13 +214,10 @@ class PropagationSession(
         val newFid = state.addLearnedClause(clause, lbd, permanent)
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid)
         if (conflict != null) return revertAndUnsat(conflict)
-        // The facts this assert just forced are implied by the decisions up to the current
-        // level, so they belong in the current level's baseline: re-snapshot the top mark.
-        // Without this, the next failed pin's revert — which restores to the top mark —
-        // silently rewinds the asserted facts while the clause itself stays registered.
-        // The search then re-derives the same conflict, re-learns the same clause, and can
-        // ping-pong between two such asserts forever. (At the root this also keeps
-        // solution-blocking deductions permanent across pops to the root.)
+        // The asserted facts are implied by the decisions up to the current level, so they
+        // join the level's baseline: re-snapshot the top mark. Otherwise the next failed
+        // pin's revert — which restores to the top mark — silently rewinds them while the
+        // clause stays registered, and the search can re-derive the same conflict forever.
         levelStates[levelTop - 1] = state.mark()
         return impliedSince(base)
     }

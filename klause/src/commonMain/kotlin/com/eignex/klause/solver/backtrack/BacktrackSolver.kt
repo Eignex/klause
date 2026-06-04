@@ -19,6 +19,7 @@ import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
 
 /**
@@ -466,29 +467,18 @@ class BacktrackSolver(override val problem: Problem) :
         // backend-specific `maxDecisions` knob.
         var decisionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
 
-        // Failsafe against repeat-learning livelock: count how often conflict analysis
-        // re-derives an identical clause (by order-independent literal-set hash). Healthy
-        // re-derivation happens — after forgetting or a restart — but an unbounded streak
-        // means the backjump + assert cycle is not progressing; past the threshold those
-        // conflicts are handled chronologically instead. The count surfaces as the
-        // `relearned` solve stat so pathological runs are visible under `-s`.
+        // Failsafe against repeat-learning livelock: count identical re-derivations per
+        // clause (order-free literal-set hash). Healthy re-learning happens after
+        // forgetting or restarts, but an unbounded streak means the backjump + assert
+        // cycle is not progressing — past the threshold those conflicts are handled
+        // chronologically. The count surfaces as the `relearned` solve stat under -s.
         val relearnCounts = HashMap<Long, Int>()
-        var relearnObserved = 0L
         val relearnTripped: (Learned) -> Boolean = { learned ->
             var h = 0L
-            for (lit in learned.literals) {
-                // splitmix64 finalizer per literal, combined commutatively (order-free).
-                var x = lit.toLong() * -0x61c8864680b583ebL
-                x = (x xor (x ushr 30)) * -0x40a7b892e31b1a47L
-                x = (x xor (x ushr 27)) * -0x6b2fb644ecceee15L
-                h += x xor (x ushr 31)
-            }
+            for (lit in learned.literals) h += splitmix64(lit.toLong())
             val n = (relearnCounts[h] ?: 0) + 1
             relearnCounts[h] = n
-            if (n > 1) {
-                relearnObserved++
-                sink?.observeRelearn()
-            }
+            if (n > 1) sink?.observeRelearn()
             n > RELEARN_FALLBACK_THRESHOLD
         }
 
@@ -643,10 +633,9 @@ class BacktrackSolver(override val problem: Problem) :
                 } else {
                     val rootBlock = pendingBlock
                     if (rootBlock != null) {
-                        // Apply the pending blocking nogood at the root: pop everything, register
-                        // the clause while no decision is live (so it cannot conflict or assert
-                        // mid-trail), and restart the descent. A root-level contradiction proves
-                        // the remaining space empty.
+                        // Apply the pending blocking nogood at the root, where it can neither
+                        // conflict nor assert mid-trail; a root contradiction proves the
+                        // remaining space empty.
                         pendingBlock = null
                         while (trail.isNotEmpty()) {
                             session.popLast()
@@ -895,20 +884,17 @@ class BacktrackSolver(override val problem: Problem) :
                 // 1UIP cannot collapse) would never become unit, so asserting it is a no-op
                 // and the search would re-make the same decision forever. Fall through to
                 // chronological within-node value enumeration instead, which is complete.
+                // Two guards before taking the backjump: a clause carrying an
+                // already-true literal (a kept resolved-atom literal can be) is satisfied,
+                // so the assert would be a no-op and the popped frames' untried values
+                // lost for nothing; and a clause re-derived identically past the relearn
+                // threshold signals a cycle the backjump isn't breaking. Either way the
+                // conflict falls through to chronological within-node enumeration.
                 if (learned != null &&
                     learned.asserting &&
                     learned.literals.none { session.litTruth(it) == true } &&
                     relearnTripped?.invoke(learned) != true
                 ) {
-                    // Two guards before taking the backjump. The truth scan: a clause
-                    // carrying a literal that is already true here (a kept resolved-atom
-                    // literal can be) is satisfied, so popping to its backjump level cannot
-                    // make it unit — the assert would be a no-op and the popped frames'
-                    // untried values would be lost for nothing. The relearn failsafe: a
-                    // clause the analyzer keeps re-deriving identically signals a cycle the
-                    // backjump machinery isn't breaking. Either way the conflict falls
-                    // through to chronological within-node enumeration, which is complete
-                    // and always progresses.
                     return AdvanceOutcome.Backjump(learned)
                 }
                 continue
