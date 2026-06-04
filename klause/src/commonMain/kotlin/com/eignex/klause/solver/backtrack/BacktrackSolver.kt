@@ -7,8 +7,8 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SearchEvent
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolveStatsSink
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
@@ -198,9 +198,12 @@ class BacktrackSolver(override val problem: Problem) :
         // to root and re-traverses the bound-pruned tree instead of exhausting it once. The
         // proof of optimality then never terminates in budget while a restart-free DFS does.
         // Suppress restarts for the optimization path; VSIDS + phase-saving + LBD still apply.
+        val sink = SolveStatsSink(backend = "backtrack")
+        sink.start()
         for (outcome in driveSearch(
             params.copy(minHammingDistance = 0, recentWindow = 0, lubyRestartBase = null),
             pruneIf = pruneIf,
+            sink = sink,
         )) {
             when (outcome) {
                 is SearchOutcome.Found -> {
@@ -227,28 +230,33 @@ class BacktrackSolver(override val problem: Problem) :
                     // calling portfolio can upgrade to Optimal/Infeasible after combining
                     // every worker's verdict.
                     val externalShared = params.objectiveBoundSupplier != null
+                    sink.stop()
+                    val stats = sink.snapshot()
                     yield(
                         when {
                             externalShared && best != null ->
-                                MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted)
+                                MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted, stats)
 
                             externalShared ->
-                                MinimizeResult.Unknown(TerminationReason.SearchExhausted)
+                                MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
-                            best != null -> MinimizeResult.Optimal(best, bestObj)
+                            best != null -> MinimizeResult.Optimal(best, bestObj, stats)
 
-                            else -> MinimizeResult.Infeasible(outcome.core)
+                            else -> MinimizeResult.Infeasible(outcome.core, stats)
                         },
                     )
                     return@sequence
                 }
 
                 SearchOutcome.BudgetCapped -> {
+                    sink.stop()
+                    sink.timedOut = true
+                    val stats = sink.snapshot()
                     yield(
                         if (best != null) {
-                            MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
+                            MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted, stats)
                         } else {
-                            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                            MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
                         },
                     )
                     return@sequence
@@ -256,7 +264,14 @@ class BacktrackSolver(override val problem: Problem) :
             }
         }
         // Sequence drained without a terminal outcome — treat as exhausted.
-        yield(if (best != null) MinimizeResult.Optimal(best, bestObj) else MinimizeResult.Infeasible())
+        sink.stop()
+        yield(
+            if (best != null) {
+                MinimizeResult.Optimal(best, bestObj, sink.snapshot())
+            } else {
+                MinimizeResult.Infeasible(stats = sink.snapshot())
+            },
+        )
     }
 
     /**

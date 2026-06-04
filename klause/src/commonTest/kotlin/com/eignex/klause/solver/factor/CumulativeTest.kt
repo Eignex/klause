@@ -371,7 +371,12 @@ class CumulativeTest {
     @Test
     fun `single task never overloads`() {
         // One task, dur 2 res 1, capacity 1 — always fits, no false failure or tightening.
-        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(2), resources = intArrayOf(1), capacity = 1)
+        val factor = Cumulative(
+            starts = intArrayOf(0),
+            durations = intArrayOf(2),
+            resources = intArrayOf(1),
+            capacity = 1,
+        )
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -386,7 +391,12 @@ class CumulativeTest {
     fun `zero-duration task contributes no usage`() {
         // A duration-0 task occupies no time, so it never loads the resource — feasible even
         // when its resource demand exceeds capacity.
-        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(0), resources = intArrayOf(5), capacity = 1)
+        val factor = Cumulative(
+            starts = intArrayOf(0),
+            durations = intArrayOf(0),
+            resources = intArrayOf(5),
+            capacity = 1,
+        )
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -399,7 +409,12 @@ class CumulativeTest {
     @Test
     fun `zero capacity with a positive task is infeasible`() {
         // dur 1, res 1 task cannot run on a capacity-0 resource: per-task feasibility fails.
-        val factor = Cumulative(starts = intArrayOf(0), durations = intArrayOf(1), resources = intArrayOf(1), capacity = 0)
+        val factor = Cumulative(
+            starts = intArrayOf(0),
+            durations = intArrayOf(1),
+            resources = intArrayOf(1),
+            capacity = 0,
+        )
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,

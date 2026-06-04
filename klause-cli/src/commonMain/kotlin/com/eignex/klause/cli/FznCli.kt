@@ -13,6 +13,7 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -80,14 +81,34 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
 
 /** Live-event listener for `-v`, wired into the engine params ([SearchEvent] seam, #140);
  *  null when not verbose so the engines skip observation entirely. */
-private fun verboseListener(opts: FznOptions): ((SearchEvent) -> Unit)? {
-    if (!opts.verbose) return null
+internal fun verboseListener(verbose: Boolean): ((SearchEvent) -> Unit)? {
+    if (!verbose) return null
     val log = cliLogger(verbose = true)
     val start = nowMillis()
     return { e ->
         val t = nowMillis() - start
         log.v { describeEvent(e, t) }
     }
+}
+
+/**
+ * `-s`: print solver statistics in MiniZinc's standard format — `%%%mzn-stat: key=value`
+ * lines closed by `%%%mzn-stat-end` (#141). [stats] carries the engine counters when the
+ * run produced a terminal verdict that reports them ([SolveStats.EMPTY] otherwise — e.g.
+ * portfolio runs or `-a` enumeration); the CLI-side [solveTimeMs] and [solutions] are
+ * always available.
+ */
+internal fun printMznStats(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+    println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
+    println("%%%mzn-stat: solutions=$solutions")
+    if (stats.backend.isNotEmpty()) {
+        println("%%%mzn-stat: nodes=${stats.nodes.sum.toLong()}")
+        println("%%%mzn-stat: failures=${stats.fails.sum.toLong()}")
+        println("%%%mzn-stat: restarts=${stats.restarts.sum.toLong()}")
+        println("%%%mzn-stat: propagations=${stats.propagations.sum.toLong()}")
+        if (stats.peakDepth.max.isFinite()) println("%%%mzn-stat: peakDepth=${stats.peakDepth.max.toLong()}")
+    }
+    println("%%%mzn-stat-end")
 }
 
 /** Per-worker `-v` listener for the portfolio paths ([SearchEvent] seam, #140). Workers run
@@ -177,7 +198,7 @@ private fun runWithBacktrack(program: FlatZincProgram, opts: FznOptions) {
         base.copy(
             randomSeed = opts.randomSeed ?: base.randomSeed,
             cancellation = cancellation,
-            onEvent = verboseListener(opts),
+            onEvent = verboseListener(opts.verbose),
         ),
         EngineParams(opts.engineParams),
     )
@@ -235,7 +256,7 @@ private fun runWithLocalSearch(program: FlatZincProgram, opts: FznOptions) {
         costShaping = CostShaping.Linear(lambda = setup.lambda),
         cancellation = cancellation,
         initialAssignment = initial,
-        onEvent = verboseListener(opts),
+        onEvent = verboseListener(opts.verbose),
     )
     cliLogger(
         opts.verbose,
@@ -388,29 +409,57 @@ private fun <P : SolverParams> runSatisfy(
     complete: Boolean,
 ) {
     val applier = loadOznApplier(opts)
+    val t0 = nowMillis()
     val limit = if (opts.allSolutions) opts.solutionCap ?: Long.MAX_VALUE else 1L
+
+    // Single-solution satisfy (the standard MiniZinc invocation) goes through `solve`,
+    // whose result carries the engine's [SolveStats] for `-s`; enumeration semantics are
+    // only needed under `-a` / `-n`, where the engine reports no run totals.
+    if (limit == 1L) {
+        when (val r = solver.solve(params)) {
+            is SolveResult.Sat -> {
+                print(renderSolution(applier, program, r.assignment))
+                println("==========")
+                if (opts.statistics) printMznStats(r.stats, nowMillis() - t0, solutions = 1L)
+            }
+
+            is SolveResult.Unsat -> {
+                println(if (complete) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
+                if (opts.statistics) printMznStats(r.stats, nowMillis() - t0, solutions = 0L)
+            }
+
+            is SolveResult.Unknown -> {
+                println("=====UNKNOWN=====")
+                if (opts.statistics) printMznStats(r.stats, nowMillis() - t0, solutions = 0L)
+            }
+        }
+        return
+    }
+
     var produced = 0L
     val deadline = opts.timeLimitMs?.let { nowMillis() + it }
-
+    var timedOut = false
     for (sample in solver.enumerate(params)) {
         if (deadline != null && nowMillis() > deadline) {
-            println("=====UNKNOWN=====")
-            return
+            timedOut = true
+            break
         }
         print(renderSolution(applier, program, sample))
         produced++
         if (produced >= limit) break
     }
 
-    if (produced == 0L) {
+    if (timedOut && produced == 0L) {
+        println("=====UNKNOWN=====")
+    } else if (produced == 0L) {
         // No solution found: only a complete search that ran to completion proves
-        // unsatisfiability. An incomplete (local-search) budget exhaustion — or a `-t`
-        // cancellation that emptied the enumeration — can only report UNKNOWN.
-        val timedOut = deadline != null && nowMillis() > deadline
-        println(if (complete && !timedOut) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
+        // unsatisfiability. An incomplete (local-search) budget exhaustion can only
+        // report UNKNOWN.
+        println(if (complete) "=====UNSATISFIABLE=====" else "=====UNKNOWN=====")
     } else {
         println("==========")
     }
+    if (opts.statistics) printMznStats(SolveStats.EMPTY, nowMillis() - t0, produced)
 }
 
 private fun <P : SolverParams> runOptimize(
@@ -452,24 +501,33 @@ private fun <P : SolverParams> runOptimize(
             linear
         }
     var produced = 0
+    val t0 = nowMillis()
+    var lastStats = SolveStats.EMPTY
+    fun statsLine(step: MinimizeResult) {
+        if (opts.statistics) printMznStats(step.stats, nowMillis() - t0, produced.toLong())
+    }
     for (step in optimizer.improvements(objective, params)) {
+        lastStats = step.stats
         when (step) {
             is MinimizeResult.WithSample -> {
                 print(renderSolution(applier, program, step.sample))
                 produced++
                 if (step is MinimizeResult.Optimal) {
                     println("==========")
+                    statsLine(step)
                     return
                 }
             }
 
             is MinimizeResult.Infeasible -> {
                 println("=====UNSATISFIABLE=====")
+                statsLine(step)
                 return
             }
 
             is MinimizeResult.Unknown -> {
                 println("=====UNKNOWN=====")
+                statsLine(step)
                 return
             }
         }
@@ -480,6 +538,9 @@ private fun <P : SolverParams> runOptimize(
     // must not print `==========`, which would falsely claim the last incumbent is optimal.
     // Only signal UNKNOWN when nothing feasible was found at all.
     if (produced == 0) println("=====UNKNOWN=====")
+    // The terminal BestFound (budget hit with incumbents) ends the stream without an early
+    // return above; its stats are the run totals.
+    if (opts.statistics) printMznStats(lastStats, nowMillis() - t0, produced.toLong())
 }
 
 private fun <P : SolverParams> runOptimizeViaEnumerate(

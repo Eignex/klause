@@ -4,12 +4,12 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.propagation.PropagationResult.Implied
-import com.eignex.klause.solver.propagation.PropagationResult.Unsat
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.propagation.PropagationResult.Implied
+import com.eignex.klause.solver.propagation.PropagationResult.Unsat
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -82,24 +82,33 @@ class IntArrayListTest {
                 when (rng.nextInt(4)) {
                     0 -> {
                         val v = rng.nextInt(20)
-                        list.add(v); ref.add(v)
+                        list.add(v);
+                        ref.add(v)
                     }
+
                     1 -> if (ref.isNotEmpty()) {
                         val i = rng.nextInt(ref.size)
                         list.removeAt(i)
-                        ref[i] = ref[ref.size - 1]; ref.removeAt(ref.size - 1)
+                        ref[i] = ref[ref.size - 1];
+                        ref.removeAt(ref.size - 1)
                     }
+
                     2 -> {
                         val v = rng.nextInt(20)
                         val found = list.removeValue(v)
                         val idx = ref.indexOf(v)
                         assertEquals(idx >= 0, found, "removeValue presence must match reference")
-                        if (idx >= 0) { ref[idx] = ref[ref.size - 1]; ref.removeAt(ref.size - 1) }
+                        if (idx >= 0) {
+                            ref[idx] = ref[ref.size - 1];
+                            ref.removeAt(ref.size - 1)
+                        }
                     }
+
                     3 -> if (ref.isNotEmpty()) {
                         val i = rng.nextInt(ref.size)
                         val v = rng.nextInt(20)
-                        list[i] = v; ref[i] = v
+                        list[i] = v;
+                        ref[i] = v
                     }
                 }
                 assertEquals(ref.size, list.size)

@@ -278,8 +278,10 @@ class AtomConflictAnalyzerTest {
                         "instance $idx: BnB optimum ${gotOpt.objective} != brute optimum ${truth.objective}",
                     )
                 }
+
                 is MinimizeResult.Infeasible ->
                     assertIs<MinimizeResult.Infeasible>(got, "instance $idx: brute says infeasible")
+
                 else -> error("instance $idx: brute oracle returned non-terminal $truth")
             }
         }
@@ -290,10 +292,9 @@ class AtomConflictAnalyzerTest {
  *  [ConflictAnalyzer]'s `levelOf`: bool vars via [PropagationState.boolLevel], atoms via the
  *  bound-history-derived [PropagationState.atomLevelForConflict] (#76). */
 internal object ConflictAnalyzerTestAccess {
-    fun levelOf(state: PropagationState, v: Int): Int =
-        if (v < state.problem.numBoolVars) {
-            state.boolLevel[v]
-        } else {
-            state.atomLevelForConflict(v - state.problem.numBoolVars)
-        }
+    fun levelOf(state: PropagationState, v: Int): Int = if (v < state.problem.numBoolVars) {
+        state.boolLevel[v]
+    } else {
+        state.atomLevelForConflict(v - state.problem.numBoolVars)
+    }
 }

@@ -44,7 +44,9 @@ class ReifiedAtomCycleTest {
         // Linking clauses: (v0==0) → (v1==1), (v1==1) → (v2==2), and not all three equal to 0.
         factors.add(Clause(intArrayOf(Lit.make(chan(0, 0), false), Lit.make(chan(1, 1), true))))
         factors.add(Clause(intArrayOf(Lit.make(chan(1, 1), false), Lit.make(chan(2, 2), true))))
-        factors.add(Clause(intArrayOf(Lit.make(chan(0, 0), false), Lit.make(chan(1, 0), false), Lit.make(chan(2, 0), false))))
+        factors.add(
+            Clause(intArrayOf(Lit.make(chan(0, 0), false), Lit.make(chan(1, 0), false), Lit.make(chan(2, 0), false))),
+        )
 
         val p = Problem(
             numBoolVars = numBool,
@@ -60,9 +62,13 @@ class ReifiedAtomCycleTest {
             if (a[0] == 0 && a[1] == 0 && a[2] == 0) return false
             return true
         }
-        for (x0 in 0..2) for (x1 in 0..2) for (x2 in 0..2) {
+        for (x0 in 0..2) {
+            for (x1 in 0..2) {
+                for (x2 in 0..2) {
             val a = intArrayOf(x0, x1, x2)
             if (ok(a)) brute.add(a.toList())
+        }
+            }
         }
 
         val params = BacktrackParams(randomSeed = 1L, variableHeuristic = Vsids(), maxLearnedClauses = 1_000)

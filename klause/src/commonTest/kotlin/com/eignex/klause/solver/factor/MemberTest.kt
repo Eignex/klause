@@ -42,7 +42,10 @@ class MemberTest {
                     return
                 }
                 val range = if (p < n) xr[p] else yr
-                for (v in range.first..range.second) { acc[p] = v; rec(p + 1) }
+                for (v in range.first..range.second) {
+                    acc[p] = v;
+                    rec(p + 1)
+                }
             }
             rec(0)
 

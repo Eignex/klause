@@ -216,7 +216,11 @@ private fun run(ing: Parsed, opts: XcspOptions): Verdict {
     return when (opts.engine) {
         Engine.BACKTRACK -> {
             val params = applyBacktrackParams(
-                BacktrackParams(randomSeed = opts.seed ?: 0L, cancellation = cancellation),
+                BacktrackParams(
+                    randomSeed = opts.seed ?: 0L,
+                    cancellation = cancellation,
+                    onEvent = verboseListener(opts.verbose),
+                ),
                 EngineParams(opts.params),
             )
             runOn(BacktrackSolver(ing.problem), params, ing)
@@ -227,7 +231,11 @@ private fun run(ing: Parsed, opts: XcspOptions): Verdict {
             // strategy bench sweep — so `-p tabu-tenure/pair-swap-budget/lambda` mean the
             // same thing on both paths.
             val (base, setup) = applyLsParams(
-                LocalSearchParams(randomSeed = opts.seed, cancellation = cancellation),
+                LocalSearchParams(
+                    randomSeed = opts.seed,
+                    cancellation = cancellation,
+                    onEvent = verboseListener(opts.verbose),
+                ),
                 EngineParams(opts.params),
             )
             val tabu = TabuFilter(tenure = setup.tabuTenure, aspiration = AspirationCriterion.OrImproving)
@@ -320,7 +328,7 @@ private data class XcspOptions(
     val params: List<String>,
     /** `-p N`: number of parallel workers; N > 1 routes to the portfolio. */
     val parallel: Int?,
-    /** `-v`: live progress on stderr (portfolio worker events). */
+    /** `-v`: live progress on stderr (engine and portfolio-worker events). */
     val verbose: Boolean,
 )
 
