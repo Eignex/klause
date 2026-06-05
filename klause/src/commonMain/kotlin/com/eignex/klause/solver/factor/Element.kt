@@ -206,16 +206,21 @@ class Element(
         if (d.min == d.max) {
             val pos = d.min - indexOffset
             if (pos in 0 until len) {
-                val ant = state.composeIntVarAtomAntecedents(intArrayOf(idx))
                 if (arrIsVars) {
+                    // The channeled bound is the OTHER var's current bound, so that var's
+                    // own trail joins the reason — citing the index pin alone would record
+                    // "idx = pos → bound" as if it held for any source value.
                     val sel = arr[pos]
                     val rd = state.intDomains[result]
                     val sd = state.intDomains[sel]
-                    if (!state.tightenIntMin(result, sd.min, ant)) return false
-                    if (!state.tightenIntMax(result, sd.max, ant)) return false
-                    if (!state.tightenIntMin(sel, rd.min, ant)) return false
-                    if (!state.tightenIntMax(sel, rd.max, ant)) return false
+                    val antFromSel = state.composeIntVarAtomAntecedents(intArrayOf(idx, sel))
+                    if (!state.tightenIntMin(result, sd.min, antFromSel)) return false
+                    if (!state.tightenIntMax(result, sd.max, antFromSel)) return false
+                    val antFromResult = state.composeIntVarAtomAntecedents(intArrayOf(idx, result))
+                    if (!state.tightenIntMin(sel, rd.min, antFromResult)) return false
+                    if (!state.tightenIntMax(sel, rd.max, antFromResult)) return false
                 } else {
+                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(idx))
                     val v = arr[pos]
                     if (!state.tightenIntMin(result, v, ant)) return false
                     if (!state.tightenIntMax(result, v, ant)) return false
