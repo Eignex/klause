@@ -93,6 +93,41 @@ class Cbls(
      *  −2 feasible with it on everywhere. Use via the portfolio's plateau worker or set
      *  explicitly on permutation/assignment-shaped problems. */
     val stallSwapCap: Int = 0,
+    /** **Ejection chains** (opt-in, `0` = off): cap on stall-gated directed repair-chain
+     *  compounds injected per stalled [pickMove] (see
+     *  [LocalSearchState.proposeRepairChains]). Where [stallSwapCap] hard-codes the one
+     *  coordinated shape assignment plateaus need (a same-domain pair swap), chains *derive*
+     *  the coordinated move from the break structure: apply a violated factor's repair,
+     *  find the factor it newly regressed, append that factor's best eligible repair, and
+     *  repeat to [stallChainDepth] — emitting the walk's best ≥2-part prefix as one atomic
+     *  compound. This is the move class successor/path encodings
+     *  (pos/next models à la prize-collecting) are missing: relocating a node into the tour
+     *  requires re-linking predecessor, position and tail in one move, which no bounded set
+     *  of single-var repairs (and no same-domain swap) expresses.
+     *
+     *  Enters the candidate race the same way the stall swaps do — **score only, never the
+     *  noise draw**, with stalled noise restricted to primitive moves while active. Those
+     *  two properties are the measured package (#139 ablation): coordinated moves taken by
+     *  dice thrash plateaus (bacp 8 → 104 under random coupling chains), the same shapes
+     *  taken by score are the escape mechanism. */
+    val stallChainCap: Int = 0,
+    /** Maximum repair steps per ejection chain (only consulted when [stallChainCap] > 0). */
+    val stallChainDepth: Int = 4,
+    /** **Targeted kick** (opt-in, `0` = off): steps without a strict cost drop before a
+     *  bounded LNS-style perturbation fires — randomize up to [stallKickVars] variables in
+     *  the 2-hop neighbourhood of a random violated factor and let the descent re-converge.
+     *  The escalation tier above [stallChainCap]: score-gated chains escape plateaus whose
+     *  exit is expressible as a bounded directed walk, but the repair-graph probe on
+     *  prize-collecting proved some cost-1 orbits are *closed* — every exit passes through
+     *  states several violations uphill, beyond any score-gated move's reach. A kick is a
+     *  dice move, but unlike the measured-negative hot-noise compound picks (#139: bacp
+     *  8 → 104) it is (a) rare — fires once per [stallKickAfter]-step certified-stuck
+     *  window, not per stalled pick, and (b) local — confined to the violated factor's
+     *  2-hop variable cone, the region the search has proven it cannot repair in place.
+     *  Should be ≫ [frontierAfterStall] so chains get their chance first. */
+    val stallKickAfter: Int = 0,
+    /** Variables randomized per targeted kick (only consulted when [stallKickAfter] > 0). */
+    val stallKickVars: Int = 8,
     val tabu: TabuFilter = TabuFilter.Disabled,
     /** Move-scoring basis. [MoveScoring.Weighted] (default) scores by the per-factor
      *  [LocalSearchState.factorWeights] gradient — the CBLS signal. [MoveScoring.Raw] scores by
@@ -129,6 +164,10 @@ class Cbls(
         require(frontierMoveCap >= 1) { "frontierMoveCap ≥ 1, got $frontierMoveCap" }
         require(stallNoise in 0.0..1.0) { "stallNoise ∈ [0, 1], got $stallNoise" }
         require(stallSwapCap >= 0) { "stallSwapCap ≥ 0, got $stallSwapCap" }
+        require(stallChainCap >= 0) { "stallChainCap ≥ 0, got $stallChainCap" }
+        require(stallChainDepth >= 2) { "stallChainDepth ≥ 2, got $stallChainDepth" }
+        require(stallKickAfter >= 0) { "stallKickAfter ≥ 0, got $stallKickAfter" }
+        require(stallKickVars >= 1) { "stallKickVars ≥ 1, got $stallKickVars" }
         require(maxNeighborhood >= 1) { "maxNeighborhood ≥ 1, got $maxNeighborhood" }
         require(candidatesPerLevel >= 1) { "candidatesPerLevel ≥ 1, got $candidatesPerLevel" }
         require(skewAlpha >= 0.0) { "skewAlpha ≥ 0, got $skewAlpha" }
@@ -174,6 +213,17 @@ class Cbls(
         // ([maxNeighborhood] == 1) skip this entirely, leaving the flat CBLS path unchanged.
         if (maxNeighborhood > 1 && state.cost > 0L) return pickMoveLadder(state)
 
+        // Targeted kick escalation (see [stallKickAfter]): the search has been certified
+        // stuck for a window long enough that chains/swaps/noise have all had their chance —
+        // perturb the violated factor's local cone and restart the descent clock.
+        if (stallKickAfter > 0 && state.cost > 0 && state.step - lastDropStep >= stallKickAfter) {
+            val kick = buildStallKick(state)
+            if (kick != null) {
+                lastDropStep = state.step // fresh descent window after the perturbation
+                return kick
+            }
+        }
+
         // Plateau escape: when no strict cost drop for [frontierAfterStall] steps, the search
         // is trapped — the violated-only candidate pool is too small for noise/weight-bumping
         // to escape. Broaden the pool with frontier (neighbour) moves and raise noise.
@@ -190,18 +240,35 @@ class Cbls(
         sampleFromSatisfied(state, sink)
         seedObjectiveMoves(state, sink)
 
-        // Stall swaps live in a private sink: they compete on *score only*, never in the
-        // noise draw. Random-picking a 2-var swap is a large destructive perturbation
-        // (measured on bacp: min 7 → 67); score-picked, the same swaps are exactly the
-        // coordinated escape the reification plateaus need (bacp/curriculum solve). All
-        // other candidates — including factor-proposed compounds — keep the original
-        // noise-eligible behavior; restricting those too regressed the instances whose
-        // diversification relied on them (rcpsp-wet, spot5, tpp).
+        // Stall swaps and ejection chains live in a private sink: they compete on *score
+        // only*, never in the noise draw. Random-picking a multi-var coordinated move is a
+        // large destructive perturbation (measured on bacp: min 7 → 67); score-picked, the
+        // same moves are exactly the coordinated escape the reification plateaus need
+        // (bacp/curriculum solve). All other candidates — including factor-proposed
+        // compounds — keep the original noise-eligible behavior; restricting those too
+        // regressed the instances whose diversification relied on them (rcpsp-wet, spot5,
+        // tpp).
         swapSink.clear()
-        if (stalled) sampleStallSwaps(state, swapSink)
-        val swaps = swapSink.list
+        if (stalled) {
+            sampleStallSwaps(state, swapSink)
+            sampleStallChains(state, swapSink)
+        }
 
-        val raw = sink.list
+        var raw = sink.list
+        if (raw.isEmpty() && swapSink.list.isEmpty() && !stalled) {
+            // Starvation fallback: under per-move invariants a violated factor whose repair
+            // proposals all target *defined* vars contributes nothing — on reified-heavy
+            // models (every indicator bool defined) whole picks come up empty, the engine
+            // restarts, and because null picks never advance `state.step` the stall
+            // machinery that would broaden the pool never engages (measured on
+            // prize-collecting: restart churn at cost ≈166 under invariants). Broaden
+            // immediately instead: frontier moves reach the searched neighbour vars, and
+            // chains (when enabled) walk the break structure from them.
+            sampleFrontier(state, sink)
+            sampleStallChains(state, swapSink)
+            raw = sink.list
+        }
+        val swaps = swapSink.list
         if (raw.isEmpty() && swaps.isEmpty()) return null
         val filtered = tabu.filter(state, raw)
         // While stalled, never let tabu starve the pool into a null move (which forces a
@@ -222,7 +289,7 @@ class Cbls(
             // bacp they thrash the plateau — while the same compounds score-picked are the
             // escape mechanism. Gated with the swaps because alone it starves landscapes
             // whose diversification relies on randomly-taken factor compounds.
-            val pool = if (stalled && stallSwapCap > 0) {
+            val pool = if (stalled && (stallSwapCap > 0 || stallChainCap > 0)) {
                 moves.filterNot { it is Move.Compound }.ifEmpty { moves }
             } else {
                 moves
@@ -249,8 +316,9 @@ class Cbls(
         return bestMove
     }
 
-    /** Private sink for stall-swap candidates — kept out of [LocalSearchState.moveSink] so
-     *  swaps are excluded from the noise draw by construction (see [pickMove]). */
+    /** Private sink for stall-swap and ejection-chain candidates — kept out of
+     *  [LocalSearchState.moveSink] so coordinated escapes are excluded from the noise draw
+     *  by construction (see [pickMove]). */
     private val swapSink: MoveSink = MoveSink()
 
     /** Score a candidate move. **Feasibility-first**: the objective component is gated
@@ -417,6 +485,101 @@ class Cbls(
             budget--
         }
     }
+
+    /** Stall-gated ejection-chain proposals (see [stallChainCap]): grow up to the cap of
+     *  directed repair chains from random violated seed factors, each chain entering the
+     *  score-only race as one atomic compound. Construction is delegated to
+     *  [LocalSearchState.proposeRepairChains]; this just spends the per-pick budget. */
+    private fun sampleStallChains(state: LocalSearchState, sink: MoveSink) {
+        if (stallChainCap <= 0 || state.violated.isEmpty()) return
+        var budget = stallChainCap
+        repeat(minOf(stallChainCap, state.violated.size)) {
+            if (budget <= 0) return
+            val fid = state.violated.random(state.rng)
+            budget -= state.proposeRepairChains(
+                seedFactor = fid,
+                maxDepth = stallChainDepth,
+                firstMoveCap = CHAIN_FIRST_MOVES,
+                sink = sink,
+            )
+        }
+    }
+
+    /** Build one targeted kick (see [stallKickAfter]): a **random walk** over the
+     *  variable–factor occurrence graph starting at a random violated factor, randomizing
+     *  up to [stallKickVars] distinct variables along the way. A walk rather than a cone
+     *  sample: coupled structures (successor chains, channeling rings) stretch the stuck
+     *  region many hops from the violated factor while wide global constraints make even
+     *  the 2-hop cone span most of the problem — a cone sample dilutes the kick over
+     *  uncoupled variables, a walk follows the coupling and can reach e.g. the head of a
+     *  parasitic successor chain whose dangling tail is the only violation (the measured
+     *  prize-collecting orbit shape). Returns null when nothing eligible. */
+    private fun buildStallKick(state: LocalSearchState): Move? {
+        if (state.violated.isEmpty()) return null
+        val problem = state.problem
+        var factor = state.factors[state.violated.random(state.rng)]
+        // Reuse the strategy-private sink so frozen/defined filtering applies; channeling
+        // keeps indicator bools consistent with kicked int values.
+        kickSink.clear()
+        kickSink.setAssumptions(state.assumptions)
+        kickSink.setInvariants(state.invariants)
+        var budget = stallKickVars
+        var attempts = stallKickVars * ATTEMPTS_PER_SWAP
+        while (budget > 0 && attempts-- > 0) {
+            // Step 1: a random variable of the current factor.
+            val nInts = factor.intVars.size
+            val nBools = factor.boolVars.size
+            if (nInts + nBools == 0) break
+            val pick = state.rng.nextInt(nInts + nBools)
+            val occ: IntArray
+            if (pick < nInts) {
+                val v = factor.intVars[pick]
+                val d = problem.intDomains[v]
+                val span = (d.max.toLong() - d.min.toLong()).toInt()
+                if (span > 0) {
+                    val nv = d.min + state.rng.nextInt(span + 1)
+                    if (nv != state.assignment.intValue(v)) {
+                        kickSink.addChannelingIntSet(state, v, nv)
+                        budget--
+                    }
+                }
+                occ = problem.intOccurrences[v]
+            } else {
+                val v = factor.boolVars[pick - nInts]
+                kickSink.addBoolFlip(v)
+                budget--
+                occ = problem.boolOccurrences[v]
+            }
+            // Step 2: hop to a random factor sharing that variable and continue the walk.
+            if (occ.isEmpty()) break
+            factor = state.factors[occ[state.rng.nextInt(occ.size)]]
+        }
+        // Flatten everything queued into one atomic perturbation, first-write-wins per slot.
+        val parts = ArrayList<Move>()
+        val seenSlots = HashSet<Int>()
+        fun addPart(p: Move) {
+            val slot = when (p) {
+                is Move.BoolFlip -> p.varId
+                is Move.IntSet -> state.problem.numBoolVars + p.varId
+                is Move.Compound -> return
+            }
+            if (seenSlots.add(slot)) parts.add(p)
+        }
+        for (m in kickSink.list) {
+            when (m) {
+                is Move.Compound -> for (p in m.parts) addPart(p)
+                else -> addPart(m)
+            }
+        }
+        return when (parts.size) {
+            0 -> null
+            1 -> parts[0]
+            else -> Move.Compound(parts)
+        }
+    }
+
+    /** Private sink for [buildStallKick] proposals. */
+    private val kickSink: MoveSink = MoveSink()
 
     private fun sampleFromSatisfied(state: LocalSearchState, sink: MoveSink) {
         if (satisfiedSampleCount == 0) return
@@ -606,6 +769,9 @@ class Cbls(
 
         /** Rejection-sampling attempts allowed per requested stall swap (see [sampleStallSwaps]). */
         private const val ATTEMPTS_PER_SWAP = 4
+
+        /** First-move branch width per ejection-chain seed factor (see [sampleStallChains]). */
+        private const val CHAIN_FIRST_MOVES = 4
 
         /**
          * Classical Variable-Neighbourhood-Descent as a [Cbls] preset (the unified strategy

@@ -83,30 +83,60 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
     if (byIntDef.isEmpty() && byBoolDef.isEmpty()) return null
 
     val nodes = ArrayList<DefinitionalSweep.SweepNode>(byIntDef.size + byBoolDef.size)
-    val visitedInt = HashSet<Int>()
-    val visitedBool = HashSet<Int>()
+    // Three-color DFS (gray = on the current path, black = finished): a definition re-entered
+    // while gray sits on a definitional CYCLE (e.g. prize-collecting's `pos` defined via
+    // element over `next`, feeding back). A cycle has no topological order — one-pass sweep
+    // evaluation reads stale values forever and the per-move invariant network would mark its
+    // members defined (search-excluded) while being unable to maintain them, starving the
+    // move pool (measured on prize-collecting: pickMove starvation at cost ≈166 vs the
+    // cost-1 walk without invariants). Dropping the re-entered definition breaks the cycle —
+    // that var stays a searched factor input — and keeps the rest maximally defined.
+    val grayInt = HashSet<Int>()
+    val grayBool = HashSet<Int>()
+    val doneInt = HashSet<Int>()
+    val doneBool = HashSet<Int>()
+    val cyclicInt = HashSet<Int>()
+    val cyclicBool = HashSet<Int>()
     // Bool definitions read int vars and vice versa (bool2int), so the two visits are
     // mutually recursive; a local holder breaks the forward reference without shared state.
     var visitBoolRef: ((Int) -> Unit)? = null
 
     fun visitInt(id: Int) {
-        if (id in visitedInt) return
+        if (id in doneInt) return
+        if (id in grayInt) {
+            cyclicInt.add(id)
+            return
+        }
         val c = byIntDef[id] ?: return // free var: a sweep input, not a node
-        visitedInt.add(id)
-        val built = buildIntSweepNode(c, id) ?: return // unbuildable: stays a searched factor
-        for (inId in built.intInputs) visitInt(inId)
-        for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
-        nodes.add(built)
+        grayInt.add(id)
+        // Unbuildable definitions stay searched factors; inputs of a built node are visited
+        // before the node is appended so the surviving order is topological.
+        val built = buildIntSweepNode(c, id)
+        if (built != null) {
+            for (inId in built.intInputs) visitInt(inId)
+            for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
+            if (id !in cyclicInt) nodes.add(built)
+        }
+        grayInt.remove(id)
+        doneInt.add(id)
     }
 
     fun visitBool(id: Int) {
-        if (id in visitedBool) return
+        if (id in doneBool) return
+        if (id in grayBool) {
+            cyclicBool.add(id)
+            return
+        }
         val c = byBoolDef[id] ?: return
-        visitedBool.add(id)
-        val built = buildBoolSweepNode(c, id) ?: return
-        for (inId in built.intInputs) visitInt(inId)
-        for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
-        nodes.add(built)
+        grayBool.add(id)
+        val built = buildBoolSweepNode(c, id)
+        if (built != null) {
+            for (inId in built.intInputs) visitInt(inId)
+            for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
+            if (id !in cyclicBool) nodes.add(built)
+        }
+        grayBool.remove(id)
+        doneBool.add(id)
     }
     visitBoolRef = ::visitBool
     for (id in byIntDef.keys.sorted()) visitInt(id)
