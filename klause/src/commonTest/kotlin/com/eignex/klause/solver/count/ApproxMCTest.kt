@@ -31,7 +31,7 @@ class ApproxMCTest {
         val exact = exactCount(p)
         val eps = 0.8
         val r = BacktrackSolver(p).approximateCount(
-            ApproxCountConfig(epsilon = eps, delta = 0.2, seed = 12345L),
+            ApproxCountConfig(epsilon = eps, delta = 0.01, seed = 12345L),
         )
         assertTrue(!r.exact, "instance should require hashing")
         assertWithinBand(exact, r.estimate, eps)
@@ -50,7 +50,7 @@ class ApproxMCTest {
         val exact = exactCount(p)
         val eps = 0.8
         val r = BacktrackSolver(p).approximateCount(
-            ApproxCountConfig(epsilon = eps, delta = 0.2, seed = 999L),
+            ApproxCountConfig(epsilon = eps, delta = 0.01, seed = 999L),
         )
         assertWithinBand(exact, r.estimate, eps)
     }
@@ -60,7 +60,7 @@ class ApproxMCTest {
         // 10 vars, project onto the first 6: every projection is reachable -> 2^6 = 64.
         val p = unconstrained(10)
         val r = BacktrackSolver(p).approximateCount(
-            ApproxCountConfig(epsilon = 0.8, delta = 0.2, samplingSet = intArrayOf(0, 1, 2, 3, 4, 5), seed = 5L),
+            ApproxCountConfig(epsilon = 0.8, delta = 0.01, samplingSet = intArrayOf(0, 1, 2, 3, 4, 5), seed = 5L),
         )
         assertWithinBand(64L, r.estimate, 0.8)
     }
