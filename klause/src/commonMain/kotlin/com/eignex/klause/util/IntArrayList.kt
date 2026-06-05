@@ -16,6 +16,13 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         data[index] = value
     }
 
+    /** Insert [value] at [index], shifting the tail right. */
+    fun insertAt(index: Int, value: Int) {
+        add(0) // grow by one (value irrelevant; overwritten by the shift)
+        for (i in size - 1 downTo index + 1) data[i] = data[i - 1]
+        data[index] = value
+    }
+
     fun removeAt(index: Int) {
         data[index] = data[--size]
     }

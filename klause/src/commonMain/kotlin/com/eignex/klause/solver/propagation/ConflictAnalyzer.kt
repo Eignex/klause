@@ -276,7 +276,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (v < 0) null else state.boolAntecedents[v]
         } else {
             val atomId = v - numBoolVars
-            if (atomId < state.atomAntecedents.size) state.atomAntecedents[atomId] else null
+            if (atomId < state.atomIntVar.size) state.atomAntecedentsDerived(atomId) else null
         }
     }
 
@@ -482,7 +482,25 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         val numBoolVars = state.problem.numBoolVars
         for (lit in reason) {
             val v = Lit.variable(lit)
-            if (v >= universe) continue // atom allocated after analyzer started; shouldn't happen
+            if (v >= universe) {
+                // An atom materialised mid-analysis — derived antecedents allocate the
+                // opposing-bound atoms they cite. It has no frontier slot, so keep the
+                // literal in the clause as a leaf (deduped): adding a literal only weakens
+                // the clause, while dropping it would silently strengthen the nogood past
+                // what was derived.
+                var present = false
+                for (i in 0 until learned.size) {
+                    if (learned[i] == lit) {
+                        present = true
+                        break
+                    }
+                }
+                if (!present) {
+                    learned.add(lit)
+                    if (levelOf(v) == currentLevel) bumpCurrentLevel()
+                }
+                continue
+            }
             if (seen[v]) continue // already in the frontier
             if (resolved[v]) {
                 // Resolved out as a pivot already. The bool implication graph is acyclic, so a

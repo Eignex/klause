@@ -136,18 +136,79 @@ class PropagationState(
     private val maxHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
     private val maxHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
-    private fun pushMinHist(v: Int, value: Int, level: Int) {
+    // Per-entry reasons alongside the bound histories: the near reason justifies the
+    // requested bound, the far reason additionally carries the hole-snap chain, and the
+    // requested value says which thresholds each covers. Together they let an atom's
+    // antecedents be derived on demand for any threshold the move crossed — the lazy
+    // replacement for storing a per-atom antecedent snapshot.
+    private val minHistAntNear: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+    private val minHistAntFar: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+    private val minHistReq: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    private val maxHistAntNear: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+    private val maxHistAntFar: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+    private val maxHistReq: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    private val holeHistAnt: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+
+    private fun pushMinHist(v: Int, value: Int, level: Int, antNear: IntArray?, antFar: IntArray?, requested: Int) {
         val vals = minHistVal[v] ?: IntArrayList(initialCapacity = 4).also { minHistVal[v] = it }
         val lvls = minHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { minHistLvl[v] = it }
+        val near = minHistAntNear[v] ?: ArrayList<IntArray?>(4).also { minHistAntNear[v] = it }
+        val far = minHistAntFar[v] ?: ArrayList<IntArray?>(4).also { minHistAntFar[v] = it }
+        val req = minHistReq[v] ?: IntArrayList(initialCapacity = 4).also { minHistReq[v] = it }
         vals.add(value)
         lvls.add(level)
+        near.add(antNear)
+        far.add(antFar)
+        req.add(requested)
     }
 
-    private fun pushMaxHist(v: Int, value: Int, level: Int) {
+    private fun pushMaxHist(v: Int, value: Int, level: Int, antNear: IntArray?, antFar: IntArray?, requested: Int) {
         val vals = maxHistVal[v] ?: IntArrayList(initialCapacity = 4).also { maxHistVal[v] = it }
         val lvls = maxHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { maxHistLvl[v] = it }
+        val near = maxHistAntNear[v] ?: ArrayList<IntArray?>(4).also { maxHistAntNear[v] = it }
+        val far = maxHistAntFar[v] ?: ArrayList<IntArray?>(4).also { maxHistAntFar[v] = it }
+        val req = maxHistReq[v] ?: IntArrayList(initialCapacity = 4).also { maxHistReq[v] = it }
         vals.add(value)
         lvls.add(level)
+        near.add(antNear)
+        far.add(antFar)
+        req.add(requested)
+    }
+
+    /** Reason for `[v ≥ k]` being true: null (a root/bake fact) when no search-time move
+     *  is on record, else the recorded reason of the move that first reached ≥ [k] — the
+     *  near set when the move's requested bound already covers [k], the far (hole-snap
+     *  chained) set otherwise. */
+    private fun minReasonFor(v: Int, k: Int): IntArray? {
+        if (k <= problem.intDomains[v].min) return null
+        val vals = minHistVal[v] ?: return null
+        val i = vals.lowerBound(k)
+        if (i >= vals.size) return null
+        return if (k <= requireNotNull(minHistReq[v])[i]) {
+            requireNotNull(minHistAntNear[v])[i]
+        } else {
+            requireNotNull(minHistAntFar[v])[i]
+        }
+    }
+
+    /** Reason for `[v ≤ k]` being true; symmetric to [minReasonFor]. */
+    private fun maxReasonFor(v: Int, k: Int): IntArray? {
+        if (k >= problem.intDomains[v].max) return null
+        val vals = maxHistVal[v] ?: return null
+        val i = vals.lowerBoundDescending(k)
+        if (i >= vals.size) return null
+        return if (k >= requireNotNull(maxHistReq[v])[i]) {
+            requireNotNull(maxHistAntNear[v])[i]
+        } else {
+            requireNotNull(maxHistAntFar[v])[i]
+        }
+    }
+
+    /** Reason for the interior carve of [k] from `v`'s domain; null = bake-time fact. */
+    private fun holeReasonFor(v: Int, k: Int): IntArray? {
+        val vals = holeHistVal[v] ?: return null
+        for (i in 0 until vals.size) if (vals[i] == k) return requireNotNull(holeHistAnt[v])[i]
+        return null
     }
 
     // Per-int-var interior-hole history: the (value, level) at which each search-time carve
@@ -159,11 +220,13 @@ class PropagationState(
     private val holeHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
     private val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
-    private fun pushHoleHist(v: Int, value: Int, level: Int) {
+    private fun pushHoleHist(v: Int, value: Int, level: Int, ant: IntArray?) {
         val vals = holeHistVal[v] ?: IntArrayList(initialCapacity = 4).also { holeHistVal[v] = it }
         val lvls = holeHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { holeHistLvl[v] = it }
+        val ants = holeHistAnt[v] ?: ArrayList<IntArray?>(4).also { holeHistAnt[v] = it }
         vals.add(value)
         lvls.add(level)
+        ants.add(ant)
     }
 
     /** Level at which interior value [k] was carved out of `v`'s domain. `0` when no
@@ -292,6 +355,11 @@ class PropagationState(
 
     /** Level any pin created during the current factor invocation inherits. Set by the driver. */
     internal var currentLevel: Int = 0
+
+    private companion object {
+        /** Sentinel for propagateAtomsForVar's carved-value parameter. */
+        const val NO_CARVE: Int = Int.MIN_VALUE
+    }
 
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on conflict
@@ -601,20 +669,6 @@ class PropagationState(
     /** Threshold value `k` for the atom. */
     internal val atomThreshold: IntArrayList = IntArrayList()
 
-    /** Truth of the atom at allocation time. `true` = atom holds (bound met),
-     *  `false` = atom is currently violated (bound not met). Never null — allocation
-     *  is only ever requested for atoms whose truth can be derived from current
-     *  domains. */
-    internal val atomValue: IntArrayList = IntArrayList() // 1 / 0
-
-    /** Decision level at which the atom became true (or 0 for atoms that were already
-     *  true at problem-bake time). Mirrors [boolLevel] for atoms. */
-    internal val atomLevel: IntArrayList = IntArrayList()
-
-    /** Per-atom antecedents — bool literals (or other atom literals via their virtual
-     *  ids) whose collective truth forced this atom. Mirrors [boolAntecedents]. */
-    internal val atomAntecedents: ArrayList<IntArray?> = ArrayList()
-
     /** Reverse lookup: packed key `(intVar << 33) | (kind << 32) | (threshold + INT_MAX)`
      *  → atomId. Allows O(1) re-allocation checks. */
     private val atomByKey: HashMap<Long, Int> = HashMap()
@@ -626,7 +680,57 @@ class PropagationState(
 
     /** For each int variable, the atoms whose truth depends on it — used to recompute
      *  atom truth and fire watchers after a successful tighten / exclude. */
-    private val atomsByIntVar: HashMap<Int, IntArrayList> = HashMap()
+    private val atomsByIntVar: HashMap<Int, VarAtomIndex> = HashMap()
+
+    /** Per-var sorted thresholds that some factor actually watches (either polarity of
+     *  the atom's literal). Bound moves wake watchers by walking only this index — the
+     *  full atom table grows with every reason ever materialised, but only watched atoms
+     *  need eager transition wakeups; everything else is derived on demand. */
+    private val watchedAtomsByVar: HashMap<Int, VarAtomIndex> = HashMap()
+
+    /** Per-var atom index, segregated by kind and sorted ascending by threshold. A bound
+     *  move flips a contiguous threshold range per kind, so wakeups visit exactly the
+     *  flipped atoms via binary search. */
+    internal class VarAtomIndex {
+        val geKeys = IntArrayList()
+        val geIds = IntArrayList()
+        val leKeys = IntArrayList()
+        val leIds = IntArrayList()
+        val eqKeys = IntArrayList()
+        val eqIds = IntArrayList()
+
+        fun insert(kind: Int, k: Int, id: Int) {
+            val keys = keysOf(kind)
+            val ids = idsOf(kind)
+            val at = keys.lowerBound(k)
+            keys.insertAt(at, k)
+            ids.insertAt(at, id)
+        }
+
+        fun keysOf(kind: Int): IntArrayList = when (kind) {
+            0 -> geKeys
+            1 -> leKeys
+            else -> eqKeys
+        }
+
+        fun idsOf(kind: Int): IntArrayList = when (kind) {
+            0 -> geIds
+            1 -> leIds
+            else -> eqIds
+        }
+    }
+
+    /** Register [atomId] in the watched index (idempotent per threshold/kind). */
+    private fun markAtomWatched(atomId: Int) {
+        val v = atomIntVar[atomId]
+        val kind = atomKind[atomId]
+        val k = atomThreshold[atomId]
+        val idx = watchedAtomsByVar.getOrPut(v) { VarAtomIndex() }
+        val keys = idx.keysOf(kind)
+        val at = keys.lowerBound(k)
+        if (at < keys.size && keys[at] == k) return // already tracked
+        idx.insert(kind, k, atomId)
+    }
 
     /** Factor ids woken by atom-lit transitions during the current propagation step.
      *  Drained alongside dirty-int / dirty-bool processing in [runToFixpoint]. */
@@ -665,16 +769,9 @@ class PropagationState(
      * current domain) and [level] is exactly the level it became true — both required for the
      * learned clause's backjump level to be sound.
      */
-    fun atomBoundLeafIfNew(intVar: Int, kind: Int, threshold: Int, level: Int): Int {
-        atomByKey[atomKey(intVar, kind, threshold)]?.let { return problem.numBoolVars + it }
-        val vId = allocAtom(intVar, kind = kind, threshold = threshold)
-        val id = vId - problem.numBoolVars
-        if (atomValue[id] == 1) { // freshly allocated and true → make it a correct-level leaf
-            atomLevel[id] = level
-            atomAntecedents[id] = null
-        }
-        return vId
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun atomBoundLeafIfNew(intVar: Int, kind: Int, threshold: Int, level: Int): Int =
+        allocAtom(intVar, kind = kind, threshold = threshold)
 
     /** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
     fun atomLitGe(intVar: Int, threshold: Int): Int = Lit.make(atomVarGe(intVar, threshold), true)
@@ -703,27 +800,15 @@ class PropagationState(
 
     /**
      * Decision level at which atom [atomId]'s **current** truth was established on the
-     * **current** search path — recomputed from the bound-change history
-     * ([minLevelForGe] / [maxLevelForLe]) rather than read off the drifted [atomLevel].
-     *
-     * [undoTo] re-derives an atom's truth from the restored domains but deliberately leaves
-     * [atomLevel] / [atomAntecedents] to drift (advisory, like watches). For a leaf atom that
-     * is harmless, but the [ConflictAnalyzer] reads the level of every atom it keeps or
-     * resolves through; a stale-from-a-deeper-path [atomLevel] there yields a wrong backjump
-     * level / LBD / asserting flag and an unsound learned clause (#76). The bound-change
-     * history, by contrast, is truncated on every undo and re-pushed on every tighten, so it
-     * always reflects the current path. The antecedents are not similarly recomputed because
-     * they are only read when an atom is resolved through — which happens only at its
-     * establishment level, where the truth-flip that established it already refreshed them via
-     * [propagateAtomsForVar].
-     *
-     * Falls back to the advisory [atomLevel] only when the atom is undetermined or its
-     * value sits in an interior hole with no bound history to consult.
+     * **current** search path — recomputed from the bound-change and hole-carve histories,
+     * which are truncated on every undo and re-pushed on every move, so they always
+     * reflect the current path. An undetermined atom reports the live decision count
+     * (conservative: it can only constrain at the current level).
      */
     internal fun atomLevelForConflict(atomId: Int): Int {
         val v = atomIntVar[atomId]
         val k = atomThreshold[atomId]
-        val truth = atomCurrentTruth(atomId) ?: return atomLevel[atomId]
+        val truth = atomCurrentTruth(atomId) ?: return levelToDecisionVar.size
         return when (atomKind[atomId]) {
             0 -> if (truth) minLevelForGe(v, k) else maxLevelForLe(v, k - 1)
 
@@ -742,7 +827,7 @@ class PropagationState(
                 }
             }
 
-            else -> atomLevel[atomId]
+            else -> levelToDecisionVar.size
         }
     }
 
@@ -807,48 +892,42 @@ class PropagationState(
         atomIntVar.add(intVar)
         atomKind.add(kind)
         atomThreshold.add(threshold)
-        atomAntecedents.add(null) // overwritten below if truth is determined
-        // Compute initial truth (may be null = undetermined).
-        val truth = atomTruthOf(intVar, kind, threshold)
-        if (truth == null) {
-            atomValue.add(2) // 2 = undetermined sentinel
-            atomLevel.add(0)
-        } else {
-            atomValue.add(if (truth) 1 else 0)
-            atomLevel.add(intLevel[intVar])
-            atomAntecedents[id] = deriveAtomAntecedents(intVar, kind, threshold, truth)
-        }
         atomByKey[key] = id
-        val list = atomsByIntVar.getOrPut(intVar) { IntArrayList(initialCapacity = 2) }
-        list.add(id)
+        atomsByIntVar.getOrPut(intVar) { VarAtomIndex() }.insert(kind, threshold, id)
         return problem.numBoolVars + id
     }
 
-    /** Antecedents justifying a determined atom truth straight from the var's current
-     *  bound state. A true ge/le atom is implied by the matching bound; a true eq atom
-     *  (singleton `{k}`) by both bounds; a false eq atom by whichever side excludes `k`,
-     *  with the interior-hole case falling back to `null` (the analyzer keeps such a
-     *  literal in the learned clause rather than resolving through it — sound, since
-     *  adding a literal only weakens the clause). */
-    private fun deriveAtomAntecedents(intVar: Int, kind: Int, threshold: Int, truth: Boolean): IntArray? = when (kind) {
-        0 -> if (truth) intMinAntecedents[intVar] else intMaxAntecedents[intVar]
+    /**
+     * Antecedents of atom [atomId], derived on demand: a true bound atom resolves to the
+     * recorded reason of the move that first established it (the bound histories); a
+     * false bound atom and a bound-excluded eq atom cite the opposing bound atom, which
+     * the analyzer unfolds through its own history; a true eq atom cites both endpoint
+     * atoms; an interior-hole eq atom resolves to the carve's recorded reason. `null`
+     * marks a root/bake fact or an undetermined atom — the analyzer keeps such literals
+     * instead of resolving through them.
+     */
+    internal fun atomAntecedentsDerived(atomId: Int): IntArray? {
+        val v = atomIntVar[atomId]
+        val k = atomThreshold[atomId]
+        val truth = atomCurrentTruth(atomId) ?: return null
+        return when (atomKind[atomId]) {
+            0 -> if (truth) minReasonFor(v, k) else intArrayOf(Lit.make(atomVarLe(v, k - 1), false))
 
-        1 -> if (truth) intMaxAntecedents[intVar] else intMinAntecedents[intVar]
+            1 -> if (truth) maxReasonFor(v, k) else intArrayOf(Lit.make(atomVarGe(v, k + 1), false))
 
-        2 -> {
-            val d = intDomains[intVar]
-            if (truth) {
-                composeIntVarAtomAntecedents(intArrayOf(intVar))
+            2 -> if (truth) {
+                composeIntVarAtomAntecedents(intArrayOf(v))
             } else {
+                val d = intDomains[v]
                 when {
-                    threshold < d.min -> intMinAntecedents[intVar]
-                    threshold > d.max -> intMaxAntecedents[intVar]
-                    else -> null
+                    k < d.min -> intArrayOf(Lit.make(atomVarGe(v, k + 1), false))
+                    k > d.max -> intArrayOf(Lit.make(atomVarLe(v, k - 1), false))
+                    else -> holeReasonFor(v, k)
                 }
             }
-        }
 
-        else -> null
+            else -> null
+        }
     }
 
     private fun atomTruthOf(v: Int, kind: Int, k: Int): Boolean? {
@@ -895,55 +974,57 @@ class PropagationState(
      */
     private fun propagateAtomsForVar(
         v: Int,
-        antNear: IntArray?,
-        antFar: IntArray? = antNear,
-        reqMin: Int = intDomains[v].min,
-        reqMax: Int = intDomains[v].max,
+        @Suppress("UNUSED_PARAMETER") antNear: IntArray?,
+        @Suppress("UNUSED_PARAMETER") antFar: IntArray? = antNear,
+        @Suppress("UNUSED_PARAMETER") reqMin: Int = intDomains[v].min,
+        @Suppress("UNUSED_PARAMETER") reqMax: Int = intDomains[v].max,
+        oldMin: Int,
+        oldMax: Int,
+        carved: Int = NO_CARVE,
     ) {
-        val atoms = atomsByIntVar[v] ?: return
-        for (i in 0 until atoms.size) {
-            val atomId = atoms[i]
-            val newT = atomCurrentTruth(atomId) ?: continue
-            val oldRaw = atomValue[atomId]
-            val newRaw = if (newT) 1 else 0
-            if (oldRaw == newRaw) continue // already at this truth
-            if (undoLogging) logAtomChange(atomId)
-            // Truth changed (either from the sentinel "unknown" or from the opposite
-            // boolean value). Update the snapshot and fire the now-false lit's watchers.
-            atomValue[atomId] = newRaw
-            atomLevel[atomId] = currentLevel
-            val k = atomThreshold[atomId]
-            atomAntecedents[atomId] = when (atomKind[atomId]) {
-                // [v ≥ k]: true ⇐ min ≥ k; false ⇐ max ≤ k-1.
-                0 -> if (newT) {
-                    if (k <= reqMin) antNear else antFar
-                } else {
-                    if (k - 1 >= reqMax) antNear else antFar
-                }
-
-                // [v ≤ k]: true ⇐ max ≤ k; false ⇐ min ≥ k+1.
-                1 -> if (newT) {
-                    if (k >= reqMax) antNear else antFar
-                } else {
-                    if (k + 1 <= reqMin) antNear else antFar
-                }
-
-                // [v == k]
-                else -> if (newT) {
-                    composeIntVarAtomAntecedents(intArrayOf(v))
-                } else {
-                    val d = intDomains[v]
-                    when {
-                        k < d.min -> if (k + 1 <= reqMin) antNear else antFar
-                        k > d.max -> if (k - 1 >= reqMax) antNear else antFar
-                        else -> antNear // interior carve: the move's reason is the carve itself
-                    }
-                }
-            }
-            val falseLit = Lit.make(problem.numBoolVars + atomId, !newT)
-            val w = atomWatchersByLit[falseLit] ?: continue
-            for (j in 0 until w.size) dirtyAtomFactors.addLast(w[j])
+        val idx = watchedAtomsByVar[v] ?: return
+        val d = intDomains[v]
+        val newMin = d.min
+        val newMax = d.max
+        if (newMin > oldMin) {
+            visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
+            visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+            visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
         }
+        if (newMax < oldMax) {
+            visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
+            visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+            visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+        }
+        if (carved != NO_CARVE && carved in (newMin + 1) until newMax) {
+            visitAtomRange(idx.eqKeys, idx.eqIds, carved, carved) { id -> wakeAtom(id, false) }
+        }
+        if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
+            visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
+        }
+    }
+
+    private inline fun visitAtomRange(
+        keys: IntArrayList,
+        ids: IntArrayList,
+        from: Int,
+        to: Int,
+        action: (atomId: Int) -> Unit,
+    ) {
+        if (to < from || keys.size == 0) return
+        var i = keys.lowerBound(from)
+        while (i < keys.size && keys[i] <= to) {
+            action(ids[i])
+            i++
+        }
+    }
+
+    /** Wake the watchers of [atomId]'s now-false literal after its truth flipped to
+     *  [newT]. Truth itself is never stored — it is derived from the domains on read. */
+    private fun wakeAtom(atomId: Int, newT: Boolean) {
+        val falseLit = Lit.make(problem.numBoolVars + atomId, !newT)
+        val w = atomWatchersByLit[falseLit] ?: return
+        for (j in 0 until w.size) dirtyAtomFactors.addLast(w[j])
     }
 
     /** Install [fid] as a watcher of [lit]. Dispatches between [boolWatchersByLit]
@@ -957,6 +1038,7 @@ class PropagationState(
         } else {
             val list = atomWatchersByLit.getOrPut(lit) { IntArrayList(initialCapacity = 2) }
             list.add(fid)
+            markAtomWatched(atomIdOf(v))
         }
     }
 
@@ -1047,24 +1129,6 @@ class PropagationState(
         undoHoleHistLen.add(holeHistVal[v]?.size ?: 0)
     }
 
-    /** Capture atom [atomId]'s prior (truth, level, antecedent) triple. Must be called
-     *  *before* the mutation, mirroring [logIntChange]. Reuses the parallel undo arrays:
-     *  [undoLevel] holds the prior atom level, [undoMinReason] the prior truth snapshot and
-     *  [undoMinAnt] the prior antecedent; the remaining slots stay at neutral values. */
-    private fun logAtomChange(atomId: Int) {
-        undoTag.add(2)
-        undoVar.add(atomId)
-        undoLevel.add(atomLevel[atomId])
-        undoMinReason.add(atomValue[atomId])
-        undoMaxReason.add(0)
-        undoDomain.add(null)
-        undoMinAnt.add(atomAntecedents[atomId])
-        undoMaxAnt.add(null)
-        undoMinHistLen.add(0)
-        undoMaxHistLen.add(0)
-        undoHoleHistLen.add(0)
-    }
-
     private fun truncateUndo(n: Int) {
         undoTag.truncateTo(n)
         undoVar.truncateTo(n)
@@ -1090,9 +1154,6 @@ class PropagationState(
 
     /** True iff undo record [i] is a bool pin (vs. an int-domain change). */
     fun undoIsBoolAt(i: Int): Boolean = undoTag[i] == 0
-
-    /** True iff undo record [i] is an atom-state change (vs. a bool pin or int-domain change). */
-    fun undoIsAtomAt(i: Int): Boolean = undoTag[i] == 2
 
     init {
         for (fid in 0 until problem.numFactors) {
@@ -1379,9 +1440,9 @@ class PropagationState(
         // Record the post-snap bound, not the requested one: when the landing value sits in
         // a hole the actual min jumps further, and minLevelForGe must attribute every value
         // in the jumped-over range to this level.
-        if (undoLogging) pushMinHist(v, newDomain.min, currentLevel)
+        pushMinHist(v, newDomain.min, currentLevel, antecedents, ant, lo)
         dirtyInts.addLast(v)
-        propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMin = lo)
+        propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMin = lo, oldMin = d.min, oldMax = d.max)
         return true
     }
 
@@ -1412,9 +1473,9 @@ class PropagationState(
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = ant
         // Post-snap bound for the same reason as the min side.
-        if (undoLogging) pushMaxHist(v, newDomain.max, currentLevel)
+        pushMaxHist(v, newDomain.max, currentLevel, antecedents, ant, hi)
         dirtyInts.addLast(v)
-        propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMax = hi)
+        propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMax = hi, oldMin = d.min, oldMax = d.max)
         return true
     }
 
@@ -1478,12 +1539,10 @@ class PropagationState(
         // History upkeep mirrors the tighten paths: an edge carve joins the bound history
         // (this path bypasses tightenInt*Impl), an interior carve the hole history —
         // without the record the level lookups mis-attribute the change.
-        if (undoLogging) {
-            when {
-                newDomain.min != d.min -> pushMinHist(v, newDomain.min, currentLevel)
-                newDomain.max != d.max -> pushMaxHist(v, newDomain.max, currentLevel)
-                else -> pushHoleHist(v, value, currentLevel)
-            }
+        when {
+            newDomain.min != d.min -> pushMinHist(v, newDomain.min, currentLevel, antNear, ant, value + 1)
+            newDomain.max != d.max -> pushMaxHist(v, newDomain.max, currentLevel, antNear, ant, value - 1)
+            else -> pushHoleHist(v, value, currentLevel, antecedents)
         }
         // Reason attribution: which side (min/max) "moved" depends on where the hole
         // landed. Pure interior holes don't shift either endpoint; in that case the
@@ -1499,9 +1558,28 @@ class PropagationState(
         }
         dirtyInts.addLast(v)
         when {
-            newDomain.min != d.min -> propagateAtomsForVar(v, antNear = antNear, antFar = ant, reqMin = value + 1)
-            newDomain.max != d.max -> propagateAtomsForVar(v, antNear = antNear, antFar = ant, reqMax = value - 1)
-            else -> propagateAtomsForVar(v, antNear = antecedents)
+            newDomain.min != d.min ->
+                propagateAtomsForVar(
+                    v,
+                    antNear = antNear,
+                    antFar = ant,
+                    reqMin = value + 1,
+                    oldMin = d.min,
+                    oldMax = d.max,
+                )
+
+            newDomain.max != d.max ->
+                propagateAtomsForVar(
+                    v,
+                    antNear = antNear,
+                    antFar = ant,
+                    reqMax = value - 1,
+                    oldMin = d.min,
+                    oldMax = d.max,
+                )
+
+            else ->
+                propagateAtomsForVar(v, antNear = antecedents, oldMin = d.min, oldMax = d.max, carved = value)
         }
         return true
     }
@@ -1546,7 +1624,7 @@ class PropagationState(
             val l = if (v < problem.numBoolVars) {
                 boolLevel[v]
             } else {
-                atomLevel[v - problem.numBoolVars]
+                atomLevelForConflict(v - problem.numBoolVars)
             }
             if (l > max) {
                 max = l
@@ -1572,7 +1650,7 @@ class PropagationState(
         var max = 0
         for (lit in literals) {
             val v = Lit.variable(lit)
-            val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevel[v - problem.numBoolVars]
+            val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevelForConflict(v - problem.numBoolVars)
             if (l > max) {
                 max = l
                 if (max >= cap) return cap
@@ -1593,7 +1671,7 @@ class PropagationState(
         val out = HashSet<Int>()
         val numBool = problem.numBoolVars
         for (v in boolVars) {
-            val l = if (v < numBool) boolLevel[v] else atomLevel[v - numBool]
+            val l = if (v < numBool) boolLevel[v] else atomLevelForConflict(v - numBool)
             if (l > 0) out.add(l)
         }
         for (v in intVars) {
@@ -1755,14 +1833,16 @@ class PropagationState(
                     maxHistLvl[v]?.truncateTo(undoMaxHistLen[i])
                     holeHistVal[v]?.truncateTo(undoHoleHistLen[i])
                     holeHistLvl[v]?.truncateTo(undoHoleHistLen[i])
+                    minHistAntNear[v]?.let { a -> while (a.size > undoMinHistLen[i]) a.removeAt(a.size - 1) }
+                    minHistAntFar[v]?.let { a -> while (a.size > undoMinHistLen[i]) a.removeAt(a.size - 1) }
+                    minHistReq[v]?.truncateTo(undoMinHistLen[i])
+                    maxHistAntNear[v]?.let { a -> while (a.size > undoMaxHistLen[i]) a.removeAt(a.size - 1) }
+                    maxHistAntFar[v]?.let { a -> while (a.size > undoMaxHistLen[i]) a.removeAt(a.size - 1) }
+                    maxHistReq[v]?.truncateTo(undoMaxHistLen[i])
+                    holeHistAnt[v]?.let { a -> while (a.size > undoHoleHistLen[i]) a.removeAt(a.size - 1) }
                 }
 
-                else -> { // atom change — restore the (truth, level, antecedent) triple
-                    val id = undoVar[i]
-                    atomValue[id] = undoMinReason[i]
-                    atomLevel[id] = undoLevel[i]
-                    atomAntecedents[id] = undoMinAnt[i]
-                }
+                else -> error("unknown undo tag")
             }
             i--
         }
@@ -1774,35 +1854,8 @@ class PropagationState(
         for ((fid, payload) in mark.snapshottablePayloads) {
             _refPayload[fid] = payload.snapshotCopy()
         }
-        // Atoms allocated after the mark survive the pop: their identity is
-        // path-independent, the dedupe table bounds their count, and removing them would
-        // orphan the watcher registrations of any retained clause that mentions their
-        // literals. Instead, reconcile each atom's stored triple against the restored
-        // domains: an unchanged truth keeps its journal-restored values; a now-undetermined
-        // atom is wiped to the unknown sentinel; a determined atom whose stored truth
-        // disagrees (an initialization the journal never saw) gets the derived truth with a
-        // null antecedent — re-deriving from the latest bound reason could cite a premise
-        // that presupposes this very atom, and minimization would collapse the circle into
-        // an over-strong clause.
-        for (atomId in 0 until atomIntVar.size) {
-            val t = atomCurrentTruth(atomId)
-            val raw = if (t == null) {
-                2
-            } else if (t) {
-                1
-            } else {
-                0
-            }
-            if (atomValue[atomId] == raw) continue
-            atomValue[atomId] = raw
-            if (t == null) {
-                atomLevel[atomId] = 0
-                atomAntecedents[atomId] = null
-            } else {
-                atomAntecedents[atomId] = null
-                atomLevel[atomId] = minOf(atomLevelForConflict(atomId), levelToDecisionVar.size)
-            }
-        }
+        // Atoms carry no stored state to reconcile: truth, level and antecedents are all
+        // derived on demand from the domains and histories restored above.
         dirtyAtomFactors.clear()
         dirtyBools.clear()
         dirtyInts.clear()
