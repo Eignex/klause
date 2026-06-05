@@ -47,7 +47,7 @@ class LogicNGSessionTest {
         val result = session.solve(params)
         val sat = result as? SolveResult.Sat
         assertNotNull(sat)
-        assertEquals(true, sat!!.assignment.bools[0])
+        assertEquals(true, sat.assignment.bools[0])
         assertEquals(false, sat.assignment.bools[1])
         assertEquals(false, sat.assignment.bools[2])
     }
@@ -61,7 +61,7 @@ class LogicNGSessionTest {
             val result = session.solve(LogicNGParams())
             val sat = result as? SolveResult.Sat
             assertNotNull(sat)
-            assertEquals(true, sat!!.assignment.bools[2])
+            assertEquals(true, sat.assignment.bools[2])
         } finally {
             session.pop()
         }

@@ -28,7 +28,7 @@ class RegularTest {
         fun accepts(vals: IntArray): Boolean {
             var q = 1
             for (s in vals) {
-                q = delta(q, s);
+                q = delta(q, s)
                 if (q == 0) return false
             }
             return q == 1 || q == 2
@@ -46,11 +46,11 @@ class RegularTest {
             val acc = IntArray(n)
             fun rec(p: Int) {
                 if (p == n) {
-                    if (accepts(acc)) brute.add(acc.toList());
+                    if (accepts(acc)) brute.add(acc.toList())
                     return
                 }
                 for (v in ranges[p].first..ranges[p].second) {
-                    acc[p] = v;
+                    acc[p] = v
                     rec(p + 1)
                 }
             }

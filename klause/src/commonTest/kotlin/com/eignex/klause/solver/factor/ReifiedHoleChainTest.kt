@@ -77,23 +77,23 @@ class ReifiedHoleChainTest {
             var bruteBest: Int? = null
             for (x in lo..hi) {
                 for (y in lo..hi) {
-                for (mask in 0 until (1 shl numDrivers)) {
-                    val bools = BooleanArray(numBool)
-                    for (d in 0 until numDrivers) bools[d] = (mask shr d) and 1 == 1
-                    for (v in lo..hi) {
-                        bools[cx(v)] = x == v
-                        bools[cy(v)] = y == v
-                    }
-                    val ok = clauses.all { cl ->
-                        cl.any { lit -> bools[Lit.variable(lit)] == Lit.isPositive(lit) }
-                    }
-                    if (ok) {
-                        val obj = x + 2 * y
-                        val best = bruteBest
-                        if (best == null || obj < best) bruteBest = obj
+                    for (mask in 0 until (1 shl numDrivers)) {
+                        val bools = BooleanArray(numBool)
+                        for (d in 0 until numDrivers) bools[d] = (mask shr d) and 1 == 1
+                        for (v in lo..hi) {
+                            bools[cx(v)] = x == v
+                            bools[cy(v)] = y == v
+                        }
+                        val ok = clauses.all { cl ->
+                            cl.any { lit -> bools[Lit.variable(lit)] == Lit.isPositive(lit) }
+                        }
+                        if (ok) {
+                            val obj = x + 2 * y
+                            val best = bruteBest
+                            if (best == null || obj < best) bruteBest = obj
+                        }
                     }
                 }
-            }
             }
 
             // Defensive decision cap: a capped run returns BestFound and makes no optimality

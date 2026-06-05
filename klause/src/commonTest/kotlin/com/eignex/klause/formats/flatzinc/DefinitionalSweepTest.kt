@@ -3,6 +3,8 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.LocalSearchState
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -44,7 +46,7 @@ class DefinitionalSweepTest {
         assertEquals(6, sweep.size, "all six definitional constraints are evaluable")
         val xId = program.intVarsByName.getValue("x")
         val yId = program.intVarsByName.getValue("y")
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(program.problem, kotlin.random.Random(1))
+        val state = LocalSearchState(program.problem, Random(1))
         state.assignment.setInt(xId, 10) // dx = 3, a = 3
         state.assignment.setInt(yId, 0) // dy = -2, b = 2
         state.recompute()
@@ -73,7 +75,7 @@ class DefinitionalSweepTest {
         val tight = src.replace("var 0..20: s;", "var 0..3: s;")
         val program = parseFlatZinc(tight)
         val sweep = assertNotNull(program.definitionalSweep)
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(program.problem, kotlin.random.Random(1))
+        val state = LocalSearchState(program.problem, Random(1))
         state.assignment.setInt(program.intVarsByName.getValue("x"), 0) // a = 7
         state.assignment.setInt(program.intVarsByName.getValue("y"), 10) // b = 8 -> s would be 15
         sweep.sweep(state.assignment, program.problem.intDomains, program.problem.factors)
@@ -103,7 +105,7 @@ class DefinitionalSweepTest {
         val program = parseFlatZinc(src2)
         val sweep = assertNotNull(program.definitionalSweep)
         assertEquals(4, sweep.size, "reif + bool2int + lin + element must all build")
-        val state = com.eignex.klause.solver.localsearch.LocalSearchState(program.problem, kotlin.random.Random(2))
+        val state = LocalSearchState(program.problem, Random(2))
         val iv = program.intVarsByName
         state.assignment.setInt(iv.getValue("u"), 2)
         state.assignment.setInt(iv.getValue("v"), 2) // r = true, ri = 1, t = u + ri = 3

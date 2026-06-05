@@ -77,7 +77,9 @@ class GlobalCardinalityTest {
                 val counts = IntArray(inst.cover.size)
                 for (i in 0 until n) {
                     val ci = coverIdx[acc[i]]
-                    if (ci != null) counts[ci]++ else if (inst.closed) {
+                    if (ci != null) {
+                        counts[ci]++
+                    } else if (inst.closed) {
                         return false
                     }
                 }
@@ -88,11 +90,11 @@ class GlobalCardinalityTest {
             val acc = IntArray(n)
             fun rec(p: Int) {
                 if (p == n) {
-                    if (ok(acc)) brute.add(acc.toList());
+                    if (ok(acc)) brute.add(acc.toList())
                     return
                 }
                 for (v in inst.xsRanges[p].first..inst.xsRanges[p].second) {
-                    acc[p] = v;
+                    acc[p] = v
                     rec(p + 1)
                 }
             }
@@ -139,12 +141,12 @@ class GlobalCardinalityTest {
         }
         fun rec(p: Int) {
             if (p == k) {
-                if (ok()) brute.add(acc.toList());
+                if (ok()) brute.add(acc.toList())
                 return
             }
             val r = if (p < n) xsRange else cvRange
             for (v in r.first..r.second) {
-                acc[p] = v;
+                acc[p] = v
                 rec(p + 1)
             }
         }

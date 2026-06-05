@@ -24,8 +24,8 @@ import kotlin.test.assertTrue
 class IntOverflowTest {
 
     private companion object {
-        const val BIG = 1 shl 20 // 1_048_576
-        const val WIDE = 1 shl 12 // 4_096
+        const val BIG = 1 shl 22 // 4_194_304
+        const val WIDE = 1 shl 10 // 1_024 — few literals, same overflowing 2^32 product
         const val PRODUCT = BIG.toLong() * WIDE // 2^32 = 4_294_967_296
     }
 
