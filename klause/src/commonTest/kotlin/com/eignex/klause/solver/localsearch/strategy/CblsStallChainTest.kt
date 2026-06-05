@@ -152,7 +152,7 @@ class CblsStallChainTest {
             if (m != null) {
                 if (m is Move.Compound) {
                     chainPicks++
-                    val vars = m.parts.map { (it as Move.IntSet).varId }
+                    val vars = m.parts.map { p -> (p as Move.IntSet).varId }
                     assertEquals(vars.size, vars.toSet().size, "a chain never touches a var twice")
                 }
                 state.apply(m)
