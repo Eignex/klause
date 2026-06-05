@@ -193,16 +193,16 @@ class BacktrackSolver(override val problem: Problem) :
 
             else -> null
         }
-        // #47: Luby restarts hurt branch-and-bound. The incumbent bound is preserved across
-        // restarts (it lives here, outside driveSearch, and `pruneIf` reads it live), but the
-        // objective-bound pruning is a predicate, not a learned clause — so each restart pops
-        // to root and re-traverses the bound-pruned tree instead of exhausting it once. The
-        // proof of optimality then never terminates in budget while a restart-free DFS does.
-        // Suppress restarts for the optimization path; VSIDS + phase-saving + LBD still apply.
+        // Restarts stay off unless the caller asks: a restart pops to root and re-traverses
+        // the bound-pruned tree (the objective bound is a predicate, not a learned clause),
+        // which can keep an optimality proof from terminating in budget. With an explicit
+        // lubyRestartBase the caller is choosing anytime diversification over proof speed —
+        // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
+        // solved leaves.
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
         for (outcome in driveSearch(
-            params.copy(minHammingDistance = 0, recentWindow = 0, lubyRestartBase = null),
+            params.copy(minHammingDistance = 0, recentWindow = 0),
             pruneIf = pruneIf,
             sink = sink,
         )) {
