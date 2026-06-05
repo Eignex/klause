@@ -497,9 +497,9 @@ class FactorConflictReasonTest {
         // (v0's lower bound plays no part in v1's lower bound), yielding a sharper reason.
         val atomVarGE3 = state.atomVarGe(1, 3)
         val atomId = state.atomIdOf(atomVarGE3)
-        assertEquals(1, state.atomValue[atomId], "atom [v1≥3] should hold (v1.min=3≥3)")
-        assertEquals(1, state.atomLevel[atomId], "atom became known at level 1")
-        val ant = state.atomAntecedents[atomId]
+        assertEquals(true, state.atomCurrentTruth(atomId), "atom [v1≥3] should hold (v1.min=3≥3)")
+        assertEquals(1, state.atomLevelForConflict(atomId), "atom became known at level 1")
+        val ant = state.atomAntecedentsDerived(atomId)
         assertTrue(ant != null, "atom should have antecedents from intMinAntecedents[v1]")
         val ge5 = Lit.make(state.atomVarGe(0, 5), false)
         val le5 = Lit.make(state.atomVarLe(0, 5), false)
@@ -516,8 +516,8 @@ class FactorConflictReasonTest {
         val atomVarGE10 = state.atomVarGe(1, 10)
         val atomId10 = state.atomIdOf(atomVarGE10)
         assertEquals(
-            0,
-            state.atomValue[atomId10],
+            false,
+            state.atomCurrentTruth(atomId10),
             "atom [v1≥10] should not hold (v1.max=3 < 10)",
         )
         // Identity: re-requesting the same atom should return the same id (cached).

@@ -417,7 +417,6 @@ class PropagationSession(
         val bRaw = IntArrayList()
         val iRaw = IntArrayList()
         for (i in base until top) {
-            if (state.undoIsAtomAt(i)) continue // atom snapshots ride along with their int change
             val v = state.undoVarAt(i)
             if (state.undoIsBoolAt(i)) bRaw.add(v) else iRaw.add(v)
         }

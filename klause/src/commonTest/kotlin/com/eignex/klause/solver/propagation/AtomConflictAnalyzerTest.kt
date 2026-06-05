@@ -47,7 +47,7 @@ class AtomConflictAnalyzerTest {
      * for each. With `numBoolVars = 0` and allocation in var order, the atom's virtual var id
      * equals its int var index — so atom `i` is var `i` and `Lit.make(i, false)` is `¬(varᵢ ≥ 5)`.
      */
-    private fun atomGeState(levels: IntArray): PropagationState {
+    private fun atomGeState(levels: IntArray, ants: Array<IntArray?>? = null): PropagationState {
         val n = levels.size
         val problem = Problem(
             numBoolVars = 0,
@@ -59,7 +59,7 @@ class AtomConflictAnalyzerTest {
         state.undoLogging = true
         for (v in 0 until n) {
             state.currentLevel = levels[v]
-            check(state.tightenIntMin(v, 5)) { "tighten v$v failed" }
+            check(state.tightenIntMin(v, 5, ants?.get(v))) { "tighten v$v failed" }
             val atomVar = state.atomVarGe(v, 5)
             check(atomVar == v) { "expected atom var id $v, got $atomVar" }
         }
@@ -92,13 +92,10 @@ class AtomConflictAnalyzerTest {
     @Test
     fun `backjump level uses bound history not a drifted atomLevel`() {
         // #76 regression: ax's bound was genuinely established at level 1 on this path (its
-        // history records level 1), but atomLevel drifted stale-high to 5 from a deeper path
-        // that has since been popped. The analyzer must take ax's level from the history (1),
-        // not the drifted atomLevel (5). With the drifted value, backjumpLevelOf would discard
-        // ax entirely (5 is not below the conflict level 2) and compute backjumpLevel = 0 —
-        // popping past level 1 and unsoundly asserting a clause that isn't unit there.
+        // history records level 1). Atom levels are derived from the bound histories on
+        // every read — there is no stored per-atom level left to drift — so the analyzer
+        // necessarily sees ax at its true level 1 regardless of how the search popped.
         val state = atomGeState(intArrayOf(1, 2)) // ax established @1, ay @2
-        state.atomLevel[0] = 5 // simulate undo-induced drift (advisory field, left stale)
         state.currentLevel = 2
         val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
 
@@ -136,9 +133,12 @@ class AtomConflictAnalyzerTest {
         // The loop resolves ay (current level, has antecedents) out through ¬ax, leaving az
         // as the lone current-level UIP. ay must NOT survive in the learned clause; ax (its
         // antecedent) takes its place at level 1. Exercises antecedentsOf's atom branch.
-        val state = atomGeState(intArrayOf(1, 2, 2)) // ax @1, ay @2, az @2
-        // ay is the implied pivot: override its antecedent to ¬ax (a leaf at level 1).
-        state.atomAntecedents[1] = intArrayOf(negAtom(0))
+        // ay is the implied pivot: its bound move records ¬ax (a leaf at level 1) as its
+        // reason, so the derived antecedents of [ay ≥ 5] resolve to ¬ax.
+        val state = atomGeState(
+            intArrayOf(1, 2, 2), // ax @1, ay @2, az @2
+            arrayOf(null, intArrayOf(negAtom(0)), null),
+        )
         state.currentLevel = 2
         val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(1), negAtom(2))), lbd = 2)
 
