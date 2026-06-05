@@ -81,3 +81,6 @@ tasks.register<Copy>("saveBaseline") {
 kotlin {
     jvmToolchain(24)
 }
+
+tasks.withType<Test> {
+}

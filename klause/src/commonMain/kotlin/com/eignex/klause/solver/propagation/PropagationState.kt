@@ -1129,6 +1129,25 @@ class PropagationState(
         undoHoleHistLen.add(holeHistVal[v]?.size ?: 0)
     }
 
+    /** Journal an interior carve as just the carved value: replay re-inserts it instead
+     *  of restoring a retained domain snapshot, whose O(holes) cost per carve made deep
+     *  searches on wide hole-list domains quadratic in retained heap (tag 2). Columns:
+     *  [undoMinReason] = carved value, [undoLevel] = prior intLevel,
+     *  [undoMaxReason] = prior holeHist length. */
+    private fun logIntCarve(v: Int, value: Int) {
+        undoTag.add(2)
+        undoVar.add(v)
+        undoLevel.add(intLevel[v])
+        undoMinReason.add(value)
+        undoMaxReason.add(holeHistVal[v]?.size ?: 0)
+        undoDomain.add(null)
+        undoMinAnt.add(null)
+        undoMaxAnt.add(null)
+        undoMinHistLen.add(0)
+        undoMaxHistLen.add(0)
+        undoHoleHistLen.add(0)
+    }
+
     private fun truncateUndo(n: Int) {
         undoTag.truncateTo(n)
         undoVar.truncateTo(n)
@@ -1501,7 +1520,10 @@ class PropagationState(
             seedConflictFactor(currentFactor)
             return false
         }
-        if (undoLogging) logIntChange(v)
+        val interior = value > d.min && value < d.max
+        if (undoLogging) {
+            if (interior) logIntCarve(v, value) else logIntChange(v)
+        }
         if (currentFactor >= 0) propagations++
         val newDomain = d.excludeValue(value)
         // An edge exclusion advances the endpoint: the new bound rests on the *prior* bound, the
@@ -1840,6 +1862,15 @@ class PropagationState(
                     maxHistAntFar[v]?.let { a -> while (a.size > undoMaxHistLen[i]) a.removeAt(a.size - 1) }
                     maxHistReq[v]?.truncateTo(undoMaxHistLen[i])
                     holeHistAnt[v]?.let { a -> while (a.size > undoHoleHistLen[i]) a.removeAt(a.size - 1) }
+                }
+
+                2 -> { // interior carve — re-insert the carved value
+                    val v = undoVar[i]
+                    intDomains[v] = intDomains[v].includeInteriorValue(undoMinReason[i])
+                    intLevel[v] = undoLevel[i]
+                    holeHistVal[v]?.truncateTo(undoMaxReason[i])
+                    holeHistLvl[v]?.truncateTo(undoMaxReason[i])
+                    holeHistAnt[v]?.let { a -> while (a.size > undoMaxReason[i]) a.removeAt(a.size - 1) }
                 }
 
                 else -> error("unknown undo tag")
