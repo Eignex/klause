@@ -113,6 +113,32 @@ class IntDomain private constructor(
      * to the bitset form when `(max - min + 1) ≤ BITSET_THRESHOLD`, otherwise to the
      * holes form. Subsequent excludes preserve the rep.
      */
+    /**
+     * Inverse of an interior [excludeValue]: put [value] (strictly inside `min..max` and
+     * currently absent) back into the domain. Exists for the undo journal — an interior
+     * carve is journaled as the carved value alone instead of retaining a full prior
+     * domain snapshot, which on wide hole-list domains costs O(holes) memory per carve
+     * and made deep searches quadratic in retained heap.
+     */
+    fun includeInteriorValue(value: Int): IntDomain {
+        require(value > min && value < max) { "includeInteriorValue($value) outside ($min, $max)" }
+        holes?.let { hs ->
+            val idx = hs.indexOfFirst { it == value }
+            require(idx >= 0) { "includeInteriorValue($value): not a hole" }
+            if (hs.size == 1) return IntDomain(min, max, null, null, 0)
+            val out = IntArray(hs.size - 1)
+            hs.copyInto(out, 0, 0, idx)
+            hs.copyInto(out, idx, idx + 1, hs.size)
+            return IntDomain(min, max, out, null, 0)
+        }
+        bitset?.let { bs ->
+            val newBits = bs.copyOf()
+            setBit(newBits, value - bitsetLo)
+            return IntDomain(min, max, null, newBits, bitsetLo)
+        }
+        error("includeInteriorValue($value) on a contiguous domain")
+    }
+
     fun excludeValue(value: Int): IntDomain {
         if (!contains(value)) return this
         val bs = bitset
@@ -422,6 +448,10 @@ class IntDomain private constructor(
         }
 
         @PublishedApi
+        internal fun setBit(bits: LongArray, bit: Int) {
+            bits[bit ushr 6] = bits[bit ushr 6] or (1L shl (bit and 63))
+        }
+
         internal fun clearBit(bits: LongArray, bit: Int) {
             val w = bit ushr 6
             val b = bit and 63
