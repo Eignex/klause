@@ -56,6 +56,13 @@ internal data class LocalSearchWorkerConfig(
      *  required for a CBLS worker to actually use CBLS for the objective rather than the
      *  built-in greedy descent. */
     val optimizeStrategy: Strategy? = null,
+    /** Per-worker switch for the per-move invariant network (#153). Default on (when the
+     *  model provides a definitional sweep). Off carves out a diversity niche: defined vars
+     *  re-enter the move space, which is what cyclic-definitional successor encodings
+     *  (prize-collecting's pos/next) need — under invariants their reified indicators are
+     *  search-excluded and the dismantle chains can't thread (measured: chains solve pc 3/3
+     *  without invariants, plateau at cost ≈3 with them). */
+    val perMoveInvariants: Boolean = true,
 ) {
     companion object {
         private fun cblsTabu() = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
@@ -69,8 +76,18 @@ internal data class LocalSearchWorkerConfig(
 
         /** A CBLS worker with the unified minimize path: [make] is invoked twice so the satisfy
          *  and optimize strategies are independent instances (Cbls carries per-search state). */
-        private fun cblsWorker(label: String, restart: RestartPolicy, make: () -> Cbls) =
-            LocalSearchWorkerConfig(label, make(), restart, optimizeStrategy = make())
+        private fun cblsWorker(
+            label: String,
+            restart: RestartPolicy,
+            perMoveInvariants: Boolean = true,
+            make: () -> Cbls,
+        ) = LocalSearchWorkerConfig(
+            label,
+            make(),
+            restart,
+            optimizeStrategy = make(),
+            perMoveInvariants = perMoveInvariants,
+        )
 
         /**
          * The named pool of worker configs, **ordered by measured credit** so `diverse(n)` is
@@ -107,6 +124,30 @@ internal data class LocalSearchWorkerConfig(
             // plateau variant (+9 uncovered, +5 best).
             "cbls-plateau/ils-basin" to {
                 cblsWorker("cbls-plateau/ils-basin", ilsBasin()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
+            },
+            // Ejection chains ([Cbls.stallChainCap]) + targeted kick — the principled
+            // plateau escape (#154). Sweep-off (perMoveInvariants = false): defined vars
+            // re-enter the move space, the niche cyclic-definitional successor encodings
+            // need — closes prize-collecting (3/3 in diag at ≤214k flips) where every
+            // invariants-on config plateaus.
+            // Deep-runway cadence: the measured pc dismantle threads at 21k–214k flips, so
+            // the default 10k restart cadence cuts every walk short.
+            "cbls-chain-noinv/fixed" to {
+                cblsWorker(
+                    "cbls-chain-noinv/fixed",
+                    FixedCadenceRestart(maxFlipsBeforeRestart = 1_000_000),
+                    perMoveInvariants = false,
+                ) {
+                    Cbls(stallChainCap = 8, stallChainDepth = 16, tabu = cblsTabu())
+                }
+            },
+            // Ejection chains on the ILS basin-hopping restart with invariants on (mirrors
+            // the swap buster's best-variant pairing; +3 uncovered, +9 best-held at BOTH
+            // campaign seeds — the most seed-stable adder in the pool).
+            "cbls-chain/ils-basin" to {
+                cblsWorker("cbls-chain/ils-basin", ilsBasin()) {
+                    Cbls(stallChainCap = 8, stallChainDepth = 16, tabu = cblsTabu())
+                }
             },
             // Plateau-buster + smoothing (+5 uncovered, +2 best).
             "cbls-plateau-smooth/fixed" to {
@@ -190,19 +231,22 @@ internal data class LocalSearchWorkerConfig(
         )
 
         /**
-         * Pool order by **cross-seed combined marginal credit** (2026-06-04, two campaigns at
-         * seeds 11/42 on post-#150 main, score = Σ uncovered + 0.5·Σ best-held; cbls/fixed
+         * Pool order by **cross-seed combined marginal credit** (2026-06-05, two campaigns at
+         * seeds 1/2 on the #154 branch — 18 configs incl. the chain workers, 91 mzn-bench
+         * optimization instances, 10 s; score = Σ uncovered + 0.5·Σ best-held; cbls/fixed
          * anchored first as the satisfy workhorse). Re-derive by re-running `bench run credit`
-         * at two seeds (`-Dklause.bench.credit.seed`) and editing this one list. Notable: the
-         * single-seed post-#148 tenure3/raw promotion did NOT replicate across seeds;
-         * cbls-stallslow's rise (#2-adder in both seeds) did.
+         * at two seeds (`-Dklause.bench.credit.seed`) and editing this one list. Notable:
+         * the chain workers land #5/#6 on their first cross-seed campaign and absorb most of
+         * the swap busters' coverage (plateau/fixed and plateau-smooth fell to the redundant
+         * tail; plateau/ils-basin keeps a strong but high-variance contribution — #1 at one
+         * seed, +0 uncovered at the other).
          */
         private val rankedOrder = listOf(
-            "cbls/fixed", "adaptive-probsat/fixed", "cbls-stallslow/fixed", "sa/adaptive-perturb",
-            "cbls-smooth/ils-basin", "cbls-plateau64/fixed", "cbls-hinoise/fixed",
-            "cbls-plateau/ils-basin", "cbls-plateau-smooth/fixed", "walksat-cc/luby",
-            "sa/fixed", "cbls-tenure3/fixed", "cbls-plateau/fixed", "cbls-lonoise/fixed",
-            "cbls-notabu/fixed", "cbls-raw/fixed",
+            "cbls/fixed", "cbls-plateau/ils-basin", "cbls-smooth/ils-basin", "sa/adaptive-perturb",
+            "cbls-chain/ils-basin", "cbls-chain-noinv/fixed", "cbls-notabu/fixed", "cbls-lonoise/fixed",
+            "adaptive-probsat/fixed", "cbls-tenure3/fixed", "cbls-stallslow/fixed", "sa/fixed",
+            "cbls-plateau64/fixed", "walksat-cc/luby", "cbls-hinoise/fixed", "cbls-plateau-smooth/fixed",
+            "cbls-plateau/fixed", "cbls-raw/fixed",
         )
 
         /** Labels of every config in the pool, in credit order. */

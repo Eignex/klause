@@ -139,4 +139,33 @@ class DefinitionalSweepTest {
         val r = solver.solve(LocalSearchParams(maxFlips = 50_000, randomSeed = 3L))
         assertTrue(r is SolveResult.Sat, "decomposed model must be satisfiable under the sweep; got $r")
     }
+
+    @Test
+    fun `cyclic definitions are dropped while the acyclic remainder survives`() {
+        // a and b define each other — a definitional cycle (the prize-collecting pos/next
+        // shape in miniature). A cycle has no topological order: one-pass sweep evaluation
+        // reads stale values and the invariant network would search-exclude vars it cannot
+        // maintain. The re-entered definition must be dropped (it stays a searched factor);
+        // the other cycle member and the independent definition keep their nodes.
+        val cyclic = """
+            var 0..10: x;
+            var 0..10: a;
+            var 0..10: b;
+            var 0..10: c;
+            constraint int_lin_eq([1, -1], [b, a], 1) :: defines_var(a);
+            constraint int_lin_eq([1, -1], [a, b], -1) :: defines_var(b);
+            constraint int_lin_eq([1, -1], [x, c], 3) :: defines_var(c);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(cyclic)
+        val sweep = assertNotNull(program.definitionalSweep, "the acyclic definitions must still yield a sweep")
+        assertEquals(2, sweep.size, "one cycle member is dropped; the other and the independent def survive")
+        val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
+        val aId = program.intVarsByName.getValue("a")
+        val bId = program.intVarsByName.getValue("b")
+        val cId = program.intVarsByName.getValue("c")
+        assertTrue(!net.isDefinedInt(aId), "the re-entered cycle member must stay searched")
+        assertTrue(net.isDefinedInt(bId), "the surviving cycle member is defined via the now-free input")
+        assertTrue(net.isDefinedInt(cId), "the independent definition is unaffected")
+    }
 }
