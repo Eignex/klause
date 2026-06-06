@@ -52,18 +52,17 @@ data class ParityResults(
 object ParityMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget = Budget(), reference: Backend = Backend.CHOCO) {
         val ref = System.getProperty("klause.bench.parity.reference")?.let { Reference.byId(it) } ?: Reference.of(reference)
-        // Sharding for parallel sweeps: -Dklause.bench.parity.shard=i/n keeps every n-th
-        // entry starting at i (0-based). Launch n bench JVMs off one installDist build —
-        // never via overlapping gradle invocations — and concatenate the logs.
-        val shard = System.getProperty("klause.bench.parity.shard")?.let(::parseShard)
-        val sharded = if (shard == null) entries else entries.filterIndexed { i, _ -> i % shard.second == shard.first }
+        // Sharding for parallel sweeps is applied at selection time (klause.bench.shard in
+        // BenchCli.select, before resolution) so disjoint workers never race on the shared
+        // mzn-fzn cache; the prop is read here only to suffix the report path.
+        val shard = System.getProperty("klause.bench.shard")?.let(::parseShard)
         // Reference-column cache: -Dklause.bench.parity.referenceCache=<previous sweep log>
         // reuses the reference solver's printed results row-by-row instead of re-running it,
         // halving sweep wall time. Rows absent from the cache run the reference live.
         val cache = System.getProperty("klause.bench.parity.referenceCache")?.let(::parseReferenceCache).orEmpty()
         println()
         println("=== parity (klause backtrack vs ${ref.name} reference; checked against recorded expected) ===")
-        val rows = sharded.map { entry ->
+        val rows = entries.map { entry ->
             val r = row(entry, budget, ref, cache[entry.name])
             val mark = if (r.verdict == "OK") "ok " else "!! "
             println("$mark[${r.name}] ${r.kind} klause=${r.klause} ${r.referenceSolver}=${r.reference} expected=${r.expected}" +
