@@ -155,22 +155,29 @@ class Portfolio(
             return@coroutineScope (directOptimal as MinimizeResult.Optimal).copy(stats = stats)
         }
 
-        // "Dirty" Unknown = ran out of budget / timed out / cancelled before fully exploring.
-        // SearchExhausted is clean — the worker's space was fully covered.
-        val anyDirtyUnknown = results.any { r ->
-            r is MinimizeResult.Unknown && r.reason != TerminationReason.SearchExhausted
+        // The pool's exploration is complete only when EVERY worker covered its space
+        // (SearchExhausted). A worker that timed out or was cancelled mid-search is dirty
+        // regardless of verdict shape: a BestFound under BudgetExhausted holds a real
+        // incumbent but proves nothing about better solutions, so upgrading the shared
+        // incumbent to Optimal over one manufactures a false optimality proof.
+        val anyDirty = results.any { r ->
+            when (r) {
+                is MinimizeResult.BestFound -> r.reason != TerminationReason.SearchExhausted
+                is MinimizeResult.Unknown -> r.reason != TerminationReason.SearchExhausted
+                is MinimizeResult.Optimal, is MinimizeResult.Infeasible -> false
+            }
         }
         val snapshot = incumbent.load()
         val sample = snapshot.sample
         val finalBound = snapshot.bound
         if (sample != null) {
-            return@coroutineScope if (anyDirtyUnknown) {
+            return@coroutineScope if (anyDirty) {
                 MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted, stats)
             } else {
                 MinimizeResult.Optimal(sample, finalBound, stats)
             }
         }
-        if (anyDirtyUnknown) {
+        if (anyDirty) {
             MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
         } else {
             MinimizeResult.Infeasible(stats = stats)
