@@ -1,6 +1,8 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test

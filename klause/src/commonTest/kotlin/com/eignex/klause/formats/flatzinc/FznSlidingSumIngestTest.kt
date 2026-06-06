@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
  * `fzn_sliding_sum(low, up, seq, vs)` routes to the native graded [SlidingSum] factor
  * (issue #44). Checks the windowed-sum semantics hold on the solved assignment.
  */
-class SlidingSumTest {
+class FznSlidingSumIngestTest {
 
     @Test
     fun `fzn_sliding_sum routes native and bounds every window`() {

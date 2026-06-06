@@ -8,6 +8,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -51,8 +52,9 @@ class CancellationTest {
         flagger.join()
 
         assertTrue(elapsed < 2_000, "LS samples should stop within ~50ms of cancel; took ${elapsed}ms")
-        // The sequence may have yielded any number of solutions before cancel fired.
-        assertTrue(samples.isNotEmpty() || samples.isEmpty()) // tautology — just exercising the path
+        // The sequence may have yielded any number of solutions before cancel fired, but
+        // every yielded sample must be complete for the 20 unconstrained bools.
+        samples.forEach { assertEquals(problem.numBoolVars, it.bools.size) }
     }
 
     /** Same but for backtrack — cancel a long enumeration and verify prompt exit. */

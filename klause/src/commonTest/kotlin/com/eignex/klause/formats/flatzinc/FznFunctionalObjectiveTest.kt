@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class FunctionalObjectiveTest {
+class FznFunctionalObjectiveTest {
     @Test
     fun `functional objective delta matches evaluate-after minus before`() {
         // objective = |a - b| + |a - c|, minimized. Decomposed via int_abs + int_lin_eq.

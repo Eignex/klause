@@ -1,9 +1,12 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.localsearch
 
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSession
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import kotlin.test.Test
 import kotlin.test.assertEquals

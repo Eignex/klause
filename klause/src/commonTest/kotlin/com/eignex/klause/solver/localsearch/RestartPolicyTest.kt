@@ -1,14 +1,14 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.localsearch
 
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.LubyRestart
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

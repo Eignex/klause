@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * fast-food shape — decision vars feeding an abs → min → linear-sum DAG — which the LS engine
  * previously had to hand-repair move by move.
  */
-class DefinitionalSweepTest {
+class FznDefinitionalSweepTest {
 
     // x, y decisions; a = |x - 7| and b = |y - 2| via lin_eq+abs; m = min(a, b); s = a + b.
     private val src = """

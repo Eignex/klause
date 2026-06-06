@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * factor (issue #44). Mirrors the flattened form MiniZinc emits and checks the multi-machine
  * capacity semantics hold on the solved assignment.
  */
-class CumulativesTest {
+class FznCumulativesIngestTest {
 
     @Test
     fun `fzn_cumulatives routes native and enforces per-machine capacity`() {

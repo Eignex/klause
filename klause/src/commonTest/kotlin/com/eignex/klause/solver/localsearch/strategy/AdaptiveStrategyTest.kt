@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.strategy
+package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.ast.atLeast
 import com.eignex.klause.ast.atMost
@@ -7,8 +7,6 @@ import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.NoiseController
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
