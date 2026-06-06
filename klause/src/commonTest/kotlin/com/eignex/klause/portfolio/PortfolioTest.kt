@@ -86,9 +86,6 @@ class PortfolioTest {
                 .toList()
             val elapsed = started.elapsedNow().inWholeMilliseconds
             assertEquals(20, samples.size)
-            // Generous bound — 20 samples on a 4-bool problem take milliseconds of CPU; the
-            // slack only absorbs scheduler stalls on loaded CI hosts, while a worker that
-            // ignores collector cancellation would still blow well past it.
             assertTrue(elapsed < 30_000, "take(20) should be quick on a small problem; took ${elapsed}ms")
             // Every sample is a valid exactly-one configuration.
             for (s in samples) {
@@ -204,15 +201,10 @@ class PortfolioTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
-        // The builder's LS workers carry no flip budget — under shared-bound the backtrack
-        // workers report BestFound (not Optimal), so nothing self-cancels the pool. Every real
-        // driver (CLI/bench) bounds it with a deadline; here the stop is event-driven instead:
-        // cancel once any worker reports an incumbent at the known optimum (3). On cancel every
-        // worker still yields a terminal BestFound carrying its incumbent (the anytime
-        // invariant), so the pool's shared bound holds the optimum when minimize returns. The
-        // busy loop stays milliseconds long in the normal case (long uninterrupted busy loops
-        // get the page killed on wasm-browser runs, #164) without racing a loaded CI scheduler
-        // the way a fixed short deadline does; the generous fallback only bounds a regression.
+        // The LS workers are unbudgeted and shared-bound demotes backtrack to BestFound, so
+        // nothing self-cancels the pool: stop once any worker reports an incumbent at the known
+        // optimum (cancelled workers still yield their best — the anytime invariant). The
+        // fallback only bounds a regression.
         val sawOptimum = AtomicBoolean(false)
         PortfolioBuilder.build(
             problem,
@@ -259,10 +251,7 @@ class PortfolioTest {
                 }
             },
         ).use { p ->
-            // Event-driven stop: cancel once the first labeled incumbent has been collected —
-            // that is all the assertions below need — with a generous fallback that only
-            // bounds a regression. Keeps the busy loop milliseconds long in the normal case
-            // (#164) without racing a loaded CI scheduler the way a fixed 250ms deadline does.
+            // Stop once the first labeled incumbent is collected — all the assertions need.
             val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
             p.minimize(cancellation = {
                 events.load().any { it.second is SearchEvent.Incumbent } || fallback.hasPassedNow()

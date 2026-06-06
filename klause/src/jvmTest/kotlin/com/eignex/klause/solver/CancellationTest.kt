@@ -51,12 +51,8 @@ class CancellationTest {
         val elapsed = System.currentTimeMillis() - started
         flagger.join()
 
-        // Generous bound: the per-flip poll notices the flag within microseconds of real
-        // CPU time; the slack only absorbs scheduler stalls on a loaded CI host. A broken
-        // poll would not return at all (maxFlips is unbounded).
         assertTrue(elapsed < 10_000, "LS samples should stop promptly after cancel; took ${elapsed}ms")
-        // The sequence may have yielded any number of solutions before cancel fired, but
-        // every yielded sample must be complete for the 20 unconstrained bools.
+        // Every yielded sample must be complete for the 20 unconstrained bools.
         samples.forEach { assertEquals(problem.numBoolVars, it.bools.size) }
     }
 
@@ -83,11 +79,8 @@ class CancellationTest {
         val elapsed = System.currentTimeMillis() - started
         flagger.join()
 
-        // solve() may find a solution quickly (the first leaf is feasible), or it may
-        // get cancelled mid-search if we cancel before it finds one. Either way the
-        // call returns promptly.
-        // Same generous bound as the LS test: per-decision polling notices the flag almost
-        // immediately; the slack absorbs CI scheduler stalls, and a broken poll would hang.
+        // solve() may find a solution quickly (the first leaf is feasible) or get cancelled
+        // mid-search. Either way the call returns promptly.
         assertTrue(elapsed < 10_000, "backtrack solve should respond promptly to cancel; took ${elapsed}ms")
         assertTrue(
             r is SolveResult.Sat || r is SolveResult.Unknown,

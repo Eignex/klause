@@ -55,10 +55,7 @@ class AnytimeObjectiveTest {
         )
         val problem = Problem(6, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 1.0, 100.0, 50.0, 25.0))
-        // Cancel on a logical clock instead of wall time: after 10k cancellation polls the
-        // search has long since visited a feasible exactly-one assignment, regardless of
-        // host speed or CI load. With `maxFlips = MAX_VALUE` only the cancellation can end
-        // the run, so this still exercises the cancelled-mid-search return path.
+        // Logical-clock cancel: maxFlips is unbounded, so only the poll-count token ends the run.
         var polls = 0
         val sample = LocalSearchSolver(problem).minimize(
             obj,

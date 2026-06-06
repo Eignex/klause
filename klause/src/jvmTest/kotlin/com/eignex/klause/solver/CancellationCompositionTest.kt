@@ -51,10 +51,7 @@ class CancellationCompositionTest {
 
     @Test
     fun `after fires once the duration has elapsed`() {
-        // Two tokens so neither assertion races the scheduler: a far-future deadline can't
-        // have passed no matter how long the host stalls between creation and the check,
-        // and a short deadline plus a much longer sleep has certainly passed (sleep only
-        // ever oversleeps).
+        // Two tokens so neither assertion races the scheduler (sleep only ever oversleeps).
         val farFuture = Cancellation.after(10.minutes)
         assertFalse(farFuture(), "a far-future deadline must not cancel yet")
         val soon = Cancellation.after(10.milliseconds)
