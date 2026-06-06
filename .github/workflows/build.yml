@@ -49,6 +49,13 @@ jobs:
         with:
           chrome-version: 148.0.7778.178
 
+      # Ubuntu 24.04 restricts unprivileged user namespaces via AppArmor, so a downloaded
+      # Chrome binary (unlike the image's profiled preinstall) cannot create its sandbox
+      # and aborts at launch with "No usable sandbox!". Re-enable userns so Chrome keeps
+      # its sandbox — preferred over --no-sandbox per the chromium docs the error links.
+      - name: Allow Chrome's sandbox (Ubuntu 24.04 userns restriction)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       # Repo-wide detekt (kumulant runs lintDocs here; klause's dokka half is blocked on a
       # backlog of unresolved KDoc links — see the tracking issue).
       - name: Run linter
