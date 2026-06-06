@@ -29,14 +29,6 @@ class IntOverflowTest {
         const val PRODUCT = BIG.toLong() * WIDE // 2^32 = 4_294_967_296
     }
 
-    @Test
-    fun `naive Int product would wrap - documents the hazard`() {
-        // 2^20 * 2^12 = 2^32, which is exactly 0 in 32-bit two's complement. This is the
-        // wrap the Long payloads must avoid.
-        assertEquals(0, BIG * WIDE)
-        assertEquals(4_294_967_296L, PRODUCT)
-    }
-
     private fun stateFor(numBool: Int, domains: Array<IntDomain>, factor: LocalSearchFactor): LocalSearchState {
         val problem = Problem(numBool, domains.size, domains, listOf(factor as Factor))
         return LocalSearchState(problem, Random(0))

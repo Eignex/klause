@@ -95,10 +95,11 @@ class LubyRestartTest {
     }
 
     @Test
-    fun `Luby sequence has the canonical 1 1 2 1 1 2 4 prefix`() {
-        // Indirect check: with lubyRestartBase = 1, the first 7 restarts run 1+1+2+1+1+2+4
-        // = 12 total decisions before finding a solution on a 4-bool instance — verify the
-        // search terminates within a generous budget. (We don't expose lubyN directly.)
+    fun `unit luby base terminates within the decision budget despite constant restarts`() {
+        // With lubyRestartBase = 1 the engine restarts on the canonical 1,1,2,1,1,2,4,...
+        // cadence (the sequence values themselves are asserted in RestartPolicyTest's
+        // `luby sequence matches knuth`); here we verify the backtrack restart loop
+        // still finds SAT within a generous budget under that maximal restart pressure.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),

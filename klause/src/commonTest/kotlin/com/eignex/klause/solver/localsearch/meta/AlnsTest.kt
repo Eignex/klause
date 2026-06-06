@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.meta
+package com.eignex.klause.solver.localsearch.meta
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -10,13 +10,6 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.meta.Alns
-import com.eignex.klause.solver.localsearch.meta.DestroyOperator
-import com.eignex.klause.solver.localsearch.meta.FreedVars
-import com.eignex.klause.solver.localsearch.meta.GreedyConstructionRepair
-import com.eignex.klause.solver.localsearch.meta.InnerLsRepair
-import com.eignex.klause.solver.localsearch.meta.RepairContext
-import com.eignex.klause.solver.localsearch.meta.RepairOperator
 import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import kotlin.random.Random

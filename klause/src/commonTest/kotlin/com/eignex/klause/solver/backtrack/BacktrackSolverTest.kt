@@ -1,13 +1,12 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.backtrack
 
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.DomWdeg
-import com.eignex.klause.solver.backtrack.LastConflict
-import com.eignex.klause.solver.backtrack.RandomVariable
-import com.eignex.klause.solver.backtrack.SmallestDomain
-import com.eignex.klause.solver.backtrack.VarRef
-import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative

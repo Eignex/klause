@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.strategy
+package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
@@ -7,9 +7,6 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
-import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import com.eignex.klause.solver.localsearch.strategy.WalkSat
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

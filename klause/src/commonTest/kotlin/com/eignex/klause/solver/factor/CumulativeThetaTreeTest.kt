@@ -8,14 +8,14 @@ import kotlin.test.assertTrue
 
 class CumulativeThetaTreeTest {
 
-    @Test fun emptyTreeReturnsNoEnv() {
+    @Test fun `empty tree returns no envelope`() {
         val t = CumulativeThetaTree(n = 4, capacity = 3)
         assertEquals(CumulativeThetaTree.NO_ENV, t.envOfTheta())
         assertEquals(0L, t.energyOfTheta())
         assertFalse(t.isActive(0))
     }
 
-    @Test fun singleTaskEnvelopeMatchesFormula() {
+    @Test fun `single task envelope matches the formula`() {
         val t = CumulativeThetaTree(n = 1, capacity = 2)
         t.activate(id = 0, est = 5, taskEnergy = 6L)
         assertTrue(t.isActive(0))
@@ -23,7 +23,7 @@ class CumulativeThetaTreeTest {
         assertEquals(6L, t.energyOfTheta())
     }
 
-    @Test fun deactivateRestoresEmpty() {
+    @Test fun `deactivate restores the empty envelope`() {
         val t = CumulativeThetaTree(n = 2, capacity = 2)
         t.activate(0, est = 0, taskEnergy = 4L)
         t.activate(1, est = 3, taskEnergy = 6L)
@@ -33,7 +33,7 @@ class CumulativeThetaTreeTest {
         assertEquals(0L, t.energyOfTheta())
     }
 
-    @Test fun twoTasksLeftAnchorWins() {
+    @Test fun `two tasks left anchor wins the envelope`() {
         // Tasks: a est=0 e=10, b est=5 e=2, capacity=1.
         // env(a) = 0 + 10 = 10
         // env(b) = 5 + 2 = 7
@@ -46,7 +46,7 @@ class CumulativeThetaTreeTest {
         assertEquals(12L, t.energyOfTheta())
     }
 
-    @Test fun twoTasksRightAnchorWins() {
+    @Test fun `two tasks right anchor wins the envelope`() {
         // Tasks: a est=0 e=1, b est=100 e=5, capacity=10.
         // env(a) = 0 + 1 = 1
         // env(b) = 1000 + 5 = 1005
@@ -58,7 +58,7 @@ class CumulativeThetaTreeTest {
         assertEquals(1005L, t.envOfTheta())
     }
 
-    @Test fun deactivateMatchesNeverActivated() {
+    @Test fun `deactivate matches never-activated state`() {
         // Build a tree of three tasks, then deactivate one. Result should match a tree
         // that was built with only the other two from the start.
         val full = CumulativeThetaTree(n = 3, capacity = 4)
@@ -77,7 +77,7 @@ class CumulativeThetaTreeTest {
         assertEquals(twoOnly.energyOfTheta(), full.energyOfTheta())
     }
 
-    @Test fun leafOrderingMattersForEnvelope() {
+    @Test fun `leaf ordering matters for the envelope`() {
         // Same task set, different leaf orderings: the recurrence anchors at the
         // leftmost EST in the subtree, so EST-ascending leaf order is the one that
         // gives the correct envelope.
@@ -105,7 +105,7 @@ class CumulativeThetaTreeTest {
         assertEquals(19L, swapped.envOfTheta())
     }
 
-    @Test fun nonPowerOfTwoTaskCountWorks() {
+    @Test fun `non-power-of-two task count works`() {
         // n=5 → leafBase=8, three padding leaves should stay inert.
         val t = CumulativeThetaTree(n = 5, capacity = 2)
         t.setLeafOrder(intArrayOf(0, 1, 2, 3, 4))
@@ -126,7 +126,7 @@ class CumulativeThetaTreeTest {
         assertEquals(5L, t.energyOfTheta())
     }
 
-    @Test fun reactivationOverwritesPriorContribution() {
+    @Test fun `reactivation overwrites the prior contribution`() {
         val t = CumulativeThetaTree(n = 2, capacity = 1)
         t.setLeafOrder(intArrayOf(0, 1))
         t.activate(0, est = 0, taskEnergy = 100L)
@@ -162,7 +162,7 @@ class CumulativeThetaTreeTest {
         return best
     }
 
-    @Test fun randomizedAgainstBruteForce() {
+    @Test fun `randomized envelopes match brute force`() {
         val rng = Random(0x7C0FEE)
         repeat(200) {
             val n = 1 + rng.nextInt(7) // up to 7 tasks: 2^7 = 128 subsets

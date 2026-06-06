@@ -195,14 +195,11 @@ class ChocoFactorCoverageTest {
     }
 
     @Test fun `linear whose reachable sum exceeds Choco's range is reported unsupported, not crashed`() {
-        // Regression for #120: two vars near half the int range sum past Integer.MAX_VALUE, so the
-        // scalar's intermediate var would trip Choco's domain-range guard. The adapter must raise
-        // its explicit unsupported signal rather than letting a raw SolverException escape.
         val big = 1_500_000_000
         val p = problem(
             2,
-            arrayOf(IntDomain(0, big), IntDomain(0, big)),
-            Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, bound = big),
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            Linear(coeffs = intArrayOf(big, big), vars = intArrayOf(0, 1), op = LinearOp.LE, bound = big),
         )
         assertFailsWith<UnsupportedFactorException> { ChocoSolver(p).solve(ChocoParams()) }
     }

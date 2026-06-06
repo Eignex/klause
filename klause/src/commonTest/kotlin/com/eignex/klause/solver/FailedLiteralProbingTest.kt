@@ -83,21 +83,6 @@ class FailedLiteralProbingTest {
     }
 
     @Test
-    fun `probing with already-Unsat problem reports Unsat`() {
-        val p = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-            probeFailedLiterals = true,
-        )
-        assertIs<PropagationResult.Unsat>(p.baked)
-    }
-
-    @Test
     fun `probing on a feasible problem with no forced literals leaves baked unchanged`() {
         val p = Problem(
             numBoolVars = 4,

@@ -98,10 +98,10 @@ class GapFactorLogicNgTest {
     }
 
     @Test
-    fun `subcircuit rejects a single disjoint subcycle leaving included nodes`() {
-        // n=4, force a 2-cycle on {0,1} and self-loops on {2,3}: 0→1→0, 2,3 excluded. This is
-        // a valid subcircuit (single cycle among included nodes). Sanity SAT check.
-        val n = 4
+    fun `subcircuit accepts a single included 2-cycle with an excluded self-loop`() {
+        // n=3, force a 2-cycle on {0,1} and a self-loop on {2}: 0→1→0, 2 excluded. This is
+        // a valid subcircuit (single cycle among included nodes).
+        val n = 3
         val problem = Problem(
             0,
             n,
@@ -111,10 +111,9 @@ class GapFactorLogicNgTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2),
-                Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 3),
             ),
         )
-        assertIs<SolveResult.Sat>(solve(problem), "single included 2-cycle with exclusions should be SAT")
+        assertIs<SolveResult.Sat>(solve(problem), "single included 2-cycle with exclusion should be SAT")
     }
 
     private fun eq(v: Int, value: Int): Linear = Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, value)

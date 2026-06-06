@@ -5,6 +5,7 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -29,14 +30,14 @@ class ReifiedEqNegationTest {
                 ),
             ),
         )
-        val r = p.propagate(Assumptions(bools = mapOf(0 to false), ints = mapOf(1 to 2)))
-        val impl = assertIs<PropagationResult.Implied>(r)
-        // x=3 forbidden. With domain [3..6] and 3 forbidden at the min boundary, x should tighten.
-        // We don't get a single forced value, but the propagation completes without Unsat.
-        // Hard to assert exact value without more structure; verify no Unsat.
-
-        @Suppress("UNUSED_VARIABLE")
-        val ok = impl
+        val session = PropagationSession(p)
+        assertIs<PropagationResult.Implied>(
+            session.seed(Assumptions(bools = mapOf(0 to false), ints = mapOf(1 to 2))),
+        )
+        // x=3 forbidden at the min boundary of [3..6] → x.min tightens to 4.
+        val dxAfter = session.intDomain(0)
+        assertEquals(4, dxAfter.min, "x=3 should be shaved off the min boundary; got $dxAfter")
+        assertEquals(6, dxAfter.max, "x.max untouched; got $dxAfter")
     }
 
     @Test

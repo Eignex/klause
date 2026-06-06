@@ -19,12 +19,10 @@ class ProductReverseTest {
             intDomains = arrayOf(IntDomain(-10, 10), IntDomain(3, 3), IntDomain(6, 9)),
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
-        val r = assertIs<PropagationResult.Implied>(p.propagate())
-        // The Implied map only contains singleton-pinned vars; a's [2..3] narrowing
-        // isn't returned. Tighter-result tests below cover the singleton case.
-
-        @Suppress("UNUSED_VARIABLE")
-        val ok = r
+        assertIs<PropagationResult.Implied>(p.propagate())
+        val daAfter = PropagationSession(p).intDomain(0)
+        assertEquals(2, daAfter.min, "a.min should be ceil(6/3) = 2; got $daAfter")
+        assertEquals(3, daAfter.max, "a.max should be floor(9/3) = 3; got $daAfter")
     }
 
     @Test

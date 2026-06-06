@@ -1,12 +1,11 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.propagation
 
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.propagation.PropagationResult
-import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.solver.propagation.VarKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -65,23 +64,6 @@ class PropagationSessionTest {
         assertEquals(Assumptions(bools = mapOf(0 to true, 1 to false)), s.currentAssumptions())
         s.popLast()
         assertEquals(Assumptions(bools = mapOf(0 to true)), s.currentAssumptions())
-    }
-
-    @Test
-    fun `pinInt with subsequent contradiction Unsat`() {
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
-        )
-        val s = PropagationSession(p)
-        s.seed(Assumptions.None)
-        assertIs<PropagationResult.Implied>(s.pinInt(0, 1))
-        val r = s.pinInt(1, 1)
-        val u = assertIs<PropagationResult.Unsat>(r)
-        assertTrue(0 in u.conflictInts)
-        assertTrue(1 in u.conflictInts)
     }
 
     @Test

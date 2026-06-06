@@ -3,17 +3,13 @@ package com.eignex.klause.smt
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.Cardinality
-import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 
 class SmtOptimizerTest {
 
@@ -65,13 +61,12 @@ class SmtOptimizerTest {
     }
 
     /**
-     * Verdict surface check: the [MinimizeResult] sealed type must be usable from a
-     * generic `Optimizer<SmtParams>` cast. Doesn't exercise an optimization-capable
-     * backend (none on the classpath in CI), just confirms the wiring compiles and the
-     * default `improvements` overload is reachable.
+     * The default `improvements` overload (reached through a generic `Optimizer<SmtParams>`
+     * cast) wraps `minimize`, so it must surface the same SMTInterpol no-optimization
+     * exception when the sequence is forced — not swallow it lazily.
      */
     @Test
-    fun `optimizer interface visible on smt solver`() {
+    fun `improvements surfaces the SMTInterpol no-optimization exception when forced`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 0,
@@ -79,18 +74,8 @@ class SmtOptimizerTest {
             factors = arrayOf<Factor>(),
         )
         val opt: Optimizer<SmtParams> = SmtSolver(problem)
-        assertNotNull(opt)
-        // Calling minimize on an empty problem with SMTInterpol still throws on opt env.
-        assertFailsWith<UnsupportedOperationException> {
-            opt.minimize(LinearObjective(), SmtParams())
-        }
-        // The default improvements sequence wraps the same call, so it also throws when
-        // forced.
         assertFailsWith<UnsupportedOperationException> {
             opt.improvements(LinearObjective(), SmtParams()).toList()
         }
-        // Sanity: returned type is MinimizeResult-typed when it does return.
-        val expected: KClass<MinimizeResult> = MinimizeResult::class
-        assertIs<KClass<MinimizeResult>>(expected)
     }
 }

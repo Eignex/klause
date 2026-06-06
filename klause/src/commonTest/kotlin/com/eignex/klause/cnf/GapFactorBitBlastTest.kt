@@ -38,10 +38,10 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Each previously-unsupported native factor must bit-blast to CNF that (a) accepts every
- * feasible assignment the local-search solver finds, and (b) rejects targeted infeasible
- * pinnings. Validation reuses the [SatCheck] oracle: pin a feasible sample into the CNF and
- * assert SAT; pin an infeasible scenario and assert UNSAT.
+ * Each previously-unsupported native factor must bit-blast to CNF that accepts a feasible
+ * assignment found by the local-search solver. Validation reuses the [SatCheck] oracle: pin
+ * a feasible sample into the CNF and assert SAT. (The reject-infeasible direction is covered
+ * by [SolverVsBitBlasterTest]'s UNSAT cross-check, not here.)
  */
 class GapFactorBitBlastTest {
 
@@ -54,7 +54,7 @@ class GapFactorBitBlastTest {
         assertTrue(SatCheck.isSat(cnf.numVars, cnf.clauses, pins), "$name: feasible sample UNSAT under bit-blast")
     }
 
-    @Test fun disjunctive() = feasibleSampleIsSat(
+    @Test fun `disjunctive bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "disjunctive",
         Problem(
             0,
@@ -66,7 +66,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun cumulative() = feasibleSampleIsSat(
+    @Test fun `cumulative bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "cumulative",
         Problem(
             0,
@@ -83,7 +83,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun count() = feasibleSampleIsSat(
+    @Test fun `count bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "count",
         // n (var 3) = #{i : xs[i] = 1}, xs = vars 0..2 ∈ [0,2], n ∈ [0,3].
         Problem(
@@ -96,7 +96,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun nvalue() = feasibleSampleIsSat(
+    @Test fun `nvalue bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "nvalue",
         Problem(
             0,
@@ -108,7 +108,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun gcc() = feasibleSampleIsSat(
+    @Test fun `gcc bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "gcc",
         Problem(
             0,
@@ -129,7 +129,7 @@ class GapFactorBitBlastTest {
     // sample, so the brute-force SatCheck oracle can't validate them — they're round-tripped
     // through a real SAT solver in klause-logicng's GapFactorLogicNgTest instead.
 
-    @Test fun setSubset() = feasibleSampleIsSat(
+    @Test fun `set subset bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "set subset",
         Problem(
             4,
@@ -143,7 +143,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun setDisjoint() = feasibleSampleIsSat(
+    @Test fun `set disjoint bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "set disjoint",
         Problem(
             4,
@@ -155,7 +155,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun setEq() = feasibleSampleIsSat(
+    @Test fun `set eq bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "set eq",
         Problem(
             4,
@@ -167,17 +167,17 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun allEqual() = feasibleSampleIsSat(
+    @Test fun `all equal bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "all equal",
         Problem(0, 3, Array(3) { IntDomain(0, 3) }, arrayOf<Factor>(AllEqual(intArrayOf(0, 1, 2)))),
     )
 
-    @Test fun member() = feasibleSampleIsSat(
+    @Test fun `member bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "member",
         Problem(0, 4, Array(4) { IntDomain(0, 3) }, arrayOf<Factor>(Member(xs = intArrayOf(0, 1, 2), y = 3))),
     )
 
-    @Test fun among() = feasibleSampleIsSat(
+    @Test fun `among bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "among",
         Problem(
             0,
@@ -189,7 +189,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun monotone() = feasibleSampleIsSat(
+    @Test fun `monotone bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "monotone",
         Problem(
             0,
@@ -201,7 +201,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun lexLess() = feasibleSampleIsSat(
+    @Test fun `lex less bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "lex less",
         Problem(
             0,
@@ -213,7 +213,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun valuePrecede() = feasibleSampleIsSat(
+    @Test fun `value precede bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "value precede",
         Problem(
             0,
@@ -225,7 +225,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun elementConst() = feasibleSampleIsSat(
+    @Test fun `element const bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "element const",
         // idx (var0) ∈ [1,3], result (var1) ∈ [5,9], arr = [5,7,9], 1-based.
         Problem(
@@ -238,7 +238,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun elementVars() = feasibleSampleIsSat(
+    @Test fun `element vars bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "element vars",
         // result (var0), idx (var1) ∈ [1,3], arr = vars 2,3,4.
         Problem(
@@ -251,7 +251,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun inverse() = feasibleSampleIsSat(
+    @Test fun `inverse bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "inverse",
         Problem(
             0,
@@ -263,7 +263,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun symmetricAllDifferent() = feasibleSampleIsSat(
+    @Test fun `symmetric all different bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "symmetric all different",
         Problem(
             0,
@@ -275,7 +275,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun sort() = feasibleSampleIsSat(
+    @Test fun `sort bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "sort",
         Problem(
             0,
@@ -287,7 +287,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun arrayMax() = feasibleSampleIsSat(
+    @Test fun `array max bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "array max",
         Problem(
             0,
@@ -299,7 +299,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun argMin() = feasibleSampleIsSat(
+    @Test fun `arg min bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "arg min",
         Problem(
             0,
@@ -311,7 +311,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun diffn() = feasibleSampleIsSat(
+    @Test fun `diffn bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "diffn",
         Problem(
             0,
@@ -328,7 +328,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun binPacking() = feasibleSampleIsSat(
+    @Test fun `bin packing bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "bin packing",
         Problem(
             0,
@@ -347,7 +347,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun knapsack() = feasibleSampleIsSat(
+    @Test fun `knapsack bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "knapsack",
         // xs = vars 0,1 ∈ {0,1}; w (var2) = Σ weights·xs; p (var3) = Σ profits·xs.
         Problem(
@@ -360,7 +360,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun table() = feasibleSampleIsSat(
+    @Test fun `table bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "table",
         Problem(
             0,
@@ -372,7 +372,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun sequence() = feasibleSampleIsSat(
+    @Test fun `sequence bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "sequence",
         Problem(
             0,
@@ -384,7 +384,7 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun regular() = feasibleSampleIsSat(
+    @Test fun `regular bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "regular",
         // 2-state DFA, alphabet {1,2}, q0=1, accept {1}. trans[(q-1)*S+(s-1)]: 1×1→1,1×2→2,2×1→2,2×2→1.
         Problem(
