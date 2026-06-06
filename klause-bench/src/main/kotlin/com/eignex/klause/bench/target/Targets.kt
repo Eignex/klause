@@ -59,6 +59,10 @@ object Targets {
         Target("parity-core-ortools", "Differential parity (klause vs OR-Tools) over the in-process core", IN_PROCESS_CORE, MetricKind.PARITY, reference = Backend.ORTOOLS),
         Target("mzn-parity-ortools", "Differential parity (klause vs OR-Tools) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY, reference = Backend.ORTOOLS),
         Target("mzn-anytime-choco", "Anytime optimization (klause-LS vs Choco) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.ANYTIME, Budget(timeoutMillis = 5_000), reference = Backend.CHOCO),
+        // Yuck-referenced variants (LS-vs-LS; requires a provisioned Yuck distribution, see
+        // `:klause-yuck:installYuck`). Temporary, for the LS parity sweep.
+        Target("mzn-parity-yuck", "Differential parity (klause vs Yuck LS) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.PARITY, reference = Backend.YUCK),
+        Target("mzn-anytime-yuck", "Anytime optimization (klause-LS vs Yuck LS) over the MiniZinc smoke set", listOf("mzn-smoke"), MetricKind.ANYTIME, Budget(timeoutMillis = 5_000), reference = Backend.YUCK),
     )
 
     fun get(id: String): Target =
