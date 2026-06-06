@@ -95,7 +95,7 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
         ints = IntArray(problem.numIntVars) { solution["i$it"]?.toInt() ?: 0 },
     )
 
-    /** One Yuck subprocess run over [fzn]: solutions in emission order plus status markers. */
+    /** One Yuck subprocess run over a FlatZinc model: solutions in emission order plus status markers. */
     private class RunResult(
         val solutions: List<Map<String, String>>,
         val unsatisfiable: Boolean,
