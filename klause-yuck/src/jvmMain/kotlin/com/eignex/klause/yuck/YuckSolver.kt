@@ -143,14 +143,14 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
         drain.start()
 
         val solutions = ArrayList<Map<String, String>>()
-        var current = HashMap<String, String>()
+        val current = HashMap<String, String>()
         var unsatisfiable = false
         var complete = false
         process.inputStream.bufferedReader().forEachLine { line ->
             when {
                 line == SOLUTION_SEPARATOR -> {
-                    solutions.add(current)
-                    current = HashMap()
+                    solutions.add(HashMap(current))
+                    current.clear()
                 }
 
                 line == SEARCH_COMPLETE -> complete = true
