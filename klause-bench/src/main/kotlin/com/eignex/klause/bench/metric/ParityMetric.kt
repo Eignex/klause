@@ -108,7 +108,15 @@ object ParityMetric {
 
     private fun btParams(budget: Budget): BacktrackParams {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        return BacktrackParams(randomSeed = 1L, cancellation = Cancellation { System.currentTimeMillis() > deadline })
+        // Luby restarts: the anytime configuration. Branch-and-bound leaves a permanent
+        // blocking nogood per incumbent, so restarts diversify without revisiting solved
+        // leaves; on plateau-prone instances they are the difference between stalling on
+        // the first incumbents and walking to the optimum.
+        return BacktrackParams(
+            randomSeed = 1L,
+            lubyRestartBase = 256L,
+            cancellation = Cancellation { System.currentTimeMillis() > deadline },
+        )
     }
 
     /** true = feasible, false = infeasible, null = unknown/timeout. */
