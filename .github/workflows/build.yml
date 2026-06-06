@@ -40,13 +40,31 @@ jobs:
       - name: Grant execute permission for Gradle
         run: chmod +x gradlew
 
+      # Pin the karma browser to the Chrome for Testing build validated locally (#171):
+      # the runner image's own Chrome drifts with image rollouts, and the wasm flake wave
+      # correlated with an image update. CHROME_BIN is honored by karma-chrome-launcher.
+      - name: Set up pinned Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 148.0.7778.178
+
       # Repo-wide detekt (kumulant runs lintDocs here; klause's dokka half is blocked on a
       # backlog of unresolved KDoc links — see the tracking issue).
       - name: Run linter
         run: ./gradlew detekt
 
+      # Compile at full parallelism first, then run the verification phase with bounded
+      # workers: with the configuration cache Gradle executes test tasks in parallel, so
+      # JVM test JVMs, ChromeHeadless and the node wasm runtimes otherwise compete for the
+      # runner's cores — the load that starves/kills roughly one wasm test per run (#171).
+      - name: Assemble
+        run: ./gradlew assemble
+
       - name: Run build and tests with coverage
-        run: ./gradlew build koverXmlReport
+        run: ./gradlew build koverXmlReport --max-workers=2
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
 
       - name: Upload test reports
         if: always()
