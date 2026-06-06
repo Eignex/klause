@@ -7,7 +7,11 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.SearchTier
 import com.eignex.klause.solver.backtrack.SolutionGuided
+import com.eignex.klause.solver.backtrack.TierVarSelect
+import com.eignex.klause.solver.backtrack.TieredValueHeuristic
+import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
 import com.eignex.klause.solver.backtrack.ValueHeuristic
 import com.eignex.klause.solver.backtrack.VariableHeuristic
 import com.eignex.klause.solver.factor.Clause
@@ -122,67 +126,149 @@ internal class FlatZincCompiler(
     }
 
     /**
-     * Map a `solve :: int_search(...) / bool_search(...) / seq_search([...])` annotation
-     * onto a [BacktrackParams] with the requested
-     * heuristics. Returns `null` when no recognised search annotation is present.
-     *
-     * Klause's engine doesn't take per-variable-array search blocks today, so when the
-     * annotation lists a specific var array we still apply the strategies globally. For
-     * `seq_search([s1, s2, ...])` we adopt the first search block's strategies. Strategies
-     * we don't recognise fall through to the engine's defaults (random/random).
+     * Map the `solve :: int_search/bool_search/set_search/seq_search(...)` annotation onto
+     * [BacktrackParams]. Each search block becomes a [SearchTier] over the variables its
+     * array actually lists, in order; `seq_search` contributes its blocks as consecutive
+     * tiers. A [TieredVariableHeuristic] explores the tiers first and falls back to the
+     * first block's strategy applied globally for the remaining (introduced) variables,
+     * with a matching [TieredValueHeuristic] on the value side. Returns `null` when no
+     * recognised search annotation is present or no block lists any resolvable variable.
      */
     internal fun compileSearchAnnotation(): BacktrackParams? {
-        val ann = model.solve.annotations.firstOrNull(::isSearchAnnotation) ?: return null
-        val (varStr, valStr) = extractStrategies(ann) ?: return null
-        val varH = mapVariableStrategy(varStr) ?: return null
-        val valH = mapValueStrategy(valStr) ?: return null
-        // For minimize / maximize, wrap the chosen value heuristic in SolutionGuided so
-        // each new incumbent biases the next descent toward "near the last good solution"
-        // — the standard SOTA phase-saving-for-BnB pattern.
+        val blocks = model.solve.annotations.filter(::isSearchAnnotation).flatMap(::searchBlocksOf)
+        val tiers = blocks.mapNotNull(::compileSearchBlock)
+        if (tiers.isEmpty()) return null
+        val firstBlockVarName = blocks.firstNotNullOfOrNull { (it.args.getOrNull(1) as? FznExpr.Ident)?.name }
+        val firstBlockValName = blocks.firstNotNullOfOrNull { (it.args.getOrNull(2) as? FznExpr.Ident)?.name }
+        val fallbackVar = firstBlockVarName?.let(::mapVariableStrategy)
+            ?: com.eignex.klause.solver.backtrack.SmallestDomain
+        val fallbackVal = firstBlockValName?.let(::mapValueStrategy)
+            ?: com.eignex.klause.solver.backtrack.IndomainMin
+        val tieredVal = TieredValueHeuristic(tiers, fallbackVal, numBoolVars, intDomains.size)
+        // For minimize / maximize, wrap the value side in SolutionGuided so each new
+        // incumbent biases the next descent toward "near the last good solution" — the
+        // standard SOTA phase-saving-for-BnB pattern.
         val wrappedValH = when (model.solve) {
-            is FznSolve.Minimize, is FznSolve.Maximize ->
-                SolutionGuided(valH)
-
-            is FznSolve.Satisfy -> valH
+            is FznSolve.Minimize, is FznSolve.Maximize -> SolutionGuided(tieredVal)
+            is FznSolve.Satisfy -> tieredVal
         }
         return BacktrackParams(
-            variableHeuristic = varH,
+            variableHeuristic = TieredVariableHeuristic(tiers, fallbackVar),
             valueHeuristic = wrappedValH,
         )
     }
 
     internal fun isSearchAnnotation(a: FznAnnotation): Boolean =
-        a.name == "int_search" || a.name == "bool_search" || a.name == "seq_search"
+        a.name == "int_search" || a.name == "bool_search" || a.name == "set_search" || a.name == "seq_search"
 
-    /** Returns (var_strategy_name, value_strategy_name) for the first int_search/bool_search
-     *  block we find, or null. */
-    internal fun extractStrategies(a: FznAnnotation): Pair<String, String>? = when (a.name) {
-        "int_search", "bool_search" -> {
-            // Signature: search(varArray, var_strategy, value_strategy, complete)
-            if (a.args.size < 3) {
-                null
-            } else {
-                val vs = (a.args[1] as? FznExpr.Ident)?.name
-                val vls = (a.args[2] as? FznExpr.Ident)?.name
-                if (vs != null && vls != null) vs to vls else null
-            }
-        }
+    /** Flatten an annotation into its concrete search blocks: a plain block is itself;
+     *  `seq_search` lists its blocks in order (recursing through nested seq_search). */
+    internal fun searchBlocksOf(a: FznAnnotation): List<FznAnnotation> = when (a.name) {
+        "int_search", "bool_search", "set_search" -> listOf(a)
 
         "seq_search" -> {
-            val list = (a.args.firstOrNull() as? FznExpr.ArrayLit)?.elements
-            val first = list?.firstNotNullOfOrNull { e ->
-                (e as? FznExpr.AnnCall)?.takeIf { it.name == "int_search" || it.name == "bool_search" }
-            } ?: return null
-            extractStrategies(FznAnnotation(first.name, first.args))
+            val list = (a.args.firstOrNull() as? FznExpr.ArrayLit)?.elements.orEmpty()
+            list.mapNotNull { it as? FznExpr.AnnCall }
+                .flatMap { searchBlocksOf(FznAnnotation(it.name, it.args)) }
         }
 
+        else -> emptyList()
+    }
+
+    /** One search block → one [SearchTier], or null when the block lists no resolvable
+     *  variable. Signature: `search(varArray, var_strategy, value_strategy, complete)`. */
+    private fun compileSearchBlock(a: FznAnnotation): SearchTier? {
+        if (a.args.size < 3) return null
+        val bools = ArrayList<Int>()
+        val ints = ArrayList<Int>()
+        collectSearchVars(a.args[0], bools, ints)
+        if (bools.isEmpty() && ints.isEmpty()) return null
+        val varName = (a.args[1] as? FznExpr.Ident)?.name
+        val valName = (a.args[2] as? FznExpr.Ident)?.name
+        return SearchTier(
+            boolVars = bools.toIntArray(),
+            intVars = ints.toIntArray(),
+            // An unrecognised variable strategy keeps the tier (the var list is the
+            // valuable part) and labels it in listed order.
+            varSelect = varName?.let(::mapTierVarSelect) ?: TierVarSelect.InputOrder,
+            valueHeuristic = valName?.let(::mapValueStrategy)
+                ?: com.eignex.klause.solver.backtrack.IndomainMin,
+        )
+    }
+
+    /** Resolve a search block's variable-array expression into engine var ids, in listed
+     *  order. Set vars contribute their indicator bools; float vars their bucket int var;
+     *  constants are skipped (models do list literals in search arrays). */
+    private fun collectSearchVars(e: FznExpr, bools: ArrayList<Int>, ints: ArrayList<Int>) {
+        when (e) {
+            is FznExpr.Ident -> {
+                val name = e.name
+                boolVars[name]?.let {
+                    bools.add(it);
+                    return
+                }
+                intVars[name]?.let {
+                    ints.add(it);
+                    return
+                }
+                floatVars[name]?.let {
+                    ints.add(it.varId);
+                    return
+                }
+                setVarsByName[name]?.let { layout ->
+                    for (b in layout.indicatorBoolIds) bools.add(b)
+                    return
+                }
+                when (val arr = arrays[name]) {
+                    is FlatZincArray.Vars -> when (arr.elementKind) {
+                        FlatZincArray.Vars.ElementKind.Bool -> for (v in arr.varIds) bools.add(v)
+
+                        FlatZincArray.Vars.ElementKind.Int,
+                        FlatZincArray.Vars.ElementKind.Float,
+                        -> for (v in arr.varIds) ints.add(v)
+                    }
+
+                    else -> {}
+                }
+            }
+
+            is FznExpr.ArrayLit -> for (el in e.elements) collectSearchVars(el, bools, ints)
+
+            is FznExpr.ArrayAccess -> {
+                val arr = arrays[e.name] as? FlatZincArray.Vars ?: return
+                val idx = e.index - 1
+                if (idx !in arr.varIds.indices) return
+                when (arr.elementKind) {
+                    FlatZincArray.Vars.ElementKind.Bool -> bools.add(arr.varIds[idx])
+
+                    FlatZincArray.Vars.ElementKind.Int,
+                    FlatZincArray.Vars.ElementKind.Float,
+                    -> ints.add(arr.varIds[idx])
+                }
+            }
+
+            // Constants and anything else contribute no search variables.
+            else -> {}
+        }
+    }
+
+    internal fun mapTierVarSelect(name: String): TierVarSelect? = when (name) {
+        "input_order" -> TierVarSelect.InputOrder
+        "first_fail", "most_constrained", "dom_w_deg", "occurrence" -> TierVarSelect.SmallestDomain
+        "anti_first_fail" -> TierVarSelect.LargestDomain
+        "smallest" -> TierVarSelect.SmallestLowerBound
+        "largest" -> TierVarSelect.LargestUpperBound
+        "random_order" -> TierVarSelect.RandomOrder
         else -> null
     }
 
     internal fun mapVariableStrategy(name: String): VariableHeuristic? = when (name) {
         "input_order" -> com.eignex.klause.solver.backtrack.InputOrder
-        "first_fail", "dom_w_deg" -> com.eignex.klause.solver.backtrack.SmallestDomain
+        "first_fail", "most_constrained" -> com.eignex.klause.solver.backtrack.SmallestDomain
+        "dom_w_deg" -> com.eignex.klause.solver.backtrack.DomWdeg()
         "anti_first_fail", "occurrence" -> com.eignex.klause.solver.backtrack.LargestDomain
+        "smallest" -> com.eignex.klause.solver.backtrack.SmallestLowerBound
+        "largest" -> com.eignex.klause.solver.backtrack.LargestUpperBound
         "random_order" -> com.eignex.klause.solver.backtrack.RandomVariable
         else -> null
     }
@@ -190,7 +276,8 @@ internal class FlatZincCompiler(
     internal fun mapValueStrategy(name: String): ValueHeuristic? = when (name) {
         "indomain_min", "indomain" -> com.eignex.klause.solver.backtrack.IndomainMin
         "indomain_max" -> com.eignex.klause.solver.backtrack.IndomainMax
-        "indomain_middle", "indomain_split" -> com.eignex.klause.solver.backtrack.IndomainMiddle
+        "indomain_middle", "indomain_median" -> com.eignex.klause.solver.backtrack.IndomainMiddle
+        "indomain_split" -> com.eignex.klause.solver.backtrack.IndomainSplit
         "indomain_random" -> com.eignex.klause.solver.backtrack.IndomainRandom
         else -> null
     }

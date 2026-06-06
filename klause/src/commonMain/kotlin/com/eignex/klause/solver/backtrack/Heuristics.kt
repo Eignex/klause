@@ -172,6 +172,56 @@ object LargestDomain : VariableHeuristic {
 }
 
 /**
+ * Smallest lower bound first (MiniZinc's `smallest`): the free variable whose domain
+ * minimum is lowest. Free bools count as minimum 0. Ties broken by variable id, bools
+ * before ints. The scheduling staple — branching on the task that can start earliest.
+ */
+object SmallestLowerBound : VariableHeuristic {
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        var best: VarRef? = null
+        var bestLb = Int.MAX_VALUE
+        val problem = session.problem
+        for (v in 0 until problem.numBoolVars) {
+            if (session.boolValue(v) == null && 0 < bestLb) {
+                best = VarRef.Bool(v)
+                bestLb = 0
+            }
+        }
+        for (v in 0 until problem.numIntVars) {
+            val d = session.intDomain(v)
+            if (d.size > 1 && d.min < bestLb) {
+                best = VarRef.IntVar(v)
+                bestLb = d.min
+            }
+        }
+        return best
+    }
+}
+
+/** Largest upper bound first (MiniZinc's `largest`). Free bools count as maximum 1. */
+object LargestUpperBound : VariableHeuristic {
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        var best: VarRef? = null
+        var bestUb = Int.MIN_VALUE
+        val problem = session.problem
+        for (v in 0 until problem.numBoolVars) {
+            if (session.boolValue(v) == null && 1 > bestUb) {
+                best = VarRef.Bool(v)
+                bestUb = 1
+            }
+        }
+        for (v in 0 until problem.numIntVars) {
+            val d = session.intDomain(v)
+            if (d.size > 1 && d.max > bestUb) {
+                best = VarRef.IntVar(v)
+                bestUb = d.max
+            }
+        }
+        return best
+    }
+}
+
+/**
  * Variable State Independent Decaying Sum (Moskewicz et al., Chaff 2001 / MiniSAT). The
  * activity counter for each variable is bumped on every conflict the variable is implicated
  * in, with the bump amount `increment` growing geometrically over time so recent conflicts
@@ -819,6 +869,28 @@ object IndomainMiddle : ValueHeuristic {
                     off++
                 }
             }
+        }
+    }
+}
+
+/**
+ * Domain bisection (`indomain_split`): branch `v ≤ mid` first, then `v ≥ mid+1`, with
+ * `mid` the floor midpoint of the current interval. The engine's int decisions are bound
+ * splits around the heuristic's first value (see `BacktrackSolver.IntNode`), so yielding
+ * the midpoint produces exactly the dichotomic search the annotation asks for — log-depth
+ * on wide domains where value enumeration is linear.
+ */
+object IndomainSplit : ValueHeuristic {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(0, 1)
+
+        is VarRef.IntVar -> {
+            val d = session.intDomain(varRef.varId)
+            val mid = d.min + (d.max - d.min) / 2
+            // The midpoint may sit in a hole; the bound split doesn't care, but the
+            // trailing ascending walk keeps the sequence complete for any consumer that
+            // enumerates past the first value.
+            sequenceOf(mid) + sequence { d.forEach { if (it != mid) yield(it) } }
         }
     }
 }
