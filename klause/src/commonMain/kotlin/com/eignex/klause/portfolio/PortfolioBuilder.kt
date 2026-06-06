@@ -102,7 +102,7 @@ object PortfolioBuilder {
                     optimizeStrategy = cfg.optimizeStrategy,
                     restartPolicy = cfg.restartPolicy,
                     definitionalSweep = definitionalSweep,
-                    perMoveInvariants = definitionalSweep != null,
+                    perMoveInvariants = definitionalSweep != null && cfg.perMoveInvariants,
                 ).session()
                 val label = "ls/${cfg.label}"
                 val params = LocalSearchParams(

@@ -30,6 +30,8 @@ import kotlinx.serialization.Serializable
  *    `8:8` = mixed).
  *  - `klause.bench.credit.configs=all|<label,…>` — explicit LS config selection from the named
  *    pool, overriding the `<ls>` count (the campaign knob).
+ *  - `klause.bench.credit.seed=<N>` — base portfolio RNG seed (default 1); campaigns should be
+ *    run at two or more seeds before re-deriving the palette ordering.
  */
 @Serializable
 data class CreditRow(
@@ -83,18 +85,19 @@ object PortfolioCreditMetric {
         val bt = parts.getOrNull(1)?.toIntOrNull() ?: 0
         val configs = System.getProperty("klause.bench.credit.configs")
             ?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }
+        val seed = System.getProperty("klause.bench.credit.seed")?.toLongOrNull() ?: 1L
         val opt = entries.filter { it.objective != null }
         println()
         println(
             "=== portfolio credit (attribute first/best/sole per worker; portfolio=$prop" +
-                "${configs?.let { " configs=${it.joinToString(",")}" } ?: ""}; " +
+                "${configs?.let { " configs=${it.joinToString(",")}" } ?: ""}; seed=$seed; " +
                 "${budget.timeoutMillis}ms budget; ${opt.size} optimization instance(s)) ===",
         )
         if (opt.isEmpty()) {
             println("(no optimization instances in this selection)")
             return
         }
-        val rows = opt.map { row(it, ls, bt, configs, budget) }
+        val rows = opt.map { row(it, ls, bt, configs, seed, budget) }
         val aggregates = aggregate(rows)
         val marginal = marginalRanking(rows)
         report(rows, aggregates, marginal, budget, prop)
@@ -105,11 +108,12 @@ object PortfolioCreditMetric {
         ls: Int,
         bt: Int,
         configs: List<String>?,
+        seed: Long,
         budget: Budget,
     ): CreditRow {
         val portfolio = PortfolioBuilder.build(
             entry.problem,
-            PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L, lsConfigLabels = configs),
+            PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = seed, lsConfigLabels = configs),
             lsObjective = entry.lsObjective ?: entry.objective,
             linearObjective = entry.objective,
             definitionalSweep = entry.definitionalSweep,
