@@ -82,7 +82,14 @@ object BenchCli {
             maxInstances = f["max"]?.toIntOrNull(),
             sampleSeed = f["seed"]?.toLongOrNull(),
         )
-        return CorpusSelection.applySelectionBy(refs, sel) { it.name.substringBefore('/') }
+        val selected = CorpusSelection.applySelectionBy(refs, sel) { it.name.substringBefore('/') }
+        // Sharding for parallel sweeps: -Dklause.bench.shard=i/n keeps every n-th selected
+        // problem starting at i (0-based). Applied before resolution so each worker only
+        // compiles its own rows — disjoint shards never race on the shared mzn-fzn cache.
+        val shard = System.getProperty("klause.bench.shard") ?: return selected
+        val (idx, n) = shard.split("/").map { it.trim().toInt() }
+        require(n > 0 && idx in 0 until n) { "klause.bench.shard must be i/n with 0 <= i < n, got $shard" }
+        return selected.filterIndexed { i, _ -> i % n == idx }
     }
 
     private fun matches(pattern: String, name: String): Boolean =
