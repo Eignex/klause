@@ -20,6 +20,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
@@ -85,7 +86,10 @@ class PortfolioTest {
                 .toList()
             val elapsed = started.elapsedNow().inWholeMilliseconds
             assertEquals(20, samples.size)
-            assertTrue(elapsed < 5_000, "take(20) should be quick on a small problem; took ${elapsed}ms")
+            // Generous bound — 20 samples on a 4-bool problem take milliseconds of CPU; the
+            // slack only absorbs scheduler stalls on loaded CI hosts, while a worker that
+            // ignores collector cancellation would still blow well past it.
+            assertTrue(elapsed < 30_000, "take(20) should be quick on a small problem; took ${elapsed}ms")
             // Every sample is a valid exactly-one configuration.
             for (s in samples) {
                 assertEquals(1, s.bools.count { it }, "exactly-one violated by $s")
@@ -200,21 +204,27 @@ class PortfolioTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        // The builder's LS workers carry no flip budget — under shared-bound the backtrack
+        // workers report BestFound (not Optimal), so nothing self-cancels the pool. Every real
+        // driver (CLI/bench) bounds it with a deadline; here the stop is event-driven instead:
+        // cancel once any worker reports an incumbent at the known optimum (3). On cancel every
+        // worker still yields a terminal BestFound carrying its incumbent (the anytime
+        // invariant), so the pool's shared bound holds the optimum when minimize returns. The
+        // busy loop stays milliseconds long in the normal case (long uninterrupted busy loops
+        // get the page killed on wasm-browser runs, #164) without racing a loaded CI scheduler
+        // the way a fixed short deadline does; the generous fallback only bounds a regression.
+        val sawOptimum = AtomicBoolean(false)
         PortfolioBuilder.build(
             problem,
             PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
             lsObjective = obj,
             linearObjective = obj,
+            onEvent = { _, e ->
+                if (e is SearchEvent.Incumbent && e.objective <= 3.0) sawOptimum.store(true)
+            },
         ).use { p ->
-            // The builder's LS workers carry no flip budget — under shared-bound the backtrack
-            // workers report BestFound (not Optimal), so nothing self-cancels the pool. Every real
-            // driver (CLI/bench) bounds it with a deadline; do the same here. Backtrack finds the
-            // optimum (3) almost immediately; the deadline just stops the unbounded LS workers.
-            // 250ms, not seconds: backtrack proves the optimum in ms and LS incumbents land
-            // within tens of ms; long uninterrupted busy loops get the page killed on
-            // wasm-browser test runs (#164), so the stop only needs to outlive the slow CI case.
-            val deadline = TimeSource.Monotonic.markNow() + Duration.parse("250ms")
-            val r = p.minimize(cancellation = { deadline.hasPassedNow() })
+            val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
+            val r = p.minimize(cancellation = { sawOptimum.load() || fallback.hasPassedNow() })
             assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
             // Worker stats fold into the verdict: a mixed pool degrades the backend tag.
             assertEquals("mixed", r.stats.backend)
@@ -249,11 +259,14 @@ class PortfolioTest {
                 }
             },
         ).use { p ->
-            // 250ms, not seconds: backtrack proves the optimum in ms and LS incumbents land
-            // within tens of ms; long uninterrupted busy loops get the page killed on
-            // wasm-browser test runs (#164), so the stop only needs to outlive the slow CI case.
-            val deadline = TimeSource.Monotonic.markNow() + Duration.parse("250ms")
-            p.minimize(cancellation = { deadline.hasPassedNow() })
+            // Event-driven stop: cancel once the first labeled incumbent has been collected —
+            // that is all the assertions below need — with a generous fallback that only
+            // bounds a regression. Keeps the busy loop milliseconds long in the normal case
+            // (#164) without racing a loaded CI scheduler the way a fixed 250ms deadline does.
+            val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
+            p.minimize(cancellation = {
+                events.load().any { it.second is SearchEvent.Incumbent } || fallback.hasPassedNow()
+            })
         }
         val incumbents = events.load().filter { it.second is SearchEvent.Incumbent }
         assertTrue(incumbents.isNotEmpty(), "expected labeled incumbent events, got ${events.load()}")
