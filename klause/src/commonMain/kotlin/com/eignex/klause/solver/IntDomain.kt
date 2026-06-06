@@ -105,15 +105,6 @@ class IntDomain private constructor(
     }
 
     /**
-     * Return a new domain with [value] excluded, or `this` if [value] is not currently
-     * present (idempotent on absent values). Throws [IllegalStateException] if removing
-     * [value] would empty the domain.
-     *
-     * When a contiguous domain has an interior value removed, the new domain switches
-     * to the bitset form when `(max - min + 1) ≤ BITSET_THRESHOLD`, otherwise to the
-     * holes form. Subsequent excludes preserve the rep.
-     */
-    /**
      * Inverse of an interior [excludeValue]: put [value] (strictly inside `min..max` and
      * currently absent) back into the domain. Exists for the undo journal — an interior
      * carve is journaled as the carved value alone instead of retaining a full prior
@@ -139,6 +130,15 @@ class IntDomain private constructor(
         error("includeInteriorValue($value) on a contiguous domain")
     }
 
+    /**
+     * Return a new domain with [value] excluded, or `this` if [value] is not currently
+     * present (idempotent on absent values). Throws [IllegalStateException] if removing
+     * [value] would empty the domain.
+     *
+     * When a contiguous domain has an interior value removed, the new domain switches
+     * to the bitset form when `(max - min + 1) ≤ BITSET_THRESHOLD`, otherwise to the
+     * holes form. Subsequent excludes preserve the rep.
+     */
     fun excludeValue(value: Int): IntDomain {
         if (!contains(value)) return this
         val bs = bitset
