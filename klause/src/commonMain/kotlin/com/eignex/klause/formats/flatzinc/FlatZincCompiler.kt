@@ -7,7 +7,19 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.DomWdeg
+import com.eignex.klause.solver.backtrack.IndomainMax
+import com.eignex.klause.solver.backtrack.IndomainMiddle
+import com.eignex.klause.solver.backtrack.IndomainMin
+import com.eignex.klause.solver.backtrack.IndomainRandom
+import com.eignex.klause.solver.backtrack.IndomainSplit
+import com.eignex.klause.solver.backtrack.InputOrder
+import com.eignex.klause.solver.backtrack.LargestDomain
+import com.eignex.klause.solver.backtrack.LargestUpperBound
+import com.eignex.klause.solver.backtrack.RandomVariable
 import com.eignex.klause.solver.backtrack.SearchTier
+import com.eignex.klause.solver.backtrack.SmallestDomain
+import com.eignex.klause.solver.backtrack.SmallestLowerBound
 import com.eignex.klause.solver.backtrack.SolutionGuided
 import com.eignex.klause.solver.backtrack.TierVarSelect
 import com.eignex.klause.solver.backtrack.TieredValueHeuristic
@@ -141,9 +153,9 @@ internal class FlatZincCompiler(
         val firstBlockVarName = blocks.firstNotNullOfOrNull { (it.args.getOrNull(1) as? FznExpr.Ident)?.name }
         val firstBlockValName = blocks.firstNotNullOfOrNull { (it.args.getOrNull(2) as? FznExpr.Ident)?.name }
         val fallbackVar = firstBlockVarName?.let(::mapVariableStrategy)
-            ?: com.eignex.klause.solver.backtrack.SmallestDomain
+            ?: SmallestDomain
         val fallbackVal = firstBlockValName?.let(::mapValueStrategy)
-            ?: com.eignex.klause.solver.backtrack.IndomainMin
+            ?: IndomainMin
         val tieredVal = TieredValueHeuristic(tiers, fallbackVal, numBoolVars, intDomains.size)
         // For minimize / maximize, wrap the value side in SolutionGuided so each new
         // incumbent biases the next descent toward "near the last good solution" — the
@@ -192,7 +204,7 @@ internal class FlatZincCompiler(
             // valuable part) and labels it in listed order.
             varSelect = varName?.let(::mapTierVarSelect) ?: TierVarSelect.InputOrder,
             valueHeuristic = valName?.let(::mapValueStrategy)
-                ?: com.eignex.klause.solver.backtrack.IndomainMin,
+                ?: IndomainMin,
         )
     }
 
@@ -204,15 +216,15 @@ internal class FlatZincCompiler(
             is FznExpr.Ident -> {
                 val name = e.name
                 boolVars[name]?.let {
-                    bools.add(it);
+                    bools.add(it)
                     return
                 }
                 intVars[name]?.let {
-                    ints.add(it);
+                    ints.add(it)
                     return
                 }
                 floatVars[name]?.let {
-                    ints.add(it.varId);
+                    ints.add(it.varId)
                     return
                 }
                 setVarsByName[name]?.let { layout ->
@@ -263,22 +275,22 @@ internal class FlatZincCompiler(
     }
 
     internal fun mapVariableStrategy(name: String): VariableHeuristic? = when (name) {
-        "input_order" -> com.eignex.klause.solver.backtrack.InputOrder
-        "first_fail", "most_constrained" -> com.eignex.klause.solver.backtrack.SmallestDomain
-        "dom_w_deg" -> com.eignex.klause.solver.backtrack.DomWdeg()
-        "anti_first_fail", "occurrence" -> com.eignex.klause.solver.backtrack.LargestDomain
-        "smallest" -> com.eignex.klause.solver.backtrack.SmallestLowerBound
-        "largest" -> com.eignex.klause.solver.backtrack.LargestUpperBound
-        "random_order" -> com.eignex.klause.solver.backtrack.RandomVariable
+        "input_order" -> InputOrder
+        "first_fail", "most_constrained" -> SmallestDomain
+        "dom_w_deg" -> DomWdeg()
+        "anti_first_fail", "occurrence" -> LargestDomain
+        "smallest" -> SmallestLowerBound
+        "largest" -> LargestUpperBound
+        "random_order" -> RandomVariable
         else -> null
     }
 
     internal fun mapValueStrategy(name: String): ValueHeuristic? = when (name) {
-        "indomain_min", "indomain" -> com.eignex.klause.solver.backtrack.IndomainMin
-        "indomain_max" -> com.eignex.klause.solver.backtrack.IndomainMax
-        "indomain_middle", "indomain_median" -> com.eignex.klause.solver.backtrack.IndomainMiddle
-        "indomain_split" -> com.eignex.klause.solver.backtrack.IndomainSplit
-        "indomain_random" -> com.eignex.klause.solver.backtrack.IndomainRandom
+        "indomain_min", "indomain" -> IndomainMin
+        "indomain_max" -> IndomainMax
+        "indomain_middle", "indomain_median" -> IndomainMiddle
+        "indomain_split" -> IndomainSplit
+        "indomain_random" -> IndomainRandom
         else -> null
     }
 
