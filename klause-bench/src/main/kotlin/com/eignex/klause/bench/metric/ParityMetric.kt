@@ -75,7 +75,7 @@ object ParityMetric {
     }
 
     private fun satisfyRow(entry: ResolvedProblem, budget: Budget, ref: Reference): ParityRow {
-        val klause = runCatching { feasibility(BacktrackSolver(entry.problem).solve(btParams(budget))) }
+        val klause = runCatching { feasibility(BacktrackSolver(entry.problem).solve(btParams(budget, entry))) }
             .getOrElse { return errorRow(entry, "satisfy", "KLAUSE_ERROR", ref, it) }
         val refFeas = runCatching { feasibility(ref.solve(entry.problem, budget)) }
             .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
@@ -89,7 +89,7 @@ object ParityMetric {
     }
 
     private fun optimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget, ref: Reference): ParityRow {
-        val klause = runCatching { BacktrackSolver(entry.problem).minimize(obj, btParams(budget)) }
+        val klause = runCatching { BacktrackSolver(entry.problem).minimize(obj, btParams(budget, entry)) }
             .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", ref, it) }
         val refRes = runCatching { ref.minimize(entry.problem, obj, budget) }
             .getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
@@ -106,13 +106,16 @@ object ParityMetric {
             optStr(klause), optStr(refRes), ref.name, exp?.toString() ?: "?")
     }
 
-    private fun btParams(budget: Budget): BacktrackParams {
+    private fun btParams(budget: Budget, entry: ResolvedProblem): BacktrackParams {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
+        // Start from the model's search annotation (when present) so benchmark runs honour
+        // the author's intended heuristics the same way the competition CLI does, then
+        // layer the bench's budget/seed/restart config on top.
         // Luby restarts: the anytime configuration. Branch-and-bound leaves a permanent
         // blocking nogood per incumbent, so restarts diversify without revisiting solved
         // leaves; on plateau-prone instances they are the difference between stalling on
         // the first incumbents and walking to the optimum.
-        return BacktrackParams(
+        return (entry.searchParams ?: BacktrackParams()).copy(
             randomSeed = 1L,
             lubyRestartBase = 256L,
             cancellation = Cancellation { System.currentTimeMillis() > deadline },

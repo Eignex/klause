@@ -20,6 +20,11 @@ data class ResolvedProblem(
     /** Definitional sweep for the LS engine (see [com.eignex.klause.solver.DefinitionalSweep]);
      *  carried from `FlatZincProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
     val definitionalSweep: com.eignex.klause.solver.DefinitionalSweep? = null,
+    /** Search heuristics from the model's `solve :: int_search(...)` annotation (see
+     *  `FlatZincProgram.defaultBacktrackParams`); null when the model has none. Metrics
+     *  merge their budget/seed/restart config into this so benchmark runs honour the
+     *  model author's intended search the same way the competition CLI does. */
+    val searchParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
 ) {
     val name: String get() = ref.name
 }

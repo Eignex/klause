@@ -302,7 +302,10 @@ object AnytimeMetric {
         val cpMs = System.getProperty("klause.anytime.cpseed.ms")?.toLong() ?: 1000L
         val cpDeadline = minOf(System.currentTimeMillis() + cpMs, overallDeadline)
         val cp = BacktrackSolver(entry.problem).solve(
-            BacktrackParams(randomSeed = 1L, cancellation = Cancellation { System.currentTimeMillis() > cpDeadline }),
+            (entry.searchParams ?: BacktrackParams()).copy(
+                randomSeed = 1L,
+                cancellation = Cancellation { System.currentTimeMillis() > cpDeadline },
+            ),
         )
         val seed: Sample? = (cp as? SolveResult.Sat)?.assignment
         val params = LocalSearchParams(

@@ -34,6 +34,7 @@ class MiniZincRunner(
         return ResolvedProblem(
             ref, program.problem, objective,
             lsObjective = program.lsObjective, definitionalSweep = program.definitionalSweep,
+            searchParams = program.defaultBacktrackParams,
         )
     }
 
