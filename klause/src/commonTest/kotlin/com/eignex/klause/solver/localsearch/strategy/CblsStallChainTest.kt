@@ -148,8 +148,7 @@ class CblsStallChainTest {
         val strategy = Cbls(stallChainCap = 8)
         var chainPicks = 0
         var budget = 10_000
-        // A handful of validated chain picks proves the machinery engages; no need to
-        // grind out the full budget once they have surfaced.
+        // A few validated chain picks prove the machinery engages; stop early once they surface.
         while (budget-- > 0 && chainPicks < 3) {
             val m = strategy.pickMove(state)
             if (m != null) {

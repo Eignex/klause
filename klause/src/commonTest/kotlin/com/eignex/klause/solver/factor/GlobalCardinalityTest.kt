@@ -289,5 +289,4 @@ class GlobalCardinalityTest {
         }
         assertTrue(2 in citedInts && 3 in citedInts, "reason must cite both count vars; cited $citedInts")
     }
-
 }

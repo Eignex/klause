@@ -96,10 +96,8 @@ class LubyRestartTest {
 
     @Test
     fun `unit luby base terminates within the decision budget despite constant restarts`() {
-        // With lubyRestartBase = 1 the engine restarts on the canonical 1,1,2,1,1,2,4,...
-        // cadence (the sequence values themselves are asserted in RestartPolicyTest's
-        // `luby sequence matches knuth`); here we verify the backtrack restart loop
-        // still finds SAT within a generous budget under that maximal restart pressure.
+        // lubyRestartBase = 1 restarts on the canonical 1,1,2,... cadence (values asserted in
+        // RestartPolicyTest); verify the restart loop still finds SAT under that pressure.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
