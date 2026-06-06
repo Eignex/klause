@@ -10,8 +10,12 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import kotlinx.serialization.Serializable
 
@@ -122,7 +126,7 @@ object ParityMetric {
     }
 
     private fun satisfyRow(entry: ResolvedProblem, budget: Budget, ref: Reference, cached: CachedRef?): ParityRow {
-        val klause = runCatching { feasibility(BacktrackSolver(entry.problem).solve(btParams(budget, entry))) }
+        val klause = runCatching { feasibility(klauseSolve(entry, budget)) }
             .getOrElse { return errorRow(entry, "satisfy", "KLAUSE_ERROR", ref, it) }
         val refFeas = if (cached != null) {
             cached.feasible
@@ -146,7 +150,7 @@ object ParityMetric {
         ref: Reference,
         cached: CachedRef?,
     ): ParityRow {
-        val klause = runCatching { BacktrackSolver(entry.problem).minimize(obj, btParams(budget, entry)) }
+        val klause = runCatching { klauseMinimize(entry, obj, budget) }
             .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", ref, it) }
         val kv = klause.objectiveValue
         val cv: Double?
@@ -171,20 +175,47 @@ object ParityMetric {
             optStr(klause), refDisplay, ref.name, exp?.toString() ?: "?")
     }
 
-    private fun btParams(budget: Budget, entry: ResolvedProblem): BacktrackParams {
+    // Luby restarts everywhere: the anytime configuration. Branch-and-bound leaves a
+    // permanent blocking nogood per incumbent, so restarts diversify without revisiting
+    // solved leaves; on plateau-prone instances they are the difference between stalling
+    // on the first incumbents and walking to the optimum.
+    private fun freeParams(): BacktrackParams = BacktrackParams(randomSeed = 1L, lubyRestartBase = 256L)
+
+    /**
+     * The klause side of a row: a two-worker portfolio racing the model's annotated search
+     * (when present) against the engine's free default, sharing the objective bound. The
+     * annotated-vs-free sweeps split the corpus down the middle — annotations win the
+     * structured reach rows and lose plateau rows where restart-driven free search shines —
+     * so the bench measures the race, the same shape the competition entry runs. Rows
+     * without an annotation keep the single free worker.
+     */
+    private fun workers(entry: ResolvedProblem, objective: Objective?): List<PortfolioWorker> {
+        val free = PortfolioWorker.of(
+            "free", BacktrackSolver(entry.problem).session(), freeParams(), objective,
+        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
+        val annotated = entry.searchParams?.let { ann ->
+            PortfolioWorker.of(
+                "annotated", BacktrackSolver(entry.problem).session(),
+                ann.copy(randomSeed = 2L, lubyRestartBase = 256L), objective,
+            ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
+        }
+        return listOfNotNull(free, annotated)
+    }
+
+    private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        // Start from the model's search annotation (when present) so benchmark runs honour
-        // the author's intended heuristics the same way the competition CLI does, then
-        // layer the bench's budget/seed/restart config on top.
-        // Luby restarts: the anytime configuration. Branch-and-bound leaves a permanent
-        // blocking nogood per incumbent, so restarts diversify without revisiting solved
-        // leaves; on plateau-prone instances they are the difference between stalling on
-        // the first incumbents and walking to the optimum.
-        return (entry.searchParams ?: BacktrackParams()).copy(
-            randomSeed = 1L,
-            lubyRestartBase = 256L,
-            cancellation = Cancellation { System.currentTimeMillis() > deadline },
-        )
+        return runBlocking(Dispatchers.Default) {
+            Portfolio(workers(entry, objective = null))
+                .solve(Cancellation { System.currentTimeMillis() > deadline })
+        }
+    }
+
+    private fun klauseMinimize(entry: ResolvedProblem, obj: Objective, budget: Budget): MinimizeResult {
+        val deadline = System.currentTimeMillis() + budget.timeoutMillis
+        return runBlocking(Dispatchers.Default) {
+            Portfolio(workers(entry, obj))
+                .minimize(Cancellation { System.currentTimeMillis() > deadline })
+        }
     }
 
     /** true = feasible, false = infeasible, null = unknown/timeout. */
