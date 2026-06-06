@@ -22,6 +22,8 @@ import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.yuck.YuckParams
+import com.eignex.klause.yuck.YuckSolver
 
 /**
  * The solver axis. A [Backend] names an engine; a [SolverConfig] pre-binds a backend with
@@ -43,6 +45,10 @@ enum class Backend {
     CHOCO,
     /** OR-Tools CP-SAT, anytime / local-search reference adapter (`klause-ortools`). */
     ORTOOLS,
+    /** Yuck, local-search reference adapter (`klause-yuck`) — temporary, for the LS parity
+     *  sweep. Runs an external Yuck subprocess (Yuck is not on Maven Central); provision it
+     *  with `./gradlew :klause-yuck:installYuck` or `-Dklause.yuck.home`. */
+    YUCK,
     /** klause unified parallel [Portfolio] (mixed LS + backtrack workers) run *as a solver* —
      *  the same engine the anytime metric drives, exposed here so the time / completeness /
      *  parity / verify metrics can benchmark the portfolio itself. Worker counts come from
@@ -146,6 +152,19 @@ private class OrToolsBench(
     override fun samplesSequence() = s.samples(params)
 }
 
+private class YuckBench(
+    override val problem: Problem,
+    private val params: YuckParams = YuckParams(),
+) : InProcessSolver {
+    private val s = YuckSolver(problem)
+    override val name = "yuck"
+    override fun solve() = s.solve(params)
+    override fun samples(n: Int) = s.samples(params).take(n).toList()
+    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
+    override fun enumerateSequence() = s.enumerate(params)
+    override fun samplesSequence() = s.samples(params)
+}
+
 /**
  * The unified parallel [Portfolio] exposed as a bench backend (#64): the same mixed LS +
  * backtrack engine the anytime metric drives, now selectable for the time / completeness /
@@ -200,6 +219,7 @@ object Solvers {
     val BRUTE_FORCE = SolverConfig("brute-force", Backend.BRUTE_FORCE)
     val CHOCO = SolverConfig("choco", Backend.CHOCO)
     val ORTOOLS = SolverConfig("ortools", Backend.ORTOOLS)
+    val YUCK = SolverConfig("yuck", Backend.YUCK)
     val KLAUSE_PORTFOLIO = SolverConfig("portfolio", Backend.KLAUSE_PORTFOLIO)
 
     /** Build a bound solver for [problem]. */
@@ -210,6 +230,7 @@ object Solvers {
         Backend.BRUTE_FORCE -> BruteForceBench(problem)
         Backend.CHOCO -> ChocoBench(problem)
         Backend.ORTOOLS -> OrToolsBench(problem)
+        Backend.YUCK -> YuckBench(problem)
         Backend.KLAUSE_PORTFOLIO -> PortfolioBench(problem)
     }
 
