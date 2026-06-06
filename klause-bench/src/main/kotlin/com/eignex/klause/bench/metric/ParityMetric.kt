@@ -52,33 +52,84 @@ data class ParityResults(
 object ParityMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget = Budget(), reference: Backend = Backend.CHOCO) {
         val ref = System.getProperty("klause.bench.parity.reference")?.let { Reference.byId(it) } ?: Reference.of(reference)
+        // Sharding for parallel sweeps: -Dklause.bench.parity.shard=i/n keeps every n-th
+        // entry starting at i (0-based). Launch n bench JVMs off one installDist build —
+        // never via overlapping gradle invocations — and concatenate the logs.
+        val shard = System.getProperty("klause.bench.parity.shard")?.let(::parseShard)
+        val sharded = if (shard == null) entries else entries.filterIndexed { i, _ -> i % shard.second == shard.first }
+        // Reference-column cache: -Dklause.bench.parity.referenceCache=<previous sweep log>
+        // reuses the reference solver's printed results row-by-row instead of re-running it,
+        // halving sweep wall time. Rows absent from the cache run the reference live.
+        val cache = System.getProperty("klause.bench.parity.referenceCache")?.let(::parseReferenceCache).orEmpty()
         println()
         println("=== parity (klause backtrack vs ${ref.name} reference; checked against recorded expected) ===")
-        val rows = entries.map { entry ->
-            val r = row(entry, budget, ref)
+        val rows = sharded.map { entry ->
+            val r = row(entry, budget, ref, cache[entry.name])
             val mark = if (r.verdict == "OK") "ok " else "!! "
             println("$mark[${r.name}] ${r.kind} klause=${r.klause} ${r.referenceSolver}=${r.reference} expected=${r.expected}" +
                 if (r.detail.isNotEmpty()) " — ${r.detail}" else "")
             r
         }
         val results = ParityResults(Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(), rows)
-        Reports.writeJson("build/parity-report.json", results)
+        val reportPath = if (shard == null) {
+            "build/parity-report.json"
+        } else {
+            "build/parity-report-shard-${shard.first}-of-${shard.second}.json"
+        }
+        Reports.writeJson(reportPath, results)
         println("\n${rows.count { it.verdict == "OK" }}/${rows.size} OK, ${results.mismatches} mismatch(es)")
         if (System.getProperty("klause.bench.parity.failOnMismatch")?.toBoolean() == true && results.mismatches > 0) {
             error("${results.mismatches} parity mismatch(es)")
         }
     }
 
-    private fun row(entry: ResolvedProblem, budget: Budget, ref: Reference): ParityRow {
-        val obj = entry.objective
-        return if (obj == null) satisfyRow(entry, budget, ref) else optimizeRow(entry, obj, budget, ref)
+    private fun parseShard(spec: String): Pair<Int, Int> {
+        val (i, n) = spec.split("/").map { it.trim().toInt() }
+        require(n > 0 && i in 0 until n) { "shard must be i/n with 0 <= i < n, got $spec" }
+        return i to n
     }
 
-    private fun satisfyRow(entry: ResolvedProblem, budget: Budget, ref: Reference): ParityRow {
+    /** Cached reference outcome parsed back from a previous sweep log line. */
+    private data class CachedRef(val feasible: Boolean?, val objective: Double?, val display: String)
+
+    /** Parse `ok|!! [name] kind klause=… <ref>=<value> expected=…` sweep lines into
+     *  name → cached reference outcome. Unparseable lines are skipped. */
+    private fun parseReferenceCache(path: String): Map<String, CachedRef> {
+        val re = Regex("""^(?:ok|!!)\s+\[(.+?)]\s+\S+\s+klause=\S+\s+\S+?=(\S+)\s+expected=""")
+        val out = HashMap<String, CachedRef>()
+        java.io.File(path).useLines { lines ->
+            for (line in lines) {
+                val m = re.find(line) ?: continue
+                val (name, value) = m.destructured
+                out[name] = CachedRef(
+                    feasible = when {
+                        value == "SAT" -> true
+                        value == "UNSAT" -> false
+                        value.startsWith("opt=") || value.startsWith("best=") -> true
+                        else -> null
+                    },
+                    objective = value.substringAfter("=", "").toDoubleOrNull(),
+                    display = value,
+                )
+            }
+        }
+        return out
+    }
+
+    private fun row(entry: ResolvedProblem, budget: Budget, ref: Reference, cached: CachedRef?): ParityRow {
+        val obj = entry.objective
+        return if (obj == null) satisfyRow(entry, budget, ref, cached) else optimizeRow(entry, obj, budget, ref, cached)
+    }
+
+    private fun satisfyRow(entry: ResolvedProblem, budget: Budget, ref: Reference, cached: CachedRef?): ParityRow {
         val klause = runCatching { feasibility(BacktrackSolver(entry.problem).solve(btParams(budget, entry))) }
             .getOrElse { return errorRow(entry, "satisfy", "KLAUSE_ERROR", ref, it) }
-        val refFeas = runCatching { feasibility(ref.solve(entry.problem, budget)) }
-            .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
+        val refFeas = if (cached != null) {
+            cached.feasible
+        } else {
+            runCatching { feasibility(ref.solve(entry.problem, budget)) }
+                .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
+        }
         val exp = expectedFeasible(entry.ref.expected)
         val verdict = when {
             !agree(klause, refFeas) -> "MISMATCH"
@@ -88,13 +139,27 @@ object ParityMetric {
         return ParityRow(entry.name, "satisfy", verdict, feasStr(klause), feasStr(refFeas), ref.name, feasStr(exp))
     }
 
-    private fun optimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget, ref: Reference): ParityRow {
+    private fun optimizeRow(
+        entry: ResolvedProblem,
+        obj: Objective,
+        budget: Budget,
+        ref: Reference,
+        cached: CachedRef?,
+    ): ParityRow {
         val klause = runCatching { BacktrackSolver(entry.problem).minimize(obj, btParams(budget, entry)) }
             .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", ref, it) }
-        val refRes = runCatching { ref.minimize(entry.problem, obj, budget) }
-            .getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
         val kv = klause.objectiveValue
-        val cv = refRes.objectiveValue
+        val cv: Double?
+        val refDisplay: String
+        if (cached != null) {
+            cv = cached.objective
+            refDisplay = cached.display
+        } else {
+            val refRes = runCatching { ref.minimize(entry.problem, obj, budget) }
+                .getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
+            cv = refRes.objectiveValue
+            refDisplay = optStr(refRes)
+        }
         val exp = (entry.ref.expected as? Expected.Opt)?.value?.toDouble()
         val verdict = when {
             kv == null || cv == null -> if (kv == cv) "OK" else "MISMATCH"
@@ -103,7 +168,7 @@ object ParityMetric {
             else -> "OK"
         }
         return ParityRow(entry.name, "optimize", verdict,
-            optStr(klause), optStr(refRes), ref.name, exp?.toString() ?: "?")
+            optStr(klause), refDisplay, ref.name, exp?.toString() ?: "?")
     }
 
     private fun btParams(budget: Budget, entry: ResolvedProblem): BacktrackParams {
