@@ -147,7 +147,10 @@ class CblsStallChainTest {
         state.recompute()
         val strategy = Cbls(stallChainCap = 8)
         var chainPicks = 0
-        for (step in 0 until 10_000) {
+        var budget = 10_000
+        // A handful of validated chain picks proves the machinery engages; no need to
+        // grind out the full budget once they have surfaced.
+        while (budget-- > 0 && chainPicks < 3) {
             val m = strategy.pickMove(state)
             if (m != null) {
                 if (m is Move.Compound) {
@@ -157,9 +160,6 @@ class CblsStallChainTest {
                 }
                 state.apply(m)
             }
-            // A handful of validated chain picks proves the machinery engages; no need to
-            // grind out the full budget once they have surfaced.
-            if (chainPicks >= 3) break
         }
         assertTrue(chainPicks > 0, "the permanently-stalled search must surface at least one chain")
     }
