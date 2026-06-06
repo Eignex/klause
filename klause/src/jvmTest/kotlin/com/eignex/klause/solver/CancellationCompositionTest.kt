@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 
 class CancellationCompositionTest {
 
@@ -50,9 +51,14 @@ class CancellationCompositionTest {
 
     @Test
     fun `after fires once the duration has elapsed`() {
-        val token = Cancellation.after(10.milliseconds)
-        assertFalse(token(), "should not cancel immediately")
-        Thread.sleep(20)
-        assertTrue(token(), "should cancel after the duration")
+        // Two tokens so neither assertion races the scheduler: a far-future deadline can't
+        // have passed no matter how long the host stalls between creation and the check,
+        // and a short deadline plus a much longer sleep has certainly passed (sleep only
+        // ever oversleeps).
+        val farFuture = Cancellation.after(10.minutes)
+        assertFalse(farFuture(), "a far-future deadline must not cancel yet")
+        val soon = Cancellation.after(10.milliseconds)
+        Thread.sleep(100)
+        assertTrue(soon(), "should cancel after the duration")
     }
 }

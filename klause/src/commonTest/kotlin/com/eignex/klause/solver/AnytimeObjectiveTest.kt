@@ -3,8 +3,6 @@ package com.eignex.klause.solver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -57,22 +55,19 @@ class AnytimeObjectiveTest {
         )
         val problem = Problem(6, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 1.0, 100.0, 50.0, 25.0))
-        val cancel = AtomicBoolean(false)
-
-        val flagger = thread(start = true) {
-            Thread.sleep(50)
-            cancel.set(true)
-        }
+        // Cancel on a logical clock instead of wall time: after 10k cancellation polls the
+        // search has long since visited a feasible exactly-one assignment, regardless of
+        // host speed or CI load. With `maxFlips = MAX_VALUE` only the cancellation can end
+        // the run, so this still exercises the cancelled-mid-search return path.
+        var polls = 0
         val sample = LocalSearchSolver(problem).minimize(
             obj,
             LocalSearchParams(
                 maxFlips = Long.MAX_VALUE,
                 randomSeed = 0L,
-                cancellation = { cancel.get() },
+                cancellation = { ++polls >= 10_000 },
             ),
         ).assignment
-        flagger.join()
-        // 50ms is enough for any local-search to find at least one of the 6 feasibles.
         assertNotNull(sample, "minimize must remember the best feasible across cancellation")
         assertTrue(sample.bools.count { it } == 1)
     }
