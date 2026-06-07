@@ -28,7 +28,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: gradle
+
+      # Persists the Gradle home (dependencies AND the local build cache) across runs:
+      # main writes cache entries, PR runs read them, so unchanged modules' compile,
+      # detekt and jvm test tasks come back FROM-CACHE instead of re-executing.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Cache Kotlin/Native toolchain
         uses: actions/cache@v4
