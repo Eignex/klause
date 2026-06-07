@@ -48,6 +48,7 @@ import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import org.chocosolver.solver.Model
+import org.chocosolver.solver.SettingsBuilder
 import org.chocosolver.solver.constraints.Constraint
 import org.chocosolver.solver.constraints.extension.Tuples
 import org.chocosolver.solver.constraints.nary.automata.FA.FiniteAutomaton
@@ -544,8 +545,15 @@ class ChocoModel private constructor(
         private const val MAX_ENUMERATED_SPAN = 1 shl 16
 
         /** Translate [problem] into a [ChocoModel] by posting every factor as a Choco constraint. */
-        fun build(problem: Problem): ChocoModel {
-            val model = Model("klause-choco")
+        fun build(problem: Problem, lcg: Boolean = false): ChocoModel {
+            // lcg = Choco's lazy-clause-generation engine (the "Choco CP-SAT" competition
+            // entry's architecture): bound/value literals + clause learning instead of the
+            // classic CP kernel. The architecture-matched reference for klause.
+            val model = if (lcg) {
+                Model("klause-choco", SettingsBuilder().setLCG(true).build())
+            } else {
+                Model("klause-choco")
+            }
             val boolVars = Array(problem.numBoolVars) { model.boolVar("b$it") }
             val intVars = Array(problem.numIntVars) { i ->
                 val d = problem.intDomains[i]

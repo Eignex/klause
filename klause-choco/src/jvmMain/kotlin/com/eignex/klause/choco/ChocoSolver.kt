@@ -26,7 +26,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
 
     override fun solve(params: ChocoParams): SolveResult {
         if (params.workers > 1) return solveParallel(params)
-        val cm = ChocoModel.build(problem)
+        val cm = ChocoModel.build(problem, params.lcg)
         applyLimits(cm.model, params)
         applySearch(cm, params)
         return if (cm.model.solver.solve()) {
@@ -45,7 +45,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         val portfolio = ParallelPortfolio()
         val byModel = HashMap<Model, ChocoModel>(params.workers * 2)
         repeat(params.workers) {
-            val cm = ChocoModel.build(problem)
+            val cm = ChocoModel.build(problem, params.lcg)
             applyLimits(cm.model, params)
             byModel[cm.model] = cm
             portfolio.addModel(cm.model)
@@ -61,7 +61,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
     override fun samples(params: ChocoParams): Sequence<Sample> = enumerate(params)
 
     override fun enumerate(params: ChocoParams): Sequence<Sample> = sequence {
-        val cm = ChocoModel.build(problem)
+        val cm = ChocoModel.build(problem, params.lcg)
         applyLimits(cm.model, params)
         var yielded = 0L
         while (yielded < params.maxModels && cm.model.solver.solve()) {
@@ -75,7 +75,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
             "klause-choco only optimizes LinearObjective (got ${objective::class.simpleName})"
         }
         if (params.workers > 1) return minimizeParallel(objective, params)
-        val cm = ChocoModel.build(problem)
+        val cm = ChocoModel.build(problem, params.lcg)
         applyLimits(cm.model, params)
         applySearch(cm, params)
         val objVar = buildObjectiveVar(cm, objective)
@@ -110,7 +110,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         val byModel = HashMap<Model, ChocoModel>(params.workers * 2)
         val objVarByModel = HashMap<Model, IntVar>(params.workers * 2)
         repeat(params.workers) {
-            val cm = ChocoModel.build(problem)
+            val cm = ChocoModel.build(problem, params.lcg)
             applyLimits(cm.model, params)
             val objVar = buildObjectiveVar(cm, objective)
             cm.model.setObjective(Model.MINIMIZE, objVar)

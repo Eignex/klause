@@ -59,8 +59,13 @@ private object ChocoReference : Reference {
     // ParallelPortfolio — the track-honest reference when klause runs a multi-worker
     // portfolio on the same core budget. Default 1 = the classic sequential reference.
     private val workers = System.getProperty("klause.bench.choco.workers")?.toIntOrNull() ?: 1
+
+    // -Dklause.bench.choco.lcg=true builds the reference with Choco's lazy-clause-generation
+    // engine — the Choco CP-SAT competition entry's architecture, the architecture-matched
+    // rival for klause on the fixed track.
+    private val lcg = System.getProperty("klause.bench.choco.lcg")?.toBoolean() ?: false
     private fun params(b: Budget, search: BacktrackParams? = null) =
-        ChocoParams(b.timeoutMillis, workers = workers, fixedSearch = search)
+        ChocoParams(b.timeoutMillis, workers = workers, fixedSearch = search, lcg = lcg)
     override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
         ChocoSolver(problem).solve(params(budget, search))
     override fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams?) =
