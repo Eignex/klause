@@ -56,38 +56,21 @@ jobs:
           path: ~/.cache/klause-yuck
           key: ${{ runner.os }}-yuck-${{ hashFiles('klause-yuck/build.gradle.kts') }}
 
-      # Pin the karma browser to the Chrome for Testing build validated locally (#171):
-      # the runner image's own Chrome drifts with image rollouts, and the wasm flake wave
-      # correlated with an image update. CHROME_BIN is honored by karma-chrome-launcher.
-      - name: Set up pinned Chrome for Testing
-        id: chrome
-        uses: browser-actions/setup-chrome@v2
-        with:
-          chrome-version: 148.0.7778.178
-
-      # Ubuntu 24.04 restricts unprivileged user namespaces via AppArmor, so a downloaded
-      # Chrome binary (unlike the image's profiled preinstall) cannot create its sandbox
-      # and aborts at launch with "No usable sandbox!". Re-enable userns so Chrome keeps
-      # its sandbox — preferred over --no-sandbox per the chromium docs the error links.
-      - name: Allow Chrome's sandbox (Ubuntu 24.04 userns restriction)
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      # PR/main builds compile and test only the host-executable targets (jvm + linuxX64,
+      # -Ptargets.hostOnly); the full matrix — apple, windows, js, wasm and their browser/
+      # node test runtimes (pinned Chrome, userns sandbox, bounded workers; #171) — runs on
+      # release via release.yml.
 
       # Repo-wide detekt (kumulant runs lintDocs here; klause's dokka half is blocked on a
       # backlog of unresolved KDoc links — see the tracking issue).
       - name: Run linter
-        run: ./gradlew detekt
+        run: ./gradlew detekt -Ptargets.hostOnly
 
-      # Compile at full parallelism first, then run the verification phase with bounded
-      # workers: with the configuration cache Gradle executes test tasks in parallel, so
-      # JVM test JVMs, ChromeHeadless and the node wasm runtimes otherwise compete for the
-      # runner's cores — the load that starves/kills roughly one wasm test per run (#171).
       - name: Assemble
-        run: ./gradlew assemble
+        run: ./gradlew assemble -Ptargets.hostOnly
 
       - name: Run build and tests with coverage
-        run: ./gradlew build koverXmlReport --max-workers=2
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: ./gradlew build koverXmlReport -Ptargets.hostOnly
 
       - name: Upload test reports
         if: always()
