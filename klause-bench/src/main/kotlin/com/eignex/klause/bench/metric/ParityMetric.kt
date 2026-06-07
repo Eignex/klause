@@ -217,7 +217,13 @@ object ParityMetric {
                 ann.copy(randomSeed = 2L, lubyRestartBase = 256L), objective,
             ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         }
-        return listOfNotNull(free, conflictDriven, annotated)
+        val xor = entry.xorSearchParams?.let { xs ->
+            PortfolioWorker.of(
+                "xor", BacktrackSolver(entry.problem).session(),
+                xs.copy(randomSeed = 4L, lubyRestartBase = 256L), objective,
+            ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
+        }
+        return listOfNotNull(free, conflictDriven, annotated, xor)
     }
 
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
