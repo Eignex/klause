@@ -48,6 +48,24 @@ kotlin {
     }
 }
 
+// Pin the wasm test runtime to node 25 (V8 14.1), where the exnref exception-handling
+// proposal the wasmWasi target compiles to (default since Kotlin 2.3) is stable. The KGP
+// default node 24 (V8 13.6) only has exnref behind --experimental-wasm-exnref, and that
+// experimental codepath intermittently killed the wasi dry run on loaded CI runners with
+// a bare uncaught WebAssembly.Exception (#171).
+// KGP registers node env specs on both the root and this project (the test tasks read the
+// project-level one), and KotlinWasmNode resolves its node from the js spec rather than
+// the wasm one — pin all four. The js targets don't need exnref but run fine on 25.
+val pinnedNodeVersion = "25.0.0"
+for (proj in listOf(project, rootProject)) {
+    proj.plugins.withType<org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsPlugin> {
+        proj.the<org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec>().version = pinnedNodeVersion
+    }
+    proj.plugins.withType<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin> {
+        proj.the<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec>().version = pinnedNodeVersion
+    }
+}
+
 // #160: kbuild's lintDocs gate (fail-on-warning dokka) trips on ~460 legacy unresolved
 // KDoc links in this module. Skip doc generation until the links are repaired so `build`
 // stays green; detekt still runs in full.
@@ -66,3 +84,4 @@ dokka {
         }
     }
 }
+
