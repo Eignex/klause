@@ -1595,6 +1595,33 @@ internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
 internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remVar: Int?) {
     val dA = intDomains[a]
     val dB = intDomains[b]
+    // Constant positive divisor over a non-negative dividend: truncated division equals
+    // floor division, so the whole relation is one linear `a = B·q + r` with tight aux
+    // domains q ∈ [aMin/B, aMax/B] and r ∈ [0, B-1]. The general encoding below instead
+    // posts a var·var product plus an |b| reification chain and gives q a ±|a| span —
+    // on divisibility-grid models (evilshop schedules on a 97 grid, fifty mods over
+    // 0..273346 dividends) that difference is half a million spurious q values per
+    // constraint and the row never finds a solution.
+    if (dB.min == dB.max && dB.min > 0 && dA.min >= 0) {
+        val bConst = dB.min
+        val q = qVar ?: allocInt("__div_q_${a}_$b", dA.min / bConst, dA.max / bConst)
+        val rem = remVar ?: allocInt("__div_r_${a}_$b", 0, bConst - 1)
+        // a − B·q − r = 0; a supplied q/rem (FZN-declared) may carry wider or signed
+        // domains, so bound r into [0, B−1] explicitly when it was supplied.
+        factors.add(
+            Linear(
+                coeffs = intArrayOf(1, -bConst, -1),
+                vars = intArrayOf(a, q, rem),
+                op = LinearOp.EQ,
+                bound = 0,
+            ),
+        )
+        if (remVar != null) {
+            factors.add(Linear(intArrayOf(1), intArrayOf(rem), LinearOp.GE, 0))
+            factors.add(Linear(intArrayOf(1), intArrayOf(rem), LinearOp.LE, bConst - 1))
+        }
+        return
+    }
     val bMag = maxOf(abs(dB.min), abs(dB.max))
     val aMag = maxOf(abs(dA.min), abs(dA.max))
     val qDomain = if (bMag == 0) {
