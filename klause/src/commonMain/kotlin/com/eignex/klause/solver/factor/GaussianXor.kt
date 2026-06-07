@@ -19,8 +19,10 @@ import com.eignex.klause.solver.propagation.PropagationState
  *
  * Each [propagate] substitutes the current partial assignment, reduces the residual system to
  * row-echelon form, and pins every variable the system forces (rows that collapse to a single
- * variable). Conflicts and forced pins are explained by the set of currently-assigned literals in
- * the system — sound (the substitution that produced the derivation), if not minimal.
+ * variable). Conflicts and forced pins are explained sharply: every row carries a reason
+ * bitset of the assigned variables feeding it, xor-combined through each elimination step,
+ * so even-occurrence variables cancel and a derived row's reason is exactly its
+ * odd-occurrence assigned support — the minimal sufficient set (#174).
  */
 class GaussianXor(constraints: List<Xor>) : Factor {
 
