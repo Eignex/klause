@@ -16,6 +16,7 @@ import com.eignex.klause.solver.backtrack.IndomainSplit
 import com.eignex.klause.solver.backtrack.InputOrder
 import com.eignex.klause.solver.backtrack.LargestDomain
 import com.eignex.klause.solver.backtrack.LargestUpperBound
+import com.eignex.klause.solver.backtrack.LastConflict
 import com.eignex.klause.solver.backtrack.RandomVariable
 import com.eignex.klause.solver.backtrack.SearchTier
 import com.eignex.klause.solver.backtrack.SmallestDomain
@@ -26,7 +27,10 @@ import com.eignex.klause.solver.backtrack.TieredValueHeuristic
 import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
 import com.eignex.klause.solver.backtrack.ValueHeuristic
 import com.eignex.klause.solver.backtrack.VariableHeuristic
+import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.GaussianXor
+import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -97,6 +101,20 @@ internal class FlatZincCompiler(
     fun compile(): FlatZincProgram {
         for (decl in model.varDecls) processDecl(decl)
         for (c in model.constraints) processConstraint(c)
+        // Joint GF(2) reasoning for multi-xor models: one GaussianXor system on top of the
+        // individual Xor factors (which keep their sharper unit-propagation reasons), plus
+        // a search recipe that branches the system's rare variables first. On
+        // learning-parity-with-noise shaped models the rare variables are the per-sample
+        // error indicators; fixing them first leaves a pure linear system the elimination
+        // solves instantly, which decomposes the search by error pattern (proves
+        // parity-learning at the reference optimum where every other config finds nothing).
+        val xors = factors.filterIsInstance<Xor>()
+        val xorParams = if (xors.size < 2) {
+            null
+        } else {
+            factors.add(GaussianXor(xors))
+            xorSearchParams(xors)
+        }
         val floatMetadata = if (floatIntervals.isEmpty()) {
             null
         } else {
@@ -126,6 +144,7 @@ internal class FlatZincCompiler(
             arraysByName = arrays,
             outputItems = model.output?.let { compileOutput(it) } ?: synthesizeOutputItems(),
             defaultBacktrackParams = compileSearchAnnotation(),
+            xorSearchParams = xorParams,
             enumLabelsByVar = enumLabelsByVar.toMap(),
             setVarsByName = setVarsByName.toMap(),
             lsObjective = when (solveDirective) {
@@ -167,6 +186,32 @@ internal class FlatZincCompiler(
         return BacktrackParams(
             variableHeuristic = TieredVariableHeuristic(tiers, fallbackVar),
             valueHeuristic = wrappedValH,
+        )
+    }
+
+    /** Search recipe for a model carrying a multi-xor system: branch the system's bool vars
+     *  in ascending xor-occurrence order (rare vars — typically per-row error/slack
+     *  indicators — first, smallest value first), with conflict-driven free search
+     *  completing the rest. */
+    private fun xorSearchParams(xors: List<Xor>): BacktrackParams {
+        val occ = LinkedHashMap<Int, Int>()
+        for (x in xors) {
+            for (lit in x.literals) {
+            val v = Lit.variable(lit)
+            occ[v] = (occ[v] ?: 0) + 1
+        }
+        }
+        val ordered = occ.entries.sortedBy { it.value }.map { it.key }.toIntArray()
+        val tier = SearchTier(ordered, IntArray(0), TierVarSelect.InputOrder, IndomainMin)
+        return BacktrackParams(
+            variableHeuristic = TieredVariableHeuristic(listOf(tier), LastConflict(Vsids())),
+            valueHeuristic = TieredValueHeuristic(
+                listOf(tier),
+                SolutionGuided(IndomainMin),
+                numBoolVars,
+                intDomains.size,
+            ),
+            phaseSaving = true,
         )
     }
 

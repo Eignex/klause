@@ -25,6 +25,9 @@ data class ResolvedProblem(
      *  merge their budget/seed/restart config into this so benchmark runs honour the
      *  model author's intended search the same way the competition CLI does. */
     val searchParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
+    /** Xor-system search recipe (see `FlatZincProgram.xorSearchParams`); null unless the
+     *  model carries two or more xor constraints. Raced as an extra portfolio worker. */
+    val xorSearchParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
 ) {
     val name: String get() = ref.name
 }
