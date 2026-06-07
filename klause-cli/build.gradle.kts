@@ -12,11 +12,14 @@ eignexCli {
 kotlin {
     jvm()
     // Host-linkable native executables; Windows is served by the JVM dist for now
-    // (MinGW needs its own filesystem actuals).
+    // (MinGW needs its own filesystem actuals). PR/main CI passes -Ptargets.hostOnly and
+    // skips the targets it can't execute; release builds the full set (see :klause).
     linuxX64()
-    linuxArm64()
-    macosX64()
-    macosArm64()
+    if (!providers.gradleProperty("targets.hostOnly").isPresent) {
+        linuxArm64()
+        macosX64()
+        macosArm64()
+    }
 
     sourceSets {
         commonMain.dependencies {

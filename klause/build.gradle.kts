@@ -12,23 +12,31 @@ eignexPublish {
     githubRepo.set("Eignex/klause")
 }
 
+// PR/main CI passes -Ptargets.hostOnly and builds only the targets whose tests execute on
+// the linux runner (jvm + linuxX64); the rest of the matrix would be compile-only there.
+// The full matrix still builds and tests on release (and locally, where it's the default).
+val hostTargetsOnly = providers.gradleProperty("targets.hostOnly").isPresent
+
 kotlin {
     jvm()
-    // Solver tests are compute-heavy; Mocha's default 2s test timeout is far too tight
-    // for the single-threaded JS/wasm targets. Tests must also avoid multi-second
-    // uninterrupted busy loops — ChromeHeadless kills the page (#164).
-    js(IR) {
-        browser { testTask { useMocha { timeout = "120s" } } }
-        nodejs { testTask { useMocha { timeout = "120s" } } }
+    linuxX64()
+    if (!hostTargetsOnly) {
+        // Solver tests are compute-heavy; Mocha's default 2s test timeout is far too tight
+        // for the single-threaded JS/wasm targets. Tests must also avoid multi-second
+        // uninterrupted busy loops — ChromeHeadless kills the page (#164).
+        js(IR) {
+            browser { testTask { useMocha { timeout = "120s" } } }
+            nodejs { testTask { useMocha { timeout = "120s" } } }
+        }
+        wasmJs {
+            browser { testTask { useMocha { timeout = "120s" } } }
+            nodejs { testTask { useMocha { timeout = "120s" } } }
+        }
+        wasmWasi { nodejs { testTask { useMocha { timeout = "120s" } } } }
+        linuxArm64()
+        macosX64(); macosArm64(); mingwX64()
+        iosX64(); iosArm64(); iosSimulatorArm64()
     }
-    wasmJs {
-        browser { testTask { useMocha { timeout = "120s" } } }
-        nodejs { testTask { useMocha { timeout = "120s" } } }
-    }
-    wasmWasi { nodejs { testTask { useMocha { timeout = "120s" } } } }
-    linuxX64(); linuxArm64()
-    macosX64(); macosArm64(); mingwX64()
-    iosX64(); iosArm64(); iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
