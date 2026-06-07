@@ -50,7 +50,12 @@ interface Reference {
 
 private object ChocoReference : Reference {
     override val name = "choco"
-    private fun params(b: Budget) = ChocoParams(b.timeoutMillis)
+
+    // -Dklause.bench.choco.workers=n races n diversified model copies via Choco's
+    // ParallelPortfolio — the track-honest reference when klause runs a multi-worker
+    // portfolio on the same core budget. Default 1 = the classic sequential reference.
+    private val workers = System.getProperty("klause.bench.choco.workers")?.toIntOrNull() ?: 1
+    private fun params(b: Budget) = ChocoParams(b.timeoutMillis, workers = workers)
     override fun solve(problem: Problem, budget: Budget) = ChocoSolver(problem).solve(params(budget))
     override fun minimize(problem: Problem, objective: Objective, budget: Budget) =
         ChocoSolver(problem).minimize(objective, params(budget))
