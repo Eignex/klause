@@ -40,6 +40,7 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
+import com.eignex.klause.solver.factor.SubsetSumEq
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.ValuePrecede
@@ -609,6 +610,15 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
         factors.add(ReifiedLinear(Lit.variable(aux), coeffs, vars, op, bound))
     } else {
         factors.add(Linear(coeffs, vars, op, bound))
+        // Subset-sum shape: an exact sum over 0/1 vars with positive coefficients gets the
+        // dynamic-programming reachability filter alongside. The Linear's bounds
+        // propagation sees almost nothing on this shape (every partial sum admits wide
+        // completions until nearly all vars are pinned); the DP filter is exact.
+        if (op == LinearOp.EQ && bound > 0 && coeffs.all { it > 0 } &&
+            vars.all { intDomains[it].min >= 0 && intDomains[it].max <= 1 }
+        ) {
+            factors.add(SubsetSumEq(vars, coeffs, bound))
+        }
     }
 }
 
