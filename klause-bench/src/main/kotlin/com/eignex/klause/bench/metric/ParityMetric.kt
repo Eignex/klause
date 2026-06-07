@@ -218,13 +218,24 @@ object ParityMetric {
                 ann.copy(randomSeed = 2L, lubyRestartBase = 256L), objective,
             ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         }
+        // Seed twins for the two strongest free compositions: when a close-call row's
+        // run-to-run variance exceeds its gap to the reference, a second seed with the
+        // shared bound flips it — the five-worker sweep flipped five rows over the
+        // three-worker config with zero regressions.
+        val free2 = PortfolioWorker.of(
+            "free#2", BacktrackSolver(entry.problem).session(), freeParams().copy(randomSeed = 11L), objective,
+        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
+        val conflictDriven2 = PortfolioWorker.of(
+            "conflict-driven#2", BacktrackSolver(entry.problem).session(),
+            conflictDrivenParams().copy(randomSeed = 13L), objective,
+        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         val xor = entry.xorSearchParams?.let { xs ->
             PortfolioWorker.of(
                 "xor", BacktrackSolver(entry.problem).session(),
                 xs.copy(randomSeed = 4L, lubyRestartBase = 256L), objective,
             ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         }
-        return listOfNotNull(free, conflictDriven, annotated, xor)
+        return listOfNotNull(free, free2, conflictDriven, conflictDriven2, annotated, xor)
     }
 
     // -Dklause.bench.parity.mode=fixed scores the fixed competition track: a single
