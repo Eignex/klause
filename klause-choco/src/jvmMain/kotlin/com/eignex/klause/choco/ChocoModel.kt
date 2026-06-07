@@ -19,6 +19,7 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
+import com.eignex.klause.solver.factor.GaussianXor
 import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
@@ -43,6 +44,7 @@ import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
+import com.eignex.klause.solver.factor.SubsetSumEq
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.ValuePrecede
@@ -109,6 +111,13 @@ class ChocoModel private constructor(
             }
 
             is Xor -> postParity(litVars(f.literals), f.targetParity)
+
+            // Redundant klause-internal propagators: each is fully implied by the Linear
+            // (SubsetSumEq) or per-row Xor factors (GaussianXor) klause posts alongside it,
+            // so the Choco model already enforces the constraint and skips these.
+            is SubsetSumEq -> {}
+
+            is GaussianXor -> {}
 
             is AllDifferent -> model.allDifferent(*intVarsOf(f.vars)).post()
 
