@@ -68,14 +68,16 @@ class UniGenTest {
 
     @Test
     fun `accurate sampling on a hashed instance returns valid distinct models`() {
-        // 9 free vars -> 512 models, well above the un-hashed cell band, so hashing kicks in.
-        val p = unconstrained(9)
+        // 7 free vars -> 128 models: the smallest power of two above the un-hashed cell band
+        // (hiThresh ≈ 45), so hashing kicks in at the cheapest possible enumeration cost (the
+        // slow targets run this single-threaded; the hashed path is identical at any size).
+        val p = unconstrained(7)
         val samples = BacktrackSolver(p)
             .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 3L), BacktrackParams())
             .take(12).toList()
         assertTrue(samples.size == 12, "should produce the requested number of accurate samples")
-        // Unconstrained, so every assignment is valid; uniformity at 512 cells only checked loosely.
-        val distinct = samples.map { projectionKey(it, 9) }.toHashSet().size
+        // Unconstrained, so every assignment is valid; uniformity at 128 cells only checked loosely.
+        val distinct = samples.map { projectionKey(it, 7) }.toHashSet().size
         assertTrue(distinct >= 6, "expected good spread, got $distinct distinct out of 12")
     }
 

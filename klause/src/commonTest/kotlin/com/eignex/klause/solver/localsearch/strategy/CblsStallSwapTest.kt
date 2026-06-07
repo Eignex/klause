@@ -48,8 +48,18 @@ class CblsStallSwapTest {
         ),
     )
 
-    private fun drive(strategy: Cbls, state: LocalSearchState, steps: Int, onMove: (Move) -> Unit) {
+    /** Drives up to [steps] picks. The positive tests only need a handful of validated swap
+     *  compounds, not the full stalled drive — they pass [compoundCap] to stop early once
+     *  enough have surfaced (the negative default-cap test must ride out every step). */
+    private fun drive(
+        strategy: Cbls,
+        state: LocalSearchState,
+        steps: Int,
+        compoundCap: Int = Int.MAX_VALUE,
+        onMove: (Move) -> Unit,
+    ) {
         state.recompute()
+        var compounds = 0
         repeat(steps) {
             // A null pick is "no candidate this step" (the engine would restart); keep
             // driving — the RNG advances inside pickMove, so the next call resamples.
@@ -57,6 +67,7 @@ class CblsStallSwapTest {
             if (m != null) {
                 onMove(m)
                 state.apply(m)
+                if (m is Move.Compound && ++compounds >= compoundCap) return
             }
         }
     }
@@ -74,7 +85,7 @@ class CblsStallSwapTest {
         val problem = stallProblem()
         val state = LocalSearchState(problem, Random(7))
         var swaps = 0
-        drive(Cbls(stallSwapCap = 16), state, steps = 10_000) { m ->
+        drive(Cbls(stallSwapCap = 16), state, steps = 10_000, compoundCap = 5) { m ->
             if (m is Move.Compound) {
                 swaps++
                 assertEquals(2, m.parts.size, "stall swap must be a two-part compound")
@@ -99,7 +110,7 @@ class CblsStallSwapTest {
     fun `swaps never touch frozen vars`() {
         val frozen = Assumptions(ints = mapOf(2 to 3))
         val state = LocalSearchState(stallProblem(), Random(7), frozen)
-        drive(Cbls(stallSwapCap = 16), state, steps = 10_000) { m ->
+        drive(Cbls(stallSwapCap = 16), state, steps = 10_000, compoundCap = 5) { m ->
             if (m is Move.Compound) {
                 for (p in m.parts) {
                     assertTrue(p is Move.IntSet, "stall swap parts must be int sets")
