@@ -7,6 +7,7 @@ import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.ortools.OrToolsParams
 import com.eignex.klause.ortools.OrToolsSolver
 import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -21,8 +22,11 @@ import com.eignex.klause.yuck.YuckSolver
  */
 interface Reference {
     val name: String
-    fun solve(problem: Problem, budget: Budget): SolveResult
-    fun minimize(problem: Problem, objective: Objective, budget: Budget): MinimizeResult
+
+    /** [search]: annotation-derived klause search params for fixed-track comparisons —
+     *  references that can mirror the prescribed search (Choco) apply it; others ignore it. */
+    fun solve(problem: Problem, budget: Budget, search: BacktrackParams? = null): SolveResult
+    fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams? = null): MinimizeResult
     /** Anytime incumbent stream for the anytime metric. OR-Tools yields each new incumbent
      *  over time; Choco (complete) yields its single optimum. */
     fun improvements(problem: Problem, objective: Objective, budget: Budget): Sequence<MinimizeResult>
@@ -55,10 +59,12 @@ private object ChocoReference : Reference {
     // ParallelPortfolio — the track-honest reference when klause runs a multi-worker
     // portfolio on the same core budget. Default 1 = the classic sequential reference.
     private val workers = System.getProperty("klause.bench.choco.workers")?.toIntOrNull() ?: 1
-    private fun params(b: Budget) = ChocoParams(b.timeoutMillis, workers = workers)
-    override fun solve(problem: Problem, budget: Budget) = ChocoSolver(problem).solve(params(budget))
-    override fun minimize(problem: Problem, objective: Objective, budget: Budget) =
-        ChocoSolver(problem).minimize(objective, params(budget))
+    private fun params(b: Budget, search: BacktrackParams? = null) =
+        ChocoParams(b.timeoutMillis, workers = workers, fixedSearch = search)
+    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
+        ChocoSolver(problem).solve(params(budget, search))
+    override fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams?) =
+        ChocoSolver(problem).minimize(objective, params(budget, search))
     override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
         ChocoSolver(problem).improvements(objective, params(budget))
 }
@@ -69,8 +75,9 @@ private object ChocoReference : Reference {
 private object YuckReference : Reference {
     override val name = "yuck"
     private fun params(b: Budget) = YuckParams(timeoutMillis = b.timeoutMillis)
-    override fun solve(problem: Problem, budget: Budget) = YuckSolver(problem).solve(params(budget))
-    override fun minimize(problem: Problem, objective: Objective, budget: Budget) =
+    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
+        YuckSolver(problem).solve(params(budget))
+    override fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams?) =
         YuckSolver(problem).minimize(objective, params(budget))
     override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
         YuckSolver(problem).improvements(objective, params(budget))
@@ -79,8 +86,9 @@ private object YuckReference : Reference {
 private object OrToolsReference : Reference {
     override val name = "ortools"
     private fun params(b: Budget) = OrToolsParams(timeoutMillis = b.timeoutMillis)
-    override fun solve(problem: Problem, budget: Budget) = OrToolsSolver(problem).solve(params(budget))
-    override fun minimize(problem: Problem, objective: Objective, budget: Budget) =
+    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
+        OrToolsSolver(problem).solve(params(budget))
+    override fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams?) =
         OrToolsSolver(problem).minimize(objective, params(budget))
     override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
         OrToolsSolver(problem).improvements(objective, params(budget))
