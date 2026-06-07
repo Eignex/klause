@@ -12,9 +12,8 @@ eignexPublish {
     githubRepo.set("Eignex/klause")
 }
 
-// PR/main CI passes -Ptargets.hostOnly and builds only the targets whose tests execute on
-// the linux runner (jvm + linuxX64); the rest of the matrix would be compile-only there.
-// The full matrix still builds and tests on release (and locally, where it's the default).
+// PR/main CI passes -Ptargets.hostOnly: only the targets whose tests run on the linux
+// runner. The full matrix builds and tests on release and locally.
 val hostTargetsOnly = providers.gradleProperty("targets.hostOnly").isPresent
 
 kotlin {
@@ -56,14 +55,11 @@ kotlin {
     }
 }
 
-// Pin the wasm test runtime to node 25 (V8 14.1), where the exnref exception-handling
-// proposal the wasmWasi target compiles to (default since Kotlin 2.3) is stable. The KGP
-// default node 24 (V8 13.6) only has exnref behind --experimental-wasm-exnref, and that
-// experimental codepath intermittently killed the wasi dry run on loaded CI runners with
-// a bare uncaught WebAssembly.Exception (#171).
-// KGP registers node env specs on both the root and this project (the test tasks read the
-// project-level one), and KotlinWasmNode resolves its node from the js spec rather than
-// the wasm one — pin all four. The js targets don't need exnref but run fine on 25.
+// Pin the test node to 25, whose V8 has the exnref exception handling wasmWasi compiles
+// to (Kotlin 2.3 default) as stable; on the KGP-default node 24 it is experimental and
+// intermittently killed the wasi dry run on loaded CI runners. KGP registers env specs
+// on both the root and this project, and the wasi runner reads the js spec rather than
+// the wasm one — pin all four.
 val pinnedNodeVersion = "25.0.0"
 for (proj in listOf(project, rootProject)) {
     proj.plugins.withType<org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsPlugin> {

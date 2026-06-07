@@ -29,11 +29,8 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # Persists the Gradle home (dependencies AND the local build cache) across runs, so
-      # unchanged modules' compile, detekt and test tasks come back FROM-CACHE instead of
-      # re-executing. Every branch writes its own entries — GitHub scopes them (a branch
-      # reads its own entries plus main's), so repeated pushes to a PR hit the cache even
-      # before anything lands on main.
+      # Persists the Gradle home incl. the local build cache; every branch writes so
+      # repeated PR pushes hit it (GitHub scopes entries to the branch plus main).
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -58,10 +55,8 @@ jobs:
           path: ~/.cache/klause-yuck
           key: ${{ runner.os }}-yuck-${{ hashFiles('klause-yuck/build.gradle.kts') }}
 
-      # PR/main builds compile and test only the host-executable targets (jvm + linuxX64,
-      # -Ptargets.hostOnly); the full matrix — apple, windows, js, wasm and their browser/
-      # node test runtimes (pinned Chrome, userns sandbox, bounded workers; #171) — runs on
-      # release via release.yml.
+      # -Ptargets.hostOnly: only jvm + linuxX64 here; the full matrix (apple, windows,
+      # js/wasm with their browser/node runtimes) builds and tests on release.
 
       # Repo-wide detekt (kumulant runs lintDocs here; klause's dokka half is blocked on a
       # backlog of unresolved KDoc links — see the tracking issue).
