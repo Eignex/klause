@@ -134,7 +134,7 @@ object ParityMetric {
         val refFeas = if (cached != null) {
             cached.feasible
         } else {
-            runCatching { feasibility(ref.solve(entry.problem, budget)) }
+            runCatching { feasibility(ref.solve(entry.problem, budget, if (fixedMode) entry.searchParams else null)) }
                 .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
         }
         val exp = expectedFeasible(entry.ref.expected)
@@ -162,8 +162,9 @@ object ParityMetric {
             cv = cached.objective
             refDisplay = cached.display
         } else {
-            val refRes = runCatching { ref.minimize(entry.problem, obj, budget) }
-                .getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
+            val refRes = runCatching {
+                ref.minimize(entry.problem, obj, budget, if (fixedMode) entry.searchParams else null)
+            }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
             cv = refRes.objectiveValue
             refDisplay = optStr(refRes)
         }
@@ -226,8 +227,23 @@ object ParityMetric {
         return listOfNotNull(free, conflictDriven, annotated, xor)
     }
 
+    // -Dklause.bench.parity.mode=fixed scores the fixed competition track: a single
+    // klause worker that follows the model's search annotation (the engine's
+    // conflict-driven free composition where the model has none), against a reference
+    // that mirrors the same prescribed search. Default "portfolio" races the multi-worker
+    // parallel-track configuration.
+    private val fixedMode = System.getProperty("klause.bench.parity.mode") == "fixed"
+
+    private fun fixedParams(entry: ResolvedProblem, deadline: Long): BacktrackParams =
+        (entry.searchParams ?: conflictDrivenParams()).copy(
+            randomSeed = 1L,
+            lubyRestartBase = 256L,
+            cancellation = Cancellation { System.currentTimeMillis() > deadline },
+        )
+
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
+        if (fixedMode) return BacktrackSolver(entry.problem).solve(fixedParams(entry, deadline))
         return runBlocking(Dispatchers.Default) {
             Portfolio(workers(entry, objective = null))
                 .solve(Cancellation { System.currentTimeMillis() > deadline })
@@ -236,6 +252,7 @@ object ParityMetric {
 
     private fun klauseMinimize(entry: ResolvedProblem, obj: Objective, budget: Budget): MinimizeResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
+        if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, fixedParams(entry, deadline))
         return runBlocking(Dispatchers.Default) {
             Portfolio(workers(entry, obj))
                 .minimize(Cancellation { System.currentTimeMillis() > deadline })

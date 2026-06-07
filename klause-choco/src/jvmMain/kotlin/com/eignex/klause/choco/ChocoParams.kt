@@ -1,6 +1,7 @@
 package com.eignex.klause.choco
 
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.backtrack.BacktrackParams
 
 /**
  * Per-call params for [ChocoSolver].
@@ -16,5 +17,11 @@ import com.eignex.klause.solver.SolverParams
  * are intentionally minimal — assumptions/cancellation fall back to the [SolverParams]
  * no-op defaults.
  */
-data class ChocoParams(val timeoutMillis: Long? = null, val maxModels: Long = Long.MAX_VALUE, val workers: Int = 1) :
-    SolverParams
+data class ChocoParams(
+    val timeoutMillis: Long? = null,
+    val maxModels: Long = Long.MAX_VALUE,
+    val workers: Int = 1,
+    /** Annotation-derived klause search params to mirror onto the Choco model (see
+     *  `applyFixedSearch`) for fixed-track comparisons; null leaves Choco's own search. */
+    val fixedSearch: BacktrackParams? = null,
+) : SolverParams

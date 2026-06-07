@@ -28,6 +28,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         if (params.workers > 1) return solveParallel(params)
         val cm = ChocoModel.build(problem)
         applyLimits(cm.model, params)
+        applySearch(cm, params)
         return if (cm.model.solver.solve()) {
             SolveResult.Sat(readSample(cm))
         } else if (cm.model.solver.isStopCriterionMet()) {
@@ -76,6 +77,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         if (params.workers > 1) return minimizeParallel(objective, params)
         val cm = ChocoModel.build(problem)
         applyLimits(cm.model, params)
+        applySearch(cm, params)
         val objVar = buildObjectiveVar(cm, objective)
         cm.model.setObjective(Model.MINIMIZE, objVar)
         val best = Solution(cm.model)
@@ -139,6 +141,10 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
 
     private fun applyLimits(model: Model, params: ChocoParams) {
         params.timeoutMillis?.let { model.solver.limitTime(it) }
+    }
+
+    private fun applySearch(cm: ChocoModel, params: ChocoParams) {
+        params.fixedSearch?.let { applyFixedSearch(cm, it, seed = 0L) }
     }
 
     /** Build an IntVar equal to the linear objective (excluding the constant offset, which is
