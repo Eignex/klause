@@ -165,6 +165,14 @@ data class SamplingConfig(
      * uniform, more expensive. Only consulted by [SampleQuality.ACCURATE].
      */
     val tolerance: Double = 0.5,
+    /**
+     * ApproxMC multiplicative tolerance for the internal one-shot count estimate that seeds the
+     * hash depth. Coarse is fine for sampling: the estimate only picks the starting cell size,
+     * and draws still enforce the `κ` band. Only consulted by [SampleQuality.ACCURATE].
+     */
+    val countEpsilon: Double = 0.8,
+    /** ApproxMC failure probability for the internal count estimate; see [countEpsilon]. */
+    val countDelta: Double = 0.2,
 ) {
     init {
         require(tolerance > 0.0) { "tolerance must be positive, was $tolerance" }

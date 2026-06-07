@@ -34,8 +34,8 @@ internal object UniGen {
             val estimate = ApproxMC.run(
                 problem,
                 ApproxCountConfig(
-                    epsilon = 0.8,
-                    delta = 0.2,
+                    epsilon = config.countEpsilon,
+                    delta = config.countDelta,
                     samplingSet = config.samplingSet,
                     intSamplingSet = config.intSamplingSet,
                     seed = config.seed,
