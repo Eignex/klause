@@ -102,16 +102,19 @@ class AllDifferentExcept(
 
     private fun pairsAt(k: Int): Int = if (k <= 1) 0 else k * (k - 1) / 2
 
-    /** The Hall-violator vars captured by the last [propagate] failure (matching pass), or
-     *  null for a singleton-clash / no-capture path. Lets the reason cite just the responsible
-     *  set rather than every var. */
-    private var conflictHallVars: IntArray? = null
-
+    // The Hall-violator vars behind the last propagate failure live in the session's
+    // ReginCache (null for a singleton-clash / no-capture path), so the reason cites just
+    // the responsible set and portfolio workers sharing one Problem never cross reasons
+    // (#182).
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, conflictHallVars ?: xs)
+        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? ReginCache)?.conflictVars ?: xs)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        conflictHallVars = null // stale-guard; set at the matching-pass failure point.
+        // Stale-guard up front: phase 1 can fail before the matching pass, and the reason
+        // fallback (all of xs) must not be shadowed by a previous failure's Hall set.
+        val cache = (state.refPayload[factorId] as? ReginCache)
+            ?: ReginCache().also { state.refPayload[factorId] = it }
+        cache.conflictVars = null // set at the matching-pass failure point.
         // Phase 1: singleton-take filter (cheap, runs first).
         val taken = HashSet<Int>()
         for (v in xs) {
@@ -133,11 +136,9 @@ class AllDifferentExcept(
         }
         // Phase 2: shared Régin matching-and-SCC pruning ([reginFilter]); excepted values are
         // modelled as capacity-n copies. The cache warm-starts the matching across calls (#96).
-        val cache = (state.refPayload[factorId] as? ReginCache)
-            ?: ReginCache().also { state.refPayload[factorId] = it }
         val hall = reginFilter(state, xs, exceptSet, cache)
         if (hall != null) {
-            conflictHallVars = hall
+            cache.conflictVars = hall
             return false
         }
         return true

@@ -198,24 +198,17 @@ class AllDifferent(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    /** The variable subset responsible for the most recent [propagate] failure — a Hall
-     *  violator (a set of `k` vars whose domains are jointly confined to `< k` values),
-     *  captured at the failing point because the matching state is local to [propagate].
-     *  Lets [conflictReason] cite only the Hall set rather than every var. Reset at the
-     *  start of each [propagate]; read immediately afterwards by the analyzer on failure. */
-    private var conflictHallVars: IntArray? = null
-
     /** Hall-style conflict reason: bound + `[v ≠ value]` hole literals confining each
-     *  responsible var's domain. Uses the Hall violator captured by [propagate]
-     *  ([conflictHallVars]) when available — only those vars' domains jointly prove the
+     *  responsible var's domain. Uses the Hall violator [propagate] captured in the
+     *  session's [ReginCache] when available — only those vars' domains jointly prove the
      *  pigeonhole, so the others are irrelevant and citing them only over-specialises the
      *  learned clause. Falls back to all vars if no Hall set was recorded (e.g. a failure
-     *  path that didn't set it). */
+     *  path that didn't set it). The scratch lives on the per-session payload, not the
+     *  factor, so portfolio workers sharing one Problem never cross reasons (#182). */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, conflictHallVars ?: vars)
+        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? ReginCache)?.conflictVars ?: vars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        conflictHallVars = null // stale-guard; set at each failure point below.
         // Only the definitely-present positions participate in Régin filtering. Build a
         // local index map: filteredIdx → original position. Unpinned-presence positions
         // are dropped — they may still go absent and would otherwise force unsound prunes.
@@ -237,9 +230,10 @@ class AllDifferent(
         // warm-starts the matching across calls (#96).
         val cache = (state.refPayload[factorId] as? ReginCache)
             ?: ReginCache().also { state.refPayload[factorId] = it }
+        cache.conflictVars = null // stale-guard; set at the failure point below.
         val hall = reginFilter(state, filteredVars, emptySet(), cache)
         if (hall != null) {
-            conflictHallVars = hall
+            cache.conflictVars = hall
             return false
         }
         return true

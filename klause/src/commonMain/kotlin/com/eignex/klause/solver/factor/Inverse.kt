@@ -155,18 +155,12 @@ class Inverse(
      * based (Hall sets), which inverse's bijection structure rarely needs in practice.
      */
 
-    /** The variable subset responsible for the most recent [propagate] failure. Inverse
-     *  conflicts are pair-local: a structural range failure implicates one channel var, and
-     *  every singleton-forcing / value-removal failure implicates exactly the source var and
-     *  its target across the channel. Citing only that var (or pair) is strictly sharper than
-     *  the whole-constraint reason. Reset at the start of each [propagate]; read on failure
-     *  (`null` ⇒ fall back to all vars). */
-    private var conflictVars: IntArray? = null
-
     /** Hole-aware conflict reason, sharpened to the responsible channel var / pair captured
-     *  by [propagate]; falls back to all vars when no pair was recorded. */
+     *  by [propagate]; falls back to all vars when no pair was recorded. The scratch lives
+     *  on the session's [InverseCache], not the factor, so portfolio workers sharing one
+     *  Problem never cross reasons (#182). */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, conflictVars ?: intVars)
+        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars)
 
     /** Cached domain refs (f then g) at the last successful propagate. The O(n²) value-removal
      *  sweep reprocesses only rows/columns whose domain reference changed since this baseline;
@@ -175,16 +169,20 @@ class Inverse(
      *  fires (the engine re-queues on any prune), reaching the same fixpoint as the full sweep.
      *  Backtrack-safe via [snapshotCopy]. */
     private class InverseCache(val refs: Array<IntDomain?>) : PropagationState.SnapshottablePayload {
+        /** The channel var / pair behind the most recent propagate failure on this session;
+         *  propagate-to-analysis transient, so excluded from [snapshotCopy] (#182). */
+        var conflictVars: IntArray? = null
+
         override fun snapshotCopy(): InverseCache = InverseCache(refs.copyOf())
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        conflictVars = null // stale-guard; set at each failure point below.
         val cache = (state.refPayload[factorId] as? InverseCache) ?: run {
             val fresh = InverseCache(arrayOfNulls(intVars.size))
             state.refPayload[factorId] = fresh
             fresh
         }
+        cache.conflictVars = null // stale-guard; set at each failure point below.
         val entryRefs = Array(intVars.size) { state.intDomains[intVars[it]] }
         // Range tightens are structural (no input antecedents). A failure means that one var
         // alone cannot reach the legal index span, so it is the sole reason.
@@ -192,11 +190,11 @@ class Inverse(
         val gHi = gOffset + g.size - 1
         for (i in f.indices) {
             if (!state.tightenIntMin(f[i], gLo)) {
-                conflictVars = intArrayOf(f[i])
+                cache.conflictVars = intArrayOf(f[i])
                 return false
             }
             if (!state.tightenIntMax(f[i], gHi)) {
-                conflictVars = intArrayOf(f[i])
+                cache.conflictVars = intArrayOf(f[i])
                 return false
             }
         }
@@ -204,11 +202,11 @@ class Inverse(
         val fHi = fOffset + f.size - 1
         for (i in g.indices) {
             if (!state.tightenIntMin(g[i], fLo)) {
-                conflictVars = intArrayOf(g[i])
+                cache.conflictVars = intArrayOf(g[i])
                 return false
             }
             if (!state.tightenIntMax(g[i], fHi)) {
-                conflictVars = intArrayOf(g[i])
+                cache.conflictVars = intArrayOf(g[i])
                 return false
             }
         }
@@ -219,16 +217,16 @@ class Inverse(
             if (d.min != d.max) continue
             val gIdx = d.min - gOffset
             if (gIdx !in g.indices) {
-                conflictVars = intArrayOf(f[i])
+                cache.conflictVars = intArrayOf(f[i])
                 return false
             }
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
             if (!state.tightenIntMin(g[gIdx], i + fOffset, ant)) {
-                conflictVars = intArrayOf(f[i], g[gIdx])
+                cache.conflictVars = intArrayOf(f[i], g[gIdx])
                 return false
             }
             if (!state.tightenIntMax(g[gIdx], i + fOffset, ant)) {
-                conflictVars = intArrayOf(f[i], g[gIdx])
+                cache.conflictVars = intArrayOf(f[i], g[gIdx])
                 return false
             }
         }
@@ -237,16 +235,16 @@ class Inverse(
             if (d.min != d.max) continue
             val fIdx = d.min - fOffset
             if (fIdx !in f.indices) {
-                conflictVars = intArrayOf(g[i])
+                cache.conflictVars = intArrayOf(g[i])
                 return false
             }
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[i]))
             if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) {
-                conflictVars = intArrayOf(g[i], f[fIdx])
+                cache.conflictVars = intArrayOf(g[i], f[fIdx])
                 return false
             }
             if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) {
-                conflictVars = intArrayOf(g[i], f[fIdx])
+                cache.conflictVars = intArrayOf(g[i], f[fIdx])
                 return false
             }
         }
@@ -267,13 +265,13 @@ class Inverse(
             if (fHas && !gHas) {
                 val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
                 if (!state.excludeIntValue(f[i], jVal, ant)) {
-                    conflictVars = intArrayOf(f[i], g[gIdx])
+                    cache.conflictVars = intArrayOf(f[i], g[gIdx])
                     return false
                 }
             } else if (!fHas && gHas) {
                 val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
                 if (!state.excludeIntValue(g[gIdx], iVal, ant)) {
-                    conflictVars = intArrayOf(f[i], g[gIdx])
+                    cache.conflictVars = intArrayOf(f[i], g[gIdx])
                     return false
                 }
             }

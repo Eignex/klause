@@ -147,22 +147,16 @@ class Geost(
         }
     }
 
-    /** Origin vars responsible for the conflict that made the last [propagate] return false —
-     *  only the involved object pair(s), not all objects. Lets CDCL learn a tight nogood
-     *  (an all-vars reason produces useless long clauses → the solver thrashes at shallow
-     *  depth on multi-object instances). Falls back to all vars if unset. */
-    private var conflictVars: IntArray? = null
-
     /** Append object [i]'s origin vars (all dims) to [acc]. */
     private fun objectVarsInto(i: Int, acc: IntArrayList) {
         for (d in 0 until numDims) acc.add(origin[i * numDims + d])
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.composeIntVarAtomAntecedents(conflictVars ?: intVars)
+        state.composeIntVarAtomAntecedents((state.refPayload[factorId] as? IntArray) ?: intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        conflictVars = null
+        state.refPayload[factorId] = null
         // First sweep: detect "must overlap in every dim" → infeasibility. The conflict is
         // caused solely by the two objects' origin bounds — cite just those.
         for (i in 0 until numObjects) {
@@ -171,7 +165,7 @@ class Geost(
                     val acc = IntArrayList()
                     objectVarsInto(i, acc)
                     objectVarsInto(j, acc)
-                    conflictVars = acc.toIntArray()
+                    state.refPayload[factorId] = acc.toIntArray()
                     return false
                 }
             }
@@ -212,7 +206,7 @@ class Geost(
                     }
                 }
                 if (lo > hi) {
-                    conflictVars = antVars.toIntArray()
+                    state.refPayload[factorId] = antVars.toIntArray()
                     return false
                 }
                 if (!state.tightenIntMin(oi, lo, ant)) return false
