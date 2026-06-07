@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.MinimizeResult.Optimal
 import com.eignex.klause.solver.MinimizeResult.WithSample
 import com.eignex.klause.solver.Problem
@@ -11,6 +12,9 @@ import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.IndomainMax
+import com.eignex.klause.solver.backtrack.IndomainMiddle
+import com.eignex.klause.solver.backtrack.InputOrder
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
@@ -146,6 +150,49 @@ class PortfolioTest {
             val r = p.minimize()
             val optimal = assertIs<Optimal>(r)
             assertEquals(3.0, optimal.objectiveValue)
+        }
+    }
+
+    @Test
+    fun `budget-capped workers never upgrade the incumbent to a false optimal`() = runTest {
+        // minimize x over x ∈ [0..1000] with no constraints: the optimum is 0, but every
+        // worker is decision-capped so none can exhaust its space. A pool of BestFound
+        // verdicts under BudgetExhausted proves nothing about better solutions — the fold
+        // must report BestFound, not Optimal (a portfolio over budget-capped workers
+        // previously manufactured an optimality proof from timed-out incumbents).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1000)),
+            factors = arrayOf<Factor>(),
+        )
+        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val workers = List(2) { i ->
+            PortfolioWorker.of(
+                "bt#$i",
+                BacktrackSolver(problem).session(),
+                // Worker 0 walks down from 1000, worker 1 from the domain middle, so both
+                // hold real incumbents when the 50-decision cap lands — and neither is
+                // anywhere near reaching (or proving) the optimum at 0. A pool of capped
+                // BestFound verdicts is the exact shape that was upgraded falsely.
+                BacktrackParams(
+                    randomSeed = i.toLong(),
+                    maxDecisions = 50,
+                    variableHeuristic = InputOrder,
+                    valueHeuristic = if (i == 0) IndomainMax else IndomainMiddle,
+                ),
+                objective = obj,
+            ) { params, supplier ->
+                params.copy(objectiveBoundSupplier = supplier)
+            }
+        }
+        Portfolio(workers).use { p ->
+            // The middle-bisecting worker may legitimately stumble onto the optimum value,
+            // but with the max-descending worker budget-capped the pool has not covered the
+            // space — the verdict must stay BestFound; claiming Optimal here is a
+            // manufactured proof.
+            assertIs<MinimizeResult.BestFound>(p.minimize())
+            Unit
         }
     }
 

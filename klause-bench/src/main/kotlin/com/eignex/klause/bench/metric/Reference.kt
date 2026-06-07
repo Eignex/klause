@@ -10,6 +10,8 @@ import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.yuck.YuckParams
+import com.eignex.klause.yuck.YuckSolver
 
 /**
  * A trusted in-process reference solver used by differential metrics. Both supported
@@ -27,19 +29,21 @@ interface Reference {
 
     companion object {
         /** The reference backends a metric may diff against. */
-        val backends: List<Backend> = listOf(Backend.CHOCO, Backend.ORTOOLS)
+        val backends: List<Backend> = listOf(Backend.CHOCO, Backend.ORTOOLS, Backend.YUCK)
 
         fun of(backend: Backend): Reference = when (backend) {
             Backend.CHOCO -> ChocoReference
             Backend.ORTOOLS -> OrToolsReference
+            Backend.YUCK -> YuckReference
             else -> error("$backend is not a reference solver (use ${backends})")
         }
 
-        /** Resolve a reference by id ("choco"/"ortools"), e.g. from a system property. */
+        /** Resolve a reference by id ("choco"/"ortools"/"yuck"), e.g. from a system property. */
         fun byId(id: String): Reference = when (id.lowercase()) {
             "choco" -> ChocoReference
             "ortools", "or-tools" -> OrToolsReference
-            else -> error("unknown reference '$id' (have choco, ortools)")
+            "yuck" -> YuckReference
+            else -> error("unknown reference '$id' (have choco, ortools, yuck)")
         }
     }
 }
@@ -52,6 +56,19 @@ private object ChocoReference : Reference {
         ChocoSolver(problem).minimize(objective, params(budget))
     override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
         ChocoSolver(problem).improvements(objective, params(budget))
+}
+
+/** Yuck local-search reference (temporary, LS parity sweep). Unlike the complete references it
+ *  cannot prove UNSAT or optimality — "not found within budget" maps to `Unknown`, so parity
+ *  rows diff feasibility/quality, not completeness. */
+private object YuckReference : Reference {
+    override val name = "yuck"
+    private fun params(b: Budget) = YuckParams(timeoutMillis = b.timeoutMillis)
+    override fun solve(problem: Problem, budget: Budget) = YuckSolver(problem).solve(params(budget))
+    override fun minimize(problem: Problem, objective: Objective, budget: Budget) =
+        YuckSolver(problem).minimize(objective, params(budget))
+    override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
+        YuckSolver(problem).improvements(objective, params(budget))
 }
 
 private object OrToolsReference : Reference {

@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":klause-logicng"))
     implementation(project(":klause-choco"))
     implementation(project(":klause-ortools"))
+    implementation(project(":klause-yuck"))
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
     implementation("com.eignex:kumulant:0.3.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")

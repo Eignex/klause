@@ -13,7 +13,7 @@ kotlin {
     sourceSets {
         jvmMain.dependencies {
             implementation(project(":klause"))
-            implementation("org.choco-solver:choco-solver:4.10.14")
+            implementation("org.choco-solver:choco-solver:6.0.1")
             // klause uses kotlinx-serialization compileOnly; reify the runtime dep since our
             // translation path touches @Serializable AST types transitively.
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
