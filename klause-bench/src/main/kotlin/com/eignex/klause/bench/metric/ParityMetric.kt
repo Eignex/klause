@@ -14,6 +14,10 @@ import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.IndomainMin
+import com.eignex.klause.solver.backtrack.LastConflict
+import com.eignex.klause.solver.backtrack.SolutionGuided
+import com.eignex.klause.solver.backtrack.Vsids
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
@@ -181,17 +185,32 @@ object ParityMetric {
     // on the first incumbents and walking to the optimum.
     private fun freeParams(): BacktrackParams = BacktrackParams(randomSeed = 1L, lubyRestartBase = 256L)
 
+    /** Conflict-driven free search: last-conflict probing over VSIDS activity, solution-
+     *  guided value order, phase saving. The A/B over the scheduling tail picked this
+     *  composition decisively — it proves rcpsp-wet and shortest_path in seconds and takes
+     *  celar from 9344 to 2323 where the random free worker and the annotation both stall. */
+    private fun conflictDrivenParams(): BacktrackParams = BacktrackParams(
+        randomSeed = 3L,
+        variableHeuristic = LastConflict(Vsids()),
+        valueHeuristic = SolutionGuided(IndomainMin),
+        phaseSaving = true,
+        lubyRestartBase = 256L,
+    )
+
     /**
-     * The klause side of a row: a two-worker portfolio racing the model's annotated search
-     * (when present) against the engine's free default, sharing the objective bound. The
-     * annotated-vs-free sweeps split the corpus down the middle — annotations win the
-     * structured reach rows and lose plateau rows where restart-driven free search shines —
-     * so the bench measures the race, the same shape the competition entry runs. Rows
-     * without an annotation keep the single free worker.
+     * The klause side of a row: a portfolio racing the model's annotated search (when
+     * present), the engine's free default, and a conflict-driven VSIDS composition, all
+     * sharing the objective bound. The single-config sweeps split the corpus three ways —
+     * annotations win the structured reach rows, random free search wins plateau rows,
+     * and the conflict-driven worker wins the scheduling tail — so the bench measures the
+     * race, the same shape the competition entry runs.
      */
     private fun workers(entry: ResolvedProblem, objective: Objective?): List<PortfolioWorker> {
         val free = PortfolioWorker.of(
             "free", BacktrackSolver(entry.problem).session(), freeParams(), objective,
+        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
+        val conflictDriven = PortfolioWorker.of(
+            "conflict-driven", BacktrackSolver(entry.problem).session(), conflictDrivenParams(), objective,
         ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         val annotated = entry.searchParams?.let { ann ->
             PortfolioWorker.of(
@@ -199,7 +218,7 @@ object ParityMetric {
                 ann.copy(randomSeed = 2L, lubyRestartBase = 256L), objective,
             ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         }
-        return listOfNotNull(free, annotated)
+        return listOfNotNull(free, conflictDriven, annotated)
     }
 
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {

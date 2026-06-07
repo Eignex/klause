@@ -524,7 +524,7 @@ private fun pickByActivityWithDomDivider(
  * `LastConflict(Vsids())` to get last-conflict priority on top of activity-driven
  * picking.
  */
-internal class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
+class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
 
     private var pending: VarRef? = null
 
@@ -1116,7 +1116,7 @@ internal class IndomainBest(private val objective: LinearObjective) : ValueHeuri
  * inner choice — the engine still runs through the saved value first, but if that branch
  * proves infeasible, the inner heuristic's order takes over.
  */
-internal class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic {
+class SolutionGuided(private val base: ValueHeuristic) : ValueHeuristic {
 
     private var bools: BooleanArray? = null
     private var ints: IntArray? = null
