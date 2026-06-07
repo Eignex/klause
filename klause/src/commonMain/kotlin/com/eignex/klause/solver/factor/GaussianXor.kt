@@ -62,9 +62,6 @@ class GaussianXor(constraints: List<Xor>) : Factor {
         }
     }
 
-    /** Cached clause-form reason from the most recent [propagate] conflict, for [conflictReason]. */
-    private var lastConflictReason: IntArray? = null
-
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = rowMask.size
         // Residual system over the *unassigned* variables: substitute current assignments. For each
@@ -113,7 +110,7 @@ class GaussianXor(constraints: List<Xor>) : Factor {
             val pop = popcount(mask[r])
             if (pop == 0) {
                 if (rhs[r] == 1) { // 0 = 1
-                    lastConflictReason = reasonLiterals(state, reason[r], excludeCol = -1)
+                    state.refPayload[factorId] = reasonLiterals(state, reason[r], excludeCol = -1)
                     return false
                 }
                 continue
@@ -131,7 +128,8 @@ class GaussianXor(constraints: List<Xor>) : Factor {
         return true
     }
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = lastConflictReason
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        state.refPayload[factorId] as? IntArray
 
     /**
      * Clause-form reason for a forced pin or conflict: one currently-false literal per assigned

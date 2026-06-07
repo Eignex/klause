@@ -216,6 +216,14 @@ internal fun reginFilter(
 internal class ReginCache : PropagationState.SnapshottablePayload {
     val matchedValue = HashMap<Int, Int>()
 
+    /** The Hall violator behind the most recent propagate failure on this session — written
+     *  at the failing point, read immediately afterwards by the analyzer via the factor's
+     *  conflictReason. Lives here (per-session payload) rather than on the factor object so
+     *  portfolio workers sharing one Problem never read another session's reason (#182).
+     *  Deliberately excluded from [snapshotCopy]: it is propagate-to-analysis transient and
+     *  never survives a backtrack. */
+    var conflictVars: IntArray? = null
+
     override fun snapshotCopy(): ReginCache {
         val c = ReginCache()
         c.matchedValue.putAll(matchedValue)
