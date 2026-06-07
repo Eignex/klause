@@ -112,12 +112,14 @@ class ExactCountTest {
 
     @Test
     fun `hybrid count falls back to approximate when exact budget is tiny`() {
-        // 128 models: the smallest free instance ApproxMC still hashes (cell threshold ≈ 73),
-        // so the fallback runs its full pipeline at the cheapest possible enumeration cost.
-        val r = BacktrackSolver(freeBools(7)).count(CountConfig(exactBudget = 5, delta = 0.35, seed = 7L))
+        // 128 models with the cheapest hashed-fallback smoke configuration: ε=2 shrinks the
+        // cell threshold to ≈38 (still exceeded, so ApproxMC hashes) and δ=0.99 floors the
+        // iteration count; the loose band plus pinned seed keep the assert deterministic.
+        val r = BacktrackSolver(freeBools(7))
+            .count(CountConfig(exactBudget = 5, epsilon = 2.0, delta = 0.99, seed = 7L))
         // Fell back to ApproxMC: a probabilistic estimate near 128, bracketed and confidence < 1.
-        val lo = 128 / 1.8
-        val hi = 128 * 1.8
+        val lo = 128 / 3.0
+        val hi = 128 * 3.0
         assertTrue(r.estimate in lo.toLong()..hi.toLong(), "estimate ${r.estimate} outside [$lo,$hi]")
         assertTrue(r.lower <= r.upper)
         assertTrue(r.confidence < 1.0)

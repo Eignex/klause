@@ -31,11 +31,13 @@ class IntVarLiftTest {
 
     @Test
     fun `hashed count over integer variables is within the epsilon band`() {
-        // 3 int vars over 0..4 → 125 combinations, just above the ε=0.8 cell threshold (≈73),
-        // forcing XOR hashing over the bits at the cheapest possible enumeration cost.
+        // 3 int vars over 0..4 → 125 combinations, above the ε=2 cell threshold (≈38), forcing
+        // XOR hashing over the bits at the cheapest smoke configuration: ε=2/δ=0.99 floor the
+        // cell size and iteration count, the loose band still pins the hashed-lift plumbing,
+        // and the pinned seed keeps the outcome deterministic.
         val p = intVars(3, 0, 4)
-        val eps = 0.8
-        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(epsilon = eps, delta = 0.2, seed = 7L))
+        val eps = 2.0
+        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 7L))
         assertTrue(!r.exact, "125 combinations should require hashing")
         val lo = 125 / (1.0 + eps)
         val hi = 125 * (1.0 + eps)
