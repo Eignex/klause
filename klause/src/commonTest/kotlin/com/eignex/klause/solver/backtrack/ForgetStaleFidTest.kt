@@ -2,8 +2,8 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import kotlin.test.Test

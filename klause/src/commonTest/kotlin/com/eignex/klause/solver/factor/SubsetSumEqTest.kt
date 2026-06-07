@@ -62,14 +62,15 @@ class SubsetSumEqTest {
                 }
             }
 
-            assertEquals(feasible, ok, "feasibility mismatch: coeffs=${coeffs.toList()} target=$target pins=${pins.toList()}")
+            val ctx = "coeffs=${coeffs.toList()} target=$target pins=${pins.toList()}"
+            assertEquals(feasible, ok, "feasibility mismatch: $ctx")
             if (!feasible) return@repeat
             for (i in 0 until n) {
                 val d = state.intDomains[i]
                 val expectMin = if (support0[i]) 0 else 1
                 val expectMax = if (support1[i]) 1 else 0
-                assertEquals(expectMin, d.min, "min of var $i: coeffs=${coeffs.toList()} target=$target pins=${pins.toList()}")
-                assertEquals(expectMax, d.max, "max of var $i: coeffs=${coeffs.toList()} target=$target pins=${pins.toList()}")
+                assertEquals(expectMin, d.min, "min of var $i: $ctx")
+                assertEquals(expectMax, d.max, "max of var $i: $ctx")
             }
         }
     }
