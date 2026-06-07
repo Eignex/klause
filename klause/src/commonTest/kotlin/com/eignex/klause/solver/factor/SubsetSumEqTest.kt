@@ -30,14 +30,14 @@ class SubsetSumEqTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) {
-                    when (pins[it]) {
+                intDomains = Array(n) { i ->
+                    when (pins[i]) {
                         1 -> IntDomain(0, 0)
                         2 -> IntDomain(1, 1)
                         else -> IntDomain(0, 1)
                     }
                 },
-                factors = arrayOf<Factor>(SubsetSumEq(IntArray(n) { it }, coeffs, target)),
+                factors = arrayOf<Factor>(SubsetSumEq(IntArray(n) { i -> i }, coeffs, target)),
             )
             val state = PropagationState(problem, Assumptions.None)
             val ok = problem.factors[0].propagate(state, 0)
