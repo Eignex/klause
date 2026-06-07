@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.TerminationReason
 import org.chocosolver.solver.Model
+import org.chocosolver.solver.ParallelPortfolio
 import org.chocosolver.solver.Solution
 import org.chocosolver.solver.variables.IntVar
 
@@ -24,6 +25,7 @@ import org.chocosolver.solver.variables.IntVar
 class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
 
     override fun solve(params: ChocoParams): SolveResult {
+        if (params.workers > 1) return solveParallel(params)
         val cm = ChocoModel.build(problem)
         applyLimits(cm.model, params)
         return if (cm.model.solver.solve()) {
@@ -33,6 +35,26 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         } else {
             SolveResult.Unsat()
         }
+    }
+
+    /** Race [ChocoParams.workers] model copies with Choco's [ParallelPortfolio] (default
+     *  per-model search diversification). The portfolio owns the threading; each copy gets
+     *  the same wall-clock limit. */
+    private fun solveParallel(params: ChocoParams): SolveResult {
+        val portfolio = ParallelPortfolio()
+        val byModel = HashMap<Model, ChocoModel>(params.workers * 2)
+        repeat(params.workers) {
+            val cm = ChocoModel.build(problem)
+            applyLimits(cm.model, params)
+            byModel[cm.model] = cm
+            portfolio.addModel(cm.model)
+        }
+        if (portfolio.solve()) {
+            val winner = byModel.getValue(portfolio.bestModel)
+            return SolveResult.Sat(readSample(winner))
+        }
+        val timedOut = byModel.keys.any { it.solver.isStopCriterionMet() }
+        return if (timedOut) SolveResult.Unknown(TerminationReason.Timeout) else SolveResult.Unsat()
     }
 
     override fun samples(params: ChocoParams): Sequence<Sample> = enumerate(params)
@@ -51,6 +73,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         require(objective is LinearObjective) {
             "klause-choco only optimizes LinearObjective (got ${objective::class.simpleName})"
         }
+        if (params.workers > 1) return minimizeParallel(objective, params)
         val cm = ChocoModel.build(problem)
         applyLimits(cm.model, params)
         val objVar = buildObjectiveVar(cm, objective)
@@ -71,6 +94,43 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         val sample = readSample(cm, best)
         val value = best.getIntVal(objVar).toDouble() + objective.constant
         return if (cm.model.solver.isStopCriterionMet()) {
+            MinimizeResult.BestFound(sample, value, TerminationReason.Timeout)
+        } else {
+            MinimizeResult.Optimal(sample, value)
+        }
+    }
+
+    /** Parallel branch-and-bound: every copy declares the same objective, the portfolio
+     *  shares the best bound across copies, and the winner's last solution is reported.
+     *  Optimality is only claimed when no copy stopped on its limit. */
+    private fun minimizeParallel(objective: LinearObjective, params: ChocoParams): MinimizeResult {
+        val portfolio = ParallelPortfolio()
+        val byModel = HashMap<Model, ChocoModel>(params.workers * 2)
+        val objVarByModel = HashMap<Model, IntVar>(params.workers * 2)
+        repeat(params.workers) {
+            val cm = ChocoModel.build(problem)
+            applyLimits(cm.model, params)
+            val objVar = buildObjectiveVar(cm, objective)
+            cm.model.setObjective(Model.MINIMIZE, objVar)
+            byModel[cm.model] = cm
+            objVarByModel[cm.model] = objVar
+            portfolio.addModel(cm.model)
+        }
+        var best: Solution? = null
+        var bestModel: Model? = null
+        while (portfolio.solve()) {
+            val winner = portfolio.bestModel
+            // Record on the winner's model: its variables carry the improving assignment.
+            best = Solution(winner).record()
+            bestModel = winner
+        }
+        val timedOut = byModel.keys.any { it.solver.isStopCriterionMet() }
+        if (best == null || bestModel == null) {
+            return if (timedOut) MinimizeResult.Unknown(TerminationReason.Timeout) else MinimizeResult.Infeasible()
+        }
+        val sample = readSample(byModel.getValue(bestModel), best)
+        val value = best.getIntVal(objVarByModel.getValue(bestModel)).toDouble() + objective.constant
+        return if (timedOut) {
             MinimizeResult.BestFound(sample, value, TerminationReason.Timeout)
         } else {
             MinimizeResult.Optimal(sample, value)
