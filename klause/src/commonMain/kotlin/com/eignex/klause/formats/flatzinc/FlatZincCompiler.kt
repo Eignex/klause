@@ -197,9 +197,9 @@ internal class FlatZincCompiler(
         val occ = LinkedHashMap<Int, Int>()
         for (x in xors) {
             for (lit in x.literals) {
-            val v = Lit.variable(lit)
-            occ[v] = (occ[v] ?: 0) + 1
-        }
+                val v = Lit.variable(lit)
+                occ[v] = (occ[v] ?: 0) + 1
+            }
         }
         val ordered = occ.entries.sortedBy { it.value }.map { it.key }.toIntArray()
         val tier = SearchTier(ordered, IntArray(0), TierVarSelect.InputOrder, IndomainMin)
