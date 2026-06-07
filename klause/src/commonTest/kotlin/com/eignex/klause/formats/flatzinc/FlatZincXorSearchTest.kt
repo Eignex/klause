@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.factor.GaussianXor
 import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
+import com.eignex.klause.solver.factor.GaussianXor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
