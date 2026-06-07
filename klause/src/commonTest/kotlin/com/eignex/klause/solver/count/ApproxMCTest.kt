@@ -27,7 +27,10 @@ class ApproxMCTest {
 
     @Test
     fun `large free instance is within the epsilon band of the exact count`() {
-        val p = unconstrained(9) // 512 models — still above the cell band, so hashing kicks in
+        // 128 models — the smallest power of two above the ε=0.8 cell threshold (≈73), so
+        // hashing kicks in at the cheapest possible enumeration cost (the slow targets run
+        // this single-threaded; the hashed path is identical at any instance size).
+        val p = unconstrained(7)
         val exact = exactCount(p)
         val eps = 0.8
         val r = BacktrackSolver(p).approximateCount(
@@ -39,8 +42,9 @@ class ApproxMCTest {
 
     @Test
     fun `constrained instance is within the epsilon band`() {
-        // 8 free vars, one clause (x0 v x1) removes the 2^6 assignments with x0=x1=false.
-        val n = 8
+        // 7 free vars, one clause (x0 v x1) removes the 2^5 assignments with x0=x1=false:
+        // 96 models, above the cell threshold (≈73) so the constrained hashed path runs.
+        val n = 7
         val p = Problem(
             numBoolVars = n,
             numIntVars = 0,
