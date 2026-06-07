@@ -564,6 +564,24 @@ class PropagationState(
             list.truncateTo(wi)
         }
 
+        // Atom-literal watcher lists carry learned fids too — a learned clause watching a
+        // bound atom registers here, not in the bool-var lists. Skipping this remap left
+        // stale fids pointing past the compacted clause array, crashing the next atom wake
+        // on any model whose conflicts learn atom-literal clauses.
+        for (list in atomWatchersByLit.values) {
+            var wi = 0
+            for (r in 0 until list.size) {
+                val fid = list[r]
+                if (fid < refBase) {
+                    list[wi++] = fid
+                } else {
+                    val newLearnedIdx = remap[fid - refBase]
+                    if (newLearnedIdx >= 0) list[wi++] = refBase + newLearnedIdx
+                }
+            }
+            list.truncateTo(wi)
+        }
+
         // The compaction renumbered learned fids and shifted every list position, so the
         // back-pointer index is stale — rebuild it wholesale from the final lists. Cheap
         // relative to the rest of forget, which is itself infrequent (≈ once per restart).
@@ -571,6 +589,33 @@ class PropagationState(
         for (lit in boolWatchersByLit.indices) {
             val list = boolWatchersByLit[lit]
             for (i in 0 until list.size) boolWatchPos[packWatch(list[i], lit)] = i
+        }
+
+        // A conflict return leaves the propagation queues holding in-flight fids, and the
+        // engine forgets at the following restart — so the queues can still carry learned
+        // fids from before the compaction. Remap them like the watcher lists: a stale fid
+        // surviving here indexes past the compacted clause array on the next drain.
+        remapQueue(propQueue, remap, refBase)
+        remapQueue(dirtyAtomFactors, remap, refBase)
+    }
+
+    /** Rewrite every learned fid in [queue] through [remap] (static fids pass through;
+     *  dropped clauses' fids are removed). Preserves order. */
+    private fun remapQueue(queue: IntArrayDeque, remap: IntArray, refBase: Int) {
+        if (queue.isEmpty()) return
+        val drained = IntArrayList(queue.size)
+        while (queue.isNotEmpty()) drained.add(queue.removeFirst())
+        for (i in 0 until drained.size) {
+            val fid = drained[i]
+            if (fid < refBase) {
+                queue.addLast(fid)
+            } else {
+                val idx = fid - refBase
+                if (idx < remap.size) {
+                    val newLearnedIdx = remap[idx]
+                    if (newLearnedIdx >= 0) queue.addLast(refBase + newLearnedIdx)
+                }
+            }
         }
     }
 
