@@ -8,8 +8,12 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.choco.ChocoParams
+import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -153,6 +157,7 @@ object ParityMetric {
         ref: Reference,
         cached: CachedRef?,
     ): ParityRow {
+        if (timedMode) return timedOptimizeRow(entry, obj, budget)
         val klause = runCatching { klauseMinimize(entry, obj, budget) }
             .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", ref, it) }
         val kv = klause.objectiveValue
@@ -178,6 +183,48 @@ object ParityMetric {
         return ParityRow(entry.name, "optimize", verdict,
             optStr(klause), refDisplay, ref.name, exp?.toString() ?: "?")
     }
+
+    // -Dklause.bench.parity.timed scores the real fixed-track COP goal: a single
+    // annotation-following klause worker vs Choco-CP-SAT (LCG) under the same prescribed
+    // search, where "beat" means a strictly better objective OR the same objective reached
+    // sooner. Both solvers run single-threaded; the row records each side's final value and
+    // the wall-clock at its last incumbent, and is marked ok iff klause beats.
+    private val timedMode = System.getProperty("klause.bench.parity.timed")?.toBoolean() ?: false
+
+    private fun timedOptimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget): ParityRow {
+        val deadline = System.currentTimeMillis() + budget.timeoutMillis
+        // klause: fixed-track single worker, time-stamped at each incumbent.
+        var kBestMillis: Long? = null
+        val t0 = System.currentTimeMillis()
+        val kParams = fixedParams(entry, deadline).copy(
+            onEvent = { e -> if (e is SearchEvent.Incumbent) kBestMillis = System.currentTimeMillis() - t0 },
+        )
+        val k = runCatching { BacktrackSolver(entry.problem).minimize(obj, kParams) }
+            .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", Reference.of(Backend.CHOCO), it) }
+        val kv = k.objectiveValue
+        // Choco-CP-SAT (LCG) reference under the same prescribed search.
+        val c = runCatching {
+            ChocoSolver(entry.problem).minimizeTimed(
+                obj as LinearObjective,
+                ChocoParams(budget.timeoutMillis, lcg = true, fixedSearch = entry.searchParams),
+            )
+        }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", Reference.of(Backend.CHOCO), it) }
+        val cv = c.value
+        val beat = when {
+            kv == null -> false
+            cv == null -> true // klause found something, reference did not
+            kv < cv -> true
+            kv == cv -> (kBestMillis ?: Long.MAX_VALUE) < (c.timeToBestMillis ?: Long.MAX_VALUE)
+            else -> false
+        }
+        val detail = "k=${fmt(kv)}@${kBestMillis ?: "-"}ms cpsat=${fmt(cv)}@${c.timeToBestMillis ?: "-"}ms"
+        return ParityRow(
+            entry.name, "optimize", if (beat) "OK" else "MISMATCH",
+            fmt(kv), fmt(cv), "choco-cpsat", "?", detail,
+        )
+    }
+
+    private fun fmt(v: Double?): String = v?.toString() ?: "?"
 
     // Luby restarts everywhere: the anytime configuration. Branch-and-bound leaves a
     // permanent blocking nogood per incumbent, so restarts diversify without revisiting

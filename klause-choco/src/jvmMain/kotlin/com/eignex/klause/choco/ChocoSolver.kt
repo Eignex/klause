@@ -70,6 +70,31 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         }
     }
 
+    /** Final objective and the wall-clock millis at which the last (best) incumbent was
+     *  recorded, measured from the start of [minimizeTimed]. [proven] is true when the
+     *  search closed without hitting its limit. [value] / [timeToBestMillis] are null when
+     *  no incumbent was found. Bench-only: feeds the anytime "beat = better value, or same
+     *  value reached faster" comparison against this reference. */
+    data class TimedMin(val value: Double?, val timeToBestMillis: Long?, val proven: Boolean)
+
+    /** Like [minimize] but records the time of the last improving incumbent. Single-worker
+     *  only (the anytime comparison runs both solvers single-threaded). */
+    fun minimizeTimed(objective: LinearObjective, params: ChocoParams): TimedMin {
+        val cm = ChocoModel.build(problem, params.lcg)
+        applyLimits(cm.model, params)
+        applySearch(cm, params)
+        val objVar = buildObjectiveVar(cm, objective)
+        cm.model.setObjective(Model.MINIMIZE, objVar)
+        val t0 = System.currentTimeMillis()
+        var bestVal: Double? = null
+        var bestMillis: Long? = null
+        while (cm.model.solver.solve()) {
+            bestVal = objVar.value.toDouble() + objective.constant
+            bestMillis = System.currentTimeMillis() - t0
+        }
+        return TimedMin(bestVal, bestMillis, proven = !cm.model.solver.isStopCriterionMet())
+    }
+
     override fun minimize(objective: Objective, params: ChocoParams): MinimizeResult {
         require(objective is LinearObjective) {
             "klause-choco only optimizes LinearObjective (got ${objective::class.simpleName})"
