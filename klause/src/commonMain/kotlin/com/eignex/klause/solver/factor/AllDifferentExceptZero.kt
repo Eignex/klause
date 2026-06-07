@@ -101,20 +101,19 @@ class AllDifferentExceptZero(
     /** Count of unordered pairs from [k] indistinguishable elements: k * (k-1) / 2. */
     private fun pairsAt(k: Int): Int = if (k <= 1) 0 else k * (k - 1) / 2
 
-    /** The variable subset responsible for the most recent [propagate] failure. A singleton
-     *  clash is exactly two vars pinned to the same non-zero value; only that pair's pins
-     *  prove the contradiction, so [conflictReason] cites just those two rather than every
-     *  var. Reset at the start of each [propagate]; read immediately afterwards on failure
-     *  (`null` ⇒ a failure path that didn't capture a pair, so fall back to all vars). */
-    private var conflictVars: IntArray? = null
-
-    /** Hole-aware conflict reason, sharpened to the responsible pair when [propagate]
-     *  captured a singleton clash; falls back to all vars otherwise. */
+    /** Hole-aware conflict reason, sharpened to the responsible vars when [propagate]
+     *  captured a singleton clash (the colliding pair) or a Hall set; falls back to all
+     *  vars otherwise. The scratch lives on the session's [ReginCache], not the factor,
+     *  so portfolio workers sharing one Problem never cross reasons (#182). */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, conflictVars ?: xs)
+        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? ReginCache)?.conflictVars ?: xs)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        conflictVars = null // stale-guard; set at the singleton-clash failure point below.
+        // Stale-guard up front: the singleton clash below fails before the matching pass,
+        // and its pair must not be shadowed by a previous failure's Hall set.
+        val cache = (state.refPayload[factorId] as? ReginCache)
+            ?: ReginCache().also { state.refPayload[factorId] = it }
+        cache.conflictVars = null // set at each failure point below.
         // Singleton conflicts on non-zero values. Track each taken value's owner so a clash
         // cites exactly the two colliding vars, and each punch-out cites just the single
         // owner forcing it — both are strictly sharper than the whole-constraint reason.
@@ -126,7 +125,7 @@ class AllDifferentExceptZero(
             val prev = owner.put(d.min, v)
             if (prev != null) {
                 // Two vars pinned to the same non-zero value: that pair alone is the reason.
-                conflictVars = intArrayOf(prev, v)
+                cache.conflictVars = intArrayOf(prev, v)
                 return false
             }
         }
@@ -147,11 +146,9 @@ class AllDifferentExceptZero(
         // Régin matching-and-SCC pruning (except = {0}), shared with [AllDifferentExcept] via
         // [reginFilter]. Stronger than singleton-take above, which misses Hall sets that the
         // matching pass catches.
-        val cache = (state.refPayload[factorId] as? ReginCache)
-            ?: ReginCache().also { state.refPayload[factorId] = it }
         val hall = reginFilter(state, xs, ZERO_EXCEPT_SET, cache)
         if (hall != null) {
-            conflictVars = hall
+            cache.conflictVars = hall
             return false
         }
         return true

@@ -73,3 +73,47 @@ class ChocoSolverTest {
         assertEquals(2.0, r.objective)
     }
 }
+
+class ChocoParallelPortfolioTest {
+
+    @Test
+    fun `parallel solve finds a model and parallel unsat is proven`() {
+        val sat = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+        )
+        val r = ChocoSolver(sat).solve(ChocoParams(workers = 3))
+        assertTrue(r is SolveResult.Sat)
+        assertTrue(r.assignment.bools[0] || r.assignment.bools[1])
+
+        val unsat = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+            ),
+        )
+        assertTrue(ChocoSolver(unsat).solve(ChocoParams(workers = 3)) is SolveResult.Unsat)
+    }
+
+    @Test
+    fun `parallel minimize proves the optimum`() {
+        // minimize x + 2y subject to x + y >= 3 over [0..5]^2; optimum 3 at (3, 0).
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val r = ChocoSolver(p).minimize(obj, ChocoParams(workers = 3))
+        val opt = r as MinimizeResult.Optimal
+        assertEquals(3.0, opt.objective)
+    }
+}

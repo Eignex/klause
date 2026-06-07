@@ -79,17 +79,10 @@ class Member(
         }
     }
 
-    /** Bound-style sharpened antecedents captured at a singleton-y conflict: `y`'s pin plus,
-     *  per candidate, only the single literal proving `y`'s value is excluded from it —
-     *  strictly sharper than every var's whole domain. `null` ⇒ no such conflict captured
-     *  this run (the `allSingleton` exclusion path genuinely needs all candidates), so fall
-     *  back to the constraint-wide reason. */
-    private var conflictLits: IntArray? = null
-
     /** Conflict reason, sharpened to the singleton-y witness captured by [propagate]; falls
      *  back to the hole-aware constraint-wide reason otherwise. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        conflictLits ?: collectHoleAndBoundAntecedents(state, intVars)
+        (state.refPayload[factorId] as? IntArray) ?: collectHoleAndBoundAntecedents(state, intVars)
 
     /** Append the one literal proving value [v] is absent from `dom(x)` — the tightened
      *  bound that steps past it, or the hole atom when [v] sits inside the bounds. Skips a
@@ -122,7 +115,7 @@ class Member(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        conflictLits = null // stale-guard; set at the singleton-y failure point below.
+        state.refPayload[factorId] = null // stale-guard; set at the singleton-y failure point below.
         // Singleton-y check: if y is singleton and no xs[i]'s domain contains y's value, fail.
         val dy = state.intDomains[y]
         if (dy.min == dy.max) {
@@ -142,7 +135,7 @@ class Member(
                 val seen = HashSet<Int>()
                 addPinLits(state, out, seen)
                 for (x in xs) addExcludeLit(state, x, yv, out, seen)
-                conflictLits = if (out.size == 0) null else out.toIntArray()
+                state.refPayload[factorId] = if (out.size == 0) null else out.toIntArray()
                 return false
             }
         }
