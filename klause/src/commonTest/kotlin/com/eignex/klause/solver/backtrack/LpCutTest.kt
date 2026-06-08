@@ -6,6 +6,8 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -41,5 +43,29 @@ class LpCutTest {
         assertTrue(on is MinimizeResult.Optimal)
         assertEquals(6.0, on.objectiveValue)
         assertTrue(on.stats.lpCuts.sum > 0.0, "expected AllDifferent cuts, got ${on.stats.lpCuts.sum}")
+    }
+
+    @Test
+    fun `gomory cuts fire and preserve the optimum on a fractional covering problem`() {
+        // Pairwise covering with no AllDifferent, so any cut is a Gomory cut: x_i + x_j >= 3 over
+        // [0,3], minimize the sum. The pairwise LP relaxation is fractional, so Gomory separates.
+        val rows = ArrayList<Factor>()
+        val n = 4
+        for (i in 0 until n) {
+            for (j in i + 1 until n) {
+                rows.add(Linear(intArrayOf(1, 1), intArrayOf(i, j), LinearOp.GE, 3))
+            }
+        }
+        val p = Problem(0, n, Array(n) { IntDomain(0, 3) }, rows.toTypedArray())
+        val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
+
+        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val on = BacktrackSolver(p).minimize(
+            obj,
+            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true, lpGomory = true),
+        )
+        assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
+        assertEquals(off.objectiveValue, on.objectiveValue, "Gomory cuts changed the optimum")
+        assertTrue(on.stats.lpCuts.sum > 0.0, "expected Gomory cuts, got ${on.stats.lpCuts.sum}")
     }
 }

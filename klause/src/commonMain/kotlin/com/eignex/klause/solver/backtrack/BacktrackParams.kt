@@ -190,6 +190,12 @@ data class BacktrackParams(
     val lpCuts: Boolean = false,
     /** Maximum separation rounds per node for [lpCuts]; each round adds cuts and re-solves. */
     val lpCutRounds: Int = 4,
+    /**
+     * Include Gomory integrality cuts among the [lpCuts] separators. These come from the simplex
+     * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
+     * tableau makes them numerically clean. On by default when [lpCuts] is set.
+     */
+    val lpGomory: Boolean = true,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**
