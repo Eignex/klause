@@ -54,7 +54,10 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
             val winner = byModel.getValue(portfolio.bestModel)
             return SolveResult.Sat(readSample(winner))
         }
-        val timedOut = byModel.keys.any { it.solver.isStopCriterionMet() }
+        // A real timeout stops every copy; a proof of unsatisfiability leaves the proving copy
+        // exhausted (not stopped) while the portfolio halts its siblings — so only treat it as
+        // a timeout when every copy stopped on a limit.
+        val timedOut = byModel.keys.all { it.solver.isStopCriterionMet() }
         return if (timedOut) SolveResult.Unknown(TerminationReason.Timeout) else SolveResult.Unsat()
     }
 
@@ -129,7 +132,9 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
 
     /** Parallel branch-and-bound: every copy declares the same objective, the portfolio
      *  shares the best bound across copies, and the winner's last solution is reported.
-     *  Optimality is only claimed when no copy stopped on its limit. */
+     *  Optimality is claimed unless *every* copy stopped on a limit: a real timeout halts
+     *  all copies, whereas a proof leaves the proving copy exhausted (not stopped) while the
+     *  portfolio merely halts its now-redundant siblings. */
     private fun minimizeParallel(objective: LinearObjective, params: ChocoParams): MinimizeResult {
         val portfolio = ParallelPortfolio()
         val byModel = HashMap<Model, ChocoModel>(params.workers * 2)
@@ -151,7 +156,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
             best = Solution(winner).record()
             bestModel = winner
         }
-        val timedOut = byModel.keys.any { it.solver.isStopCriterionMet() }
+        val timedOut = byModel.keys.all { it.solver.isStopCriterionMet() }
         if (best == null || bestModel == null) {
             return if (timedOut) MinimizeResult.Unknown(TerminationReason.Timeout) else MinimizeResult.Infeasible()
         }
