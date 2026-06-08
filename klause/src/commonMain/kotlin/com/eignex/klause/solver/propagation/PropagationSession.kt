@@ -259,6 +259,9 @@ class PropagationSession(
     /** True iff learned clause [learnedIndex] survives every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
+    /** The learned clause at [learnedIndex]. Read by the engine's vivification pass (#203). */
+    fun learnedClauseAt(learnedIndex: Int): Clause = state.learnedClauses[learnedIndex]
+
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
         val want = if (value) 1 else 0
         if (boolPinned[v] == want) return PropagationResult.Implied.Empty

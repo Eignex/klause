@@ -104,6 +104,23 @@ data class BacktrackParams(
      */
     val lbdGlueThreshold: Int = 2,
     /**
+     * Clause vivification (#203) as an inprocessing pass. When true the engine periodically
+     * — at restart boundaries, where the trail is at root and assumptions are clean — walks a
+     * bounded slice of the learned-clause database and strengthens each clause by tentatively
+     * asserting the negations of its literals under propagation: a remaining literal already
+     * falsified is dropped; one forced true (or a conflict) shortens the clause to the
+     * literals tried so far. Pure-Boolean; atom-literal clauses are skipped. Disabled by
+     * default. One of the highest-value inprocessing techniques on hard UNSAT instances like
+     * the pigeonhole family in #117. Only honoured when [assumptions] is empty.
+     */
+    val vivification: Boolean = false,
+    /**
+     * Maximum number of learned clauses vivified per restart when [vivification] is on. The
+     * pass advances a cursor across the database round-robin so the per-restart cost stays
+     * bounded while the whole database is covered over successive restarts. Must be positive.
+     */
+    val vivifyBatch: Int = 256,
+    /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
      * engines read it at each leaf-attempt and prune the subtree whenever the
