@@ -678,7 +678,7 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
  * `int2float(x_int, y_float)` — coerce x's int value into y's float value. y is
  * backed by a bucket-index int var with `value(idx) = lo + idx * step`. The
  * constraint is `x = lo + idx_y * step`, which rearranges (after scaling by
- * [floatScale]) to a single linear equality over (x, idx_y). Identity buckets
+ * `floatScale`) to a single linear equality over (x, idx_y). Identity buckets
  * (step=1.0, lo integer) are the common case from `var int → var float` lifts.
  */
 internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
@@ -1546,8 +1546,8 @@ internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
     factors.add(Disjunctive(starts = starts, durations = durations, durationVars = durationVars))
 }
 
-/** Returns (values, vars). When [e] is all-constant, `vars` is empty and `values` holds
- *  the constants. When [e] is a var array, `vars` holds the var ids and `values` holds
+/** Returns (values, vars). When `e` is all-constant, `vars` is empty and `values` holds
+ *  the constants. When `e` is a var array, `vars` holds the var ids and `values` holds
  *  each var's current domain ub — the factor uses these as worst-case bounds for horizon
  *  sizing and reads the live values via the var ids at solve time. */
 private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<IntArray, IntArray> {
@@ -1558,8 +1558,8 @@ private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<IntArr
     return ubs to vars
 }
 
-/** Returns (constOrUb, varId). When [e] is an int literal/param, varId = -1 and the int
- *  is the value. When [e] is a var, varId is set and the int is the var's domain ub. */
+/** Returns (constOrUb, varId). When `e` is an int literal/param, varId = -1 and the int
+ *  is the value. When `e` is a var, varId is set and the int is the var's domain ub. */
 private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
     val asConst = evalIntConstOrNull(e)
     if (asConst != null) return asConst.toInt() to -1
@@ -1919,7 +1919,7 @@ internal fun FlatZincCompiler.emitArrayMinMax(c: FznConstraint, max: Boolean) {
     factors.add(ArrayMinMax(result = result, xs = xs, max = max))
 }
 
-/** `exactly_int(n, xs, v)` — n equals #{i : xs[i] = v}. Reuses the [Count] factor with
+/** `exactly_int(n, xs, v)` — n equals `#{i : xs[i] = v}`. Reuses the [Count] factor with
  *  `op = Eq` and a constant target count channeled through an aux singleton int. */
 internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
     require(c.args.size == 3)
@@ -2667,13 +2667,13 @@ internal fun FlatZincCompiler.resolveSetVarArray(e: FznExpr): List<SetVarLayout>
  *   - For S and T, alloc `xmax`/`ymax` int vars = max(set ∪ {U[0]-1}). Channel each
  *     indicator bool to a 0/1 int and use ArrayMax.
  *   - Allocate `b[i]` bool for each position i in U, representing "lex-≤ considering
- *     only elements ≥ U[i]".
+ *     only elements ≥ `U[i]`".
  *   - Top of the table: `b[u]` = `S_has(u) → T_has(u)` (last position).
  *   - Inner i: 4-case truth-table over (S_has, T_has):
- *       (0,0) → b[i] = b[i+1]
- *       (0,1) → b[i] = (xmax < U[i])         // S has nothing ≥ U[i], T has U[i], S<T
- *       (1,0) → b[i] = (ymax > U[i])         // S has U[i], T must have larger, else S>T
- *       (1,1) → b[i] = b[i+1]
+ *       `(0,0) → b[i] = b[i+1]`
+ *       `(0,1) → b[i] = (xmax < U[i])` — S has nothing ≥ Uᵢ, T has Uᵢ, S<T
+ *       `(1,0) → b[i] = (ymax > U[i])` — S has Uᵢ, T must have larger, else S>T
+ *       `(1,1) → b[i] = b[i+1]`
  *   - Result: `b[0]` is the lex-≤ verdict. For `set_lt` (strict), the final bit is
  *     `b[0] ∧ ¬(S = T)` — implemented by reifying set_eq as an aux and combining.
  */
@@ -3119,7 +3119,7 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
     }
 }
 
-/** `all_disjoint(arr)` — every pair of sets in [arr] has empty intersection. For each
+/** `all_disjoint(arr)` — every pair of sets in `arr` has empty intersection. For each
  *  pair (Sᵢ, Sⱼ) and each element `e` shared between their universes, post the binary
  *  mutex clause `¬Sᵢ[e] ∨ ¬Sⱼ[e]`. */
 internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
@@ -3146,7 +3146,7 @@ internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
     }
 }
 
-/** `set_partition_into(arr, U)` — sets in [arr] are pairwise disjoint AND their union
+/** `set_partition_into(arr, U)` — sets in `arr` are pairwise disjoint AND their union
  *  equals U. Reuses `emitAllDisjoint`'s pairwise mutex; adds for each `e` in U's universe
  *  the clause `Uₑ ↔ ⋁ᵢ Sᵢ[e]` plus the universe-mismatch exclusions (elements outside
  *  U but in some Sᵢ's universe must be absent from Sᵢ).
