@@ -38,7 +38,7 @@ interface IncrementalObjective : Objective {
 }
 
 /**
- * Σ boolWeights[b] · 1[bool[b]] + Σ intCoefficients[i] · int[i] + constant, with **integer
+ * `Σ boolWeights[b] · 1[bool[b]] + Σ intCoefficients[i] · int[i] + constant`, with **integer
  * coefficients** — the native objective. Every FlatZinc integer `solve minimize`, the
  * SAT/pseudo-Boolean/XCSP/LIA front-ends, and the `minimizeInt` family build this. Integer
  * coefficients let branch-and-bound compute the lower bound and apply the optimality cutoff

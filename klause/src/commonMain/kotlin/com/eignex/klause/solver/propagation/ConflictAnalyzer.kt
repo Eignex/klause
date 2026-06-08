@@ -265,7 +265,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
     }
 
-    /** Antecedents of [v], or null when [v] is a decision/leaf — or when [v] falls outside
+    /** Antecedents of `v`, or null when `v` is a decision/leaf — or when `v` falls outside
      *  the current antecedent universe. Out-of-range atom ids can be reached only through the
      *  recursive antecedent walk in [isRedundant] (the 1UIP loop stays within `seen`/`resolved`
      *  bounds); treating them as antecedent-less leaves keeps the literal, which is always sound
@@ -426,9 +426,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /**
-     * True iff every chain of antecedents leading to [v]'s pin terminates in either a
+     * True iff every chain of antecedents leading to `v`'s pin terminates in either a
      * variable that's *already in the learned clause* ([inClause]) or a level-0 fact.
-     * Decision-style leaves (variables with `null` antecedents) make [v] non-redundant.
+     * Decision-style leaves (variables with `null` antecedents) make `v` non-redundant.
      *
      * Cached per variable for the duration of a single [minimize] call — the recursion
      * depth is bounded by the size of the implication graph reached, but the cache

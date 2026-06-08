@@ -36,7 +36,7 @@ class PropagationSession(
 ) {
     private val state: PropagationState = PropagationState(problem, Assumptions.None)
 
-    /** `levelStates[L]` is the [PropagationState.LevelMark] right after level [L]'s
+    /** `levelStates[L]` is the [PropagationState.LevelMark] right after level `L`'s
      *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
      *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
     private var levelStates: Array<PropagationState.LevelMark?> = arrayOfNulls(8)

@@ -354,7 +354,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
  *
  * Each variable carries a score `Q[v]`, updated by exponential recency weighting on every
  * event the variable participates in:
- *     Q[v] ← (1 − α)·Q[v] + α·r,   r = multiplier / (conflicts − lastConflict[v] + 1)
+ *     `Q[v] ← (1 − α)·Q[v] + α·r,   r = multiplier / (conflicts − lastConflict[v] + 1)`
  * The reward `r` is *larger* the more recently `v` took part in a conflict (a smaller
  * denominator), and `multiplier` is [conflictReward] (1.0) for the variables in the conflict
  * reason set and [assignReward] (0.9) for variables merely assigned along the way — the
