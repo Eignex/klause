@@ -15,6 +15,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.DualSimplex
 import com.eignex.klause.solver.lp.LpOverflowException
@@ -214,6 +215,9 @@ class BacktrackSolver(override val problem: Problem) :
             null
         }
         var lpCheckCounter = 0
+        // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
+        // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
+        val lpBasisByDepth = ArrayList<Basis?>()
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
             is LinearObjective -> { session ->
                 // Effective bound = min(local incumbent, external supplier). External bound
@@ -229,8 +233,20 @@ class BacktrackSolver(override val problem: Problem) :
                     // expensive part of a node, so it does not run at every node).
                     lpRelaxer != null &&
                         session.decisionLevel <= params.lpBoundMaxDepth &&
-                        ++lpCheckCounter % params.lpBoundEvery == 0 ->
-                        lpBoundAndFix(lpRelaxer, session, effectiveBound, sink)
+                        ++lpCheckCounter % params.lpBoundEvery == 0 -> {
+                        val depth = session.decisionLevel
+                        val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
+                            lpBasisByDepth[depth - 1]
+                        } else {
+                            null
+                        }
+                        val outcome = lpBoundAndFix(lpRelaxer, session, effectiveBound, sink, warm)
+                        if (outcome.basis != null) {
+                            while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
+                            lpBasisByDepth[depth] = outcome.basis
+                        }
+                        outcome.prune
+                    }
 
                     else -> false
                 }
@@ -365,31 +381,38 @@ class BacktrackSolver(override val problem: Problem) :
      * Returns false (keep the node) when the relaxation has no columns, the LP is unbounded, or no
      * reduction makes the node infeasible.
      */
+
+    /** Outcome of one node LP pass: whether to prune, and the basis to warm-start children from. */
+    private class LpNodeOutcome(val prune: Boolean, val basis: Basis?)
+
     private fun lpBoundAndFix(
         relaxer: CpToLpRelaxation,
         session: PropagationSession,
         bound: Double,
         sink: SolveStatsSink,
-    ): Boolean {
+        warmBasis: Basis?,
+    ): LpNodeOutcome {
         val relaxation = relaxer.build(session)
-        if (relaxation.model.n == 0) return false // empty relaxation: nothing to bound with
-        val solution = DualSimplex(relaxation.model).solve()
+        if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
+        val solution = DualSimplex(relaxation.model).solve(warmBasis)
+        sink.observeLpPivots(solution.pivots)
         when (solution.status) {
             LpStatus.INFEASIBLE -> {
                 sink.observeLpPrune()
-                return true
+                return LpNodeOutcome(true, null)
             }
 
-            LpStatus.UNBOUNDED -> return false
+            LpStatus.UNBOUNDED -> return LpNodeOutcome(false, null)
 
             LpStatus.OPTIMAL -> {
                 val lpBound = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
                 if (bound.isFinite() && lpBound.toDouble() >= bound) {
                     sink.observeLpPrune()
-                    return true
+                    return LpNodeOutcome(true, solution.basis)
                 }
                 // Reduced-cost fixing needs a known gap, i.e. a finite incumbent.
-                return bound.isFinite() && applyReducedCostFixing(relaxation, solution, session, bound, sink)
+                val prune = bound.isFinite() && applyReducedCostFixing(relaxation, solution, session, bound, sink)
+                return LpNodeOutcome(prune, solution.basis)
             }
         }
     }

@@ -53,6 +53,8 @@ internal class LpSolution(
     /** The optimal basis, for warm-starting a child node. */
     val basis: Basis,
     private val sense: Sense,
+    /** Dual-simplex pivots taken to reach this solution; lower with a good warm start. */
+    val pivots: Int = 0,
 ) {
     /** The objective in the model's original sense as a floating value (convenience only). */
     val objectiveValue: Double
@@ -268,6 +270,7 @@ internal class DualSimplex(private val model: LpModel) {
         // Bland's rule guarantees termination; the cap only catches an implementation bug.
         val maxIter = 1000L + 100L * (numVars + m)
         var iter = 0L
+        var pivots = 0
         while (true) {
             check(iter++ <= maxIter) { "dual simplex exceeded $maxIter iterations (cycling bug?)" }
             val beta = computeBeta()
@@ -286,7 +289,7 @@ internal class DualSimplex(private val model: LpModel) {
                     belowLower = low
                 }
             }
-            if (r == -1) return buildSolution(beta, LpStatus.OPTIMAL)
+            if (r == -1) return buildSolution(beta, LpStatus.OPTIMAL, pivots)
 
             // --- Entering variable: dual ratio test, min |d_j / α_j|, Bland tie-break. ---
             val reduced = computeReducedCostsScaled()
@@ -318,17 +321,18 @@ internal class DualSimplex(private val model: LpModel) {
                 }
             }
             // No entering variable: the dual is unbounded, so the primal is infeasible.
-            if (q == -1) return buildSolution(beta, LpStatus.INFEASIBLE)
+            if (q == -1) return buildSolution(beta, LpStatus.INFEASIBLE, pivots)
 
             // The leaving variable settles at the bound it was driven to.
             status[leavingVar] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
+            pivots++
             pivot(r, q)
             basicVar[r] = q
             status[q] = VarStatus.BASIC
         }
     }
 
-    private fun buildSolution(beta: LongArray, st: LpStatus): LpSolution {
+    private fun buildSolution(beta: LongArray, st: LpStatus, pivots: Int): LpSolution {
         // Map each basic variable to its row for primal extraction.
         val varRow = IntArray(numVars) { -1 }
         for (i in 0 until m) varRow[basicVar[i]] = i
@@ -385,6 +389,7 @@ internal class DualSimplex(private val model: LpModel) {
             reducedCostNumerator = redNum,
             basis = Basis(basicVars = basicVar.copyOf(), status = status.copyOf()),
             sense = model.sense,
+            pivots = pivots,
         )
     }
 }
