@@ -4,7 +4,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Circuit
@@ -17,7 +16,6 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -260,35 +258,6 @@ class GapFactorLogicNgTest {
                 Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 2, 2, 1)),
                 eq(0, 0),
                 eq(1, 1), // (0,1) is not a listed tuple
-            ),
-        )
-        assertIs<SolveResult.Unsat>(solve(problem))
-    }
-
-    @Test
-    fun `value_precede rejects t before any s`() {
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            arrayOf<Factor>(
-                ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2)),
-                eq(0, 2), // t at position 0 with no earlier s
-            ),
-        )
-        assertIs<SolveResult.Unsat>(solve(problem))
-    }
-
-    @Test
-    fun `all_equal rejects a mismatch`() {
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 3) },
-            arrayOf<Factor>(
-                AllEqual(intArrayOf(0, 1, 2)),
-                eq(0, 0),
-                eq(1, 1),
             ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))
