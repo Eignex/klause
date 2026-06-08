@@ -106,12 +106,14 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.long("rephase-interval")?.let { out = out.copy(rephaseInterval = it) }
     p.int("max-learned")?.let { out = out.copy(maxLearnedClauses = it) }
     p.int("lbd-glue")?.let { out = out.copy(lbdGlueThreshold = it) }
+    p.bool("tiered-db")?.let { out = out.copy(tieredLearnedDb = it) }
+    p.int("mid-lbd")?.let { out = out.copy(midLbdThreshold = it) }
     p.varHeuristic("var-heuristic")?.let { out = out.copy(variableHeuristic = it) }
     p.valHeuristic("val-heuristic")?.let { out = out.copy(valueHeuristic = it) }
     p.finish(
         "cp",
         "seed, max-decisions, luby, adaptive-restart, phase-saving, target-phasing, " +
-            "rephase-interval, max-learned, lbd-glue, var-heuristic, val-heuristic",
+            "rephase-interval, max-learned, lbd-glue, tiered-db, mid-lbd, var-heuristic, val-heuristic",
     )
     return out
 }
