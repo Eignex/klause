@@ -8,6 +8,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /** Relational operator for a [Linear] constraint. */
 enum class LinearOp {
@@ -308,7 +309,7 @@ class Linear private constructor(
  * tighter than the original (caller falls back to default antecedents).
  */
 internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntArray): IntArray? {
-    val seen = HashSet<Int>()
+    val seen = IntHashSet()
     val out = IntArrayList()
     // Sweep-prefix tightening: collect *only* antecedents tied to decision levels > 0 when
     // any such exist in scope. A var with `intLevel[v] <= 0` was tightened at root level —
@@ -380,7 +381,7 @@ internal fun collectLinearDirAntecedents(
     extraLit: Int,
     useLo: Boolean,
 ): IntArray? {
-    val seen = HashSet<Int>()
+    val seen = IntHashSet()
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
@@ -456,7 +457,7 @@ internal fun collectLinearRelaxedAntecedents(
     // The per-var relaxation treats each entry independently; duplicate vars would double-spend
     // slack or under-cite, so defer to the unrelaxed direction-aware reason in that case.
     run {
-        val seenVar = HashSet<Int>(vars.size)
+        val seenVar = IntHashSet(vars.size)
         for (j in vars.indices) {
             if (j == excludeIdx) continue
             if (!seenVar.add(vars[j])) {
@@ -466,7 +467,7 @@ internal fun collectLinearRelaxedAntecedents(
     }
     val currentLevel = state.currentLevel
     var remaining = if (slack < 0) 0 else slack
-    val seen = HashSet<Int>()
+    val seen = IntHashSet()
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
@@ -523,7 +524,7 @@ internal fun collectLinearTightenAntecedents(
     excludeIdx: Int,
     extraLit: Int,
 ): IntArray? {
-    val seen = HashSet<Int>()
+    val seen = IntHashSet()
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)

@@ -27,6 +27,9 @@ import com.eignex.klause.solver.propagation.TIER_CORE
 import com.eignex.klause.solver.propagation.TIER_LOCAL
 import com.eignex.klause.solver.propagation.TIER_MID
 import com.eignex.klause.solver.propagation.TIER_UNSET
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
 
@@ -579,12 +582,11 @@ class BacktrackSolver(override val problem: Problem) :
         // forgetting or restarts, but an unbounded streak means the backjump + assert
         // cycle is not progressing — past the threshold those conflicts are handled
         // chronologically. The count surfaces as the `relearned` solve stat under -s.
-        val relearnCounts = HashMap<Long, Int>()
+        val relearnCounts = MutableLongIntMap()
         val relearnTripped: (Learned) -> Boolean = { learned ->
             var h = 0L
             for (lit in learned.literals) h += splitmix64(lit.toLong())
-            val n = (relearnCounts[h] ?: 0) + 1
-            relearnCounts[h] = n
+            val n = relearnCounts.addTo(h, 1)
             if (n > 1) sink?.observeRelearn()
             n > RELEARN_FALLBACK_THRESHOLD
         }
@@ -1151,7 +1153,7 @@ class BacktrackSolver(override val problem: Problem) :
         val remainingCap = (cap - glueCount).coerceAtLeast(0)
         if (nonGlue.size <= remainingCap) return // already under cap
         nonGlue.sortBy { it[0] } // ascending LBD
-        val kept = HashSet<Int>(remainingCap)
+        val kept = IntHashSet(remainingCap)
         for (k in 0 until remainingCap) kept.add(nonGlue[k][1])
         session.forgetLearnedClauses { idx, lbd ->
             lbd <= glueThreshold || session.learnedClausePermanent(idx) || idx in kept
@@ -1216,7 +1218,7 @@ class BacktrackSolver(override val problem: Problem) :
             return
         }
         locals.sortBy { it[0] } // ascending LBD: keep the lowest, drop the highest
-        val dropSet = HashSet<Int>(locals.size - residualCap)
+        val dropSet = IntHashSet(locals.size - residualCap)
         for (k in residualCap until locals.size) dropSet.add(locals[k][1])
         session.forgetLearnedClauses { idx, _ -> idx !in dropSet }
         params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropSet.size, dropped = dropSet.size))
@@ -1244,7 +1246,7 @@ class BacktrackSolver(override val problem: Problem) :
         val numBool = session.problem.numBoolVars
         val batch = params.vivifyBatch.coerceAtLeast(1)
         val replacements = ArrayList<IntArray>()
-        val dropIdx = HashSet<Int>()
+        val dropIdx = IntHashSet()
         var cursor = if (startCursor in 0 until count) startCursor else 0
         var examined = 0
         while (examined < batch && examined < count) {
@@ -1278,7 +1280,7 @@ class BacktrackSolver(override val problem: Problem) :
      * so the session is left exactly as it was found.
      */
     private fun vivifyClause(session: PropagationSession, lits: IntArray): IntArray? {
-        val keep = ArrayList<Int>(lits.size)
+        val keep = IntArrayList(lits.size)
         var pushed = 0
         var result: IntArray? = null
         for (li in lits) {

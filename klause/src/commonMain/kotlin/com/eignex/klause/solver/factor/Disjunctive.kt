@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.max
 
 /**
@@ -239,7 +240,7 @@ class Disjunctive(
      */
     @Suppress("ReturnCount")
     private fun forwardPass(state: PropagationState, effDur: IntArray, reversed: Boolean): Boolean {
-        val active = ArrayList<Int>()
+        val active = IntArrayList()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             if (effDur[i] > 0) active.add(i)

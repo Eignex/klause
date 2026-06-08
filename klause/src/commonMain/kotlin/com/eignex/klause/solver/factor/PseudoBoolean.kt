@@ -9,6 +9,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -273,7 +274,7 @@ internal fun pbFalseFormAntecedents(
 ): IntArray? {
     var n = 0
     if (extraLit != 0) n++
-    val seen = HashSet<Int>()
+    val seen = IntHashSet()
     for (lit in literals) {
         val v = Lit.variable(lit)
         if (v == excludeVar) continue

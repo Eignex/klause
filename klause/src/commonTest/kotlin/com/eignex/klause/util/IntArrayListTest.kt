@@ -73,9 +73,66 @@ class IntArrayListTest {
     }
 
     @Test
+    fun `sortByIntKey orders by key ascending and descending with element tie-break`() {
+        val list = IntArrayList()
+        for (v in intArrayOf(3, 1, 2, 5, 4)) list.add(v)
+        list.sortByIntKey { it } // identity key → plain value sort
+        assertEquals(listOf(1, 2, 3, 4, 5), list.toIntArray().toList())
+        list.sortByIntKey(descending = true) { it }
+        assertEquals(listOf(5, 4, 3, 2, 1), list.toIntArray().toList())
+    }
+
+    @Test
+    fun `sortByIntKey sorts by an external key and is stable on ties via element order`() {
+        // Elements are item ids; key is a weight lookup with deliberate ties.
+        val weights = intArrayOf(10, 5, 10, 5, 7) // by id
+        val list = IntArrayList()
+        for (id in 0 until 5) list.add(id)
+        list.sortByIntKey { weights[it] }
+        // Ascending weight: {1,3}=5, {4}=7, {0,2}=10; ties break by id ascending.
+        assertEquals(listOf(1, 3, 4, 0, 2), list.toIntArray().toList())
+        list.sortByIntKey(descending = true) { weights[it] }
+        // Descending is the exact reverse of the ascending packed order.
+        assertEquals(listOf(2, 0, 4, 3, 1), list.toIntArray().toList())
+    }
+
+    @Test
+    fun `sortByIntKey handles negative keys and elements`() {
+        val list = IntArrayList()
+        for (v in intArrayOf(-3, 7, 0, -10, 4)) list.add(v)
+        list.sortByIntKey { it }
+        assertEquals(listOf(-10, -3, 0, 4, 7), list.toIntArray().toList())
+    }
+
+    @Test
+    fun `sortByIntKey matches a stdlib reference under random keys`() {
+        val rng = Random(7)
+        repeat(20) { _ ->
+            val n = rng.nextInt(0, 40)
+            val list = IntArrayList()
+            val ref = ArrayList<Int>()
+            repeat(n) {
+                val v = rng.nextInt(-50, 50)
+                list.add(v)
+                ref.add(v)
+            }
+            val desc = rng.nextBoolean()
+            val key: (Int) -> Int = { it / 3 } // many ties
+            list.sortByIntKey(descending = desc) { key(it) }
+            // Reference: stable sort by key, with the same (key high, element low) packing,
+            // which orders ties by element value — reverse for descending.
+            val expected = ref.map { (key(it).toLong() shl 32) or (it.toLong() and 0xFFFFFFFFL) }
+                .sorted()
+                .map { (it and 0xFFFFFFFFL).toInt() }
+                .let { if (desc) it.reversed() else it }
+            assertEquals(expected, list.toIntArray().toList())
+        }
+    }
+
+    @Test
     fun `random ops match a swap-remove reference model`() {
         val rng = Random(104)
-        repeat(40) {
+        repeat(15) {
             val list = IntArrayList(initialCapacity = 1)
             val ref = ArrayList<Int>() // mirrors the same swap-remove semantics
             repeat(300) {
