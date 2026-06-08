@@ -695,7 +695,7 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
     val yBk = floatVars[yName] ?: failHere("`$yName` is not a float var")
     val step = if (yBk.buckets > 1) (yBk.hi - yBk.lo) / (yBk.buckets - 1) else 0.0
     // floatScale·x − floatScale·step·idx_y = floatScale·lo.
-    val cX = floatScale.toLong()
+    val cX = floatScale
     val cIdxY = (-step * floatScale).roundToLong()
     val bound = (yBk.lo * floatScale).roundToLong()
     factors.add(

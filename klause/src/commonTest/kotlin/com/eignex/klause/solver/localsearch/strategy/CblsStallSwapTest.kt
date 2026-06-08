@@ -92,8 +92,6 @@ class CblsStallSwapTest {
                 val a = m.parts[0]
                 val b = m.parts[1]
                 assertTrue(a is Move.IntSet && b is Move.IntSet, "stall swap parts must be int sets")
-                a as Move.IntSet
-                b as Move.IntSet
                 // A value exchange: each var receives the other's current value.
                 assertEquals(state.assignment.intValue(b.varId), a.newValue, "swap must exchange values")
                 assertEquals(state.assignment.intValue(a.varId), b.newValue, "swap must exchange values")
@@ -114,7 +112,7 @@ class CblsStallSwapTest {
             if (m is Move.Compound) {
                 for (p in m.parts) {
                     assertTrue(p is Move.IntSet, "stall swap parts must be int sets")
-                    assertTrue((p as Move.IntSet).varId != 2, "swap must not touch a frozen var")
+                    assertTrue(p.varId != 2, "swap must not touch a frozen var")
                 }
             }
         }

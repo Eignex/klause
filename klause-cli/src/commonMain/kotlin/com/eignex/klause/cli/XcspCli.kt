@@ -296,7 +296,7 @@ private fun <P : SolverParams> runOn(solver: Solver<P>, params: P, ing: Parsed):
     val objective = ing.objective
     if (objective != null && solver is Optimizer<*>) {
         @Suppress("UNCHECKED_CAST")
-        return when (val r = (solver as Optimizer<P>).minimize(objective as Objective, params)) {
+        return when (val r = (solver as Optimizer<P>).minimize(objective, params)) {
             is MinimizeResult.Optimal -> Verdict.Optimal(r.objective, r.sample.ints, r.sample.bools)
             is MinimizeResult.BestFound -> Verdict.BestFound(r.objective, r.sample.ints, r.sample.bools)
             is MinimizeResult.Infeasible -> Verdict.Unsat
