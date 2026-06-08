@@ -23,7 +23,10 @@ class MiniZincRunnerTest {
 
     @Test
     fun `choco reference solves the minizinc smoke set`() {
-        if (!minizincOnPath()) { println("[mzn-runner] minizinc not on PATH — skipping"); return }
+        if (!minizincOnPath()) {
+            println("[mzn-runner] minizinc not on PATH — skipping")
+            return
+        }
         val runner = MiniZincRunner()
         for (ref in Catalog.suite("mzn-smoke").problems) {
             val resolved = runner.resolve(ref)

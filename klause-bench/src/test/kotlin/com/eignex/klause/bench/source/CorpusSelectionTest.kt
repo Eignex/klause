@@ -21,13 +21,28 @@ class CorpusSelectionTest {
     @Test
     fun `pickPrimaryMzn prefers exact then model then non-mznc prefix`() {
         fun f(n: String) = File("$n.mzn")
-        assertEquals("queens.mzn", CorpusSelection.pickPrimaryMzn("queens",
-            listOf(f("mznc2009_queens"), f("queens"), f("queens_alt"))).name)
-        assertEquals("rost_model.mzn", CorpusSelection.pickPrimaryMzn("rost",
-            listOf(f("mznc2009_rost"), f("rost_model"))).name)
+        assertEquals(
+            "queens.mzn",
+            CorpusSelection.pickPrimaryMzn(
+                "queens",
+                listOf(f("mznc2009_queens"), f("queens"), f("queens_alt")),
+            ).name,
+        )
+        assertEquals(
+            "rost_model.mzn",
+            CorpusSelection.pickPrimaryMzn(
+                "rost",
+                listOf(f("mznc2009_rost"), f("rost_model")),
+            ).name,
+        )
         // Falls back to a family-prefixed non-mznc name over the year-prefixed variant.
-        assertEquals("amaze3.mzn", CorpusSelection.pickPrimaryMzn("amaze",
-            listOf(f("mznc2012_amaze"), f("amaze3"))).name)
+        assertEquals(
+            "amaze3.mzn",
+            CorpusSelection.pickPrimaryMzn(
+                "amaze",
+                listOf(f("mznc2012_amaze"), f("amaze3")),
+            ).name,
+        )
     }
 
     @Test

@@ -8,10 +8,10 @@ import kotlin.random.Random
 
 /** Per-phase nanos for a propagation-heavy workload. */
 data class PropagationTimings(
-    val bakeNanos: Long,
-    val oneShotPinNanos: Long,
-    val incrementalPinNanos: Long,
-    val pinCount: Int,
+    internal val bakeNanos: Long,
+    internal val oneShotPinNanos: Long,
+    internal val incrementalPinNanos: Long,
+    internal val pinCount: Int,
 )
 
 /**
@@ -19,7 +19,7 @@ data class PropagationTimings(
  * overhead: bake-time, one-shot with assumptions, and incremental (session) pinning.
  */
 object PropagationMetric {
-    fun bench(
+    internal fun bench(
         problem: Problem,
         pinCount: Int = 10,
         repetitions: Int = 50,
@@ -44,7 +44,9 @@ object PropagationMetric {
 
         val bakeNs = repeatTimed(repetitions) { problem.propagate() }
         val oneShotNs = repeatTimed(repetitions) { problem.propagate(asm) }
-        val incrementalNs = repeatTimed(repetitions) { runSessionChain(problem, pins) } / pinCount.toLong().coerceAtLeast(1L)
+        val incrementalNs = repeatTimed(
+            repetitions,
+        ) { runSessionChain(problem, pins) } / pinCount.toLong().coerceAtLeast(1L)
 
         return PropagationTimings(bakeNs, oneShotNs, incrementalNs, pinCount)
     }

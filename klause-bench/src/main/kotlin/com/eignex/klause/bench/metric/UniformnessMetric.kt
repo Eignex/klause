@@ -12,9 +12,9 @@ import com.eignex.klause.solver.brute.BruteForceSolver
 import com.eignex.kumulant.stat.cardinality.HyperLogLogStat
 import com.eignex.kumulant.stat.quantile.TDigestStat
 import com.eignex.kumulant.stat.summary.MeanStat
+import kotlinx.serialization.Serializable
 import java.time.Instant
 import kotlin.math.ln
-import kotlinx.serialization.Serializable
 
 /**
  * Per-backend sampling-quality metrics for one [Problem]. Oracle fields ([coverageFraction],
@@ -23,26 +23,26 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class UniformnessReport(
-    val entryName: String,
-    val backendName: String,
-    val sampleCount: Int,
-    val distinctCount: Int,
-    val distinctnessRatio: Double,
+    internal val entryName: String,
+    internal val backendName: String,
+    internal val sampleCount: Int,
+    internal val distinctCount: Int,
+    internal val distinctnessRatio: Double,
     /** HyperLogLog estimate of [distinctCount] from streamed sample hashes — the scale-out
      *  path for sample counts where exact distinct-tracking stops being feasible; reported
      *  alongside the exact count so the estimator stays validated at exact-trackable sizes. */
     val distinctEstimate: Double? = null,
-    val meanPairwiseHamming: Double,
-    val pairwiseHammingP5: Double,
-    val pairwiseHammingP95: Double,
-    val sampleEntropy: Double,
+    internal val meanPairwiseHamming: Double,
+    internal val pairwiseHammingP5: Double,
+    internal val pairwiseHammingP95: Double,
+    internal val sampleEntropy: Double,
     val coverageFraction: Double?,
     val klFromUniform: Double?,
-    val oracleFeasibleCount: Int?,
+    internal val oracleFeasibleCount: Int?,
 )
 
 @Serializable
-data class UniformnessResults(
+internal data class UniformnessResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,
@@ -58,11 +58,13 @@ object UniformnessMetric {
     private const val P_LO = 0.05
     private const val P_HI = 0.95
 
-    fun run(entries: List<ResolvedProblem>) {
+    internal fun run(entries: List<ResolvedProblem>) {
         val sampleCount = System.getProperty("klause.bench.uniformness.samples")?.toIntOrNull() ?: DEFAULT_SAMPLE_COUNT
         println()
-        println("=== uniformness bench (n=$sampleCount per backend; entropy & Hamming always reported, " +
-            "coverage + KL only when oracle fits) ===")
+        println(
+            "=== uniformness bench (n=$sampleCount per backend; entropy & Hamming always reported, " +
+                "coverage + KL only when oracle fits) ===",
+        )
         val results = mutableListOf<UniformnessReport>()
         for (entry in entries) {
             val rows = mutableListOf<String>()
@@ -83,7 +85,11 @@ object UniformnessMetric {
         )
     }
 
-    fun analyse(entryName: String, backend: InProcessSolver, sampleCount: Int = DEFAULT_SAMPLE_COUNT): UniformnessReport {
+    internal fun analyse(
+        entryName: String,
+        backend: InProcessSolver,
+        sampleCount: Int = DEFAULT_SAMPLE_COUNT,
+    ): UniformnessReport {
         val samples = backend.samplesSequence().take(sampleCount).toList()
         val n = samples.size
         val counts: Map<Sample, Int> = samples.groupingBy { it }.eachCount()
@@ -146,6 +152,4 @@ object UniformnessMetric {
         }
         return Triple(coverage, kl, total)
     }
-
-
 }

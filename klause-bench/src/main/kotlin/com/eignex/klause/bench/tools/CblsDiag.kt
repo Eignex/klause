@@ -2,7 +2,6 @@ package com.eignex.klause.bench.tools
 
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
@@ -22,10 +21,11 @@ import kotlin.random.Random
  * Run: `./gradlew :klause-bench:runCblsDiag -Dklause.cblsdiag.file=klause-bench/build/easiest/amaze.fzn`
  */
 object CblsDiag {
+    /** Entry point for the CBLS diagnostic tool. */
     @JvmStatic
     fun main(args: Array<String>) {
         val path = System.getProperty("klause.cblsdiag.file") ?: args.getOrNull(0)
-        ?: error("set -Dklause.cblsdiag.file=<fzn>")
+            ?: error("set -Dklause.cblsdiag.file=<fzn>")
         val flips = System.getProperty("klause.cblsdiag.flips")?.toLong() ?: 3_000_000L
         val restarts = System.getProperty("klause.cblsdiag.restarts")?.toInt() ?: 3
         val prog = parseFlatZinc(File(path).readText())
@@ -76,8 +76,11 @@ object CblsDiag {
             val kickVars = System.getProperty("klause.cblsdiag.kickvars")?.toInt() ?: 8
             val strat = Cbls(
                 noiseProbability = noise,
-                tabu = if (noTabu) TabuFilter.Disabled
-                else TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
+                tabu = if (noTabu) {
+                    TabuFilter.Disabled
+                } else {
+                    TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
+                },
                 maxNeighborhood = maxNbhd,
                 skewAlpha = skew,
                 scoring = scoring,
@@ -120,15 +123,18 @@ object CblsDiag {
                 nullStreak = 0
                 state.apply(move)
                 if (state.cost < minCost) {
-                    minCost = state.cost; flipsToMin = f
-                    minBool = snapshotBool(state); minInt = snapshotInt(state)
+                    minCost = state.cost
+                    flipsToMin = f
+                    minBool = snapshotBool(state)
+                    minInt = snapshotInt(state)
                 }
             }
             val solved = state.cost == 0L
             println("restart $r: min=$minCost (at flip $flipsToMin / $f)${if (solved) "  SOLVED" else ""}")
             if (minCost < globalBest) {
                 globalBest = minCost
-                bestBoolVals = minBool; bestIntVals = minInt
+                bestBoolVals = minBool
+                bestIntVals = minInt
             }
         }
         println("global best cost (sum of violation degrees): $globalBest")
@@ -172,8 +178,14 @@ object CblsDiag {
         }
         fun key(s: Pair<BooleanArray, IntArray>): Long {
             var h = 1469598103934665603L
-            for (b in s.first) { h = h xor (if (b) 1L else 0L); h *= 1099511628211L }
-            for (v in s.second) { h = h xor v.toLong(); h *= 1099511628211L }
+            for (b in s.first) {
+                h = h xor (if (b) 1L else 0L)
+                h *= 1099511628211L
+            }
+            for (v in s.second) {
+                h = h xor v.toLong()
+                h *= 1099511628211L
+            }
             return h
         }
 
@@ -294,14 +306,27 @@ object CblsDiag {
             var bestMoveStr = "(none)"
             for (m in sink.list) {
                 val d = st.netDelta(m)
-                if (d < bestForFactor) { bestForFactor = d; bestMoveStr = "$m Δ=$d" }
+                if (d < bestForFactor) {
+                    bestForFactor = d
+                    bestMoveStr = "$m Δ=$d"
+                }
                 if (d < bestGlobal) bestGlobal = d
             }
-            println("  ${f::class.simpleName} fid=$fid degree=${f.violationDegree(st, fid)} " +
-                "moves=${sink.list.size} bestΔ=$bestMoveStr")
+            println(
+                "  ${f::class.simpleName} fid=$fid degree=${f.violationDegree(st, fid)} " +
+                    "moves=${sink.list.size} bestΔ=$bestMoveStr",
+            )
         }
-        println("--- best single repair move over all violated factors: Δ=$bestGlobal " +
-            "(${if (bestGlobal < 0) "improving — not a local min" else "≥0 — STRICT LOCAL MIN, needs worsening move/restart"}) ---")
+        println(
+            "--- best single repair move over all violated factors: Δ=$bestGlobal " +
+                "(${
+                    if (bestGlobal < 0) {
+                        "improving — not a local min"
+                    } else {
+                        "≥0 — STRICT LOCAL MIN, needs worsening move/restart"
+                    }
+                }) ---",
+        )
     }
 
     private fun snapshotBool(s: LocalSearchState): BooleanArray =
