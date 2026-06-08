@@ -42,9 +42,9 @@ class GomoryCutTest {
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 6)
             val b = LpBuilder()
-            for (k in 0 until n) b.addVar(0, hi.toLong(), cost = rng.nextInt(-3, 4).toLong())
+            repeat(n) { b.addVar(0, hi.toLong(), cost = rng.nextInt(-3, 4).toLong()) }
             val rows = ArrayList<Row>()
-            repeat(rng.nextInt(1, 4)) {
+            repeat(rng.nextInt(1, 4)) { _ ->
                 val coeffs = LongArray(n) { rng.nextInt(-3, 4).toLong() }
                 if (coeffs.all { it == 0L }) return@repeat
                 val rhs = rng.nextInt(-4, hi * n + 1).toLong()
