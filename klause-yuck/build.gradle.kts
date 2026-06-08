@@ -1,7 +1,7 @@
 import java.net.URI
 
 plugins {
-    id("com.eignex.kmp") version "1.2.2"
+    id("com.eignex.kmp") version "1.2.5"
 }
 
 eignexPublish {
@@ -26,10 +26,9 @@ kotlin {
     }
 }
 
-// Yuck is not on Maven Central (it ships only as a GitHub release zip), so the adapter shells
-// out to a locally provisioned distribution instead of declaring a dependency. `installYuck`
-// downloads the pinned release into a user-level cache (shared across worktrees and cacheable
-// in CI) and unpacks it; the test task points the adapter at it via `klause.yuck.home`.
+// Yuck ships only as a GitHub release zip, so the adapter shells out to a locally
+// provisioned distribution. `installYuck` unpacks the pinned release into a user-level
+// cache; the test task points the adapter at it via `klause.yuck.home`.
 val yuckVersion = "20251106"
 val yuckCacheDir = File(System.getProperty("user.home"), ".cache/klause-yuck")
 val yuckHome = yuckCacheDir.resolve("yuck-$yuckVersion")

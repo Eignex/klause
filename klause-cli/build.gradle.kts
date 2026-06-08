@@ -1,7 +1,7 @@
 plugins {
     // kbuild CLI conventions: KMP + lint + kover, JVM dist + native executables,
     // and the `releaseAssets` packaging task.
-    id("com.eignex.cli") version "1.2.4"
+    id("com.eignex.cli") version "1.2.5"
 }
 
 eignexCli {
