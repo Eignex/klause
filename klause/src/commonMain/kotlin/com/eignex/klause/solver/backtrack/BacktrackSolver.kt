@@ -474,10 +474,37 @@ class BacktrackSolver(override val problem: Problem) :
         // distinguishes "never committed a value yet" from "saved value happens to be
         // false" — without it the default-false BooleanArray entries would shadow any
         // real saves of false.
-        val boolPhase: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numBoolVars) else null
-        val boolPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numBoolVars) else null
+        // Boolean phase saving is needed both for plain phase saving and as the fallback
+        // polarity source in target phasing's SAVED rephase mode, so allocate it whenever
+        // either feature is on. Integer phase saving stays gated on [phaseSaving] alone —
+        // target phasing is pure-Boolean and never touches integer value selection.
+        val boolPhaseTracking = params.phaseSaving || params.targetPhasing
+        val boolPhase: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
+        val boolPhaseSet: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
         val intPhase: IntArray? = if (params.phaseSaving) IntArray(problem.numIntVars) else null
         val intPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numIntVars) else null
+        // Target phasing (#204): the deepest conflict-free Boolean assignment seen so far and
+        // a rephasing schedule. [boolTarget]/[boolTargetSet] hold the target phase; the target
+        // is refreshed whenever the trail reaches a new maximum depth (a deeper conflict-free
+        // prefix). [rephaseMode] selects the current polarity source and rotates every
+        // [BacktrackParams.rephaseInterval] conflicts. All persist across restarts.
+        val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
+        val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
+        var bestTrailSize = -1
+        var rephaseMode = REPHASE_TARGET
+        var conflictsSinceRephase = 0L
+        // Counts conflicts as they happen inside [advance] and rotates the rephase mode when
+        // the interval elapses. The mode change takes effect on the next fresh descent — no
+        // need to pop to root, since rephasing only reorders which polarity a new decision
+        // tries first.
+        val onConflictTick: () -> Unit = tick@{
+            if (boolTarget == null) return@tick
+            conflictsSinceRephase++
+            if (conflictsSinceRephase >= params.rephaseInterval) {
+                conflictsSinceRephase = 0
+                rephaseMode = (rephaseMode + 1) % REPHASE_MODE_COUNT
+            }
+        }
 
         val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
         val rng = Random(baseSeed)
@@ -525,13 +552,23 @@ class BacktrackSolver(override val problem: Problem) :
             return session.assertObjectiveBound(objectiveVar, threshold, atMost = objectiveAscending) is
                 PropagationResult.Unsat
         }
+        // Glucose-style adaptive restart policy (#198). When enabled it replaces the Luby
+        // budget: restarts fire on learned-clause quality (recent LBD vs the long-run average),
+        // with trail-size blocking. `restartRequested` is set by the conflict handlers and
+        // consumed at the top of the inner loop; the policy's own stats persist across restarts.
+        val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
+        var restartRequested = false
         var lubyIdx = 1L
         outer@ while (true) {
-            val perRunBudget: Long = params.lubyRestartBase?.let { base ->
-                // Cap multiplication to avoid overflow on tiny base + huge lubyIdx.
-                val limit = lubyN(lubyIdx)
-                if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
-            } ?: Long.MAX_VALUE
+            val perRunBudget: Long = if (glucose != null) {
+                Long.MAX_VALUE // adaptive restarts drive the schedule; the Luby budget is off
+            } else {
+                params.lubyRestartBase?.let { base ->
+                    // Cap multiplication to avoid overflow on tiny base + huge lubyIdx.
+                    val limit = lubyN(lubyIdx)
+                    if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
+                } ?: Long.MAX_VALUE
+            }
             var decisionsThisRun = 0L
 
             val trail: MutableList<TrailNode> = ArrayList()
@@ -546,8 +583,10 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                     cancelCheckCountdown = CANCEL_CHECK_INTERVAL
                 }
-                // Luby budget hit → pop back to root and restart.
-                if (decisionsThisRun >= perRunBudget) {
+                // Restart trigger: Luby budget hit, or the adaptive policy asked to re-pick.
+                // Either way pop back to root and restart.
+                if (decisionsThisRun >= perRunBudget || restartRequested) {
+                    restartRequested = false
                     while (trail.isNotEmpty()) {
                         session.popLast()
                         trail.removeAt(trail.size - 1)
@@ -601,7 +640,10 @@ class BacktrackSolver(override val problem: Problem) :
                         continue@inner
                     }
                     val values = params.valueHeuristic.values(session, varRef, rng)
-                    val ordered = applyPhase(varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                    val ordered = applyPhase(
+                        varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
+                        boolTarget, boolTargetSet, rephaseMode, rng,
+                    )
                     val node = makeNode(varRef, ordered)
                     val decsBefore = decisionsLeft
                     val out = advance(
@@ -613,6 +655,7 @@ class BacktrackSolver(override val problem: Problem) :
                         { decisionsLeft-- },
                         sink,
                         relearnTripped,
+                        onConflictTick,
                     )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
@@ -620,6 +663,12 @@ class BacktrackSolver(override val problem: Problem) :
                             capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
                             trail.add(node)
                             sink?.observeNode(trail.size)
+                            // Target phasing: a new maximum trail depth is the deepest
+                            // conflict-free assignment seen — snapshot it as the target phase.
+                            if (boolTarget != null && boolTargetSet != null && trail.size > bestTrailSize) {
+                                bestTrailSize = trail.size
+                                captureTargetPhase(session, boolTarget, boolTargetSet)
+                            }
                         }
 
                         AdvanceOutcome.Exhausted -> {
@@ -638,9 +687,14 @@ class BacktrackSolver(override val problem: Problem) :
                             if (touchedSeedLevels != null) {
                                 for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
                             }
-                            // Trail size == session.decisionLevel here (the failed pin was
-                            // self-reverted by the session); execute the backjump + learn
-                            // sequence. On cascading conflict during assertion, recurse.
+                            // Feed the learned clause's LBD and the current depth to the
+                            // adaptive restart policy (trail size == decision level here; the
+                            // failed pin was self-reverted by the session).
+                            if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
+                                restartRequested = true
+                            }
+                            // Execute the backjump + learn sequence. On cascading conflict
+                            // during assertion, recurse.
                             val term = backjumpAndLearn(
                                 out.learned, trail, session, params,
                                 boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false,
@@ -717,6 +771,7 @@ class BacktrackSolver(override val problem: Problem) :
                         { decisionsLeft-- },
                         sink,
                         relearnTripped,
+                        onConflictTick,
                     )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
@@ -737,6 +792,9 @@ class BacktrackSolver(override val problem: Problem) :
                         is AdvanceOutcome.Backjump -> {
                             if (touchedSeedLevels != null) {
                                 for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                            }
+                            if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
+                                restartRequested = true
                             }
                             // Else-path: session has been popped below trail.last; align
                             // first (trail.removeAt) then proceed to backjump + learn.
@@ -783,14 +841,40 @@ class BacktrackSolver(override val problem: Problem) :
         boolPhaseSet: BooleanArray?,
         intPhase: IntArray?,
         intPhaseSet: BooleanArray?,
+        boolTarget: BooleanArray? = null,
+        boolTargetSet: BooleanArray? = null,
+        rephaseMode: Int = REPHASE_TARGET,
+        rng: Random? = null,
     ): Sequence<Int> = when (varRef) {
         is VarRef.Bool -> {
-            if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[varRef.varId]) {
-                val saved = if (boolPhase[varRef.varId]) 1 else 0
-                sequenceOf(saved) + values.filter { it != saved }
+            val v = varRef.varId
+            val savedFirst: Int? = if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[v]) {
+                if (boolPhase[v]) 1 else 0
             } else {
-                values
+                null
             }
+            // Target phasing rotates the polarity source; plain phase saving just uses the
+            // saved value. The chosen value (if any) is tried first, with the heuristic's
+            // order filling the rest.
+            val preferred: Int? = if (boolTarget != null && boolTargetSet != null) {
+                when (rephaseMode) {
+                    // Target: the deepest conflict-free phase, falling back to saved.
+                    REPHASE_TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1 else 0) else savedFirst
+
+                    REPHASE_SAVED -> savedFirst
+
+                    REPHASE_TRUE -> 1
+
+                    REPHASE_FALSE -> 0
+
+                    REPHASE_RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1 else 0
+
+                    else -> savedFirst
+                }
+            } else {
+                savedFirst
+            }
+            if (preferred != null) sequenceOf(preferred) + values.filter { it != preferred } else values
         }
 
         is VarRef.IntVar -> {
@@ -833,6 +917,17 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                 }
             }
+        }
+    }
+
+    /** Snapshot the current Boolean assignment as the target phase (the deepest conflict-free
+     *  prefix). Variables not yet pinned keep their previous target entry — a deeper later
+     *  descent will fill them in. */
+    private fun captureTargetPhase(session: PropagationSession, boolTarget: BooleanArray, boolTargetSet: BooleanArray) {
+        for (v in boolTarget.indices) {
+            val value = session.boolValue(v) ?: continue
+            boolTarget[v] = value
+            boolTargetSet[v] = true
         }
     }
 
@@ -895,6 +990,7 @@ class BacktrackSolver(override val problem: Problem) :
         decrement: () -> Unit,
         sink: SolveStatsSink? = null,
         relearnTripped: ((Learned) -> Boolean)? = null,
+        onConflictTick: (() -> Unit)? = null,
     ): AdvanceOutcome {
         while (true) {
             if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
@@ -906,6 +1002,7 @@ class BacktrackSolver(override val problem: Problem) :
             sink?.observePropagation(session.propagationCount - propsBefore)
             val r = outcome.result
             if (r is PropagationResult.Unsat) {
+                onConflictTick?.invoke()
                 // Forward the full conflict reason record so activity-, weight-, and
                 // factor-driven heuristics (VSIDS, dom/wdeg) all see exactly what they
                 // need without further plumbing.
@@ -1101,5 +1198,25 @@ class BacktrackSolver(override val problem: Problem) :
          *  long means the backjump + assert cycle is not progressing. Generous enough that
          *  healthy re-learning (after forgetting or restarts) never trips it. */
         const val RELEARN_FALLBACK_THRESHOLD: Int = 8
+
+        // Rephasing polarity sources (#204), rotated every `rephaseInterval` conflicts.
+
+        /** Bias toward the deepest conflict-free assignment seen (falls back to saved). */
+        const val REPHASE_TARGET: Int = 0
+
+        /** Plain phase saving — the last value committed for the variable. */
+        const val REPHASE_SAVED: Int = 1
+
+        /** Force all decisions to try `true` first. */
+        const val REPHASE_TRUE: Int = 2
+
+        /** Force all decisions to try `false` first. */
+        const val REPHASE_FALSE: Int = 3
+
+        /** Random polarity per decision. */
+        const val REPHASE_RANDOM: Int = 4
+
+        /** Number of rephase modes in the rotation. */
+        const val REPHASE_MODE_COUNT: Int = 5
     }
 }

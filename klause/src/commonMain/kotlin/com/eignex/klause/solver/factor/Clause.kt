@@ -49,6 +49,14 @@ class Clause(val literals: IntArray) : LocalSearchFactor {
             intArrayOf(literals[0], literals[1])
         }
 
+    /** Blocking literal for each initial watch (#200): the *other* watched literal. A clause
+     *  is satisfied by any single true literal, so if the partner watch is true the engine
+     *  can skip waking this clause when the watched literal goes false. A unit clause has no
+     *  partner, so no blockers. Kept in sync as watches drift via the `blocker` argument to
+     *  [PropagationState.moveBoolWatcher]. */
+    override val initialBoolWatcherBlockers: IntArray? =
+        if (literals.size == 1) null else intArrayOf(literals[1], literals[0])
+
     /** When [propagate] returns false, every literal of this clause was false — that's
      *  the textbook clause-form nogood for conflict analysis. Returning the literals
      *  directly (no copy) is safe because the analyzer only reads them. */
@@ -326,14 +334,16 @@ class Clause(val literals: IntArray) : LocalSearchFactor {
         if (litFalse(state, watches[0])) {
             val rep = findNonFalseLitExcept(state, watches[0], watches[1])
             if (rep >= 0) {
-                state.moveBoolWatcher(factorId, literals[watches[0]], literals[rep])
+                // The relocated watch's blocker is the partner watch — if it's true the
+                // clause is satisfied and the engine can skip future wakeups on this watch.
+                state.moveBoolWatcher(factorId, literals[watches[0]], literals[rep], literals[watches[1]])
                 watches[0] = rep
             }
         }
         if (litFalse(state, watches[1])) {
             val rep = findNonFalseLitExcept(state, watches[1], watches[0])
             if (rep >= 0) {
-                state.moveBoolWatcher(factorId, literals[watches[1]], literals[rep])
+                state.moveBoolWatcher(factorId, literals[watches[1]], literals[rep], literals[watches[0]])
                 watches[1] = rep
             }
         }

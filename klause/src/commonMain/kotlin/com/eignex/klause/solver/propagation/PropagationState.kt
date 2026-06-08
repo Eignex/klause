@@ -359,6 +359,10 @@ class PropagationState(
     private companion object {
         /** Sentinel for propagateAtomsForVar's carved-value parameter. */
         const val NO_CARVE: Int = Int.MIN_VALUE
+
+        /** Blocking-literal slot with no blocker (#200): the watcher always fires. Lit ids
+         *  are non-negative ([Lit.make] = `var shl 1 | sign`), so −1 is a safe sentinel. */
+        const val NO_BLOCKER: Int = -1
     }
 
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
@@ -482,7 +486,9 @@ class PropagationState(
         learnedLbds.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
         _refPayload.add(null)
-        for (lit in clause.initialBoolWatchers) installLitWatch(lit, newFid)
+        val watchers = clause.initialBoolWatchers
+        val blockers = clause.initialBoolWatcherBlockers
+        for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
         return newFid
     }
 
@@ -548,17 +554,24 @@ class PropagationState(
         // either rewrite to their new factor id or get dropped.
         for (lit in boolWatchersByLit.indices) {
             val list = boolWatchersByLit[lit]
+            val blockers = boolBlockersByLit[lit] // compacted in lockstep so indices stay aligned
             var wi = 0
             for (r in 0 until list.size) {
                 val fid = list[r]
+                val blocker = blockers[r]
                 if (fid < refBase) {
+                    blockers[wi] = blocker
                     list[wi++] = fid
                 } else {
                     val newLearnedIdx = remap[fid - refBase]
-                    if (newLearnedIdx >= 0) list[wi++] = refBase + newLearnedIdx
+                    if (newLearnedIdx >= 0) {
+                        blockers[wi] = blocker
+                        list[wi++] = refBase + newLearnedIdx
+                    }
                 }
             }
             list.truncateTo(wi)
+            blockers.truncateTo(wi)
         }
 
         // Atom-literal watcher lists carry learned fids too — a learned clause watching a
@@ -630,6 +643,24 @@ class PropagationState(
      * pins which only *adds* non-false literals.
      */
     internal val boolWatchersByLit: Array<IntArrayList> =
+        Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
+
+    /**
+     * Blocking literals paired index-for-index with [boolWatchersByLit] (#200). Entry `i`
+     * holds a literal that, if currently true, proves the watcher at the same index is
+     * already satisfied — so [enqueueForBoolChange] can skip waking that factor entirely,
+     * removing a large fraction of clause touches in the hot BCP loop on dense instances.
+     * [NO_BLOCKER] means "no blocker, always fire", which is the default for every factor
+     * that doesn't supply [com.eignex.klause.solver.Factor.initialBoolWatcherBlockers]
+     * (e.g. cardinality), so behaviour for those is unchanged.
+     *
+     * Held in lockstep with [boolWatchersByLit] through every mutation ([installLitWatch],
+     * [moveBoolWatcher]'s swap-pop, and the [forgetLearnedClauses] compaction). Like the
+     * watcher lists it drifts across snapshot / restore; a stale blocker is always sound
+     * because it is still a real literal of the factor — if true the factor really is
+     * satisfied; if not we simply fire as before.
+     */
+    internal val boolBlockersByLit: Array<IntArrayList> =
         Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
 
     /**
@@ -1071,12 +1102,13 @@ class PropagationState(
 
     /** Install [fid] as a watcher of [lit]. Dispatches between [boolWatchersByLit]
      *  (bool var space) and [atomWatchersByLit] (atom var space). */
-    internal fun installLitWatch(lit: Int, fid: Int) {
+    internal fun installLitWatch(lit: Int, fid: Int, blocker: Int = NO_BLOCKER) {
         val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
             val list = boolWatchersByLit[lit]
             boolWatchPos[packWatch(fid, lit)] = list.size // position of the about-to-append entry
             list.add(fid)
+            boolBlockersByLit[lit].add(blocker) // index-aligned with the watcher just appended
         } else {
             val list = atomWatchersByLit.getOrPut(lit) { IntArrayList(initialCapacity = 2) }
             list.add(fid)
@@ -1218,8 +1250,12 @@ class PropagationState(
 
     init {
         for (fid in 0 until problem.numFactors) {
-            val watchers = problem.factors[fid].initialBoolWatchers ?: continue
-            for (lit in watchers) installLitWatch(lit, fid)
+            val factor = problem.factors[fid]
+            val watchers = factor.initialBoolWatchers ?: continue
+            val blockers = factor.initialBoolWatcherBlockers
+            for (i in watchers.indices) {
+                installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+            }
         }
     }
 
@@ -1229,7 +1265,7 @@ class PropagationState(
      * during propagation. The removal scans [oldLit]'s slot (typically a handful of
      * entries) and swap-and-pops; the insert is O(1).
      */
-    fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
+    fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int, blocker: Int = NO_BLOCKER) {
         if (oldLit == newLit) return
         val oldV = Lit.variable(oldLit)
         if (oldV < problem.numBoolVars) {
@@ -1237,8 +1273,9 @@ class PropagationState(
         } else {
             atomWatchersByLit[oldLit]?.removeValue(factorId)
         }
-        // Install on new.
-        installLitWatch(newLit, factorId)
+        // Install on new, carrying the blocking literal supplied by the watcher-using factor
+        // (#200). Defaults to NO_BLOCKER for factors that don't track blockers.
+        installLitWatch(newLit, factorId, blocker)
     }
 
     /** O(1) removal of [factorId] from `boolWatchersByLit[lit]` via the [boolWatchPos]
@@ -1248,23 +1285,43 @@ class PropagationState(
      *  never remove the wrong watcher. */
     private fun removeBoolWatch(factorId: Int, lit: Int) {
         val list = boolWatchersByLit[lit]
+        val blockers = boolBlockersByLit[lit]
         val key = packWatch(factorId, lit)
-        val pos = boolWatchPos[key]
-        if (pos == null || pos >= list.size || list[pos] != factorId) {
-            // Index miss/desync — fall back to the linear scan and resync this lit's positions.
-            list.removeValue(factorId)
+        val recorded = boolWatchPos[key]
+        if (recorded == null || recorded >= list.size || list[recorded] != factorId) {
+            // Index miss/desync — fall back to a linear scan, swap-pop both lists in lockstep
+            // at the found index, and resync this lit's positions.
+            var pos = -1
+            for (i in 0 until list.size) {
+                if (list[i] == factorId) {
+                    pos = i
+                    break
+                }
+            }
             boolWatchPos.remove(key)
+            if (pos >= 0) swapPopWatch(list, blockers, pos)
             resyncBoolWatchPos(lit)
             return
         }
         val last = list.size - 1
-        if (pos != last) {
+        if (recorded != last) {
             val movedFid = list[last]
-            list[pos] = movedFid
-            boolWatchPos[packWatch(movedFid, lit)] = pos
+            boolWatchPos[packWatch(movedFid, lit)] = recorded
+        }
+        swapPopWatch(list, blockers, recorded)
+        boolWatchPos.remove(key)
+    }
+
+    /** Swap-pop index [pos] from a watcher list and its parallel blocker list in lockstep,
+     *  keeping the two index-aligned. The caller fixes [boolWatchPos] for the moved entry. */
+    private fun swapPopWatch(list: IntArrayList, blockers: IntArrayList, pos: Int) {
+        val last = list.size - 1
+        if (pos != last) {
+            list[pos] = list[last]
+            blockers[pos] = blockers[last]
         }
         list.truncateTo(last)
-        boolWatchPos.remove(key)
+        blockers.truncateTo(last)
     }
 
     /** Recompute every recorded position for [lit]'s watcher list (used by the self-heal
@@ -2042,6 +2099,15 @@ class PropagationState(
         // successful pin); read it directly.
         val falseLit = Lit.make(v, !requireNotNull(boolValues[v]))
         val watchers = boolWatchersByLit[falseLit]
-        for (i in 0 until watchers.size) propEnq(watchers[i])
+        val blockers = boolBlockersByLit[falseLit]
+        for (i in 0 until watchers.size) {
+            // Blocking-literal short-cut (#200): if the cached blocker for this watch is
+            // already true, the factor is satisfied and waking it would be a no-op — skip
+            // the enqueue and the clause dereference entirely. NO_BLOCKER falls through and
+            // always fires, so factors without blockers behave exactly as before.
+            val blocker = blockers[i]
+            if (blocker != NO_BLOCKER && litTrue(blocker)) continue
+            propEnq(watchers[i])
+        }
     }
 }
