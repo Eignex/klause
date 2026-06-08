@@ -96,18 +96,19 @@ class VivificationTest {
 
     @Test
     fun `vivification preserves the feasible set`() {
-        fun models(vivify: Boolean): Set<List<Boolean>> = BacktrackSolver(clauseProblem())
-            .enumerate(
-                BacktrackParams(
-                    randomSeed = 5L,
-                    variableHeuristic = Vsids(),
-                    lubyRestartBase = 4L,
-                    vivification = vivify,
-                    vivifyBatch = 8,
-                ),
-            )
-            .map { it.bools.toList() }
-            .toSet()
+        fun models(vivify: Boolean): Set<List<Boolean>> =
+            BacktrackSolver(clauseProblem())
+                .enumerate(
+                    BacktrackParams(
+                        randomSeed = 5L,
+                        variableHeuristic = Vsids(),
+                        lubyRestartBase = 4L,
+                        vivification = vivify,
+                        vivifyBatch = 8,
+                    ),
+                )
+                .map { it.bools.toList() }
+                .toSet()
 
         val plain = models(vivify = false)
         assertTrue(plain.isNotEmpty())
