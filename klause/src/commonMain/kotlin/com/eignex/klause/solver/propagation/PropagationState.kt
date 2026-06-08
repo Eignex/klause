@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
@@ -585,7 +586,7 @@ class PropagationState(
         boolWatchPos.clear()
         for (lit in boolWatchersByLit.indices) {
             val list = boolWatchersByLit[lit]
-            for (i in 0 until list.size) boolWatchPos[packWatch(list[i], lit)] = i
+            for (i in 0 until list.size) boolWatchPos.put(packWatch(list[i], lit), i)
         }
 
         // A conflict return leaves the propagation queues holding in-flight fids, and the
@@ -647,7 +648,7 @@ class PropagationState(
      * falls back to the linear scan on any mismatch — a desynced index can never silently
      * remove the wrong watcher (the soundness hazard called out in #42).
      */
-    private val boolWatchPos: HashMap<Long, Int> = HashMap()
+    private val boolWatchPos: MutableLongIntMap = MutableLongIntMap()
 
     private fun packWatch(fid: Int, lit: Int): Long = (fid.toLong() shl 32) or (lit.toLong() and 0xFFFFFFFFL)
 
@@ -713,7 +714,7 @@ class PropagationState(
 
     /** Reverse lookup: packed key `(intVar << 33) | (kind << 32) | (threshold + INT_MAX)`
      *  → atomId. Allows O(1) re-allocation checks. */
-    private val atomByKey: HashMap<Long, Int> = HashMap()
+    private val atomByKey: MutableLongIntMap = MutableLongIntMap()
 
     /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions
      *  to false. Mirrors [boolWatchersByLit] for atoms; keyed by atom-lit id rather than
@@ -929,12 +930,13 @@ class PropagationState(
 
     private fun allocAtom(intVar: Int, kind: Int, threshold: Int): Int {
         val key = atomKey(intVar, kind, threshold)
-        atomByKey[key]?.let { return problem.numBoolVars + it }
+        val existing = atomByKey.getOrDefault(key, -1)
+        if (existing >= 0) return problem.numBoolVars + existing
         val id = atomIntVar.size
         atomIntVar.add(intVar)
         atomKind.add(kind)
         atomThreshold.add(threshold)
-        atomByKey[key] = id
+        atomByKey.put(key, id)
         atomsByIntVar.getOrPut(intVar) { VarAtomIndex() }.insert(kind, threshold, id)
         return problem.numBoolVars + id
     }
@@ -1075,7 +1077,7 @@ class PropagationState(
         val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
             val list = boolWatchersByLit[lit]
-            boolWatchPos[packWatch(fid, lit)] = list.size // position of the about-to-append entry
+            boolWatchPos.put(packWatch(fid, lit), list.size) // position of the about-to-append entry
             list.add(fid)
         } else {
             val list = atomWatchersByLit.getOrPut(lit) { IntArrayList(initialCapacity = 2) }
@@ -1249,8 +1251,8 @@ class PropagationState(
     private fun removeBoolWatch(factorId: Int, lit: Int) {
         val list = boolWatchersByLit[lit]
         val key = packWatch(factorId, lit)
-        val pos = boolWatchPos[key]
-        if (pos == null || pos >= list.size || list[pos] != factorId) {
+        val pos = boolWatchPos.getOrDefault(key, -1)
+        if (pos < 0 || pos >= list.size || list[pos] != factorId) {
             // Index miss/desync — fall back to the linear scan and resync this lit's positions.
             list.removeValue(factorId)
             boolWatchPos.remove(key)
@@ -1261,7 +1263,7 @@ class PropagationState(
         if (pos != last) {
             val movedFid = list[last]
             list[pos] = movedFid
-            boolWatchPos[packWatch(movedFid, lit)] = pos
+            boolWatchPos.put(packWatch(movedFid, lit), pos)
         }
         list.truncateTo(last)
         boolWatchPos.remove(key)
@@ -1271,7 +1273,7 @@ class PropagationState(
      *  fallback in [removeBoolWatch]). */
     private fun resyncBoolWatchPos(lit: Int) {
         val list = boolWatchersByLit[lit]
-        for (i in 0 until list.size) boolWatchPos[packWatch(list[i], lit)] = i
+        for (i in 0 until list.size) boolWatchPos.put(packWatch(list[i], lit), i)
     }
 
     init {

@@ -9,6 +9,7 @@ import com.eignex.klause.solver.propagation.PropagationResult.Unsat
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IndexedMaxHeap
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.random.Random
@@ -1002,7 +1003,7 @@ private fun probeAndOrder(
             if (d.size <= maxProbes) {
                 IntArray(d.size) { d.valueAt(it) }
             } else {
-                val seen = HashSet<Int>(maxProbes * 2)
+                val seen = IntHashSet(maxProbes * 2)
                 val sample = IntArray(maxProbes)
                 var i = 0
                 var guard = 0
@@ -1033,7 +1034,7 @@ private fun probeAndOrder(
     if (varRef is VarRef.IntVar) {
         val d = session.intDomain(varRef.varId)
         if (candidates.size < d.size) {
-            val probed = HashSet<Int>(candidates.size * 2).apply {
+            val probed = IntHashSet(candidates.size * 2).apply {
                 for ((p, _) in scored) add(p)
                 for (c in candidates) add(c)
             }

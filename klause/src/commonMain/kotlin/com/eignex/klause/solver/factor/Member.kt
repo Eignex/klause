@@ -7,6 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `member_int(xs, y)` — `y` equals at least one of the `xs[i]`. The dual of
@@ -63,7 +64,7 @@ class Member(
         val yv = state.assignment.intValue(y)
         val dy = state.problem.intDomains[y]
         // Direction 1: snap y to an existing xs[i] value.
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         for (x in xs) {
             val xv = state.assignment.intValue(x)
             if (seen.add(xv) && xv != yv && xv in dy) {
@@ -89,7 +90,7 @@ class Member(
      *  bound still at its original value (a structural/global fact with no trail literal).
      *  Uses the same atoms as [collectHoleAndBoundAntecedents], so soundness/level handling
      *  matches. Caller guarantees `v !in dom(x)`. */
-    private fun addExcludeLit(state: PropagationState, x: Int, v: Int, out: IntArrayList, seen: HashSet<Int>) {
+    private fun addExcludeLit(state: PropagationState, x: Int, v: Int, out: IntArrayList, seen: IntHashSet) {
         val d = state.intDomains[x]
         val orig = state.problem.intDomains[x]
         val lit = when {
@@ -101,7 +102,7 @@ class Member(
     }
 
     /** Append `y`'s pin literals (the tightened bounds collapsing it to a singleton). */
-    private fun addPinLits(state: PropagationState, out: IntArrayList, seen: HashSet<Int>) {
+    private fun addPinLits(state: PropagationState, out: IntArrayList, seen: IntHashSet) {
         val d = state.intDomains[y]
         val orig = state.problem.intDomains[y]
         if (d.min > orig.min) {
@@ -132,7 +133,7 @@ class Member(
                 // pin plus, per candidate, only the literal that excludes yv — not its whole
                 // domain. (Every candidate participates, so the var set itself is minimal.)
                 val out = IntArrayList()
-                val seen = HashSet<Int>()
+                val seen = IntHashSet()
                 addPinLits(state, out, seen)
                 for (x in xs) addExcludeLit(state, x, yv, out, seen)
                 state.refPayload[factorId] = if (out.size == 0) null else out.toIntArray()

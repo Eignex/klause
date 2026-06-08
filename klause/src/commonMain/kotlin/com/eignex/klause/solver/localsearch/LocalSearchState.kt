@@ -12,7 +12,11 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 import kotlin.random.Random
 
 /**
@@ -251,8 +255,8 @@ class LocalSearchState(
     /** Re-evaluate the definitional cone the [move]'s touched vars feed, in topological order,
      *  writing changes through the incremental primitives (no full recompute). */
     private fun propagateInvariants(net: InvariantNetwork, move: Move) {
-        val ints = ArrayList<Int>(2)
-        val bools = ArrayList<Int>(2)
+        val ints = IntArrayList(2)
+        val bools = IntArrayList(2)
         fun collect(m: Move) {
             when (m) {
                 is Move.BoolFlip -> bools.add(m.varId)
@@ -419,8 +423,8 @@ class LocalSearchState(
         // factor doesn't try to override the choice. Without this two Linear EQs sharing
         // the same compensation target would both add IntSet for it and the second one
         // would clobber the first.
-        val pinned = HashSet<Int>()
-        pinned += intVar
+        val pinned = IntHashSet()
+        pinned.add(intVar)
         parts += Move.IntSet(intVar, newValue)
         for (fid in problem.intOccurrences[intVar]) {
             val f = factors[fid]
@@ -469,7 +473,7 @@ class LocalSearchState(
         oldV: Int,
         newV: Int,
         parts: ArrayList<Move>,
-        pinned: HashSet<Int>,
+        pinned: IntHashSet,
     ) {
         var coeffV = 0
         for (i in f.vars.indices) {
@@ -506,7 +510,7 @@ class LocalSearchState(
         val dom = problem.intDomains[u]
         if (newU < dom.min || newU > dom.max) return
         parts += Move.IntSet(u, newU)
-        pinned += u
+        pinned.add(u)
     }
 
     /** Net cost change if [move] were applied, without mutating state. */
@@ -753,7 +757,8 @@ class LocalSearchState(
         val oldStep = step
         val oldCost = cost
         val oldBestCost = bestCostSeen
-        val oldViolatedIds: Set<Int> = violated.toIntArray().toHashSet()
+        val oldViolatedIds = IntHashSet(violated.size)
+        violated.forEach { oldViolatedIds.add(it) }
         val oldBoolConf = boolConfChange.copyOf()
         val oldIntConf = intConfChange.copyOf()
         // Degree snapshot for the exact weighted delta — same O(n)-copy class as the
@@ -873,7 +878,7 @@ class LocalSearchState(
      *  (sharing a variable) — the ejection-step vocabulary for chain firsts. */
     private fun neighbourPrimitives(fid: Int, sink: MoveSink) {
         val f = factors[fid]
-        val seenFactors = HashSet<Int>()
+        val seenFactors = IntHashSet()
         for (v in f.intVars) for (nf in problem.intOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
         for (v in f.boolVars) for (nf in problem.boolOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
     }
@@ -883,7 +888,7 @@ class LocalSearchState(
      *  endpoint is the semantic "remove from the structure" eject (next[i] → 0), the move
      *  that lets a chain dismantle a parasitic successor fragment backwards — ±1 alone
      *  cannot express that jump and the prize-collecting orbit stays closed without it. */
-    private fun emitFactorPrimitives(seed: Int, nf: Int, seenFactors: HashSet<Int>, sink: MoveSink) {
+    private fun emitFactorPrimitives(seed: Int, nf: Int, seenFactors: IntHashSet, sink: MoveSink) {
         if (nf == seed || !seenFactors.add(nf)) return
         val nfac = factors[nf]
         for (u in nfac.intVars) {
@@ -915,13 +920,13 @@ class LocalSearchState(
         val oldIntConf = intConfChange.copyOf()
         val parts = ArrayList<Move>(maxDepth + 1)
         val inverses = ArrayList<Move>(maxDepth + 1)
-        val savedSlots = ArrayList<Int>(maxDepth + 1)
-        val savedTouched = ArrayList<Long>(maxDepth + 1)
-        val savedCounts = ArrayList<Int>(maxDepth + 1)
-        val pinnedSlots = HashSet<Int>()
+        val savedSlots = IntArrayList(maxDepth + 1)
+        val savedTouched = LongArrayList(maxDepth + 1)
+        val savedCounts = IntArrayList(maxDepth + 1)
+        val pinnedSlots = IntHashSet()
         // Degree of every potentially-affected factor at its first sighting — the chain-start
         // baseline that "newly regressed" is measured against.
-        val baseDegree = HashMap<Int, Int>()
+        val baseDegree = MutableIntIntMap()
 
         fun applyPart(p: Move) {
             val slot = slotOf(p)
@@ -961,7 +966,7 @@ class LocalSearchState(
 
         for (i in inverses.indices.reversed()) apply(inverses[i])
         step = oldStep
-        for (i in savedSlots.indices) {
+        for (i in 0 until savedSlots.size) {
             lastTouched[savedSlots[i]] = savedTouched[i]
             touchCount[savedSlots[i]] = savedCounts[i]
         }
@@ -975,15 +980,15 @@ class LocalSearchState(
     /** Record into [base] the current degree of every factor [p] could affect — factors over
      *  [p]'s own variable plus factors over any defined variable in its invariant cone —
      *  keeping the *first* sighting (the chain-start baseline). */
-    private fun recordBaseDegrees(p: Move, base: HashMap<Int, Int>) {
+    private fun recordBaseDegrees(p: Move, base: MutableIntIntMap) {
         when (p) {
             is Move.BoolFlip -> {
-                for (fid in problem.boolOccurrences[p.varId]) base.getOrPut(fid) { factorDegree[fid] }
+                for (fid in problem.boolOccurrences[p.varId]) recordFirstDegree(base, fid)
                 recordConeDegrees(intSeeds = EMPTY_INTS, boolSeeds = intArrayOf(p.varId), base)
             }
 
             is Move.IntSet -> {
-                for (fid in problem.intOccurrences[p.varId]) base.getOrPut(fid) { factorDegree[fid] }
+                for (fid in problem.intOccurrences[p.varId]) recordFirstDegree(base, fid)
                 recordConeDegrees(intSeeds = intArrayOf(p.varId), boolSeeds = EMPTY_INTS, base)
             }
 
@@ -991,29 +996,35 @@ class LocalSearchState(
         }
     }
 
+    /** Record [factorDegree] for [fid] on its first sighting only (mirrors `getOrPut`). */
+    private fun recordFirstDegree(base: MutableIntIntMap, fid: Int) {
+        if (!base.containsKey(fid)) base.put(fid, factorDegree[fid])
+    }
+
     /** [recordBaseDegrees] helper: factors over the invariant cone's output vars. */
-    private fun recordConeDegrees(intSeeds: IntArray, boolSeeds: IntArray, base: HashMap<Int, Int>) {
+    private fun recordConeDegrees(intSeeds: IntArray, boolSeeds: IntArray, base: MutableIntIntMap) {
         val net = invariants ?: return
         for (idx in net.affectedNodes(intSeeds, boolSeeds)) {
             val n = net.node(idx)
             val occ = if (n.outIsBool) problem.boolOccurrences[n.out] else problem.intOccurrences[n.out]
-            for (fid in occ) base.getOrPut(fid) { factorDegree[fid] }
+            for (fid in occ) recordFirstDegree(base, fid)
         }
     }
 
     /** The factor with the largest weighted degree increase over its chain-start baseline,
      *  or -1 when nothing regressed (the chain caused no new damage). */
-    private fun worstRegressedFactor(base: HashMap<Int, Int>): Int {
+    private fun worstRegressedFactor(base: MutableIntIntMap): Int {
         val w = factorWeights
         var worst = -1
         var worstScore = 0.0
-        for ((fid, deg0) in base) {
+        base.forEach { fid, deg0 ->
             val inc = factorDegree[fid] - deg0
-            if (inc <= 0) continue
-            val s = w[fid] * inc
-            if (s > worstScore) {
-                worstScore = s
-                worst = fid
+            if (inc > 0) {
+                val s = w[fid] * inc
+                if (s > worstScore) {
+                    worstScore = s
+                    worst = fid
+                }
             }
         }
         return worst
@@ -1022,7 +1033,7 @@ class LocalSearchState(
     /** Best repair proposal of [target] that avoids every pinned slot, by immediate
      *  [netDelta] probe (ties broken uniformly). Null when [target] proposes nothing
      *  eligible — the chain ends. */
-    private fun pickChainRepair(target: Int, pinnedSlots: HashSet<Int>, propose: MoveSink): Move? {
+    private fun pickChainRepair(target: Int, pinnedSlots: IntHashSet, propose: MoveSink): Move? {
         propose.clear()
         factors[target].proposeRepairMoves(this, target, propose)
         var best: Move? = null

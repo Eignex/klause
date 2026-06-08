@@ -19,6 +19,7 @@ import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.util.IntHashSet
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
 
@@ -987,7 +988,7 @@ class BacktrackSolver(override val problem: Problem) :
         val remainingCap = (cap - glueCount).coerceAtLeast(0)
         if (nonGlue.size <= remainingCap) return // already under cap
         nonGlue.sortBy { it[0] } // ascending LBD
-        val kept = HashSet<Int>(remainingCap)
+        val kept = IntHashSet(remainingCap)
         for (k in 0 until remainingCap) kept.add(nonGlue[k][1])
         session.forgetLearnedClauses { idx, lbd ->
             lbd <= glueThreshold || session.learnedClausePermanent(idx) || idx in kept

@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * `all_equal_int(xs)` — every `xs[i]` takes the same value. Trivially equivalent to a
@@ -54,15 +55,28 @@ class AllEqual(
      *  Falls back to the secondary mode if the primary target is out of some domains. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
-        val counts = HashMap<Int, Int>(xs.size)
-        for (v in xs) {
-            val cur = state.assignment.intValue(v)
-            counts[cur] = (counts[cur] ?: 0) + 1
+        val counts = MutableIntIntMap(xs.size)
+        for (v in xs) counts.addTo(state.assignment.intValue(v), 1)
+        // Try the top-2 most-frequent values; if first is rejected by some domain, the second
+        // often succeeds. A two-slot scan finds them without sorting a boxed entry list.
+        var best = 0
+        var bestCnt = -1
+        var second = 0
+        var secondCnt = -1
+        counts.forEach { value, count ->
+            if (count > bestCnt) {
+                second = best
+                secondCnt = bestCnt
+                best = value
+                bestCnt = count
+            } else if (count > secondCnt) {
+                second = value
+                secondCnt = count
+            }
         }
-        // Try the top-2 most-frequent values; if first is rejected by some domain, the
-        // second often succeeds. Keeps the proposal-set small.
-        val ranked = counts.entries.sortedByDescending { it.value }
-        for ((target, _) in ranked.take(2)) {
+        for (pass in 0 until 2) {
+            val target = if (pass == 0) best else second
+            if ((if (pass == 0) bestCnt else secondCnt) < 0) continue
             for (v in xs) {
                 val cur = state.assignment.intValue(v)
                 if (cur != target && target in state.problem.intDomains[v]) {

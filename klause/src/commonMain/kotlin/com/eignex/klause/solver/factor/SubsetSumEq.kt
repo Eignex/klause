@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * Exact reachability filtering for `Σ coeffs[i]·xs[i] == target` over 0/1 integer vars with
@@ -97,7 +98,7 @@ class SubsetSumEq(
 
     /** Coarse, sound reason: the equality atoms of every currently-pinned var in scope. */
     private fun pinnedReason(state: PropagationState): IntArray? {
-        val pinned = ArrayList<Int>(xs.size)
+        val pinned = IntArrayList(xs.size)
         for (v in xs) {
             val d = state.intDomains[v]
             if (d.min == d.max) pinned.add(v)

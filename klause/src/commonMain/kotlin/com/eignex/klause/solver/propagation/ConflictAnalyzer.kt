@@ -2,6 +2,8 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * First-UIP (Unique Implication Point) conflict analyzer — the classical CDCL clause-learning
@@ -312,7 +314,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      *  in one pass via this helper. */
     private fun distinctLevelsOf(learned: IntArrayList): IntArray {
         if (learned.size == 0) return IntArray(0)
-        val seen = HashSet<Int>(learned.size)
+        val seen = IntHashSet(learned.size)
         for (i in 0 until learned.size) seen.add(levelOf(Lit.variable(learned[i])))
         val out = seen.toIntArray()
         out.sort()
@@ -343,7 +345,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             val v = Lit.variable(learned[i])
             if (v < universeSize) inClause[v] = true
         }
-        val cache = HashMap<Int, Boolean>(learned.size * 4)
+        // Per-call redundancy memo: -1 absent, 0 = non-redundant, 1 = redundant. A primitive
+        // int map avoids boxing the var key and the Boolean value per cached node.
+        val cache = MutableIntIntMap(learned.size * 4)
         toDrop = scratch(toDrop, universeSize)
         var dropCount = 0
         for (i in 0 until learned.size) {
@@ -374,10 +378,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * depth is bounded by the size of the implication graph reached, but the cache
      * keeps the total work linear.
      */
-    private fun isRedundant(root: Int, inClause: BooleanArray, cache: HashMap<Int, Boolean>): Boolean {
-        cache[root]?.let { return it }
+    private fun isRedundant(root: Int, inClause: BooleanArray, cache: MutableIntIntMap): Boolean {
+        val cachedRoot = cache.getOrDefault(root, -1)
+        if (cachedRoot >= 0) return cachedRoot == 1
         val rootAnt = antecedentsOf(root) ?: run {
-            cache[root] = false
+            cache.put(root, 0)
             return false
         }
         // Iterative post-order DFS over the implication graph, replacing the former recursion
@@ -409,10 +414,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     failed = true
                     break
                 }
-                when (cache[u]) {
-                    true -> continue
+                when (cache.getOrDefault(u, -1)) {
+                    1 -> continue
 
-                    false -> {
+                    0 -> {
                         failed = true
                         break
                     }
@@ -420,7 +425,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     else -> {
                         val uAnt = antecedentsOf(u)
                         if (uAnt == null) {
-                            cache[u] = false
+                            cache.put(u, 0)
                             failed = true
                             break
                         }
@@ -440,12 +445,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 // current path — non-redundant. Mark them all and stop.
                 for (k in 0 until redVarStack.size) {
                     val a = redVarStack[k]
-                    cache[a] = false
+                    cache.put(a, 0)
                     if (a < onPath.size) onPath[a] = false
                 }
                 return false
             }
-            cache[v] = true // all antecedents resolved redundant
+            cache.put(v, 1) // all antecedents resolved redundant
             if (v < onPath.size) onPath[v] = false
             redVarStack.removeAt(top)
             redAntStack.removeAt(redAntStack.size - 1)
