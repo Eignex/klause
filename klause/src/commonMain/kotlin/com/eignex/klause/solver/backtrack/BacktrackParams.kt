@@ -173,6 +173,15 @@ data class BacktrackParams(
      * and rarely repay the solve. `Int.MAX_VALUE` (default) applies LP bounding at every depth.
      */
     val lpBoundMaxDepth: Int = Int.MAX_VALUE,
+    /**
+     * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
+     * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
+     * re-optimises in a handful of dual pivots. The constraint matrix is identical across nodes
+     * (only bounds change), so the basis transfers directly. Sound either way — a stale or singular
+     * basis just falls back to a cold solve; this only changes pivot count, never the result.
+     * Enabled by default when [lpBounding] is on.
+     */
+    val lpWarmStart: Boolean = true,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

@@ -47,6 +47,8 @@ data class SolveStats(
     val lpPruned: SumResult = ZERO_COUNT,
     /** Domain reductions applied by LP reduced-cost fixing (#21). */
     val lpFixed: SumResult = ZERO_COUNT,
+    /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
+    val lpPivots: SumResult = ZERO_COUNT,
     val peakDepth: MaxResult = NO_MAX,
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     val wallMs: Long = 0L,
@@ -80,6 +82,7 @@ data class SolveStats(
             learnedClauses = SumResult(learnedClauses.sum + other.learnedClauses.sum),
             lpPruned = SumResult(lpPruned.sum + other.lpPruned.sum),
             lpFixed = SumResult(lpFixed.sum + other.lpFixed.sum),
+            lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
             peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
             depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
             wallMs = maxOf(wallMs, other.wallMs),
@@ -114,6 +117,7 @@ internal class SolveStatsSink(val backend: String) {
     val relearned: CountStat = CountStat()
     val lpPruned: CountStat = CountStat()
     val lpFixed: CountStat = CountStat()
+    val lpPivots: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
 
@@ -176,6 +180,11 @@ internal class SolveStatsSink(val backend: String) {
         lpFixed.update(1.0)
     }
 
+    /** Record [count] dual-simplex pivots from one node LP solve. */
+    fun observeLpPivots(count: Int) {
+        repeat(count) { lpPivots.update(1.0) }
+    }
+
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
      *  uses the most recent [start] / [stop] window; if [stop] hasn't been called yet, we
      *  read the elapsed time from now. */
@@ -193,6 +202,7 @@ internal class SolveStatsSink(val backend: String) {
             relearned = relearned.read(),
             lpPruned = lpPruned.read(),
             lpFixed = lpFixed.read(),
+            lpPivots = lpPivots.read(),
             peakDepth = peakDepth.read(),
             depthMean = depthMean.read(),
             wallMs = elapsedMs,
