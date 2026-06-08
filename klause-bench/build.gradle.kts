@@ -30,10 +30,8 @@ application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
-/** Forward any `-Dklause.*` props from the gradle invocation into the JavaExec child JVM so
- *  callers can tune every bench / selection / diagnostic knob (`klause.bench.*`,
- *  `klause.measure.*`, `klause.cblsdiag.*`, …) without editing source. Uses doFirst so the
- *  System.getProperties() snapshot is captured at execution time — config-cache safe. */
+/** Forward `-Dklause.*` props into the JavaExec child JVM so callers can tune any bench knob
+ *  from the gradle invocation. doFirst keeps the property snapshot config-cache safe. */
 fun JavaExec.forwardBenchProps() {
     doFirst {
         for ((k, v) in System.getProperties()) {
@@ -43,9 +41,8 @@ fun JavaExec.forwardBenchProps() {
     }
 }
 
-/** Single bench entry point. `./gradlew :klause-bench:bench --args="<target-id>"`; pass
- *  `list` (or no args) to see the available targets and catalog suites. Each target binds a
- *  set of catalog suites to a metric (time / uniformness / completeness / verify). */
+/** Single bench entry point: `./gradlew :klause-bench:bench --args="<target-id>"`, or
+ *  `--args="list"` to enumerate targets. Each target binds catalog suites to a metric. */
 tasks.register<JavaExec>("bench") {
     group = "bench"
     description = "Run a bench target by id. Use --args=\"list\" to enumerate targets."
