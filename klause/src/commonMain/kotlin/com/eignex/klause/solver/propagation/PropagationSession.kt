@@ -240,6 +240,38 @@ class PropagationSession(
         return addLearnedClause(Clause(intArrayOf(Lit.make(atom, true))), lbd = 1, permanent = true)
     }
 
+    /**
+     * Apply a domain reduction inferred at the **current** decision level — for LP reduced-cost
+     * fixing (#21). Like [addLearnedClause] and unlike the `pin*` decisions, this opens **no** new
+     * level: the tightening is folded into the current level's baseline (re-snapshotted mark), so
+     * [popLast] of that level undoes it. That is exactly right for a subtree-local inference, which
+     * is valid only under this node's bounds and the current incumbent and must vanish on backtrack.
+     *
+     * The reduction is recorded with no antecedents, so conflict analysis treats its bound atom as a
+     * level leaf (like a decision). That is sound: a conflict it triggers is a real infeasibility of
+     * the problem under the path bounds plus this tightening, so any learned nogood is globally
+     * valid; the reduction itself never escapes its level.
+     */
+    fun implyIntAtMost(v: Int, hi: Int): PropagationResult = implyAtCurrentLevel { state.tightenIntMax(v, hi) }
+
+    /** Lower-bound reduced-cost reduction at the current level. See [implyIntAtMost]. */
+    fun implyIntAtLeast(v: Int, lo: Int): PropagationResult = implyAtCurrentLevel { state.tightenIntMin(v, lo) }
+
+    /** Boolean reduced-cost fixing at the current level. See [implyIntAtMost]. */
+    fun implyBool(v: Int, value: Boolean): PropagationResult = implyAtCurrentLevel { state.pinBool(v, value) }
+
+    private fun implyAtCurrentLevel(apply: () -> Boolean): PropagationResult {
+        bakedUnsat?.let { return it }
+        val base = state.undoTop
+        if (!apply()) return revertAndUnsat(state.conflictLevels.orEmpty())
+        val conflict = state.runToFixpoint(allFactors = false)
+        if (conflict != null) return revertAndUnsat(conflict)
+        // Fold into the current level's baseline so a later same-level revert keeps it, and so
+        // popLast of this level — and only this level — discards it. Mirrors addLearnedClause.
+        levelStates[levelTop - 1] = state.mark()
+        return impliedSince(base)
+    }
+
     /** Forward to [PropagationState.forgetLearnedClauses]. Called by the engine's
      *  restart hook to bound the learned-clause database. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
