@@ -100,6 +100,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
     p.long("max-decisions")?.let { out = out.copy(maxDecisions = it) }
     p.long("luby")?.let { out = out.copy(lubyRestartBase = it) }
+    p.bool("adaptive-restart")?.let { out = out.copy(adaptiveRestart = it) }
     p.bool("phase-saving")?.let { out = out.copy(phaseSaving = it) }
     p.bool("target-phasing")?.let { out = out.copy(targetPhasing = it) }
     p.long("rephase-interval")?.let { out = out.copy(rephaseInterval = it) }
@@ -111,8 +112,8 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.valHeuristic("val-heuristic")?.let { out = out.copy(valueHeuristic = it) }
     p.finish(
         "cp",
-        "seed, max-decisions, luby, phase-saving, target-phasing, rephase-interval, " +
-            "max-learned, lbd-glue, tiered-db, mid-lbd, var-heuristic, val-heuristic",
+        "seed, max-decisions, luby, adaptive-restart, phase-saving, target-phasing, " +
+            "rephase-interval, max-learned, lbd-glue, tiered-db, mid-lbd, var-heuristic, val-heuristic",
     )
     return out
 }

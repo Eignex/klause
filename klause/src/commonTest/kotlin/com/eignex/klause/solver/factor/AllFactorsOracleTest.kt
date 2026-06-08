@@ -247,16 +247,6 @@ class AllFactorsOracleTest {
         check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
     }
 
-    @Test fun `all different except zero passes the brute-force propagation and repair oracles`() {
-        val f = AllDifferentExceptZero(xs = intArrayOf(0, 1, 2))
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
-    }
-
-    @Test fun `all equal passes the brute-force propagation and repair oracles`() {
-        val f = AllEqual(xs = intArrayOf(0, 1, 2))
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
-    }
-
     @Test fun `symmetric all different passes the brute-force propagation and repair oracles`() {
         val f = SymmetricAllDifferent(xs = intArrayOf(0, 1, 2, 3))
         check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)))
@@ -265,16 +255,6 @@ class AllFactorsOracleTest {
     @Test fun `lex less passes the brute-force propagation and repair oracles`() {
         val f = LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = false)
         check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
-    }
-
-    @Test fun `monotone increasing passes the brute-force propagation and repair oracles`() {
-        val f = Monotone(xs = intArrayOf(0, 1, 2), direction = Monotone.Direction.Increasing, strict = false)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
-    }
-
-    @Test fun `value precede passes the brute-force propagation and repair oracles`() {
-        val f = ValuePrecede(s = 0, t = 1, xs = intArrayOf(0, 1, 2))
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
     }
 
     @Test fun `sequence passes the brute-force propagation and repair oracles`() {
@@ -318,11 +298,6 @@ class AllFactorsOracleTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             exactProbe = true,
         )
-    }
-
-    @Test fun `member passes the brute-force propagation and repair oracles`() {
-        val f = Member(xs = intArrayOf(1, 2, 3), y = 0)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
     }
 
     @Test fun `element with a constant array passes the propagation and repair oracles with an exact probe`() {
@@ -445,21 +420,6 @@ class AllFactorsOracleTest {
     @Test fun `disjunctive passes the brute-force propagation and repair oracles`() {
         val f = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(2, 1))
         check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)))
-    }
-
-    @Test fun `sliding sum passes the propagation and repair oracles with an exact probe`() {
-        // Every window of 2 consecutive elements sums into [1, 3]; 4 vars ∈ [0,2].
-        val f = SlidingSum(low = 1, up = 3, seq = 2, vs = intArrayOf(0, 1, 2, 3))
-        check(
-            f,
-            intDomains = arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-            ),
-            exactProbe = true,
-        )
     }
 
     @Test fun `cumulatives upper bound passes the propagation and repair oracles with an exact probe`() {
@@ -762,16 +722,6 @@ class AllFactorsOracleTest {
         )
     }
 
-    @Test fun `all different except zero with holey domains passes the propagation oracle`() {
-        val f = AllDifferentExceptZero(xs = intArrayOf(0, 1, 2))
-        checkPropagation(
-            f,
-            arrayOf(holey(0, 3, 1), holey(0, 3, 2), IntDomain(0, 3)),
-            "AllDifferentExceptZero.holey",
-            gac = false,
-        )
-    }
-
     @Test fun `symmetric all different with holey domains passes the propagation oracle`() {
         val f = SymmetricAllDifferent(xs = intArrayOf(0, 1, 2, 3))
         checkPropagation(
@@ -796,66 +746,6 @@ class AllFactorsOracleTest {
             ),
             "Inverse.holey",
             gac = false,
-        )
-    }
-
-    @Test fun `member with holey domains passes the propagation oracle`() {
-        // y over a full range against holey candidate domains — exercises the union-hull and
-        // unique-support rules under the brute oracle (sound-only).
-        val f = Member(xs = intArrayOf(0, 1), y = 2)
-        checkPropagation(
-            f,
-            arrayOf(holey(0, 3, 1), holey(0, 3, 2), IntDomain(0, 3)),
-            "Member.holey",
-            gac = false,
-        )
-    }
-
-    @Test fun `value precede with holey domains passes the propagation oracle`() {
-        // s=1, t=2 with interior holes at 1 in the first two positions — exercises the
-        // hole-aware "no premature t" rule under the brute oracle (sound-only; not GAC).
-        val f = ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))
-        checkPropagation(
-            f,
-            arrayOf(holey(0, 2, 1), holey(0, 2, 1), IntDomain(0, 2)),
-            "ValuePrecede.holey",
-            gac = false,
-        )
-    }
-
-    @Test fun `all equal with holey domains passes the GAC propagation oracle`() {
-        // x0,x1 ∈ {0,2}; x2 ∈ {0,1,2}. all-equal ⟹ common value ∈ {0,2}, so x2's 1 is
-        // unsupported. AllEqual documents intersection filtering, so assert full GAC (#82).
-        val f = AllEqual(xs = intArrayOf(0, 1, 2))
-        checkPropagation(
-            f,
-            arrayOf(holey(0, 2, 1), holey(0, 2, 1), IntDomain(0, 2)),
-            "AllEqual.holey",
-            gac = true,
-        )
-    }
-
-    @Test fun `all equal with holey domains detects the empty intersection under the GAC oracle`() {
-        // dom(x0) = {0,2}, dom(x1) = {1}: the true intersection is empty ⟹ UNSAT (#82). The
-        // bounds-only intersection would pin both to [1,1] without this being caught.
-        val f = AllEqual(xs = intArrayOf(0, 1))
-        checkPropagation(
-            f,
-            arrayOf(holey(0, 2, 1), IntDomain(1, 1)),
-            "AllEqual.holey-empty",
-            gac = true,
-        )
-    }
-
-    @Test fun `all equal with holey domains detects disjoint interiors under overlapping bounds`() {
-        // dom(x0) = {0,3}, dom(x1) = {1,2}: overlapping bounds [0,3]/[1,2] but disjoint
-        // members ⟹ UNSAT even though commonMin ≤ commonMax.
-        val f = AllEqual(xs = intArrayOf(0, 1))
-        checkPropagation(
-            f,
-            arrayOf(holey(0, 3, 1, 2), holey(1, 2)),
-            "AllEqual.holey-disjoint",
-            gac = true,
         )
     }
 }

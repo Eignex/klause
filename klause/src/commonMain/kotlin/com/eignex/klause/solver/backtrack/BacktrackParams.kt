@@ -52,6 +52,17 @@ data class BacktrackParams(
      */
     val lubyRestartBase: Long? = null,
     /**
+     * Glucose-style adaptive restarts (Audemard-Simon) for the pure-Boolean search path.
+     * When true, the engine restarts based on learned-clause quality — a short window of
+     * recent LBD running hotter than the long-run average forces a re-pick — with trail-size
+     * blocking that suppresses the restart when the solver is driving deep toward a model.
+     * See [GlucoseRestart]. Selectable *alongside* [lubyRestartBase] rather than replacing it:
+     * when adaptive restarts are on the Luby budget is ignored, so SAT-heavy configs opt into
+     * data-driven restarts while the CP optimization path keeps Luby. Disabled by default. On
+     * larger random instances near the phase transition (see #117) this usually beats Luby.
+     */
+    val adaptiveRestart: Boolean = false,
+    /**
      * Phase-saving: cache the last value the search committed to for each variable.
      * On a fresh descent (after a backtrack or restart) the cached value is tried
      * first, so the search doesn't lose the work spent narrowing down the right
