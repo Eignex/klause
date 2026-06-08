@@ -1056,10 +1056,17 @@ object IndomainRandom : ValueHeuristic {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            // Materialise the actual non-hole values via valueAt, shuffle, return.
-            val list = IntArray(d.size) { d.valueAt(it) }.toMutableList()
-            list.shuffle(rng)
-            list.asSequence()
+            // Materialise the actual non-hole values via valueAt, then Fisher-Yates shuffle in
+            // place. Kotlin has no primitive-array shuffle, so shuffling the raw IntArray avoids
+            // boxing every value into a MutableList<Int> on each branching node.
+            val arr = IntArray(d.size) { d.valueAt(it) }
+            for (i in arr.size - 1 downTo 1) {
+                val j = rng.nextInt(i + 1)
+                val tmp = arr[i]
+                arr[i] = arr[j]
+                arr[j] = tmp
+            }
+            arr.asSequence()
         }
     }
 }
