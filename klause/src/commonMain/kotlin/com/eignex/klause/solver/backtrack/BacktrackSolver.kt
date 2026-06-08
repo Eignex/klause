@@ -525,13 +525,23 @@ class BacktrackSolver(override val problem: Problem) :
             return session.assertObjectiveBound(objectiveVar, threshold, atMost = objectiveAscending) is
                 PropagationResult.Unsat
         }
+        // Glucose-style adaptive restart policy (#198). When enabled it replaces the Luby
+        // budget: restarts fire on learned-clause quality (recent LBD vs the long-run average),
+        // with trail-size blocking. `restartRequested` is set by the conflict handlers and
+        // consumed at the top of the inner loop; the policy's own stats persist across restarts.
+        val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
+        var restartRequested = false
         var lubyIdx = 1L
         outer@ while (true) {
-            val perRunBudget: Long = params.lubyRestartBase?.let { base ->
-                // Cap multiplication to avoid overflow on tiny base + huge lubyIdx.
-                val limit = lubyN(lubyIdx)
-                if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
-            } ?: Long.MAX_VALUE
+            val perRunBudget: Long = if (glucose != null) {
+                Long.MAX_VALUE // adaptive restarts drive the schedule; the Luby budget is off
+            } else {
+                params.lubyRestartBase?.let { base ->
+                    // Cap multiplication to avoid overflow on tiny base + huge lubyIdx.
+                    val limit = lubyN(lubyIdx)
+                    if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
+                } ?: Long.MAX_VALUE
+            }
             var decisionsThisRun = 0L
 
             val trail: MutableList<TrailNode> = ArrayList()
@@ -546,8 +556,10 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                     cancelCheckCountdown = CANCEL_CHECK_INTERVAL
                 }
-                // Luby budget hit → pop back to root and restart.
-                if (decisionsThisRun >= perRunBudget) {
+                // Restart trigger: Luby budget hit, or the adaptive policy asked to re-pick.
+                // Either way pop back to root and restart.
+                if (decisionsThisRun >= perRunBudget || restartRequested) {
+                    restartRequested = false
                     while (trail.isNotEmpty()) {
                         session.popLast()
                         trail.removeAt(trail.size - 1)
@@ -638,9 +650,14 @@ class BacktrackSolver(override val problem: Problem) :
                             if (touchedSeedLevels != null) {
                                 for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
                             }
-                            // Trail size == session.decisionLevel here (the failed pin was
-                            // self-reverted by the session); execute the backjump + learn
-                            // sequence. On cascading conflict during assertion, recurse.
+                            // Feed the learned clause's LBD and the current depth to the
+                            // adaptive restart policy (trail size == decision level here; the
+                            // failed pin was self-reverted by the session).
+                            if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
+                                restartRequested = true
+                            }
+                            // Execute the backjump + learn sequence. On cascading conflict
+                            // during assertion, recurse.
                             val term = backjumpAndLearn(
                                 out.learned, trail, session, params,
                                 boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false,
@@ -737,6 +754,9 @@ class BacktrackSolver(override val problem: Problem) :
                         is AdvanceOutcome.Backjump -> {
                             if (touchedSeedLevels != null) {
                                 for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                            }
+                            if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
+                                restartRequested = true
                             }
                             // Else-path: session has been popped below trail.last; align
                             // first (trail.removeAt) then proceed to backjump + learn.
