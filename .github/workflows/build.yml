@@ -60,10 +60,10 @@ jobs:
       # -Ptargets.hostOnly: only jvm + linuxX64 here; the full matrix (apple, windows,
       # js/wasm with their browser/node runtimes) builds and tests on release.
 
-      # Repo-wide detekt (kumulant runs lintDocs here; klause's dokka half is blocked on a
-      # backlog of unresolved KDoc links — see the tracking issue).
+      # Repo-wide lintDocs: detekt plus dokka with fail-on-warning, for KDoc-link validation
+      # parity with the other modules.
       - name: Run linter
-        run: ./gradlew detekt -Ptargets.hostOnly
+        run: ./gradlew lintDocs -Ptargets.hostOnly
 
       - name: Assemble
         run: ./gradlew assemble -Ptargets.hostOnly

@@ -55,7 +55,6 @@ kotlin {
     }
 }
 
-
 dokka {
     dokkaSourceSets.configureEach {
         sourceLink {
