@@ -43,7 +43,6 @@ internal object MetricRunner {
                     MetricKind.TIME -> TimeMetric.run(corpus.benchEntries)
                     MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
                     MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
-                    else -> error("unreachable")
                 }
             }
         }
