@@ -9,8 +9,8 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
-import java.time.Instant
 import kotlinx.serialization.Serializable
+import java.time.Instant
 
 /**
  * Complete-search effort per problem: run [BacktrackSolver] under a fixed, deterministic CDCL
@@ -29,19 +29,19 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class SearchEffortReport(
-    val name: String,
-    val verdict: String,
-    val solved: Boolean,
-    val nodes: Long,
-    val fails: Long,
-    val learned: Long,
-    val restarts: Long,
-    val wallMs: Long,
-    val timedOut: Boolean,
+    internal val name: String,
+    internal val verdict: String,
+    internal val solved: Boolean,
+    internal val nodes: Long,
+    internal val fails: Long,
+    internal val learned: Long,
+    internal val restarts: Long,
+    internal val wallMs: Long,
+    internal val timedOut: Boolean,
 )
 
 @Serializable
-data class SearchEffortResults(
+internal data class SearchEffortResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,
@@ -54,14 +54,25 @@ data class SearchEffortResults(
     val entries: List<SearchEffortReport>,
 )
 
-object SearchEffortMetric {
+internal object SearchEffortMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget) {
         val seed = System.getProperty("klause.bench.search.seed")?.toLongOrNull() ?: 1L
         println()
-        println("=== search-effort (KLAUSE_COMPLETE, VSIDS+phaseSaving+Luby+LBD, seed=$seed, " +
-            "${budget.timeoutMillis}ms/instance) ===")
-        println("%-22s %-8s %10s %12s %10s %9s %8s".format(
-            "instance", "verdict", "nodes", "fails", "learned", "restarts", "ms"))
+        println(
+            "=== search-effort (KLAUSE_COMPLETE, VSIDS+phaseSaving+Luby+LBD, seed=$seed, " +
+                "${budget.timeoutMillis}ms/instance) ===",
+        )
+        println(
+            "%-22s %-8s %10s %12s %10s %9s %8s".format(
+                "instance",
+                "verdict",
+                "nodes",
+                "fails",
+                "learned",
+                "restarts",
+                "ms",
+            ),
+        )
         val reports = mutableListOf<SearchEffortReport>()
         for (e in entries) {
             val deadline = System.currentTimeMillis() + budget.timeoutMillis
@@ -90,8 +101,17 @@ object SearchEffortMetric {
                 timedOut = st?.timedOut ?: false,
             )
             reports += r
-            println("%-22s %-8s %10d %12d %10d %9d %8d".format(
-                r.name.take(22), r.verdict, r.nodes, r.fails, r.learned, r.restarts, r.wallMs))
+            println(
+                "%-22s %-8s %10d %12d %10d %9d %8d".format(
+                    r.name.take(22),
+                    r.verdict,
+                    r.nodes,
+                    r.fails,
+                    r.learned,
+                    r.restarts,
+                    r.wallMs,
+                ),
+            )
         }
         val solved = reports.filter { it.solved }
         val solvedFails = solved.map { it.fails }.sorted()

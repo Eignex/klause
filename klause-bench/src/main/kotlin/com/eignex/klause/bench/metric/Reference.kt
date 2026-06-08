@@ -7,10 +7,10 @@ import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.ortools.OrToolsParams
 import com.eignex.klause.ortools.OrToolsSolver
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.yuck.YuckParams
 import com.eignex.klause.yuck.YuckSolver
 
@@ -20,13 +20,19 @@ import com.eignex.klause.yuck.YuckSolver
  * surface — solve a [Problem] and minimize an [Objective] under a [Budget] — so metrics can
  * be parameterized over which reference they diff klause against.
  */
-interface Reference {
+internal interface Reference {
     val name: String
 
     /** [search]: annotation-derived klause search params for fixed-track comparisons —
      *  references that can mirror the prescribed search (Choco) apply it; others ignore it. */
     fun solve(problem: Problem, budget: Budget, search: BacktrackParams? = null): SolveResult
-    fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams? = null): MinimizeResult
+    fun minimize(
+        problem: Problem,
+        objective: Objective,
+        budget: Budget,
+        search: BacktrackParams? = null,
+    ): MinimizeResult
+
     /** Anytime incumbent stream for the anytime metric. OR-Tools yields each new incumbent
      *  over time; Choco (complete) yields its single optimum. */
     fun improvements(problem: Problem, objective: Objective, budget: Budget): Sequence<MinimizeResult>
@@ -39,7 +45,7 @@ interface Reference {
             Backend.CHOCO -> ChocoReference
             Backend.ORTOOLS -> OrToolsReference
             Backend.YUCK -> YuckReference
-            else -> error("$backend is not a reference solver (use ${backends})")
+            else -> error("$backend is not a reference solver (use $backends)")
         }
 
         /** Resolve a reference by id ("choco"/"ortools"/"yuck"), e.g. from a system property. */

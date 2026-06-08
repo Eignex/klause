@@ -1,7 +1,5 @@
 package com.eignex.klause.bench.report
 
-import java.io.File
-
 /**
  * Minimal Markdown report builder so metrics emit a human-readable summary alongside their
  * JSON. Centralizes table / section / heading formatting; metrics build a [Markdown] and call
@@ -10,10 +8,10 @@ import java.io.File
 class Markdown {
     private val sb = StringBuilder()
 
-    fun h1(text: String) = apply { sb.append("# ").append(text).append("\n\n") }
-    fun h2(text: String) = apply { sb.append("## ").append(text).append("\n\n") }
-    fun line(text: String = "") = apply { sb.append(text).append('\n') }
-    fun para(text: String) = apply { sb.append(text).append("\n\n") }
+    internal fun h1(text: String) = apply { sb.append("# ").append(text).append("\n\n") }
+    internal fun h2(text: String) = apply { sb.append("## ").append(text).append("\n\n") }
+    internal fun line(text: String = "") = apply { sb.append(text).append('\n') }
+    internal fun para(text: String) = apply { sb.append(text).append("\n\n") }
 
     /** A GitHub-flavored table. [rows] cells are stringified as-is; ragged rows are padded. */
     fun table(headers: List<String>, rows: List<List<Any?>>) = apply {

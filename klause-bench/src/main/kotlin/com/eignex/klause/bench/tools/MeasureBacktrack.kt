@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Invoked via the bench CLI: `./gradlew :klause-bench:bench --args="diag:backtrack"`
  * (knobs via `-Dklause.measure.*`).
  */
-object MeasureBacktrack {
+internal object MeasureBacktrack {
     @JvmStatic
     fun run() = runImpl()
 }
@@ -50,12 +50,12 @@ private fun runImpl() {
     println()
     println(
         "=== BacktrackSolver measurement (heuristic=${if (useVsids) "VSIDS" else "Random"}, " +
-            "lubyBase=${lubyBase ?: "off"}, phaseSaving=$phaseSaving, LBD forget; ${budgetMs}ms budget) ==="
+            "lubyBase=${lubyBase ?: "off"}, phaseSaving=$phaseSaving, LBD forget; ${budgetMs}ms budget) ===",
     )
     println(
         "%-14s %-8s %12s %12s %10s %9s %14s %8s %12s".format(
-            "instance", "verdict", "decisions", "conflicts", "learned", "restarts", "propagations", "depth", "dec/sec"
-        )
+            "instance", "verdict", "decisions", "conflicts", "learned", "restarts", "propagations", "depth", "dec/sec",
+        ),
     )
     for ((name, cnf) in instances) {
         val problem = Dimacs.parse(cnf)
@@ -80,8 +80,8 @@ private fun runImpl() {
         println(
             "%-14s %-8s %12.0f %12.0f %10.0f %9.0f %14.0f %8.0f %12.0f".format(
                 name, verdict, decisions, s.fails.sum, s.learnedClauses.sum, s.restarts.sum,
-                s.propagations.sum, depth, decPerSec
-            )
+                s.propagations.sum, depth, decPerSec,
+            ),
         )
     }
     println()
@@ -94,13 +94,17 @@ private fun generatePhp(n: Int): String {
     fun v(p: Int, h: Int) = p * n + h + 1
     val clauses = StringBuilder()
     var count = 0
-    for (p in 0 until pigeons) {                       // each pigeon in ≥1 hole
+    for (p in 0 until pigeons) { // each pigeon in ≥1 hole
         for (h in 0 until n) clauses.append(v(p, h)).append(' ')
-        clauses.append("0\n"); count++
+        clauses.append("0\n")
+        count++
     }
-    for (h in 0 until n) {                             // ≤1 pigeon per hole
-        for (p in 0 until pigeons) for (q in p + 1 until pigeons) {
-            clauses.append(-v(p, h)).append(' ').append(-v(q, h)).append(" 0\n"); count++
+    for (h in 0 until n) { // ≤1 pigeon per hole
+        for (p in 0 until pigeons) {
+            for (q in p + 1 until pigeons) {
+                clauses.append(-v(p, h)).append(' ').append(-v(q, h)).append(" 0\n")
+                count++
+            }
         }
     }
     return "p cnf ${pigeons * n} $count\n$clauses"

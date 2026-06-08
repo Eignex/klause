@@ -27,6 +27,7 @@ import com.eignex.klause.bench.tools.MeasureBacktrack
  * two stay independent.
  */
 object BenchCli {
+    /** CLI entry point dispatching bench subcommands. */
     @JvmStatic
     fun main(args: Array<String>) {
         when (val cmd = args.firstOrNull() ?: "list") {
@@ -46,7 +47,12 @@ object BenchCli {
     private fun runTarget(id: String) {
         val target = Targets.get(id)
         println("=== target '${target.id}' — ${target.description} ===")
-        MetricRunner.run(target.metric, Catalog.problems(*target.suiteIds.toTypedArray()), target.budget, target.reference)
+        MetricRunner.run(
+            target.metric,
+            Catalog.problems(*target.suiteIds.toTypedArray()),
+            target.budget,
+            target.reference,
+        )
     }
 
     private fun adHoc(args: List<String>, preview: Boolean) {
@@ -54,7 +60,10 @@ object BenchCli {
         val metric = parseMetric(metricName)
         val f = args.drop(1).filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
-        if (refs.isEmpty()) { println("(no problems matched the selection)"); return }
+        if (refs.isEmpty()) {
+            println("(no problems matched the selection)")
+            return
+        }
 
         if (preview) {
             println("=== preview: $metricName over ${refs.size} instance(s) ===")
@@ -75,7 +84,9 @@ object BenchCli {
         f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
             refs = refs.filter { it.category in cats }
         }
-        f["tag"]?.split(",")?.map { it.trim() }?.toSet()?.let { tags -> refs = refs.filter { it.tags.any { t -> t in tags } } }
+        f["tag"]?.split(
+            ",",
+        )?.map { it.trim() }?.toSet()?.let { tags -> refs = refs.filter { it.tags.any { t -> t in tags } } }
         f["name"]?.let { g -> refs = refs.filter { matches(g, it.name) } }
         val sel = CorpusSelection.Selection(
             perFamily = f["per-family"]?.toIntOrNull(),
@@ -92,9 +103,11 @@ object BenchCli {
         return selected.filterIndexed { i, _ -> i % n == idx }
     }
 
-    private fun matches(pattern: String, name: String): Boolean =
-        if ('*' in pattern) Regex("^" + Regex.escape(pattern).replace("\\*", ".*") + "$").containsMatchIn(name)
-        else name.contains(pattern)
+    private fun matches(pattern: String, name: String): Boolean = if ('*' in pattern) {
+        Regex("^" + Regex.escape(pattern).replace("\\*", ".*") + "$").containsMatchIn(name)
+    } else {
+        name.contains(pattern)
+    }
 
     private fun parseMetric(name: String): MetricKind = when (name.lowercase()) {
         "time" -> MetricKind.TIME
@@ -135,7 +148,7 @@ object BenchCli {
             |  bench diag:backtrack | diag:cbls <x>  diagnostics
             |
             |Filters: suite=a,b category=SAT,OPTIMIZATION tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools timeout=<ms>
-            """.trimMargin()
+            """.trimMargin(),
         )
     }
 }

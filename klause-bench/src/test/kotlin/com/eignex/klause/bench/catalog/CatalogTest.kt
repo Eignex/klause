@@ -12,8 +12,7 @@ import kotlin.test.assertTrue
 /** Catalog + in-process resolution coverage. */
 class CatalogTest {
 
-    private fun ref(suite: String, name: String): ProblemRef =
-        Catalog.suite(suite).problems.first { it.name == name }
+    private fun ref(suite: String, name: String): ProblemRef = Catalog.suite(suite).problems.first { it.name == name }
 
     @Test
     fun `dimacs-core resolves with expected shapes and oracles`() {

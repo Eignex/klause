@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.report
 
-import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.File
 
 /**
  * Shared reporting primitives for every metric: environment capture, the serializable result
@@ -11,9 +11,12 @@ import kotlinx.serialization.json.Json
  * reuses [EnvInfo], [Reports.json], and [Reports.writeJson] for a consistent output shape.
  */
 object Reports {
-    val json: Json = Json { prettyPrint = true; encodeDefaults = true }
+    internal val json: Json = Json {
+        prettyPrint = true
+        encodeDefaults = true
+    }
 
-    inline fun <reified T> writeJson(path: String, value: T) {
+    internal inline fun <reified T> writeJson(path: String, value: T) {
         val file = File(path)
         file.parentFile?.mkdirs()
         file.writeText(json.encodeToString(value))
@@ -29,7 +32,7 @@ object Reports {
         println("wrote $path")
     }
 
-    fun readGitSha(): String? = runCatching {
+    internal fun readGitSha(): String? = runCatching {
         val proc = ProcessBuilder("git", "rev-parse", "HEAD")
             .redirectErrorStream(true)
             .start()
@@ -37,7 +40,7 @@ object Reports {
         if (proc.waitFor() == 0 && out.isNotEmpty()) out else null
     }.getOrNull()
 
-    fun formatNs(ns: Long): String = when {
+    internal fun formatNs(ns: Long): String = when {
         ns < 1_000 -> "${ns}ns"
         ns < 1_000_000 -> "${ns / 1_000}µs"
         ns < 1_000_000_000 -> "${ns / 1_000_000}ms"
@@ -47,7 +50,7 @@ object Reports {
 
 /** Environment metadata captured in every bench output JSON so results stay interpretable. */
 @Serializable
-data class EnvInfo(
+internal data class EnvInfo(
     val javaVersion: String,
     val javaVendor: String,
     val osName: String,
@@ -68,7 +71,7 @@ data class EnvInfo(
 // --- Time metric ---
 
 @Serializable
-data class CellResult(
+internal data class CellResult(
     val backend: String,
     val solveNsMedian: Long,
     val sampleNsMedian: Long,
@@ -76,14 +79,10 @@ data class CellResult(
 )
 
 @Serializable
-data class EntryResult(
-    val name: String,
-    val expectedSat: Boolean,
-    val backends: List<CellResult>,
-)
+internal data class EntryResult(val name: String, val expectedSat: Boolean, val backends: List<CellResult>)
 
 @Serializable
-data class BenchResults(
+internal data class BenchResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,

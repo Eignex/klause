@@ -19,16 +19,23 @@ import com.eignex.klause.bench.solver.Backend
  * by predefined [Target]s and the ad-hoc selection CLI — so both reach every metric the same
  * way. Differential metrics (parity/anytime) take a reference backend; the rest ignore it.
  */
-object MetricRunner {
+internal object MetricRunner {
     fun run(metric: MetricKind, refs: List<ProblemRef>, budget: Budget, reference: Backend?) {
         when (metric) {
             MetricKind.PARITY -> ParityMetric.run(BenchLoad.resolveRefs(refs), budget, reference ?: Backend.CHOCO)
+
             MetricKind.ANYTIME -> AnytimeMetric.run(BenchLoad.resolveRefs(refs), budget, reference ?: Backend.ORTOOLS)
+
             MetricKind.TUNING -> TuningMetric.run(BenchLoad.resolveRefs(refs), budget)
+
             MetricKind.CREDIT -> PortfolioCreditMetric.run(BenchLoad.resolveRefs(refs), budget)
+
             MetricKind.SEARCH -> SearchEffortMetric.run(BenchLoad.resolveRefs(refs), budget)
+
             MetricKind.COVERAGE -> CoverageMetric.run(refs)
+
             MetricKind.AUDIT -> CompileAuditMetric.run(refs)
+
             MetricKind.VERIFY, MetricKind.TIME, MetricKind.UNIFORMNESS, MetricKind.COMPLETENESS -> {
                 val corpus = BenchLoad.loadAndVerifyRefs(refs)
                 when (metric) {

@@ -8,8 +8,8 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.Cancellation
-import java.time.Instant
 import kotlinx.serialization.Serializable
+import java.time.Instant
 
 /**
  * Per-worker **credit campaign** over a portfolio: for each optimization instance, race the
@@ -35,11 +35,11 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CreditRow(
-    val name: String,
-    val workers: Int,
+    internal val name: String,
+    internal val workers: Int,
     /** Label of the worker that produced the first global incumbent; null = no incumbent. */
     val first: String? = null,
-    val firstMs: Long = -1,
+    internal val firstMs: Long = -1,
     /** Label of the worker holding the final best. */
     val best: String? = null,
     /** Strict global improvements per worker label. */
@@ -47,7 +47,7 @@ data class CreditRow(
 )
 
 @Serializable
-data class CreditAggregate(
+internal data class CreditAggregate(
     val label: String,
     val firsts: Int,
     val bests: Int,
@@ -56,7 +56,7 @@ data class CreditAggregate(
 )
 
 @Serializable
-data class MarginalSlot(
+internal data class MarginalSlot(
     val rank: Int,
     val label: String,
     /** Instances this config covers that no higher-ranked config touched. */
@@ -66,7 +66,7 @@ data class MarginalSlot(
 )
 
 @Serializable
-data class CreditResults(
+internal data class CreditResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,
@@ -77,7 +77,7 @@ data class CreditResults(
     val marginal: List<MarginalSlot>,
 )
 
-object PortfolioCreditMetric {
+internal object PortfolioCreditMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget = Budget()) {
         val prop = System.getProperty("klause.bench.credit.portfolio") ?: "8:0"
         val parts = prop.split(":", ",")
@@ -103,6 +103,7 @@ object PortfolioCreditMetric {
         report(rows, aggregates, marginal, budget, prop)
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun row(
         entry: ResolvedProblem,
         ls: Int,
@@ -142,7 +143,9 @@ object PortfolioCreditMetric {
         }
         val row = CreditRow(entry.name, portfolio.workers.size, first, firstMs, last, contrib)
         println(
-            "[${row.name}] " + if (first == null) "no incumbent" else {
+            "[${row.name}] " + if (first == null) {
+                "no incumbent"
+            } else {
                 "first=$first@${firstMs}ms best=$last " +
                     "contrib=${contrib.entries.joinToString(",") { "${it.key}:${it.value}" }}"
             },
@@ -209,10 +212,22 @@ object PortfolioCreditMetric {
         println("--- aggregate credit (first/best/sole/improvements) ---")
         for (a in aggregates) println("  ${a.label.padEnd(32)} ${a.firsts}/${a.bests}/${a.soles}/${a.improvements}")
         println("--- marginal ranking (greedy set cover; omitted = redundant) ---")
-        for (m in marginal) println("  ${m.rank.toString().padStart(2)}. ${m.label.padEnd(32)} +uncovered=${m.addedUncovered} +best=${m.addedBest}")
+        for (m in marginal) {
+            println(
+                "  ${m.rank.toString().padStart(
+                    2,
+                )}. ${m.label.padEnd(32)} +uncovered=${m.addedUncovered} +best=${m.addedBest}",
+            )
+        }
         val res = CreditResults(
-            Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(),
-            budget.timeoutMillis, portfolio, rows, aggregates, marginal,
+            Instant.now().toString(),
+            Reports.readGitSha(),
+            EnvInfo.capture(),
+            budget.timeoutMillis,
+            portfolio,
+            rows,
+            aggregates,
+            marginal,
         )
         Reports.writeJson("build/portfolio-credit-report.json", res)
         Reports.writeMarkdown(
@@ -226,10 +241,21 @@ object PortfolioCreditMetric {
                 h2("Aggregate credit")
                 table(
                     listOf("config", "firsts", "bests", "soles", "improvements"),
-                    aggregates.map { listOf(it.label, it.firsts, it.bests, it.soles, it.improvements).map(Any::toString) },
+                    aggregates.map {
+                        listOf(
+                            it.label,
+                            it.firsts,
+                            it.bests,
+                            it.soles,
+                            it.improvements,
+                        ).map(Any::toString)
+                    },
                 )
                 h2("Marginal-contribution ranking")
-                para("Greedy set cover: each slot adds the most instances uncovered by the slots above; omitted configs are redundant.")
+                para(
+                    "Greedy set cover: each slot adds the most instances uncovered by the slots above; " +
+                        "omitted configs are redundant.",
+                )
                 table(
                     listOf("rank", "config", "+uncovered", "+best"),
                     marginal.map { listOf(it.rank, it.label, it.addedUncovered, it.addedBest).map(Any::toString) },

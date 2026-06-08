@@ -8,16 +8,12 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.InProcessSolver
 import com.eignex.klause.bench.solver.Solvers
+import kotlinx.serialization.encodeToString
 import java.io.File
 import java.time.Instant
-import kotlinx.serialization.encodeToString
 
 /** Per-rep `nanoTime` deltas for one backend's three call kinds. */
-private class BackendTimings(
-    val solveNanos: LongArray,
-    val sampleNanos: LongArray,
-    val enumerateNanos: LongArray,
-)
+private class BackendTimings(val solveNanos: LongArray, val sampleNanos: LongArray, val enumerateNanos: LongArray)
 
 /**
  * Wall-time bench for `solve` / `samples` / `enumerate` per backend per problem, plus the
@@ -28,7 +24,7 @@ object TimeMetric {
     private const val RESULTS_PATH = "build/bench-time.json"
     private const val BASELINE_PATH = "bench-baseline.json"
 
-    fun run(entries: List<ResolvedProblem>) {
+    internal fun run(entries: List<ResolvedProblem>) {
         val repetitions = System.getProperty("klause.bench.repetitions")?.toIntOrNull() ?: 5
         val sampleCount = System.getProperty("klause.bench.sampleCount")?.toIntOrNull() ?: 10
         val warmupReps = System.getProperty("klause.bench.warmupReps")?.toIntOrNull() ?: 3
@@ -43,12 +39,19 @@ object TimeMetric {
 
         println()
         val baselineNote = if (baseline == null) "no baseline" else "vs baseline @ ${baseline.timestamp}"
-        println("=== benchmark (per entry, median of $repetitions reps × $sampleCount samples; " +
-            "$warmupReps warmup reps; $baselineNote) ===")
+        println(
+            "=== benchmark (per entry, median of $repetitions reps × $sampleCount samples; " +
+                "$warmupReps warmup reps; $baselineNote) ===",
+        )
         val results = mutableListOf<EntryResult>()
         val regressions = mutableListOf<String>()
         for (entry in entries) {
-            val timings = bench(entry.problem.let { Solvers.defaultPortfolio(it) }, repetitions, sampleCount, warmupReps)
+            val timings = bench(
+                entry.problem.let { Solvers.defaultPortfolio(it) },
+                repetitions,
+                sampleCount,
+                warmupReps,
+            )
             val cells = mutableListOf<CellResult>()
             val cellStrings = mutableListOf<String>()
             for ((name, t) in timings) {
@@ -57,24 +60,50 @@ object TimeMetric {
                 val enumMed = median(t.enumerateNanos)
                 cells += CellResult(name, solveMed, sampleMed, enumMed)
                 val prior = baselineIndex[entry.name to name]
-                val solveStr = formatCell("solve", solveMed, prior?.solveNsMedian, thresholdPct, entry.name, name, regressions)
-                val sampleStr = formatCell("sample", sampleMed, prior?.sampleNsMedian, thresholdPct, entry.name, name, regressions)
-                val enumStr = formatCell("enum", enumMed, prior?.enumNsMedian, thresholdPct, entry.name, name, regressions)
+                val solveStr = formatCell(
+                    "solve",
+                    solveMed,
+                    prior?.solveNsMedian,
+                    thresholdPct,
+                    entry.name,
+                    name,
+                    regressions,
+                )
+                val sampleStr = formatCell(
+                    "sample",
+                    sampleMed,
+                    prior?.sampleNsMedian,
+                    thresholdPct,
+                    entry.name,
+                    name,
+                    regressions,
+                )
+                val enumStr = formatCell(
+                    "enum",
+                    enumMed,
+                    prior?.enumNsMedian,
+                    thresholdPct,
+                    entry.name,
+                    name,
+                    regressions,
+                )
                 cellStrings += "$name $solveStr $sampleStr $enumStr"
             }
             println("[${entry.name}] ${cellStrings.joinToString(" | ")}")
             results += EntryResult(entry.name, entry.ref.expected.expectsSat, cells)
         }
 
-        writeResults(BenchResults(
-            timestamp = Instant.now().toString(),
-            gitSha = Reports.readGitSha(),
-            env = EnvInfo.capture(),
-            repetitions = repetitions,
-            sampleCount = sampleCount,
-            warmupReps = warmupReps,
-            entries = results,
-        ))
+        writeResults(
+            BenchResults(
+                timestamp = Instant.now().toString(),
+                gitSha = Reports.readGitSha(),
+                env = EnvInfo.capture(),
+                repetitions = repetitions,
+                sampleCount = sampleCount,
+                warmupReps = warmupReps,
+                entries = results,
+            ),
+        )
 
         println()
         println("=== propagation microbenchmark (mean of 50 reps × 10 pins) ===")
@@ -85,12 +114,12 @@ object TimeMetric {
             println(
                 "[${entry.name}] bake=${Reports.formatNs(t.bakeNanos)} " +
                     "one-shot[${t.pinCount} pins]=${Reports.formatNs(t.oneShotPinNanos)} " +
-                    "incr/pin=${Reports.formatNs(t.incrementalPinNanos)}"
+                    "incr/pin=${Reports.formatNs(t.incrementalPinNanos)}",
             )
         }
 
         if (regressions.isNotEmpty()) {
-            error("regression(s) past ${thresholdPct}% threshold:\n  " + regressions.joinToString("\n  "))
+            error("regression(s) past $thresholdPct% threshold:\n  " + regressions.joinToString("\n  "))
         }
     }
 
@@ -122,8 +151,7 @@ object TimeMetric {
         return System.nanoTime() - t0
     }
 
-    private fun median(times: LongArray): Long =
-        if (times.isEmpty()) 0 else times.sortedArray()[times.size / 2]
+    private fun median(times: LongArray): Long = if (times.isEmpty()) 0 else times.sortedArray()[times.size / 2]
 
     private fun scaledThreshold(base: Double, prior: Long): Double = when {
         prior >= 1_000_000 -> base
@@ -147,7 +175,7 @@ object TimeMetric {
         val effectiveThreshold = scaledThreshold(thresholdPct, prior)
         if (pct > effectiveThreshold) {
             regressions += "$entryName/$backendName $label: ${Reports.formatNs(prior)} → " +
-                "${Reports.formatNs(now)} (+${"%.1f".format(pct)}%, threshold ${effectiveThreshold}%)"
+                "${Reports.formatNs(now)} (+${"%.1f".format(pct)}%, threshold $effectiveThreshold%)"
         }
         val sign = if (pct >= 0) "+" else ""
         return "$base (Δ$sign${"%.0f".format(pct)}%)"
