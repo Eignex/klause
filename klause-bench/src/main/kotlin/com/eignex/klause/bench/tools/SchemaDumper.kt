@@ -18,8 +18,12 @@ private class CampaignSchema : VariableSchema() {
     val noPremForB by constraint { (type eq "b") implies !premium }
 }
 
+/** Entry point that dumps the campaign schema as JSON. */
 fun main() {
     val schema = CampaignSchema()
-    val json = Json { schemaJsonConfig(); prettyPrint = true }
+    val json = Json {
+        schemaJsonConfig()
+        prettyPrint = true
+    }
     println(json.encodeToString(SchemaDef.serializer(SchemaEntry.serializer()), schema.definition()))
 }

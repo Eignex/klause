@@ -288,7 +288,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * every exit path of [analyze] so all exit shapes get the same post-processing.
      */
     private fun finalizeClause(learned: IntArrayList, currentLevel: Int): AnalysisResult.Learned {
-        val minimized = minimize(learned, currentLevel)
+        val minimized = binaryMinimize(minimize(learned, currentLevel), currentLevel)
         val levels = distinctLevelsOf(minimized)
         // A proper 1UIP clause carries exactly one literal at the conflict level; that lone
         // literal becomes the unit-asserting literal after the backjump. Some conflicts —
@@ -367,6 +367,66 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (v >= universeSize || !toDrop[v]) out.add(lit)
         }
         return out
+    }
+
+    /**
+     * Binary-resolution minimization (#202) — Glucose's "minimisation with binary clauses",
+     * run as a second stage after [minimize]. For the kept asserting (UIP) literal `u`, every
+     * binary clause `(u ∨ x)` lets us drop the clause literal `¬x` by one resolution step:
+     *   `C ⊗ (u ∨ x)` on `var(x)` = `(C \ {¬x}) ∪ {u}` = `C \ {¬x}`   (since `u ∈ C`).
+     * Because every removal is justified by the single, never-removed UIP literal, the
+     * removals can't interact, so the result stays an implied, asserting clause regardless of
+     * how many literals go — the soundness guarantee the issue requires. Gated on binary
+     * clauses being present and on the clause being a genuine 1UIP clause (exactly one literal
+     * at the conflict level); a non-asserting clause is left untouched.
+     *
+     * Complements self-subsuming minimization: it removes literals reachable by a *binary*
+     * implication from the asserting literal that the antecedent-recursion pass does not,
+     * typically shrinking the clause a few percent further and lowering its LBD.
+     */
+    private fun binaryMinimize(clause: IntArrayList, currentLevel: Int): IntArrayList {
+        if (clause.size <= 2 || !state.hasBinaryClauses) return clause
+        // The asserting literal is the unique literal at the conflict level. Bail when there
+        // isn't exactly one (non-asserting clause) or it's an atom literal (the binary watch
+        // index covers bool vars only).
+        var uip = 0
+        var uipCount = 0
+        for (i in 0 until clause.size) {
+            val l = clause[i]
+            if (levelOf(Lit.variable(l)) == currentLevel) {
+                uip = l
+                uipCount++
+            }
+        }
+        if (uipCount != 1 || Lit.variable(uip) >= state.problem.numBoolVars) return clause
+
+        toDrop = scratch(toDrop, universe)
+        var dropCount = 0
+        state.forEachBinaryPartner(uip) { x ->
+            val neg = x xor 1 // ¬x
+            val v = Lit.variable(neg)
+            if (neg != uip && v < universe && !toDrop[v] && clauseContains(clause, neg)) {
+                toDrop[v] = true
+                dropCount++
+            }
+        }
+        if (dropCount == 0) return clause
+        val out = IntArrayList(clause.size - dropCount)
+        for (i in 0 until clause.size) {
+            val lit = clause[i]
+            val v = Lit.variable(lit)
+            // Keep the UIP and any literal not marked. A var appears once in a clause (no
+            // tautologies), so the marked var corresponds to exactly the removable literal.
+            if (lit == uip || v >= universe || !toDrop[v]) out.add(lit)
+        }
+        return out
+    }
+
+    /** Linear membership test for [lit] in [clause]; clauses are short, so this beats a
+     *  per-conflict set allocation. */
+    private fun clauseContains(clause: IntArrayList, lit: Int): Boolean {
+        for (i in 0 until clause.size) if (clause[i] == lit) return true
+        return false
     }
 
     /**

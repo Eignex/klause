@@ -1,13 +1,19 @@
 import java.io.FileOutputStream
 
 plugins {
-    kotlin("jvm")
+    id("com.eignex.jvm") version "1.2.6"
     kotlin("plugin.serialization")
     application
 }
 
-repositories {
-    mavenCentral()
+// Internal tooling module: use the build conventions but never publish.
+eignexPublish {
+    publish.set(false)
+}
+
+// Skip doc generation; the lintDocs/dokka gate trips on internal KDoc links, as in :klause.
+tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEach {
+    enabled = false
 }
 
 dependencies {
@@ -22,8 +28,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
     // runBlocking + Flow.collect bridge for the suspend Portfolio API in the anytime metric.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-
-    testImplementation(kotlin("test"))
 }
 
 application {
@@ -74,10 +78,6 @@ tasks.register<Copy>("saveBaseline") {
     from(layout.buildDirectory.file("bench-time.json"))
     into(layout.projectDirectory)
     rename { "bench-baseline.json" }
-}
-
-kotlin {
-    jvmToolchain(21)
 }
 
 tasks.withType<Test> {

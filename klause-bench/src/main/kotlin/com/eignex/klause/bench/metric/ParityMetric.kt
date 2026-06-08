@@ -6,16 +6,16 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.Backend
-import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.Objective
-import com.eignex.klause.solver.SearchEvent
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.SearchEvent
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.IndomainMin
@@ -24,8 +24,8 @@ import com.eignex.klause.solver.backtrack.SolutionGuided
 import com.eignex.klause.solver.backtrack.Vsids
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import java.time.Instant
 import kotlinx.serialization.Serializable
+import java.time.Instant
 
 /**
  * Differential parity: solve each problem with **klause** (complete backtracking) and an
@@ -40,10 +40,10 @@ import kotlinx.serialization.Serializable
  * `-Dklause.bench.parity.reference=choco|ortools`.
  */
 @Serializable
-data class ParityRow(
+internal data class ParityRow(
     val name: String,
-    val kind: String,            // "satisfy" | "optimize"
-    val verdict: String,         // OK | MISMATCH | KLAUSE_ERROR | REFERENCE_ERROR
+    val kind: String, // "satisfy" | "optimize"
+    val verdict: String, // OK | MISMATCH | KLAUSE_ERROR | REFERENCE_ERROR
     val klause: String,
     val reference: String,
     val referenceSolver: String, // "choco" | "ortools"
@@ -52,7 +52,7 @@ data class ParityRow(
 )
 
 @Serializable
-data class ParityResults(
+internal data class ParityResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,
@@ -61,9 +61,11 @@ data class ParityResults(
     val mismatches: Int get() = rows.count { it.verdict != "OK" }
 }
 
-object ParityMetric {
+internal object ParityMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget = Budget(), reference: Backend = Backend.CHOCO) {
-        val ref = System.getProperty("klause.bench.parity.reference")?.let { Reference.byId(it) } ?: Reference.of(reference)
+        val ref = System.getProperty(
+            "klause.bench.parity.reference",
+        )?.let { Reference.byId(it) } ?: Reference.of(reference)
         // Sharding for parallel sweeps is applied at selection time (klause.bench.shard in
         // BenchCli.select, before resolution) so disjoint workers never race on the shared
         // mzn-fzn cache; the prop is read here only to suffix the report path.
@@ -77,8 +79,11 @@ object ParityMetric {
         val rows = entries.map { entry ->
             val r = row(entry, budget, ref, cache[entry.name])
             val mark = if (r.verdict == "OK") "ok " else "!! "
-            println("$mark[${r.name}] ${r.kind} klause=${r.klause} ${r.referenceSolver}=${r.reference} expected=${r.expected}" +
-                if (r.detail.isNotEmpty()) " — ${r.detail}" else "")
+            println(
+                "$mark[${r.name}] ${r.kind} klause=${r.klause} " +
+                    "${r.referenceSolver}=${r.reference} expected=${r.expected}" +
+                    if (r.detail.isNotEmpty()) " — ${r.detail}" else "",
+            )
             r
         }
         val results = ParityResults(Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(), rows)
@@ -180,8 +185,15 @@ object ParityMetric {
             exp != null && cv != exp -> "MISMATCH"
             else -> "OK"
         }
-        return ParityRow(entry.name, "optimize", verdict,
-            optStr(klause), refDisplay, ref.name, exp?.toString() ?: "?")
+        return ParityRow(
+            entry.name,
+            "optimize",
+            verdict,
+            optStr(klause),
+            refDisplay,
+            ref.name,
+            exp?.toString() ?: "?",
+        )
     }
 
     // -Dklause.bench.parity.timed scores the real fixed-track COP goal: a single
@@ -219,15 +231,26 @@ object ParityMetric {
         val cv = c.value
         val beat = when {
             kv == null -> false
-            cv == null -> true // klause found something, reference did not
+
+            cv == null -> true
+
+            // klause found something, reference did not
             kv < cv -> true
+
             kv == cv -> (kBestMillis ?: Long.MAX_VALUE) < (c.timeToBestMillis ?: Long.MAX_VALUE)
+
             else -> false
         }
         val detail = "k=${fmt(kv)}@${kBestMillis ?: "-"}ms cpsat=${fmt(cv)}@${c.timeToBestMillis ?: "-"}ms"
         return ParityRow(
-            entry.name, "optimize", if (beat) "OK" else "MISMATCH",
-            fmt(kv), fmt(cv), "choco-cpsat", "?", detail,
+            entry.name,
+            "optimize",
+            if (beat) "OK" else "MISMATCH",
+            fmt(kv),
+            fmt(cv),
+            "choco-cpsat",
+            "?",
+            detail,
         )
     }
 
@@ -293,15 +316,23 @@ object ParityMetric {
      */
     private fun workers(entry: ResolvedProblem, objective: Objective?): List<PortfolioWorker> {
         val free = PortfolioWorker.of(
-            "free", BacktrackSolver(entry.problem).session(), freeParams(), objective,
+            "free",
+            BacktrackSolver(entry.problem).session(),
+            freeParams(),
+            objective,
         ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         val conflictDriven = PortfolioWorker.of(
-            "conflict-driven", BacktrackSolver(entry.problem).session(), conflictDrivenParams(), objective,
+            "conflict-driven",
+            BacktrackSolver(entry.problem).session(),
+            conflictDrivenParams(),
+            objective,
         ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         val annotated = entry.searchParams?.let { ann ->
             PortfolioWorker.of(
-                "annotated", BacktrackSolver(entry.problem).session(),
-                ann.copy(randomSeed = 2L, lubyRestartBase = 256L), objective,
+                "annotated",
+                BacktrackSolver(entry.problem).session(),
+                ann.copy(randomSeed = 2L, lubyRestartBase = 256L),
+                objective,
             ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         }
         // Seed twins for the two strongest free compositions: when a close-call row's
@@ -309,16 +340,23 @@ object ParityMetric {
         // shared bound flips it — the five-worker sweep flipped five rows over the
         // three-worker config with zero regressions.
         val free2 = PortfolioWorker.of(
-            "free#2", BacktrackSolver(entry.problem).session(), freeParams().copy(randomSeed = 11L), objective,
+            "free#2",
+            BacktrackSolver(entry.problem).session(),
+            freeParams().copy(randomSeed = 11L),
+            objective,
         ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         val conflictDriven2 = PortfolioWorker.of(
-            "conflict-driven#2", BacktrackSolver(entry.problem).session(),
-            conflictDrivenParams().copy(randomSeed = 13L), objective,
+            "conflict-driven#2",
+            BacktrackSolver(entry.problem).session(),
+            conflictDrivenParams().copy(randomSeed = 13L),
+            objective,
         ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         val xor = entry.xorSearchParams?.let { xs ->
             PortfolioWorker.of(
-                "xor", BacktrackSolver(entry.problem).session(),
-                xs.copy(randomSeed = 4L, lubyRestartBase = 256L), objective,
+                "xor",
+                BacktrackSolver(entry.problem).session(),
+                xs.copy(randomSeed = 4L, lubyRestartBase = 256L),
+                objective,
             ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         }
         return listOfNotNull(free, free2, conflictDriven, conflictDriven2, annotated, xor)
@@ -338,6 +376,7 @@ object ParityMetric {
             cancellation = Cancellation { System.currentTimeMillis() > deadline },
         )
 
+    @Suppress("InjectDispatcher")
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).solve(fixedParams(entry, deadline))
@@ -347,6 +386,7 @@ object ParityMetric {
         }
     }
 
+    @Suppress("InjectDispatcher")
     private fun klauseMinimize(entry: ResolvedProblem, obj: Objective, budget: Budget): MinimizeResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, fixedParams(entry, deadline))
@@ -373,7 +413,11 @@ object ParityMetric {
     /** Two feasibility verdicts agree if neither is a definite contradiction of the other. */
     private fun agree(a: Boolean?, b: Boolean?): Boolean = a == null || b == null || a == b
 
-    private fun feasStr(b: Boolean?): String = when (b) { true -> "SAT"; false -> "UNSAT"; null -> "?" }
+    private fun feasStr(b: Boolean?): String = when (b) {
+        true -> "SAT"
+        false -> "UNSAT"
+        null -> "?"
+    }
 
     private fun optStr(r: MinimizeResult): String = when (r) {
         is MinimizeResult.Optimal -> "opt=${r.objective}"
@@ -382,13 +426,25 @@ object ParityMetric {
         is MinimizeResult.Unknown -> "?"
     }
 
-    private fun errorRow(entry: ResolvedProblem, kind: String, verdict: String, ref: Reference, t: Throwable): ParityRow {
+    private fun errorRow(
+        entry: ResolvedProblem,
+        kind: String,
+        verdict: String,
+        ref: Reference,
+        t: Throwable,
+    ): ParityRow {
         if (System.getProperty("klause.bench.parity.trace")?.toBoolean() == true) {
             System.err.println(">>> $verdict on ${entry.name}:")
             t.printStackTrace()
         }
         return ParityRow(
-            entry.name, kind, verdict, "-", "-", ref.name, entry.ref.expected.toString(),
+            entry.name,
+            kind,
+            verdict,
+            "-",
+            "-",
+            ref.name,
+            entry.ref.expected.toString(),
             t.message?.take(160) ?: t::class.simpleName ?: "error",
         )
     }

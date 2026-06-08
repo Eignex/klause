@@ -19,7 +19,6 @@ import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedLinear
@@ -184,14 +183,6 @@ class FznModelTest {
             ),
         )
         assertContains(fzn, "constraint yuck_regular([i0, i1], 2, 2, [2, 0, 0, 2], 1, {2});")
-    }
-
-    @Test
-    fun `monotone decreasing reverses into increasing`() {
-        val fzn = FznModel.emit(
-            problem(0, dom(2, 0, 3), Monotone(intArrayOf(0, 1), Monotone.Direction.Decreasing, strict = false)),
-        )
-        assertContains(fzn, "constraint yuck_increasing_int([i1, i0], false);")
     }
 
     @Test

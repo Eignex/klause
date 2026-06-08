@@ -1,6 +1,8 @@
 package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.LibminizincExpected
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -24,10 +26,13 @@ import com.eignex.klause.solver.factor.Xor
  *  - [mznSmoke] — the in-tree `klause-mzn-lib/test-models/` smoke set (referenced, not copied).
  *  - external MiniZinc/SAT collections (fetched on demand) are declared in [ExternalCollections].
  */
-object Suites {
+internal object Suites {
 
     val all: List<Suite> by lazy {
-        listOf(handwrittenCore, slackAllDifferent, dimacsCore, opbCore, schemaCore, flatzincCore, smtlibCore, xcsp3Core, mznSmoke, satlibUf20, satLadder, satCrafted)
+        listOf(
+            handwrittenCore, slackAllDifferent, dimacsCore, opbCore, schemaCore, flatzincCore,
+            smtlibCore, xcsp3Core, mznSmoke, satlibUf20, satLadder, satCrafted,
+        )
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
@@ -36,27 +41,27 @@ object Suites {
     val dynamic: List<DynamicSuite> by lazy {
         listOf(
             DynamicSuite("mzn-bench", "MiniZinc Challenge benchmarks (fetched; 1/family by default)") {
-                com.eignex.klause.bench.source.CorpusSelection.select(
+                CorpusSelection.select(
                     ExternalCollections.minizincBenchmarks,
-                    com.eignex.klause.bench.source.CorpusSelection.Layout.MznChallenge(),
-                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    CorpusSelection.Layout.MznChallenge(),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.OPTIMIZATION,
                 )
             },
             DynamicSuite("libminizinc-tests", "libminizinc compiler test suite (fetched; 1/family by default)") {
-                com.eignex.klause.bench.source.CorpusSelection.select(
+                CorpusSelection.select(
                     ExternalCollections.libminizincTests,
-                    com.eignex.klause.bench.source.CorpusSelection.Layout.FlatMzn("tests/spec/unit"),
-                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    CorpusSelection.Layout.FlatMzn("tests/spec/unit"),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.CSP,
-                    expected = { com.eignex.klause.bench.source.LibminizincExpected.parse(it) },
+                    expected = { LibminizincExpected.parse(it) },
                 )
             },
             DynamicSuite("hakank", "hakank MiniZinc collection (fetched, sparse minizinc/; 1/family by default)") {
-                com.eignex.klause.bench.source.CorpusSelection.select(
+                CorpusSelection.select(
                     ExternalCollections.hakank,
-                    com.eignex.klause.bench.source.CorpusSelection.Layout.FlatMzn("minizinc"),
-                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    CorpusSelection.Layout.FlatMzn("minizinc"),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.CSP,
                 )
             },
@@ -80,9 +85,13 @@ object Suites {
         val numInt = m + nDiffs
         val domains = Array(numInt) { idx ->
             when {
-                idx == 0 -> IntDomain(0, 0)        // mark[0] pinned to 0
-                idx < m -> IntDomain(0, maxLen)    // marks
-                else -> IntDomain(1, maxLen)       // differences
+                idx == 0 -> IntDomain(0, 0)
+
+                // mark[0] pinned to 0
+                idx < m -> IntDomain(0, maxLen)
+
+                // marks
+                else -> IntDomain(1, maxLen) // differences
             }
         }
         val factors = ArrayList<Factor>()
@@ -113,180 +122,275 @@ object Suites {
         license = "internal"
 
         inCode("threeClauses", Category.SAT, Expected.Sat) {
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
-            ))
+            Problem(
+                numBoolVars = 4,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
+                ),
+            )
         }
         inCode("cardXor", Category.SAT, Expected.Sat) {
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-                Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-                    min = 2, max = 3),
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), targetParity = 1),
-            ))
+            Problem(
+                numBoolVars = 4,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(
+                    Cardinality(
+                        intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+                        min = 2,
+                        max = 3,
+                    ),
+                    Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), targetParity = 1),
+                ),
+            )
         }
         inCode("pseudoBoolean", Category.SAT, Expected.Sat) {
-            Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-                PseudoBoolean(
-                    weights = intArrayOf(2, 3, 1, 1),
-                    literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-                    op = PbOp.LE, bound = 3,
+            Problem(
+                numBoolVars = 4,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(
+                    PseudoBoolean(
+                        weights = intArrayOf(2, 3, 1, 1),
+                        literals = intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(1, true),
+                            Lit.make(2, true),
+                            Lit.make(3, true),
+                        ),
+                        op = PbOp.LE,
+                        bound = 3,
+                    ),
+                    Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
                 ),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-            ))
+            )
         }
         inCode("linearLE", Category.CSP, Expected.Sat) {
-            Problem(numBoolVars = 0, numIntVars = 2,
+            Problem(
+                numBoolVars = 0,
+                numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
                 factors = arrayOf<Factor>(
                     Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, 4),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
-                ))
+                ),
+            )
         }
         inCode("permutation3", Category.CSP, Expected.Sat) {
-            Problem(numBoolVars = 0, numIntVars = 3,
+            Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)))
+                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+            )
         }
         inCode("mixedBoolInt", Category.CSP, Expected.Sat) {
-            Problem(numBoolVars = 2, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
+            Problem(
+                numBoolVars = 2,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(0, 3)),
                 factors = arrayOf<Factor>(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-                ))
+                ),
+            )
         }
         inCode("cardinalityStress", Category.SAT, Expected.Sat) {
-            Problem(numBoolVars = 8, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-                Cardinality((0..5).map { Lit.make(it, true) }.toIntArray(), min = 0, max = 3),
-                Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 3, max = 8),
-                Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
-                Cardinality(intArrayOf(Lit.make(2, true), Lit.make(3, true)), min = 0, max = 1),
-                Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 3, max = 8),
-                Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 0, max = 5),
-            ))
+            Problem(
+                numBoolVars = 8,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(
+                    Cardinality((0..5).map { Lit.make(it, true) }.toIntArray(), min = 0, max = 3),
+                    Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 3, max = 8),
+                    Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
+                    Cardinality(intArrayOf(Lit.make(2, true), Lit.make(3, true)), min = 0, max = 1),
+                    Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 3, max = 8),
+                    Cardinality((0..7).map { Lit.make(it, true) }.toIntArray(), min = 0, max = 5),
+                ),
+            )
         }
         inCode("pbReifiedMix", Category.SAT, Expected.Sat) {
-            Problem(numBoolVars = 6, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-                ReifiedCardinality(auxBoolVar = 4,
-                    literals = intArrayOf(Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(4, true))),
-                ReifiedCardinality(auxBoolVar = 5,
-                    literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-                    min = 1, max = 3),
-                Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
-                Cardinality(intArrayOf(
-                    Lit.make(0, false), Lit.make(1, true), Lit.make(2, true), Lit.make(3, false),
-                ), min = 0, max = 2),
-                PseudoBoolean(
-                    weights = intArrayOf(1, 2, 3, 4),
-                    literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-                    op = PbOp.GE, bound = 3,
+            Problem(
+                numBoolVars = 6,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(
+                    ReifiedCardinality(
+                        auxBoolVar = 4,
+                        literals = intArrayOf(Lit.make(1, true), Lit.make(2, true)),
+                        min = 2,
+                        max = 2,
+                    ),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(4, true))),
+                    ReifiedCardinality(
+                        auxBoolVar = 5,
+                        literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
+                        min = 1,
+                        max = 3,
+                    ),
+                    Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
+                    Cardinality(
+                        intArrayOf(
+                            Lit.make(0, false),
+                            Lit.make(1, true),
+                            Lit.make(2, true),
+                            Lit.make(3, false),
+                        ),
+                        min = 0,
+                        max = 2,
+                    ),
+                    PseudoBoolean(
+                        weights = intArrayOf(1, 2, 3, 4),
+                        literals = intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(1, true),
+                            Lit.make(2, true),
+                            Lit.make(3, true),
+                        ),
+                        op = PbOp.GE,
+                        bound = 3,
+                    ),
                 ),
-            ))
+            )
         }
         inCode("smallRandom3sat", Category.SAT, Expected.Sat) {
-            Problem(numBoolVars = 12, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(7, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(4, true), Lit.make(8, false))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(5, false), Lit.make(9, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(6, true), Lit.make(10, false))),
-                Clause(intArrayOf(Lit.make(3, true), Lit.make(7, false), Lit.make(11, true))),
-                Clause(intArrayOf(Lit.make(1, true), Lit.make(5, true), Lit.make(9, false))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(4, false), Lit.make(11, true))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(8, true), Lit.make(10, true))),
-                Clause(intArrayOf(Lit.make(6, false), Lit.make(7, true), Lit.make(8, false))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false), Lit.make(3, true))),
-                Clause(intArrayOf(Lit.make(4, true), Lit.make(5, true), Lit.make(6, true))),
-                Clause(intArrayOf(Lit.make(7, false), Lit.make(9, false), Lit.make(11, false))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(5, true))),
-                Clause(intArrayOf(Lit.make(3, false), Lit.make(8, true), Lit.make(10, false))),
-                Clause(intArrayOf(Lit.make(1, true), Lit.make(6, false), Lit.make(11, false))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(4, false), Lit.make(9, true))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(7, true), Lit.make(10, false))),
-                Clause(intArrayOf(Lit.make(3, true), Lit.make(5, false), Lit.make(8, false))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(6, true), Lit.make(11, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false), Lit.make(11, true))),
-                Clause(intArrayOf(Lit.make(4, true), Lit.make(7, false), Lit.make(9, false))),
-                Clause(intArrayOf(Lit.make(5, true), Lit.make(8, true), Lit.make(10, true))),
-                Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true), Lit.make(6, false))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(5, false), Lit.make(7, false))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(8, true), Lit.make(11, false))),
-                Clause(intArrayOf(Lit.make(3, false), Lit.make(6, true), Lit.make(9, true))),
-                Clause(intArrayOf(Lit.make(4, false), Lit.make(10, true), Lit.make(11, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(8, false))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false), Lit.make(4, true))),
-                Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true), Lit.make(7, true))),
-            ))
+            Problem(
+                numBoolVars = 12,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(7, true))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(4, true), Lit.make(8, false))),
+                    Clause(intArrayOf(Lit.make(2, true), Lit.make(5, false), Lit.make(9, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(6, true), Lit.make(10, false))),
+                    Clause(intArrayOf(Lit.make(3, true), Lit.make(7, false), Lit.make(11, true))),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(5, true), Lit.make(9, false))),
+                    Clause(intArrayOf(Lit.make(2, false), Lit.make(4, false), Lit.make(11, true))),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(8, true), Lit.make(10, true))),
+                    Clause(intArrayOf(Lit.make(6, false), Lit.make(7, true), Lit.make(8, false))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false), Lit.make(3, true))),
+                    Clause(intArrayOf(Lit.make(4, true), Lit.make(5, true), Lit.make(6, true))),
+                    Clause(intArrayOf(Lit.make(7, false), Lit.make(9, false), Lit.make(11, false))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(5, true))),
+                    Clause(intArrayOf(Lit.make(3, false), Lit.make(8, true), Lit.make(10, false))),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(6, false), Lit.make(11, false))),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(4, false), Lit.make(9, true))),
+                    Clause(intArrayOf(Lit.make(2, true), Lit.make(7, true), Lit.make(10, false))),
+                    Clause(intArrayOf(Lit.make(3, true), Lit.make(5, false), Lit.make(8, false))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(6, true), Lit.make(11, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false), Lit.make(11, true))),
+                    Clause(intArrayOf(Lit.make(4, true), Lit.make(7, false), Lit.make(9, false))),
+                    Clause(intArrayOf(Lit.make(5, true), Lit.make(8, true), Lit.make(10, true))),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true), Lit.make(6, false))),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(5, false), Lit.make(7, false))),
+                    Clause(intArrayOf(Lit.make(2, false), Lit.make(8, true), Lit.make(11, false))),
+                    Clause(intArrayOf(Lit.make(3, false), Lit.make(6, true), Lit.make(9, true))),
+                    Clause(intArrayOf(Lit.make(4, false), Lit.make(10, true), Lit.make(11, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(8, false))),
+                    Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false), Lit.make(4, true))),
+                    Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true), Lit.make(7, true))),
+                ),
+            )
         }
         inCode("budgetCampaign", Category.ASSIGNMENT, Expected.Sat) {
-            Problem(numBoolVars = 3, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 100)),
+            Problem(
+                numBoolVars = 3,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(0, 100)),
                 factors = arrayOf<Factor>(
-                    Cardinality.exactlyOne(intArrayOf(
-                        Lit.make(0, true), Lit.make(1, true), Lit.make(2, true),
-                    )),
+                    Cardinality.exactlyOne(
+                        intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(1, true),
+                            Lit.make(2, true),
+                        ),
+                    ),
                     ReifiedLinear(auxBoolVar = 0, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, 30),
                     ReifiedLinear(auxBoolVar = 1, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, 50),
                     ReifiedLinear(auxBoolVar = 2, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, 80),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 60),
-                ))
+                ),
+            )
         }
 
         inCode("clauseContradiction", Category.UNSAT, Expected.Unsat) {
-            Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ))
+            Problem(
+                numBoolVars = 1,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(
+                    Clause(intArrayOf(Lit.make(0, true))),
+                    Clause(intArrayOf(Lit.make(0, false))),
+                ),
+            )
         }
         inCode("intEqContradiction", Category.UNSAT, Expected.Unsat) {
-            Problem(numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 3)),
+            Problem(
+                numBoolVars = 0,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(0, 3)),
                 factors = arrayOf<Factor>(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
-                ))
+                ),
+            )
         }
         inCode("pigeonhole", Category.UNSAT, Expected.Unsat) {
-            Problem(numBoolVars = 0, numIntVars = 3,
+            Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
-                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)))
+                factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2)),
+            )
         }
     }
 
     // --- Vendored corpus suites (klause-bench/corpus/) ---
 
     private val dimacsCore = suite("dimacs-core", "Curated small DIMACS CNF (SAT + UNSAT)") {
-        format = Format.DIMACS; license = "SATLIB-style (public benchmarks)"
+        format = Format.DIMACS
+        license = "SATLIB-style (public benchmarks)"
         vendored("php4", Category.UNSAT, Expected.Unsat)
         vendored("random3sat-20-80", Category.SAT, Expected.Sat)
         vendored("random3sat-50-200", Category.SAT, Expected.Sat)
     }
 
     private val opbCore = suite("opb-core", "Curated pseudo-Boolean OPB") {
-        format = Format.OPB; license = "internal"
+        format = Format.OPB
+        license = "internal"
         vendored("setcover-tiny", Category.PACKING, Expected.Sat)
     }
 
     private val schemaCore = suite("schema-core", "klause JSON schema instances") {
-        format = Format.JSON_SCHEMA; license = "internal"
+        format = Format.JSON_SCHEMA
+        license = "internal"
         vendored("campaign", Category.ASSIGNMENT, Expected.Sat)
     }
 
     private val flatzincCore = suite("flatzinc-core", "Curated small FlatZinc (satisfaction)") {
-        format = Format.FLATZINC; license = "internal"
+        format = Format.FLATZINC
+        license = "internal"
         vendored("cardinality", Category.CSP, Expected.Sat)
         vendored("permutation4", Category.CSP, Expected.Sat)
         vendored("small-linear", Category.CSP, Expected.Sat)
     }
 
     private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA instances") {
-        format = Format.SMTLIB_QF_LIA; license = "internal"
+        format = Format.SMTLIB_QF_LIA
+        license = "internal"
         vendored("lia-basic", Category.CSP, Expected.Sat)
         vendored("lia-opt", Category.OPTIMIZATION, Expected.Opt(7))
     }
 
     private val xcsp3Core = suite("xcsp3-core", "Curated XCSP3 integer CSP/COP instances") {
-        format = Format.XCSP3; license = "internal"
+        format = Format.XCSP3
+        license = "internal"
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
     }
@@ -309,28 +413,48 @@ object Suites {
     /** SATLIB random-3SAT phase-transition ladder (uf=SAT, uuf=UNSAT), V=50…250 — labelled
      *  instances at increasing size for measuring CDCL scaling. A small sample per family
      *  (the full tarball is fetched once and cached). */
-    private val satLadder = suite("sat-ladder", "SATLIB random-3SAT phase-transition ladder (uf=SAT / uuf=UNSAT, 50–250 vars)") {
-        format = Format.DIMACS; license = "SATLIB (public benchmarks)"
+    private val satLadder = suite(
+        "sat-ladder",
+        "SATLIB random-3SAT phase-transition ladder (uf=SAT / uuf=UNSAT, 50–250 vars)",
+    ) {
+        format = Format.DIMACS
+        license = "SATLIB (public benchmarks)"
         for ((name, col) in ExternalCollections.satlibLadder) {
             val sat = name.startsWith("uf")
-            val prefix = name.substringBefore("-")   // instances are named "<vars>-0<n>.cnf" (e.g. uf50-01.cnf)
-            for (n in 1..5) external(
-                "$name-$n", col, "$prefix-0$n.cnf",
-                if (sat) Category.SAT else Category.UNSAT,
-                if (sat) Expected.Sat else Expected.Unsat,
-            )
+            val prefix = name.substringBefore("-") // instances are named "<vars>-0<n>.cnf" (e.g. uf50-01.cnf)
+            for (n in 1..5) {
+                external(
+                    "$name-$n",
+                    col,
+                    "$prefix-0$n.cnf",
+                    if (sat) Category.SAT else Category.UNSAT,
+                    if (sat) Expected.Sat else Expected.Unsat,
+                )
+            }
         }
     }
 
     /** In-code crafted SAT: pigeonhole PHPₙ (UNSAT, CDCL stress) + random-3SAT at the phase
      *  transition. No fetch / no license; parametric for performance regression tracking. */
-    private val satCrafted = suite("sat-crafted", "In-code crafted SAT: pigeonhole (UNSAT) + random-3SAT (phase transition)") {
+    private val satCrafted = suite(
+        "sat-crafted",
+        "In-code crafted SAT: pigeonhole (UNSAT) + random-3SAT (phase transition)",
+    ) {
         for (n in 5..9) inCode("php$n", Category.UNSAT, Expected.Unsat) { SatGenerators.php(n) }
-        for (v in intArrayOf(50, 100, 150, 200, 250)) inCode("rand3sat-$v", Category.SAT, Expected.Unknown) { SatGenerators.random3Sat(v) }
+        for (v in intArrayOf(
+            50,
+            100,
+            150,
+            200,
+            250,
+        )) {
+            inCode("rand3sat-$v", Category.SAT, Expected.Unknown) { SatGenerators.random3Sat(v) }
+        }
     }
 
     private val mznSmoke = suite("mzn-smoke", "Mandatory MiniZinc smoke models (CI parity)") {
-        format = Format.MINIZINC; license = "internal"
+        format = Format.MINIZINC
+        license = "internal"
         val base = "klause-mzn-lib/test-models"
         workspace("graph_coloring", "$base/graph_coloring.mzn", Category.CSP, Expected.Sat)
         workspace("latin_square", "$base/latin_square.mzn", Category.CSP, Expected.Sat)
@@ -346,7 +470,7 @@ object Suites {
  * Non-vendored problem collections, fetched on demand by `source.CorpusFetcher`. Declared
  * here so the "where did this come from / why isn't it in the repo" answer is auditable.
  */
-object ExternalCollections {
+internal object ExternalCollections {
     val minizincBenchmarks = ExternalCollection(
         id = "minizinc-benchmarks",
         url = "https://github.com/MiniZinc/minizinc-benchmarks.git",
@@ -397,8 +521,13 @@ object ExternalCollections {
         fetch = FetchMethod.Zip,
     )
     val xcsp3Competition = listOf(
-        xcsp(2017, 102), xcsp(2018, 69), xcsp(2019, 136),
-        xcsp(2022, 103), xcsp(2023, 86), xcsp(2024, 63), xcsp(2025, 31),
+        xcsp(2017, 102),
+        xcsp(2018, 69),
+        xcsp(2019, 136),
+        xcsp(2022, 103),
+        xcsp(2023, 86),
+        xcsp(2024, 63),
+        xcsp(2025, 31),
     )
 
     /** SMT-LIB QF_LIA non-incremental benchmark set (official CLC repository). */
@@ -419,9 +548,12 @@ object ExternalCollections {
         reason = "1000-instance RND3SAT family; fetched rather than vendored",
         fetch = FetchMethod.Tarball,
     )
+
     /** Ordered rungs (low→high vars) of the SAT and UNSAT ladders, keyed by family name. */
     val satlibLadder: Map<String, ExternalCollection> = listOf(
-        "uf50-218", "uf75-325", "uf100-430", "uf125-538", "uf150-645", "uf175-753", "uf200-860", "uf225-960", "uf250-1065",
-        "uuf50-218", "uuf75-325", "uuf100-430", "uuf125-538", "uuf150-645", "uuf175-753", "uuf200-860", "uuf225-960", "uuf250-1065",
+        "uf50-218", "uf75-325", "uf100-430", "uf125-538", "uf150-645",
+        "uf175-753", "uf200-860", "uf225-960", "uf250-1065",
+        "uuf50-218", "uuf75-325", "uuf100-430", "uuf125-538", "uuf150-645",
+        "uuf175-753", "uuf200-860", "uuf225-960", "uuf250-1065",
     ).associateWith { satlibRnd(it) }
 }

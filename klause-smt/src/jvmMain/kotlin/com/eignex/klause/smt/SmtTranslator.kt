@@ -7,8 +7,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
@@ -28,8 +26,6 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Member
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -45,7 +41,6 @@ import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import org.sosy_lab.java_smt.api.BooleanFormula
 import org.sosy_lab.java_smt.api.FormulaManager
@@ -245,16 +240,7 @@ internal object SmtTranslator {
                 )
             }
 
-            is AllEqual -> {
-                val first = iv(factor.xs[0])
-                bmgr.and(factor.xs.drop(1).map { eqV(first, iv(it)) })
-            }
-
-            is AllDifferentExceptZero -> distinctExcept(factor.xs, intArrayOf(0))
-
             is AllDifferentExcept -> distinctExcept(factor.xs, factor.except)
-
-            is Member -> bmgr.or(factor.xs.map { eqV(iv(factor.y), iv(it)) })
 
             is Among -> eqV(iv(factor.n), imgr.sum(factor.xs.map { oneIf(inValues(iv(it), factor.values)) }))
 
@@ -268,15 +254,11 @@ internal object SmtTranslator {
 
             is LexLess -> lexLess(factor.xs, factor.ys, factor.strict)
 
-            is Monotone -> monotone(factor)
-
             is NValue -> translateNValue(factor)
 
             is GlobalCardinality -> translateGcc(factor)
 
             is Table -> translateTable(factor)
-
-            is ValuePrecede -> valuePrecede(factor)
 
             is ArrayMinMax -> arrayMinMax(factor)
 
@@ -394,21 +376,6 @@ internal object SmtTranslator {
             return acc
         }
 
-        private fun monotone(f: Monotone): BooleanFormula {
-            val conj = ArrayList<BooleanFormula>()
-            for (i in 0 until f.xs.size - 1) {
-                val a = iv(f.xs[i])
-                val b = iv(f.xs[i + 1])
-                conj.add(
-                    when (f.direction) {
-                        Monotone.Direction.Increasing -> if (f.strict) lt(a, b) else imgr.lessOrEquals(a, b)
-                        Monotone.Direction.Decreasing -> if (f.strict) lt(b, a) else imgr.greaterOrEquals(a, b)
-                    },
-                )
-            }
-            return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
-        }
-
         private fun translateNValue(f: NValue): BooleanFormula {
             // distinct-count = Σ_i [xs[i] is the first occurrence of its value].
             val terms = f.xs.indices.map { i ->
@@ -454,17 +421,6 @@ internal object SmtTranslator {
                 bmgr.and(f.xs.indices.map { c -> eqN(iv(f.xs[c]), f.tuples[r * f.arity + c]) })
             }
             return if (rows.isEmpty()) bmgr.makeFalse() else bmgr.or(rows)
-        }
-
-        private fun valuePrecede(f: ValuePrecede): BooleanFormula {
-            // Whenever xs[i] = t, some earlier xs[j] = s. `seen` = "s appeared before i".
-            val conj = ArrayList<BooleanFormula>()
-            var seen: BooleanFormula = bmgr.makeFalse()
-            for (i in f.xs.indices) {
-                conj.add(bmgr.implication(eqN(iv(f.xs[i]), f.t), seen))
-                seen = bmgr.or(seen, eqN(iv(f.xs[i]), f.s))
-            }
-            return bmgr.and(conj)
         }
 
         private fun arrayMinMax(f: ArrayMinMax): BooleanFormula {

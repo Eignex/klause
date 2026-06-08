@@ -11,6 +11,20 @@ import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
+// Three-tier learned-clause DB tiers (#201). Top-level so the engine's reduction policy in
+// BacktrackSolver and the parallel tier array in PropagationState share one definition.
+/** Not yet classified — the reduction policy assigns a tier by LBD on first encounter. */
+internal const val TIER_UNSET: Int = -1
+
+/** Permanent core: very low LBD, never deleted. */
+internal const val TIER_CORE: Int = 0
+
+/** Mid tier: kept across reductions, demoted to [TIER_LOCAL] when idle. */
+internal const val TIER_MID: Int = 1
+
+/** Local tier: aggressively deleted; promoted to [TIER_MID] on reuse. */
+internal const val TIER_LOCAL: Int = 2
+
 /**
  * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
  * values and the (tightened) int domains, plus a **decision level** per pinned variable for
@@ -360,6 +374,10 @@ class PropagationState(
     private companion object {
         /** Sentinel for propagateAtomsForVar's carved-value parameter. */
         const val NO_CARVE: Int = Int.MIN_VALUE
+
+        /** Blocking-literal slot with no blocker (#200): the watcher always fires. Lit ids
+         *  are non-negative ([Lit.make] = `var shl 1 | sign`), so −1 is a safe sentinel. */
+        const val NO_BLOCKER: Int = -1
     }
 
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
@@ -443,6 +461,41 @@ class PropagationState(
     /** Clauses learned during conflict analysis. */
     val learnedClauses: List<Clause> get() = _learnedClauses
 
+    /** Count of binary (2-literal) clauses known — original problem clauses plus learned
+     *  ones. Gates the #202 binary-resolution minimization, which is a no-op without binary
+     *  clauses. Over-approximates after forgetting (never decremented), which only costs a
+     *  harmless no-op pass — never correctness. */
+    private var binaryClauseCount: Int = run {
+        var n = 0
+        for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
+        n
+    }
+
+    /** True iff any binary clause is known — the gate for binary-resolution minimization. */
+    val hasBinaryClauses: Boolean get() = binaryClauseCount > 0
+
+    /**
+     * Invoke [action] with the *other* literal of every binary clause that contains [lit]
+     * (#202). Binary clauses watch both their literals and never relocate a watch (there is
+     * no third literal to move to), so [boolWatchersByLit] reliably lists every binary clause
+     * on [lit]. No-op for atom-literal [lit] (the bool watcher index only covers bool vars).
+     */
+    internal fun forEachBinaryPartner(lit: Int, action: (other: Int) -> Unit) {
+        if (Lit.variable(lit) >= problem.numBoolVars) return
+        val list = boolWatchersByLit[lit]
+        for (i in 0 until list.size) {
+            val f = factorAt(list[i])
+            if (f is Clause && f.literals.size == 2) {
+                val a = f.literals[0]
+                val b = f.literals[1]
+                when (lit) {
+                    a -> action(b)
+                    b -> action(a)
+                }
+            }
+        }
+    }
+
     /** LBD (Literal Block Distance) per learned clause, parallel to [_learnedClauses].
      *  Glucose-style glue metric: lower = more re-usable. Forgetting policies key on
      *  this to decide which clauses to drop. */
@@ -452,6 +505,17 @@ class PropagationState(
      *  Solution-blocking nogoods are the main client: dropping one re-opens an already
      *  reported leaf and the search can revisit it forever. */
     private val learnedPermanent: IntArrayList = IntArrayList()
+
+    /** Three-tier database tier per learned clause (#201), parallel to [_learnedClauses]:
+     *  [TIER_CORE] / [TIER_MID] / [TIER_LOCAL], or [TIER_UNSET] before the reduction policy
+     *  first classifies it by LBD. The policy promotes/demotes clauses between tiers based on
+     *  reuse, so the tier is persistent state rather than a pure function of LBD. */
+    private val learnedTier: IntArrayList = IntArrayList()
+
+    /** 1 iff the learned clause has detected a conflict or forced a unit since the last
+     *  reduction, parallel to [_learnedClauses]. The three-tier reduction policy reads this
+     *  to promote reused clauses and demote idle ones, then clears it for survivors. */
+    private val learnedUsedFlags: IntArrayList = IntArrayList()
 
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
@@ -482,8 +546,13 @@ class PropagationState(
         _learnedClauses.add(clause)
         learnedLbds.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
+        learnedTier.add(TIER_UNSET)
+        learnedUsedFlags.add(0)
+        if (clause.literals.size == 2) binaryClauseCount++ // keep the #202 gate current
         _refPayload.add(null)
-        for (lit in clause.initialBoolWatchers) installLitWatch(lit, newFid)
+        val watchers = clause.initialBoolWatchers
+        val blockers = clause.initialBoolWatcherBlockers
+        for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
         return newFid
     }
 
@@ -492,6 +561,34 @@ class PropagationState(
 
     /** True iff learned clause [learnedIndex] must survive every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = learnedPermanent[learnedIndex] == 1
+
+    /** Three-tier (#201) DB tier of learned clause [learnedIndex] ([TIER_UNSET] until the
+     *  reduction policy classifies it). */
+    fun learnedClauseTier(learnedIndex: Int): Int = learnedTier[learnedIndex]
+
+    /** Set the three-tier DB tier of learned clause [learnedIndex] (promotion / demotion /
+     *  initial classification by the reduction policy). */
+    fun setLearnedClauseTier(learnedIndex: Int, tier: Int) {
+        learnedTier[learnedIndex] = tier
+    }
+
+    /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
+     *  reduction. */
+    fun learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean = learnedUsedFlags[learnedIndex] == 1
+
+    /** Clear the reuse flag for learned clause [learnedIndex] — called for survivors at the
+     *  end of a reduction so the next window measures fresh activity. */
+    fun clearLearnedClauseUsed(learnedIndex: Int) {
+        learnedUsedFlags[learnedIndex] = 0
+    }
+
+    /** Mark learned clause [fid] (a factor id; ignored when it isn't a learned clause) as
+     *  used since the last reduction — it just detected a conflict or forced a unit. Drives
+     *  three-tier promotion (#201). */
+    internal fun noteLearnedUse(fid: Int) {
+        val idx = fid - problem.numFactors
+        if (idx in 0 until learnedUsedFlags.size) learnedUsedFlags[idx] = 1
+    }
 
     /**
      * Prune the learned-clause database. The [keep] predicate decides per (learnedIndex,
@@ -526,12 +623,16 @@ class PropagationState(
                 _learnedClauses[w] = _learnedClauses[i]
                 learnedLbds[w] = learnedLbds[i]
                 learnedPermanent[w] = learnedPermanent[i]
+                learnedTier[w] = learnedTier[i]
+                learnedUsedFlags[w] = learnedUsedFlags[i]
                 w++
             }
         }
         while (_learnedClauses.size > newCount) _learnedClauses.removeAt(_learnedClauses.size - 1)
         learnedLbds.truncateTo(newCount)
         learnedPermanent.truncateTo(newCount)
+        learnedTier.truncateTo(newCount)
+        learnedUsedFlags.truncateTo(newCount)
 
         // Compact the learned tail of _refPayload similarly. Static-factor entries stay
         // at indices [0, problem.numFactors) untouched.
@@ -549,17 +650,24 @@ class PropagationState(
         // either rewrite to their new factor id or get dropped.
         for (lit in boolWatchersByLit.indices) {
             val list = boolWatchersByLit[lit]
+            val blockers = boolBlockersByLit[lit] // compacted in lockstep so indices stay aligned
             var wi = 0
             for (r in 0 until list.size) {
                 val fid = list[r]
+                val blocker = blockers[r]
                 if (fid < refBase) {
+                    blockers[wi] = blocker
                     list[wi++] = fid
                 } else {
                     val newLearnedIdx = remap[fid - refBase]
-                    if (newLearnedIdx >= 0) list[wi++] = refBase + newLearnedIdx
+                    if (newLearnedIdx >= 0) {
+                        blockers[wi] = blocker
+                        list[wi++] = refBase + newLearnedIdx
+                    }
                 }
             }
             list.truncateTo(wi)
+            blockers.truncateTo(wi)
         }
 
         // Atom-literal watcher lists carry learned fids too — a learned clause watching a
@@ -631,6 +739,24 @@ class PropagationState(
      * pins which only *adds* non-false literals.
      */
     internal val boolWatchersByLit: Array<IntArrayList> =
+        Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
+
+    /**
+     * Blocking literals paired index-for-index with [boolWatchersByLit] (#200). Entry `i`
+     * holds a literal that, if currently true, proves the watcher at the same index is
+     * already satisfied — so [enqueueForBoolChange] can skip waking that factor entirely,
+     * removing a large fraction of clause touches in the hot BCP loop on dense instances.
+     * [NO_BLOCKER] means "no blocker, always fire", which is the default for every factor
+     * that doesn't supply [com.eignex.klause.solver.Factor.initialBoolWatcherBlockers]
+     * (e.g. cardinality), so behaviour for those is unchanged.
+     *
+     * Held in lockstep with [boolWatchersByLit] through every mutation ([installLitWatch],
+     * [moveBoolWatcher]'s swap-pop, and the [forgetLearnedClauses] compaction). Like the
+     * watcher lists it drifts across snapshot / restore; a stale blocker is always sound
+     * because it is still a real literal of the factor — if true the factor really is
+     * satisfied; if not we simply fire as before.
+     */
+    internal val boolBlockersByLit: Array<IntArrayList> =
         Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
 
     /**
@@ -1073,12 +1199,13 @@ class PropagationState(
 
     /** Install [fid] as a watcher of [lit]. Dispatches between [boolWatchersByLit]
      *  (bool var space) and [atomWatchersByLit] (atom var space). */
-    internal fun installLitWatch(lit: Int, fid: Int) {
+    internal fun installLitWatch(lit: Int, fid: Int, blocker: Int = NO_BLOCKER) {
         val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
             val list = boolWatchersByLit[lit]
             boolWatchPos.put(packWatch(fid, lit), list.size) // position of the about-to-append entry
             list.add(fid)
+            boolBlockersByLit[lit].add(blocker) // index-aligned with the watcher just appended
         } else {
             val list = atomWatchersByLit.getOrPut(lit) { IntArrayList(initialCapacity = 2) }
             list.add(fid)
@@ -1220,8 +1347,12 @@ class PropagationState(
 
     init {
         for (fid in 0 until problem.numFactors) {
-            val watchers = problem.factors[fid].initialBoolWatchers ?: continue
-            for (lit in watchers) installLitWatch(lit, fid)
+            val factor = problem.factors[fid]
+            val watchers = factor.initialBoolWatchers ?: continue
+            val blockers = factor.initialBoolWatcherBlockers
+            for (i in watchers.indices) {
+                installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+            }
         }
     }
 
@@ -1231,7 +1362,7 @@ class PropagationState(
      * during propagation. The removal scans [oldLit]'s slot (typically a handful of
      * entries) and swap-and-pops; the insert is O(1).
      */
-    fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int) {
+    fun moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int, blocker: Int = NO_BLOCKER) {
         if (oldLit == newLit) return
         val oldV = Lit.variable(oldLit)
         if (oldV < problem.numBoolVars) {
@@ -1239,8 +1370,9 @@ class PropagationState(
         } else {
             atomWatchersByLit[oldLit]?.removeValue(factorId)
         }
-        // Install on new.
-        installLitWatch(newLit, factorId)
+        // Install on new, carrying the blocking literal supplied by the watcher-using factor
+        // (#200). Defaults to NO_BLOCKER for factors that don't track blockers.
+        installLitWatch(newLit, factorId, blocker)
     }
 
     /** O(1) removal of [factorId] from `boolWatchersByLit[lit]` via the [boolWatchPos]
@@ -1250,23 +1382,43 @@ class PropagationState(
      *  never remove the wrong watcher. */
     private fun removeBoolWatch(factorId: Int, lit: Int) {
         val list = boolWatchersByLit[lit]
+        val blockers = boolBlockersByLit[lit]
         val key = packWatch(factorId, lit)
-        val pos = boolWatchPos.getOrDefault(key, -1)
-        if (pos < 0 || pos >= list.size || list[pos] != factorId) {
-            // Index miss/desync — fall back to the linear scan and resync this lit's positions.
-            list.removeValue(factorId)
+        val recorded = boolWatchPos.getOrDefault(key, -1)
+        if (recorded < 0 || recorded >= list.size || list[recorded] != factorId) {
+            // Index miss/desync — fall back to a linear scan, swap-pop both lists in lockstep
+            // at the found index, and resync this lit's positions.
+            var pos = -1
+            for (i in 0 until list.size) {
+                if (list[i] == factorId) {
+                    pos = i
+                    break
+                }
+            }
             boolWatchPos.remove(key)
+            if (pos >= 0) swapPopWatch(list, blockers, pos)
             resyncBoolWatchPos(lit)
             return
         }
         val last = list.size - 1
-        if (pos != last) {
+        if (recorded != last) {
             val movedFid = list[last]
-            list[pos] = movedFid
-            boolWatchPos.put(packWatch(movedFid, lit), pos)
+            boolWatchPos.put(packWatch(movedFid, lit), recorded)
+        }
+        swapPopWatch(list, blockers, recorded)
+        boolWatchPos.remove(key)
+    }
+
+    /** Swap-pop index [pos] from a watcher list and its parallel blocker list in lockstep,
+     *  keeping the two index-aligned. The caller fixes [boolWatchPos] for the moved entry. */
+    private fun swapPopWatch(list: IntArrayList, blockers: IntArrayList, pos: Int) {
+        val last = list.size - 1
+        if (pos != last) {
+            list[pos] = list[last]
+            blockers[pos] = blockers[last]
         }
         list.truncateTo(last)
-        boolWatchPos.remove(key)
+        blockers.truncateTo(last)
     }
 
     /** Recompute every recorded position for [lit]'s watcher list (used by the self-heal
@@ -1425,6 +1577,7 @@ class PropagationState(
         boolValues[v] = value
         boolLevel[v] = currentLevel
         boolReason[v] = currentFactor
+        noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused (#201)
         boolAntecedents[v] = antecedents
         boolPinOrder.add(v)
         dirtyBools.addLast(v)
@@ -1652,6 +1805,7 @@ class PropagationState(
 
     private fun seedConflictFactor(fid: Int) {
         if (fid < 0) return
+        noteLearnedUse(fid) // a learned clause that detects a conflict counts as reused (#201)
         val s = conflictSeedFactors ?: HashSet<Int>().also { conflictSeedFactors = it }
         s.add(fid)
     }
@@ -2044,6 +2198,15 @@ class PropagationState(
         // successful pin); read it directly.
         val falseLit = Lit.make(v, !requireNotNull(boolValues[v]))
         val watchers = boolWatchersByLit[falseLit]
-        for (i in 0 until watchers.size) propEnq(watchers[i])
+        val blockers = boolBlockersByLit[falseLit]
+        for (i in 0 until watchers.size) {
+            // Blocking-literal short-cut (#200): if the cached blocker for this watch is
+            // already true, the factor is satisfied and waking it would be a no-op — skip
+            // the enqueue and the clause dereference entirely. NO_BLOCKER falls through and
+            // always fires, so factors without blockers behave exactly as before.
+            val blocker = blockers[i]
+            if (blocker != NO_BLOCKER && litTrue(blocker)) continue
+            propEnq(watchers[i])
+        }
     }
 }

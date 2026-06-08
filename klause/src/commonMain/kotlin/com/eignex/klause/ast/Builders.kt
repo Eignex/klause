@@ -351,6 +351,24 @@ fun allDifferentExcept(xs: List<IntTerm>, except: Set<Int>): BoolExpr {
 }
 
 /**
+ * `symmetric_all_different(xs)` — the map `i -> xs[i] − indexOffset` is a self-inverse
+ * permutation: `xs[i] = j + indexOffset` iff `xs[j] = i + indexOffset`.
+ */
+fun symmetricAllDifferent(xs: List<IntTerm>, indexOffset: Int = 0): BoolExpr {
+    require(xs.size >= 2) { "symmetricAllDifferent: need at least two terms" }
+    return SymmetricAllDifferent(xs.map { it.toIntExpr() }, indexOffset)
+}
+
+/**
+ * `inverse(f, g)` — mutual-inverse channeling: `f[i] = j + gOffset` iff `g[j] = i + fOffset`.
+ */
+fun inverse(f: List<IntTerm>, g: List<IntTerm>, fOffset: Int = 0, gOffset: Int = 0): BoolExpr {
+    require(f.size == g.size) { "inverse: f and g must have equal length" }
+    require(f.isNotEmpty()) { "inverse: arrays must be non-empty" }
+    return InverseChannel(f.map { it.toIntExpr() }, g.map { it.toIntExpr() }, fOffset, gOffset)
+}
+
+/**
  * `arg_sort(values, perm)` — perm is a permutation of `[permOffset, permOffset + n − 1]`
  * such that `values[perm[i] − permOffset]` is non-decreasing. Ties broken by index.
  */

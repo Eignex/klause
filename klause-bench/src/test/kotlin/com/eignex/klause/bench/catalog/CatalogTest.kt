@@ -12,15 +12,14 @@ import kotlin.test.assertTrue
 /** Catalog + in-process resolution coverage. */
 class CatalogTest {
 
-    private fun ref(suite: String, name: String): ProblemRef =
-        Catalog.suite(suite).problems.first { it.name == name }
+    private fun ref(suite: String, name: String): ProblemRef = Catalog.suite(suite).problems.first { it.name == name }
 
     @Test
     fun `dimacs-core resolves with expected shapes and oracles`() {
         val byName = Catalog.suite("dimacs-core").problems.associateBy { it.name }
         assertEquals(3, byName.size)
-        assertEquals(Expected.Unsat, byName["php4"]!!.expected)
-        assertEquals(Expected.Sat, byName["random3sat-20-80"]!!.expected)
+        assertEquals(Expected.Unsat, byName.getValue("php4").expected)
+        assertEquals(Expected.Sat, byName.getValue("random3sat-20-80").expected)
 
         val php4 = InProcessRunner.resolve(ref("dimacs-core", "php4")).problem
         assertEquals(20, php4.numBoolVars)

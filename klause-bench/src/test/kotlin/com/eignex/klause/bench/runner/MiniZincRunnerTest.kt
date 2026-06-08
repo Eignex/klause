@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
@@ -23,7 +24,10 @@ class MiniZincRunnerTest {
 
     @Test
     fun `choco reference solves the minizinc smoke set`() {
-        if (!minizincOnPath()) { println("[mzn-runner] minizinc not on PATH — skipping"); return }
+        if (!minizincOnPath()) {
+            println("[mzn-runner] minizinc not on PATH — skipping")
+            return
+        }
         val runner = MiniZincRunner()
         for (ref in Catalog.suite("mzn-smoke").problems) {
             val resolved = runner.resolve(ref)
@@ -37,7 +41,7 @@ class MiniZincRunnerTest {
         }
     }
 
-    private fun satisfies(p: com.eignex.klause.solver.Problem, r: SolveResult.Sat): Boolean {
+    private fun satisfies(p: Problem, r: SolveResult.Sat): Boolean {
         val st = LocalSearchState(p, Random(0))
         for (b in 0 until p.numBoolVars) st.assignment.setBool(b, r.assignment.bools[b])
         for (i in 0 until p.numIntVars) st.assignment.setInt(i, r.assignment.ints[i])

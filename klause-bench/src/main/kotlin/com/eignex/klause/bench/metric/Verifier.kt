@@ -9,24 +9,24 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 
 /** Per-backend solve verdicts + per-sample satisfaction checks for one [Problem]. */
-data class VerificationReport(
-    val problem: Problem,
-    val verdicts: Map<String, SolveResult>,
-    val agreement: Agreement,
-    val sampleChecks: Map<String, List<SampleCheck>>,
+internal data class VerificationReport(
+    internal val problem: Problem,
+    internal val verdicts: Map<String, SolveResult>,
+    internal val agreement: Agreement,
+    internal val sampleChecks: Map<String, List<SampleCheck>>,
 ) {
-    val allSamplesSatisfy: Boolean
+    internal val allSamplesSatisfy: Boolean
         get() = sampleChecks.values.all { it.all { check -> check.satisfies } }
 }
 
-enum class Agreement { Agree, Disagree, OnlyLocalSearch }
+internal enum class Agreement { Agree, Disagree, OnlyLocalSearch }
 
-data class SampleCheck(val sample: Sample, val satisfies: Boolean)
+internal data class SampleCheck(val sample: Sample, val satisfies: Boolean)
 
 /** Cross-checks the in-process backends agree on SAT/UNSAT and that every sample produced
  *  actually satisfies the problem. Used as a correctness gate before benchmarking. */
 object Verifier {
-    fun verify(
+    internal fun verify(
         problem: Problem,
         solvers: List<InProcessSolver> = Solvers.defaultPortfolio(problem),
         sampleCount: Int = 5,

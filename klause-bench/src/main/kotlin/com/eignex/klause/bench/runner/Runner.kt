@@ -5,35 +5,37 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.format.Formats
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.BacktrackParams
 
 /** A catalog [ProblemRef] resolved into a concrete, solvable klause [Problem]. */
-data class ResolvedProblem(
-    val ref: ProblemRef,
-    val problem: Problem,
-    val objective: Objective? = null,
+internal data class ResolvedProblem(
+    internal val ref: ProblemRef,
+    internal val problem: Problem,
+    internal val objective: Objective? = null,
     /** Local-search-only objective: a functional (gradient-bearing) mirror of [objective] for
      *  decomposed objectives, when the model provides one. Reference/complete backends use
      *  [objective]; the LS engine prefers this. Null ⇒ fall back to [objective]. */
     val lsObjective: Objective? = null,
     /** Definitional sweep for the LS engine (see [com.eignex.klause.solver.DefinitionalSweep]);
      *  carried from `FlatZincProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
-    val definitionalSweep: com.eignex.klause.solver.DefinitionalSweep? = null,
+    val definitionalSweep: DefinitionalSweep? = null,
     /** Search heuristics from the model's `solve :: int_search(...)` annotation (see
      *  `FlatZincProgram.defaultBacktrackParams`); null when the model has none. Metrics
      *  merge their budget/seed/restart config into this so benchmark runs honour the
      *  model author's intended search the same way the competition CLI does. */
-    val searchParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
+    val searchParams: BacktrackParams? = null,
     /** Xor-system search recipe (see `FlatZincProgram.xorSearchParams`); null unless the
      *  model carries two or more xor constraints. Raced as an extra portfolio worker. */
-    val xorSearchParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
+    val xorSearchParams: BacktrackParams? = null,
 ) {
-    val name: String get() = ref.name
+    internal val name: String get() = ref.name
 }
 
 /** Wall-clock / effort budget threaded into solver params by metrics that honor it. */
-data class Budget(val timeoutMillis: Long = 10_000L)
+data class Budget(internal val timeoutMillis: Long = 10_000L)
 
 /**
  * Resolves a [ProblemRef] into a [ResolvedProblem]. The runner axis is *how a problem becomes
@@ -41,14 +43,14 @@ data class Budget(val timeoutMillis: Long = 10_000L)
  * builder); `MiniZincRunner` compiles `.mzn`→`.fzn` via the `minizinc` CLI first.
  * Solving the resulting `Problem` is then uniform across runners (see the solver axis).
  */
-interface Runner {
+internal interface Runner {
     val id: String
     fun supports(ref: ProblemRef): Boolean
     fun resolve(ref: ProblemRef): ResolvedProblem
 }
 
 /** Resolves in-process formats (DIMACS / OPB / JSON-Schema / FlatZinc) and `InCode` builders. */
-object InProcessRunner : Runner {
+internal object InProcessRunner : Runner {
     override val id = "in-process"
 
     override fun supports(ref: ProblemRef): Boolean =

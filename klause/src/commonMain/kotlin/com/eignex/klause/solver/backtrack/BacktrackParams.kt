@@ -52,6 +52,17 @@ data class BacktrackParams(
      */
     val lubyRestartBase: Long? = null,
     /**
+     * Glucose-style adaptive restarts (Audemard-Simon) for the pure-Boolean search path.
+     * When true, the engine restarts based on learned-clause quality — a short window of
+     * recent LBD running hotter than the long-run average forces a re-pick — with trail-size
+     * blocking that suppresses the restart when the solver is driving deep toward a model.
+     * See [GlucoseRestart]. Selectable *alongside* [lubyRestartBase] rather than replacing it:
+     * when adaptive restarts are on the Luby budget is ignored, so SAT-heavy configs opt into
+     * data-driven restarts while the CP optimization path keeps Luby. Disabled by default. On
+     * larger random instances near the phase transition (see #117) this usually beats Luby.
+     */
+    val adaptiveRestart: Boolean = false,
+    /**
      * Phase-saving: cache the last value the search committed to for each variable.
      * On a fresh descent (after a backtrack or restart) the cached value is tried
      * first, so the search doesn't lose the work spent narrowing down the right
@@ -60,6 +71,23 @@ data class BacktrackParams(
      * fixed seed when no restarts are in play.
      */
     val phaseSaving: Boolean = false,
+    /**
+     * Target phasing and rephasing on top of plain [phaseSaving]. When enabled, the engine
+     * tracks the deepest conflict-free Boolean assignment seen so far (the "target" phase,
+     * the trail prefix at the most-assigned point before a backtrack) and biases fresh
+     * Boolean decisions toward it. A rephasing schedule periodically rotates the polarity
+     * source — target, saved, all-true, all-false, random — every [rephaseInterval] conflicts
+     * to escape basins the saved phase keeps reproducing. Pure-Boolean: integer value
+     * selection is untouched (it still follows plain phase saving when [phaseSaving] is set).
+     * Disabled by default, leaving plain phase saving as the baseline behaviour.
+     */
+    val targetPhasing: Boolean = false,
+    /**
+     * Conflicts between rephasing rotations when [targetPhasing] is on. Each rotation
+     * advances the Boolean polarity source through target → saved → all-true → all-false →
+     * random and back. Ignored when [targetPhasing] is false. Must be positive.
+     */
+    val rephaseInterval: Long = 1000L,
     /**
      * Cap on the learned-clause database size. When non-null, a restart-driven
      * forgetting pass runs on every Luby restart (gated by [lubyRestartBase]): clauses
@@ -75,6 +103,24 @@ data class BacktrackParams(
      * MiniSAT / Glucose default is 2.
      */
     val lbdGlueThreshold: Int = 2,
+    /**
+     * Three-tier learned-clause database (#201). When true (and [maxLearnedClauses] is set),
+     * the restart-driven reduction replaces the binary glue split with three tiers: a
+     * permanent core (LBD ≤ [lbdGlueThreshold]), a mid tier (LBD ≤ [midLbdThreshold]) kept
+     * across reductions but demoted when idle, and a local tier deleted aggressively. Clauses
+     * that participate in a later conflict (detect it or force a unit) are promoted on the
+     * next reduction; mid-tier clauses idle across a reduction are demoted. This gives more
+     * selective deletion than the binary glue split and helps proof-search families (#117)
+     * where useful clauses are otherwise forgotten. Disabled by default — the binary glue
+     * policy stays the baseline.
+     */
+    val tieredLearnedDb: Boolean = false,
+    /**
+     * Mid-tier LBD threshold for [tieredLearnedDb]: a freshly learned clause with
+     * `lbdGlueThreshold < LBD ≤ midLbdThreshold` starts in the mid tier, higher LBD in the
+     * local tier. Glucose's "Tier2" cutoff is 6.
+     */
+    val midLbdThreshold: Int = 6,
     /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`

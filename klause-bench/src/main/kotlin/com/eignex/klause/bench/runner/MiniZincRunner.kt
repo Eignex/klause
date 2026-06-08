@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
  * then parsed in-process (`parseFlatZinc`) into a klause [com.eignex.klause.solver.Problem].
  * No external solver is invoked — solving is uniform across runners via the solver axis.
  */
-class MiniZincRunner(
+internal class MiniZincRunner(
     private val timeoutSec: Int = System.getProperty("klause.bench.mzn.timeoutSec")?.toIntOrNull() ?: 60,
 ) : Runner {
     override val id = "minizinc"
@@ -32,8 +32,11 @@ class MiniZincRunner(
             is SolveDirective.Satisfy -> null
         }
         return ResolvedProblem(
-            ref, program.problem, objective,
-            lsObjective = program.lsObjective, definitionalSweep = program.definitionalSweep,
+            ref,
+            program.problem,
+            objective,
+            lsObjective = program.lsObjective,
+            definitionalSweep = program.definitionalSweep,
             searchParams = program.defaultBacktrackParams,
             xorSearchParams = program.xorSearchParams,
         )
@@ -57,18 +60,28 @@ class MiniZincRunner(
         val libDir = File(root, "klause-mzn-lib/share/minizinc/klause")
         val cmd = buildList {
             add("minizinc")
-            add("--solver"); add(msc.absolutePath)
+            add("--solver")
+            add(msc.absolutePath)
             add("-c")
-            add("-G"); add(libDir.absolutePath)
-            add("--output-fzn-to-file"); add(out.absolutePath)
+            add("-G")
+            add(libDir.absolutePath)
+            add("--output-fzn-to-file")
+            add(out.absolutePath)
             add(mzn.absolutePath)
             if (dzn != null) add(dzn.absolutePath)
         }
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val finished = proc.waitFor(timeoutSec.toLong(), TimeUnit.SECONDS)
-        if (!finished) { proc.destroyForcibly(); error("minizinc compile timed out after ${timeoutSec}s for ${mzn.name}") }
+        if (!finished) {
+            proc.destroyForcibly()
+            error(
+                "minizinc compile timed out after ${timeoutSec}s for ${mzn.name}",
+            )
+        }
         val output = proc.inputStream.bufferedReader().readText()
-        require(proc.exitValue() == 0) { "minizinc compile failed (exit ${proc.exitValue()}) for ${mzn.name}: ${output.take(500)}" }
+        require(
+            proc.exitValue() == 0,
+        ) { "minizinc compile failed (exit ${proc.exitValue()}) for ${mzn.name}: ${output.take(500)}" }
         require(out.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }
     }
 }
