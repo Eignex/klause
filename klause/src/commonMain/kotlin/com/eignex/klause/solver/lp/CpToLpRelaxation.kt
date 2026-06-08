@@ -1,0 +1,266 @@
+package com.eignex.klause.solver.lp
+
+import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.util.IntArrayList
+
+/**
+ * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
+ * back to the CP variable it stands for. The mapping is what lets reduced-cost fixing (#21) turn
+ * an LP column reduction into a domain reduction on the right `(kind, varId)`.
+ *
+ * The LP objective is over the column costs only; the true objective is
+ * `lpObjective + objectiveConstant`. Branch-and-bound must add [objectiveConstant] before
+ * comparing the LP bound to the incumbent.
+ */
+internal class LpRelaxation(
+    val model: LpModel,
+    /** Structural LP column → origin CP variable id. */
+    val colVarId: IntArray,
+    /** Structural LP column → true if it is a Boolean variable, false if an integer variable. */
+    val colIsBool: BooleanArray,
+    /** Constant term of the objective, omitted from the LP and re-added to its bound. */
+    val objectiveConstant: Long,
+)
+
+/**
+ * Walks [Problem.factors] and emits an [LpModel] relaxation for the LP-emittable factor types,
+ * pulling variable bounds live from the current search node (#19).
+ *
+ * ## What is encoded
+ *  - [Linear]: one row, `LE`/`GE`/`EQ` mapped directly; `NE` is not LP-relaxable and is skipped.
+ *  - [Cardinality], [Clause], [PseudoBoolean]: linear rows over the Boolean fan-in. A positive
+ *    literal contributes `x_b`, a negative literal `1 − x_b`; the constant folds into the row's
+ *    right-hand side.
+ *  - [ReifiedLinear]: indicator rows via tight big-M (see [reifiedRows]).
+ *  - The [LinearObjective] (always minimization): a cost on each variable's column. Every variable
+ *    with a nonzero objective coefficient gets a column even if no constraint mentions it, so the
+ *    LP objective is the complete relaxed objective and its optimum is a valid bound.
+ *
+ * ## What is skipped
+ *  Hard globals (AllDifferent, Cumulative, Element, Circuit, …) are not encoded here; they are
+ *  handled by cut generation (#22) or Lagrangian relaxation (#23). Unrecognized factors are
+ *  silently skipped — a missing constraint only loosens the relaxation, it never makes the bound
+ *  unsound.
+ *
+ * ## Live bounds
+ *  Integer columns take `[min, max]` from [PropagationSession.intDomain]; a Boolean column takes
+ *  `[1, 1]` / `[0, 0]` when its variable is already pinned this node, else `[0, 1]`. Pinning a
+ *  Boolean column collapses every big-M indicator that mentions it to the exact constraint.
+ */
+internal class CpToLpRelaxation(private val problem: Problem, private val objective: LinearObjective?) {
+    fun build(session: PropagationSession): LpRelaxation = Assembler(session).assemble()
+
+    private fun intCost(i: Int): Long = objective?.intCoefficients?.getOrElse(i) { 0L } ?: 0L
+
+    private fun boolCost(b: Int): Long = objective?.boolWeights?.getOrElse(b) { 0L } ?: 0L
+
+    /** Per-build mutable state: the builder, the column maps, and the row emitters. */
+    private inner class Assembler(private val session: PropagationSession) {
+        private val builder = LpBuilder()
+        private val intCol = IntArray(problem.numIntVars) { -1 }
+        private val boolCol = IntArray(problem.numBoolVars) { -1 }
+        private val colVarId = IntArrayList()
+        private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
+
+        /** Column for integer variable [i], created on first use with its live domain bounds. */
+        private fun intColumn(i: Int): Int {
+            var c = intCol[i]
+            if (c == -1) {
+                val dom = session.intDomain(i)
+                c = builder.addVar(dom.min.toLong(), dom.max.toLong(), intCost(i), tag = i)
+                intCol[i] = c
+                colVarId.add(i)
+                colIsBool.add(0)
+            }
+            return c
+        }
+
+        /** Column for Boolean variable [b]; bounds collapse to a point if it is pinned this node. */
+        private fun boolColumn(b: Int): Int {
+            var c = boolCol[b]
+            if (c == -1) {
+                val pinned = session.boolValue(b)
+                val lo = if (pinned == true) 1L else 0L
+                val hi = if (pinned == false) 0L else 1L
+                c = builder.addVar(lo, hi, boolCost(b), tag = b)
+                boolCol[b] = c
+                colVarId.add(b)
+                colIsBool.add(1)
+            }
+            return c
+        }
+
+        /** Emit `Σ coeffs[k]·x_{vars[k]} (+ auxCoeff·x_aux) rel rhs`; pass `auxCol = -1` for no aux. */
+        private fun addIntRow(
+            vars: IntArray,
+            coeffs: IntArray,
+            auxCol: Int,
+            auxCoeff: Long,
+            rel: Relation,
+            rhs: Long,
+        ) {
+            val extra = if (auxCol >= 0) 1 else 0
+            val cols = IntArray(vars.size + extra)
+            val vals = LongArray(vars.size + extra)
+            for (k in vars.indices) {
+                cols[k] = intColumn(vars[k])
+                vals[k] = coeffs[k].toLong()
+            }
+            if (auxCol >= 0) {
+                cols[vars.size] = auxCol
+                vals[vars.size] = auxCoeff
+            }
+            builder.addRow(cols, vals, rel, rhs)
+        }
+
+        /**
+         * Emit `Σ weights[k]·literal[k] rel rhs` over Boolean literals. A positive literal counts
+         * `+w·x_b`, a negative literal `+w·(1 − x_b) = w − w·x_b`; the `+w` constants accumulate
+         * and move to the right-hand side. [weights] of `null` means unit weights (cardinality).
+         */
+        private fun addBoolRow(literals: IntArray, weights: IntArray?, rel: Relation, rhs: Long) {
+            val cols = IntArray(literals.size)
+            val vals = LongArray(literals.size)
+            var constant = 0L
+            for (k in literals.indices) {
+                val lit = literals[k]
+                val w = (weights?.get(k) ?: 1).toLong()
+                cols[k] = boolColumn(Lit.variable(lit))
+                if (Lit.isPositive(lit)) {
+                    vals[k] = w
+                } else {
+                    vals[k] = -w
+                    constant = addExact(constant, w)
+                }
+            }
+            builder.addRow(cols, vals, rel, subExact(rhs, constant))
+        }
+
+        /**
+         * Indicator rows for `auxBoolVar ↔ (L op bound)` via big-M, where `L = Σ coeffs·vars`. The
+         * big-Ms are the tightest possible from the live range `[lMin, lMax]` of `L`, and the
+         * `¬(L op bound)` side uses integrality (`¬(L ≤ bound) ⇔ L ≥ bound + 1`) so the rows are as
+         * strong as a single indicator allows.
+         *
+         * For `EQ` only the `aux = 1 ⇒ L = bound` direction is emitted, and for `NE` only the
+         * `aux = 0 ⇒ L = bound` direction: the complementary side is the disjunction `L ≠ bound`,
+         * whose convex hull is the whole interval, so it yields no valid LP cut and is dropped.
+         */
+        private fun reifiedRows(rl: ReifiedLinear) {
+            var lMin = 0L
+            var lMax = 0L
+            for (k in rl.vars.indices) {
+                val c = rl.coeffs[k].toLong()
+                val dom = session.intDomain(rl.vars[k])
+                val lo = dom.min.toLong()
+                val hi = dom.max.toLong()
+                if (c >= 0L) {
+                    lMin = addExact(lMin, mulExact(c, lo))
+                    lMax = addExact(lMax, mulExact(c, hi))
+                } else {
+                    lMin = addExact(lMin, mulExact(c, hi))
+                    lMax = addExact(lMax, mulExact(c, lo))
+                }
+            }
+            val a = boolColumn(rl.auxBoolVar)
+            val bound = rl.bound.toLong()
+            val boundUp = addExact(bound, 1L) // L ≥ bound + 1 is the integer negation of L ≤ bound
+            val boundDown = subExact(bound, 1L)
+
+            fun row(auxCoeff: Long, rel: Relation, rhs: Long) = addIntRow(rl.vars, rl.coeffs, a, auxCoeff, rel, rhs)
+
+            when (rl.op) {
+                LinearOp.LE -> {
+                    val m1 = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
+                    row(m1, Relation.LE, addExact(bound, m1))
+                    val m2 = maxOf(0L, subExact(boundUp, lMin)) // aux=0 ⇒ L ≥ bound+1
+                    row(m2, Relation.GE, boundUp)
+                }
+
+                LinearOp.GE -> {
+                    val m1 = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
+                    row(-m1, Relation.GE, subExact(bound, m1))
+                    val m2 = maxOf(0L, subExact(lMax, boundDown)) // aux=0 ⇒ L ≤ bound-1
+                    row(-m2, Relation.LE, boundDown)
+                }
+
+                LinearOp.EQ -> {
+                    val mHi = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
+                    row(mHi, Relation.LE, addExact(bound, mHi))
+                    val mLo = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
+                    row(-mLo, Relation.GE, subExact(bound, mLo))
+                }
+
+                LinearOp.NE -> {
+                    val mHi = maxOf(0L, subExact(lMax, bound)) // aux=0 ⇒ L ≤ bound
+                    row(-mHi, Relation.LE, bound)
+                    val mLo = maxOf(0L, subExact(bound, lMin)) // aux=0 ⇒ L ≥ bound
+                    row(mLo, Relation.GE, bound)
+                }
+            }
+        }
+
+        fun assemble(): LpRelaxation {
+            // Materialize objective-only variables first so the relaxed objective is complete.
+            objective?.let { obj ->
+                for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intColumn(i)
+                for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolColumn(b)
+            }
+
+            for (factor in problem.factors) {
+                when (factor) {
+                    is Linear -> linearRow(factor.op, factor.vars, factor.coeffs, factor.bound.toLong())
+
+                    is ReifiedLinear -> reifiedRows(factor)
+
+                    is Cardinality -> {
+                        addBoolRow(factor.literals, null, Relation.GE, factor.min.toLong())
+                        addBoolRow(factor.literals, null, Relation.LE, factor.max.toLong())
+                    }
+
+                    is Clause -> addBoolRow(factor.literals, null, Relation.GE, 1L)
+
+                    is PseudoBoolean -> {
+                        val rel = when (factor.op) {
+                            PbOp.LE -> Relation.LE
+                            PbOp.GE -> Relation.GE
+                            PbOp.EQ -> Relation.EQ
+                        }
+                        addBoolRow(factor.literals, factor.weights, rel, factor.bound.toLong())
+                    }
+
+                    else -> Unit // hard globals and unrecognized factors: handled elsewhere or skipped
+                }
+            }
+
+            val model = builder.build(Sense.MINIMIZE)
+            val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
+            return LpRelaxation(
+                model = model,
+                colVarId = IntArray(colVarId.size) { colVarId[it] },
+                colIsBool = kinds,
+                objectiveConstant = objective?.constant ?: 0L,
+            )
+        }
+
+        private fun linearRow(op: LinearOp, vars: IntArray, coeffs: IntArray, bound: Long) {
+            val rel = when (op) {
+                LinearOp.LE -> Relation.LE
+                LinearOp.GE -> Relation.GE
+                LinearOp.EQ -> Relation.EQ
+                LinearOp.NE -> return // not LP-relaxable
+            }
+            addIntRow(vars, coeffs, auxCol = -1, auxCoeff = 0L, rel = rel, rhs = bound)
+        }
+    }
+}
