@@ -3,7 +3,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    id("com.eignex.kmp") version "1.2.4"
+    id("com.eignex.kmp") version "1.2.5"
     kotlin("plugin.serialization")
 }
 
@@ -20,9 +20,9 @@ kotlin {
     jvm()
     linuxX64()
     if (!hostTargetsOnly) {
-        // Solver tests are compute-heavy; Mocha's default 2s test timeout is far too tight
-        // for the single-threaded JS/wasm targets. Tests must also avoid multi-second
-        // uninterrupted busy loops — ChromeHeadless kills the page (#164).
+        // Solver tests are compute-heavy; Mocha's default 2s timeout is far too tight for
+        // the single-threaded JS/wasm targets. Tests must also avoid multi-second busy
+        // loops — ChromeHeadless kills the page.
         js(IR) {
             browser { testTask { useMocha { timeout = "120s" } } }
             nodejs { testTask { useMocha { timeout = "120s" } } }
@@ -70,9 +70,9 @@ for (proj in listOf(project, rootProject)) {
     }
 }
 
-// #160: kbuild's lintDocs gate (fail-on-warning dokka) trips on ~460 legacy unresolved
-// KDoc links in this module. Skip doc generation until the links are repaired so `build`
-// stays green; detekt still runs in full.
+// kbuild's lintDocs gate (fail-on-warning dokka) trips on ~460 legacy unresolved KDoc
+// links in this module. Skip doc generation until the links are repaired so `build` stays
+// green; detekt still runs in full.
 tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEach {
     enabled = false
 }

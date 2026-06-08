@@ -1,5 +1,5 @@
 plugins {
-    id("com.eignex.kmp") version "1.2.2"
+    id("com.eignex.kmp") version "1.2.5"
 }
 
 eignexPublish {
