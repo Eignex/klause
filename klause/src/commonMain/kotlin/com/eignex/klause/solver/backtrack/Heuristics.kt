@@ -75,6 +75,16 @@ interface VariableHeuristic {
     /** Called when the engine restarts (Luby / geometric); decay activity or reset
      *  per-run counters here. */
     fun onRestart() {}
+
+    /** True if this heuristic wants per-variable [onUnassign] callbacks on every backtrack.
+     *  Off by default so heuristics that don't need them pay nothing — the engine only
+     *  installs the (per-revert) unassign listener when some heuristic opts in. */
+    val tracksUnassign: Boolean get() = false
+
+    /** Called for each variable made free again by a backtrack, when [tracksUnassign] is true.
+     *  VSIDS removes assigned variables from its order heap on pick and re-inserts them here,
+     *  keeping pick O(log n) instead of O(trail-depth · log n). Default no-op. */
+    fun onUnassign(varRef: VarRef) {}
 }
 
 /**
@@ -260,10 +270,12 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
 
-    // Scratch buffer for picks: ids extracted but rejected because pinned. Restored at the
-    // end of pick() so the heap stays complete across calls. Field rather than local so it
-    // doesn't re-allocate per pick.
-    private val pickSkipBuffer = IntArrayList(16)
+    // Identity of the session pick() last ran against. pick() removes assigned vars from the
+    // heap and relies on onUnassign (per backtrack) to re-insert them; a solve that ends on a
+    // leaf or timeout leaves the heap partial. When the same Vsids instance is reused for a
+    // fresh session (optimisation B&B, repeated solves), re-offer every removed var on the
+    // first pick — keeping their stored activities so VSIDS stays warm across iterations.
+    private var lastSession: PropagationSession? = null
 
     private fun ensureSized(numBool: Int, numInt: Int) {
         if (heap != null && numBoolCached == numBool && numIntCached == numInt) return
@@ -274,39 +286,49 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         numIntCached = numInt
     }
 
+    override val tracksUnassign: Boolean get() = true
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         ensureSized(problem.numBoolVars, problem.numIntVars)
         val h = requireNotNull(heap)
-        pickSkipBuffer.clear()
-        var result: VarRef? = null
+        if (session !== lastSession) {
+            lastSession = session
+            val total = numBoolCached + numIntCached
+            for (id in 0 until total) if (!h.contains(id)) h.restore(id)
+        }
+        // MiniSAT-style decision pop: extract the max-activity id and *keep it out* of the
+        // heap. Already-pinned ids surfacing here (a propagated var sitting near the top) are
+        // dropped, not restored — [onUnassign] re-inserts every variable a backtrack frees, so
+        // the heap holds (roughly) only unassigned variables and pick stays O(log n) regardless
+        // of trail depth, instead of re-skipping every pinned var per pick.
+        //
+        // The bool branch fully assigns the picked var (true/false), so it can stay removed. An
+        // int branch may only *narrow* the domain (still size > 1 after), so the picked int var
+        // is restored — onUnassign fires on widening, not narrowing, and would otherwise never
+        // re-offer a still-free int var, making pick return null with variables undetermined.
         while (h.size > 0) {
             val id = h.extractMax()
             if (id < numBoolCached) {
-                if (session.boolValue(id) == null) {
-                    result = VarRef.Bool(id)
-                    break
-                }
+                if (session.boolValue(id) == null) return VarRef.Bool(id)
             } else {
                 val intId = id - numBoolCached
                 if (session.intDomain(intId).size > 1) {
-                    result = VarRef.IntVar(intId)
-                    break
+                    h.restore(id)
+                    return VarRef.IntVar(intId)
                 }
             }
-            pickSkipBuffer.add(id)
         }
-        // Restore every popped-but-pinned id (and the winner — it stays in the heap so
-        // subsequent bumps can find it) at their stored keys. Pinned ones become candidates
-        // again once propagation backtracks past their pin point.
-        if (result != null) {
-            when (result) {
-                is VarRef.Bool -> h.restore(result.varId)
-                is VarRef.IntVar -> h.restore(result.varId + numBoolCached)
-            }
+        return null
+    }
+
+    override fun onUnassign(varRef: VarRef) {
+        val h = heap ?: return
+        val id = when (varRef) {
+            is VarRef.Bool -> varRef.varId
+            is VarRef.IntVar -> numBoolCached + varRef.varId
         }
-        for (i in 0 until pickSkipBuffer.size) h.restore(pickSkipBuffer.get(i))
-        return result
+        if (!h.contains(id)) h.restore(id)
     }
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
@@ -721,6 +743,9 @@ class LastConflict(private val base: VariableHeuristic) : VariableHeuristic {
     override fun onSolution(snapshot: Sample) {
         base.onSolution(snapshot)
     }
+
+    override val tracksUnassign: Boolean get() = base.tracksUnassign
+    override fun onUnassign(varRef: VarRef) = base.onUnassign(varRef)
 }
 
 /**
@@ -925,6 +950,8 @@ internal class ConflictOrdering(private val base: VariableHeuristic) : VariableH
     override fun onPropagation(implied: PropagationResult.Implied) = base.onPropagation(implied)
     override fun onRestart() = base.onRestart()
     override fun onSolution(snapshot: Sample) = base.onSolution(snapshot)
+    override val tracksUnassign: Boolean get() = base.tracksUnassign
+    override fun onUnassign(varRef: VarRef) = base.onUnassign(varRef)
 }
 
 /**
@@ -979,6 +1006,8 @@ internal class MaxRegret(
     override fun onPropagation(implied: PropagationResult.Implied) = base.onPropagation(implied)
     override fun onRestart() = base.onRestart()
     override fun onSolution(snapshot: Sample) = base.onSolution(snapshot)
+    override val tracksUnassign: Boolean get() = base.tracksUnassign
+    override fun onUnassign(varRef: VarRef) = base.onUnassign(varRef)
 }
 
 // ---- Value heuristics ------------------------------------------------------------------

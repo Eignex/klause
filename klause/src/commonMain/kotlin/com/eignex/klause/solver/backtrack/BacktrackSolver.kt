@@ -764,6 +764,16 @@ class BacktrackSolver(override val problem: Problem) :
             return@sequence
         }
         val session = PropagationSession(problem)
+        // Bridge backtrack-time unassigns to a heuristic that removes assigned vars from its
+        // order structure on pick (VSIDS): decode the combined index and re-offer the var.
+        // Only wired when the heuristic opts in, so other heuristics pay no per-revert cost.
+        if (params.variableHeuristic.tracksUnassign) {
+            val heuristic = params.variableHeuristic
+            val numBool = problem.numBoolVars
+            session.unassignListener = { enc ->
+                heuristic.onUnassign(if (enc < numBool) VarRef.Bool(enc) else VarRef.IntVar(enc - numBool))
+            }
+        }
         // Number of decision levels seed pushes uses — bool pins first then int pins.
         // Decision levels 1..numSeed correspond to assumptions; levels > numSeed are
         // post-seed DFS decisions.

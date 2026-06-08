@@ -37,6 +37,14 @@ class PropagationSession(
 ) {
     private val state: PropagationState = PropagationState(problem, Assumptions.None)
 
+    /** Subscribe to per-variable unassign events fired by every backtrack/undo; see
+     *  [PropagationState.undoTo]. Combined-index encoding: bool id `v`, int id `numBoolVars + v`. */
+    var unassignListener: ((Int) -> Unit)?
+        get() = state.unassignListener
+        set(value) {
+            state.unassignListener = value
+        }
+
     /** `levelStates[L]` is the [PropagationState.LevelMark] right after level `L`'s
      *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
      *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
