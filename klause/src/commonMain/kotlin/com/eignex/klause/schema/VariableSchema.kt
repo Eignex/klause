@@ -108,7 +108,7 @@ open class VariableSchema : Schema<SchemaEntry>() {
     /**
      * Set variable over an integer universe. Internally allocates one indicator bool per
      * universe element; the decoder reads those indicators back to a [Set]<Int>. Use the
-     * infix operators in [com.eignex.klause.schema.SetHandles] to compose constraints.
+     * infix operators in `com.eignex.klause.schema.SetHandles` to compose constraints.
      *
      * Example: `val chosen by setVar(0..9)` declares a set drawn from `{0, …, 9}`.
      */

@@ -13,7 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * sequence of `(srcState, value, dstState[, weight])` rows; [layerStarts] indexes into it
  * (layer i spans `layerStarts[i] until layerStarts[i+1]`).
  *
- * When [weights] is non-null, each transition has a 4th field (weight) and [cost] must be
+ * When `weights` is non-null, each transition has a 4th field (weight) and [cost] must be
  * provided — the sum of edge weights along the accepted path equals [cost].
  *
  * Propagation:

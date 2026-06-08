@@ -63,7 +63,7 @@ sealed interface SolveResult {
         val core: UnsatCore? = null,
         override val stats: SolveStats = SolveStats.EMPTY,
         /**
-         * When the engine was driven with [params.assumptions] non-empty and proved
+         * When the engine was driven with `params.assumptions` non-empty and proved
          * UNSAT, the subset of those assumptions whose decision levels were touched by
          * any conflict's 1UIP analysis during the search. Sound (jointly infeasible
          * with the hard constraints) but not guaranteed minimal — populated by
@@ -93,9 +93,9 @@ sealed interface SolveResult {
  *  - [samples] — *with replacement*. Each yield is an independent draw; the same
  *    assignment may reappear. Dedup fields on [P] (where present) are ignored.
  *  - [enumerate] — *without replacement* for complete backends ([BacktrackSolver],
- *    [BruteForceSolver], LogicNG, Z3): distinct satisfying assignments, with optional
+ *    `BruteForceSolver`, LogicNG, Z3): distinct satisfying assignments, with optional
  *    rolling-window post-filter via `params.minHammingDistance` / `params.recentWindow`.
- *    Stochastic backends ([LocalSearchSolver]) cannot enumerate; their `enumerate` is
+ *    Stochastic backends (`LocalSearchSolver`) cannot enumerate; their `enumerate` is
  *    an alias for [samples] and may yield duplicates.
  */
 interface Solver<P : SolverParams> {
@@ -225,7 +225,7 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      * `solver.minimize(obj, p)` is now equivalent to `solver.improvements(obj, p).last()`.
      *
      * Default implementation: a single-element sequence wrapping [minimize]. Backends
-     * with an inner anytime loop ([BacktrackSolver], [LocalSearchSolver]) override to
+     * with an inner anytime loop ([BacktrackSolver], `LocalSearchSolver`) override to
      * yield each improvement as it lands.
      */
     fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> =

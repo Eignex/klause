@@ -29,14 +29,14 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * Build a diverse pool of [LocalSearchSession] workers for a multi-core LS [Portfolio].
  * Provides three coordinated capabilities:
  *
- *  - **Per-worker strategy selection** ([config]): each worker gets a distinct
+ *  - **Per-worker strategy selection** (`config`): each worker gets a distinct
  *    `(Strategy, RestartPolicy)` pair from the supplied [LocalSearchWorkerConfig] list,
  *    so the portfolio explores algorithmically-orthogonal trajectories in parallel.
- *  - **Best-feasible sharing** ([sharedBest]): workers publish their incumbent samples
+ *  - **Best-feasible sharing** (`sharedBest`): workers publish their incumbent samples
  *    into a shared atomic reference exposed back through the [LocalSearchSession]'s
  *    warm-start hook; on restart, a worker that hasn't found anything yet anchors to
  *    the global best instead of a fresh random assignment.
- *  - **Shared kumulant stats** ([restartBandit]): an optional univariate bandit over the
+ *  - **Shared kumulant stats** (`restartBandit`): an optional univariate bandit over the
  *    worker configs that gets rewarded when a worker improves the shared best, so future
  *    restart cycles can switch a stalled worker to a more-promising config.
  *
@@ -300,7 +300,7 @@ internal class LocalSearchPortfolio(val problem: Problem, val configs: List<Loca
         ).session()
     }
 
-    /** Try to update [sharedBest] with [sample]; returns true if accepted as the new
+    /** Try to update `sharedBest` with [sample]; returns true if accepted as the new
      *  global best (lower objective via [objectiveOf]). Workers should call this when
      *  they find a feasible local optimum (cost == 0 typically). */
     inline fun publishIfBetter(sample: Sample, objectiveOf: (Sample) -> Double): Boolean {

@@ -147,7 +147,7 @@ class AllDifferent(
         return c
     }
 
-    /** Delta on [duplicateCount] from adjusting a value's count by [delta] (±1). */
+    /** Delta on `duplicateCount` from adjusting a value's count by [delta] (±1). */
     private fun adjustDuplicates(counts: IntArray, valueIdx: Int, delta: Int): Int {
         val before = counts[valueIdx]
         val after = before + delta

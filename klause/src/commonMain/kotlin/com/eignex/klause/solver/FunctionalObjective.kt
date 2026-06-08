@@ -8,7 +8,7 @@ import kotlin.math.abs
  * decomposed objectives (e.g. `objective = Σ |dist_i − approx_i|` lowered to int_abs / int_max /
  * int_min / int_lin_eq aux vars).
  *
- * Why this exists: [LocalSearchState.shapedObjectiveDelta] gives a [LinearObjective]
+ * Why this exists: `LocalSearchState.shapedObjectiveDelta` gives a [LinearObjective]
  * (`minimizeInt(V)`) a non-zero gradient only on `V` itself. But `V` is *derived* — moving a
  * decision variable `x` leaves `V`'s stored value untouched (it merely breaks `V`'s defining
  * constraint), so the move scores an objective-delta of 0 and CBLS is blind to the gradient

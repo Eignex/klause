@@ -40,7 +40,7 @@ data class SmtLibProblem(
  * **Bound inference.** SMT-LIB `Int` is unbounded; klause int vars need finite domains. A
  * bounds-propagation pass over the *conjunctive* top-level assertions (descending through
  * `and`) tightens each var from constant comparisons, linear inequalities and equalities to
- * a fixed point. Vars still open on a side fall back to ±[intBound]. With [strictBounds] set,
+ * a fixed point. Vars still open on a side fall back to ±`intBound`. With `strictBounds` set,
  * an unbounded var instead raises [UnsupportedSmtException] naming it.
  *
  * Out-of-subset constructs (nonlinear terms, arrays, `ite` over ints, real division, etc.)

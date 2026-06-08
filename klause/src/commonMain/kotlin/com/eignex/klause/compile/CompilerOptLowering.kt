@@ -105,7 +105,7 @@ internal fun Compiler.Build.reifyCountOpt(expr: CountExprOpt): Int {
 
 /** `b ↔ nvalue(n, xs, mode)` over a presence-gated subset. Enumerate the union domain;
  *  for each candidate value `v`, build the indicator `∃i (p_i ∧ x_i = v)`. Sum the
- *  indicators and compare against `n` per [mode]. */
+ *  indicators and compare against `n` per `mode`. */
 internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
     // Compute the union of static domains for each x_i. Each xs entry must lift to a
     // bare IntRef so we can look up its domain — non-bare arithmetic on opt vars at this

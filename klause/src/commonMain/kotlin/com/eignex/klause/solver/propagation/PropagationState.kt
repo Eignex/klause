@@ -453,7 +453,7 @@ class PropagationState(
      *  [ConflictAnalyzer]). Their factor ids live in `[problem.numFactors, totalFactorCount)` —
      *  treat them like any other [Clause] via [factorAt];
      *  they participate in propagation through [boolWatchersByLit] just like static
-     *  clauses. Survives [restore] (clauses are facts about the original problem, not
+     *  clauses. Survives `restore` (clauses are facts about the original problem, not
      *  trail state); pruned by [forgetLearnedClauses]. */
     private val _learnedClauses: ArrayList<Clause> = ArrayList()
 
@@ -704,7 +704,7 @@ class PropagationState(
         remapQueue(dirtyAtomFactors, remap, refBase)
     }
 
-    /** Rewrite every learned fid in [queue] through [remap] (static fids pass through;
+    /** Rewrite every learned fid in `queue` through [remap] (static fids pass through;
      *  dropped clauses' fids are removed). Preserves order. */
     private fun remapQueue(queue: IntArrayDeque, remap: IntArray, refBase: Int) {
         if (queue.isEmpty()) return
@@ -961,7 +961,7 @@ class PropagationState(
     fun atomIdOf(v: Int): Int = v - problem.numBoolVars
 
     /** Current truth of an atom — derived fresh from `intDomains`, not the
-     *  snapshot-at-allocation [atomValue]. Returns `null` when undetermined (the bound
+     *  snapshot-at-allocation `atomValue`. Returns `null` when undetermined (the bound
      *  isn't either side-decided yet). Used by [litTrue] / [litFalse] / [pinLit]. */
     fun atomCurrentTruth(atomId: Int): Boolean? =
         atomTruthOf(atomIntVar[atomId], atomKind[atomId], atomThreshold[atomId])
@@ -1824,10 +1824,10 @@ class PropagationState(
     /** Pop one int var that's been dirtied since the last call, or `-1` if none. */
     fun pollDirtyInt(): Int = if (dirtyInts.isEmpty()) -1 else dirtyInts.removeFirst()
 
-    /** Max decision level of any variable in [boolVars] / [intVars]. Used by the driver to
+    /** Max decision level of any variable in `boolVars` / `intVars`. Used by the driver to
      *  set `currentLevel` before each factor invocation.
      *
-     *  No variable's level can exceed the number of decisions pushed so far ([cap]); once
+     *  No variable's level can exceed the number of decisions pushed so far (`cap`); once
      *  the running max reaches that ceiling, the remaining vars can't raise it, so we stop
      *  early. This is an exact short-circuit (same result, fewer reads) — it mainly trims
      *  the scan for large-arity global constraints that fire often during search. */
@@ -1861,7 +1861,7 @@ class PropagationState(
 
     /** Variant that also folds in atom-lit levels for a Clause's literals — used for
      *  learned clauses that reference atom-vars, where the relevant decision level isn't
-     *  captured by [boolVars] / [intVars] alone. */
+     *  captured by `boolVars` / `intVars` alone. */
     fun maxLevelForClause(literals: IntArray): Int {
         // Clamped to the live decision count for the same reason as [maxLevelForVars].
         val cap = levelToDecisionVar.size
@@ -1877,13 +1877,13 @@ class PropagationState(
         return max
     }
 
-    /** Collect every decision level touched by [boolVars] / [intVars] — the factor's view of
+    /** Collect every decision level touched by `boolVars` / `intVars` — the factor's view of
      *  who's responsible. Used when a factor returns `false` without explicitly setting
      *  [conflictLevels].
      *
-     *  Atom-lit dispatch: [boolVars] may legitimately contain virtual atom-var ids when the
+     *  Atom-lit dispatch: `boolVars` may legitimately contain virtual atom-var ids when the
      *  failing factor is a learned Clause whose literals reference atom-lits (encoded as
-     *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those map into [atomLevel],
+     *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those map into `atomLevel`,
      *  not [boolLevel] — mirrors the [maxLevelForVars] dispatch a few lines above. */
     fun collectLevelsForVars(boolVars: IntArray, intVars: IntArray): Set<Int> {
         val out = HashSet<Int>()
@@ -2183,7 +2183,7 @@ class PropagationState(
     }
 
     /**
-     * Add every factor that should fire on [v]'s newly-pinned value to [queue], using the
+     * Add every factor that should fire on [v]'s newly-pinned value to `queue`, using the
      * split wakeup paths: occurrence-list for factors that don't watch literals, plus the
      * per-literal watcher index for those that do (currently Clauses). For watcher-using
      * factors only the literal that just transitioned to *false* triggers a fire — true

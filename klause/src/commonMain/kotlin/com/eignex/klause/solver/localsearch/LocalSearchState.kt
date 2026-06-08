@@ -46,7 +46,7 @@ class LocalSearchState(
     val intPayload: IntArray = IntArray(problem.numFactors)
 
     /** Per-factor `Long` scratch, the wide counterpart to [intPayload]. The weighted-sum
-     *  family ([Linear], [ReifiedLinear], [PseudoBoolean], [ReifiedPseudoBoolean]) keeps its
+     *  family ([Linear], [ReifiedLinear], `PseudoBoolean`, `ReifiedPseudoBoolean`) keeps its
      *  running `Σ coeff·value` here so large coefficients / wide domains can't wrap a 32-bit
      *  accumulator and silently corrupt `isViolated` / `violationDegree`. */
     val longPayload: LongArray = LongArray(problem.numFactors)
@@ -692,7 +692,7 @@ class LocalSearchState(
 
     /** Pick a uniformly-random violated factor, ask it for repair-move suggestions, and
      *  return the raw list. Returns `null` when no factor is violated or the violated
-     *  factor proposed no moves. Every WalkSAT-family [Strategy.pickMove] starts the same
+     *  factor proposed no moves. Every WalkSAT-family `Strategy.pickMove` starts the same
      *  way; this method is the shared opener. */
     fun proposeMovesFromRandomViolated(): List<Move>? {
         if (violated.isEmpty()) return null

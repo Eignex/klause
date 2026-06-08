@@ -295,7 +295,7 @@ class Clause(val literals: IntArray) : LocalSearchFactor {
      * O(arity) worst-case but amortised across many fires since most flips don't disturb
      * the watches.
      *
-     * Soundness across [PropagationSession] push/pop: watches deliberately aren't
+     * Soundness across `PropagationSession` push/pop: watches deliberately aren't
      * snapshotted (see [PropagationState.refPayload] kdoc). After a pop, watches may
      * point at literals that are again unassigned at the restored level — perfectly
      * valid, since the invariant is "watches point at non-false literals" and unassigned

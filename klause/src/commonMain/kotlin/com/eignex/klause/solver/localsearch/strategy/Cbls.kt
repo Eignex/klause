@@ -40,7 +40,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
  *     weighted-improvement moves.
  *
  * Defaults match the yuck-style "moderate noise, gentle stall pressure" regime that
- * generalises across CP shapes. Tune [shapingLambda] upward on objective-heavy problems
+ * generalises across CP shapes. Tune `shapingLambda` upward on objective-heavy problems
  * where the constraint gradient dominates; tune [stallIncrement] up on plateau-heavy
  * landscapes.
  */
@@ -57,7 +57,7 @@ class Cbls(
      *  [baseWeight] (`w ← (1 - smoothFactor)·w + smoothFactor·baseWeight`). Only consulted
      *  when [smoothProb] > 0. */
     val smoothFactor: Double = 0.8,
-    /** Weight that smoothing pulls toward — the lazily-allocated default of [factorWeights]. */
+    /** Weight that smoothing pulls toward — the lazily-allocated default of `factorWeights`. */
     val baseWeight: Double = 1.0,
     /** Cap on violated factors sampled per [pickMove] call for candidate generation. */
     val violatedSampleCount: Int = 4,
@@ -81,7 +81,7 @@ class Cbls(
      *  breaks an equal-coefficient sum — the reification plateau where the best single repair
      *  is Δ ≥ 0. A swap (`u ← value(w)`, `w ← value(u)`) between same-domain vars fixes
      *  ordering/channel violations while *preserving* those sums — the move class the
-     *  engine's [LocalSearchSolver] pair-swap only offers after feasibility.
+     *  engine's `LocalSearchSolver` pair-swap only offers after feasibility.
      *
      *  Enabling this also switches the *stalled* noise draw to primitive moves only — the
      *  two are a package: measured on bacp (diag, 3 seeds × 3M flips), baseline plateaus at

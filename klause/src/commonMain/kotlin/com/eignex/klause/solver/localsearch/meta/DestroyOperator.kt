@@ -63,7 +63,7 @@ internal fun interface DestroyOperator {
 
         /** Free a connected "blob" of variables via BFS through factor co-occurrence.
          *  Starts from a random seed variable, hops to factors that contain it, then to
-         *  the other variables in those factors, until [fraction] of the variable pool
+         *  the other variables in those factors, until `fraction` of the variable pool
          *  is reached. Captures the problem's coupling structure: re-optimising a
          *  related cluster surfaces dependencies that a uniformly-random subset misses
          *  (the "Shaw-related" pattern from LNS 1998 / ALNS 2006).

@@ -2,7 +2,7 @@ package com.eignex.klause.solver
 
 /**
  * Closed real interval `[lo, hi]` over IEEE-754 doubles. Used as the domain for float
- * variables in [Problem.floatDomains].
+ * variables in `Problem.floatDomains`.
  *
  * Soundness note: this is a *user-facing* interval. Native-float backends (Z3 today,
  * future native interval-CP) reason within the exact rational/real semantics this

@@ -29,7 +29,7 @@ data class TabuFilter(
     val aspiration: AspirationCriterion = AspirationCriterion.AllowAllWhenAllTabu,
     val dynamicTenure: ((step: Long) -> Int)? = null,
 ) {
-    /** Filter [moves], dropping tabu ones (subject to aspiration). */
+    /** Filter `moves`, dropping tabu ones (subject to aspiration). */
     fun filter(state: LocalSearchState, raw: List<Move>): List<Move> {
         val effective = dynamicTenure?.invoke(state.step) ?: tenure
         if (effective <= 0 || raw.isEmpty()) return raw

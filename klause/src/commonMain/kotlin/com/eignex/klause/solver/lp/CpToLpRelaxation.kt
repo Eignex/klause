@@ -41,7 +41,7 @@ internal class LpRelaxation(
  *  - [Cardinality], [Clause], [PseudoBoolean]: linear rows over the Boolean fan-in. A positive
  *    literal contributes `x_b`, a negative literal `1 − x_b`; the constant folds into the row's
  *    right-hand side.
- *  - [ReifiedLinear]: indicator rows via tight big-M (see [reifiedRows]).
+ *  - [ReifiedLinear]: indicator rows via tight big-M (see `reifiedRows`).
  *  - The [LinearObjective] (always minimization): a cost on each variable's column. Every variable
  *    with a nonzero objective coefficient gets a column even if no constraint mentions it, so the
  *    LP objective is the complete relaxed objective and its optimum is a valid bound.

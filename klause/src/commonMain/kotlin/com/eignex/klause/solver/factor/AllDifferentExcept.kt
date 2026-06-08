@@ -8,7 +8,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /**
  * Generalised `alldifferent_except(xs, except)` — `xs[i] != xs[j]` for every pair `i < j`
- * unless one of the two values is in [except]. The classic [AllDifferentExceptZero] is the
+ * unless one of the two values is in [except]. The classic `AllDifferentExceptZero` is the
  * `except = {0}` specialisation; this factor uses a HashSet membership check so propagation
  * over arbitrary excluded-value sets remains O(N · |except|) per call.
  *

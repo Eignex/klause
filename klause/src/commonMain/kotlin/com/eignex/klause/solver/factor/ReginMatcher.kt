@@ -5,7 +5,7 @@ import com.eignex.klause.util.IntArrayList
 
 /**
  * Shared Régin domain-consistency filtering for the alldifferent family — [AllDifferent],
- * [AllDifferentExcept], and [AllDifferentExceptZero] all route their matching pass through
+ * [AllDifferentExcept], and `AllDifferentExceptZero` all route their matching pass through
  * here, so the bipartite matching / reverse-graph free-value reachability / Tarjan SCC / Hall
  * pruning machinery lives once rather than being copy-pasted (and drifting) per variant.
  *

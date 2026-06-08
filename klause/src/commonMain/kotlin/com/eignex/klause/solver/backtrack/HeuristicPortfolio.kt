@@ -13,7 +13,7 @@ import kotlin.random.Random
  * picker" that learns which configuration works best on the current instance and switches
  * between them at every Luby restart.
  *
- * Each [arm] is one named strategy. The [bandit] (any kumulant [MultiArmedBandit] — UCB1,
+ * Each `arm` is one named strategy. The [bandit] (any kumulant [MultiArmedBandit] — UCB1,
  * UCB1Tuned, ThompsonSampling, etc.) is consulted at construction to pick the initial arm,
  * and at every restart to update the previous arm's reward and choose the next arm.
  *

@@ -591,7 +591,7 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
 // ----------------------------------------------------------------------------
 
 /** Helper: build the [Mdd] factor and emit it when
- *  [seq] is all bare IntRefs. Falls back to the table-based decomposition. */
+ *  `seq` is all bare IntRefs. Falls back to the table-based decomposition. */
 internal fun Compiler.Build.assertMddNative(
     seqExpr: List<IntExpr>,
     numStatesPerLayer: List<Int>,

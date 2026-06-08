@@ -108,7 +108,7 @@ internal class NoiseController(
          * @param numVars total Boolean + integer variable count (`problem.numBoolVars +
          *                problem.numIntVars`).
          * @param flipBudget the per-restart flip budget the strategy will run against
-         *                   (typically [LocalSearchParams.maxFlips]).
+         *                   (typically `LocalSearchParams.maxFlips`).
          */
         fun autoEwmaAlpha(numVars: Int, flipBudget: Int): Double {
             require(numVars >= 0) { "numVars must be non-negative, got $numVars" }

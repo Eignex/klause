@@ -336,7 +336,7 @@ class Problem(
     /**
      * Bound-SAC fixed-point loop. Probes the min and max of each multi-value int var
      * under the current [base]; an Unsat result lets us tighten that bound by one
-     * and re-probe. Returns the strengthened [PropagationResult.Implied], or [Unsat]
+     * and re-probe. Returns the strengthened [PropagationResult.Implied], or `Unsat`
      * if the problem turns out to be infeasible.
      */
     private fun probeBoundSac(
@@ -435,7 +435,7 @@ class Problem(
         )
     }
 
-    /** Union two [Implied]s by replaying everything from [b] into the [a] base. */
+    /** Union two `Implied`s by replaying everything from [b] into the [a] base. */
     private fun mergeImplied(a: PropagationResult.Implied, b: PropagationResult.Implied): PropagationResult.Implied {
         val bools = HashMap(a.bools)
         b.forEachBool { k, v -> bools[k] = v }

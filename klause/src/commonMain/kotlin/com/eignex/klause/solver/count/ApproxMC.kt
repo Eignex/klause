@@ -10,7 +10,7 @@ import kotlin.random.Random
  * Approximate model counting (ApproxMC2; Chakraborty, Meel & Vardi) over a Boolean sampling set.
  *
  * Native path: XOR hashes are appended as `Xor` factors and solved on the same backend via
- * [Solver.deriveFor]. Returns a count within a multiplicative `(1 ± ε)` factor with probability
+ * `Solver.deriveFor`. Returns a count within a multiplicative `(1 ± ε)` factor with probability
  * at least `1 - δ`.
  *
  * Outer loop runs `t = ⌈17·log2(3/δ)⌉` (odd) independent iterations and reports the median.

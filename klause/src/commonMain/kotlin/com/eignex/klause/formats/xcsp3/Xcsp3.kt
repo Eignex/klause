@@ -48,7 +48,7 @@ data class Xcsp3Problem(
  * Out-of-subset features (set/graph/float vars, n-D arrays, unsupported globals, nonlinear
  * intension) raise [UnsupportedXcsp3Exception] rather than silently producing a wrong model.
  *
- * [negTableCap] bounds the domain cartesian product enumerated when lowering a negative table.
+ * `negTableCap` bounds the domain cartesian product enumerated when lowering a negative table.
  */
 object Xcsp3 {
     /** Parse XCSP3 [text] into an [Xcsp3Problem]. */
@@ -168,7 +168,7 @@ object Xcsp3 {
         }
 
         /** Lower a negative table to a positive [Table] over the domain cartesian product
-         *  minus the forbidden rows. Guarded by [negTableCap] to avoid blowup. */
+         *  minus the forbidden rows. Guarded by `negTableCap` to avoid blowup. */
         private fun negativeTable(vars: IntArray, conflicts: IntArray): Table {
             val arity = vars.size
             val valuesPer = vars.map { domainValues(it) }

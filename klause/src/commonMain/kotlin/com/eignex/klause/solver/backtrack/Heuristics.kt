@@ -41,7 +41,7 @@ interface VariableHeuristic {
     /** Pick the next variable to branch on, or null when all are determined. */
     fun pick(session: PropagationSession, rng: Random): VarRef?
 
-    /** Called once per propagation conflict at [varRef]; bump activity / failure weight. */
+    /** Called once per propagation conflict at `varRef`; bump activity / failure weight. */
     fun onConflict(varRef: VarRef) {}
 
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
@@ -49,7 +49,7 @@ interface VariableHeuristic {
     fun onSolution(snapshot: Sample) {}
 
     /**
-     * Richer conflict notification: [varRef] is the decision that triggered the conflict,
+     * Richer conflict notification: `varRef` is the decision that triggered the conflict,
      * [unsat] carries the full reason set (decision variables, decision levels, contributing
      * factor ids) the propagation engine assembled. VSIDS reads `conflictBools` /
      * `conflictInts`; dom/wdeg reads `conflictFactors`; impact-style heuristics could read
@@ -60,7 +60,7 @@ interface VariableHeuristic {
         onConflict(varRef)
     }
 
-    /** Called once per successful pin of [varRef]; useful for phase-saving-like state. */
+    /** Called once per successful pin of `varRef`; useful for phase-saving-like state. */
     fun onCommit(varRef: VarRef) {}
 
     /**
@@ -89,13 +89,13 @@ interface VariableHeuristic {
  * heuristics consume these.
  */
 interface ValueHeuristic {
-    /** Candidate values for [varRef], yielded in trial order. */
+    /** Candidate values for `varRef`, yielded in trial order. */
     fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int>
 
-    /** Hook: a conflict involved [varRef] taking [value]. */
+    /** Hook: a conflict involved `varRef` taking [value]. */
     fun onConflict(varRef: VarRef, value: Int) {}
 
-    /** Hook: [varRef] was committed to [value]. */
+    /** Hook: `varRef` was committed to [value]. */
     fun onCommit(varRef: VarRef, value: Int) {}
 
     /** Hook: the search restarted. */
@@ -1078,8 +1078,8 @@ internal class IndomainSet(private val allowedValues: IntArray) : ValueHeuristic
 }
 
 /**
- * Impact-based value selection (Refalo 2004). For each candidate value of [varRef], probes
- * a real propagation pin via [PropagationSession.pinBool] / [pinInt], measures the log of
+ * Impact-based value selection (Refalo 2004). For each candidate value of `varRef`, probes
+ * a real propagation pin via [PropagationSession.pinBool] / `pinInt`, measures the log of
  * the post-pin remaining-domain product, then reverts. Values are returned in **ascending
  * post-product order**: smaller residual search space = stronger pruning = try first.
  *
@@ -1130,8 +1130,8 @@ internal class MaxSd(private val maxProbes: Int = 32) : ValueHeuristic {
 }
 
 /**
- * Shared probing core for [Impact] and [MaxSd]. For each candidate value of [varRef]:
- *   - push a real propagation pin via [PropagationSession.pinBool] / [pinInt];
+ * Shared probing core for [Impact] and [MaxSd]. For each candidate value of `varRef`:
+ *   - push a real propagation pin via [PropagationSession.pinBool] / `pinInt`;
  *   - score by the log of the remaining-domain product;
  *   - revert with [PropagationSession.popLast] (Unsat probes self-revert, are dropped).
  *

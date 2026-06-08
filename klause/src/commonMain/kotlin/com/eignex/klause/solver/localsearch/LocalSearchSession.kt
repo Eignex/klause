@@ -53,7 +53,7 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
     internal val warmState: WarmState get() = warm
 
     /** Read-only handle for cooperating components (e.g. ALNS destroy operators that
-     *  read [WarmState.activityRecency]). External callers must not mutate the warm
+     *  read `WarmState.activityRecency`). External callers must not mutate the warm
      *  state directly — use [reset] to clear it. */
     internal val warmStateView: WarmState get() = warm
 

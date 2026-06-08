@@ -259,7 +259,7 @@ internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: In
 
 /**
  * Build a clause-form antecedent set for a pin emitted by [propagatePbBounds] /
- * [propagatePbNotEqual]: each currently-pinned constraint literal (excluding the var
+ * `propagatePbNotEqual`: each currently-pinned constraint literal (excluding the var
  * about to be pinned, which is still unassigned) expressed in its currently-*false*
  * polarity, plus an optional context literal (e.g. the reif var for
  * [ReifiedPseudoBoolean]). Returns `null` when nothing was pinned and no context lit —

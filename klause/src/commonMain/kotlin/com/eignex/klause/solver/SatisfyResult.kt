@@ -47,7 +47,7 @@ sealed interface SatisfyResult {
 }
 
 /**
- * Run [solver] with [assumptions] pinned for this call and return a [SatisfyResult].
+ * Run `solver` with [assumptions] pinned for this call and return a [SatisfyResult].
  *
  * On `Unsat`, the assumption subset returned in [SatisfyResult.UnsatUnderAssumptions.core]
  * is sound (jointly infeasible with the hard constraints) but not guaranteed minimal.

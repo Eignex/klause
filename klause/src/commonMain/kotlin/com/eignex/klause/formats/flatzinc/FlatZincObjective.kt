@@ -15,7 +15,7 @@ import com.eignex.klause.solver.factor.LinearOp
  * returned objective is therefore always an *exact* mirror of the objective variable.
  *
  * See [FunctionalObjective] for why this matters: it gives CBLS a real gradient to the decision
- * variables of a decomposed objective, which a coefficient-on-V-only [LinearObjective] cannot.
+ * variables of a decomposed objective, which a coefficient-on-V-only `LinearObjective` cannot.
  */
 internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? {
     val objId = intVars[objName] ?: return null

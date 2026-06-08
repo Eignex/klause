@@ -48,7 +48,7 @@ data class PortfolioSpec(
     }
 }
 
-/** Materialises a [Portfolio] for [problem] from a [PortfolioSpec]. The single entry point the
+/** Materialises a [Portfolio] for `problem` from a [PortfolioSpec]. The single entry point the
  *  CLI and bench call — they differ only in the [PortfolioSpec] they pass. */
 object PortfolioBuilder {
     /**
@@ -62,7 +62,7 @@ object PortfolioBuilder {
      * gets its preferred form, and the shared incumbent bound stays comparable because every
      * worker minimises the same objective var.
      *
-     * Either objective may be null: pass both null for a satisfaction-only portfolio ([solve]),
+     * Either objective may be null: pass both null for a satisfaction-only portfolio (`solve`),
      * or just one if the model only provides that form (each engine falls back to the other when
      * its preferred representation is absent).
      *

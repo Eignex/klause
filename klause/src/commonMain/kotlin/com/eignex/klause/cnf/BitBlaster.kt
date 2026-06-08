@@ -56,7 +56,7 @@ import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
  * Covers every factor type that can appear in a [Problem]. Core primitives: [Clause],
  * [Cardinality], [Linear] (all four ops including NE), [PseudoBoolean], [Xor], [Product], and
  * the reified forms ([ReifiedLinear], [ReifiedCardinality], [ReifiedPseudoBoolean]). Globals
- * are lowered directly to CNF: [AllDifferent] / [AllDifferentExcept]
+ * are lowered directly to CNF: `AllDifferent` / [AllDifferentExcept]
  * / [SymmetricAllDifferent], [Circuit] / [Subcircuit] (MTZ position vectors), [Cumulative] /
  * [Disjunctive] (time-tabling / pairwise no-overlap), [Diffn] (2D), [Count], [NValue], [Among],
  * [GlobalCardinality], [Sequence], [Element], [Table], [Regular] (DFA layers), [Inverse],
@@ -1027,7 +1027,7 @@ object BitBlaster {
         b.addClause(disj.toIntArray())
     }
 
-    /** `result = arr[idx]`, `idx` [indexOffset]-based. */
+    /** `result = arr[idx]`, `idx` `indexOffset`-based. */
     private fun emitElement(b: CnfBuilder, f: Element, intBits: Array<IntArray>, intMin: IntArray) {
         val len = f.arr.size
         b.addClause(intArrayOf(cmp1(b, f.idx, LinearOp.GE, f.indexOffset, intBits, intMin)))
@@ -1106,7 +1106,7 @@ object BitBlaster {
         b.addClause(eq)
     }
 
-    /** `arg_max(idx, xs)` / `arg_min(idx, xs)` — first optimal position, [indexOffset]-based. */
+    /** `arg_max(idx, xs)` / `arg_min(idx, xs)` — first optimal position, `indexOffset`-based. */
     private fun emitArgMinMax(b: CnfBuilder, f: ArgMinMax, intBits: Array<IntArray>, intMin: IntArray) {
         val n = f.xs.size
         b.addClause(intArrayOf(cmp1(b, f.idx, LinearOp.GE, f.indexOffset, intBits, intMin)))
@@ -1204,7 +1204,7 @@ object BitBlaster {
         }
     }
 
-    /** `bin_packing` — per-bin load = Σ weights·1[bins[i]=bin], bounded per [mode]. */
+    /** `bin_packing` — per-bin load = Σ weights·1[bins[i]=bin], bounded per `mode`. */
     private fun emitBinPacking(b: CnfBuilder, f: BinPacking, intBits: Array<IntArray>, intMin: IntArray) {
         for (bIdx in 0 until f.numBins) {
             val binVal = bIdx + f.binOffset

@@ -18,7 +18,7 @@ import kotlin.random.Random
  * pick uniformly (exactly uniform). Otherwise draw `m ≈ log2(C / pivot)` hashes, enumerate the
  * resulting cell, and — when its size lands in the `[loThresh, hiThresh]` band — pick a member
  * uniformly at random. Out-of-band cells are rejected and retried with a fresh hash family; after
- * [MAX_CONSECUTIVE_REJECTS] failures it falls back to [cheapFallback] rather than spin forever.
+ * [MAX_CONSECUTIVE_REJECTS] failures it falls back to `cheapFallback` rather than spin forever.
  */
 internal object UniGen {
 
