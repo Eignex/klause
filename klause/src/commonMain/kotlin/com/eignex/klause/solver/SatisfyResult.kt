@@ -247,7 +247,7 @@ private fun Assumptions.dropInt(id: Int): Assumptions {
  * deductions that conflictLevels somehow surfaces) are dropped, matching the contract
  * that the returned [Assumptions] is a subset of the input.
  */
-internal fun projectSeedConflictToAssumptions(input: Assumptions, conflictLevels: Set<Int>): Assumptions {
+internal fun projectSeedConflictToAssumptions(input: Assumptions, conflictLevels: IntArray): Assumptions {
     val nb = input.boolKeys.size
     val ni = input.intKeys.size
     val boolHit = BooleanArray(nb)

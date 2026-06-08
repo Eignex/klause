@@ -95,7 +95,7 @@ class HeuristicsTest {
         // No conflicts yet: all scores are 0, so the tie breaks to the lowest var id.
         assertEquals(VarRef.Bool(0), chb.pick(session, rng))
         // A conflict implicating var 2 lifts its Q above every untouched variable.
-        chb.onConflict(VarRef.Bool(2), PropagationResult.Unsat(conflictBools = setOf(2)))
+        chb.onConflict(VarRef.Bool(2), PropagationResult.Unsat(conflictBools = intArrayOf(2)))
         assertEquals(VarRef.Bool(2), chb.pick(session, rng))
     }
 

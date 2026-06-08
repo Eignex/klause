@@ -67,7 +67,7 @@ class IncrementalSessionTest {
         s.pinBool(0, false)
         assertEquals(1, s.decisionLevel)
         val u = assertIs<PropagationResult.Unsat>(s.pinBool(1, false))
-        assertEquals(setOf(1, 2), u.conflictLevels)
+        assertEquals(setOf(1, 2), u.conflictLevels.toSet())
         assertEquals(1, s.decisionLevel, "failed push must not be on the trail")
         assertEquals(Assumptions(bools = mapOf(0 to false)), s.currentAssumptions())
         // Subsequent push of the (forced) alternate value must succeed.
@@ -144,7 +144,7 @@ class IncrementalSessionTest {
         val u = assertIs<PropagationResult.Unsat>(
             s.seed(Assumptions(bools = mapOf(0 to false, 1 to false))),
         )
-        assertEquals(setOf(0, 1), u.conflictBools)
+        assertEquals(setOf(0, 1), u.conflictBools.toSet())
         // After Unsat, the session should be at the pre-conflict level (level 1 — just x).
         assertEquals(1, s.decisionLevel)
     }
@@ -189,7 +189,7 @@ class IncrementalSessionTest {
         val u = assertIs<PropagationResult.Unsat>(s.pinInt(1, 1)) // 1+1 > 1
         assertEquals(2, s.decisionLevel, "failed push must not stick")
         // The conflict came from levels involving the int pins (levels 2 and 3).
-        assertEquals(setOf(2, 3), u.conflictLevels)
+        assertEquals(setOf(2, 3), u.conflictLevels.toSet())
     }
 
     @Test
