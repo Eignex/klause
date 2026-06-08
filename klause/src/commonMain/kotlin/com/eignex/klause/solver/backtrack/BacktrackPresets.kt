@@ -11,29 +11,37 @@ import com.eignex.klause.solver.SearchEvent
 object BacktrackPresets {
 
     /**
-     * Competitive modern-CDCL configuration for SAT-style search, bundling the full
-     * pure-Boolean stack:
+     * Competitive modern-CDCL configuration for SAT-style search:
      *  - VSIDS activity branching;
      *  - phase saving plus target phasing with periodic rephasing;
      *  - glucose-style adaptive restarts with trail-size blocking;
      *  - a capped three-tier learned-clause database with promotion on reuse;
-     *  - binary-resolution learned-clause minimization (always on in the analyzer);
-     *  - periodic clause vivification at restart boundaries.
+     *  - binary-resolution learned-clause minimization (always on in the analyzer).
      *
      * Every component is sound on any [com.eignex.klause.solver.Problem] and the pure-Boolean
      * inprocessing simply no-ops where it doesn't apply, so the same preset drives both
      * satisfaction and the complete-search side of optimization — in a portfolio the shared
      * objective bound keeps a SAT-tuned worker useful on COP by racing to feasible incumbents.
      *
+     * **Vivification is intentionally left off here** ([vivify] defaults to false). On the SAT
+     * search-effort benchmark its per-restart probing — amplified by the frequent adaptive
+     * restarts this preset enables — cut conflict *throughput* enough to time out instances the
+     * leaner config solves (e.g. php8), while the conflict-quality win it was meant to provide
+     * already comes from the three-tier DB + binary minimization + LBD restarts (the preset is
+     * ~0.73-0.77× the baseline's conflicts either way). It stays available via [vivify] for
+     * hard-UNSAT campaigns that restart infrequently, where the probing pays for itself.
+     *
      *  - [randomSeed] seeds the engine RNG.
      *  - [maxLearnedClauses] caps the learned database (the three-tier reduction runs at each
      *    restart once over the cap).
+     *  - [vivify] opts the periodic clause-vivification inprocessing pass back in.
      *  - [cancellation] / [onEvent] thread the usual cooperative-cancellation and observation
      *    seams through unchanged.
      */
     fun satOptimized(
         randomSeed: Long = 0L,
         maxLearnedClauses: Int = 20_000,
+        vivify: Boolean = false,
         cancellation: Cancellation = Cancellation.Never,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
@@ -44,7 +52,7 @@ object BacktrackPresets {
         adaptiveRestart = true,
         maxLearnedClauses = maxLearnedClauses,
         tieredLearnedDb = true,
-        vivification = true,
+        vivification = vivify,
         cancellation = cancellation,
         onEvent = onEvent,
     )
