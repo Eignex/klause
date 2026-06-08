@@ -382,19 +382,6 @@ class BacktrackSolver(override val problem: Problem) :
         return total
     }
 
-    /**
-     * LP-relaxation bounding (#20) and reduced-cost fixing (#21): build and solve one exact integer
-     * LP relaxation of the live problem, then either prune this node or tighten its domains.
-     *
-     * Prunes (returns true) when the relaxation is infeasible (the subtree is infeasible regardless
-     * of the incumbent) or when its objective bound — rounded **up**, since the true objective is
-     * integral — is at least the incumbent [bound]. The rounded comparison is exact.
-     *
-     * Otherwise, with a finite incumbent, applies reduced-cost fixing: see [applyReducedCostFixing].
-     * Returns false (keep the node) when the relaxation has no columns, the LP is unbounded, or no
-     * reduction makes the node infeasible.
-     */
-
     /** Outcome of one node LP pass: whether to prune, and the basis to warm-start children from. */
     private class LpNodeOutcome(val prune: Boolean, val basis: Basis?)
 
@@ -405,6 +392,14 @@ class BacktrackSolver(override val problem: Problem) :
         return lpBound.toDouble() >= bound
     }
 
+    /**
+     * LP-relaxation bounding (#20), cut generation (#22) and reduced-cost fixing (#21): build and
+     * solve one exact integer LP relaxation of the live problem, optionally strengthen it with cuts,
+     * then either prune this node or tighten its domains. Prunes when the relaxation is infeasible or
+     * its objective bound — rounded up, since the true objective is integral — is at least the
+     * incumbent. Catches determinant overflow and keeps the node soundly (a missing bound only loses
+     * pruning, never correctness).
+     */
     private fun lpBoundAndFix(
         relaxer: CpToLpRelaxation,
         session: PropagationSession,
