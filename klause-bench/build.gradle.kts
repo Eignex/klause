@@ -59,7 +59,8 @@ tasks.register<JavaExec>("bench") {
     // a long-running, single-engine target (e.g. diag:backtrack) for a clean CDCL hot-path view.
     (findProperty("asyncProfiler") as String?)?.let { agent ->
         val out = (findProperty("profOut") as String?) ?: "$workspaceRoot/build/prof.txt"
-        jvmArgs("-agentpath:$agent=start,event=cpu,flat=60,file=$out")
+        val event = (findProperty("profEvent") as String?) ?: "cpu" // cpu | alloc | wall
+        jvmArgs("-agentpath:$agent=start,event=$event,flat=60,file=$out")
     }
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
