@@ -5,8 +5,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArgSort
@@ -27,9 +25,7 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.MinCostFlow
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Path
 import com.eignex.klause.solver.factor.Product
@@ -44,7 +40,6 @@ import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Tree
-import com.eignex.klause.solver.factor.ValuePrecede
 
 /**
  * Allocator hook for fresh aux variables used by [FactorDecomposer]. Backends that
@@ -88,17 +83,7 @@ internal object FactorDecomposer {
      *  Mid-IR factors map to themselves; callers should check via [isMidIR] before
      *  calling decompose to avoid pointless lookups. */
     fun decompose(f: Factor, ctx: DecompositionContext): List<Factor>? = when (f) {
-        is AllEqual -> decomposeAllEqual(f)
-
-        is AllDifferentExceptZero -> decomposeAllDifferentExceptZero(f, ctx)
-
         is AllDifferentExcept -> decomposeAllDifferentExcept(f, ctx)
-
-        is Monotone -> decomposeMonotone(f)
-
-        is ValuePrecede -> decomposeValuePrecede(f, ctx)
-
-        is Member -> decomposeMember(f, ctx)
 
         is Among -> decomposeAmong(f, ctx)
 
@@ -177,17 +162,6 @@ internal object FactorDecomposer {
 
     // ---------------- per-factor decompositions ----------------
 
-    /** `all_equal(xs)` → `xs[i] = xs[0]` for `i = 1..n-1` as a chain of Linear EQ. */
-    private fun decomposeAllEqual(f: AllEqual): List<Factor> {
-        if (f.xs.size < 2) return emptyList()
-        val out = ArrayList<Factor>(f.xs.size - 1)
-        val x0 = f.xs[0]
-        for (i in 1 until f.xs.size) {
-            out.add(Linear(intArrayOf(1, -1), intArrayOf(f.xs[i], x0), LinearOp.EQ, 0))
-        }
-        return out
-    }
-
     /** `all_different_except(xs, except)` → for each pair (i, j), require
      *  `(xᵢ ∈ except) ∨ (xⱼ ∈ except) ∨ (xᵢ ≠ xⱼ)`. We allocate per-var "in-except"
      *  aux and per-pair "ne" aux, then assert the disjunction as a Clause. */
@@ -196,12 +170,8 @@ internal object FactorDecomposer {
         return decomposeGatedPairwiseNE(f.xs, f.except, ctx)
     }
 
-    /** `all_different_except_zero(xs)` is the singleton-`{0}` exception case. */
-    private fun decomposeAllDifferentExceptZero(f: AllDifferentExceptZero, ctx: DecompositionContext): List<Factor> =
-        decomposeGatedPairwiseNE(f.xs, intArrayOf(0), ctx)
-
-    /** Shared gated-pairwise-NE encoding used by AllDifferentExcept and
-     *  AllDifferentExceptZero. For each var an aux "is in except" bool is reified
+    /** Shared gated-pairwise-NE encoding used by AllDifferentExcept. For each var an aux
+     *  "is in except" bool is reified
      *  via the disjunction of equality reifications across the exception set; for
      *  each pair an aux "ne" bool is reified as the negation of equality, then a
      *  Clause asserts that for each pair at least one of the three release
@@ -235,85 +205,6 @@ internal object FactorDecomposer {
                 )
             }
         }
-        return out
-    }
-
-    /** `monotone(xs, direction, strict)` → chain of Linear comparisons between
-     *  adjacent elements. */
-    private fun decomposeMonotone(f: Monotone): List<Factor> {
-        if (f.xs.size < 2) return emptyList()
-        val out = ArrayList<Factor>(f.xs.size - 1)
-        val ascending = f.direction == Monotone.Direction.Increasing
-        val strict = f.strict
-        for (i in 0 until f.xs.size - 1) {
-            // ascending non-strict:  xs[i+1] - xs[i] >= 0
-            // ascending strict:      xs[i+1] - xs[i] >= 1
-            // descending non-strict: xs[i] - xs[i+1] >= 0
-            // descending strict:     xs[i] - xs[i+1] >= 1
-            val (a, b) = if (ascending) f.xs[i + 1] to f.xs[i] else f.xs[i] to f.xs[i + 1]
-            out.add(
-                Linear(
-                    coeffs = intArrayOf(1, -1),
-                    vars = intArrayOf(a, b),
-                    op = LinearOp.GE,
-                    bound = if (strict) 1 else 0,
-                ),
-            )
-        }
-        return out
-    }
-
-    /** `value_precede(s, t, xs)`: t may only appear in xs after s has appeared.
-     *  Decompose to: for each position i, if xs[i] = t then ∃ j < i with xs[j] = s.
-     *  Equivalent reformulation via aux "seen_s_by_i" cumulative bool:
-     *  - seen_s_i ↔ ∃ j ≤ i : xs[j] = s   (computed via reified-eq chain)
-     *  - constraint: xs[i] = t  ⇒  seen_s_{i-1} = true
-     *  We emit reified linears for the seen-s indicators and clauses for the chain. */
-    private fun decomposeValuePrecede(f: ValuePrecede, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        val n = f.xs.size
-        // eqS[i] ↔ (xs[i] = s); eqT[i] ↔ (xs[i] = t).
-        val eqS = IntArray(n) { ctx.freshBool() }
-        val eqT = IntArray(n) { ctx.freshBool() }
-        for (i in 0 until n) {
-            out.add(ReifiedLinear(eqS[i], intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, f.s))
-            out.add(ReifiedLinear(eqT[i], intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, f.t))
-        }
-        // seenS[i] ↔ (∃ j ≤ i : eqS[j]). Chain: seenS[0] ↔ eqS[0]; seenS[i] ↔ seenS[i-1] ∨ eqS[i].
-        val seenS = IntArray(n) { ctx.freshBool() }
-        // seenS[0] = eqS[0]:  (seenS[0] ∨ ¬eqS[0]) ∧ (¬seenS[0] ∨ eqS[0])
-        out.add(Clause(intArrayOf(Lit.make(seenS[0], true), Lit.make(eqS[0], false))))
-        out.add(Clause(intArrayOf(Lit.make(seenS[0], false), Lit.make(eqS[0], true))))
-        for (i in 1 until n) {
-            // seenS[i] = seenS[i-1] ∨ eqS[i]:
-            //   (¬seenS[i] ∨ seenS[i-1] ∨ eqS[i])
-            //   (seenS[i] ∨ ¬seenS[i-1])
-            //   (seenS[i] ∨ ¬eqS[i])
-            out.add(Clause(intArrayOf(Lit.make(seenS[i], false), Lit.make(seenS[i - 1], true), Lit.make(eqS[i], true))))
-            out.add(Clause(intArrayOf(Lit.make(seenS[i], true), Lit.make(seenS[i - 1], false))))
-            out.add(Clause(intArrayOf(Lit.make(seenS[i], true), Lit.make(eqS[i], false))))
-        }
-        // Constraint: eqT[i] ⇒ seenS[i-1] for i ≥ 1; eqT[0] must be false (no prior s).
-        out.add(Clause(intArrayOf(Lit.make(eqT[0], false))))
-        for (i in 1 until n) {
-            out.add(Clause(intArrayOf(Lit.make(eqT[i], false), Lit.make(seenS[i - 1], true))))
-        }
-        return out
-    }
-
-    /** `member(xs, y)` — y must equal at least one of xs. Decompose via reified-eq
-     *  aux: `eq[i] ↔ (xs[i] = y)`, then `Σ eq[i] ≥ 1` (encoded as a Cardinality with
-     *  min=1, max=|xs|). */
-    private fun decomposeMember(f: Member, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>(f.xs.size + 1)
-        val eqLits = IntArray(f.xs.size)
-        for (i in f.xs.indices) {
-            val aux = ctx.freshBool()
-            eqLits[i] = Lit.make(aux, true)
-            // eq[i] ↔ (xs[i] - y = 0). Use ReifiedLinear with coeffs [1, -1].
-            out.add(ReifiedLinear(aux, intArrayOf(1, -1), intArrayOf(f.xs[i], f.y), LinearOp.EQ, 0))
-        }
-        out.add(Cardinality(eqLits, min = 1, max = f.xs.size))
         return out
     }
 

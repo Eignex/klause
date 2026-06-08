@@ -5,7 +5,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
@@ -20,8 +19,6 @@ import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
-import com.eignex.klause.solver.factor.Member
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.Sequence
@@ -31,7 +28,6 @@ import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
@@ -167,16 +163,6 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun `all equal bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "all equal",
-        Problem(0, 3, Array(3) { IntDomain(0, 3) }, arrayOf<Factor>(AllEqual(intArrayOf(0, 1, 2)))),
-    )
-
-    @Test fun `member bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "member",
-        Problem(0, 4, Array(4) { IntDomain(0, 3) }, arrayOf<Factor>(Member(xs = intArrayOf(0, 1, 2), y = 3))),
-    )
-
     @Test fun `among bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "among",
         Problem(
@@ -189,18 +175,6 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun `monotone bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "monotone",
-        Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 5) },
-            arrayOf<Factor>(
-                Monotone(intArrayOf(0, 1, 2), Monotone.Direction.Increasing, strict = true),
-            ),
-        ),
-    )
-
     @Test fun `lex less bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "lex less",
         Problem(
@@ -209,18 +183,6 @@ class GapFactorBitBlastTest {
             Array(4) { IntDomain(0, 3) },
             arrayOf<Factor>(
                 LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true),
-            ),
-        ),
-    )
-
-    @Test fun `value precede bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "value precede",
-        Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            arrayOf<Factor>(
-                ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2)),
             ),
         ),
     )
