@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `regular(seq, Q, S, d, q0, F)` — the sequence `seq` is accepted by the DFA with
@@ -32,8 +33,13 @@ class Regular(
     val accepting: IntArray,
 ) : LocalSearchFactor {
 
-    /** Accepting states as a set for O(1) membership. */
-    val acceptingSet: HashSet<Int> = accepting.toHashSet()
+    /** Accepting states as a primitive set for O(1) boxing-free membership in the hot
+     *  acceptance checks (`q in acceptingSet`). */
+    internal val acceptingSet: IntHashSet = run {
+        val s = IntHashSet(accepting.size)
+        for (q in accepting) s.add(q)
+        s
+    }
 
     init {
         require(seq.isNotEmpty()) { "regular: empty seq" }

@@ -5,6 +5,7 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Constraint-Based Local Search strategy. Unlike SAT-family strategies ([ProbSat],
@@ -556,7 +557,7 @@ class Cbls(
         }
         // Flatten everything queued into one atomic perturbation, first-write-wins per slot.
         val parts = ArrayList<Move>()
-        val seenSlots = HashSet<Int>()
+        val seenSlots = IntHashSet()
         fun addPart(p: Move) {
             val slot = when (p) {
                 is Move.BoolFlip -> p.varId

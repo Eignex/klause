@@ -83,7 +83,8 @@ internal class LongArrayList(initialCapacity: Int = 8) {
     fun last(): Long = data[size - 1]
 
     /** Sort the live elements in place, delegating to stdlib [LongArray.sort]; [descending]
-     *  reverses the result. */
+     *  reverses the result. (Unlike [IntArrayList.sortByIntKey] there is no key-packing variant —
+     *  a 64-bit element leaves no room for a key in the same word.) */
     fun sort(descending: Boolean = false) {
         data.sort(0, size)
         if (descending) {

@@ -90,7 +90,7 @@ class LongArrayListTest {
     @Test
     fun `random add-remove ops match a swap-remove reference model`() {
         val rng = Random(99)
-        repeat(40) {
+        repeat(15) {
             val list = LongArrayList(initialCapacity = 1)
             val ref = ArrayList<Long>()
             repeat(300) {

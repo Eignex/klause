@@ -5,6 +5,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Generalised `alldifferent_except(xs, except)` — `xs[i] != xs[j]` for every pair `i < j`
@@ -22,7 +24,11 @@ class AllDifferentExcept(
 ) : LocalSearchFactor {
 
     val except: IntArray = except.distinct().sorted().toIntArray()
-    private val exceptSet: Set<Int> = this.except.toHashSet()
+    private val exceptSet: IntHashSet = run {
+        val s = IntHashSet(except.size)
+        for (e in except) s.add(e)
+        s
+    }
 
     init {
         require(xs.size >= 2) { "AllDifferentExcept needs at least two variables" }
@@ -33,16 +39,16 @@ class AllDifferentExcept(
 
     /** Per-value count among non-excluded values. `violatedPairs` is the number of (i, j) with
      *  i < j and `xs[i]` = `xs[j]` ∉ except. */
-    private class State(val counts: HashMap<Int, Int>, var violatedPairs: Int)
+    private class State(val counts: MutableIntIntMap, var violatedPairs: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        val counts = HashMap<Int, Int>()
+        val counts = MutableIntIntMap()
         var bad = 0
         for (v in xs) {
             val value = state.assignment.intValue(v)
             if (value in exceptSet) continue
-            val prev = counts[value] ?: 0
-            counts[value] = prev + 1
+            val prev = counts.getOrDefault(value, 0)
+            counts.put(value, prev + 1)
             if (prev >= 1) bad++
         }
         state.refPayload[factorId] = State(counts, bad)
@@ -62,12 +68,12 @@ class AllDifferentExcept(
         if (occurrences == 0) return 0
         var bad = s.violatedPairs
         if (old !in exceptSet) {
-            val cnt = s.counts[old] ?: 0
+            val cnt = s.counts.getOrDefault(old, 0)
             val after = cnt - occurrences
             bad -= pairsAt(cnt) - pairsAt(maxOf(after, 0))
         }
         if (newValue !in exceptSet) {
-            val cnt = s.counts[newValue] ?: 0
+            val cnt = s.counts.getOrDefault(newValue, 0)
             val after = cnt + occurrences
             bad += pairsAt(after) - pairsAt(cnt)
         }
@@ -85,16 +91,16 @@ class AllDifferentExcept(
         if (occurrences == 0) return 0
         val wasViolated = s.violatedPairs > 0
         if (oldValue !in exceptSet) {
-            val cnt = s.counts[oldValue] ?: 0
+            val cnt = s.counts.getOrDefault(oldValue, 0)
             val after = cnt - occurrences
             s.violatedPairs -= pairsAt(cnt) - pairsAt(maxOf(after, 0))
-            if (after <= 0) s.counts.remove(oldValue) else s.counts[oldValue] = after
+            if (after <= 0) s.counts.remove(oldValue) else s.counts.put(oldValue, after)
         }
         if (cur !in exceptSet) {
-            val cnt = s.counts[cur] ?: 0
+            val cnt = s.counts.getOrDefault(cur, 0)
             val after = cnt + occurrences
             s.violatedPairs += pairsAt(after) - pairsAt(cnt)
-            s.counts[cur] = after
+            s.counts.put(cur, after)
         }
         val nowViolated = s.violatedPairs > 0
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
@@ -116,21 +122,20 @@ class AllDifferentExcept(
             ?: ReginCache().also { state.refPayload[factorId] = it }
         cache.conflictVars = null // set at the matching-pass failure point.
         // Phase 1: singleton-take filter (cheap, runs first).
-        val taken = HashSet<Int>()
+        val taken = IntHashSet()
         for (v in xs) {
             val d = state.intDomains[v]
             if (d.min != d.max) continue
             if (d.min in exceptSet) continue
             if (!taken.add(d.min)) return false
         }
-        if (taken.isNotEmpty()) {
+        if (!taken.isEmpty()) {
             val ant = state.composeIntVarAtomAntecedents(xs)
             for (v in xs) {
                 val d = state.intDomains[v]
                 if (d.min == d.max) continue
-                for (t in taken) {
-                    if (t < d.min || t > d.max) continue
-                    if (!state.excludeIntValue(v, t, ant)) return false
+                taken.forEach { t ->
+                    if (t in d.min..d.max && !state.excludeIntValue(v, t, ant)) return false
                 }
             }
         }
@@ -155,10 +160,11 @@ class AllDifferentExcept(
         // Reservoir-sample a duplicated value.
         var pickedValue = Int.MIN_VALUE
         var seenDups = 0
-        for ((value, count) in s.counts) {
-            if (count < 2) continue
-            seenDups++
-            if (state.rng.nextInt(seenDups) == 0) pickedValue = value
+        s.counts.forEach { value, count ->
+            if (count >= 2) {
+                seenDups++
+                if (state.rng.nextInt(seenDups) == 0) pickedValue = value
+            }
         }
         if (pickedValue == Int.MIN_VALUE) return
         // Reservoir-sample one occupant of that value.
@@ -190,7 +196,7 @@ class AllDifferentExcept(
         d.forEach { target ->
             if (target == pickedValue) return@forEach
             if (target in exceptSet) return@forEach // already proposed above
-            val count = s.counts[target] ?: 0
+            val count = s.counts.getOrDefault(target, 0)
             if (count != 0) return@forEach
             seenTargets++
             if (filled < budget) {

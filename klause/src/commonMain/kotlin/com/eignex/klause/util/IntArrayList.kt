@@ -109,4 +109,25 @@ internal class IntArrayList(initialCapacity: Int = 8) {
     inline fun forEach(action: (Int) -> Unit) {
         for (i in 0 until size) action(this[i])
     }
+
+    /** Sort the live elements in place by an integer [key], delegating the ordering to stdlib
+     *  [LongArray.sort]. Each element is packed with its key into a single `Long` (key in the
+     *  high word, element in the low) so the primitive sort orders by key with no boxing and no
+     *  per-element comparator; ties break by element value. [descending] reverses the result.
+     *  Keys and elements are both `Int`, so the low-word round-trip via [toInt] is exact. */
+    inline fun sortByIntKey(descending: Boolean = false, key: (Int) -> Int) {
+        val d = backingData
+        val n = size
+        val packed = LongArray(n) { (key(d[it]).toLong() shl 32) or (d[it].toLong() and 0xFFFFFFFFL) }
+        packed.sort()
+        if (descending) {
+            for (i in 0 until n) d[n - 1 - i] = (packed[i] and 0xFFFFFFFFL).toInt()
+        } else {
+            for (i in 0 until n) d[i] = (packed[i] and 0xFFFFFFFFL).toInt()
+        }
+    }
+
+    // Exposed for the inline [sortByIntKey]; not part of the public contract. The live region is
+    // `[0, size)`; sorting never grows the list so reading the current array once is safe.
+    @PublishedApi internal val backingData: IntArray get() = data
 }

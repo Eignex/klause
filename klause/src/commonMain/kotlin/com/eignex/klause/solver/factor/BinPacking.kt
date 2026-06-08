@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /**
  * `bin_packing` family — item-to-bin assignment with weight totals subject to bin
@@ -254,13 +255,13 @@ class BinPacking(
             // Collect every item currently assigned to overloaded bin b, sorted by
             // weight descending — the top of the list is the highest-leverage candidate
             // but lighter items may fit when the heaviest doesn't.
-            val itemsHere = ArrayList<Int>()
+            val itemsHere = IntArrayList()
             for (i in bins.indices) {
                 val itemBin = state.assignment.intValue(bins[i]) - binOffset
                 if (itemBin == b) itemsHere.add(i)
             }
             if (itemsHere.isEmpty()) continue
-            itemsHere.sortByDescending { weights[it] }
+            itemsHere.sortByIntKey(descending = true) { weights[it] }
 
             // (1) + (2): for each of the top-K heaviest items propose moves to receivers.
             val topK = minOf(MAX_ITEMS_PER_BIN, itemsHere.size)

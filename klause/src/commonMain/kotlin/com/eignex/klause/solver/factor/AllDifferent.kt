@@ -8,6 +8,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -163,22 +164,22 @@ class AllDifferent(
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
         val wasViolated = s.duplicateCount > 0
-        // Simulate on a counts snapshot — touch only indices the flip would toggle.
-        val touched = mutableListOf<IntArray>() // each: [valueIdx, delta]
+        // Simulate on a counts snapshot — touch only indices the flip would toggle. Parallel
+        // primitive lists (valueIdx, delta) avoid boxing an IntArray pair per touched position.
+        val touchedIdx = IntArrayList()
+        val touchedDelta = IntArrayList()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasP = present(state, i)
             val delta = if (wasP) -1 else +1
             val valueIdx = state.assignment.intValue(vars[i]) - domainMin
-            touched += intArrayOf(valueIdx, delta)
+            touchedIdx.add(valueIdx)
+            touchedDelta.add(delta)
         }
         var dupDelta = 0
         val snapshot = s.counts
-        for (t in touched) dupDelta += adjustDuplicates(snapshot, t[0], t[1])
-        for (k in touched.indices.reversed()) {
-            val t = touched[k]
-            adjustDuplicates(snapshot, t[0], -t[1])
-        }
+        for (k in 0 until touchedIdx.size) dupDelta += adjustDuplicates(snapshot, touchedIdx[k], touchedDelta[k])
+        for (k in touchedIdx.size - 1 downTo 0) adjustDuplicates(snapshot, touchedIdx[k], -touchedDelta[k])
         val willViolate = (s.duplicateCount + dupDelta) > 0
         return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
@@ -231,7 +232,7 @@ class AllDifferent(
         val cache = (state.refPayload[factorId] as? ReginCache)
             ?: ReginCache().also { state.refPayload[factorId] = it }
         cache.conflictVars = null // stale-guard; set at the failure point below.
-        val hall = reginFilter(state, filteredVars, emptySet(), cache)
+        val hall = reginFilter(state, filteredVars, NO_EXCEPT, cache)
         if (hall != null) {
             cache.conflictVars = hall
             return false
@@ -332,6 +333,10 @@ class AllDifferent(
     }
 
     private companion object {
+        /** Empty excepted-value set for the shared [reginFilter] (plain alldifferent has none).
+         *  [reginFilter] only reads it, so one shared immutable-in-practice instance is safe. */
+        val NO_EXCEPT = IntHashSet()
+
         /** Cap on candidate targets per repair call. Each candidate adds one O(arity) break-score
          *  evaluation in WalkSat/probSAT, so don't go wild — the fan only needs to be wide enough
          *  for the strategy to discriminate. */

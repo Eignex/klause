@@ -2,6 +2,8 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Shared Régin domain-consistency filtering for the alldifferent family — [AllDifferent],
@@ -31,7 +33,7 @@ import com.eignex.klause.util.IntArrayList
 internal fun reginFilter(
     state: PropagationState,
     filteredVars: IntArray,
-    exceptSet: Set<Int>,
+    exceptSet: IntHashSet,
     cache: ReginCache? = null,
 ): IntArray? {
     val n = filteredVars.size
@@ -39,24 +41,29 @@ internal fun reginFilter(
 
     // Compact value-id mapping + per-var value-id lists (hole-aware). Non-except values get one
     // id; each except value gets `n` capacity-1 copies (contiguous ids) so up to n vars share it.
-    val valueId = HashMap<Int, Int>() // non-except value → id
-    val exceptBase = HashMap<Int, Int>() // except value → first of its n copy ids
+    // Both maps key on domain values and store non-negative ids, so -1 is a safe "absent"
+    // sentinel for the primitive lookup (no real id is negative).
+    val valueId = MutableIntIntMap() // non-except value → id
+    val exceptBase = MutableIntIntMap() // except value → first of its n copy ids
     val idToValue = IntArrayList()
     val valuesPerVar = Array(n) { i ->
         val d = state.intDomains[filteredVars[i]]
         val list = IntArrayList()
         d.forEach { v ->
             if (v in exceptSet) {
-                val base = exceptBase.getOrPut(v) {
-                    val b = idToValue.size
+                var base = exceptBase.getOrDefault(v, -1)
+                if (base < 0) {
+                    base = idToValue.size
                     repeat(n) { idToValue.add(v) }
-                    b
+                    exceptBase.put(v, base)
                 }
                 for (c in 0 until n) list.add(base + c)
             } else {
-                val id = valueId.getOrPut(v) {
+                var id = valueId.getOrDefault(v, -1)
+                if (id < 0) {
                     idToValue.add(v)
-                    idToValue.size - 1
+                    id = idToValue.size - 1
+                    valueId.put(v, id)
                 }
                 list.add(id)
             }
@@ -77,10 +84,12 @@ internal fun reginFilter(
     // maximum and Régin pruning is matching-independent, so this changes speed, not results.
     if (cache != null) {
         for (i in 0 until n) {
-            val prev = cache.matchedValue[filteredVars[i]] ?: continue
+            if (!cache.matchedValue.containsKey(filteredVars[i])) continue
+            val prev = cache.matchedValue.getOrDefault(filteredVars[i], 0)
             if (prev !in state.intDomains[filteredVars[i]]) continue // edge broke
             if (prev in exceptSet) {
-                val base = exceptBase[prev] ?: continue
+                val base = exceptBase.getOrDefault(prev, -1)
+                if (base < 0) continue
                 for (c in 0 until n) {
                     if (matchVal[base + c] == -1) {
                         matchVar[i] = base + c
@@ -89,7 +98,8 @@ internal fun reginFilter(
                     }
                 }
             } else {
-                val id = valueId[prev] ?: continue
+                val id = valueId.getOrDefault(prev, -1)
+                if (id < 0) continue
                 if (matchVal[id] == -1) {
                     matchVar[i] = id
                     matchVal[id] = i
@@ -203,7 +213,7 @@ internal fun reginFilter(
     if (cache != null) {
         cache.matchedValue.clear()
         for (i in 0 until n) {
-            if (matchVar[i] != -1) cache.matchedValue[filteredVars[i]] = idToValue[matchVar[i]]
+            if (matchVar[i] != -1) cache.matchedValue.put(filteredVars[i], idToValue[matchVar[i]])
         }
     }
     return null
@@ -214,7 +224,7 @@ internal fun reginFilter(
  *  the current domains and completes to a maximum matching, so a stale cache never affects
  *  correctness, only the number of augmenting searches. Backtrack-safe via [snapshotCopy]. */
 internal class ReginCache : PropagationState.SnapshottablePayload {
-    val matchedValue = HashMap<Int, Int>()
+    val matchedValue = MutableIntIntMap()
 
     /** The Hall violator behind the most recent propagate failure on this session — written
      *  at the failing point, read immediately afterwards by the analyzer via the factor's
@@ -226,7 +236,7 @@ internal class ReginCache : PropagationState.SnapshottablePayload {
 
     override fun snapshotCopy(): ReginCache {
         val c = ReginCache()
-        c.matchedValue.putAll(matchedValue)
+        matchedValue.forEach { k, v -> c.matchedValue.put(k, v) }
         return c
     }
 }

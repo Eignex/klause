@@ -6,6 +6,9 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayDeque
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `arg_sort(values, perm, permOffset=0)` — [perm] is a permutation of
@@ -184,19 +187,18 @@ class ArgSort(
             if (!state.tightenIntMax(p, permOffset + n - 1, ant)) return false
         }
         // Singleton-take filter on perm (cheap fast-path).
-        val taken = HashSet<Int>()
+        val taken = IntHashSet()
         for (p in perm) {
             val d = state.intDomains[p]
             if (d.min != d.max) continue
             if (!taken.add(d.min)) return false
         }
-        if (taken.isNotEmpty()) {
+        if (!taken.isEmpty()) {
             for (p in perm) {
                 val d = state.intDomains[p]
                 if (d.min == d.max) continue
-                for (t in taken) {
-                    if (t < d.min || t > d.max) continue
-                    if (!state.excludeIntValue(p, t, ant)) return false
+                taken.forEach { t ->
+                    if (t in d.min..d.max && !state.excludeIntValue(p, t, ant)) return false
                 }
             }
         }
@@ -248,10 +250,10 @@ class ArgSort(
 
         val varAdj = Array(n) { i ->
             val d = state.intDomains[perm[i]]
-            val out = ArrayList<Int>()
+            val out = IntArrayList()
             // Walk the actual in-domain values (respects holes).
             d.forEach { v ->
-                if (v in permOffset..(permOffset + n - 1)) out += v - permOffset
+                if (v in permOffset..(permOffset + n - 1)) out.add(v - permOffset)
             }
             out.toIntArray()
         }
@@ -266,7 +268,7 @@ class ArgSort(
 
         // Build oriented residual graph: matched (val→var), unmatched (var→val).
         val totalV = n + numVals
-        val adj = Array(totalV) { ArrayList<Int>() }
+        val adj = Array(totalV) { IntArrayList() }
         for (i in 0 until n) {
             for (vi in varAdj[i]) {
                 if (matchVarToVal[i] == vi) {
@@ -282,32 +284,38 @@ class ArgSort(
             val index = IntArray(totalV) { -1 }
             val low = IntArray(totalV)
             val onStack = BooleanArray(totalV)
-            val stack = ArrayDeque<Int>()
+            val stack = IntArrayDeque()
             var idx = 0
             var sccCount = 0
-            val callStack = ArrayDeque<IntArray>()
+            // Explicit DFS call stack as parallel primitive stacks: callNode[t] is the vertex and
+            // callEdge[t] its next-edge cursor — avoids boxing an `intArrayOf(node, cursor)` per frame.
+            val callNode = IntArrayList()
+            val callEdge = IntArrayList()
             for (root in 0 until totalV) {
                 if (index[root] != -1) continue
-                callStack.addLast(intArrayOf(root, 0))
+                callNode.add(root)
+                callEdge.add(0)
                 index[root] = idx
                 low[root] = idx
                 idx++
                 stack.addLast(root)
                 onStack[root] = true
-                while (callStack.isNotEmpty()) {
-                    val top = callStack.last()
-                    val u = top[0]
+                while (callNode.size != 0) {
+                    val depth = callNode.size - 1
+                    val u = callNode[depth]
                     val edges = adj[u]
-                    if (top[1] < edges.size) {
-                        val w = edges[top[1]]
-                        top[1]++
+                    val cursor = callEdge[depth]
+                    if (cursor < edges.size) {
+                        val w = edges[cursor]
+                        callEdge[depth] = cursor + 1
                         if (index[w] == -1) {
                             index[w] = idx
                             low[w] = idx
                             idx++
                             stack.addLast(w)
                             onStack[w] = true
-                            callStack.addLast(intArrayOf(w, 0))
+                            callNode.add(w)
+                            callEdge.add(0)
                         } else if (onStack[w]) {
                             if (index[w] < low[u]) low[u] = index[w]
                         }
@@ -321,9 +329,10 @@ class ArgSort(
                             }
                             sccCount++
                         }
-                        callStack.removeLast()
-                        if (callStack.isNotEmpty()) {
-                            val parent = callStack.last()[0]
+                        callNode.removeAt(callNode.size - 1)
+                        callEdge.removeAt(callEdge.size - 1)
+                        if (callNode.size != 0) {
+                            val parent = callNode[callNode.size - 1]
                             if (low[u] < low[parent]) low[parent] = low[u]
                         }
                     }

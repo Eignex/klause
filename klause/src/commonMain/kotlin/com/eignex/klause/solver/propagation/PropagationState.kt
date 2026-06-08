@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 // Three-tier learned-clause DB tiers (#201). Top-level so the engine's reduction policy in
 // BacktrackSolver and the parallel tier array in PropagationState share one definition.
@@ -693,7 +694,7 @@ class PropagationState(
         boolWatchPos.clear()
         for (lit in boolWatchersByLit.indices) {
             val list = boolWatchersByLit[lit]
-            for (i in 0 until list.size) boolWatchPos[packWatch(list[i], lit)] = i
+            for (i in 0 until list.size) boolWatchPos.put(packWatch(list[i], lit), i)
         }
 
         // A conflict return leaves the propagation queues holding in-flight fids, and the
@@ -702,6 +703,29 @@ class PropagationState(
         // surviving here indexes past the compacted clause array on the next drain.
         remapQueue(propQueue, remap, refBase)
         remapQueue(dirtyAtomFactors, remap, refBase)
+
+        // The per-variable reason fields record which factor forced each currently-implied
+        // value, learned-clause ids included. Level-0 facts — e.g. a permanent blocking nogood
+        // or a learned unit that propagated at the root — survive the restart's pop-to-root, so
+        // their reason fids outlive this renumber. Left unremapped, the next conflict's
+        // [extractConflictFactors] would dereference a stale learned fid through [factorAt] and
+        // index past the compacted clause array (the php8 crash). Remap them like the watchers:
+        // a kept clause's reason rewrites to its new id, a dropped clause's reason clears to -1.
+        remapReasons(boolReason, remap, refBase)
+        remapReasons(intMinReason, remap, refBase)
+        remapReasons(intMaxReason, remap, refBase)
+    }
+
+    /** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]
+     *  (static fids `< refBase` pass through; dropped clauses' reasons clear to -1). */
+    private fun remapReasons(reasons: IntArray, remap: IntArray, refBase: Int) {
+        for (i in reasons.indices) {
+            val fid = reasons[i]
+            if (fid >= refBase) {
+                val idx = fid - refBase
+                reasons[i] = if (idx < remap.size && remap[idx] >= 0) refBase + remap[idx] else -1
+            }
+        }
     }
 
     /** Rewrite every learned fid in `queue` through [remap] (static fids pass through;
@@ -773,7 +797,7 @@ class PropagationState(
      * falls back to the linear scan on any mismatch — a desynced index can never silently
      * remove the wrong watcher (the soundness hazard called out in #42).
      */
-    private val boolWatchPos: HashMap<Long, Int> = HashMap()
+    private val boolWatchPos: MutableLongIntMap = MutableLongIntMap()
 
     private fun packWatch(fid: Int, lit: Int): Long = (fid.toLong() shl 32) or (lit.toLong() and 0xFFFFFFFFL)
 
@@ -839,7 +863,7 @@ class PropagationState(
 
     /** Reverse lookup: packed key `(intVar << 33) | (kind << 32) | (threshold + INT_MAX)`
      *  → atomId. Allows O(1) re-allocation checks. */
-    private val atomByKey: HashMap<Long, Int> = HashMap()
+    private val atomByKey: MutableLongIntMap = MutableLongIntMap()
 
     /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions
      *  to false. Mirrors [boolWatchersByLit] for atoms; keyed by atom-lit id rather than
@@ -1055,12 +1079,13 @@ class PropagationState(
 
     private fun allocAtom(intVar: Int, kind: Int, threshold: Int): Int {
         val key = atomKey(intVar, kind, threshold)
-        atomByKey[key]?.let { return problem.numBoolVars + it }
+        val existing = atomByKey.getOrDefault(key, -1)
+        if (existing >= 0) return problem.numBoolVars + existing
         val id = atomIntVar.size
         atomIntVar.add(intVar)
         atomKind.add(kind)
         atomThreshold.add(threshold)
-        atomByKey[key] = id
+        atomByKey.put(key, id)
         atomsByIntVar.getOrPut(intVar) { VarAtomIndex() }.insert(kind, threshold, id)
         return problem.numBoolVars + id
     }
@@ -1201,7 +1226,7 @@ class PropagationState(
         val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
             val list = boolWatchersByLit[lit]
-            boolWatchPos[packWatch(fid, lit)] = list.size // position of the about-to-append entry
+            boolWatchPos.put(packWatch(fid, lit), list.size) // position of the about-to-append entry
             list.add(fid)
             boolBlockersByLit[lit].add(blocker) // index-aligned with the watcher just appended
         } else {
@@ -1382,8 +1407,8 @@ class PropagationState(
         val list = boolWatchersByLit[lit]
         val blockers = boolBlockersByLit[lit]
         val key = packWatch(factorId, lit)
-        val recorded = boolWatchPos[key]
-        if (recorded == null || recorded >= list.size || list[recorded] != factorId) {
+        val recorded = boolWatchPos.getOrDefault(key, -1)
+        if (recorded < 0 || recorded >= list.size || list[recorded] != factorId) {
             // Index miss/desync — fall back to a linear scan, swap-pop both lists in lockstep
             // at the found index, and resync this lit's positions.
             var pos = -1
@@ -1401,7 +1426,7 @@ class PropagationState(
         val last = list.size - 1
         if (recorded != last) {
             val movedFid = list[last]
-            boolWatchPos[packWatch(movedFid, lit)] = recorded
+            boolWatchPos.put(packWatch(movedFid, lit), recorded)
         }
         swapPopWatch(list, blockers, recorded)
         boolWatchPos.remove(key)
@@ -1423,7 +1448,7 @@ class PropagationState(
      *  fallback in [removeBoolWatch]). */
     private fun resyncBoolWatchPos(lit: Int) {
         val list = boolWatchersByLit[lit]
-        for (i in 0 until list.size) boolWatchPos[packWatch(list[i], lit)] = i
+        for (i in 0 until list.size) boolWatchPos.put(packWatch(list[i], lit), i)
     }
 
     init {

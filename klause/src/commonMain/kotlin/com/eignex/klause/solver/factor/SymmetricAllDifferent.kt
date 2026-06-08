@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `symmetric_all_different(xs)` — `xs` is a self-inverse permutation: `xs[xs[i]] = i` for
@@ -32,7 +33,7 @@ class SymmetricAllDifferent(
     override val intVars: IntArray = xs
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         for (i in xs.indices) {
             val v = state.assignment.intValue(xs[i])
             if (!seen.add(v)) return true
@@ -46,7 +47,7 @@ class SymmetricAllDifferent(
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val wasViolated = isViolated(state, factorId)
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         var willViolate = false
         for (i in xs.indices) {
             val v = if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
@@ -120,7 +121,7 @@ class SymmetricAllDifferent(
             if (!state.tightenIntMax(v, hi)) return false
         }
         // AllDifferent singleton conflict.
-        val taken = HashSet<Int>()
+        val taken = IntHashSet()
         for (v in xs) {
             val d = state.intDomains[v]
             if (d.min != d.max) continue

@@ -7,6 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.max
 import kotlin.math.min
 
@@ -585,7 +586,7 @@ class Cumulatives(
         for (k in 0 until machineCount) {
             val cap = fixedBound(state, k) ?: continue // var bound not yet fixed → skip machine
             // Tasks definitely present and pinned to machine k, with fixed duration / resource.
-            val members = ArrayList<Int>()
+            val members = IntArrayList()
             for (i in 0 until n) {
                 if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
                 if (fixedMachineIdx(state, i) != k) continue
@@ -596,7 +597,8 @@ class Cumulatives(
             if (members.isEmpty()) continue
             // Mandatory profile for machine k.
             val profile = MandatoryProfile()
-            for (i in members) {
+            for (mi in 0 until members.size) {
+                val i = members[mi]
                 val d = requireNotNull(fixedDur(state, i))
                 val r = requireNotNull(fixedRes(state, i))
                 val dom = state.intDomains[starts[i]]
@@ -604,7 +606,8 @@ class Cumulatives(
             }
             if (!profile.build(cap)) return false
             // Tighten each member's start against overloading placements.
-            for (i in members) {
+            for (mi in 0 until members.size) {
+                val i = members[mi]
                 val d = requireNotNull(fixedDur(state, i))
                 val r = requireNotNull(fixedRes(state, i))
                 val v = starts[i]

@@ -5,6 +5,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * `sort(xs, ys)` — [ys] is the non-decreasing sorted permutation of [xs] (same multiset
@@ -70,14 +72,16 @@ class Sort(val xs: IntArray, val ys: IntArray) : LocalSearchFactor {
                 sink.addChannelingIntSet(state, ys[i], target)
             }
         }
-        val xsCount = HashMap<Int, Int>().also { for (v in xsVals) it[v] = (it[v] ?: 0) + 1 }
-        val ysCount = HashMap<Int, Int>().also { for (v in ysVals) it[v] = (it[v] ?: 0) + 1 }
-        val over = ArrayList<Int>()
-        val under = ArrayList<Int>()
-        for ((v, c) in xsCount) if (c > (ysCount[v] ?: 0)) over.add(v)
-        for ((v, c) in ysCount) if (c > (xsCount[v] ?: 0)) under.add(v)
-        for (v in over) {
-            for (vPrime in under) {
+        val xsCount = MutableIntIntMap().also { for (v in xsVals) it.addTo(v, 1) }
+        val ysCount = MutableIntIntMap().also { for (v in ysVals) it.addTo(v, 1) }
+        val over = IntArrayList()
+        val under = IntArrayList()
+        xsCount.forEach { v, c -> if (c > ysCount.getOrDefault(v, 0)) over.add(v) }
+        ysCount.forEach { v, c -> if (c > xsCount.getOrDefault(v, 0)) under.add(v) }
+        for (oi in 0 until over.size) {
+            val v = over[oi]
+            for (ui in 0 until under.size) {
+                val vPrime = under[ui]
                 for (k in xs.indices) {
                     if (xsVals[k] == v && vPrime in state.problem.intDomains[xs[k]]) {
                         sink.addChannelingIntSet(state, xs[k], vPrime)

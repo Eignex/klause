@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `XOR(lit_1, ..., lit_n) == targetParity`. `targetParity = 1` means an odd number of literals
@@ -78,7 +79,7 @@ class Xor(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // Walk literals once: tally parity from pinned literals, collect unassigned variables.
         var pinnedParity = 0
-        val unassigned = LinkedHashSet<Int>()
+        val unassigned = IntHashSet()
         for (lit in literals) {
             val v = Lit.variable(lit)
             val b = state.boolValues[v]
@@ -91,7 +92,7 @@ class Xor(
         // Only variables with odd-count occurrences ("effective") affect parity.
         var effective = -1
         var effectiveCount = 0
-        for (v in unassigned) {
+        unassigned.forEach { v ->
             if (parityByVar.coeffOf(v) == 1) {
                 effectiveCount++
                 if (effectiveCount > 1) return true // 2+ effective: parity not yet decidable

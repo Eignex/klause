@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.localsearch.CostShaping
@@ -114,25 +115,32 @@ object PortfolioBuilder {
             }
         }
 
-        // Backtrack workers: seed diversity, plus a CDCL/VSIDS variant every other worker for
-        // satisfaction robustness. Each bounds on the linear objective (falling back to the
-        // functional form if only that exists) and injects the shared objective bound so a
-        // tighter incumbent from any worker prunes the others' subtrees.
+        // Backtrack workers: a diverse trio of complete configs, cycled across workers so even a
+        // single backtrack worker gets the strong SAT-optimized config. Each bounds on the linear
+        // objective (falling back to the functional form if only that exists) and injects the
+        // shared objective bound so a tighter incumbent from any worker prunes the others' subtrees.
+        //  - i % 3 == 0: the full SAT-optimized CDCL stack ([BacktrackPresets.satOptimized]) —
+        //    adaptive restarts, phase + target phasing, three-tier learned DB, vivification;
+        //  - i % 3 == 1: classic VSIDS + phase saving + Luby restarts;
+        //  - i % 3 == 2: the bare random-heuristic engine, for raw seed diversity.
         val btObj = linearObjective ?: lsObjective
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
             val label = "backtrack#$i"
             val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(label, e) } }
-            val params = if (i % 2 == 0) {
-                BacktrackParams(
-                    randomSeed = spec.seed + 1000L + i,
+            val seed = spec.seed + 1000L + i
+            val params = when (i % 3) {
+                0 -> BacktrackPresets.satOptimized(randomSeed = seed, onEvent = workerEvent)
+
+                1 -> BacktrackParams(
+                    randomSeed = seed,
                     variableHeuristic = Vsids(),
                     phaseSaving = true,
                     lubyRestartBase = 100L,
                     onEvent = workerEvent,
                 )
-            } else {
-                BacktrackParams(randomSeed = spec.seed + 1000L + i, onEvent = workerEvent)
+
+                else -> BacktrackParams(randomSeed = seed, onEvent = workerEvent)
             }
             workers += PortfolioWorker.of(label, session, params, objective = btObj) { p, supplier ->
                 p.copy(objectiveBoundSupplier = supplier)
