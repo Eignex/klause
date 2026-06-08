@@ -10,7 +10,7 @@ import java.io.File
  * keywords and map to the catalog [Expected] oracle, defaulting to [Expected.Unknown] when no
  * directive is found (the file is then merely a compile/parse exercise).
  */
-object LibminizincExpected {
+internal object LibminizincExpected {
     private val statusRe = Regex("""status\s*:\s*([A-Z_]+)""")
     private val objectiveRe = Regex("""objective\s*:\s*(-?\d+)""")
 
@@ -22,10 +22,14 @@ object LibminizincExpected {
         val upper = header.uppercase()
         return when {
             "UNSATISFIABLE" in upper -> Expected.Unsat
+
             statusRe.find(header)?.groupValues?.get(1)?.let { it.contains("UNSAT") } == true -> Expected.Unsat
+
             "OPTIMAL_SOLUTION" in upper -> objectiveRe.find(header)?.groupValues?.get(1)?.toLongOrNull()
                 ?.let { Expected.Opt(it) } ?: Expected.Sat
+
             "SATISFIABLE" in upper || "SATISFIED" in upper -> Expected.Sat
+
             else -> Expected.Unknown
         }
     }

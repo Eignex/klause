@@ -20,6 +20,10 @@ import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.solver.propagation.TIER_CORE
+import com.eignex.klause.solver.propagation.TIER_LOCAL
+import com.eignex.klause.solver.propagation.TIER_MID
+import com.eignex.klause.solver.propagation.TIER_UNSET
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
 
@@ -1070,13 +1074,12 @@ class BacktrackSolver(override val problem: Problem) :
      */
     private fun forgetIfOverCap(session: PropagationSession, params: BacktrackParams) {
         val cap = params.maxLearnedClauses ?: return
-        val learnedSize = session.problem.let { _ ->
-            // PropagationSession exposes the count indirectly via session.state — pull
-            // it from the state field that learnedClauses reads. We reuse the public
-            // accessor on the session here to avoid leaking the state.
-            session.learnedClauseCount
-        }
+        val learnedSize = session.learnedClauseCount
         if (learnedSize <= cap) return
+        if (params.tieredLearnedDb) {
+            forgetTiered(session, params, cap, learnedSize)
+            return
+        }
         val glueThreshold = params.lbdGlueThreshold
         // Bucket non-glue clauses by LBD and pick the lowest LBDs up to the residual
         // capacity. We do this as: compute LBD per index, sort ascending, and define
@@ -1099,6 +1102,71 @@ class BacktrackSolver(override val problem: Problem) :
         }
         val dropped = nonGlue.size - remainingCap
         params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
+    }
+
+    /**
+     * Three-tier reduction policy (#201). Each learned clause is classified by LBD into a
+     * permanent core (LBD ≤ [BacktrackParams.lbdGlueThreshold]), a mid tier
+     * (LBD ≤ [BacktrackParams.midLbdThreshold]) and a local tier; tiers persist across
+     * reductions. Reuse since the last reduction (the clause detected a conflict or forced a
+     * unit, tracked by `PropagationState.noteLearnedUse`) drives promotion and demotion:
+     *  - core: always kept;
+     *  - mid: always kept this pass, but demoted to local when idle so it can be deleted later;
+     *  - local: promoted to mid when reused, otherwise a deletion candidate.
+     * Among the local deletion candidates the lowest-LBD ones are kept up to the residual cap
+     * and the rest are dropped. Reuse flags are cleared for survivors so the next window
+     * measures fresh activity.
+     */
+    private fun forgetTiered(session: PropagationSession, params: BacktrackParams, cap: Int, learnedSize: Int) {
+        val coreThreshold = params.lbdGlueThreshold
+        val midThreshold = params.midLbdThreshold
+        val locals = ArrayList<IntArray>(learnedSize) // [lbd, index] local deletion candidates
+        for (i in 0 until learnedSize) {
+            val lbd = session.learnedClauseLbd(i)
+            val used = session.learnedClauseUsedSinceReduction(i)
+            val entryTier = session.learnedClauseTier(i).let { t ->
+                if (t != TIER_UNSET) {
+                    t
+                } else {
+                    when {
+                        lbd <= coreThreshold -> TIER_CORE
+                        lbd <= midThreshold -> TIER_MID
+                        else -> TIER_LOCAL
+                    }
+                }
+            }
+            if (session.learnedClausePermanent(i)) {
+                session.setLearnedClauseTier(i, entryTier) // permanent clauses are always kept
+                continue
+            }
+            when (entryTier) {
+                TIER_CORE -> session.setLearnedClauseTier(i, TIER_CORE)
+
+                // Mid is kept this pass; demote to local when idle so it ages out next time.
+                TIER_MID -> session.setLearnedClauseTier(i, if (used) TIER_MID else TIER_LOCAL)
+
+                else -> if (used) {
+                    session.setLearnedClauseTier(i, TIER_MID) // promote a reused local clause
+                } else {
+                    session.setLearnedClauseTier(i, TIER_LOCAL)
+                    locals.add(intArrayOf(lbd, i)) // deletion candidate
+                }
+            }
+        }
+        val kept = learnedSize - locals.size
+        val residualCap = (cap - kept).coerceAtLeast(0)
+        if (locals.size <= residualCap) {
+            for (i in 0 until learnedSize) session.clearLearnedClauseUsed(i)
+            return
+        }
+        locals.sortBy { it[0] } // ascending LBD: keep the lowest, drop the highest
+        val dropSet = HashSet<Int>(locals.size - residualCap)
+        for (k in residualCap until locals.size) dropSet.add(locals[k][1])
+        session.forgetLearnedClauses { idx, _ -> idx !in dropSet }
+        params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropSet.size, dropped = dropSet.size))
+        // Indices were compacted by the forget; reset every survivor's reuse flag.
+        val survivors = session.learnedClauseCount
+        for (i in 0 until survivors) session.clearLearnedClauseUsed(i)
     }
 
     /**

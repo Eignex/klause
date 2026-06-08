@@ -11,22 +11,21 @@ import com.eignex.klause.solver.SolveResult
 
 /** Resolved + cross-checked corpus, split into the full verify set and the benchable
  *  (feasible-expected) subset the measurement metrics run on. */
-data class LoadedCorpus(
-    val verifyEntries: List<ResolvedProblem>,
-    val benchEntries: List<ResolvedProblem>,
-)
+internal data class LoadedCorpus(val verifyEntries: List<ResolvedProblem>, val benchEntries: List<ResolvedProblem>)
 
 /**
  * Resolves the in-process problems of the given suites and runs [Verifier] across them as a
  * correctness gate. Problems whose format is not in-process (e.g. MiniZinc) are skipped here.
  */
-object BenchLoad {
+internal object BenchLoad {
     /** Resolve every problem in the given suites with the appropriate runner (MiniZinc compile
      *  or in-process), without the cross-backend verify gate. Used by differential metrics
      *  (parity) that *are* the comparison. */
+    @Suppress("SpreadOperator")
     fun resolve(suiteIds: List<String>): List<ResolvedProblem> =
         Catalog.problems(*suiteIds.toTypedArray()).map { Runners.resolve(it) }
 
+    @Suppress("SpreadOperator")
     fun loadAndVerify(suiteIds: List<String>, quiet: Boolean = false): LoadedCorpus =
         loadAndVerifyRefs(Catalog.problems(*suiteIds.toTypedArray()), quiet)
 

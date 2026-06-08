@@ -18,6 +18,7 @@ import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.maximizeInt
 import com.eignex.klause.solver.minimizeInt
 import java.io.File
+import java.util.Locale
 
 /**
  * Hybrid CP-seeding probe: does handing LS a CP/backtrack-found *feasible* point unlock the
@@ -33,9 +34,12 @@ import java.io.File
  * Run: `./gradlew :klause-bench:bench --args="diag:cpseed <fzn>" -Dklause.cpseed.cpms=4000 -Dklause.cpseed.lsms=8000`
  */
 object CpSeedProbe {
+    /** Entry point for the CP-seeded local search probe. */
     @JvmStatic
     fun main(args: Array<String>) {
-        val path = System.getProperty("klause.cpseed.file") ?: args.getOrNull(0) ?: error("set -Dklause.cpseed.file=<fzn>")
+        val path = System.getProperty(
+            "klause.cpseed.file",
+        ) ?: args.getOrNull(0) ?: error("set -Dklause.cpseed.file=<fzn>")
         val cpMs = System.getProperty("klause.cpseed.cpms")?.toLong() ?: 4000L
         val lsMs = System.getProperty("klause.cpseed.lsms")?.toLong() ?: 8000L
         val prog = parseFlatZinc(File(path).readText())
@@ -90,8 +94,12 @@ object CpSeedProbe {
             }
             println(
                 "  %-12s feasible=%-5s best=%-10s first=%sms n=%d".format(
-                    label, (best != null).toString(), best?.toString() ?: "—",
-                    if (firstMs < 0) "—" else firstMs.toString(), n,
+                    Locale.ROOT,
+                    label,
+                    (best != null).toString(),
+                    best?.toString() ?: "—",
+                    if (firstMs < 0) "—" else firstMs.toString(),
+                    n,
                 ),
             )
         }

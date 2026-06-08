@@ -10,13 +10,13 @@ class EngineTimesTest {
     @Test
     fun `records first incumbent and tracks the best, ignoring non-improvements`() {
         val t = EngineTimes()
-        t.listener(SearchEvent.Restart(1, 10))            // non-incumbent events are ignored
+        t.listener(SearchEvent.Restart(1, 10)) // non-incumbent events are ignored
         assertEquals(-1L, t.firstMs)
         t.listener(SearchEvent.Incumbent(5.0))
         val first = t.firstMs
         assertTrue(first >= 0)
-        t.listener(SearchEvent.Incumbent(3.0))            // improvement moves bestMs
-        t.listener(SearchEvent.Incumbent(7.0))            // worse: best unchanged
+        t.listener(SearchEvent.Incumbent(3.0)) // improvement moves bestMs
+        t.listener(SearchEvent.Incumbent(7.0)) // worse: best unchanged
         assertEquals(first, t.firstMs)
         assertTrue(t.bestMs >= first)
     }

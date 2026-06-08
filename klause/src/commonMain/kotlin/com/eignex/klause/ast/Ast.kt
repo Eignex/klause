@@ -424,6 +424,45 @@ data class AllDifferent(
 }
 
 /**
+ * `symmetric_all_different(xs)`: the assignment `i -> xs[i] - indexOffset` is an involution —
+ * `xs[i] = j + indexOffset` iff `xs[j] = i + indexOffset`. A self-inverse permutation; each
+ * term is also pairwise distinct. Terms must be bare integer handles.
+ */
+@Serializable
+@SerialName("sym_alldiff")
+data class SymmetricAllDifferent(
+    /** The permutation terms. */
+    val terms: List<IntExpr>,
+    /** Value `xs[i] = i + indexOffset` denotes the self-paired position i. */
+    val indexOffset: Int = 0,
+) : BoolExpr {
+    init {
+        require(terms.size >= 2) { "SymmetricAllDifferent needs at least two terms" }
+    }
+}
+
+/**
+ * `inverse(f, g)`: the two index arrays are mutual inverses — `f[i] = j + gOffset` iff
+ * `g[j] = i + fOffset`. Channels a permutation against its inverse.
+ */
+@Serializable
+@SerialName("inverse")
+data class InverseChannel(
+    /** The forward array. */
+    val f: List<IntExpr>,
+    /** The inverse array. */
+    val g: List<IntExpr>,
+    /** Offset of values stored in [f] (the base index of [g]). */
+    val fOffset: Int = 0,
+    /** Offset of values stored in [g] (the base index of [f]). */
+    val gOffset: Int = 0,
+) : BoolExpr {
+    init {
+        require(f.size == g.size) { "Inverse needs f and g of equal length" }
+    }
+}
+
+/**
  * Generalized alldifferent_except: every pair of distinct positions must take different
  * values, unless one of them takes a value in [except]. [except] is the set of "ignored"
  * sentinel values (e.g., {0} for the classic alldifferent_except_0).

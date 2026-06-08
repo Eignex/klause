@@ -15,11 +15,13 @@ import com.eignex.klause.solver.Problem
  * }
  * ```
  */
-class SuiteBuilder(val id: String, val description: String) {
+internal class SuiteBuilder(val id: String, val description: String) {
     /** Default format for entries that don't specify one. */
     var format: Format? = null
+
     /** Default category for entries that don't specify one. */
     var category: Category = Category.CSP
+
     /** Default license/provenance string for entries that don't specify one. */
     var license: String = "internal"
 
@@ -63,8 +65,14 @@ class SuiteBuilder(val id: String, val description: String) {
         tags: Set<String> = emptySet(),
         license: String = this.license,
     ) = problem(
-        name, corpus(model), Format.MINIZINC, category, expected,
-        data = data?.let { corpus(it) }, tags = tags, license = license,
+        name,
+        corpus(model),
+        Format.MINIZINC,
+        category,
+        expected,
+        data = data?.let { corpus(it) },
+        tags = tags,
+        license = license,
     )
 
     /** A file tracked elsewhere in the workspace (e.g. `klause-mzn-lib/test-models/`). */
@@ -90,8 +98,14 @@ class SuiteBuilder(val id: String, val description: String) {
         data: ProblemSource? = null,
         tags: Set<String> = emptySet(),
     ) = problem(
-        name, ProblemSource.External(collection, relPath), format, category, expected,
-        data = data, tags = tags, license = collection.license,
+        name,
+        ProblemSource.External(collection, relPath),
+        format,
+        category,
+        expected,
+        data = data,
+        tags = tags,
+        license = collection.license,
     )
 
     /** A programmatic instance built in Kotlin. */
@@ -103,8 +117,7 @@ class SuiteBuilder(val id: String, val description: String) {
         build: () -> Problem,
     ) = problem(name, ProblemSource.InCode(build), Format.IN_CODE, category, expected, tags = tags)
 
-    private fun requireFormat(): Format =
-        format ?: error("suite '$id': set a default `format` or pass one per problem")
+    private fun requireFormat(): Format = format ?: error("suite '$id': set a default `format` or pass one per problem")
 
     private fun defaultRelPath(name: String, fmt: Format): String = "${fmt.dir}/$name.${fmt.ext}"
 
@@ -112,7 +125,7 @@ class SuiteBuilder(val id: String, val description: String) {
 }
 
 /** Build a [Suite] with the DSL. */
-fun suite(id: String, description: String, block: SuiteBuilder.() -> Unit): Suite =
+internal fun suite(id: String, description: String, block: SuiteBuilder.() -> Unit): Suite =
     SuiteBuilder(id, description).apply(block).build()
 
 /** Default corpus sub-directory for a format (matches the `corpus/<dir>/` layout). */

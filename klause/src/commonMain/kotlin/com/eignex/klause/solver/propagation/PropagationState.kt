@@ -10,6 +10,20 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
+// Three-tier learned-clause DB tiers (#201). Top-level so the engine's reduction policy in
+// BacktrackSolver and the parallel tier array in PropagationState share one definition.
+/** Not yet classified — the reduction policy assigns a tier by LBD on first encounter. */
+internal const val TIER_UNSET: Int = -1
+
+/** Permanent core: very low LBD, never deleted. */
+internal const val TIER_CORE: Int = 0
+
+/** Mid tier: kept across reductions, demoted to [TIER_LOCAL] when idle. */
+internal const val TIER_MID: Int = 1
+
+/** Local tier: aggressively deleted; promoted to [TIER_MID] on reuse. */
+internal const val TIER_LOCAL: Int = 2
+
 /**
  * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
  * values and the (tightened) int domains, plus a **decision level** per pinned variable for
@@ -446,6 +460,41 @@ class PropagationState(
     /** Clauses learned during conflict analysis. */
     val learnedClauses: List<Clause> get() = _learnedClauses
 
+    /** Count of binary (2-literal) clauses known — original problem clauses plus learned
+     *  ones. Gates the #202 binary-resolution minimization, which is a no-op without binary
+     *  clauses. Over-approximates after forgetting (never decremented), which only costs a
+     *  harmless no-op pass — never correctness. */
+    private var binaryClauseCount: Int = run {
+        var n = 0
+        for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
+        n
+    }
+
+    /** True iff any binary clause is known — the gate for binary-resolution minimization. */
+    val hasBinaryClauses: Boolean get() = binaryClauseCount > 0
+
+    /**
+     * Invoke [action] with the *other* literal of every binary clause that contains [lit]
+     * (#202). Binary clauses watch both their literals and never relocate a watch (there is
+     * no third literal to move to), so [boolWatchersByLit] reliably lists every binary clause
+     * on [lit]. No-op for atom-literal [lit] (the bool watcher index only covers bool vars).
+     */
+    internal fun forEachBinaryPartner(lit: Int, action: (other: Int) -> Unit) {
+        if (Lit.variable(lit) >= problem.numBoolVars) return
+        val list = boolWatchersByLit[lit]
+        for (i in 0 until list.size) {
+            val f = factorAt(list[i])
+            if (f is Clause && f.literals.size == 2) {
+                val a = f.literals[0]
+                val b = f.literals[1]
+                when (lit) {
+                    a -> action(b)
+                    b -> action(a)
+                }
+            }
+        }
+    }
+
     /** LBD (Literal Block Distance) per learned clause, parallel to [_learnedClauses].
      *  Glucose-style glue metric: lower = more re-usable. Forgetting policies key on
      *  this to decide which clauses to drop. */
@@ -455,6 +504,17 @@ class PropagationState(
      *  Solution-blocking nogoods are the main client: dropping one re-opens an already
      *  reported leaf and the search can revisit it forever. */
     private val learnedPermanent: IntArrayList = IntArrayList()
+
+    /** Three-tier database tier per learned clause (#201), parallel to [_learnedClauses]:
+     *  [TIER_CORE] / [TIER_MID] / [TIER_LOCAL], or [TIER_UNSET] before the reduction policy
+     *  first classifies it by LBD. The policy promotes/demotes clauses between tiers based on
+     *  reuse, so the tier is persistent state rather than a pure function of LBD. */
+    private val learnedTier: IntArrayList = IntArrayList()
+
+    /** 1 iff the learned clause has detected a conflict or forced a unit since the last
+     *  reduction, parallel to [_learnedClauses]. The three-tier reduction policy reads this
+     *  to promote reused clauses and demote idle ones, then clears it for survivors. */
+    private val learnedUsedFlags: IntArrayList = IntArrayList()
 
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
@@ -485,6 +545,9 @@ class PropagationState(
         _learnedClauses.add(clause)
         learnedLbds.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
+        learnedTier.add(TIER_UNSET)
+        learnedUsedFlags.add(0)
+        if (clause.literals.size == 2) binaryClauseCount++ // keep the #202 gate current
         _refPayload.add(null)
         val watchers = clause.initialBoolWatchers
         val blockers = clause.initialBoolWatcherBlockers
@@ -497,6 +560,34 @@ class PropagationState(
 
     /** True iff learned clause [learnedIndex] must survive every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = learnedPermanent[learnedIndex] == 1
+
+    /** Three-tier (#201) DB tier of learned clause [learnedIndex] ([TIER_UNSET] until the
+     *  reduction policy classifies it). */
+    fun learnedClauseTier(learnedIndex: Int): Int = learnedTier[learnedIndex]
+
+    /** Set the three-tier DB tier of learned clause [learnedIndex] (promotion / demotion /
+     *  initial classification by the reduction policy). */
+    fun setLearnedClauseTier(learnedIndex: Int, tier: Int) {
+        learnedTier[learnedIndex] = tier
+    }
+
+    /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
+     *  reduction. */
+    fun learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean = learnedUsedFlags[learnedIndex] == 1
+
+    /** Clear the reuse flag for learned clause [learnedIndex] — called for survivors at the
+     *  end of a reduction so the next window measures fresh activity. */
+    fun clearLearnedClauseUsed(learnedIndex: Int) {
+        learnedUsedFlags[learnedIndex] = 0
+    }
+
+    /** Mark learned clause [fid] (a factor id; ignored when it isn't a learned clause) as
+     *  used since the last reduction — it just detected a conflict or forced a unit. Drives
+     *  three-tier promotion (#201). */
+    internal fun noteLearnedUse(fid: Int) {
+        val idx = fid - problem.numFactors
+        if (idx in 0 until learnedUsedFlags.size) learnedUsedFlags[idx] = 1
+    }
 
     /**
      * Prune the learned-clause database. The [keep] predicate decides per (learnedIndex,
@@ -531,12 +622,16 @@ class PropagationState(
                 _learnedClauses[w] = _learnedClauses[i]
                 learnedLbds[w] = learnedLbds[i]
                 learnedPermanent[w] = learnedPermanent[i]
+                learnedTier[w] = learnedTier[i]
+                learnedUsedFlags[w] = learnedUsedFlags[i]
                 w++
             }
         }
         while (_learnedClauses.size > newCount) _learnedClauses.removeAt(_learnedClauses.size - 1)
         learnedLbds.truncateTo(newCount)
         learnedPermanent.truncateTo(newCount)
+        learnedTier.truncateTo(newCount)
+        learnedUsedFlags.truncateTo(newCount)
 
         // Compact the learned tail of _refPayload similarly. Static-factor entries stay
         // at indices [0, problem.numFactors) untouched.
@@ -1480,6 +1575,7 @@ class PropagationState(
         boolValues[v] = value
         boolLevel[v] = currentLevel
         boolReason[v] = currentFactor
+        noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused (#201)
         boolAntecedents[v] = antecedents
         boolPinOrder.add(v)
         dirtyBools.addLast(v)
@@ -1707,6 +1803,7 @@ class PropagationState(
 
     private fun seedConflictFactor(fid: Int) {
         if (fid < 0) return
+        noteLearnedUse(fid) // a learned clause that detects a conflict counts as reused (#201)
         val s = conflictSeedFactors ?: HashSet<Int>().also { conflictSeedFactors = it }
         s.add(fid)
     }

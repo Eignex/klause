@@ -14,7 +14,7 @@ import kotlin.random.Random
  *  - [random3Sat] — uniform random 3-SAT at a clause/var [ratio] (4.26 ≈ the phase transition);
  *    sweep `n` to plot solver scaling.
  */
-object SatGenerators {
+internal object SatGenerators {
     fun php(n: Int): Problem = Dimacs.parse(phpCnf(n))
     fun random3Sat(n: Int, ratio: Double = 4.26, seed: Long = 1L): Problem = Dimacs.parse(random3SatCnf(n, ratio, seed))
 
@@ -24,13 +24,17 @@ object SatGenerators {
         fun v(p: Int, h: Int) = p * n + h + 1
         val clauses = StringBuilder()
         var count = 0
-        for (p in 0 until pigeons) {                       // each pigeon in ≥1 hole
+        for (p in 0 until pigeons) { // each pigeon in ≥1 hole
             for (h in 0 until n) clauses.append(v(p, h)).append(' ')
-            clauses.append("0\n"); count++
+            clauses.append("0\n")
+            count++
         }
-        for (h in 0 until n) {                             // ≤1 pigeon per hole
-            for (p in 0 until pigeons) for (q in p + 1 until pigeons) {
-                clauses.append(-v(p, h)).append(' ').append(-v(q, h)).append(" 0\n"); count++
+        for (h in 0 until n) { // ≤1 pigeon per hole
+            for (p in 0 until pigeons) {
+                for (q in p + 1 until pigeons) {
+                    clauses.append(-v(p, h)).append(' ').append(-v(q, h)).append(" 0\n")
+                    count++
+                }
             }
         }
         return "p cnf ${pigeons * n} $count\n$clauses"

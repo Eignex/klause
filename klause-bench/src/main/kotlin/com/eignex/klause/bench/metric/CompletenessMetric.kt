@@ -8,8 +8,8 @@ import com.eignex.klause.bench.solver.Solvers
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
-import java.time.Instant
 import kotlinx.serialization.Serializable
+import java.time.Instant
 
 /**
  * Per-backend enumeration completeness for one problem: how many distinct SAT assignments
@@ -17,7 +17,7 @@ import kotlinx.serialization.Serializable
  * the brute-force oracle total.
  */
 @Serializable
-data class CompletenessReport(
+internal data class CompletenessReport(
     val entryName: String,
     val backendName: String,
     val budgetsMillis: LongArray,
@@ -28,7 +28,7 @@ data class CompletenessReport(
 )
 
 @Serializable
-data class CompletenessResults(
+internal data class CompletenessResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,
@@ -36,14 +36,16 @@ data class CompletenessResults(
     val entries: List<CompletenessReport>,
 )
 
-object CompletenessMetric {
+internal object CompletenessMetric {
     private const val ORACLE_MAX_MODELS = 4096
 
     fun run(entries: List<ResolvedProblem>) {
         val budgets = budgetsFromProperty()
         println()
-        println("=== completeness bench (reach @ ${budgets.joinToString { "${it}ms" }}; coverage = " +
-            "distinct/feasible when oracle fits) ===")
+        println(
+            "=== completeness bench (reach @ ${budgets.joinToString { "${it}ms" }}; coverage = " +
+                "distinct/feasible when oracle fits) ===",
+        )
         val results = mutableListOf<CompletenessReport>()
         for (entry in entries) {
             val rows = mutableListOf<String>()
@@ -51,7 +53,7 @@ object CompletenessMetric {
                 val r = analyse(entry.name, backend, budgets)
                 results += r
                 rows += "${backend.name} reach=${r.reachAtBudget.joinToString(",")} total=${r.totalDistinct} " +
-                    "cov=${r.coverageAtMaxBudget?.let { "%.2f".format(it) } ?: "—"}"
+                    "cov=${r.coverageAtMaxBudget?.let { "%.2f".format(java.util.Locale.ROOT, it) } ?: "—"}"
             }
             println("[${entry.name}] ${rows.joinToString(" | ")}")
         }

@@ -13,8 +13,9 @@ import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import java.time.Instant
 import kotlinx.serialization.Serializable
+import java.time.Instant
+import java.util.Locale
 
 /**
  * Solver-config tuning for a **mixed (satisfaction + optimization) workload**, run over catalog
@@ -27,16 +28,26 @@ import kotlinx.serialization.Serializable
  * mean true objective over feasible seeds (configs that never reach feasible rank last).
  */
 @Serializable
-data class TuneCell(val config: String, val solveRate: Double, val meanObjective: Double?, val meanMs: Double)
+data class TuneCell(
+    internal val config: String,
+    internal val solveRate: Double,
+    internal val meanObjective: Double?,
+    internal val meanMs: Double,
+)
 
 @Serializable
-data class TuneInstance(val name: String, val goal: String, val cells: List<TuneCell>)
+internal data class TuneInstance(val name: String, val goal: String, val cells: List<TuneCell>)
 
 @Serializable
-data class TuneConfigRank(val config: String, val overallRank: Double, val satRank: Double?, val optRank: Double?)
+internal data class TuneConfigRank(
+    val config: String,
+    val overallRank: Double,
+    val satRank: Double?,
+    val optRank: Double?,
+)
 
 @Serializable
-data class TuningResults(
+internal data class TuningResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,
@@ -89,7 +100,7 @@ private class BtConfig(override val id: String) : TuneConfig {
     }
 }
 
-object TuningMetric {
+internal object TuningMetric {
     private val CONFIGS: List<TuneConfig> = listOf(
         LsConfig("ls-feasibility-first", CostShaping.FeasibilityFirst),
         LsConfig("ls-linear-1.0", CostShaping.linear(1.0)),
@@ -100,7 +111,10 @@ object TuningMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget = Budget(timeoutMillis = 2_000)) {
         val seeds = System.getProperty("klause.bench.tune.seeds")?.toIntOrNull() ?: 3
         println()
-        println("=== tuning sweep (${CONFIGS.size} configs × $seeds seeds; ${budget.timeoutMillis}ms; overall avg dense rank) ===")
+        println(
+            "=== tuning sweep (${CONFIGS.size} configs × $seeds seeds; ${budget.timeoutMillis}ms; " +
+                "overall avg dense rank) ===",
+        )
 
         val instances = entries.map { evaluate(it, seeds, budget) }
         // Per-instance dense rank of configs (lower rank = better), then average per config.
@@ -111,31 +125,67 @@ object TuningMetric {
             val ranks = denseRankCells(inst)
             for ((cfg, rank) in ranks) {
                 rankByConfig.getOrPut(cfg) { mutableListOf() }.add(rank)
-                (if (inst.goal == "optimize") rankByConfigOpt else rankByConfigSat).getOrPut(cfg) { mutableListOf() }.add(rank)
+                (if (inst.goal == "optimize") rankByConfigOpt else rankByConfigSat).getOrPut(
+                    cfg,
+                ) { mutableListOf() }.add(rank)
             }
         }
         val ranking = CONFIGS.map { c ->
-            TuneConfigRank(c.id,
+            TuneConfigRank(
+                c.id,
                 rankByConfig[c.id]?.average() ?: Double.NaN,
                 rankByConfigSat[c.id]?.takeIf { it.isNotEmpty() }?.average(),
-                rankByConfigOpt[c.id]?.takeIf { it.isNotEmpty() }?.average())
+                rankByConfigOpt[c.id]?.takeIf { it.isNotEmpty() }?.average(),
+            )
         }.sortedBy { it.overallRank }
 
         for (r in ranking) {
-            println("  ${r.config.padEnd(24)} overall=${"%.2f".format(r.overallRank)} " +
-                "sat=${r.satRank?.let { "%.2f".format(it) } ?: "—"} opt=${r.optRank?.let { "%.2f".format(it) } ?: "—"}")
+            println(
+                "  ${r.config.padEnd(24)} overall=${"%.2f".format(Locale.ROOT, r.overallRank)} " +
+                    "sat=${r.satRank?.let {
+                        "%.2f".format(
+                            Locale.ROOT,
+                            it,
+                        )
+                    } ?: "—"} opt=${r.optRank?.let { "%.2f".format(Locale.ROOT, it) } ?: "—"}",
+            )
         }
         val best = ranking.firstOrNull()?.config
         println("\nbest overall config: $best")
 
-        Reports.writeJson("build/tuning-report.json",
-            TuningResults(Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(), seeds, budget.timeoutMillis, ranking, instances))
-        Reports.writeMarkdown("build/tuning-report.md", markdown {
-            h1("Solver-config tuning (mixed workload)")
-            para("${CONFIGS.size} configs × $seeds seeds; ${budget.timeoutMillis}ms budget. Lower rank is better. Best overall: **$best**.")
-            table(listOf("config", "overall rank", "sat rank", "opt rank"),
-                ranking.map { listOf(it.config, "%.2f".format(it.overallRank), it.satRank?.let { r -> "%.2f".format(r) } ?: "—", it.optRank?.let { r -> "%.2f".format(r) } ?: "—") })
-        })
+        Reports.writeJson(
+            "build/tuning-report.json",
+            TuningResults(
+                Instant.now().toString(),
+                Reports.readGitSha(),
+                EnvInfo.capture(),
+                seeds,
+                budget.timeoutMillis,
+                ranking,
+                instances,
+            ),
+        )
+        Reports.writeMarkdown(
+            "build/tuning-report.md",
+            markdown {
+                h1("Solver-config tuning (mixed workload)")
+                para(
+                    "${CONFIGS.size} configs × $seeds seeds; ${budget.timeoutMillis}ms budget. " +
+                        "Lower rank is better. Best overall: **$best**.",
+                )
+                table(
+                    listOf("config", "overall rank", "sat rank", "opt rank"),
+                    ranking.map {
+                        listOf(
+                            it.config,
+                            "%.2f".format(Locale.ROOT, it.overallRank),
+                            it.satRank?.let { r -> "%.2f".format(Locale.ROOT, r) } ?: "—",
+                            it.optRank?.let { r -> "%.2f".format(Locale.ROOT, r) } ?: "—",
+                        )
+                    },
+                )
+            },
+        )
     }
 
     private fun evaluate(entry: ResolvedProblem, seeds: Int, budget: Budget): TuneInstance {
@@ -143,8 +193,11 @@ object TuningMetric {
         val goal = if (obj == null) "satisfy" else "optimize"
         val cells = CONFIGS.map { cfg ->
             val runs = (0 until seeds).map { s ->
-                if (obj == null) cfg.satisfy(entry.problem, s.toLong(), budget)
-                else cfg.optimize(entry.problem, obj, s.toLong(), budget)
+                if (obj == null) {
+                    cfg.satisfy(entry.problem, s.toLong(), budget)
+                } else {
+                    cfg.optimize(entry.problem, obj, s.toLong(), budget)
+                }
             }
             val feasibleRuns = runs.filter { it.feasible }
             TuneCell(
@@ -161,7 +214,7 @@ object TuningMetric {
     private fun denseRankCells(inst: TuneInstance): Map<String, Double> {
         // Comparable score where SMALLER is better.
         fun score(c: TuneCell): Double = if (inst.goal == "optimize") {
-            c.meanObjective ?: Double.POSITIVE_INFINITY            // no feasible -> worst
+            c.meanObjective ?: Double.POSITIVE_INFINITY // no feasible -> worst
         } else {
             // satisfaction: maximize solve-rate (so negate), tiebreak by time.
             -c.solveRate * 1e9 + c.meanMs
