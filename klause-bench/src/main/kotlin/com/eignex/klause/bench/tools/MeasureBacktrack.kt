@@ -37,6 +37,10 @@ private fun runImpl() {
     val instances = buildList {
         for (n in 5..8) add("php$n" to generatePhp(n))
         for (n in intArrayOf(50, 100, 150, 200)) add("rand3sat-$n" to generateRandom3Sat(n, ratio = 4.26, seed = seed))
+        // Under-constrained (ratio well below the 4.26 phase transition): satisfiable, found by
+        // a long run of decisions + propagation with few conflicts — a decision-throughput probe
+        // that isolates per-decision cost from conflict-analysis cost and amortizes per-solve setup.
+        for (n in intArrayOf(2000, 5000)) add("rand3sat-lite-$n" to generateRandom3Sat(n, ratio = 3.0, seed = seed))
     }
 
     // Config knobs (so the restart cadence / heuristic can be swept):
