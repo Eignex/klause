@@ -33,7 +33,7 @@ kotlin {
         }
         wasmWasi { nodejs { testTask { useMocha { timeout = "120s" } } } }
         linuxArm64()
-        macosX64(); macosArm64(); mingwX64()
+        macosArm64(); mingwX64()
         iosX64(); iosArm64(); iosSimulatorArm64()
     }
 

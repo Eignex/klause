@@ -16,7 +16,6 @@ kotlin {
     linuxX64()
     if (!providers.gradleProperty("targets.hostOnly").isPresent) {
         linuxArm64()
-        macosX64()
         macosArm64()
     }
 
