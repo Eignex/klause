@@ -49,6 +49,8 @@ data class SolveStats(
     val lpFixed: SumResult = ZERO_COUNT,
     /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
     val lpPivots: SumResult = ZERO_COUNT,
+    /** LP cuts added by separators (#22). */
+    val lpCuts: SumResult = ZERO_COUNT,
     val peakDepth: MaxResult = NO_MAX,
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     val wallMs: Long = 0L,
@@ -83,6 +85,7 @@ data class SolveStats(
             lpPruned = SumResult(lpPruned.sum + other.lpPruned.sum),
             lpFixed = SumResult(lpFixed.sum + other.lpFixed.sum),
             lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
+            lpCuts = SumResult(lpCuts.sum + other.lpCuts.sum),
             peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
             depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
             wallMs = maxOf(wallMs, other.wallMs),
@@ -118,6 +121,7 @@ internal class SolveStatsSink(val backend: String) {
     val lpPruned: CountStat = CountStat()
     val lpFixed: CountStat = CountStat()
     val lpPivots: CountStat = CountStat()
+    val lpCuts: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
 
@@ -185,6 +189,11 @@ internal class SolveStatsSink(val backend: String) {
         repeat(count) { lpPivots.update(1.0) }
     }
 
+    /** Record [count] cuts added by separators (#22). */
+    fun observeLpCuts(count: Int) {
+        repeat(count) { lpCuts.update(1.0) }
+    }
+
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
      *  uses the most recent [start] / [stop] window; if [stop] hasn't been called yet, we
      *  read the elapsed time from now. */
@@ -203,6 +212,7 @@ internal class SolveStatsSink(val backend: String) {
             lpPruned = lpPruned.read(),
             lpFixed = lpFixed.read(),
             lpPivots = lpPivots.read(),
+            lpCuts = lpCuts.read(),
             peakDepth = peakDepth.read(),
             depthMean = depthMean.read(),
             wallMs = elapsedMs,
