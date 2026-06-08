@@ -2,6 +2,7 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
@@ -22,7 +23,7 @@ class ForgetReasonRemapTest {
         val p = Problem(
             numBoolVars = 4,
             numIntVars = 1,
-            intDomains = arrayOf(com.eignex.klause.solver.IntDomain(0, 4)),
+            intDomains = arrayOf(IntDomain(0, 4)),
             // Two static factors so learned-clause ids start at numFactors = 2.
             factors = arrayOf<Factor>(
                 Clause(intArrayOf(Lit.make(0, true))),
