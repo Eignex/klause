@@ -54,6 +54,13 @@ tasks.register<JavaExec>("bench") {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
     val workspaceRoot = rootDir.absolutePath
     forwardBenchProps()
+    // Opt-in CPU profiling: -PasyncProfiler=/path/to/libasyncProfiler.so [-PprofOut=...] attaches
+    // async-profiler to the forked bench JVM and writes a flat top-method list on exit. Pair with
+    // a long-running, single-engine target (e.g. diag:backtrack) for a clean CDCL hot-path view.
+    (findProperty("asyncProfiler") as String?)?.let { agent ->
+        val out = (findProperty("profOut") as String?) ?: "$workspaceRoot/build/prof.txt"
+        jvmArgs("-agentpath:$agent=start,event=cpu,flat=60,file=$out")
+    }
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 

@@ -72,17 +72,21 @@ class Clause(val literals: IntArray) : LocalSearchFactor {
         absent = -1,
     )
 
-    /** CP-only memo: are all literals plain bool vars (no atom-lits)? `null` until first
-     *  queried. A pure-bool clause only ever fires when a watched bool literal just went
+    /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
+     *  tri-state (−1 unknown / 0 no / 1 yes) rather than a boxed `Boolean?`, since this is read
+     *  once per clause fire on the BCP hot path and a boxed read costs a load + null-check +
+     *  unbox each time. A pure-bool clause only ever fires when a watched bool literal just went
      *  false at the *current* decision level, so its effective level is exactly the current
-     *  decision level — letting the propagation dispatch skip the per-fire level scan. Atom-
-     *  lit clauses can fire on an atom that flipped at a sub-decision level, so they still
-     *  need the scan. Intrinsic to the clause (numBoolVars is fixed per Problem), so it's
-     *  valid across learned-clause forget/remap. Unused by the local-search path. */
-    private var pureBoolMemo: Boolean? = null
+     *  decision level — letting the propagation dispatch skip the per-fire level scan. Atom-lit
+     *  clauses can fire on an atom that flipped at a sub-decision level, so they still need the
+     *  scan. Intrinsic to the clause (numBoolVars is fixed per Problem), so it's valid across
+     *  learned-clause forget/remap. Unused by the local-search path. */
+    private var pureBoolMemo: Int = -1
 
     /** True iff every literal is a plain bool var (variable id `< numBoolVars`), memoised. */
-    fun allLiteralsBool(numBoolVars: Int): Boolean = pureBoolMemo ?: run {
+    fun allLiteralsBool(numBoolVars: Int): Boolean {
+        val m = pureBoolMemo
+        if (m >= 0) return m == 1
         var allBool = true
         for (lit in literals) {
             if (Lit.variable(lit) >= numBoolVars) {
@@ -90,8 +94,8 @@ class Clause(val literals: IntArray) : LocalSearchFactor {
                 break
             }
         }
-        pureBoolMemo = allBool
-        allBool
+        pureBoolMemo = if (allBool) 1 else 0
+        return allBool
     }
 
     private class Watches(var w1: Int, var w2: Int)
