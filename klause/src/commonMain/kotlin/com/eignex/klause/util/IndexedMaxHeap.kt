@@ -47,12 +47,14 @@ internal class IndexedMaxHeap(val capacity: Int) {
         siftUp(size - 1)
     }
 
-    /** Change [id]'s key. Caller must have inserted [id]; calling on absent id is a no-op. */
+    /** Change [id]'s key. The stored key is updated even when [id] is absent from the heap (so
+     *  activity bumps on a currently-removed/assigned variable persist and take effect when the
+     *  id is later [restore]d); the sift only runs when the id is present. */
     fun updateKey(id: Int, newKey: Double) {
-        val p = pos[id]
-        if (p < 0) return
         val old = keys[id]
         keys[id] = newKey
+        val p = pos[id]
+        if (p < 0) return
         if (newKey > old) {
             siftUp(p)
         } else if (newKey < old) {

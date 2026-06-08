@@ -1303,6 +1303,9 @@ class PropagationState(
     // from the restored int domains (matching the old `restore`), and atoms allocated
     // after a mark are truncated wholesale. atomLevel / atomAntecedents drift across pops,
     // exactly as they did under the snapshot scheme (advisory, like watches).
+
+    /** Per-variable unassign sink invoked by [undoTo]; see its doc. Null = no subscriber. */
+    var unassignListener: ((Int) -> Unit)? = null
     private val undoTag = IntArrayList()
     private val undoVar = IntArrayList()
     private val undoLevel = IntArrayList() // int: prior intLevel
@@ -2094,6 +2097,12 @@ class PropagationState(
      * caller only ever marks / undoes between propagation cycles, when those are idle.
      */
     fun undoTo(mark: LevelMark) {
+        // Optional sink for variables made (potentially) free again by this revert. Used by
+        // VSIDS-style pickers that remove a variable from their order heap when it's assigned
+        // and need it re-inserted on backtrack (combined-index encoding: bool id `v`, int id
+        // `numBoolVars + v`). Captured once so the no-listener case stays a single null check.
+        val unassigned = unassignListener
+        val numBool = problem.numBoolVars
         var i = undoTag.size - 1
         while (i >= mark.undoSize) {
             when (undoTag[i]) {
@@ -2103,10 +2112,12 @@ class PropagationState(
                     boolLevel[v] = -1
                     boolReason[v] = -1
                     boolAntecedents[v] = null
+                    unassigned?.invoke(v)
                 }
 
                 1 -> { // int change — restore the full recorded prior int-var state
                     val v = undoVar[i]
+                    unassigned?.invoke(numBool + v)
                     intDomains[v] = requireNotNull(undoDomain[i])
                     intLevel[v] = undoLevel[i]
                     intMinReason[v] = undoMinReason[i]
@@ -2132,6 +2143,7 @@ class PropagationState(
 
                 2 -> { // interior carve — re-insert the carved value
                     val v = undoVar[i]
+                    unassigned?.invoke(numBool + v)
                     intDomains[v] = intDomains[v].includeInteriorValue(undoMinReason[i])
                     intLevel[v] = undoLevel[i]
                     holeHistVal[v]?.truncateTo(undoMaxReason[i])
