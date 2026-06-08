@@ -259,6 +259,9 @@ class PropagationSession(
     /** True iff learned clause [learnedIndex] survives every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
+    /** The learned clause at [learnedIndex]. Read by the engine's vivification pass (#203). */
+    fun learnedClauseAt(learnedIndex: Int): Clause = state.learnedClauses[learnedIndex]
+
     /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
     fun learnedClauseTier(learnedIndex: Int): Int = state.learnedClauseTier(learnedIndex)
 

@@ -2,6 +2,7 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
@@ -562,6 +563,10 @@ class BacktrackSolver(override val problem: Problem) :
         // consumed at the top of the inner loop; the policy's own stats persist across restarts.
         val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
         var restartRequested = false
+        // Vivification (#203) walks the learned DB round-robin across restarts; the cursor
+        // persists between restart passes so successive passes cover the whole database.
+        val vivifyEnabled = params.vivification && params.assumptions.isEmpty
+        var vivifyCursor = 0
         var lubyIdx = 1L
         outer@ while (true) {
             val perRunBudget: Long = if (glucose != null) {
@@ -625,6 +630,9 @@ class BacktrackSolver(override val problem: Problem) :
                     // are always retained; among the rest, the lowest-LBD entries are
                     // kept up to the cap.
                     forgetIfOverCap(session, params)
+                    // Vivification inprocessing: the trail is at root here, so a bounded slice
+                    // of the learned DB can be strengthened against clean assumptions (#203).
+                    if (vivifyEnabled) vivifyCursor = vivify(session, params, vivifyCursor)
                     lubyIdx++
                     sink?.observeRestart()
                     params.onEvent?.invoke(SearchEvent.Restart(lubyIdx - 1, decisionsThisRun))
@@ -1159,6 +1167,92 @@ class BacktrackSolver(override val problem: Problem) :
         // Indices were compacted by the forget; reset every survivor's reuse flag.
         val survivors = session.learnedClauseCount
         for (i in 0 until survivors) session.clearLearnedClauseUsed(i)
+    }
+
+    /**
+     * Clause vivification inprocessing (#203) — Piette-Hamadi-Saïs 2008. Walks a bounded
+     * round-robin slice ([BacktrackParams.vivifyBatch]) of the learned-clause database and
+     * strengthens each pure-Boolean, non-permanent clause via [vivifyClause]. Must be called
+     * with the session at root (the restart boundary pops the DFS trail first). Strengthened
+     * clauses are swapped in by dropping the originals and re-adding the shortened versions;
+     * since the re-added clauses are at least binary over root-unassigned variables they don't
+     * propagate, so the session is left at root. Returns the advanced cursor for the next pass.
+     *
+     * Soundness: every clause [vivifyClause] returns is still implied by the formula (a
+     * subclause of an implied clause, or a prefix proven implied by propagation), so swapping
+     * it in cannot lose models — checked by the learned-clause / witness validation tests.
+     */
+    private fun vivify(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
+        val count = session.learnedClauseCount
+        if (count == 0) return 0
+        val numBool = session.problem.numBoolVars
+        val batch = params.vivifyBatch.coerceAtLeast(1)
+        val replacements = ArrayList<IntArray>()
+        val dropIdx = HashSet<Int>()
+        var cursor = if (startCursor in 0 until count) startCursor else 0
+        var examined = 0
+        while (examined < batch && examined < count) {
+            val idx = cursor
+            cursor = (cursor + 1) % count
+            examined++
+            if (session.learnedClausePermanent(idx)) continue
+            val clause = session.learnedClauseAt(idx)
+            val lits = clause.literals
+            // Pure-Boolean only; nothing to shorten below 3 literals (we never emit units).
+            if (lits.size < 3 || !clause.allLiteralsBool(numBool)) continue
+            val strengthened = vivifyClause(session, lits) ?: continue
+            if (strengthened.size in 2 until lits.size) {
+                dropIdx.add(idx)
+                replacements.add(strengthened)
+            }
+        }
+        if (replacements.isEmpty()) return cursor
+        session.forgetLearnedClauses { i, _ -> i !in dropIdx }
+        for (newLits in replacements) session.addLearnedClause(Clause(newLits), lbd = newLits.size)
+        // The forget renumbered the database, so resume the round-robin from the start.
+        return 0
+    }
+
+    /**
+     * Vivify one clause with the session at root: walk [lits] asserting the negation of each
+     * literal under propagation. A literal already falsified by the earlier negations is
+     * dropped (redundant); a literal forced true, or a conflict on asserting its negation,
+     * shortens the clause to the literals visited so far. Returns the strengthened literal
+     * array, or null when nothing changed. Every tentative pin is reverted before returning,
+     * so the session is left exactly as it was found.
+     */
+    private fun vivifyClause(session: PropagationSession, lits: IntArray): IntArray? {
+        val keep = ArrayList<Int>(lits.size)
+        var pushed = 0
+        var result: IntArray? = null
+        for (li in lits) {
+            when (session.litTruth(li)) {
+                // The earlier negations already force li true ⇒ (kept ∨ li) is implied.
+                true -> {
+                    keep.add(li)
+                    result = keep.toIntArray()
+                    break
+                }
+
+                // li is already falsified by the earlier negations ⇒ redundant, drop it.
+                false -> Unit
+
+                // Undetermined: assert ¬li and keep going.
+                null -> {
+                    keep.add(li)
+                    val r = session.pinBool(Lit.variable(li), !Lit.isPositive(li))
+                    if (r is PropagationResult.Unsat) {
+                        // ¬(kept) is unsatisfiable ⇒ (kept) is implied.
+                        result = keep.toIntArray()
+                        break
+                    }
+                    pushed++
+                }
+            }
+        }
+        repeat(pushed) { session.popLast() }
+        if (result == null && keep.size < lits.size) result = keep.toIntArray()
+        return result
     }
 
     /** How [backjumpAndLearn] terminated. */
