@@ -702,6 +702,29 @@ class PropagationState(
         // surviving here indexes past the compacted clause array on the next drain.
         remapQueue(propQueue, remap, refBase)
         remapQueue(dirtyAtomFactors, remap, refBase)
+
+        // The per-variable reason fields record which factor forced each currently-implied
+        // value, learned-clause ids included. Level-0 facts — e.g. a permanent blocking nogood
+        // or a learned unit that propagated at the root — survive the restart's pop-to-root, so
+        // their reason fids outlive this renumber. Left unremapped, the next conflict's
+        // [extractConflictFactors] would dereference a stale learned fid through [factorAt] and
+        // index past the compacted clause array (the php8 crash). Remap them like the watchers:
+        // a kept clause's reason rewrites to its new id, a dropped clause's reason clears to -1.
+        remapReasons(boolReason, remap, refBase)
+        remapReasons(intMinReason, remap, refBase)
+        remapReasons(intMaxReason, remap, refBase)
+    }
+
+    /** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]
+     *  (static fids `< refBase` pass through; dropped clauses' reasons clear to -1). */
+    private fun remapReasons(reasons: IntArray, remap: IntArray, refBase: Int) {
+        for (i in reasons.indices) {
+            val fid = reasons[i]
+            if (fid >= refBase) {
+                val idx = fid - refBase
+                reasons[i] = if (idx < remap.size && remap[idx] >= 0) refBase + remap[idx] else -1
+            }
+        }
     }
 
     /** Rewrite every learned fid in [queue] through [remap] (static fids pass through;
