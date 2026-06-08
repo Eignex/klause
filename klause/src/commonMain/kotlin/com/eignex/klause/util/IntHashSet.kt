@@ -11,24 +11,31 @@ package com.eignex.klause.util
  * is a valid member. [remove] uses backward-shift deletion so the table is tombstone-free and
  * reusable via [clear].
  *
+ * **Empty sets cost nothing.** The factor/propagation scratch sets (`taken`, `seen`, …) are
+ * overwhelmingly created, membership-checked while still empty, and discarded without ever holding
+ * an element — in real solves ~93% of operations hit a size-0 set. So a fresh set starts on a
+ * shared, immutable 1-slot table whose only slot is permanently unoccupied: `contains` / `remove`
+ * / iteration are just the normal probe (slot 0 reads as empty, so they return without a special
+ * case), and a set that never grows allocates no backing. The first [add] copies onto a private
+ * power-of-two table.
+ *
  * Not thread-safe. Iteration order is unspecified; callers needing determinism must sort.
  */
 internal class IntHashSet(initialCapacity: Int = 8) {
-    private var keys: IntArray
-    private var used: BooleanArray
-    private var mask: Int
+    private var keys: IntArray = EMPTY_KEYS
+    private var used: BooleanArray = EMPTY_USED
+    private var mask: Int = 0
+
+    /** Backing size to allocate on the first [add] — next power of two keeping load ≤ 0.5. */
+    private val initialCap: Int = run {
+        var c = 8
+        while (c < initialCapacity * 2) c *= 2
+        c
+    }
 
     /** Number of members currently in the set. */
     var size: Int = 0
         private set
-
-    init {
-        var cap = 8
-        while (cap < initialCapacity * 2) cap *= 2
-        keys = IntArray(cap)
-        used = BooleanArray(cap)
-        mask = cap - 1
-    }
 
     operator fun contains(value: Int): Boolean {
         var i = mix(value) and mask
@@ -41,6 +48,7 @@ internal class IntHashSet(initialCapacity: Int = 8) {
 
     /** Add [value]; returns true if it was newly inserted, false if already present. */
     fun add(value: Int): Boolean {
+        if (used === EMPTY_USED) allocateBacking()
         var i = mix(value) and mask
         while (used[i]) {
             if (keys[i] == value) return false
@@ -53,7 +61,8 @@ internal class IntHashSet(initialCapacity: Int = 8) {
         return true
     }
 
-    /** Remove [value]; returns true if it was present. */
+    /** Remove [value]; returns true if it was present. (On the shared empty table slot 0 reads
+     *  as unoccupied, so this returns false without ever writing through the shared backing.) */
     fun remove(value: Int): Boolean {
         var i = mix(value) and mask
         while (used[i]) {
@@ -80,7 +89,7 @@ internal class IntHashSet(initialCapacity: Int = 8) {
     }
 
     fun clear() {
-        used.fill(false)
+        if (used !== EMPTY_USED) used.fill(false) // never write through the shared empty table
         size = 0
     }
 
@@ -94,6 +103,12 @@ internal class IntHashSet(initialCapacity: Int = 8) {
     @PublishedApi internal val keysInternal: IntArray get() = keys
 
     @PublishedApi internal val usedInternal: BooleanArray get() = used
+
+    private fun allocateBacking() {
+        keys = IntArray(initialCap)
+        used = BooleanArray(initialCap)
+        mask = initialCap - 1
+    }
 
     /** Backward-shift deletion — see [MutableIntIntMap.deleteSlot] for the algorithm. */
     private fun deleteSlot(start: Int) {
@@ -131,4 +146,12 @@ internal class IntHashSet(initialCapacity: Int = 8) {
 
     /** Fibonacci-multiplicative hash; good distribution for sequential int keys. */
     private fun mix(x: Int): Int = (x * -0x61c88647).ushr(0)
+
+    private companion object {
+        // Shared immutable empty table: a single slot that is permanently unoccupied. Every fresh
+        // set aliases it until its first add, so empty-lifetime sets allocate nothing and the read
+        // paths probe it like any table (mask 0 → slot 0 → unoccupied). Never written through.
+        val EMPTY_KEYS = IntArray(1)
+        val EMPTY_USED = BooleanArray(1)
+    }
 }

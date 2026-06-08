@@ -62,10 +62,9 @@ class TargetPhasingTest {
 
     @Test
     fun `target phasing enumerates exactly the same models as plain phase saving`() {
-        fun enumerate(params: BacktrackParams): Set<List<Boolean>> =
-            BacktrackSolver(clauseProblem()).enumerate(params)
-                .map { it.bools.toList() }
-                .toSet()
+        fun enumerate(params: BacktrackParams): Set<List<Boolean>> = BacktrackSolver(clauseProblem()).enumerate(params)
+            .map { it.bools.toList() }
+            .toSet()
 
         val plain = enumerate(BacktrackParams(randomSeed = 3L, phaseSaving = true))
         // A tiny rephase interval forces the polarity source to rotate through every mode
