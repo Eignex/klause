@@ -17,7 +17,14 @@ import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.DualSimplex
+import com.eignex.klause.solver.lp.LpOverflowException
+import com.eignex.klause.solver.lp.LpRelaxation
+import com.eignex.klause.solver.lp.LpSolution
 import com.eignex.klause.solver.lp.LpStatus
+import com.eignex.klause.solver.lp.VarStatus
+import com.eignex.klause.solver.lp.addExact
+import com.eignex.klause.solver.lp.mulExact
+import com.eignex.klause.solver.lp.subExact
 import com.eignex.klause.solver.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
@@ -31,6 +38,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
+import kotlin.math.ceil
 import kotlin.random.Random
 
 /**
@@ -222,7 +230,7 @@ class BacktrackSolver(override val problem: Problem) :
                     lpRelaxer != null &&
                         session.decisionLevel <= params.lpBoundMaxDepth &&
                         ++lpCheckCounter % params.lpBoundEvery == 0 ->
-                        lpPrune(lpRelaxer, session, effectiveBound, sink)
+                        lpBoundAndFix(lpRelaxer, session, effectiveBound, sink)
 
                     else -> false
                 }
@@ -346,36 +354,137 @@ class BacktrackSolver(override val problem: Problem) :
     }
 
     /**
-     * LP-relaxation bound (#20): build and solve an exact integer LP relaxation of the live problem
-     * and decide whether this node's subtree can be cut. Prunes when the relaxation is infeasible
-     * (so the subtree is infeasible regardless of the incumbent) or when its objective bound —
-     * rounded **up** to the next integer, since the true objective is integral — is at least the
-     * incumbent [bound]. The rounded comparison is exact because the LP arithmetic is exact.
+     * LP-relaxation bounding (#20) and reduced-cost fixing (#21): build and solve one exact integer
+     * LP relaxation of the live problem, then either prune this node or tighten its domains.
      *
-     * Returns false (never prune) when the relaxation has no columns, i.e. the problem has no
-     * LP-emittable factors and no objective terms to bound against.
+     * Prunes (returns true) when the relaxation is infeasible (the subtree is infeasible regardless
+     * of the incumbent) or when its objective bound — rounded **up**, since the true objective is
+     * integral — is at least the incumbent [bound]. The rounded comparison is exact.
+     *
+     * Otherwise, with a finite incumbent, applies reduced-cost fixing: see [applyReducedCostFixing].
+     * Returns false (keep the node) when the relaxation has no columns, the LP is unbounded, or no
+     * reduction makes the node infeasible.
      */
-    private fun lpPrune(
+    private fun lpBoundAndFix(
         relaxer: CpToLpRelaxation,
         session: PropagationSession,
         bound: Double,
         sink: SolveStatsSink,
     ): Boolean {
         val relaxation = relaxer.build(session)
-        if (relaxation.model.n == 0) return false // empty relaxation: nothing to prune with
+        if (relaxation.model.n == 0) return false // empty relaxation: nothing to bound with
         val solution = DualSimplex(relaxation.model).solve()
-        val prune = when (solution.status) {
-            LpStatus.INFEASIBLE -> true
+        when (solution.status) {
+            LpStatus.INFEASIBLE -> {
+                sink.observeLpPrune()
+                return true
+            }
+
+            LpStatus.UNBOUNDED -> return false
 
             LpStatus.OPTIMAL -> {
                 val lpBound = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
-                bound.isFinite() && lpBound.toDouble() >= bound
+                if (bound.isFinite() && lpBound.toDouble() >= bound) {
+                    sink.observeLpPrune()
+                    return true
+                }
+                // Reduced-cost fixing needs a known gap, i.e. a finite incumbent.
+                return bound.isFinite() && applyReducedCostFixing(relaxation, solution, session, bound, sink)
             }
-
-            LpStatus.UNBOUNDED -> false
         }
-        if (prune) sink.observeLpPrune()
-        return prune
+    }
+
+    /**
+     * Reduced-cost fixing (#21). At the LP optimum a nonbasic variable sits at one of its bounds; to
+     * move it `Δ` integer steps off that bound raises the objective by at least `|reducedCost|·Δ`.
+     * Any solution improving on the incumbent has objective `≤ ceil(bound) − 1`, so a variable can
+     * move at most `floor((improvingMax − lpOpt) / |reducedCost|)` steps — its opposite bound is
+     * pulled in by the rest in one shot. All arithmetic is exact over the shared LP denominator, so
+     * no tolerance is needed; overflow conservatively skips the column (a missed tightening is sound).
+     *
+     * Reductions are applied at the current decision level via [PropagationSession.implyIntAtMost] etc.,
+     * so they propagate immediately and are undone on backtrack. Returns true if a reduction empties a
+     * domain — the node is then infeasible and pruned.
+     */
+    private fun applyReducedCostFixing(
+        relaxation: LpRelaxation,
+        solution: LpSolution,
+        session: PropagationSession,
+        bound: Double,
+        sink: SolveStatsSink,
+    ): Boolean {
+        val den = solution.denominator // > 0
+        val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
+        // Gap slack in scaled integer units: improvingMax·den − lpObjective(true). Non-negative here
+        // because the node was not bound-pruned. Overflow on the scale-up just skips fixing.
+        val slack = try {
+            val objTrueNum = addExact(solution.objectiveNumerator, mulExact(relaxation.objectiveConstant, den))
+            subExact(mulExact(improvingMax, den), objTrueNum)
+        } catch (_: LpOverflowException) {
+            return false
+        }
+        if (slack < 0L) return false
+        val status = solution.basis.status
+        for (col in relaxation.colVarId.indices) {
+            val st = status[col]
+            if (st == VarStatus.BASIC) continue
+            val varId = relaxation.colVarId[col]
+            val isBool = relaxation.colIsBool[col]
+            val dNum = solution.reducedCostNumerator[col]
+            if (isBool && session.boolValue(varId) != null) continue // already pinned
+            val liveMin: Long
+            val liveMax: Long
+            if (isBool) {
+                liveMin = 0L
+                liveMax = 1L
+            } else {
+                val d = session.intDomain(varId)
+                liveMin = d.min.toLong()
+                liveMax = d.max.toLong()
+            }
+            if (liveMin == liveMax) continue
+            val span = liveMax - liveMin
+            val res = when (st) {
+                // At lower bound: dual feasibility gives reducedCost ≥ 0; it can rise at most
+                // floor(slack / d) steps before it alone overshoots the incumbent.
+                VarStatus.AT_LOWER -> {
+                    if (dNum <= 0L) continue
+                    val dMax = slack / dNum
+                    if (dMax >= span) continue
+                    if (isBool) {
+                        session.implyBool(
+                            varId,
+                            false,
+                        )
+                    } else {
+                        session.implyIntAtMost(varId, (liveMin + dMax).toInt())
+                    }
+                }
+
+                // At upper bound: reducedCost ≤ 0; symmetric, tighten the lower bound.
+                VarStatus.AT_UPPER -> {
+                    if (dNum >= 0L) continue
+                    val dMax = slack / -dNum
+                    if (dMax >= span) continue
+                    if (isBool) {
+                        session.implyBool(
+                            varId,
+                            true,
+                        )
+                    } else {
+                        session.implyIntAtLeast(varId, (liveMax - dMax).toInt())
+                    }
+                }
+
+                else -> continue
+            }
+            if (res is PropagationResult.Unsat) {
+                sink.observeLpPrune()
+                return true
+            }
+            sink.observeLpFix()
+        }
+        return false
     }
 
     // ---------------------------------------------------------------------------------------
