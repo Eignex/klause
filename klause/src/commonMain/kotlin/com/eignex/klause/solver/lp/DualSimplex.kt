@@ -266,6 +266,110 @@ internal class DualSimplex(private val model: LpModel) {
         return runDualSimplex()
     }
 
+    /**
+     * Exact Gomory fractional cuts (#22) from the current optimal tableau, expressed over the
+     * structural columns so they can be re-added by rebuilding the relaxation. Call only after a
+     * [solve] that returned [LpStatus.OPTIMAL]; produces at most [maxCuts] cuts, one per fractional
+     * basic structural variable.
+     *
+     * Derivation, in the engine's shifted space (every variable lower bound 0). A basic variable's
+     * row is `x_v = b̄ + Σ_j ā_j·t_j` where each nonbasic `j` contributes a distance-from-bound
+     * `t_j ≥ 0` (integer, since all data is integer). Writing it as `x_v + Σ a_j·t_j = b̄` with
+     * `a_j = ∓ā_j`, and using that `x_v` and the `t_j` are integers, the pure-integer Gomory cut is
+     * `Σ_j frac(a_j)·t_j ≥ frac(b̄)`. It cuts off the current vertex (all `t_j = 0`, so the left side
+     * is 0 < frac(b̄)) but holds at every integer point. Each `t_j` is then substituted back to the
+     * structural variables: a nonbasic structural variable is `x'_k` (at lower) or `ub_k − x'_k`
+     * (at upper); a `≤`-row slack is `rhs_r − Σ_k a_rk·x'_k`; an equality slack is fixed at 0. The
+     * result is a linear cut over the structural columns. All arithmetic is exact over the
+     * determinant `D = |d|`; an overflow on the scale-up drops that one cut (sound — a missed cut
+     * never removes a feasible point).
+     */
+    fun gomoryCuts(maxCuts: Int): List<Cut> {
+        val beta = computeBeta()
+        val bigD = if (d < 0L) -d else d
+        val sign = if (d < 0L) -1L else 1L
+        val cuts = ArrayList<Cut>()
+        for (i in 0 until m) {
+            if (cuts.size >= maxCuts) break
+            val v = basicVar[i]
+            if (v >= model.n) continue // cut on fractional structural variables only
+            try {
+                val bNum = mulExact(sign, beta[i])
+                val f0 = floorMod(bNum, bigD)
+                if (f0 == 0L) continue // integral value: no cut from this row
+                val cut = gomoryRow(i, bigD, sign, f0) ?: continue
+                cuts.add(cut)
+            } catch (_: LpOverflowException) {
+                continue // scale-up overflowed: skip this cut, stay sound
+            }
+        }
+        return cuts
+    }
+
+    /** Build the structural-space Gomory cut for basic row [i]; null if it has no nonzero term. */
+    private fun gomoryRow(i: Int, bigD: Long, sign: Long, f0: Long): Cut? {
+        val coef = LongArray(model.n) // accumulated coefficient on each structural x'_k
+        var c = 0L // accumulated constant on the left side
+        for (j in 0 until numVars) {
+            if (status[j] == VarStatus.BASIC) continue
+            val atLower = status[j] == VarStatus.AT_LOWER
+            // a_j in the classic row form x_v + Σ a_j t_j = b̄: +coef at lower, −coef at upper.
+            val aNum = if (atLower) mulExact(sign, nMat[i][j]) else -mulExact(sign, nMat[i][j])
+            val rj = floorMod(aNum, bigD) // D·frac(a_j), in [0, D)
+            if (rj == 0L) continue
+            if (j < model.n) {
+                if (atLower) {
+                    coef[j] = addExact(coef[j], rj) // t_j = x'_j
+                } else {
+                    coef[j] = subExact(coef[j], rj) // t_j = ub_j − x'_j
+                    c = addExact(c, mulExact(rj, model.upper[j]))
+                }
+            } else {
+                val r = j - model.n
+                if (model.hasUpper[r + model.n]) continue // equality slack is fixed at 0 → t_j = 0
+                // ≤-row slack: t_j = rhs_r − Σ_k a_rk·x'_k.
+                for (k in 0 until model.n) {
+                    val ark = model.a[r][k]
+                    if (ark != 0L) coef[k] = subExact(coef[k], mulExact(rj, ark))
+                }
+                c = addExact(c, mulExact(rj, model.rhs[r]))
+            }
+        }
+        // Cut Σ coef_k·x'_k ≥ f0 − c, then unshift x'_k = x_k − loShift_k for the builder's space.
+        var rhs = subExact(f0, c)
+        for (k in 0 until model.n) {
+            if (coef[k] != 0L) rhs = addExact(rhs, mulExact(coef[k], model.loShift[k]))
+        }
+        var count = 0
+        for (k in 0 until model.n) if (coef[k] != 0L) count++
+        if (count == 0) return null
+        // Divide by the gcd of the coefficients (keeping them small bounds determinant growth on
+        // re-solve) and round the GE right-hand side up — a valid Chvátal strengthening, since the
+        // reduced coefficients and integer variables make the left side integral.
+        var g = 0L
+        for (k in 0 until model.n) if (coef[k] != 0L) g = gcdLong(g, coef[k])
+        if (g < 1L) g = 1L
+        val cols = IntArray(count)
+        val vals = LongArray(count)
+        var idx = 0
+        for (k in 0 until model.n) {
+            if (coef[k] != 0L) {
+                cols[idx] = k;
+                vals[idx] = coef[k] / g;
+                idx++
+            }
+        }
+        val q = rhs / g
+        val newRhs = if (rhs % g != 0L && rhs > 0L) q + 1 else q // ceil(rhs / g) for g > 0
+        return Cut(cols, vals, Relation.GE, newRhs)
+    }
+
+    /** Nonnegative remainder of [a] mod [m] (`m > 0`), in `[0, m)`. */
+    private fun floorMod(a: Long, m: Long): Long {
+        val r = a % m
+        return if (r < 0L) r + m else r
+    }
+
     private fun runDualSimplex(): LpSolution {
         // Bland's rule guarantees termination; the cap only catches an implementation bug.
         val maxIter = 1000L + 100L * (numVars + m)

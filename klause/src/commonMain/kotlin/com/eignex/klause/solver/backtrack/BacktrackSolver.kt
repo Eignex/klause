@@ -245,7 +245,15 @@ class BacktrackSolver(override val problem: Problem) :
                         } else {
                             null
                         }
-                        val outcome = lpBoundAndFix(lpRelaxer, session, effectiveBound, sink, warm, params, lpSeparators)
+                        val outcome = lpBoundAndFix(
+                            lpRelaxer,
+                            session,
+                            effectiveBound,
+                            sink,
+                            warm,
+                            params,
+                            lpSeparators,
+                        )
                         if (outcome.basis != null) {
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                             lpBasisByDepth[depth] = outcome.basis
@@ -405,10 +413,27 @@ class BacktrackSolver(override val problem: Problem) :
         warmBasis: Basis?,
         params: BacktrackParams,
         separators: List<CutSeparator>,
+    ): LpNodeOutcome = try {
+        lpBoundAndFixUnsafe(relaxer, session, bound, sink, warmBasis, params, separators)
+    } catch (_: LpOverflowException) {
+        // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
+        // bound or reduction only loses pruning, never soundness — keep the node and move on.
+        LpNodeOutcome(false, null)
+    }
+
+    private fun lpBoundAndFixUnsafe(
+        relaxer: CpToLpRelaxation,
+        session: PropagationSession,
+        bound: Double,
+        sink: SolveStatsSink,
+        warmBasis: Basis?,
+        params: BacktrackParams,
+        separators: List<CutSeparator>,
     ): LpNodeOutcome {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
-        var solution = DualSimplex(relaxation.model).solve(warmBasis)
+        var simplex = DualSimplex(relaxation.model)
+        var solution = simplex.solve(warmBasis)
         sink.observeLpPivots(solution.pivots)
         // Warm-start children from the initial (pre-cut) basis: cut rows vary per node, but the base
         // model structure is identical across nodes, so only this basis transfers soundly.
@@ -437,12 +462,16 @@ class BacktrackSolver(override val problem: Problem) :
             var round = 0
             while (round++ < params.lpCutRounds) {
                 val ctx = CutContext(problem, relaxation, solution, session)
-                val fresh = separators.flatMap { it.separate(ctx) }.filter { pool.add(it.key()) }
+                // Structure-based separators run on the LP point; Gomory cuts come from the tableau.
+                val separated = separators.flatMap { it.separate(ctx) }
+                val gomory = if (params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+                val fresh = (separated + gomory).filter { pool.add(it.key()) }
                 if (fresh.isEmpty()) break
                 cuts.addAll(fresh)
                 sink.observeLpCuts(fresh.size)
                 relaxation = relaxer.build(session, cuts)
-                solution = DualSimplex(relaxation.model).solve()
+                simplex = DualSimplex(relaxation.model)
+                solution = simplex.solve()
                 sink.observeLpPivots(solution.pivots)
                 if (solution.status == LpStatus.INFEASIBLE) {
                     sink.observeLpPrune()
@@ -1585,6 +1614,9 @@ class BacktrackSolver(override val problem: Problem) :
          *  responsive; higher = lower overhead. 256 is a few microseconds per check at
          *  worst, and the search stops within a few hundred decisions of a cancel. */
         const val CANCEL_CHECK_INTERVAL: Int = 256
+
+        /** Most Gomory cuts to draw from one tableau per separation round (#22). */
+        const val GOMORY_CUTS_PER_ROUND: Int = 8
 
         /** Cap on cascading CDB backjumps within a single search step. Defensive; under
          *  a well-formed analyzer the loop terminates well before this. */
