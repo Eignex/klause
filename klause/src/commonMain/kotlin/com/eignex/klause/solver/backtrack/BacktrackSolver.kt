@@ -1113,8 +1113,10 @@ class BacktrackSolver(override val problem: Problem) :
             }
             when (entryTier) {
                 TIER_CORE -> session.setLearnedClauseTier(i, TIER_CORE)
+
                 // Mid is kept this pass; demote to local when idle so it ages out next time.
                 TIER_MID -> session.setLearnedClauseTier(i, if (used) TIER_MID else TIER_LOCAL)
+
                 else -> if (used) {
                     session.setLearnedClauseTier(i, TIER_MID) // promote a reused local clause
                 } else {
