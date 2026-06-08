@@ -354,8 +354,8 @@ internal class DualSimplex(private val model: LpModel) {
         var idx = 0
         for (k in 0 until model.n) {
             if (coef[k] != 0L) {
-                cols[idx] = k;
-                vals[idx] = coef[k] / g;
+                cols[idx] = k
+                vals[idx] = coef[k] / g
                 idx++
             }
         }
