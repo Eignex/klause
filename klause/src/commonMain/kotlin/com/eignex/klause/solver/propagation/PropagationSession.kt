@@ -222,6 +222,24 @@ class PropagationSession(
         return impliedSince(base)
     }
 
+    /**
+     * Assert a permanent objective bound on an integer variable as a propagating unit
+     * clause: `[v <= hi]` ([atMost]) or `[v >= lo]` (`atMost = false`). Branch-and-bound
+     * calls this on each new incumbent so the bound is pushed into the objective variable
+     * and the constraint defining it (linear, product, element, a global's output — any
+     * structure) propagates the tightening back into the decision variables. This is
+     * CP-SAT-style objective propagation, strictly stronger than a passive lower-bound
+     * check, and it gives objective pruning even for non-linear-defined objectives that the
+     * predicate path cannot bound. Permanent: survives forgetting and persists for the rest
+     * of the session; later incumbents assert progressively tighter (subsuming) units.
+     * Returns the propagation result, [PropagationResult.Unsat] if the bound is already
+     * infeasible at the root (the remaining objective space is empty).
+     */
+    fun assertObjectiveBound(v: Int, bound: Int, atMost: Boolean): PropagationResult {
+        val atom = if (atMost) state.atomVarLe(v, bound) else state.atomVarGe(v, bound)
+        return addLearnedClause(Clause(intArrayOf(Lit.make(atom, true))), lbd = 1, permanent = true)
+    }
+
     /** Forward to [PropagationState.forgetLearnedClauses]. Called by the engine's
      *  restart hook to bound the learned-clause database. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {

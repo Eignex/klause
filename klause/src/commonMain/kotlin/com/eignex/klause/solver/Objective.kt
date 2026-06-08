@@ -79,6 +79,29 @@ data class LinearObjective(
 
     override fun evaluate(sample: Sample): Double = evaluateLong(sample).toDouble()
 
+    /**
+     * If this objective is a single integer variable — exactly one nonzero coefficient, on
+     * an int var, no bool weights — return that variable and whether the search minimises it
+     * (coefficient positive) or maximises it (negative). FlatZinc objectives are always this
+     * shape: minizinc reifies any objective expression, however non-linear, into one variable
+     * defined by a constraint, and `solve minimize`/`maximize` points at it. Branch-and-bound
+     * uses this to push each incumbent's bound onto the objective variable so the defining
+     * constraint propagates it (see `PropagationSession.assertObjectiveBound`). Returns null
+     * for weighted-sum objectives, which have no single variable to bound. The coefficient
+     * magnitude is irrelevant (a monotone scaling), so only its sign is reported.
+     */
+    fun singleIntObjective(): SingleIntObjective? {
+        if (boolWeights.any { it != 0L }) return null
+        var found = -1
+        for (i in intCoefficients.indices) {
+            if (intCoefficients[i] == 0L) continue
+            if (found >= 0) return null
+            found = i
+        }
+        if (found < 0) return null
+        return SingleIntObjective(found, ascending = intCoefficients[found] > 0L)
+    }
+
     override fun equals(other: Any?): Boolean {
         if (other !is LinearObjective) return false
         return constant == other.constant &&
@@ -93,3 +116,10 @@ data class LinearObjective(
         return h
     }
 }
+
+/**
+ * A [LinearObjective] recognised as optimising a single integer variable: minimise
+ * [varId] when [ascending], else maximise it. Returned by [LinearObjective.singleIntObjective];
+ * consumed by branch-and-bound to bound the objective variable on each incumbent.
+ */
+data class SingleIntObjective(val varId: Int, val ascending: Boolean)
