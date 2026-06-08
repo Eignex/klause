@@ -446,6 +446,41 @@ class PropagationState(
     /** Clauses learned during conflict analysis. */
     val learnedClauses: List<Clause> get() = _learnedClauses
 
+    /** Count of binary (2-literal) clauses known — original problem clauses plus learned
+     *  ones. Gates the #202 binary-resolution minimization, which is a no-op without binary
+     *  clauses. Over-approximates after forgetting (never decremented), which only costs a
+     *  harmless no-op pass — never correctness. */
+    private var binaryClauseCount: Int = run {
+        var n = 0
+        for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
+        n
+    }
+
+    /** True iff any binary clause is known — the gate for binary-resolution minimization. */
+    val hasBinaryClauses: Boolean get() = binaryClauseCount > 0
+
+    /**
+     * Invoke [action] with the *other* literal of every binary clause that contains [lit]
+     * (#202). Binary clauses watch both their literals and never relocate a watch (there is
+     * no third literal to move to), so [boolWatchersByLit] reliably lists every binary clause
+     * on [lit]. No-op for atom-literal [lit] (the bool watcher index only covers bool vars).
+     */
+    internal fun forEachBinaryPartner(lit: Int, action: (other: Int) -> Unit) {
+        if (Lit.variable(lit) >= problem.numBoolVars) return
+        val list = boolWatchersByLit[lit]
+        for (i in 0 until list.size) {
+            val f = factorAt(list[i])
+            if (f is Clause && f.literals.size == 2) {
+                val a = f.literals[0]
+                val b = f.literals[1]
+                when (lit) {
+                    a -> action(b)
+                    b -> action(a)
+                }
+            }
+        }
+    }
+
     /** LBD (Literal Block Distance) per learned clause, parallel to [_learnedClauses].
      *  Glucose-style glue metric: lower = more re-usable. Forgetting policies key on
      *  this to decide which clauses to drop. */
@@ -485,6 +520,7 @@ class PropagationState(
         _learnedClauses.add(clause)
         learnedLbds.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
+        if (clause.literals.size == 2) binaryClauseCount++ // keep the #202 gate current
         _refPayload.add(null)
         val watchers = clause.initialBoolWatchers
         val blockers = clause.initialBoolWatcherBlockers
