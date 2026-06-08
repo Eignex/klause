@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.Chb
 import com.eignex.klause.solver.backtrack.IndomainMax
 import com.eignex.klause.solver.backtrack.IndomainMiddle
 import com.eignex.klause.solver.backtrack.IndomainMin
@@ -61,10 +62,11 @@ internal class EngineParams(pairs: List<String>) {
     fun varHeuristic(key: String): VariableHeuristic? = map.remove(key)?.let {
         when (it.lowercase()) {
             "vsids" -> Vsids()
+            "chb" -> Chb()
             "random" -> RandomVariable
             "smallest-domain" -> SmallestDomain
             "input-order" -> InputOrder
-            else -> fail("engine param `$key` expects vsids|random|smallest-domain|input-order, got `$it`")
+            else -> fail("engine param `$key` expects vsids|chb|random|smallest-domain|input-order, got `$it`")
         }
     }
 
@@ -99,6 +101,8 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.long("max-decisions")?.let { out = out.copy(maxDecisions = it) }
     p.long("luby")?.let { out = out.copy(lubyRestartBase = it) }
     p.bool("phase-saving")?.let { out = out.copy(phaseSaving = it) }
+    p.bool("target-phasing")?.let { out = out.copy(targetPhasing = it) }
+    p.long("rephase-interval")?.let { out = out.copy(rephaseInterval = it) }
     p.int("max-learned")?.let { out = out.copy(maxLearnedClauses = it) }
     p.int("lbd-glue")?.let { out = out.copy(lbdGlueThreshold = it) }
     p.bool("tiered-db")?.let { out = out.copy(tieredLearnedDb = it) }
@@ -107,8 +111,8 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.valHeuristic("val-heuristic")?.let { out = out.copy(valueHeuristic = it) }
     p.finish(
         "cp",
-        "seed, max-decisions, luby, phase-saving, max-learned, lbd-glue, tiered-db, mid-lbd, " +
-            "var-heuristic, val-heuristic",
+        "seed, max-decisions, luby, phase-saving, target-phasing, rephase-interval, " +
+            "max-learned, lbd-glue, tiered-db, mid-lbd, var-heuristic, val-heuristic",
     )
     return out
 }

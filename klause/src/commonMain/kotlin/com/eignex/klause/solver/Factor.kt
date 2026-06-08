@@ -57,6 +57,22 @@ interface Factor {
     val initialBoolWatchers: IntArray? get() = null
 
     /**
+     * Optional blocking literals paired index-for-index with [initialBoolWatchers]. Entry
+     * `i` is a literal that, if currently true, *proves this factor already satisfied*, so
+     * the propagation engine can skip waking the factor when watcher `i`'s literal goes
+     * false (see `PropagationState.boolBlockersByLit`). The standard two-watched-literal
+     * BCP speedup (MiniSAT): the blocker is typically the other watched literal of the same
+     * clause, and a stale blocker only ever costs a missed skip — never correctness.
+     *
+     * Only meaningful for factors satisfied by *any* single true literal (disjunctions /
+     * [com.eignex.klause.solver.factor.Clause]). Must stay `null` for factors where one true
+     * literal does not imply satisfaction — e.g. cardinality, where a blocker would be
+     * unsound. `null` (default) means "no blocking literals": every watcher always fires,
+     * preserving the prior behaviour exactly.
+     */
+    val initialBoolWatcherBlockers: IntArray? get() = null
+
+    /**
      * If this factor just returned `false` from [propagate], the clause-form explanation
      * of why — i.e. an array of literals, all currently *false* in [state], whose
      * disjunction is unsatisfied. The propagation-graph conflict analyzer seeds its

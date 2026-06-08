@@ -61,6 +61,23 @@ data class BacktrackParams(
      */
     val phaseSaving: Boolean = false,
     /**
+     * Target phasing and rephasing on top of plain [phaseSaving]. When enabled, the engine
+     * tracks the deepest conflict-free Boolean assignment seen so far (the "target" phase,
+     * the trail prefix at the most-assigned point before a backtrack) and biases fresh
+     * Boolean decisions toward it. A rephasing schedule periodically rotates the polarity
+     * source — target, saved, all-true, all-false, random — every [rephaseInterval] conflicts
+     * to escape basins the saved phase keeps reproducing. Pure-Boolean: integer value
+     * selection is untouched (it still follows plain phase saving when [phaseSaving] is set).
+     * Disabled by default, leaving plain phase saving as the baseline behaviour.
+     */
+    val targetPhasing: Boolean = false,
+    /**
+     * Conflicts between rephasing rotations when [targetPhasing] is on. Each rotation
+     * advances the Boolean polarity source through target → saved → all-true → all-false →
+     * random and back. Ignored when [targetPhasing] is false. Must be positive.
+     */
+    val rephaseInterval: Long = 1000L,
+    /**
      * Cap on the learned-clause database size. When non-null, a restart-driven
      * forgetting pass runs on every Luby restart (gated by [lubyRestartBase]): clauses
      * with LBD ≤ [lbdGlueThreshold] are kept regardless ("glue clauses"); among the
