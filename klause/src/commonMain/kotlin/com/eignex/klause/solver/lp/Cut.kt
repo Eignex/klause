@@ -56,7 +56,10 @@ internal class AllDifferentSeparator : CutSeparator {
             var ok = true
             for (k in vars.indices) {
                 val c = ctx.relaxation.intColOf[vars[k]]
-                if (c < 0) { ok = false; break }
+                if (c < 0) {
+                    ok = false
+                    break
+                }
                 cols[k] = c
             }
             if (!ok) continue
@@ -77,7 +80,10 @@ internal class AllDifferentSeparator : CutSeparator {
      */
     private fun distinctSumBounds(vars: IntArray, session: PropagationSession): Pair<Long, Long> {
         // Merge domain intervals into disjoint ascending ranges.
-        val ranges = vars.map { val d = session.intDomain(it); d.min.toLong() to d.max.toLong() }
+        val ranges = vars.map {
+            val d = session.intDomain(it)
+            d.min.toLong() to d.max.toLong()
+        }
             .sortedBy { it.first }
         val merged = ArrayList<LongArray>() // [lo, hi]
         for ((lo, hi) in ranges) {
