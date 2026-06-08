@@ -104,9 +104,9 @@ object Opb {
         val objective: LinearObjective? = if (!hasObjective) {
             null
         } else {
-            val weights = DoubleArray(numVars)
-            for ((v, w) in objWeights) weights[v] = w
-            LinearObjective(boolWeights = weights, intCoefficients = DoubleArray(0), constant = objConstant)
+            val weights = LongArray(numVars)
+            for ((v, w) in objWeights) weights[v] = w.toLong()
+            LinearObjective(boolWeights = weights, intCoefficients = LongArray(0), constant = objConstant.toLong())
         }
         val problem = Problem(
             numBoolVars = numVars,

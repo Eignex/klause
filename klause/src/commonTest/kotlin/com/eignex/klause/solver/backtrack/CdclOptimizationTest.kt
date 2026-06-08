@@ -51,7 +51,7 @@ class CdclOptimizationTest {
                 Linear(coeffs = weights, vars = IntArray(n) { it }, op = LinearOp.LE, bound = cap),
             ),
         )
-        val obj = LinearObjective(intCoefficients = DoubleArray(n) { -values[it].toDouble() })
+        val obj = LinearObjective(intCoefficients = LongArray(n) { -values[it].toLong() })
         // The previously-regressing config: VSIDS + Luby restarts + LBD learning.
         val params = BacktrackParams(
             randomSeed = 1L,

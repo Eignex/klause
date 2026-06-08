@@ -426,7 +426,7 @@ class BacktrackSolverTest {
                 ),
             ),
         )
-        val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val best = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(best)
         assertEquals(3.0, obj.evaluate(best))

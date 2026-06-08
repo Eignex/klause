@@ -106,7 +106,7 @@ class ReifiedHoleChainTest {
                 maxLearnedClauses = 1_000,
                 maxDecisions = 200_000,
             )
-            val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
             val result = BacktrackSolver(p).minimize(objective, params)
             val best = bruteBest
             when (result) {

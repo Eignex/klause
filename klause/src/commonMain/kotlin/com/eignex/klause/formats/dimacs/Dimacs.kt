@@ -185,7 +185,7 @@ object Dimacs {
         val totalVars = numOriginal + softClauses.size
         val factors = mutableListOf<Factor>()
         factors.addAll(hardClauses)
-        val weights = DoubleArray(totalVars)
+        val weights = LongArray(totalVars)
         for ((i, soft) in softClauses.withIndex()) {
             val (w, lits) = soft
             val relax = numOriginal + i
@@ -194,7 +194,7 @@ object Dimacs {
             extended[0] = Lit.make(relax, positive = true)
             for (k in lits.indices) extended[k + 1] = lits[k]
             factors.add(Clause(extended))
-            weights[relax] = w.toDouble()
+            weights[relax] = w.toLong()
         }
         val problem = Problem(
             numBoolVars = totalVars,

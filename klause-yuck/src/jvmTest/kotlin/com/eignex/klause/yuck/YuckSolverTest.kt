@@ -87,7 +87,7 @@ class YuckSolverTest {
             intDomains = arrayOf(IntDomain(0, 9)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val r = YuckSolver(p).minimize(obj, YuckParams(timeoutMillis = 5_000))
         assertTrue(r is MinimizeResult.WithSample, "expected a solution, got $r")
         assertEquals(2.0, r.objective)
@@ -102,7 +102,7 @@ class YuckSolverTest {
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 6)),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
         val rs = YuckSolver(p).improvements(obj, YuckParams(timeoutMillis = 5_000)).toList()
         assertTrue(rs.isNotEmpty())
         val objectives = rs.mapNotNull { it.objectiveValue }

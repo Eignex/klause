@@ -281,7 +281,7 @@ class BacktrackSolver(override val problem: Problem) :
      * weight (or 0) that makes their contribution smallest; unpinned int vars take the
      * domain endpoint matching the coefficient's sign.
      */
-    private fun linearLowerBound(obj: LinearObjective, session: PropagationSession): Double {
+    private fun linearLowerBound(obj: LinearObjective, session: PropagationSession): Long {
         var total = obj.constant
         val sp = session.problem
         val nb = minOf(sp.numBoolVars, obj.boolWeights.size)
@@ -290,17 +290,17 @@ class BacktrackSolver(override val problem: Problem) :
             val v = session.boolValue(b)
             total += when {
                 v == true -> w
-                v == false -> 0.0
-                w < 0.0 -> w
-                else -> 0.0
+                v == false -> 0L
+                w < 0L -> w
+                else -> 0L
             }
         }
         val ni = minOf(sp.numIntVars, obj.intCoefficients.size)
         for (i in 0 until ni) {
             val c = obj.intCoefficients[i]
-            if (c == 0.0) continue
+            if (c == 0L) continue
             val d = session.intDomain(i)
-            total += if (c >= 0.0) c * d.min else c * d.max
+            total += if (c >= 0L) c * d.min else c * d.max
         }
         return total
     }

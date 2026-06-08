@@ -371,7 +371,7 @@ class LocalSearchState(
             val v = move.varId
             if (v < obj.boolWeights.size) {
                 val w = obj.boolWeights[v]
-                if (assignment.boolValue(v)) -w else w
+                (if (assignment.boolValue(v)) -w else w).toDouble()
             } else {
                 0.0
             }
@@ -380,7 +380,7 @@ class LocalSearchState(
         is Move.IntSet -> {
             val v = move.varId
             if (v < obj.intCoefficients.size) {
-                obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))
+                (obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))).toDouble()
             } else {
                 0.0
             }

@@ -178,15 +178,15 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         val vars = ArrayList<IntVar>()
         val coeffs = ArrayList<Int>()
         for (b in 0 until problem.numBoolVars) {
-            val w = obj.boolWeights.getOrElse(b) { 0.0 }
-            if (w != 0.0) {
+            val w = obj.boolWeights.getOrElse(b) { 0L }
+            if (w != 0L) {
                 vars.add(cm.boolVars[b])
                 coeffs.add(w.toInt())
             }
         }
         for (i in 0 until problem.numIntVars) {
-            val c = obj.intCoefficients.getOrElse(i) { 0.0 }
-            if (c != 0.0) {
+            val c = obj.intCoefficients.getOrElse(i) { 0L }
+            if (c != 0L) {
                 vars.add(cm.intVars[i])
                 coeffs.add(c.toInt())
             }

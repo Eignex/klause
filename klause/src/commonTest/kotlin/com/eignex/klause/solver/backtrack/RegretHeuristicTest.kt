@@ -27,7 +27,7 @@ class RegretHeuristicTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 3), IntDomain(0, 9)),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 5.0, 0.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 5L, 0L))
         val session = PropagationSession(problem)
         val picked = MaxRegret(obj).pick(session, Random(0L))
         assertEquals(VarRef.IntVar(1), picked)
@@ -42,7 +42,7 @@ class RegretHeuristicTest {
             factors = emptyArray(),
         )
         // Zero coefficients → all regrets 0; base = InputOrder returns v0.
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(0.0, 0.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L))
         val session = PropagationSession(problem)
         val picked = MaxRegret(obj, base = InputOrder).pick(session, Random(0L))
         assertEquals(VarRef.IntVar(0), picked)
@@ -56,7 +56,7 @@ class RegretHeuristicTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(-1.0)) // maximise → try high first
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1L)) // maximise → try high first
         val session = PropagationSession(problem)
         val values = IndomainBest(obj).values(session, VarRef.IntVar(0), Random(0L)).toList()
         assertEquals(listOf(4, 3, 2, 1, 0), values)
@@ -70,7 +70,7 @@ class RegretHeuristicTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(2.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(2L))
         val session = PropagationSession(problem)
         val values = IndomainBest(obj).values(session, VarRef.IntVar(0), Random(0L)).toList()
         assertEquals(listOf(0, 1, 2, 3, 4), values)
@@ -93,7 +93,7 @@ class RegretHeuristicTest {
                 ),
             ),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val r = BacktrackSolver(problem).minimize(
             obj,
             BacktrackParams(

@@ -54,7 +54,7 @@ class OrToolsSolverTest {
             intDomains = arrayOf(IntDomain(0, 9)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val improvements = OrToolsSolver(p).improvements(obj, OrToolsParams()).toList()
         assertTrue(improvements.isNotEmpty())
         val terminal = improvements.last()

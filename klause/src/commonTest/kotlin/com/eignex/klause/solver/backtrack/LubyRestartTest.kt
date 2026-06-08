@@ -47,7 +47,7 @@ class LubyRestartTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
+        val obj = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
         val result = BacktrackSolver(problem).minimize(
             obj,
             BacktrackParams(

@@ -86,7 +86,7 @@ class CostShapingTest {
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
-        state.objective = LinearObjective(boolWeights = doubleArrayOf(100.0, 1.0))
+        state.objective = LinearObjective(boolWeights = longArrayOf(100L, 1L))
         state.shapingLambda = 1.0
         val score0 = state.shapedBreakScore(BoolFlip(0))
         val score1 = state.shapedBreakScore(BoolFlip(1))
@@ -104,7 +104,7 @@ class CostShapingTest {
         // No objective set → delta is 0 for any move.
         assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
         // Objective set but lambda = 0 → still 0.
-        state.objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0))
+        state.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
         state.shapingLambda = 0.0
         assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
     }
@@ -117,7 +117,7 @@ class CostShapingTest {
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
-        state.objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0))
+        state.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
         state.shapingLambda = 0.5
         // Flipping bool 0 false → true adds 10 to objective; with lambda=0.5, delta = 5.
         assertEquals(5.0, state.shapedObjectiveDelta(BoolFlip(0)))
@@ -195,7 +195,7 @@ class CostShapingTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val solver = LocalSearchSolver(problem)
         val sample = solver.minimize(
             objective,

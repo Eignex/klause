@@ -24,7 +24,7 @@ class MinimizeTerminationTest {
         )
         val solver = LocalSearchSolver(problem)
         // All-zero weights → every assignment evaluates to 0; greedy descent never improves.
-        val degenerate = LinearObjective(boolWeights = DoubleArray(4))
+        val degenerate = LinearObjective(boolWeights = LongArray(4))
         val sample = solver.minimize(
             degenerate,
             LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L),

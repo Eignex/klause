@@ -25,7 +25,7 @@ class OptimizerTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val solver = LocalSearchSolver(problem)
         val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 50_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
@@ -45,7 +45,7 @@ class OptimizerTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
             ),
         )
-        val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
         val sample = LocalSearchSolver(problem)
             .minimize(objective, LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L)).assignment
         assertNotNull(sample)
@@ -60,7 +60,7 @@ class OptimizerTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
-        val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L))
         val sample = LocalSearchSolver(problem)
             .minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 13L)).assignment
         assertNotNull(sample)
@@ -72,13 +72,13 @@ class OptimizerTest {
     @Test
     fun `linear objective evaluation`() {
         val obj = LinearObjective(
-            boolWeights = doubleArrayOf(2.0, -1.0, 3.0),
-            intCoefficients = doubleArrayOf(0.5),
-            constant = 10.0,
+            boolWeights = longArrayOf(2L, -1L, 3L),
+            intCoefficients = longArrayOf(1L),
+            constant = 10L,
         )
         val s = Sample(bools = booleanArrayOf(true, true, false), ints = intArrayOf(4))
 
-        assertEquals(13.0, obj.evaluate(s))
+        assertEquals(15.0, obj.evaluate(s))
     }
 
     @Test
@@ -92,7 +92,7 @@ class OptimizerTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val objective = LinearObjective(boolWeights = doubleArrayOf(1.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(1L))
         val sample = LocalSearchSolver(problem)
             .minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L)).assignment
         assertEquals(null, sample)

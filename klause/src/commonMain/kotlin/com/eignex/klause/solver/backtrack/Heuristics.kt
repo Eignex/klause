@@ -797,10 +797,10 @@ internal class MaxRegret(
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         var best: VarRef? = null
-        var bestRegret = 0.0
+        var bestRegret = 0L
         for (v in 0 until problem.numBoolVars) {
             if (session.boolValue(v) != null) continue
-            val w = if (v < objective.boolWeights.size) objective.boolWeights[v] else 0.0
+            val w = if (v < objective.boolWeights.size) objective.boolWeights[v] else 0L
             val r = abs(w)
             if (r > bestRegret) {
                 bestRegret = r
@@ -810,7 +810,7 @@ internal class MaxRegret(
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
             if (d.size <= 1) continue
-            val c = if (v < objective.intCoefficients.size) objective.intCoefficients[v] else 0.0
+            val c = if (v < objective.intCoefficients.size) objective.intCoefficients[v] else 0L
             val r = abs(c) * (d.max - d.min)
             if (r > bestRegret) {
                 bestRegret = r
@@ -1073,9 +1073,9 @@ private fun logRemainingDomainProduct(session: PropagationSession): Double {
 internal class IndomainBest(private val objective: LinearObjective) : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
         is VarRef.Bool -> {
-            val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0.0
+            val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0L
             // false contributes 0; true contributes w. Lower-contribution-first.
-            if (w >= 0.0) sequenceOf(0, 1) else sequenceOf(1, 0)
+            if (w >= 0L) sequenceOf(0, 1) else sequenceOf(1, 0)
         }
 
         is VarRef.IntVar -> {
@@ -1084,10 +1084,10 @@ internal class IndomainBest(private val objective: LinearObjective) : ValueHeuri
             ) {
                 objective.intCoefficients[varRef.varId]
             } else {
-                0.0
+                0L
             }
             val d = session.intDomain(varRef.varId)
-            if (c >= 0.0) {
+            if (c >= 0L) {
                 sequence { d.forEach { yield(it) } }
             } else {
                 sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }

@@ -121,15 +121,15 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
         val args = ArrayList<LinearArgument>()
         val coeffs = ArrayList<Long>()
         for (b in 0 until problem.numBoolVars) {
-            val w = obj.boolWeights.getOrElse(b) { 0.0 }
-            if (w != 0.0) {
+            val w = obj.boolWeights.getOrElse(b) { 0L }
+            if (w != 0L) {
                 args.add(m.boolVars[b])
                 coeffs.add(w.toLong())
             }
         }
         for (i in 0 until problem.numIntVars) {
-            val c = obj.intCoefficients.getOrElse(i) { 0.0 }
-            if (c != 0.0) {
+            val c = obj.intCoefficients.getOrElse(i) { 0L }
+            if (c != 0L) {
                 args.add(m.intVars[i])
                 coeffs.add(c.toLong())
             }

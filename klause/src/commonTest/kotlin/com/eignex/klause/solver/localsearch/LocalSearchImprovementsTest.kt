@@ -29,7 +29,7 @@ class LocalSearchImprovementsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val seq = LocalSearchSolver(problem).improvements(
             obj,
             LocalSearchParams(maxFlips = 50_000L, randomSeed = 1L),
@@ -69,7 +69,7 @@ class LocalSearchImprovementsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 1.0, 1.0, 1.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L, 1L))
         val solver = LocalSearchSolver(problem)
         val params = LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L)
         val viaMinimize = solver.minimize(obj, params)
@@ -92,7 +92,7 @@ class LocalSearchImprovementsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 1.0, 1.0, 1.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L, 1L))
         // With Long.MAX_VALUE budget, a non-lazy implementation would never return.
         // The lazy Sequence path must yield the first improvement and stop.
         val first = LocalSearchSolver(problem).improvements(

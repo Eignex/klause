@@ -235,7 +235,7 @@ class AtomConflictAnalyzerTest {
                     intDomains = arrayOf(IntDomain(0, 5).excludeValue(2), IntDomain(0, 5).excludeValue(1)),
                     factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4)),
                 ),
-                LinearObjective(intCoefficients = doubleArrayOf(-1.0, -2.0)),
+                LinearObjective(intCoefficients = longArrayOf(-1L, -2L)),
                 1L,
             ),
             // 2a - b >= 0 with a hole at a=1; minimise a - b (negative weight on b).
@@ -246,7 +246,7 @@ class AtomConflictAnalyzerTest {
                     intDomains = arrayOf(IntDomain(0, 4).excludeValue(1), IntDomain(0, 4)),
                     factors = arrayOf<Factor>(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.GE, 0)),
                 ),
-                LinearObjective(intCoefficients = doubleArrayOf(1.0, -1.0)),
+                LinearObjective(intCoefficients = longArrayOf(1L, -1L)),
                 2L,
             ),
             // Three vars, equality coupling, holes, mixed-sign objective.
@@ -261,7 +261,7 @@ class AtomConflictAnalyzerTest {
                     ),
                     factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)),
                 ),
-                LinearObjective(intCoefficients = doubleArrayOf(-1.0, 2.0, -1.0)),
+                LinearObjective(intCoefficients = longArrayOf(-1L, 2L, -1L)),
                 3L,
             ),
         )

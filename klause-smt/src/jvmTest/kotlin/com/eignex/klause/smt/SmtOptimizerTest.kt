@@ -33,7 +33,7 @@ class SmtOptimizerTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(factor),
         )
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L))
         assertFailsWith<UnsupportedOperationException> {
             SmtSolver(problem).minimize(objective, SmtParams())
         }

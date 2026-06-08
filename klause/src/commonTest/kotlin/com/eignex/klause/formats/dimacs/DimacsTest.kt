@@ -113,9 +113,9 @@ class DimacsTest {
         assertEquals(5, w.problem.numBoolVars)
         // 1 hard clause + 2 relaxed soft clauses.
         assertEquals(3, w.problem.factors.size)
-        assertEquals(0.0, w.objective.boolWeights[0])
-        assertEquals(1.0, w.objective.boolWeights[3])
-        assertEquals(2.0, w.objective.boolWeights[4])
+        assertEquals(0L, w.objective.boolWeights[0])
+        assertEquals(1L, w.objective.boolWeights[3])
+        assertEquals(2L, w.objective.boolWeights[4])
     }
 
     @Test
@@ -134,7 +134,7 @@ class DimacsTest {
         // 1 hard clause + 1 relaxed soft clause.
         assertEquals(2, w.problem.factors.size)
         // The relaxation bool for the soft clause carries weight 1; no relaxation bool for the hard.
-        assertEquals(1.0, w.objective.boolWeights[3])
+        assertEquals(1L, w.objective.boolWeights[3])
     }
 
     @Test
@@ -143,7 +143,7 @@ class DimacsTest {
         val w = Dimacs.parseWcnf("p wcnf 2 1\n5 -1 0\n")
         assertEquals(2, w.numOriginalBoolVars)
         assertEquals(3, w.problem.numBoolVars) // 2 original + 1 relaxation bool
-        assertEquals(5.0, w.objective.boolWeights[2])
+        assertEquals(5L, w.objective.boolWeights[2])
     }
 
     @Test
@@ -171,7 +171,7 @@ class DimacsTest {
         assertEquals(2, w.numOriginalBoolVars)
         assertEquals(4, w.problem.numBoolVars)
         assertEquals(3, w.problem.factors.size)
-        assertEquals(5.0, w.objective.boolWeights[2])
-        assertEquals(3.0, w.objective.boolWeights[3])
+        assertEquals(5L, w.objective.boolWeights[2])
+        assertEquals(3L, w.objective.boolWeights[3])
     }
 }

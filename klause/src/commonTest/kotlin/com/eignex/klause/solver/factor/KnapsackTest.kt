@@ -39,7 +39,7 @@ class KnapsackTest {
             ),
         )
         val r = BacktrackSolver(problem).minimize(
-            LinearObjective(intCoefficients = doubleArrayOf(0.0, 0.0, 0.0, 0.0, -1.0)),
+            LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 0L, -1L)),
             BacktrackParams(randomSeed = 0L),
         )
         val optimal = assertIs<MinimizeResult.Optimal>(r)

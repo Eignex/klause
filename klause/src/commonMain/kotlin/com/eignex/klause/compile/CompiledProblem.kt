@@ -173,29 +173,24 @@ class CompiledProblem internal constructor(
         return problem.maximizeBool(id)
     }
 
-    /** Minimise the real-valued float. Floats are bucketed on the int side post-compile;
-     *  the objective scales the bucket id by `(max - min) / (buckets - 1)` and folds
-     *  `min` into the constant so the objective value matches what `decode(handle, sample)`
-     *  reports — same units as the original schema declaration, not bucket indices. */
+    /** Minimise the real-valued float. Floats are bucketed on the int side post-compile,
+     *  and the real value `min + bucket · (max - min) / (buckets - 1)` is a strictly
+     *  increasing affine map of the bucket index (the scale is positive), so minimising the
+     *  real value is the same search as minimising the integer bucket id. We optimise the
+     *  bucket id directly with an exact integer objective; `decode(handle, sample)` recovers
+     *  the real value for reporting. */
     fun minimize(handle: FloatHandle): LinearObjective {
-        val spec = floatDecoders[handle.name]
-            ?: error("No float variable named '${handle.name}'")
+        floatDecoders[handle.name] ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        val arr = DoubleArray(problem.numIntVars)
-        arr[id] = spec.scale
-        return LinearObjective(intCoefficients = arr, constant = spec.min)
+        return problem.minimizeInt(id)
     }
 
-    /** A [LinearObjective] that maximises [handle]. */
+    /** A [LinearObjective] that maximises [handle] — minimise the negated bucket id. */
     fun maximize(handle: FloatHandle): LinearObjective {
-        val spec = floatDecoders[handle.name]
-            ?: error("No float variable named '${handle.name}'")
+        floatDecoders[handle.name] ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        val arr = DoubleArray(problem.numIntVars)
-        arr[id] = -spec.scale
-        // For maximise we minimise the negated real, so the constant flips too.
-        return LinearObjective(intCoefficients = arr, constant = -spec.min)
+        return problem.maximizeInt(id)
     }
 }
