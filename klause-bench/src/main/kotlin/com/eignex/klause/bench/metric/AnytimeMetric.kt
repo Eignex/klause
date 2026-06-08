@@ -369,7 +369,7 @@ internal object AnytimeMetric {
             costShaping = shapingFromProps(),
             initialAssignment = seed,
             onEvent = onEvent,
-        ).withCancellation(Cancellation { System.currentTimeMillis() > overallDeadline }) as LocalSearchParams
+        ).withCancellation(Cancellation { System.currentTimeMillis() > overallDeadline })
         return solver.improvements(klauseObj, params)
     }
 
@@ -384,7 +384,7 @@ internal object AnytimeMetric {
             randomSeed = 1L,
             costShaping = shapingFromProps(),
             onEvent = onEvent,
-        ).withCancellation(Cancellation { System.currentTimeMillis() > deadline }) as LocalSearchParams
+        ).withCancellation(Cancellation { System.currentTimeMillis() > deadline })
     }
 
     private fun shapingFromProps(): CostShaping = when (System.getProperty("klause.anytime.shaping")?.lowercase()) {
