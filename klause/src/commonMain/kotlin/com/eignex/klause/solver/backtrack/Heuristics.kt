@@ -360,8 +360,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
  * reason set and [assignReward] (0.9) for variables merely assigned along the way — the
  * standard CHB split that values conflict participation above plain propagation. The step
  * size α starts at [alphaStart] and decays by [alphaStep] per conflict down to [alphaFloor],
- * so early conflicts move scores fast and the estimate settles as evidence accumulates —
- * "the learning rate decaying as conflicts accumulate" the issue asks for.
+ * so early conflicts move scores fast and the estimate settles as evidence accumulates.
  *
  * Picks the unpinned variable with the highest `Q`. Ties broken by variable-id order (bools
  * precede ints). Scores persist across [onRestart] — like VSIDS, the learned ordering is the

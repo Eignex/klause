@@ -371,10 +371,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * binary clause `(u ∨ x)` lets us drop the clause literal `¬x` by one resolution step:
      *   `C ⊗ (u ∨ x)` on `var(x)` = `(C \ {¬x}) ∪ {u}` = `C \ {¬x}`   (since `u ∈ C`).
      * Because every removal is justified by the single, never-removed UIP literal, the
-     * removals can't interact, so the result stays an implied, asserting clause regardless of
-     * how many literals go — the soundness guarantee the issue requires. Gated on binary
-     * clauses being present and on the clause being a genuine 1UIP clause (exactly one literal
-     * at the conflict level); a non-asserting clause is left untouched.
+     * removals can't interact, so the result stays an implied, asserting clause however many
+     * literals are dropped. Gated on binary clauses being present and on the clause being a
+     * genuine 1UIP clause (exactly one literal at the conflict level); a non-asserting clause
+     * is left untouched.
      *
      * Complements self-subsuming minimization: it removes literals reachable by a *binary*
      * implication from the asserting literal that the antecedent-recursion pass does not,
