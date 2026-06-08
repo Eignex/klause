@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
 // Three-tier learned-clause DB tiers (#201). Top-level so the engine's reduction policy in
@@ -416,8 +417,9 @@ class PropagationState(
      * narrowing). [extractConflictFactors] BFSes from this seed via the reason arrays to
      * produce the full propagation-graph core.
      */
-    @Suppress("DoubleMutabilityForCollection") // lazily allocated on conflict
-    internal var conflictSeedFactors: MutableSet<Int>? = null
+    // Reused across conflicts (cleared, not reallocated) and primitive (no Int boxing) — this is
+    // populated on the propagation conflict path, which is hot on conflict-heavy instances.
+    internal val conflictSeedFactors: IntHashSet = IntHashSet()
 
     /** Var whose pinned value was contradicted by a decision-level pin attempt (i.e.
      *  `pinBoolAsDecision` tried to set the opposite value of an existing pin). `-1` when
@@ -447,8 +449,22 @@ class PropagationState(
         repeat(problem.numFactors) { add(null) }
     }
 
-    /** Per-factor mutable payload slots (reference-typed). */
-    val refPayload: MutableList<Any?> get() = _refPayload
+    /** Indices in [_refPayload] currently holding a [SnapshottablePayload]. Maintained on every
+     *  write through [refPayload] so [mark] visits only these slots instead of scanning the whole
+     *  factor list (incl. all learned clauses) per pin — the scan was an O(numFactors)-per-decision
+     *  cost, and pure-clause problems have none. Snapshottable payloads belong to static factors
+     *  (Table / Mdd), so their ids stay below `numFactors` and never move under learned-clause
+     *  forgetting. */
+    private val snapshottableIndices: IntHashSet = IntHashSet()
+
+    /** Per-factor mutable payload slots (reference-typed). Writes route through this view so
+     *  [snapshottableIndices] stays in sync; reads and structural ops delegate to [_refPayload]. */
+    val refPayload: MutableList<Any?> = object : MutableList<Any?> by _refPayload {
+        override fun set(index: Int, element: Any?): Any? {
+            if (element is SnapshottablePayload) snapshottableIndices.add(index) else snapshottableIndices.remove(index)
+            return _refPayload.set(index, element)
+        }
+    }
 
     /** Learned clauses accumulated during search (LCG-style nogoods produced by
      *  [ConflictAnalyzer]). Their factor ids live in `[problem.numFactors, totalFactorCount)` —
@@ -1847,8 +1863,7 @@ class PropagationState(
     private fun seedConflictFactor(fid: Int) {
         if (fid < 0) return
         noteLearnedUse(fid) // a learned clause that detects a conflict counts as reused (#201)
-        val s = conflictSeedFactors ?: HashSet<Int>().also { conflictSeedFactors = it }
-        s.add(fid)
+        conflictSeedFactors.add(fid)
     }
 
     private fun setIntImpl(v: Int, value: Int, antecedents: IntArray?): Boolean =
@@ -1980,32 +1995,38 @@ class PropagationState(
      * separately and both endpoints are walked for every int var.
      */
     internal fun extractConflictFactors(): Set<Int> {
-        val seed = conflictSeedFactors ?: return emptySet()
-        if (seed.isEmpty()) return emptySet()
-        val out = HashSet<Int>(seed)
-        val frontier = ArrayDeque<Int>().apply { addAll(seed) }
-        while (frontier.isNotEmpty()) {
-            val fid = frontier.removeFirst()
-            // factorAt routes learned-clause ids (≥ problem.numFactors) to the
-            // session's clause registry — required now that conflicts can name a
-            // learned clause as their failing factor.
-            val f = factorAt(fid)
+        if (conflictSeedFactors.isEmpty()) return emptySet()
+        // Primitive BFS over the propagation graph: [out] dedups reached factor ids, [frontier]
+        // is a grow-only worklist walked by a head index (no boxing, no per-step dequeue alloc).
+        val out = IntHashSet(conflictSeedFactors.size * 2)
+        val frontier = IntArrayList(conflictSeedFactors.size)
+        conflictSeedFactors.forEach { fid ->
+            out.add(fid)
+            frontier.add(fid)
+        }
+        var head = 0
+        while (head < frontier.size) {
+            // factorAt routes learned-clause ids (≥ problem.numFactors) to the session's clause
+            // registry — conflicts can name a learned clause as their failing factor.
+            val f = factorAt(frontier.get(head++))
             for (v in f.boolVars) {
-                // Skip atom-encoded literal ids (≥ numBoolVars) — they're int-bound
-                // atoms whose causation is captured through intMinReason / intMaxReason
-                // on the underlying int var, expanded below for this factor's intVars.
+                // Skip atom-encoded literal ids (≥ numBoolVars) — their causation is captured
+                // through intMinReason / intMaxReason on the underlying int var, expanded below.
                 if (v >= problem.numBoolVars) continue
                 val r = boolReason[v]
-                if (r >= 0 && out.add(r)) frontier.addLast(r)
+                if (r >= 0 && out.add(r)) frontier.add(r)
             }
             for (v in f.intVars) {
                 val rMin = intMinReason[v]
-                if (rMin >= 0 && out.add(rMin)) frontier.addLast(rMin)
+                if (rMin >= 0 && out.add(rMin)) frontier.add(rMin)
                 val rMax = intMaxReason[v]
-                if (rMax >= 0 && out.add(rMax)) frontier.addLast(rMax)
+                if (rMax >= 0 && out.add(rMax)) frontier.add(rMax)
             }
         }
-        return out
+        // Materialize the boxed Set for the result contract; the BFS above stayed primitive.
+        val result = HashSet<Int>(out.size * 2)
+        out.forEach { result.add(it) }
+        return result
     }
 
     // Mark / undo for [PropagationSession]. A pop rewinds to a prior fixpoint by replaying
@@ -2043,7 +2064,8 @@ class PropagationState(
     fun mark(): LevelMark {
         @Suppress("DoubleMutabilityForCollection") // lazily allocated when a snapshot is taken
         var payloads: HashMap<Int, SnapshottablePayload>? = null
-        for (i in _refPayload.indices) {
+        // Only the tracked snapshottable slots need copying — no per-pin scan of every factor.
+        snapshottableIndices.forEach { i ->
             val p = _refPayload[i]
             if (p is SnapshottablePayload) {
                 val m = payloads ?: HashMap<Int, SnapshottablePayload>().also { payloads = it }
@@ -2130,7 +2152,7 @@ class PropagationState(
         dirtyBools.clear()
         dirtyInts.clear()
         conflictLevels = null
-        conflictSeedFactors = null
+        conflictSeedFactors.clear()
         lastDecisionConflictVar = -1
         currentLevel = 0
         currentFactor = -1
@@ -2147,7 +2169,7 @@ class PropagationState(
     internal fun runToFixpoint(allFactors: Boolean, initialFactor: Int = -1): Set<Int>? {
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
         // would otherwise mix old seeds into a new conflict's core.
-        conflictSeedFactors = null
+        conflictSeedFactors.clear()
         val factorCount = totalFactorCount
         propBegin(factorCount)
         if (allFactors) {
