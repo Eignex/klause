@@ -122,6 +122,23 @@ data class BacktrackParams(
      */
     val midLbdThreshold: Int = 6,
     /**
+     * Clause vivification (#203) as an inprocessing pass. When true the engine periodically
+     * — at restart boundaries, where the trail is at root and assumptions are clean — walks a
+     * bounded slice of the learned-clause database and strengthens each clause by tentatively
+     * asserting the negations of its literals under propagation: a remaining literal already
+     * falsified is dropped; one forced true (or a conflict) shortens the clause to the
+     * literals tried so far. Pure-Boolean; atom-literal clauses are skipped. Disabled by
+     * default. One of the highest-value inprocessing techniques on hard UNSAT instances like
+     * the pigeonhole family in #117. Only honoured when [assumptions] is empty.
+     */
+    val vivification: Boolean = false,
+    /**
+     * Maximum number of learned clauses vivified per restart when [vivification] is on. The
+     * pass advances a cursor across the database round-robin so the per-restart cost stays
+     * bounded while the whole database is covered over successive restarts. Must be positive.
+     */
+    val vivifyBatch: Int = 256,
+    /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
      * engines read it at each leaf-attempt and prune the subtree whenever the
@@ -134,6 +151,28 @@ data class BacktrackParams(
      * can't yield a sound LB and silently skip external pruning.
      */
     val objectiveBoundSupplier: (() -> Double)? = null,
+    /**
+     * Native LP-relaxation bounding for branch-and-bound minimisation (#20). When true and the
+     * objective is a [com.eignex.klause.solver.LinearObjective], scheduled nodes solve an exact
+     * integer LP relaxation of the live problem and prune when the relaxation is infeasible or its
+     * objective bound, rounded up to the next integer, is `≥` the incumbent. This strictly
+     * dominates the cheap per-term lower bound (which still runs first as a fast pre-filter) but
+     * costs an LP solve per scheduled node. Disabled by default; ignored for non-linear objectives
+     * and for problems with no LP-emittable factors (the relaxation is then empty and never prunes).
+     */
+    val lpBounding: Boolean = false,
+    /**
+     * Frequency policy for [lpBounding]: solve the LP at one in every [lpBoundEvery] pruning checks
+     * rather than at every node, since the LP solve dominates a node's cost. `1` solves at every
+     * checked node; larger values trade pruning power for throughput. Must be positive.
+     */
+    val lpBoundEvery: Int = 1,
+    /**
+     * Depth policy for [lpBounding]: skip the LP solve below this decision depth. The relaxation is
+     * tightest and most valuable near the root where bounds are loose; deep nodes are nearly fixed
+     * and rarely repay the solve. `Int.MAX_VALUE` (default) applies LP bounding at every depth.
+     */
+    val lpBoundMaxDepth: Int = Int.MAX_VALUE,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

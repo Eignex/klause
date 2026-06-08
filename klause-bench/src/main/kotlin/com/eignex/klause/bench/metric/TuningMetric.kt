@@ -69,7 +69,7 @@ private class LsConfig(override val id: String, val shaping: CostShaping) : Tune
     private fun params(seed: Long, budget: Budget): LocalSearchParams {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         return LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = seed, costShaping = shaping)
-            .withCancellation(Cancellation { System.currentTimeMillis() > deadline }) as LocalSearchParams
+            .withCancellation(Cancellation { System.currentTimeMillis() > deadline })
     }
     override fun satisfy(p: Problem, seed: Long, budget: Budget): RunResult {
         val t0 = System.currentTimeMillis()

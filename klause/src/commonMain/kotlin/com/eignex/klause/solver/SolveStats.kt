@@ -43,6 +43,8 @@ data class SolveStats(
     val learnedClauses: SumResult = ZERO_COUNT,
     /** Clauses conflict analysis re-derived identically — a livelock indicator when large. */
     val relearned: SumResult = ZERO_COUNT,
+    /** Nodes pruned by the LP-relaxation bound (#20): infeasible relaxation or bound ≥ incumbent. */
+    val lpPruned: SumResult = ZERO_COUNT,
     val peakDepth: MaxResult = NO_MAX,
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     val wallMs: Long = 0L,
@@ -74,6 +76,7 @@ data class SolveStats(
             restarts = SumResult(restarts.sum + other.restarts.sum),
             propagations = SumResult(propagations.sum + other.propagations.sum),
             learnedClauses = SumResult(learnedClauses.sum + other.learnedClauses.sum),
+            lpPruned = SumResult(lpPruned.sum + other.lpPruned.sum),
             peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
             depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
             wallMs = maxOf(wallMs, other.wallMs),
@@ -106,6 +109,7 @@ internal class SolveStatsSink(val backend: String) {
     val propagations: CountStat = CountStat()
     val learnedClauses: CountStat = CountStat()
     val relearned: CountStat = CountStat()
+    val lpPruned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
 
@@ -158,6 +162,11 @@ internal class SolveStatsSink(val backend: String) {
         relearned.update(1.0)
     }
 
+    /** A node whose subtree was cut by the LP-relaxation bound (#20). */
+    fun observeLpPrune() {
+        lpPruned.update(1.0)
+    }
+
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
      *  uses the most recent [start] / [stop] window; if [stop] hasn't been called yet, we
      *  read the elapsed time from now. */
@@ -173,6 +182,7 @@ internal class SolveStatsSink(val backend: String) {
             propagations = propagations.read(),
             learnedClauses = learnedClauses.read(),
             relearned = relearned.read(),
+            lpPruned = lpPruned.read(),
             peakDepth = peakDepth.read(),
             depthMean = depthMean.read(),
             wallMs = elapsedMs,
