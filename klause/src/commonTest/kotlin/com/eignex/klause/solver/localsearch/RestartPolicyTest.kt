@@ -76,7 +76,7 @@ class RestartPolicyTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
-        val objective = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L))
 
         val fixed = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart())
         val adaptive = LocalSearchSolver(problem, restartPolicy = AdaptivePerturbationRestart())

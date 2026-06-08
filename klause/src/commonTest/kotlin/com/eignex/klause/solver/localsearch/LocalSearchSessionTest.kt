@@ -79,7 +79,7 @@ class LocalSearchSessionTest {
     fun `warm weights survive across two minimize calls`() {
         val problem = weightLearningProblem()
         val session = LocalSearchSession(LocalSearchSolver(problem, strategy = Cbls()))
-        val obj = LinearObjective(boolWeights = DoubleArray(6) { 1.0 })
+        val obj = LinearObjective(boolWeights = LongArray(6) { 1L })
         session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 5L)).assignment
         val firstWeights = session.warmState.factorWeights!!.copyOf()
         session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 6L)).assignment

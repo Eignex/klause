@@ -24,7 +24,7 @@ class AlnsTest {
     fun `random destroy returns expected fraction`() {
         val problem = Problem(numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val incumbent = Sample(BooleanArray(10) { false }, IntArray(0))
-        val obj = LinearObjective(boolWeights = DoubleArray(10) { 1.0 })
+        val obj = LinearObjective(boolWeights = LongArray(10) { 1L })
         val freed = DestroyOperator.Random.destroy(Random(0), problem, incumbent, obj, fraction = 0.3)
         assertEquals(3, freed.bools.size, "expected 3 freed bools (fraction 0.3 of 10)")
         assertEquals(freed.bools.toSet().size, freed.bools.size, "freed bools should be distinct")
@@ -47,7 +47,7 @@ class AlnsTest {
             factors = arrayOf<Factor>(fA, fB),
         )
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
-        val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
+        val obj = LinearObjective(boolWeights = LongArray(8) { 1L })
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
         assertEquals(2, freed.bools.size)
         val componentA = freed.bools.all { it in 0..3 }
@@ -68,7 +68,7 @@ class AlnsTest {
             factors = arrayOf<Factor>(fA, fB),
         )
         val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
-        val obj = LinearObjective(boolWeights = DoubleArray(8) { 1.0 })
+        val obj = LinearObjective(boolWeights = LongArray(8) { 1L })
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.75)
         assertEquals(6, freed.bools.size)
         val fromA = freed.bools.count { it in 0..3 }
@@ -80,7 +80,7 @@ class AlnsTest {
     fun `worst objective destroy picks high contribution vars`() {
         val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val incumbent = Sample(booleanArrayOf(false, false, false, true), IntArray(0))
-        val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 2.0, 3.0, 100.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(1L, 2L, 3L, 100L))
         val freed = DestroyOperator.WorstObjective.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
         assertEquals(1, freed.bools.size)
         assertEquals(3, freed.bools[0], "expected var 3 (highest weighted-and-set)")
@@ -97,7 +97,7 @@ class AlnsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val inner = LocalSearchSolver(problem)
         val alns = Alns(
             inner = inner,
@@ -122,7 +122,7 @@ class AlnsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val inner = LocalSearchSolver(problem)
         val alns = Alns(
             inner = inner,
@@ -154,7 +154,7 @@ class AlnsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val inner = LocalSearchSolver(problem)
         val incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0))
         val context = RepairContext(
@@ -185,7 +185,7 @@ class AlnsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val inner = LocalSearchSolver(problem)
         val pinAssumptions = Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false))
         val context = RepairContext(
@@ -209,7 +209,7 @@ class AlnsTest {
     fun `inner ls repair honours flips override`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(1.0, 5.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 5L))
         val inner = LocalSearchSolver(problem)
         val repair = InnerLsRepair(label = "test", flipsOverride = 100L)
         val context = RepairContext(
@@ -240,7 +240,7 @@ class AlnsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val solver = LocalSearchSolver(problem)
         val session = solver.session()
 
@@ -274,7 +274,7 @@ class AlnsTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 8.0, 3.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val inner = LocalSearchSolver(problem)
         val alns = Alns(
             inner = inner,
@@ -309,7 +309,7 @@ class AlnsTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true)))),
         )
-        val objective = LinearObjective(boolWeights = doubleArrayOf(1.0))
+        val objective = LinearObjective(boolWeights = longArrayOf(1L))
         val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }
         val inner = LocalSearchSolver(problem)
         val alns = Alns(inner = inner, destroyOperators = listOf(emptyOp), maxIterations = 5, flipsPerIteration = 100L)

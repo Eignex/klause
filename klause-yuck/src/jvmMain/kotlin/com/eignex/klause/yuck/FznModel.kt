@@ -738,8 +738,8 @@ class FznModel private constructor(
         var lo = 0L
         var hi = 0L
         for (b in 0 until problem.numBoolVars) {
-            val w = obj.boolWeights.getOrElse(b) { 0.0 }
-            if (w != 0.0) {
+            val w = obj.boolWeights.getOrElse(b) { 0L }
+            if (w != 0L) {
                 val c = w.toInt()
                 coeffs.add(c)
                 vars.add(boolAsInt(b))
@@ -747,8 +747,8 @@ class FznModel private constructor(
             }
         }
         for (i in 0 until problem.numIntVars) {
-            val cd = obj.intCoefficients.getOrElse(i) { 0.0 }
-            if (cd != 0.0) {
+            val cd = obj.intCoefficients.getOrElse(i) { 0L }
+            if (cd != 0L) {
                 val c = cd.toInt()
                 coeffs.add(c)
                 vars.add(intName(i))

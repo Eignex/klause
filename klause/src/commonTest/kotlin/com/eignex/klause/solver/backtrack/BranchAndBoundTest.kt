@@ -20,7 +20,7 @@ class BranchAndBoundTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(boolWeights = doubleArrayOf(1.0, 2.0, 3.0, 4.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(1L, 2L, 3L, 4L))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         for (i in 0 until 4) assertEquals(false, sample.bools[i])
@@ -34,7 +34,7 @@ class BranchAndBoundTest {
             intDomains = arrayOf(IntDomain(2, 9)),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(2, sample.ints[0])
@@ -48,7 +48,7 @@ class BranchAndBoundTest {
             intDomains = arrayOf(IntDomain(0, 7)),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(-1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1L))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(7, sample.ints[0])
@@ -69,7 +69,7 @@ class BranchAndBoundTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
+        val obj = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
         val sample = BacktrackSolver(problem).minimize(
             obj,
             BacktrackParams(
@@ -107,7 +107,7 @@ class BranchAndBoundTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 1.0, 1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
         val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         val sum = sample.ints[0] + sample.ints[1] + sample.ints[2]

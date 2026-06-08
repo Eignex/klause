@@ -271,7 +271,7 @@ class FznModelTest {
     fun `minimize channels the objective and annotates output`() {
         val fzn = FznModel.emit(
             problem(0, dom(2, 0, 9)),
-            LinearObjective(intCoefficients = doubleArrayOf(2.0, -1.0)),
+            LinearObjective(intCoefficients = longArrayOf(2L, -1L)),
         )
         assertContains(fzn, "var -9..18: objv :: output_var;")
         assertContains(fzn, "constraint int_lin_eq([2, -1, -1], [i0, i1, objv], 0);")

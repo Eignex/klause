@@ -108,13 +108,13 @@ class SmtSolver(override val problem: Problem) :
         var acc: RationalFormula = rmgr.makeNumber(obj.constant)
         for (b in obj.boolWeights.indices) {
             val w = obj.boolWeights[b]
-            if (w == 0.0) continue
+            if (w == 0L) continue
             val term = bmgr.ifThenElse(encoding.boolFormulas[b], rmgr.makeNumber(w), rmgr.makeNumber(0.0))
             acc = rmgr.add(acc, term)
         }
         for (i in obj.intCoefficients.indices) {
             val c = obj.intCoefficients[i]
-            if (c == 0.0) continue
+            if (c == 0L) continue
             val asReal = castIntToRational(encoding.intFormulas[i], encoding)
             acc = rmgr.add(acc, rmgr.multiply(rmgr.makeNumber(c), asReal))
         }

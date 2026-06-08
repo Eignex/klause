@@ -47,7 +47,7 @@ class AssumptionsTest {
         // 4 bools, objective rewards every true; without assumptions optimal is "all true".
         val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val solver = LocalSearchSolver(problem)
-        val obj = LinearObjective(boolWeights = doubleArrayOf(-1.0, -1.0, -1.0, -1.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(-1L, -1L, -1L, -1L))
         val sample = solver.minimize(
             obj,
             LocalSearchParams(

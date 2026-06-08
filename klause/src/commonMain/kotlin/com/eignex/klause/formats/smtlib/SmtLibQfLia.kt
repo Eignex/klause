@@ -660,11 +660,11 @@ object SmtLibQfLia {
 
         private fun linearObjective(t: SExpr, negate: Boolean): LinearObjective {
             val lt = linearTerm(t)
-            val coeffs = DoubleArray(nextInt)
-            for ((v, c) in lt.coeffs) coeffs[v] = (if (negate) -c else c).toDouble()
+            val coeffs = LongArray(nextInt)
+            for ((v, c) in lt.coeffs) coeffs[v] = (if (negate) -c else c).toLong()
             return LinearObjective(
                 intCoefficients = coeffs,
-                constant = (if (negate) -lt.constant else lt.constant).toDouble(),
+                constant = (if (negate) -lt.constant else lt.constant).toLong(),
             )
         }
 

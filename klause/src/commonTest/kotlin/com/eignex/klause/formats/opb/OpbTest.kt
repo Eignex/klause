@@ -53,9 +53,9 @@ class OpbTest {
         """.trimIndent()
         val out = Opb.parse(text)
         val obj = assertNotNull(out.objective)
-        assertEquals(2.0, obj.boolWeights[0])
-        assertEquals(-3.0, obj.boolWeights[1])
-        assertEquals(3.0, obj.constant)
+        assertEquals(2L, obj.boolWeights[0])
+        assertEquals(-3L, obj.boolWeights[1])
+        assertEquals(3L, obj.constant)
         assertEquals(0, obj.intCoefficients.size)
     }
 

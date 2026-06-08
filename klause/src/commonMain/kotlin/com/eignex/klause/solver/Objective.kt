@@ -4,9 +4,11 @@ package com.eignex.klause.solver
  * Anything an [Optimizer] can score an assignment by. The contract is "lower is better" —
  * optimisation backends minimise this. To maximise, negate the weights.
  *
- * The primary subtype is [LinearObjective]. Backends pattern-match on it for fast paths
- * (incremental delta in the local-search engine, native `mkAdd` translation in Z3) and may
- * either fall back to the generic [evaluate] or refuse to optimise other subtypes.
+ * The primary subtype is [LinearObjective] — the native, integer-coefficient linear
+ * objective every FlatZinc `solve minimize` and the SAT/PB/XCSP/LIA front-ends produce.
+ * Backends pattern-match on it for exact integer bounding and fast incremental deltas.
+ * Float-variable objectives are not a distinct type: klause optimises the integer bucket
+ * variable and recovers the real value only at output.
  */
 interface Objective {
     /** Objective value of [sample]; lower is better. */
@@ -36,27 +38,35 @@ interface IncrementalObjective : Objective {
 }
 
 /**
- * Σ boolWeights[b] · 1[bool[b]] + Σ intCoefficients[i] · int[i] + constant.
+ * Σ boolWeights[b] · 1[bool[b]] + Σ intCoefficients[i] · int[i] + constant, with **integer
+ * coefficients** — the native objective. Every FlatZinc integer `solve minimize`, the
+ * SAT/pseudo-Boolean/XCSP/LIA front-ends, and the `minimizeInt` family build this. Integer
+ * coefficients let branch-and-bound compute the lower bound and apply the optimality cutoff
+ * in exact [Long] arithmetic ([evaluateLong], `BacktrackSolver.linearLowerBound`), so no
+ * floating point enters the pruning decision.
  *
  * - [boolWeights] indexes by the original-problem bool var id; size must equal
  *   `problem.numBoolVars`.
- * - [intCoefficients] indexes by the original-problem int var id (note: float vars after
- *   compilation live in the int-var namespace, so a coefficient on a `floatVar` is
- *   applied to its bucket index — multiply by `(max - min) / (buckets - 1)` and fold
- *   `min · coeff` into [constant] if you need real-valued semantics).
+ * - [intCoefficients] indexes by the original-problem int var id.
  * - [constant] is added unconditionally; useful for objectives whose "zero" assignment
  *   has nonzero cost.
+ *
+ * Float-variable objectives are not represented here: klause optimises the integer bucket
+ * variable directly (the real value is a monotonic affine map of the bucket index, so the
+ * argmin is identical) and the real value is recovered only at solution output. Real-valued
+ * objective handling, where wanted, is left to external reference solvers.
  *
  * All arrays are kept by reference, not copied. Treat them as immutable after handing the
  * objective to an optimiser.
  */
 data class LinearObjective(
-    val boolWeights: DoubleArray = DoubleArray(0),
-    val intCoefficients: DoubleArray = DoubleArray(0),
-    val constant: Double = 0.0,
+    val boolWeights: LongArray = LongArray(0),
+    val intCoefficients: LongArray = LongArray(0),
+    val constant: Long = 0L,
 ) : Objective {
 
-    override fun evaluate(sample: Sample): Double {
+    /** Exact integer objective value of [sample]; lower is better. */
+    fun evaluateLong(sample: Sample): Long {
         var total = constant
         for (b in 0 until minOf(sample.bools.size, boolWeights.size)) {
             if (sample.bools[b]) total += boolWeights[b]
@@ -66,6 +76,8 @@ data class LinearObjective(
         }
         return total
     }
+
+    override fun evaluate(sample: Sample): Double = evaluateLong(sample).toDouble()
 
     override fun equals(other: Any?): Boolean {
         if (other !is LinearObjective) return false

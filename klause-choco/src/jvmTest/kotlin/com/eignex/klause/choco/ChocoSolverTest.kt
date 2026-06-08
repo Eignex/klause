@@ -67,7 +67,7 @@ class ChocoSolverTest {
             intDomains = arrayOf(IntDomain(0, 9)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val r = ChocoSolver(p).minimize(obj, ChocoParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(2.0, r.objective)
@@ -111,7 +111,7 @@ class ChocoParallelPortfolioTest {
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
             ),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val r = ChocoSolver(p).minimize(obj, ChocoParams(workers = 3))
         val opt = r as MinimizeResult.Optimal
         assertEquals(3.0, opt.objective)

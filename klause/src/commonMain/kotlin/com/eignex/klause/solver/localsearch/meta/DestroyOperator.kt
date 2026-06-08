@@ -42,10 +42,12 @@ internal fun interface DestroyOperator {
             when (objective) {
                 is LinearObjective -> {
                     for (b in 0 until problem.numBoolVars) {
-                        contribs[b] = abs(objective.boolWeights[b]) * (if (incumbent.bools[b]) 1.0 else 0.0)
+                        contribs[b] = abs(objective.boolWeights[b].toDouble()) * (if (incumbent.bools[b]) 1.0 else 0.0)
                     }
                     for (i in 0 until problem.numIntVars) {
-                        contribs[problem.numBoolVars + i] = abs(objective.intCoefficients[i] * incumbent.ints[i])
+                        contribs[problem.numBoolVars + i] = abs(
+                            (objective.intCoefficients[i] * incumbent.ints[i]).toDouble(),
+                        )
                     }
                 }
 

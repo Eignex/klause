@@ -30,7 +30,7 @@ class AnytimeObjectiveTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 1.0, 100.0, 50.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(10L, 1L, 100L, 50L))
         // A budget of 50 flips is enough to find at least one feasible.
         val sample = LocalSearchSolver(
             problem,
@@ -54,7 +54,7 @@ class AnytimeObjectiveTest {
             ),
         )
         val problem = Problem(6, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = doubleArrayOf(10.0, 5.0, 1.0, 100.0, 50.0, 25.0))
+        val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 1L, 100L, 50L, 25L))
         // Logical-clock cancel: maxFlips is unbounded, so only the poll-count token ends the run.
         var polls = 0
         val sample = LocalSearchSolver(problem).minimize(

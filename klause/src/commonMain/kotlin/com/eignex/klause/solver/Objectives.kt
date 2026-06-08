@@ -15,31 +15,31 @@ package com.eignex.klause.solver
  */
 fun Problem.minimizeInt(intVar: Int): LinearObjective {
     require(intVar in 0 until numIntVars) { "intVar $intVar out of [0, $numIntVars)" }
-    val arr = DoubleArray(numIntVars)
-    arr[intVar] = 1.0
+    val arr = LongArray(numIntVars)
+    arr[intVar] = 1L
     return LinearObjective(intCoefficients = arr)
 }
 
-/** Optimizers minimise; a `-1.0` coefficient maximises. */
+/** Optimizers minimise; a -1 coefficient maximises. */
 fun Problem.maximizeInt(intVar: Int): LinearObjective {
     require(intVar in 0 until numIntVars) { "intVar $intVar out of [0, $numIntVars)" }
-    val arr = DoubleArray(numIntVars)
-    arr[intVar] = -1.0
+    val arr = LongArray(numIntVars)
+    arr[intVar] = -1L
     return LinearObjective(intCoefficients = arr)
 }
 
 /** Penalise the Boolean being true. */
 internal fun Problem.minimizeBool(boolVar: Int): LinearObjective {
     require(boolVar in 0 until numBoolVars) { "boolVar $boolVar out of [0, $numBoolVars)" }
-    val arr = DoubleArray(numBoolVars)
-    arr[boolVar] = 1.0
+    val arr = LongArray(numBoolVars)
+    arr[boolVar] = 1L
     return LinearObjective(boolWeights = arr)
 }
 
 /** Reward the Boolean being true. */
 internal fun Problem.maximizeBool(boolVar: Int): LinearObjective {
     require(boolVar in 0 until numBoolVars) { "boolVar $boolVar out of [0, $numBoolVars)" }
-    val arr = DoubleArray(numBoolVars)
-    arr[boolVar] = -1.0
+    val arr = LongArray(numBoolVars)
+    arr[boolVar] = -1L
     return LinearObjective(boolWeights = arr)
 }

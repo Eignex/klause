@@ -134,7 +134,7 @@ class PortfolioTest {
             ),
         )
         val obj = LinearObjective(
-            intCoefficients = doubleArrayOf(1.0, 2.0),
+            intCoefficients = longArrayOf(1L, 2L),
         )
         val workers = List(3) { i ->
             PortfolioWorker.of(
@@ -166,7 +166,7 @@ class PortfolioTest {
             intDomains = arrayOf(IntDomain(0, 1000)),
             factors = arrayOf<Factor>(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val workers = List(2) { i ->
             PortfolioWorker.of(
                 "bt#$i",
@@ -210,7 +210,7 @@ class PortfolioTest {
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
             ),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val workers = List(6) { i ->
             PortfolioWorker.of(
                 "bt#$i",
@@ -247,7 +247,7 @@ class PortfolioTest {
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
             ),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         // The LS workers are unbudgeted and shared-bound demotes backtrack to BestFound, so
         // nothing self-cancels the pool: stop once any worker reports an incumbent at the known
         // optimum (cancelled workers still yield their best — the anytime invariant). The
@@ -284,7 +284,7 @@ class PortfolioTest {
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
             ),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0, 2.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val events = AtomicReference<List<Pair<String, SearchEvent>>>(emptyList())
         PortfolioBuilder.build(
             problem,

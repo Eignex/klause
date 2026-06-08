@@ -613,11 +613,11 @@ class Cbls(
         when (obj) {
             is LinearObjective -> {
                 for (v in obj.boolWeights.indices) {
-                    if (obj.boolWeights[v] == 0.0) continue
+                    if (obj.boolWeights[v] == 0L) continue
                     sink.addBoolFlip(v)
                 }
                 for (v in obj.intCoefficients.indices) {
-                    if (obj.intCoefficients[v] == 0.0) continue
+                    if (obj.intCoefficients[v] == 0L) continue
                     val cur = state.assignment.intValue(v)
                     val d = state.problem.intDomains[v]
                     // Step in the direction the coefficient says reduces the objective.

@@ -59,7 +59,7 @@ class SearchEventTest {
         val n = 8
         val problem = Problem(n, 0, emptyArray(), emptyList())
         val events = mutableListOf<SearchEvent>()
-        val objective = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
+        val objective = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
         val improvements = BacktrackSolver(problem).improvements(
             objective,
             BacktrackParams(
@@ -82,7 +82,7 @@ class SearchEventTest {
         val n = 8
         val problem = Problem(n, 0, emptyArray(), emptyList())
         val events = mutableListOf<SearchEvent>()
-        val objective = LinearObjective(boolWeights = DoubleArray(n) { (it + 1).toDouble() })
+        val objective = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
         LocalSearchSolver(problem).minimize(
             objective,
             LocalSearchParams(

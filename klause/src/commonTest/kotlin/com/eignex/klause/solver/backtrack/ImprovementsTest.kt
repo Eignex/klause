@@ -26,7 +26,7 @@ class ImprovementsTest {
             intDomains = arrayOf(IntDomain(0, 5)),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val seq = BacktrackSolver(problem).improvements(
             obj,
             BacktrackParams(
@@ -59,7 +59,7 @@ class ImprovementsTest {
             intDomains = arrayOf(IntDomain(3, 5)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val seq = BacktrackSolver(problem).improvements(obj, BacktrackParams(randomSeed = 0L)).toList()
         assertEquals(1, seq.size)
         assertIs<MinimizeResult.Infeasible>(seq[0])
@@ -74,7 +74,7 @@ class ImprovementsTest {
             intDomains = arrayOf(IntDomain(0, 7)),
             factors = emptyArray(),
         )
-        val obj = LinearObjective(intCoefficients = doubleArrayOf(1.0))
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val solver = BacktrackSolver(problem)
         val params = BacktrackParams(randomSeed = 0L, variableHeuristic = InputOrder, valueHeuristic = IndomainMin)
         val viaMinimize = solver.minimize(obj, params)

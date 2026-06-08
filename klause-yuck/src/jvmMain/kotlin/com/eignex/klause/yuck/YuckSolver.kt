@@ -86,7 +86,7 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
      *  to evaluating the objective on the sample if a solution line was somehow throttled away. */
     private fun objectiveValueOf(solution: Map<String, String>, objective: LinearObjective): Double {
         val channelled = solution[FznModel.OBJECTIVE_VAR]?.toIntOrNull()
-        if (channelled != null) return channelled + objective.constant
+        if (channelled != null) return (channelled + objective.constant).toDouble()
         return objective.evaluate(readSample(solution))
     }
 

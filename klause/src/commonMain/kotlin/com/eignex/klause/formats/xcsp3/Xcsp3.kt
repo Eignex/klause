@@ -443,16 +443,16 @@ object Xcsp3 {
             when (type) {
                 "sum" -> {
                     val coeffs = parseInts(e.child("coeffs")?.textContent) ?: IntArray(vars.size) { 1 }
-                    val arr = DoubleArray(domains.size)
-                    vars.forEachIndexed { i, v -> arr[v] = (if (maximize) -coeffs[i] else coeffs[i]).toDouble() }
+                    val arr = LongArray(domains.size)
+                    vars.forEachIndexed { i, v -> arr[v] = (if (maximize) -coeffs[i] else coeffs[i]).toLong() }
                     objective = LinearObjective(intCoefficients = arr)
                 }
 
                 "maximum", "minimum" -> {
                     val m = newAuxVar(domainMin(vars), domainMin(vars) + domainSpan(vars) - 1)
                     factors.add(ArrayMinMax(result = m, xs = vars, max = type == "maximum"))
-                    val arr = DoubleArray(domains.size)
-                    arr[m] = if (maximize) -1.0 else 1.0
+                    val arr = LongArray(domains.size)
+                    arr[m] = if (maximize) -1L else 1L
                     objective = LinearObjective(intCoefficients = arr)
                 }
 
