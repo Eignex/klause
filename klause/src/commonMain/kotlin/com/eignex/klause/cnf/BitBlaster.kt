@@ -4,8 +4,6 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArgSort
@@ -27,9 +25,7 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.MinCostFlow
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Path
 import com.eignex.klause.solver.factor.Product
@@ -47,7 +43,6 @@ import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Tree
-import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import kotlin.math.abs
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
@@ -61,11 +56,11 @@ import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
  * Covers every factor type that can appear in a [Problem]. Core primitives: [Clause],
  * [Cardinality], [Linear] (all four ops including NE), [PseudoBoolean], [Xor], [Product], and
  * the reified forms ([ReifiedLinear], [ReifiedCardinality], [ReifiedPseudoBoolean]). Globals
- * are lowered directly to CNF: [AllDifferent] / [AllDifferentExcept] / [AllDifferentExceptZero]
+ * are lowered directly to CNF: [AllDifferent] / [AllDifferentExcept]
  * / [SymmetricAllDifferent], [Circuit] / [Subcircuit] (MTZ position vectors), [Cumulative] /
  * [Disjunctive] (time-tabling / pairwise no-overlap), [Diffn] (2D), [Count], [NValue], [Among],
  * [GlobalCardinality], [Sequence], [Element], [Table], [Regular] (DFA layers), [Inverse],
- * [Sort], [LexLess], [Monotone], [ValuePrecede], [Member], [AllEqual], [ArrayMinMax],
+ * [Sort], [LexLess], [ArrayMinMax],
  * [ArgMinMax], [BinPacking], [Knapsack], [MinCostFlow], [Geost], and the [SetBitsetSubset] /
  * [SetBitsetEq] / [SetBitsetDisjoint] set-algebra factors.
  *
@@ -137,8 +132,6 @@ object BitBlaster {
 
                 is AllDifferentFactor -> emitAllDifferent(b, factor, intBits, intMin, boolMap)
 
-                is AllDifferentExceptZero -> emitAllDifferentExcept(b, factor.xs, intArrayOf(0), intBits, intMin)
-
                 is AllDifferentExcept -> emitAllDifferentExcept(b, factor.xs, factor.except, intBits, intMin)
 
                 is MinCostFlow -> emitMinCostFlow(b, factor, intBits, intMin, problem)
@@ -165,17 +158,9 @@ object BitBlaster {
 
                 is SetBitsetEq -> emitSetBitsetEq(b, factor, boolMap)
 
-                is AllEqual -> emitAllEqual(b, factor, intBits, intMin)
-
-                is Member -> emitMember(b, factor, intBits, intMin)
-
                 is Among -> emitAmong(b, factor, intBits, intMin)
 
-                is Monotone -> emitMonotone(b, factor, intBits, intMin)
-
                 is LexLess -> emitLexLess(b, factor, intBits, intMin)
-
-                is ValuePrecede -> emitValuePrecede(b, factor, intBits, intMin)
 
                 is Element -> emitElement(b, factor, intBits, intMin)
 
@@ -1006,19 +991,6 @@ object BitBlaster {
         b.addClause(intArrayOf(a, Lit.negate(c)))
     }
 
-    /** `all_equal(xs)` — chain of pairwise equalities. */
-    private fun emitAllEqual(b: CnfBuilder, f: AllEqual, intBits: Array<IntArray>, intMin: IntArray) {
-        for (i in 0 until f.xs.size - 1) {
-            b.addClause(intArrayOf(cmp2(b, f.xs[i], f.xs[i + 1], LinearOp.EQ, intBits, intMin)))
-        }
-    }
-
-    /** `member(xs, y)` — `y` equals at least one element of `xs`. */
-    private fun emitMember(b: CnfBuilder, f: Member, intBits: Array<IntArray>, intMin: IntArray) {
-        val lits = IntArray(f.xs.size) { cmp2(b, f.xs[it], f.y, LinearOp.EQ, intBits, intMin) }
-        b.addClause(lits)
-    }
-
     /** `among(n, xs, S)` — `n = #{i : xs[i] ∈ S}`. */
     private fun emitAmong(b: CnfBuilder, f: Among, intBits: Array<IntArray>, intMin: IntArray) {
         val indicators = f.xs.map { x ->
@@ -1026,38 +998,6 @@ object BitBlaster {
             if (eqs.size == 1) eqs[0] else b.tseitinOr(eqs.toIntArray())
         }
         b.addClause(intArrayOf(b.unsignedEq(sumIndicators(b, indicators), intActualUnsigned(b, f.n, intBits, intMin))))
-    }
-
-    /** `monotone(xs)` — chained ordering per direction / strictness. */
-    private fun emitMonotone(b: CnfBuilder, f: Monotone, intBits: Array<IntArray>, intMin: IntArray) {
-        for (i in 0 until f.xs.size - 1) {
-            val a = f.xs[i]
-            val c = f.xs[i + 1]
-            val lit = when (f.direction) {
-                Monotone.Direction.Increasing ->
-                    buildLinearComparator(
-                        b,
-                        intArrayOf(1, -1),
-                        intArrayOf(a, c),
-                        LinearOp.LE,
-                        if (f.strict) -1 else 0,
-                        intBits,
-                        intMin,
-                    )
-
-                Monotone.Direction.Decreasing ->
-                    buildLinearComparator(
-                        b,
-                        intArrayOf(1, -1),
-                        intArrayOf(a, c),
-                        LinearOp.GE,
-                        if (f.strict) 1 else 0,
-                        intBits,
-                        intMin,
-                    )
-            }
-            b.addClause(intArrayOf(lit))
-        }
     }
 
     /** `lex_less` / `lex_lesseq` over (possibly unequal-length) int vectors. */
@@ -1085,18 +1025,6 @@ object BitBlaster {
         }
         if (includeAllEq) disj += allEqM
         b.addClause(disj.toIntArray())
-    }
-
-    /** `value_precede(s, t, xs)` — `t` at position j requires some `s` strictly before it. */
-    private fun emitValuePrecede(b: CnfBuilder, f: ValuePrecede, intBits: Array<IntArray>, intMin: IntArray) {
-        val sEq = IntArray(f.xs.size) { cmp1(b, f.xs[it], LinearOp.EQ, f.s, intBits, intMin) }
-        for (j in f.xs.indices) {
-            val tj = cmp1(b, f.xs[j], LinearOp.EQ, f.t, intBits, intMin)
-            val clause = IntArray(j + 1)
-            clause[0] = Lit.negate(tj)
-            for (i in 0 until j) clause[i + 1] = sEq[i]
-            b.addClause(clause)
-        }
     }
 
     /** `result = arr[idx]`, `idx` [indexOffset]-based. */

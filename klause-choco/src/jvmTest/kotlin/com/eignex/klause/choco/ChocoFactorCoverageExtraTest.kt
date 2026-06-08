@@ -8,14 +8,12 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.Member
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Regular
@@ -25,7 +23,6 @@ import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
-import com.eignex.klause.solver.factor.ValuePrecede
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -48,27 +45,10 @@ class ChocoFactorCoverageExtraTest {
     private fun count(p: Problem): Int = ChocoSolver(p).enumerate(ChocoParams()).toList().size
     private fun dom(n: Int, lo: Int, hi: Int) = Array(n) { IntDomain(lo, hi) }
 
-    @Test fun `alldifferent_except_zero keeps non-zeros distinct`() {
-        val a = sat(problem(3, dom(3, 0, 2), AllDifferentExceptZero(intArrayOf(0, 1, 2))))
-        val nz = listOf(a.ints[0], a.ints[1], a.ints[2]).filter { it != 0 }
-        assertEquals(nz.size, nz.toSet().size, "non-zero values must be distinct: $nz")
-    }
-
     @Test fun `alldifferent_except keeps non-excepted distinct`() {
         val a = sat(problem(3, dom(3, 0, 2), AllDifferentExcept(intArrayOf(0, 1, 2), intArrayOf(1))))
         val kept = listOf(a.ints[0], a.ints[1], a.ints[2]).filter { it != 1 }
         assertEquals(kept.size, kept.toSet().size, "non-excepted values must be distinct: $kept")
-    }
-
-    @Test fun `member picks one of the array values`() {
-        val a = sat(
-            problem(
-                3,
-                arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-                Member(xs = intArrayOf(0, 1), y = 2),
-            ),
-        )
-        assertTrue(a.ints[2] == a.ints[0] || a.ints[2] == a.ints[1])
     }
 
     @Test fun `array max is the maximum`() {
@@ -147,16 +127,6 @@ class ChocoFactorCoverageExtraTest {
         )
         val v = listOf(a.ints[0], a.ints[1], a.ints[2], a.ints[3])
         for (s in 0..v.size - 2) assertTrue(v.subList(s, s + 2).count { it == 1 } in 1..2)
-    }
-
-    @Test fun `value_precede orders first occurrences`() {
-        val a = sat(problem(3, dom(3, 0, 2), ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))))
-        val v = listOf(a.ints[0], a.ints[1], a.ints[2])
-        val firstT = v.indexOf(2)
-        if (firstT >= 0) {
-            val firstS = v.indexOf(1)
-            assertTrue(firstS in 0 until firstT, "s must precede t: $v")
-        }
     }
 
     @Test fun `symmetric_all_different enumerates involutions`() =

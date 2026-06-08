@@ -5,19 +5,16 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
-import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.SetBitsetDisjoint
 import com.eignex.klause.solver.factor.SetBitsetEq
@@ -43,23 +40,6 @@ class OrToolsFactorCoverageTest {
     private fun count(p: Problem): Int = OrToolsSolver(p).enumerate(OrToolsParams()).toList().size
 
     private fun dom(n: Int, lo: Int, hi: Int) = Array(n) { IntDomain(lo, hi) }
-
-    @Test fun `all_equal enumerates the diagonal`() =
-        assertEquals(3, count(problem(3, dom(3, 0, 2), AllEqual(intArrayOf(0, 1, 2)))))
-
-    @Test fun `strictly increasing has one solution`() = assertEquals(
-        1,
-        count(
-            problem(
-                3,
-                dom(3, 0, 2),
-                Monotone(intArrayOf(0, 1, 2), Monotone.Direction.Increasing, strict = true),
-            ),
-        ),
-    )
-
-    @Test fun `inverse channels two permutations`() =
-        assertEquals(2, count(problem(4, dom(4, 0, 1), Inverse(intArrayOf(0, 1), intArrayOf(2, 3)))))
 
     @Test fun `circuit has two hamiltonian cycles on three nodes`() =
         assertEquals(2, count(problem(3, dom(3, 0, 2), Circuit(intArrayOf(0, 1, 2)))))
