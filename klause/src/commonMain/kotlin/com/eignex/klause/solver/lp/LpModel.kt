@@ -86,6 +86,9 @@ internal class LpBuilder {
 
     private val rows = ArrayList<RawRow>()
 
+    /** Number of structural variables added so far; valid column indices are `0 until varCount`. */
+    val varCount: Int get() = lo.size
+
     /**
      * Add a structural variable with domain `[lower, upper]` and objective coefficient [cost].
      * [tag] is an opaque caller identifier (e.g. an encoded `(varId, value)`) carried through to

@@ -4,6 +4,7 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
@@ -30,6 +31,10 @@ internal class LpRelaxation(
     val colIsBool: BooleanArray,
     /** Constant term of the objective, omitted from the LP and re-added to its bound. */
     val objectiveConstant: Long,
+    /** Integer variable id → its LP column, or -1 if none. For separators to write cuts (#22). */
+    val intColOf: IntArray,
+    /** Boolean variable id → its LP column, or -1 if none. */
+    val boolColOf: IntArray,
 )
 
 /**
@@ -57,8 +62,16 @@ internal class LpRelaxation(
  *  `[1, 1]` / `[0, 0]` when its variable is already pinned this node, else `[0, 1]`. Pinning a
  *  Boolean column collapses every big-M indicator that mentions it to the exact constraint.
  */
-internal class CpToLpRelaxation(private val problem: Problem, private val objective: LinearObjective?) {
-    fun build(session: PropagationSession): LpRelaxation = Assembler(session).assemble()
+internal class CpToLpRelaxation(
+    private val problem: Problem,
+    private val objective: LinearObjective?,
+    /** When true, materialize columns for variables of cut-eligible globals (AllDifferent) so a
+     *  [CutSeparator] can write cuts over them, even when no other factor references the variable. */
+    private val generateCuts: Boolean = false,
+) {
+    /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
+    fun build(session: PropagationSession, extraCuts: List<Cut> = emptyList()): LpRelaxation =
+        Assembler(session).assemble(extraCuts)
 
     private fun intCost(i: Int): Long = objective?.intCoefficients?.getOrElse(i) { 0L } ?: 0L
 
@@ -210,11 +223,18 @@ internal class CpToLpRelaxation(private val problem: Problem, private val object
             }
         }
 
-        fun assemble(): LpRelaxation {
+        fun assemble(extraCuts: List<Cut>): LpRelaxation {
             // Materialize objective-only variables first so the relaxed objective is complete.
             objective?.let { obj ->
                 for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intColumn(i)
                 for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolColumn(b)
+            }
+            // Cut generation needs columns for the globals' variables even when nothing else
+            // references them, so a separator has something to write the cut over.
+            if (generateCuts) {
+                for (factor in problem.factors) {
+                    if (factor is AllDifferent) for (v in factor.vars) intColumn(v)
+                }
             }
 
             for (factor in problem.factors) {
@@ -243,6 +263,14 @@ internal class CpToLpRelaxation(private val problem: Problem, private val object
                 }
             }
 
+            // Separator-produced cuts, over already-created columns. A cut referencing an absent
+            // column is dropped (defensive — separators should only emit over existing columns).
+            for (cut in extraCuts) {
+                if (cut.cols.all { it in 0 until builder.varCount }) {
+                    builder.addRow(cut.cols, cut.coeffs, cut.rel, cut.rhs)
+                }
+            }
+
             val model = builder.build(Sense.MINIMIZE)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
             return LpRelaxation(
@@ -250,6 +278,8 @@ internal class CpToLpRelaxation(private val problem: Problem, private val object
                 colVarId = IntArray(colVarId.size) { colVarId[it] },
                 colIsBool = kinds,
                 objectiveConstant = objective?.constant ?: 0L,
+                intColOf = intCol.copyOf(),
+                boolColOf = boolCol.copyOf(),
             )
         }
 

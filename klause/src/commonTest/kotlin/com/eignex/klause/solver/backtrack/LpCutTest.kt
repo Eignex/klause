@@ -1,0 +1,45 @@
+package com.eignex.klause.solver.backtrack
+
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.AllDifferent
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/** #22: cut generation wired into branch-and-bound (AllDifferent Hall-set cuts). */
+class LpCutTest {
+
+    // AllDifferent over n vars in [0, hi], minimize the sum. Optimum is 0+1+...+(n-1).
+    private fun allDiff(n: Int, hi: Int): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = n,
+        intDomains = Array(n) { IntDomain(0, hi) },
+        factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = hi + 1)),
+    )
+
+    @Test
+    fun `cuts preserve the optimum`() {
+        val p = allDiff(4, 6)
+        val obj = LinearObjective(intCoefficients = LongArray(4) { 1L })
+        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true))
+
+        assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
+        assertEquals(6.0, off.objectiveValue) // 0+1+2+3
+        assertEquals(6.0, on.objectiveValue)
+    }
+
+    @Test
+    fun `cuts fire on an all-different objective`() {
+        val p = allDiff(4, 6)
+        val obj = LinearObjective(intCoefficients = LongArray(4) { 1L })
+        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true))
+        assertTrue(on is MinimizeResult.Optimal)
+        assertEquals(6.0, on.objectiveValue)
+        assertTrue(on.stats.lpCuts.sum > 0.0, "expected AllDifferent cuts, got ${on.stats.lpCuts.sum}")
+    }
+}

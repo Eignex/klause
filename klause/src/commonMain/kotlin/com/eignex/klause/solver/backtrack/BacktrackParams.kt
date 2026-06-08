@@ -182,6 +182,14 @@ data class BacktrackParams(
      * Enabled by default when [lpBounding] is on.
      */
     val lpWarmStart: Boolean = true,
+    /**
+     * Cut generation (#22): at a scheduled node, after the LP solve, run separators that add valid
+     * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
+     * cuts), re-solving to tighten the bound. Requires [lpBounding]; off by default.
+     */
+    val lpCuts: Boolean = false,
+    /** Maximum separation rounds per node for [lpCuts]; each round adds cuts and re-solves. */
+    val lpCutRounds: Int = 4,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**
