@@ -22,6 +22,7 @@ import com.eignex.klause.solver.lp.Cut
 import com.eignex.klause.solver.lp.CutContext
 import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
+import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRelaxation
 import com.eignex.klause.solver.lp.LpSolution
@@ -219,6 +220,13 @@ class BacktrackSolver(override val problem: Problem) :
             null
         }
         val lpSeparators: List<CutSeparator> = if (params.lpCuts) listOf(AllDifferentSeparator()) else emptyList()
+        // Lagrangian bound (#23): built once; multipliers persist across nodes (rolling warm start).
+        val lagBound = if (params.lagrangian && objective is LinearObjective) {
+            LagrangianBound(problem, objective).takeIf { it.applicable }
+        } else {
+            null
+        }
+        var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
         var lpCheckCounter = 0
         // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
         // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
@@ -233,6 +241,24 @@ class BacktrackSolver(override val problem: Problem) :
                 when {
                     // Cheap separable bound first — a fast filter that often prunes without an LP solve.
                     linearLowerBound(objective, session) >= effectiveBound -> true
+
+                    // Lagrangian bound (cheaper than the LP); updates persisted multipliers as a side
+                    // effect and prunes when its bound reaches the incumbent or the subproblem is infeasible.
+                    lagBound != null && run {
+                        val res = lagBound.computeBound(
+                            session,
+                            effectiveBound,
+                            lagMultipliers,
+                            params.lagrangianIterations,
+                        )
+                        if (res != null) {
+                            lagMultipliers = res.multipliers
+                            if (res.prune) sink.observeLagrangianPrune()
+                            res.prune
+                        } else {
+                            false
+                        }
+                    } -> true
 
                     // Then the LP relaxation, gated by the depth/frequency policy (the solve is the
                     // expensive part of a node, so it does not run at every node).

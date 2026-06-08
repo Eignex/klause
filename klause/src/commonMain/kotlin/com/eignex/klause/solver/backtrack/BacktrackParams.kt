@@ -196,6 +196,16 @@ data class BacktrackParams(
      * tableau makes them numerically clean. On by default when [lpCuts] is set.
      */
     val lpGomory: Boolean = true,
+    /**
+     * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
+     * [com.eignex.klause.solver.LinearObjective], a node also computes a Lagrangian bound from an
+     * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
+     * constraints over them dualized) and prunes when that bound — rounded up — reaches the incumbent.
+     * Independent of [lpBounding]; off by default; a no-op when no eligible AllDifferent exists.
+     */
+    val lagrangian: Boolean = false,
+    /** Subgradient ascent iterations per node for [lagrangian]; more iterations tighten the bound. */
+    val lagrangianIterations: Int = 15,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**
