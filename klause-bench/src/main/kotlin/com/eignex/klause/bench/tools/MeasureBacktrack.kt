@@ -59,6 +59,10 @@ private fun runImpl() {
             "instance", "verdict", "decisions", "conflicts", "learned", "restarts", "propagations", "depth", "dec/sec",
         ),
     )
+    // Re-solve each instance `repeat` times and report the *best* decisions/sec — the last,
+    // JIT-warmed runs reflect steady-state throughput rather than cold-start (the default 1
+    // keeps the original single-shot behaviour). Set via -Dklause.measure.repeat=N.
+    val reps = System.getProperty("klause.measure.repeat")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
     for ((name, cnf) in instances) {
         val problem = Dimacs.parse(cnf)
         val params = BacktrackParams(
@@ -69,7 +73,16 @@ private fun runImpl() {
             maxLearnedClauses = 20_000,
             cancellation = Cancellation.after(budgetMs.milliseconds),
         )
-        val result = BacktrackSolver(problem).solve(params)
+        var result = BacktrackSolver(problem).solve(params)
+        var bestDecPerSec = decisionsPerSec(result)
+        repeat(reps - 1) {
+            val r = BacktrackSolver(problem).solve(params)
+            val dps = decisionsPerSec(r)
+            if (dps > bestDecPerSec) {
+                bestDecPerSec = dps
+                result = r
+            }
+        }
         val s = result.stats
         val verdict = when (result) {
             is SolveResult.Sat -> "SAT"
@@ -78,7 +91,7 @@ private fun runImpl() {
         }
         val decisions = s.nodes.sum
         val depth = if (s.peakDepth.max < 0.0) 0.0 else s.peakDepth.max
-        val decPerSec = if (s.wallMs > 0) decisions * 1000.0 / s.wallMs else 0.0
+        val decPerSec = bestDecPerSec
         println(
             "%-14s %-8s %12.0f %12.0f %10.0f %9.0f %14.0f %8.0f %12.0f".format(
                 Locale.ROOT,
@@ -88,6 +101,12 @@ private fun runImpl() {
         )
     }
     println()
+}
+
+/** Decisions per second for one solve, or 0 when the run was too short to time. */
+private fun decisionsPerSec(result: SolveResult): Double {
+    val s = result.stats
+    return if (s.wallMs > 0) s.nodes.sum * 1000.0 / s.wallMs else 0.0
 }
 
 /** Pigeonhole PHPₙ as DIMACS CNF: n+1 pigeons into n holes (UNSAT). Var p*n+h+1 = "pigeon
