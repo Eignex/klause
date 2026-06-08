@@ -15,8 +15,6 @@ import kotlin.test.assertTrue
 /** #23: the subgradient Lagrangian bound over an AllDifferent global. */
 class LagrangianBoundTest {
 
-    private val q = 128L
-
     @Test
     fun `bound is a valid lower bound on a weighted all-different`() {
         // min 1·x0 + 2·x1 + 3·x2, AllDifferent over [0,4]. Cheapest distinct assignment by the
@@ -56,7 +54,7 @@ class LagrangianBoundTest {
     fun `randomized bound never exceeds the true optimum`() {
         val rng = Random(20260608)
         var feasibleChecked = 0
-        repeat(400) {
+        repeat(400) { _ ->
             val n = 3
             val hi = rng.nextInt(2, 6)
             val doms = Array(n) { IntDomain(0, hi) }
@@ -65,7 +63,7 @@ class LagrangianBoundTest {
             // 0–2 linear linking constraints over the all-different variables.
             data class Lin(val coeffs: LongArray, val op: LinearOp, val b: Long)
             val links = ArrayList<Lin>()
-            repeat(rng.nextInt(0, 3)) {
+            repeat(rng.nextInt(0, 3)) { _ ->
                 val coeffs = LongArray(n) { rng.nextInt(-2, 3).toLong() }
                 if (coeffs.all { it == 0L }) return@repeat
                 val op = when (rng.nextInt(3)) {

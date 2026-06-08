@@ -8,6 +8,7 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import kotlin.math.ceil
 
 /**
  * Subgradient Lagrangian bound for a structured AllDifferent global (#23). For
@@ -52,14 +53,14 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
             problem.factors.filterIsInstance<AllDifferent>().firstOrNull { it.vars.size in 2..MAX_VARS }
         }
         if (chosen == null) {
-            vars = IntArray(0);
+            vars = IntArray(0)
             inV = BooleanArray(numInt)
-            linkVars = emptyArray();
-            linkCoeffs = emptyArray();
-            linkRhs = LongArray(0);
+            linkVars = emptyArray()
+            linkCoeffs = emptyArray()
+            linkRhs = LongArray(0)
             linkSign = IntArray(0)
-            intCoef = LongArray(0);
-            boolWeight = LongArray(0);
+            intCoef = LongArray(0)
+            boolWeight = LongArray(0)
             objConstant = 0L
             applicable = false
         } else {
@@ -124,7 +125,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
             val dom = session.intDomain(v)
             dom.forEach { value ->
                 if (value !in valueIndex) {
-                    valueIndex[value] = valueList.size;
+                    valueIndex[value] = valueList.size
                     valueList.add(value)
                 }
             }
@@ -258,7 +259,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
 
     /** Smallest objective that still beats [incumbent]; `Long.MIN_VALUE` headroom when none. */
     private fun incumbentCeil(incumbent: Double): Long =
-        if (incumbent.isFinite()) kotlin.math.ceil(incumbent).toLong() else Long.MAX_VALUE
+        if (incumbent.isFinite()) ceil(incumbent).toLong() else Long.MAX_VALUE
 
     private companion object {
         /** Fixed multiplier denominator: λ = p / Q. A power of two keeps the scaling exact and small. */

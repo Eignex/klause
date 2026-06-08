@@ -48,23 +48,24 @@ class MinCostAssignmentTest {
     fun `randomized parity with brute-force permutation search`() {
         val rng = Random(20260608)
         var checked = 0
-        repeat(600) {
+        repeat(600) { _ ->
             val n = rng.nextInt(1, 5)
             val m = rng.nextInt(n, n + 4)
-            // Random sparse cost matrix; null = option absent.
-            val c = Array(n) { arrayOfNulls<Long>(m) }
+            // Random sparse options: present[i][j] flags an allowed (i,j); cost[i][j] its cost.
+            val present = Array(n) { BooleanArray(m) }
+            val cost = Array(n) { LongArray(m) }
             val a = MinCostAssignment(n, m)
             for (i in 0 until n) {
                 for (j in 0 until m) {
                     if (rng.nextInt(3) != 0) { // ~2/3 of options present
-                        val cost = rng.nextInt(-5, 10).toLong()
-                        c[i][j] = cost
-                        a.addOption(i, j, cost)
+                        present[i][j] = true
+                        cost[i][j] = rng.nextInt(-5, 10).toLong()
+                        a.addOption(i, j, cost[i][j])
                     }
                 }
             }
             val r = a.solve()
-            val (feasible, best) = bruteForce(c, n, m)
+            val (feasible, best) = bruteForce(present, cost, n, m)
             assertEquals(feasible, r.feasible, "feasibility mismatch")
             if (feasible) {
                 assertEquals(best, r.cost, "cost mismatch")
@@ -73,9 +74,9 @@ class MinCostAssignmentTest {
                 var sum = 0L
                 for (i in 0 until n) {
                     val v = r.assignedValue[i]
-                    assertTrue(v in 0 until m && c[i][v] != null, "invalid option ($i,$v)")
+                    assertTrue(v in 0 until m && present[i][v], "invalid option ($i,$v)")
                     assertTrue(used.add(v), "value $v assigned twice")
-                    sum += c[i][v]!!
+                    sum += cost[i][v]
                 }
                 assertEquals(best, sum, "recovered assignment cost mismatch")
             }
@@ -85,21 +86,19 @@ class MinCostAssignmentTest {
     }
 
     /** Min cost over all injective var→value maps; (false, 0) if none exists. */
-    private fun bruteForce(c: Array<Array<Long?>>, n: Int, m: Int): Pair<Boolean, Long> {
+    private fun bruteForce(present: Array<BooleanArray>, cost: Array<LongArray>, n: Int, m: Int): Pair<Boolean, Long> {
         var best: Long? = null
         val used = BooleanArray(m)
-        val pick = IntArray(n)
         fun rec(i: Int, acc: Long) {
             if (i == n) {
-                if (best == null || acc < best!!) best = acc
+                val b = best
+                if (b == null || acc < b) best = acc
                 return
             }
             for (j in 0 until m) {
-                val cost = c[i][j]
-                if (cost != null && !used[j]) {
+                if (present[i][j] && !used[j]) {
                     used[j] = true
-                    pick[i] = j
-                    rec(i + 1, acc + cost)
+                    rec(i + 1, acc + cost[i][j])
                     used[j] = false
                 }
             }
