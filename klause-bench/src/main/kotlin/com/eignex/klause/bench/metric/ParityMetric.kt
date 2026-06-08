@@ -376,6 +376,7 @@ internal object ParityMetric {
             cancellation = Cancellation { System.currentTimeMillis() > deadline },
         )
 
+    @Suppress("InjectDispatcher")
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).solve(fixedParams(entry, deadline))
@@ -385,6 +386,7 @@ internal object ParityMetric {
         }
     }
 
+    @Suppress("InjectDispatcher")
     private fun klauseMinimize(entry: ResolvedProblem, obj: Objective, budget: Budget): MinimizeResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, fixedParams(entry, deadline))

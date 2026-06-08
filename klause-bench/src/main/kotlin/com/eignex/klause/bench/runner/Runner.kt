@@ -5,8 +5,10 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.format.Formats
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.BacktrackParams
 
 /** A catalog [ProblemRef] resolved into a concrete, solvable klause [Problem]. */
 internal data class ResolvedProblem(
@@ -19,15 +21,15 @@ internal data class ResolvedProblem(
     val lsObjective: Objective? = null,
     /** Definitional sweep for the LS engine (see [com.eignex.klause.solver.DefinitionalSweep]);
      *  carried from `FlatZincProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
-    val definitionalSweep: com.eignex.klause.solver.DefinitionalSweep? = null,
+    val definitionalSweep: DefinitionalSweep? = null,
     /** Search heuristics from the model's `solve :: int_search(...)` annotation (see
      *  `FlatZincProgram.defaultBacktrackParams`); null when the model has none. Metrics
      *  merge their budget/seed/restart config into this so benchmark runs honour the
      *  model author's intended search the same way the competition CLI does. */
-    val searchParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
+    val searchParams: BacktrackParams? = null,
     /** Xor-system search recipe (see `FlatZincProgram.xorSearchParams`); null unless the
      *  model carries two or more xor constraints. Raced as an extra portfolio worker. */
-    val xorSearchParams: com.eignex.klause.solver.backtrack.BacktrackParams? = null,
+    val xorSearchParams: BacktrackParams? = null,
 ) {
     internal val name: String get() = ref.name
 }

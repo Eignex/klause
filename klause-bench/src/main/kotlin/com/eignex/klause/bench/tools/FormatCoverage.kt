@@ -14,7 +14,10 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
+import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -138,7 +141,7 @@ object FormatCoverage {
             println("--- top unsupported constructs / parse errors ---")
             reasons.entries.sortedByDescending { it.value }.take(
                 40,
-            ).forEach { (k, v) -> println("  %5d  %s".format(v, k)) }
+            ).forEach { (k, v) -> println("  %5d  %s".format(Locale.ROOT, v, k)) }
         }
     }
 
@@ -160,7 +163,7 @@ object FormatCoverage {
                 f,
             )
         } catch (e: Exception) {
-            return R.ParseError("READ-ERROR: " + (e.message?.take(40) ?: ""))
+            return R.ParseError("READ-ERROR: " + e.message?.take(40).orEmpty())
         }
             ?: return R.Skip
         val inst = try {
@@ -189,7 +192,7 @@ object FormatCoverage {
                 work()
             } catch (e: Throwable) {
                 R.ParseError(
-                    "ERROR: " + (e.message?.take(40) ?: ""),
+                    "ERROR: " + e.message?.take(40).orEmpty(),
                 )
             }
         }
@@ -237,8 +240,8 @@ object FormatCoverage {
     }
 
     /** Read at most [cap] bytes; return null if the stream has more (i.e. instance too big). */
-    private fun boundedRead(input: java.io.InputStream, cap: Long): String? {
-        val buf = java.io.ByteArrayOutputStream()
+    private fun boundedRead(input: InputStream, cap: Long): String? {
+        val buf = ByteArrayOutputStream()
         val chunk = ByteArray(1 shl 16)
         var total = 0L
         input.use {
@@ -254,5 +257,5 @@ object FormatCoverage {
     }
 
     private fun reason(msg: String?): String = (msg ?: "unknown").substringAfter(": ").take(60)
-    private fun pct(n: Int, d: Int): String = if (d == 0) "0%" else "%.1f%%".format(n * 100.0 / d)
+    private fun pct(n: Int, d: Int): String = if (d == 0) "0%" else "%.1f%%".format(Locale.ROOT, n * 100.0 / d)
 }

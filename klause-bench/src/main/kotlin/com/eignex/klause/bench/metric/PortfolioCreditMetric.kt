@@ -8,6 +8,8 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.Cancellation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
@@ -90,7 +92,7 @@ internal object PortfolioCreditMetric {
         println()
         println(
             "=== portfolio credit (attribute first/best/sole per worker; portfolio=$prop" +
-                "${configs?.let { " configs=${it.joinToString(",")}" } ?: ""}; seed=$seed; " +
+                "${configs?.let { " configs=${it.joinToString(",")}" }.orEmpty()}; seed=$seed; " +
                 "${budget.timeoutMillis}ms budget; ${opt.size} optimization instance(s)) ===",
         )
         if (opt.isEmpty()) {
@@ -103,7 +105,7 @@ internal object PortfolioCreditMetric {
         report(rows, aggregates, marginal, budget, prop)
     }
 
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "InjectDispatcher")
     private fun row(
         entry: ResolvedProblem,
         ls: Int,
@@ -126,7 +128,7 @@ internal object PortfolioCreditMetric {
         var last: String? = null
         val contrib = LinkedHashMap<String, Int>()
         try {
-            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.Default) {
+            runBlocking(Dispatchers.Default) {
                 portfolio.improvementsAttributed(cancel).collect { a ->
                     if (first == null) {
                         first = a.workerLabel

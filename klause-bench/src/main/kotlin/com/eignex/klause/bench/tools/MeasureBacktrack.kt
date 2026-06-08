@@ -6,6 +6,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
+import java.util.Locale
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -54,6 +55,7 @@ private fun runImpl() {
     )
     println(
         "%-14s %-8s %12s %12s %10s %9s %14s %8s %12s".format(
+            Locale.ROOT,
             "instance", "verdict", "decisions", "conflicts", "learned", "restarts", "propagations", "depth", "dec/sec",
         ),
     )
@@ -79,6 +81,7 @@ private fun runImpl() {
         val decPerSec = if (s.wallMs > 0) decisions * 1000.0 / s.wallMs else 0.0
         println(
             "%-14s %-8s %12.0f %12.0f %10.0f %9.0f %14.0f %8.0f %12.0f".format(
+                Locale.ROOT,
                 name, verdict, decisions, s.fails.sum, s.learnedClauses.sum, s.restarts.sum,
                 s.propagations.sum, depth, decPerSec,
             ),

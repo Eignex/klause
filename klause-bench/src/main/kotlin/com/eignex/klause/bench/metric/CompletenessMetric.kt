@@ -53,7 +53,7 @@ internal object CompletenessMetric {
                 val r = analyse(entry.name, backend, budgets)
                 results += r
                 rows += "${backend.name} reach=${r.reachAtBudget.joinToString(",")} total=${r.totalDistinct} " +
-                    "cov=${r.coverageAtMaxBudget?.let { "%.2f".format(it) } ?: "—"}"
+                    "cov=${r.coverageAtMaxBudget?.let { "%.2f".format(java.util.Locale.ROOT, it) } ?: "—"}"
             }
             println("[${entry.name}] ${rows.joinToString(" | ")}")
         }

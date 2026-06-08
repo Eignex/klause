@@ -191,6 +191,7 @@ private class PortfolioBench(
         PortfolioBuilder.build(problem, PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 0L))
     override val name = "portfolio"
 
+    @Suppress("InjectDispatcher")
     override fun solve(): SolveResult = runBlocking(Dispatchers.Default) { portfolio.solve() }
 
     override fun samples(n: Int): List<Sample> = collectSamples(n)
@@ -200,6 +201,7 @@ private class PortfolioBench(
 
     /** Fan in [n] samples across the worker pool on the default dispatcher, then stop (the
      *  `take` cancels the upstream flow, stopping every worker). */
+    @Suppress("InjectDispatcher")
     private fun collectSamples(n: Int): List<Sample> = if (n <= 0) {
         emptyList()
     } else {

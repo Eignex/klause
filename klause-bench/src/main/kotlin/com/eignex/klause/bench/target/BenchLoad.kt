@@ -21,9 +21,11 @@ internal object BenchLoad {
     /** Resolve every problem in the given suites with the appropriate runner (MiniZinc compile
      *  or in-process), without the cross-backend verify gate. Used by differential metrics
      *  (parity) that *are* the comparison. */
+    @Suppress("SpreadOperator")
     fun resolve(suiteIds: List<String>): List<ResolvedProblem> =
         Catalog.problems(*suiteIds.toTypedArray()).map { Runners.resolve(it) }
 
+    @Suppress("SpreadOperator")
     fun loadAndVerify(suiteIds: List<String>, quiet: Boolean = false): LoadedCorpus =
         loadAndVerifyRefs(Catalog.problems(*suiteIds.toTypedArray()), quiet)
 

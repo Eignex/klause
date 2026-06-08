@@ -5,6 +5,8 @@ import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.opb.Opb
+import com.eignex.klause.formats.smtlib.SmtLibQfLia
+import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import java.io.File
@@ -69,7 +71,7 @@ internal object Xcsp3Format : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val negTableCap = System.getProperty("klause.bench.xcsp3.negTableCap")?.toLongOrNull() ?: 1_000_000L
-        val parsed = com.eignex.klause.formats.xcsp3.Xcsp3.parse(file.readText(), negTableCap)
+        val parsed = Xcsp3.parse(file.readText(), negTableCap)
         return Ingested(parsed.problem, parsed.objective)
     }
 }
@@ -82,7 +84,7 @@ internal object SmtLibFormat : ProblemFormat {
     override fun ingest(file: File): Ingested {
         val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toIntOrNull() ?: 100_000
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
-        val parsed = com.eignex.klause.formats.smtlib.SmtLibQfLia.parse(file.readText(), intBound, strict)
+        val parsed = SmtLibQfLia.parse(file.readText(), intBound, strict)
         return Ingested(parsed.problem, parsed.objective)
     }
 }

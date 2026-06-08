@@ -14,6 +14,7 @@ import com.eignex.kumulant.stat.quantile.TDigestStat
 import com.eignex.kumulant.stat.summary.MeanStat
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.util.Locale
 import kotlin.math.ln
 
 /**
@@ -71,11 +72,11 @@ object UniformnessMetric {
             for (backend in Solvers.defaultPortfolio(entry.problem)) {
                 val r = analyse(entry.name, backend, sampleCount)
                 results += r
-                val cov = r.coverageFraction?.let { "%.2f".format(it) } ?: "—"
-                val kl = r.klFromUniform?.let { "%.3f".format(it) } ?: "—"
+                val cov = r.coverageFraction?.let { "%.2f".format(Locale.ROOT, it) } ?: "—"
+                val kl = r.klFromUniform?.let { "%.3f".format(Locale.ROOT, it) } ?: "—"
                 rows += "${backend.name} distinct=${r.distinctCount}/${r.sampleCount} " +
-                    "Hp50=${"%.1f".format(r.meanPairwiseHamming)} " +
-                    "H=${"%.2f".format(r.sampleEntropy)} cov=$cov KL=$kl"
+                    "Hp50=${"%.1f".format(Locale.ROOT, r.meanPairwiseHamming)} " +
+                    "H=${"%.2f".format(Locale.ROOT, r.sampleEntropy)} cov=$cov KL=$kl"
             }
             println("[${entry.name}] ${rows.joinToString(" | ")}")
         }

@@ -175,10 +175,12 @@ object TimeMetric {
         val effectiveThreshold = scaledThreshold(thresholdPct, prior)
         if (pct > effectiveThreshold) {
             regressions += "$entryName/$backendName $label: ${Reports.formatNs(prior)} → " +
-                "${Reports.formatNs(now)} (+${"%.1f".format(pct)}%, threshold $effectiveThreshold%)"
+                "${Reports.formatNs(
+                    now,
+                )} (+${"%.1f".format(java.util.Locale.ROOT, pct)}%, threshold $effectiveThreshold%)"
         }
         val sign = if (pct >= 0) "+" else ""
-        return "$base (Δ$sign${"%.0f".format(pct)}%)"
+        return "$base (Δ$sign${"%.0f".format(java.util.Locale.ROOT, pct)}%)"
     }
 
     private fun writeResults(results: BenchResults) {

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.util.Locale
 
 /**
  * Complete-search effort per problem: run [BacktrackSolver] under a fixed, deterministic CDCL
@@ -64,6 +65,7 @@ internal object SearchEffortMetric {
         )
         println(
             "%-22s %-8s %10s %12s %10s %9s %8s".format(
+                Locale.ROOT,
                 "instance",
                 "verdict",
                 "nodes",
@@ -103,6 +105,7 @@ internal object SearchEffortMetric {
             reports += r
             println(
                 "%-22s %-8s %10d %12d %10d %9d %8d".format(
+                    Locale.ROOT,
                     r.name.take(22),
                     r.verdict,
                     r.nodes,

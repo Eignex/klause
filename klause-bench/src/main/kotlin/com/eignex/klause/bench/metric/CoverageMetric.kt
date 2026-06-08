@@ -7,6 +7,7 @@ import com.eignex.klause.bench.report.markdown
 import com.eignex.klause.bench.runner.MiniZincRunner
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.util.Locale
 
 /**
  * Native-predicate coverage: compile each MiniZinc instance to FlatZinc against klause's
@@ -48,6 +49,7 @@ internal object CoverageMetric {
                 .joinToString(", ") { "${it.key}×${it.value}" }
             println(
                 "[${r.name}] ${"%.0f".format(
+                    Locale.ROOT,
                     r.coverage * 100,
                 )}% native (${r.nativeCount}/${r.nativeCount + r.decomposedCount})" +
                     if (worst.isNotEmpty()) " — decomposed: $worst" else "",
@@ -55,7 +57,7 @@ internal object CoverageMetric {
         }
         val overall = rows.sumOf { it.nativeCount }.toDouble() /
             rows.sumOf { it.nativeCount + it.decomposedCount }.coerceAtLeast(1)
-        println("\noverall native coverage: ${"%.1f".format(overall * 100)}% over ${rows.size} instances")
+        println("\noverall native coverage: ${"%.1f".format(Locale.ROOT, overall * 100)}% over ${rows.size} instances")
 
         Reports.writeJson(
             "build/coverage-report.json",
@@ -65,13 +67,13 @@ internal object CoverageMetric {
             "build/coverage-report.md",
             markdown {
                 h1("Native-predicate coverage")
-                para("Overall: **${"%.1f".format(overall * 100)}%** native over ${rows.size} instances.")
+                para("Overall: **${"%.1f".format(Locale.ROOT, overall * 100)}%** native over ${rows.size} instances.")
                 table(
                     listOf("instance", "coverage", "native", "decomposed", "top decomposed"),
                     rows.sortedBy { it.coverage }.map { r ->
                         listOf(
                             r.name,
-                            "${"%.0f".format(r.coverage * 100)}%",
+                            "${"%.0f".format(Locale.ROOT, r.coverage * 100)}%",
                             r.nativeCount,
                             r.decomposedCount,
                             r.decomposedPredicates.entries.sortedByDescending { it.value }.take(
