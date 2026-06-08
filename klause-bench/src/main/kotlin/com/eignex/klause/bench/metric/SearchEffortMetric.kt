@@ -7,6 +7,7 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
 import kotlinx.serialization.Serializable
@@ -14,17 +15,17 @@ import java.time.Instant
 import java.util.Locale
 
 /**
- * Complete-search effort per problem: run [BacktrackSolver] under a fixed, deterministic CDCL
- * configuration and report the engine's own [com.eignex.klause.solver.SolveStats] — nodes,
- * conflicts (fails), learned clauses, restarts — plus the verdict and wall time. Unlike the
- * time metric (wall-clock, multi-backend) this exposes the search-size counters, which are the
- * signal for clause-learning / explanation quality: a sharper conflict explanation should learn
- * more reusable clauses and close the same instance in fewer conflicts.
+ * Complete-search effort per problem, run as an A/B between two [BacktrackSolver]
+ * configurations under a fixed seed and per-instance timeout: a **baseline** CDCL config
+ * (VSIDS + phase saving + Luby + LBD) and the **SAT-optimized** preset
+ * ([BacktrackPresets.satOptimized] — adaptive restarts, target phasing, three-tier learned DB,
+ * binary-resolution minimization, vivification). For each it reports the engine's own
+ * [com.eignex.klause.solver.SolveStats] — nodes, conflicts (fails), learned clauses, restarts —
+ * plus the verdict and wall time.
  *
- * The whole point is A/B-ability: hold this metric and its suite fixed, change one thing in the
- * engine (e.g. an AllDifferent explanation scope), and compare conflicts/solve-rate. The fixed
- * seed makes a single run deterministic; aggregate over a suite of related instances to see past
- * the heavy tail of any one instance.
+ * The conflict count is the search-size signal: a stronger SAT configuration should close the
+ * same instances in fewer conflicts. The summary compares total fails over the instances both
+ * configs solved, so the SAT-optimized stack's effect is read off directly.
  *
  * Knobs: `-Dklause.bench.search.seed` (default 1).
  */
@@ -42,17 +43,26 @@ data class SearchEffortReport(
 )
 
 @Serializable
+internal data class SearchEffortPair(
+    val name: String,
+    val baseline: SearchEffortReport,
+    val satOpt: SearchEffortReport,
+)
+
+@Serializable
 internal data class SearchEffortResults(
     val timestamp: String,
     val gitSha: String?,
     val env: EnvInfo,
     val seed: Long,
     val timeoutMillis: Long,
-    val solvedCount: Int,
+    val baselineSolved: Int,
+    val satOptSolved: Int,
     val total: Int,
-    val solvedFailsSum: Long,
-    val solvedFailsMedian: Long,
-    val entries: List<SearchEffortReport>,
+    val bothSolved: Int,
+    val baselineFailsSumBothSolved: Long,
+    val satOptFailsSumBothSolved: Long,
+    val entries: List<SearchEffortPair>,
 )
 
 internal object SearchEffortMetric {
@@ -60,67 +70,61 @@ internal object SearchEffortMetric {
         val seed = System.getProperty("klause.bench.search.seed")?.toLongOrNull() ?: 1L
         println()
         println(
-            "=== search-effort (KLAUSE_COMPLETE, VSIDS+phaseSaving+Luby+LBD, seed=$seed, " +
-                "${budget.timeoutMillis}ms/instance) ===",
+            "=== search-effort A/B (baseline VSIDS+phase+Luby vs SAT-optimized preset, " +
+                "seed=$seed, ${budget.timeoutMillis}ms/instance) ===",
         )
         println(
-            "%-22s %-8s %10s %12s %10s %9s %8s".format(
+            "%-20s %18s %18s %9s %9s".format(
                 Locale.ROOT,
                 "instance",
-                "verdict",
-                "nodes",
-                "fails",
-                "learned",
-                "restarts",
-                "ms",
+                "base verdict/fails",
+                "sat verdict/fails",
+                "base ms",
+                "sat ms",
             ),
         )
-        val reports = mutableListOf<SearchEffortReport>()
+        val pairs = mutableListOf<SearchEffortPair>()
         for (e in entries) {
-            val deadline = System.currentTimeMillis() + budget.timeoutMillis
-            val params = BacktrackParams(
-                randomSeed = seed,
-                variableHeuristic = Vsids(),
-                phaseSaving = true,
-                lubyRestartBase = 100L,
-                maxLearnedClauses = 20_000,
-                cancellation = Cancellation { System.currentTimeMillis() > deadline },
-            )
-            val start = System.currentTimeMillis()
-            val result = runCatching { BacktrackSolver(e.problem).solve(params) }.getOrNull()
-            val ms = System.currentTimeMillis() - start
-            val st = result?.stats
-            val verdict = result?.let { it::class.simpleName ?: "?" } ?: "ERROR"
-            val r = SearchEffortReport(
-                name = e.name,
-                verdict = verdict,
-                solved = result is SolveResult.Sat || result is SolveResult.Unsat,
-                nodes = (st?.nodes?.sum ?: 0.0).toLong(),
-                fails = (st?.fails?.sum ?: 0.0).toLong(),
-                learned = (st?.learnedClauses?.sum ?: 0.0).toLong(),
-                restarts = (st?.restarts?.sum ?: 0.0).toLong(),
-                wallMs = ms,
-                timedOut = st?.timedOut ?: false,
-            )
-            reports += r
+            val baseline = solveWith(e, budget) { deadline ->
+                BacktrackParams(
+                    randomSeed = seed,
+                    variableHeuristic = Vsids(),
+                    phaseSaving = true,
+                    lubyRestartBase = 100L,
+                    maxLearnedClauses = 20_000,
+                    cancellation = Cancellation { System.currentTimeMillis() > deadline },
+                )
+            }
+            val satOpt = solveWith(e, budget) { deadline ->
+                BacktrackPresets.satOptimized(
+                    randomSeed = seed,
+                    cancellation = Cancellation { System.currentTimeMillis() > deadline },
+                )
+            }
+            pairs += SearchEffortPair(e.name, baseline, satOpt)
             println(
-                "%-22s %-8s %10d %12d %10d %9d %8d".format(
+                "%-20s %10s/%-7d %10s/%-7d %9d %9d".format(
                     Locale.ROOT,
-                    r.name.take(22),
-                    r.verdict,
-                    r.nodes,
-                    r.fails,
-                    r.learned,
-                    r.restarts,
-                    r.wallMs,
+                    e.name.take(20),
+                    baseline.verdict.take(10),
+                    baseline.fails,
+                    satOpt.verdict.take(10),
+                    satOpt.fails,
+                    baseline.wallMs,
+                    satOpt.wallMs,
                 ),
             )
         }
-        val solved = reports.filter { it.solved }
-        val solvedFails = solved.map { it.fails }.sorted()
-        val median = if (solvedFails.isEmpty()) 0L else solvedFails[solvedFails.size / 2]
-        val sum = solvedFails.sum()
-        println("--- solved ${solved.size}/${reports.size}  |  fails over solved: sum=$sum median=$median ---")
+        val both = pairs.filter { it.baseline.solved && it.satOpt.solved }
+        val baseSum = both.sumOf { it.baseline.fails }
+        val satSum = both.sumOf { it.satOpt.fails }
+        val baseSolved = pairs.count { it.baseline.solved }
+        val satSolved = pairs.count { it.satOpt.solved }
+        println(
+            "--- solved: baseline $baseSolved/${pairs.size}, sat-opt $satSolved/${pairs.size}  |  " +
+                "fails over both-solved (${both.size}): baseline=$baseSum sat-opt=$satSum" +
+                (if (baseSum > 0) " (%.2fx)".format(Locale.ROOT, satSum.toDouble() / baseSum) else "") + " ---",
+        )
         Reports.writeJson(
             "build/bench-search.json",
             SearchEffortResults(
@@ -129,12 +133,38 @@ internal object SearchEffortMetric {
                 env = EnvInfo.capture(),
                 seed = seed,
                 timeoutMillis = budget.timeoutMillis,
-                solvedCount = solved.size,
-                total = reports.size,
-                solvedFailsSum = sum,
-                solvedFailsMedian = median,
-                entries = reports,
+                baselineSolved = baseSolved,
+                satOptSolved = satSolved,
+                total = pairs.size,
+                bothSolved = both.size,
+                baselineFailsSumBothSolved = baseSum,
+                satOptFailsSumBothSolved = satSum,
+                entries = pairs,
             ),
+        )
+    }
+
+    /** Run one config over [e] under a fresh per-instance deadline, capturing its effort stats. */
+    private fun solveWith(
+        e: ResolvedProblem,
+        budget: Budget,
+        params: (deadline: Long) -> BacktrackParams,
+    ): SearchEffortReport {
+        val deadline = System.currentTimeMillis() + budget.timeoutMillis
+        val start = System.currentTimeMillis()
+        val result = runCatching { BacktrackSolver(e.problem).solve(params(deadline)) }.getOrNull()
+        val ms = System.currentTimeMillis() - start
+        val st = result?.stats
+        return SearchEffortReport(
+            name = e.name,
+            verdict = result?.let { it::class.simpleName ?: "?" } ?: "ERROR",
+            solved = result is SolveResult.Sat || result is SolveResult.Unsat,
+            nodes = (st?.nodes?.sum ?: 0.0).toLong(),
+            fails = (st?.fails?.sum ?: 0.0).toLong(),
+            learned = (st?.learnedClauses?.sum ?: 0.0).toLong(),
+            restarts = (st?.restarts?.sum ?: 0.0).toLong(),
+            wallMs = ms,
+            timedOut = st?.timedOut ?: false,
         )
     }
 }
