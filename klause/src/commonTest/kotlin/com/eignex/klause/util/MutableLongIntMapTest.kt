@@ -42,6 +42,16 @@ class MutableLongIntMapTest {
     }
 
     @Test
+    fun `addTo increments from zero default and returns new value`() {
+        val m = MutableLongIntMap()
+        assertEquals(1, m.addTo(7_000_000_000L, 1))
+        assertEquals(3, m.addTo(7_000_000_000L, 2))
+        assertEquals(-1, m.addTo(7_000_000_000L, -4))
+        assertEquals(-1, m.getOrDefault(7_000_000_000L, 0))
+        assertEquals(1, m.size)
+    }
+
+    @Test
     fun `extreme keys and zero coexist`() {
         val m = MutableLongIntMap()
         m.put(Long.MIN_VALUE, 1)
@@ -122,7 +132,7 @@ class MutableLongIntMapTest {
             repeat(2000) {
                 // Mix of small (collision-prone) and wide keys.
                 val key = if (rng.nextBoolean()) rng.nextLong(-60, 60) else rng.nextLong()
-                when (rng.nextInt(3)) {
+                when (rng.nextInt(4)) {
                     0 -> {
                         val v = rng.nextInt(-100, 100)
                         m.put(key, v)
@@ -134,6 +144,13 @@ class MutableLongIntMapTest {
                     2 -> {
                         assertEquals(ref.containsKey(key), m.containsKey(key), "containsKey($key)")
                         assertEquals(ref[key] ?: Int.MIN_VALUE, m.getOrDefault(key, Int.MIN_VALUE), "get($key)")
+                    }
+
+                    3 -> {
+                        val d = rng.nextInt(-5, 6)
+                        val exp = (ref[key] ?: 0) + d
+                        ref[key] = exp
+                        assertEquals(exp, m.addTo(key, d), "addTo($key)")
                     }
                 }
                 assertEquals(ref.size, m.size)

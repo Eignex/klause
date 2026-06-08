@@ -69,6 +69,28 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
         if (size * 2 > keys.size) grow()
     }
 
+    /**
+     * Add [delta] to the value at [key] (treating an absent key as `0`) and return the new value.
+     * The count-map idiom `m[k] = (m[k] ?: 0) + delta` in one probe instead of two.
+     */
+    fun addTo(key: Long, delta: Int): Int {
+        var i = mix(key) and mask
+        while (used[i]) {
+            if (keys[i] == key) {
+                val nv = values[i] + delta
+                values[i] = nv
+                return nv
+            }
+            i = (i + 1) and mask
+        }
+        used[i] = true
+        keys[i] = key
+        values[i] = delta
+        size++
+        if (size * 2 > keys.size) grow()
+        return delta
+    }
+
     /** Remove [key]; returns true if it was present. Backward-shift keeps the table tombstone-free. */
     fun remove(key: Long): Boolean {
         var i = mix(key) and mask
