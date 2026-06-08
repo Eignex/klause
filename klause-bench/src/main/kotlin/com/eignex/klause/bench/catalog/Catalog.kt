@@ -108,6 +108,16 @@ internal sealed interface ProblemSource {
     /** A file inside an [ExternalCollection] that is fetched (cloned/downloaded) on first
      *  use into a cache. [relPath] is relative to the collection's root. */
     data class External(val collection: ExternalCollection, val relPath: String) : ProblemSource
+
+    /** The [index]-th file with extension [ext] (sorted by name, searched recursively) inside a
+     *  fetched [ExternalCollection]. For collections whose member filenames aren't predictable —
+     *  e.g. the SATLIB random-3SAT tarballs sample instances with inconsistent zero-padding
+     *  (`uf50-031.cnf`, `uf50-0433.cnf`), so a fixed [External.relPath] can't name them. */
+    data class ExternalIndexed(
+        val collection: ExternalCollection,
+        val index: Int,
+        val ext: String,
+    ) : ProblemSource
 }
 
 /** Convenience: a vendored file under `klause-bench/corpus/<relPath>`. */

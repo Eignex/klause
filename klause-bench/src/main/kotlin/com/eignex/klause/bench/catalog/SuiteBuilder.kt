@@ -108,6 +108,27 @@ internal class SuiteBuilder(val id: String, val description: String) {
         license = collection.license,
     )
 
+    /** The [index]-th file (sorted by name) with extension [ext] inside a fetched
+     *  [ExternalCollection] — for collections whose member filenames aren't predictable. */
+    fun externalIndexed(
+        name: String,
+        collection: ExternalCollection,
+        index: Int,
+        ext: String,
+        category: Category = this.category,
+        expected: Expected = Expected.Unknown,
+        format: Format = requireFormat(),
+        tags: Set<String> = emptySet(),
+    ) = problem(
+        name,
+        ProblemSource.ExternalIndexed(collection, index, ext),
+        format,
+        category,
+        expected,
+        tags = tags,
+        license = collection.license,
+    )
+
     /** A programmatic instance built in Kotlin. */
     fun inCode(
         name: String,

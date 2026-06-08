@@ -45,6 +45,18 @@ internal object CorpusFetcher {
             require(it.isFile) { "instance '${source.relPath}' not found in collection '${source.collection.id}'" }
         }
 
+        is ProblemSource.ExternalIndexed -> {
+            val files = ensure(source.collection).walkTopDown()
+                .filter { it.isFile && it.extension == source.ext }
+                .sortedBy { it.name }
+                .toList()
+            require(source.index in files.indices) {
+                "collection '${source.collection.id}' has ${files.size} *.${source.ext} files; " +
+                    "index ${source.index} out of range"
+            }
+            files[source.index]
+        }
+
         is ProblemSource.InCode -> error("InCode sources have no file")
     }
 

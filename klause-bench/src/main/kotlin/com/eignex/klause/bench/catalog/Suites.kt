@@ -421,14 +421,17 @@ internal object Suites {
         license = "SATLIB (public benchmarks)"
         for ((name, col) in ExternalCollections.satlibLadder) {
             val sat = name.startsWith("uf")
-            val prefix = name.substringBefore("-") // instances are named "<vars>-0<n>.cnf" (e.g. uf50-01.cnf)
-            for (n in 1..5) {
-                external(
-                    "$name-$n",
+            // The SATLIB tarballs sample instances with inconsistent zero-padding
+            // (uf50-031.cnf, uf50-0433.cnf, …), so a guessed filename like uf50-01.cnf doesn't
+            // exist. Reference the first few by index over the sorted collection instead.
+            for (n in 0 until 5) {
+                externalIndexed(
+                    "$name-${n + 1}",
                     col,
-                    "$prefix-0$n.cnf",
-                    if (sat) Category.SAT else Category.UNSAT,
-                    if (sat) Expected.Sat else Expected.Unsat,
+                    index = n,
+                    ext = "cnf",
+                    category = if (sat) Category.SAT else Category.UNSAT,
+                    expected = if (sat) Expected.Sat else Expected.Unsat,
                 )
             }
         }
