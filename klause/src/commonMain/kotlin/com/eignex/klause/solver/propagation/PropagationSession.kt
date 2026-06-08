@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -175,7 +176,7 @@ class PropagationSession(
     fun pinIntAtMost(v: Int, hi: Int): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        if (!state.setIntMaxAsDecision(v, hi)) return revertAndUnsat(state.conflictLevels.orEmpty())
+        if (!state.setIntMaxAsDecision(v, hi)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         trail.add(encInt(v))
@@ -187,7 +188,7 @@ class PropagationSession(
     fun pinIntAtLeast(v: Int, lo: Int): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        if (!state.setIntMinAsDecision(v, lo)) return revertAndUnsat(state.conflictLevels.orEmpty())
+        if (!state.setIntMinAsDecision(v, lo)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         trail.add(encInt(v))
@@ -263,7 +264,7 @@ class PropagationSession(
     private fun implyAtCurrentLevel(apply: () -> Boolean): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        if (!apply()) return revertAndUnsat(state.conflictLevels.orEmpty())
+        if (!apply()) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         // Fold into the current level's baseline so a later same-level revert keeps it, and so
@@ -311,7 +312,7 @@ class PropagationSession(
         val want = if (value) 1 else 0
         if (boolPinned[v] == want) return PropagationResult.Implied.Empty
         val base = state.undoTop
-        if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels.orEmpty())
+        if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         boolPinned[v] = want
@@ -323,7 +324,7 @@ class PropagationSession(
     private fun pushInt(v: Int, value: Int): PropagationResult {
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.Empty
         val base = state.undoTop
-        if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels.orEmpty())
+        if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = state.runToFixpoint(allFactors = false)
         if (conflict != null) return revertAndUnsat(conflict)
         intPinnedSet[v] = true
@@ -338,7 +339,7 @@ class PropagationSession(
      * encoding still on the state), then restore the pre-push snapshot. Extraction must
      * happen before restore, since restore wipes the level-to-var mapping.
      */
-    private fun revertAndUnsat(levels: Set<Int>): PropagationResult.Unsat {
+    private fun revertAndUnsat(levels: IntArray): PropagationResult.Unsat {
         // Must extract factors *before* restoring — restore wipes the seed + reason arrays.
         val factors = state.extractConflictFactors()
         // Run 1UIP analysis BEFORE restore — the analyzer walks `state.boolAntecedents` /
@@ -361,11 +362,11 @@ class PropagationSession(
         // 1UIP analysis produced a clause, prefer the canonical CDCL bump set — every
         // variable seen while walking the implication graph — over the coarse "decision
         // vars at the conflict levels" extraction. Sharper conflict focus ⇒ fewer conflicts.
-        val bools: Set<Int>
-        val ints: Set<Int>
+        val bools: IntArray
+        val ints: IntArray
         if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
-            bools = state.conflictAnalyzer.lastBumpBoolVars().toSet()
-            ints = state.conflictAnalyzer.lastBumpIntVars().toSet()
+            bools = state.conflictAnalyzer.lastBumpBoolVars().toIntArray()
+            ints = state.conflictAnalyzer.lastBumpIntVars().toIntArray()
         } else {
             bools = state.extractConflictBools(levels)
             ints = state.extractConflictInts(levels)

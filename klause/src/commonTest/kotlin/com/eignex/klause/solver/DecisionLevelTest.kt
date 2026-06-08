@@ -29,8 +29,8 @@ class DecisionLevelTest {
         assertIs<PropagationResult.Implied>(s.pinBool(0, false)) // level 1
         assertIs<PropagationResult.Implied>(s.pinBool(2, true)) // level 2
         val u = assertIs<PropagationResult.Unsat>(s.pinBool(1, false)) // level 3 → Unsat
-        assertEquals(setOf(1, 3), u.conflictLevels)
-        assertEquals(setOf(0, 1), u.conflictBools)
+        assertEquals(setOf(1, 3), u.conflictLevels.toSet())
+        assertEquals(setOf(0, 1), u.conflictBools.toSet())
         assertTrue(2 !in u.conflictBools, "z at level 2 was irrelevant")
     }
 
@@ -46,8 +46,8 @@ class DecisionLevelTest {
             ),
         )
         val u = assertIs<PropagationResult.Unsat>(p.propagate())
-        assertEquals(emptySet(), u.conflictLevels)
-        assertEquals(emptySet(), u.conflictBools)
+        assertEquals(emptySet(), u.conflictLevels.toSet())
+        assertEquals(emptySet(), u.conflictBools.toSet())
     }
 
     @Test
@@ -64,7 +64,7 @@ class DecisionLevelTest {
         s.seed(Assumptions.None)
         assertIs<PropagationResult.Implied>(s.pinBool(0, false))
         val u = assertIs<PropagationResult.Unsat>(s.pinBool(1, false))
-        assertEquals(setOf(1, 2), u.conflictLevels)
+        assertEquals(setOf(1, 2), u.conflictLevels.toSet())
         s.popToLevel(1)
         assertEquals(1, s.decisionLevel)
         // Now pinning y=true succeeds.
@@ -129,7 +129,7 @@ class DecisionLevelTest {
         assertIs<PropagationResult.Implied>(s.pinBool(2, true)) // level 2; irrelevant
         val u = assertIs<PropagationResult.Unsat>(s.pinBool(1, false)) // level 3
         // 1 (decision for x, which propagated y) and 3 (the explicit y=false attempt).
-        assertEquals(setOf(1, 3), u.conflictLevels)
+        assertEquals(setOf(1, 3), u.conflictLevels.toSet())
     }
 
     @Test
@@ -145,8 +145,8 @@ class DecisionLevelTest {
         s.seed(Assumptions.None)
         assertIs<PropagationResult.Implied>(s.pinInt(0, 1))
         val u = assertIs<PropagationResult.Unsat>(s.pinInt(1, 1))
-        assertEquals(setOf(1, 2), u.conflictLevels)
-        assertEquals(setOf(0, 1), u.conflictInts)
+        assertEquals(setOf(1, 2), u.conflictLevels.toSet())
+        assertEquals(setOf(0, 1), u.conflictInts.toSet())
     }
 
     @Test
@@ -161,7 +161,7 @@ class DecisionLevelTest {
             p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false))),
         )
         // Both seed pins are responsible — both at levels {1, 2}.
-        assertEquals(setOf(1, 2), u.conflictLevels)
-        assertEquals(setOf(0, 1), u.conflictBools)
+        assertEquals(setOf(1, 2), u.conflictLevels.toSet())
+        assertEquals(setOf(0, 1), u.conflictBools.toSet())
     }
 }

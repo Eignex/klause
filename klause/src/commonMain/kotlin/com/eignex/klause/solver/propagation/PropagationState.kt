@@ -2,6 +2,7 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Bits
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -383,7 +384,7 @@ class PropagationState(
 
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on conflict
-    internal var conflictLevels: MutableSet<Int>? = null
+    internal var conflictLevels: IntArray? = null
 
     /** Per-var record of which factor most recently *forced* the value. `-1` means "set by a
      *  decision / assumption, not by any factor's propagation step". Read by
@@ -420,6 +421,9 @@ class PropagationState(
     // Reused across conflicts (cleared, not reallocated) and primitive (no Int boxing) — this is
     // populated on the propagation conflict path, which is hot on conflict-heavy instances.
     internal val conflictSeedFactors: IntHashSet = IntHashSet()
+
+    /** Reused dedup scratch for [collectLevelsForVars] — avoids a per-conflict HashSet alloc. */
+    private val levelScratch: IntHashSet = IntHashSet()
 
     /** Var whose pinned value was contradicted by a decision-level pin attempt (i.e.
      *  `pinBoolAsDecision` tried to set the opposite value of an existing pin). `-1` when
@@ -1870,10 +1874,12 @@ class PropagationState(
         tightenIntMinImpl(v, value, antecedents) && tightenIntMaxImpl(v, value, antecedents)
 
     private fun recordConflictLevels(a: Int, b: Int) {
-        val s = HashSet<Int>()
-        if (a > 0) s.add(a)
-        if (b > 0) s.add(b)
-        conflictLevels = s
+        conflictLevels = when {
+            a > 0 && b > 0 && a != b -> intArrayOf(a, b)
+            a > 0 -> intArrayOf(a)
+            b > 0 -> intArrayOf(b)
+            else -> EmptyIntArray
+        }
     }
 
     /** Pop one bool var that's been dirtied since the last call, or `-1` if none. */
@@ -1943,43 +1949,45 @@ class PropagationState(
      *  failing factor is a learned Clause whose literals reference atom-lits (encoded as
      *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those map into `atomLevel`,
      *  not [boolLevel] — mirrors the [maxLevelForVars] dispatch a few lines above. */
-    fun collectLevelsForVars(boolVars: IntArray, intVars: IntArray): Set<Int> {
-        val out = HashSet<Int>()
+    fun collectLevelsForVars(boolVars: IntArray, intVars: IntArray): IntArray {
+        // Dedup levels in a reused primitive set (no per-conflict HashSet / Int boxing), then
+        // materialize a plain IntArray — this is on the per-conflict path.
+        levelScratch.clear()
         val numBool = problem.numBoolVars
         for (v in boolVars) {
             val l = if (v < numBool) boolLevel[v] else atomLevelForConflict(v - numBool)
-            if (l > 0) out.add(l)
+            if (l > 0) levelScratch.add(l)
         }
         for (v in intVars) {
             val l = intLevel[v]
-            if (l > 0) out.add(l)
+            if (l > 0) levelScratch.add(l)
         }
-        return out
+        return levelScratch.toIntArray()
     }
 
     /** Decode [levels] (a subset of pushed decision levels) into the bool decision vars at
      *  those levels. */
-    internal fun extractConflictBools(levels: Set<Int>): Set<Int> {
-        if (levels.isEmpty()) return emptySet()
-        val out = HashSet<Int>()
+    internal fun extractConflictBools(levels: IntArray): IntArray {
+        if (levels.isEmpty()) return EmptyIntArray
+        val out = IntHashSet(levels.size)
         for (lvl in levels) {
             if (lvl <= 0 || lvl > levelToDecisionVar.size) continue
             val encoded = levelToDecisionVar[lvl - 1]
             if (encoded < problem.numBoolVars) out.add(encoded)
         }
-        return out
+        return out.toIntArray()
     }
 
     /** Decode [levels] into the int decision vars at those levels. */
-    internal fun extractConflictInts(levels: Set<Int>): Set<Int> {
-        if (levels.isEmpty()) return emptySet()
-        val out = HashSet<Int>()
+    internal fun extractConflictInts(levels: IntArray): IntArray {
+        if (levels.isEmpty()) return EmptyIntArray
+        val out = IntHashSet(levels.size)
         for (lvl in levels) {
             if (lvl <= 0 || lvl > levelToDecisionVar.size) continue
             val encoded = levelToDecisionVar[lvl - 1]
             if (encoded >= problem.numBoolVars) out.add(encoded - problem.numBoolVars)
         }
-        return out
+        return out.toIntArray()
     }
 
     /**
@@ -1994,8 +2002,8 @@ class PropagationState(
      * Two-sided narrowing is handled because [intMinReason] and [intMaxReason] are tracked
      * separately and both endpoints are walked for every int var.
      */
-    internal fun extractConflictFactors(): Set<Int> {
-        if (conflictSeedFactors.isEmpty()) return emptySet()
+    internal fun extractConflictFactors(): IntArray {
+        if (conflictSeedFactors.isEmpty()) return EmptyIntArray
         // Primitive BFS over the propagation graph: [out] dedups reached factor ids, [frontier]
         // is a grow-only worklist walked by a head index (no boxing, no per-step dequeue alloc).
         val out = IntHashSet(conflictSeedFactors.size * 2)
@@ -2023,10 +2031,7 @@ class PropagationState(
                 if (rMax >= 0 && out.add(rMax)) frontier.add(rMax)
             }
         }
-        // Materialize the boxed Set for the result contract; the BFS above stayed primitive.
-        val result = HashSet<Int>(out.size * 2)
-        out.forEach { result.add(it) }
-        return result
+        return out.toIntArray()
     }
 
     // Mark / undo for [PropagationSession]. A pop rewinds to a prior fixpoint by replaying
@@ -2166,7 +2171,7 @@ class PropagationState(
      *
      * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
      */
-    internal fun runToFixpoint(allFactors: Boolean, initialFactor: Int = -1): Set<Int>? {
+    internal fun runToFixpoint(allFactors: Boolean, initialFactor: Int = -1): IntArray? {
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
         // would otherwise mix old seeds into a new conflict's core.
         conflictSeedFactors.clear()

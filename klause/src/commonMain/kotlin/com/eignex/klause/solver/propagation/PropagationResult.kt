@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -232,12 +233,17 @@ sealed interface PropagationResult {
      *  not assume minimality. An empty result means the contradiction was implied by problem
      *  constraints alone (no input was load-bearing).
      */
+    // Conflict id/level sets are primitive IntArrays, not Set<Int>: they're produced once per
+    // conflict (a hot path on conflict-heavy instances) and consumers only iterate / membership-
+    // test / `isEmpty` them — all of which work allocation-free on IntArray. Producers dedup via
+    // a primitive IntHashSet before materializing. Equality is by reference (no consumer compares
+    // a whole Unsat by value), so the data-class default is fine.
     @ConsistentCopyVisibility
     data class Unsat internal constructor(
-        val conflictBools: Set<Int> = emptySet(),
-        val conflictInts: Set<Int> = emptySet(),
-        val conflictLevels: Set<Int> = emptySet(),
-        val conflictFactors: Set<Int> = emptySet(),
+        val conflictBools: IntArray = EmptyIntArray,
+        val conflictInts: IntArray = EmptyIntArray,
+        val conflictLevels: IntArray = EmptyIntArray,
+        val conflictFactors: IntArray = EmptyIntArray,
         /**
          * First-UIP analysis result captured before state revert, or `null` when the
          * conflict happened at level 0 (no learning possible), inside an assumption

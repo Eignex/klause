@@ -26,8 +26,8 @@ class ConflictReasonTest {
         )
         val r = p.propagate()
         val u = assertIs<PropagationResult.Unsat>(r)
-        assertEquals(emptySet(), u.conflictBools)
-        assertEquals(emptySet(), u.conflictInts)
+        assertEquals(emptySet(), u.conflictBools.toSet())
+        assertEquals(emptySet(), u.conflictInts.toSet())
     }
 
     @Test

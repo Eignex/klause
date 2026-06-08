@@ -631,9 +631,9 @@ class BacktrackSolver(override val problem: Problem) :
      *  project) or no level was touched (no information). */
     private fun projectTouchedToAssumptions(input: Assumptions, levels: IntArray): Assumptions? {
         if (input.isEmpty || levels.isEmpty()) return null
-        val touched = HashSet<Int>(levels.size)
-        for (l in levels) touched.add(l)
-        return projectSeedConflictToAssumptions(input, touched)
+        // [levels] is already the touched seed-level array; the projection is idempotent over
+        // duplicates, so pass it straight through (no dedup set needed).
+        return projectSeedConflictToAssumptions(input, levels)
     }
 
     /** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty

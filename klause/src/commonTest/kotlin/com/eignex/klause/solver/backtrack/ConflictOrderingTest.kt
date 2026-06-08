@@ -73,7 +73,7 @@ class ConflictOrderingTest {
         )
         val session = PropagationSession(problem)
         val cos = ConflictOrdering(InputOrder)
-        val unsat = PropagationResult.Unsat(conflictInts = setOf(0, 2, 3))
+        val unsat = PropagationResult.Unsat(conflictInts = intArrayOf(0, 2, 3))
         cos.onConflict(VarRef.IntVar(3), unsat)
         // Pin var 3 and verify pick returns one of {0, 2} (stamped via unsat reason set).
         session.pinInt(3, 0)
