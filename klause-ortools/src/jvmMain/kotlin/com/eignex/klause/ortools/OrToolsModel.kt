@@ -6,8 +6,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
@@ -27,8 +25,6 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Member
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -44,7 +40,6 @@ import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import com.google.ortools.Loader
 import com.google.ortools.sat.BoolVar
@@ -175,10 +170,6 @@ class OrToolsModel private constructor(
                 model.addLinearExpressionInDomain(sum, d.complement()).onlyEnforceIf(aux.not())
             }
 
-            is AllEqual -> for (i in 1 until f.xs.size) model.addEquality(intVars[f.xs[i]], intVars[f.xs[0]])
-
-            is AllDifferentExceptZero -> postDistinctExcept(f.xs, intArrayOf(0))
-
             is AllDifferentExcept -> postDistinctExcept(f.xs, f.except)
 
             is Among -> model.addEquality(
@@ -190,8 +181,6 @@ class OrToolsModel private constructor(
                 ),
             )
 
-            is Member -> postMember(f)
-
             is Count -> postCount(f)
 
             is Element -> postElement(f)
@@ -202,8 +191,6 @@ class OrToolsModel private constructor(
 
             is LexLess -> postLexLess(f)
 
-            is Monotone -> postMonotone(f)
-
             is NValue -> postNValue(f)
 
             is GlobalCardinality -> postGcc(f)
@@ -212,8 +199,6 @@ class OrToolsModel private constructor(
                 val tc = model.addAllowedAssignments(intArgs(f.xs))
                 for (r in 0 until f.numTuples) tc.addTuple(IntArray(f.arity) { c -> f.tuples[r * f.arity + c] })
             }
-
-            is ValuePrecede -> postValuePrecede(f)
 
             is ArrayMinMax ->
                 if (f.max) {
@@ -270,16 +255,6 @@ class OrToolsModel private constructor(
         }
     }
 
-    private fun postMember(f: Member) {
-        // y equals at least one xs[i].
-        val picks = Array(f.xs.size) {
-            val b = freshBool()
-            model.addEquality(intVars[f.y], intVars[f.xs[it]]).onlyEnforceIf(b)
-            b as Literal
-        }
-        model.addBoolOr(picks)
-    }
-
     private fun postCount(f: Count) {
         if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
         val matches = Array(f.xs.size) { reifyEq(intVars[f.xs[it]], f.v) as LinearArgument }
@@ -333,25 +308,6 @@ class OrToolsModel private constructor(
         if (f.strict) model.addBoolOr(Array(n) { eq[it].not() })
     }
 
-    private fun postMonotone(f: Monotone) {
-        for (i in 0 until f.xs.size - 1) {
-            val a = intVars[f.xs[i]]
-            val b = intVars[f.xs[i + 1]]
-            when (f.direction) {
-                Monotone.Direction.Increasing -> if (f.strict) model.addLessThan(a, b) else model.addLessOrEqual(a, b)
-
-                Monotone.Direction.Decreasing -> if (f.strict) {
-                    model.addGreaterThan(
-                        a,
-                        b,
-                    )
-                } else {
-                    model.addGreaterOrEqual(a, b)
-                }
-            }
-        }
-    }
-
     private fun unionValues(ids: IntArray): IntArray {
         val s = sortedSetOf<Int>()
         for (id in ids) problem.intDomains[id].forEach { s.add(it) }
@@ -394,21 +350,6 @@ class OrToolsModel private constructor(
         if (f.closed) {
             val d = Domain.fromValues(f.cover.longs())
             for (x in f.xs) model.addLinearExpressionInDomain(LinearExpr.term(intVars[x], 1), d)
-        }
-    }
-
-    private fun postValuePrecede(f: ValuePrecede) {
-        // seen[i] = "value s appeared before position i". seen[0] = false.
-        var seen: Literal = freshBool().also { model.addEquality(it, 0) }
-        for (i in f.xs.indices) {
-            val eqT = reifyEq(intVars[f.xs[i]], f.t)
-            model.addImplication(eqT, seen) // xs[i]=t ⇒ s already seen
-            val eqS = reifyEq(intVars[f.xs[i]], f.s)
-            val next = freshBool()
-            model.addImplication(seen, next)
-            model.addImplication(eqS, next)
-            model.addBoolOr(arrayOf(seen, eqS, next.not())) // next ⇒ (seen ∨ xs[i]=s)
-            seen = next
         }
     }
 

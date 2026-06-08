@@ -6,8 +6,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
@@ -28,8 +26,6 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Member
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -41,13 +37,11 @@ import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.SetBitsetDisjoint
 import com.eignex.klause.solver.factor.SetBitsetEq
 import com.eignex.klause.solver.factor.SetBitsetSubset
-import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SubsetSumEq
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import org.chocosolver.solver.Model
 import org.chocosolver.solver.SettingsBuilder
@@ -136,15 +130,9 @@ class ChocoModel private constructor(
             is ReifiedCardinality ->
                 countConstraint(litVars(f.literals), f.min, f.max).reifyWith(boolVars[f.auxBoolVar])
 
-            is AllEqual -> model.allEqual(*intVarsOf(f.xs)).post()
-
-            is AllDifferentExceptZero -> model.allDifferentExcept0(intVarsOf(f.xs)).post()
-
             is AllDifferentExcept -> postAllDifferentExcept(f)
 
             is Among -> model.among(intVars[f.n], intVarsOf(f.xs), f.values).post()
-
-            is Member -> model.or(*Array(f.xs.size) { model.arithm(intVars[f.y], "=", intVars[f.xs[it]]) }).post()
 
             is Count -> postCountFactor(f)
 
@@ -169,15 +157,11 @@ class ChocoModel private constructor(
                     }
                     ).post()
 
-            is Monotone -> postMonotone(f)
-
             is NValue -> postNValue(f)
 
             is GlobalCardinality -> postGcc(f)
 
             is Table -> model.table(intVarsOf(f.xs), tuplesOf(f)).post()
-
-            is ValuePrecede -> model.intValuePrecedeChain(intVarsOf(f.xs), f.s, f.t).post()
 
             is ArgMinMax ->
                 (
@@ -212,8 +196,6 @@ class ChocoModel private constructor(
             is Sort -> model.sort(intVarsOf(f.xs), intVarsOf(f.ys)).post()
 
             is Sequence -> postSequence(f)
-
-            is SlidingSum -> postSlidingSum(f)
 
             is Regular -> model.regular(intVarsOf(f.seq), automatonOf(f)).post()
 
@@ -316,14 +298,6 @@ class ChocoModel private constructor(
         model.sum(matches, "=", intVars[f.n]).post()
     }
 
-    private fun postMonotone(f: Monotone) {
-        val delta = if (f.strict) 1 else 0
-        when (f.direction) {
-            Monotone.Direction.Increasing -> model.increasing(intVarsOf(f.xs), delta).post()
-            Monotone.Direction.Decreasing -> model.decreasing(intVarsOf(f.xs), delta).post()
-        }
-    }
-
     private fun postNValue(f: NValue) {
         if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
         val nVar = intVars[f.n]
@@ -396,17 +370,6 @@ class ChocoModel private constructor(
             val window = Array(f.k) { intVars[f.xs[start + it]] }
             val nb = model.intVar(f.low, f.high)
             model.among(nb, window, f.values).post()
-        }
-    }
-
-    private fun postSlidingSum(f: SlidingSum) {
-        // Dual of Sequence: every length-seq window of vs must sum into [low, up]. Choco has no
-        // sliding-sum global, so post one bounded sum per window (|vs| - seq + 1 windows).
-        if (f.seq <= 0) return
-        for (start in 0..f.vs.size - f.seq) {
-            val window = Array(f.seq) { intVars[f.vs[start + it]] }
-            model.sum(window, ">=", f.low).post()
-            model.sum(window, "<=", f.up).post()
         }
     }
 

@@ -7,8 +7,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
@@ -28,8 +26,6 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Member
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -41,11 +37,9 @@ import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.SetBitsetDisjoint
 import com.eignex.klause.solver.factor.SetBitsetEq
 import com.eignex.klause.solver.factor.SetBitsetSubset
-import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 
 /**
@@ -239,15 +233,6 @@ class FznModel private constructor(
 
             is ReifiedCardinality -> postReifiedCardinality(f)
 
-            is AllEqual -> for (k in 1 until f.xs.size) {
-                constraint("int_eq(${intName(f.xs[0])}, ${intName(f.xs[k])})")
-            }
-
-            is AllDifferentExceptZero -> {
-                val p = native("fzn_alldifferent_except_0", "array [int] of var int: x")
-                constraint("$p(${intVarArray(f.xs)})")
-            }
-
             is AllDifferentExcept -> {
                 val p = native("fzn_alldifferent_except", "array [int] of var int: x, set of int: S")
                 constraint("$p(${intVarArray(f.xs)}, ${intSet(f.except)})")
@@ -259,12 +244,6 @@ class FznModel private constructor(
                 }
                 sumOfBools(matches.map { boolAsIntByName(it) }, intName(f.n))
             }
-
-            is Member -> postClause(
-                f.xs.map { x ->
-                    newBoolAux().also { constraint("int_eq_reif(${intName(x)}, ${intName(f.y)}, $it)") }
-                },
-            )
 
             is Count -> postCountFactor(f)
 
@@ -289,15 +268,6 @@ class FznModel private constructor(
                 constraint("$p(${intVarArray(f.xs)}, ${intVarArray(f.ys)})")
             }
 
-            is Monotone -> {
-                val xs = when (f.direction) {
-                    Monotone.Direction.Increasing -> f.xs
-                    Monotone.Direction.Decreasing -> f.xs.reversedArray()
-                }
-                val p = native("yuck_increasing_int", "array [int] of var int: x, bool: strict")
-                constraint("$p(${intVarArray(xs)}, ${f.strict})")
-            }
-
             is NValue -> postNValue(f)
 
             is GlobalCardinality -> postGcc(f)
@@ -306,8 +276,6 @@ class FznModel private constructor(
                 val p = native("yuck_table_int", "array [int] of var int: x, array [int] of int: t")
                 constraint("$p(${intVarArray(f.xs)}, ${intArray(f.tuples)})")
             }
-
-            is ValuePrecede -> postValuePrecede(f)
 
             is ArgMinMax -> postArgMinMax(f)
 
@@ -330,8 +298,6 @@ class FznModel private constructor(
             is Sort -> postSort(f)
 
             is Sequence -> postSequence(f)
-
-            is SlidingSum -> postSlidingSum(f)
 
             is Regular -> {
                 val p = native(
@@ -499,19 +465,6 @@ class FznModel private constructor(
         }
     }
 
-    private fun postValuePrecede(f: ValuePrecede) {
-        // x[i] = t implies some earlier x[j] = s.
-        val eqS = ArrayList<String>(f.xs.size)
-        for (i in f.xs.indices) {
-            val eqT = newBoolAux()
-            constraint("int_eq_reif(${intName(f.xs[i])}, ${f.t}, $eqT)")
-            constraint("bool_clause(${names(eqS.toList())}, ${names(listOf(eqT))})")
-            val s = newBoolAux()
-            constraint("int_eq_reif(${intName(f.xs[i])}, ${f.s}, $s)")
-            eqS.add(s)
-        }
-    }
-
     private fun postArgMinMax(f: ArgMinMax) {
         // m = extremum(xs); idx names the first position attaining it (klause/MiniZinc
         // tie-breaking): positions before idx are strictly off the extremum, idx itself is on it.
@@ -609,17 +562,6 @@ class FznModel private constructor(
             val window = member.subList(start, start + f.k)
             if (f.low > 0) linear(List(f.k) { 1 }, window, LinearOp.GE, f.low)
             if (f.high < f.k) linear(List(f.k) { 1 }, window, LinearOp.LE, f.high)
-        }
-    }
-
-    private fun postSlidingSum(f: SlidingSum) {
-        // Every length-seq window of vs must sum into [low, up].
-        if (f.seq <= 0) return
-        for (start in 0..f.vs.size - f.seq) {
-            val window = (0 until f.seq).map { intName(f.vs[start + it]) }
-            val ones = List(f.seq) { 1 }
-            linear(ones, window, LinearOp.GE, f.low)
-            linear(ones, window, LinearOp.LE, f.up)
         }
     }
 

@@ -5,7 +5,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Cumulative
@@ -17,12 +16,10 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.SetBitsetDisjoint
 import com.eignex.klause.solver.factor.SetBitsetEq
 import com.eignex.klause.solver.factor.SetBitsetSubset
-import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import kotlin.test.Test
@@ -45,20 +42,6 @@ class ChocoFactorCoverageTest {
     private fun count(p: Problem): Int = ChocoSolver(p).enumerate(ChocoParams()).toList().size
 
     private fun dom(n: Int, lo: Int, hi: Int) = Array(n) { IntDomain(lo, hi) }
-
-    @Test fun `all_equal enumerates the diagonal`() =
-        assertEquals(3, count(problem(3, dom(3, 0, 2), AllEqual(intArrayOf(0, 1, 2)))))
-
-    @Test fun `strictly increasing has one solution`() = assertEquals(
-        1,
-        count(
-            problem(
-                3,
-                dom(3, 0, 2),
-                Monotone(intArrayOf(0, 1, 2), Monotone.Direction.Increasing, strict = true),
-            ),
-        ),
-    )
 
     @Test fun `inverse channels two permutations`() =
         assertEquals(2, count(problem(4, dom(4, 0, 1), Inverse(intArrayOf(0, 1), intArrayOf(2, 3)))))
@@ -203,13 +186,6 @@ class ChocoFactorCoverageTest {
         )
         assertFailsWith<UnsupportedFactorException> { ChocoSolver(p).solve(ChocoParams()) }
     }
-
-    @Test fun `sliding sum bounds every window`() = assertEquals(
-        // Three 0/1 vars, each adjacent pair summing to exactly 1, forces the two alternations
-        // (0,1,0) and (1,0,1).
-        2,
-        count(problem(3, dom(3, 0, 1), SlidingSum(low = 1, up = 1, seq = 2, vs = intArrayOf(0, 1, 2)))),
-    )
 
     private fun boolProblem(numBool: Int, vararg fs: Factor) =
         Problem(numBoolVars = numBool, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf(*fs))

@@ -5,8 +5,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.AllDifferentExceptZero
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArgSort
@@ -29,21 +27,17 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.Member
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.SlidingSum
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SubsetSumEq
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.util.binarySearchInt
 import kotlin.math.abs
@@ -975,7 +969,34 @@ internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
-    factors.add(AllDifferentExceptZero(vars))
+    emitGatedPairwiseNe(vars, intArrayOf(0))
+}
+
+/** Shared gated-pairwise-NE encoding. For each var an "is in except" aux bool is reified as
+ *  the disjunction of equality reifications across the exception set; for each pair an "ne"
+ *  aux is reified as `xs[i] ≠ xs[j]`, then a Clause asserts at least one release condition
+ *  (`inExcept[i] ∨ inExcept[j] ∨ ne_ij`) holds. */
+private fun FlatZincCompiler.emitGatedPairwiseNe(xs: IntArray, except: IntArray) {
+    val inExcept = IntArray(xs.size) { allocBool("__adne_in_$numBoolVars") }
+    for (i in xs.indices) {
+        val eqLits = IntArray(except.size) { v ->
+            val eqV = allocBool("__adne_eq_$numBoolVars")
+            factors.add(ReifiedLinear(eqV, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, except[v]))
+            Lit.make(eqV, true)
+        }
+        factors.add(ReifiedCardinality(inExcept[i], eqLits, min = 1, max = except.size))
+    }
+    for (i in 0 until xs.size - 1) {
+        for (j in i + 1 until xs.size) {
+            val neAux = allocBool("__adne_ne_$numBoolVars")
+            factors.add(ReifiedLinear(neAux, intArrayOf(1, -1), intArrayOf(xs[i], xs[j]), LinearOp.NE, 0))
+            factors.add(
+                Clause(
+                    intArrayOf(Lit.make(inExcept[i], true), Lit.make(inExcept[j], true), Lit.make(neAux, true)),
+                ),
+            )
+        }
+    }
 }
 
 /** `alldifferent_except(xs, S)` where S is a constant set of int (the sentinel values). */
@@ -995,15 +1016,24 @@ internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     if (vars.size < 2) return
-    factors.add(AllEqual(vars))
+    // all_equal(xs) → xs[i] = xs[0] for i = 1..n-1 as a Linear EQ chain; equality is
+    // propagation-complete so the chain matches the global.
+    for (i in 1 until vars.size) {
+        factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[0]), LinearOp.EQ, 0))
+    }
 }
 
-/** `member_int(xs, y)`. */
+/** `member_int(xs, y)` → `eq[i] ↔ (xs[i] = y)` reified, then `Σ eq[i] ≥ 1` as a Cardinality. */
 internal fun FlatZincCompiler.emitMember(c: FznConstraint) {
     require(c.args.size == 2)
     val xs = evalIntVarArray(c.args[0])
     val y = resolveIntVar(c.args[1])
-    factors.add(Member(xs, y))
+    val eqLits = IntArray(xs.size) {
+        val aux = allocBool("__member_eq_$numBoolVars")
+        factors.add(ReifiedLinear(aux, intArrayOf(1, -1), intArrayOf(xs[it], y), LinearOp.EQ, 0))
+        Lit.make(aux, true)
+    }
+    factors.add(Cardinality(eqLits, min = 1, max = xs.size))
 }
 
 /** `arg_sort_int(values, perm)` — perm is a permutation of `1..n` (or `0..n-1` if domains
@@ -1263,17 +1293,46 @@ internal fun FlatZincCompiler.emitValuePrecede(c: FznConstraint) {
     val s = evalIntConst(c.args[0]).toInt()
     val t = evalIntConst(c.args[1]).toInt()
     val xs = evalIntVarArray(c.args[2])
-    factors.add(ValuePrecede(s, t, xs))
+    emitValuePrecedeDecomp(s, t, xs)
 }
 
-/** `value_precede_chain_int(values, xs)` — equivalent to a chain of [ValuePrecede] for
- *  every consecutive `(values[i], values[i+1])` pair. */
+/** `value_precede(s, t, xs)`: t may only appear in xs after s has. Decompose via reified
+ *  per-index equalities `eqS[i] ↔ xs[i]=s`, `eqT[i] ↔ xs[i]=t`, a "seen s by i" prefix-OR
+ *  chain `seenS[i] ↔ seenS[i-1] ∨ eqS[i]`, then assert `eqT[i] ⇒ seenS[i-1]` (and eqT[0]
+ *  false). */
+private fun FlatZincCompiler.emitValuePrecedeDecomp(s: Int, t: Int, xs: IntArray) {
+    val n = xs.size
+    if (n == 0) return
+    val eqS = IntArray(n) { allocBool("__vp_s_$numBoolVars") }
+    val eqT = IntArray(n) { allocBool("__vp_t_$numBoolVars") }
+    for (i in 0 until n) {
+        factors.add(ReifiedLinear(eqS[i], intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, s))
+        factors.add(ReifiedLinear(eqT[i], intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, t))
+    }
+    val seenS = IntArray(n) { allocBool("__vp_seen_$numBoolVars") }
+    factors.add(Clause(intArrayOf(Lit.make(seenS[0], true), Lit.make(eqS[0], false))))
+    factors.add(Clause(intArrayOf(Lit.make(seenS[0], false), Lit.make(eqS[0], true))))
+    for (i in 1 until n) {
+        factors.add(
+            Clause(intArrayOf(Lit.make(seenS[i], false), Lit.make(seenS[i - 1], true), Lit.make(eqS[i], true))),
+        )
+        factors.add(Clause(intArrayOf(Lit.make(seenS[i], true), Lit.make(seenS[i - 1], false))))
+        factors.add(Clause(intArrayOf(Lit.make(seenS[i], true), Lit.make(eqS[i], false))))
+    }
+    factors.add(Clause(intArrayOf(Lit.make(eqT[0], false))))
+    for (i in 1 until n) {
+        factors.add(Clause(intArrayOf(Lit.make(eqT[i], false), Lit.make(seenS[i - 1], true))))
+    }
+}
+
+/** `value_precede_chain_int(values, xs)` — a chain of value_precede for every consecutive
+ *  `(values[i], values[i+1])` pair. */
 internal fun FlatZincCompiler.emitValuePrecedeChain(c: FznConstraint) {
     require(c.args.size == 2)
     val values = evalIntConstArray(c.args[0])
     val xs = evalIntVarArray(c.args[1])
     for (i in 0 until values.size - 1) {
-        factors.add(ValuePrecede(values[i], values[i + 1], xs))
+        emitValuePrecedeDecomp(values[i], values[i + 1], xs)
     }
 }
 
@@ -1437,7 +1496,7 @@ internal fun FlatZincCompiler.emitCumulatives(c: FznConstraint) {
 
 /**
  * `fzn_sliding_sum(low, up, seq, vs)` — every length-`seq` window of `vs` sums into
- * `[low, up]`. Routes to the native graded [SlidingSum] factor.
+ * `[low, up]`. Lowered to a pair of Linear range bounds per window.
  */
 internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
     require(c.args.size == 4) { "sliding_sum expects 4 args (low,up,seq,vs), got ${c.args.size}" }
@@ -1445,7 +1504,13 @@ internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
     val up = evalIntConst(c.args[1]).toInt()
     val seq = evalIntConst(c.args[2]).toInt()
     val vs = evalIntVarArray(c.args[3])
-    factors.add(SlidingSum(low = low, up = up, seq = seq, vs = vs))
+    // Every contiguous window of seq elements sums to [low, up] → a pair of Linear range
+    // bounds per window. (Empty when seq > vs.size: the range 0..(size-seq) is empty.)
+    for (w in 0..vs.size - seq) {
+        val window = IntArray(seq) { vs[w + it] }
+        factors.add(Linear(IntArray(seq) { 1 }, window.copyOf(), LinearOp.GE, low))
+        factors.add(Linear(IntArray(seq) { 1 }, window, LinearOp.LE, up))
+    }
 }
 
 /**
@@ -1866,7 +1931,7 @@ internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
 }
 
 /* `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
- *  ordering, lowered to a single [Monotone] factor. */
+ *  ordering, lowered to a chain of Linear comparisons. */
 
 /**
  * Channel a bool literal array into a parallel int-var array with domain [0, 1] each.
@@ -1896,8 +1961,17 @@ internal fun FlatZincCompiler.emitMonotoneBool(c: FznConstraint, ascending: Bool
     val lits = evalBoolVarArray(c.args[0])
     if (lits.size < 2) return
     val ints = channelBoolsToInts(lits, "mono")
-    val direction = if (ascending) Monotone.Direction.Increasing else Monotone.Direction.Decreasing
-    factors.add(Monotone(ints, direction, strict))
+    emitMonotoneChain(ints, ascending, strict)
+}
+
+/** (in/de)creasing(xs) → adjacent Linear comparisons. Ascending non-strict `xs[i+1]-xs[i] ≥ 0`,
+ *  strict `≥ 1`; descending swaps the pair. Bounds propagation on the chain is complete. */
+private fun FlatZincCompiler.emitMonotoneChain(xs: IntArray, ascending: Boolean, strict: Boolean) {
+    val bound = if (strict) 1 else 0
+    for (i in 0 until xs.size - 1) {
+        val (a, b) = if (ascending) xs[i + 1] to xs[i] else xs[i] to xs[i + 1]
+        factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.GE, bound))
+    }
 }
 
 internal fun FlatZincCompiler.emitLexLessBool(c: FznConstraint, strict: Boolean) {
@@ -1931,8 +2005,7 @@ internal fun FlatZincCompiler.emitMonotone(c: FznConstraint, ascending: Boolean,
     require(c.args.size == 1)
     val xs = evalIntVarArray(c.args[0])
     if (xs.size < 2) return // 0- or 1-element array is trivially monotone.
-    val direction = if (ascending) Monotone.Direction.Increasing else Monotone.Direction.Decreasing
-    factors.add(Monotone(xs, direction, strict))
+    emitMonotoneChain(xs, ascending, strict)
 }
 
 internal fun FlatZincCompiler.emitAtLeast(c: FznConstraint) {

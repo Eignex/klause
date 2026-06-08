@@ -8,7 +8,6 @@ import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllEqual
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
@@ -19,7 +18,6 @@ import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.Monotone
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
@@ -114,8 +112,6 @@ class YuckSolverTest {
     fun `factor semantics hold across one batched run`() {
         // Independent factor groups in a single Yuck run (each subprocess pays a JVM spawn).
         // Group vars:           ids        semantics
-        //   AllEqual            0..2       all equal, pinned to 1 via i0 = 1
-        //   Monotone strict     3..5       0 < 1 < 2 over domain 0..2 ⇒ exactly (0,1,2)
         //   Element (const)     6,7        i7 = [5,7,9][i6], i6 pinned to 2 ⇒ i7 = 9
         //   Among               8..10      i10 = #{i8, i9} ∈ {1,2}
         //   Table               11,12      (i11,i12) ∈ {(0,1),(2,2)}
@@ -143,9 +139,6 @@ class YuckSolverTest {
             numIntVars = doms.size,
             intDomains = doms.toTypedArray(),
             factors = arrayOf<Factor>(
-                AllEqual(intArrayOf(0, 1, 2)),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-                Monotone(intArrayOf(3, 4, 5), Monotone.Direction.Increasing, strict = true),
                 Element(idx = 6, result = 7, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 0),
                 Linear(intArrayOf(1), intArrayOf(6), LinearOp.EQ, 2),
                 Among(n = 10, xs = intArrayOf(8, 9), values = intArrayOf(1, 2)),
@@ -161,8 +154,6 @@ class YuckSolverTest {
         val r = YuckSolver(p).solve(params)
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         val a = r.assignment
-        assertEquals(listOf(1, 1, 1), a.ints.slice(0..2))
-        assertEquals(listOf(0, 1, 2), a.ints.slice(3..5))
         assertEquals(2, a.ints[6])
         assertEquals(9, a.ints[7])
         assertEquals(listOf(a.ints[8], a.ints[9]).count { it in 1..2 }, a.ints[10])
