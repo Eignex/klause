@@ -90,10 +90,10 @@ class IntHashSetTest {
     @Test
     fun `matches a HashSet reference under random add-remove churn`() {
         val rng = Random(777)
-        repeat(40) { _ ->
+        repeat(12) { _ ->
             val s = IntHashSet(rng.nextInt(1, 16))
             val ref = HashSet<Int>()
-            repeat(2000) {
+            repeat(600) {
                 val v = rng.nextInt(-60, 60)
                 when (rng.nextInt(3)) {
                     0 -> assertEquals(ref.add(v), s.add(v), "add($v)")

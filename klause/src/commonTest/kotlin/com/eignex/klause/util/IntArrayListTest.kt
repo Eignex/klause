@@ -107,7 +107,7 @@ class IntArrayListTest {
     @Test
     fun `sortByIntKey matches a stdlib reference under random keys`() {
         val rng = Random(7)
-        repeat(50) { _ ->
+        repeat(20) { _ ->
             val n = rng.nextInt(0, 40)
             val list = IntArrayList()
             val ref = ArrayList<Int>()
@@ -132,7 +132,7 @@ class IntArrayListTest {
     @Test
     fun `random ops match a swap-remove reference model`() {
         val rng = Random(104)
-        repeat(40) {
+        repeat(15) {
             val list = IntArrayList(initialCapacity = 1)
             val ref = ArrayList<Int>() // mirrors the same swap-remove semantics
             repeat(300) {

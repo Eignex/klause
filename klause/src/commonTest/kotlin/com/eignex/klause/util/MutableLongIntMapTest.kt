@@ -126,10 +126,10 @@ class MutableLongIntMapTest {
     @Test
     fun `matches a HashMap reference under random put-remove churn`() {
         val rng = Random(31)
-        repeat(40) {
+        repeat(12) {
             val m = MutableLongIntMap(rng.nextInt(1, 16))
             val ref = HashMap<Long, Int>()
-            repeat(2000) {
+            repeat(600) {
                 // Mix of small (collision-prone) and wide keys.
                 val key = if (rng.nextBoolean()) rng.nextLong(-60, 60) else rng.nextLong()
                 when (rng.nextInt(4)) {

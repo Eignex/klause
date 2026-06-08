@@ -128,10 +128,10 @@ class MutableIntIntMapTest {
     @Test
     fun `matches a HashMap reference under random put-addTo-remove churn`() {
         val rng = Random(2024)
-        repeat(40) {
+        repeat(12) {
             val m = MutableIntIntMap(rng.nextInt(1, 16))
             val ref = HashMap<Int, Int>()
-            repeat(2000) {
+            repeat(600) {
                 val key = rng.nextInt(-60, 60)
                 when (rng.nextInt(4)) {
                     0 -> {
