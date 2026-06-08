@@ -143,7 +143,10 @@ internal object ParityMetric {
         val refFeas = if (cached != null) {
             cached.feasible
         } else {
-            runCatching { feasibility(ref.solve(entry.problem, budget, if (fixedMode) entry.searchParams else null)) }
+            // The reference always uses its own default search. Mirroring the model's
+            // fixed annotation onto Choco-LCG can trigger an unsound false UNSAT (and OOMs)
+            // — choco's own search is sound and is its strongest showing anyway.
+            runCatching { feasibility(ref.solve(entry.problem, budget, null)) }
                 .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
         }
         val exp = expectedFeasible(entry.ref.expected)
@@ -173,7 +176,7 @@ internal object ParityMetric {
             refDisplay = cached.display
         } else {
             val refRes = runCatching {
-                ref.minimize(entry.problem, obj, budget, if (fixedMode) entry.searchParams else null)
+                ref.minimize(entry.problem, obj, budget, null) // reference uses its own default search
             }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
             cv = refRes.objectiveValue
             refDisplay = optStr(refRes)
@@ -225,7 +228,7 @@ internal object ParityMetric {
         val c = runCatching {
             ChocoSolver(entry.problem).minimizeTimed(
                 obj as LinearObjective,
-                ChocoParams(budget.timeoutMillis, lcg = true, fixedSearch = entry.searchParams),
+                ChocoParams(budget.timeoutMillis, lcg = true), // default search; see note above
             )
         }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", Reference.of(Backend.CHOCO), it) }
         val cv = c.value
@@ -283,7 +286,7 @@ internal object ParityMetric {
         runCatching {
             ChocoSolver(entry.problem).minimizeTimed(
                 obj as LinearObjective,
-                ChocoParams(warmMs, lcg = true, fixedSearch = entry.searchParams),
+                ChocoParams(warmMs, lcg = true),
             )
         }
     }
