@@ -235,14 +235,26 @@ object ParityMetric {
 
     /** Throwaway short solve per engine to JIT-warm the hot paths before timing (see
      *  [timedOptimizeRow]). The warmup budget is fixed and small; cancellation cuts it off
-     *  so warming a hard row costs at most this slice. Results are discarded. */
+     *  so warming a hard row costs at most this slice. Results are discarded.
+     *
+     *  The klause warmup must NOT share search-heuristic instances with the timed solve.
+     *  [fixedParams] returns `entry.searchParams.copy(...)`, a shallow copy that aliases the
+     *  same stateful heuristic objects, and the default fixed-track value heuristic
+     *  ([SolutionGuided]) remembers the best assignment it has seen. If the warmup solved
+     *  through those instances, the timed solve's first dive would reconstruct the warmup's
+     *  incumbent immediately, so the warmup would be solution-warming, not just JIT-warming,
+     *  and time-to-best would be measured from an unfairly warm start. The reference builds a
+     *  fresh model per call and starts cold, so we warm with [conflictDrivenParams], which
+     *  constructs its own fresh heuristics each call: it JIT-warms the shared engine hot paths
+     *  (propagation, BCP, conflict analysis, branch-and-bound) while leaving the annotated
+     *  [entry.searchParams] heuristics pristine for the timed solve. */
     private fun warmup(entry: ResolvedProblem, obj: Objective) {
         val warmMs = System.getProperty("klause.bench.parity.warmupMs")?.toLongOrNull() ?: 2000L
         runCatching {
             val dl = System.currentTimeMillis() + warmMs
             BacktrackSolver(entry.problem).minimize(
                 obj,
-                fixedParams(entry, dl),
+                conflictDrivenParams().copy(cancellation = Cancellation { System.currentTimeMillis() > dl }),
             )
         }
         runCatching {
