@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.Chb
 import com.eignex.klause.solver.backtrack.IndomainMax
 import com.eignex.klause.solver.backtrack.IndomainMiddle
 import com.eignex.klause.solver.backtrack.IndomainMin
@@ -61,10 +62,11 @@ internal class EngineParams(pairs: List<String>) {
     fun varHeuristic(key: String): VariableHeuristic? = map.remove(key)?.let {
         when (it.lowercase()) {
             "vsids" -> Vsids()
+            "chb" -> Chb()
             "random" -> RandomVariable
             "smallest-domain" -> SmallestDomain
             "input-order" -> InputOrder
-            else -> fail("engine param `$key` expects vsids|random|smallest-domain|input-order, got `$it`")
+            else -> fail("engine param `$key` expects vsids|chb|random|smallest-domain|input-order, got `$it`")
         }
     }
 
