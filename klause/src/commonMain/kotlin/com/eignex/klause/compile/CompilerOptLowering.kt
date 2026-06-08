@@ -105,7 +105,7 @@ internal fun Compiler.Build.reifyCountOpt(expr: CountExprOpt): Int {
 
 /** `b ↔ nvalue(n, xs, mode)` over a presence-gated subset. Enumerate the union domain;
  *  for each candidate value `v`, build the indicator `∃i (p_i ∧ x_i = v)`. Sum the
- *  indicators and compare against `n` per [mode]. */
+ *  indicators and compare against `n` per `mode`. */
 internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
     // Compute the union of static domains for each x_i. Each xs entry must lift to a
     // bare IntRef so we can look up its domain — non-bare arithmetic on opt vars at this
@@ -136,7 +136,7 @@ internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
 }
 
 /** `b ↔ gcc(...)` over a presence-gated subset, with optional closed-set check.
- *  Per cover[k]: low[k] ≤ Σ_i 1{p_i ∧ x_i=cover[k]} ≤ high[k]. */
+ *  Per cover: `low[k] ≤ Σ_i 1{p_i ∧ x_i=cover[k]} ≤ high[k]`. */
 internal fun Compiler.Build.reifyGccOpt(expr: GccExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (k in expr.cover.indices) {
@@ -265,8 +265,8 @@ internal fun Compiler.Build.reifyCircuit(expr: CircuitExpr): Int {
  * `b ↔ subcircuit(succ, valueOffset)`. Like [reifyCircuit] but `succ[i] = i + offset`
  * marks node `i` excluded; the included nodes (non-self-loops) form a single Hamiltonian
  * cycle in the induced sub-graph. We still enforce AllDifferent over `succ` and a chain
- * structure on position vars, except the chain advance is relaxed to `pos[succ[i]] =
- * pos[i] + 1 ∨ pos[succ[i]] = pos[i]` so excluded nodes (self-loops) don't force a
+ * structure on position vars, except the chain advance is relaxed to
+ * `pos[succ[i]] = pos[i] + 1 ∨ pos[succ[i]] = pos[i]` so excluded nodes (self-loops) don't force a
  * contradiction. Closing the included sub-cycle is handled by allowing
  * `pos[succ[i]] = 0` when the edge closes the loop.
  */

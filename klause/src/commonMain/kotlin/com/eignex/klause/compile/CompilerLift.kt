@@ -29,8 +29,8 @@ import com.eignex.klause.solver.factor.Product
  * non-affine subexpression ([IntMul], [IntDiv], [IntMod], [IntElement], [IntIfThenElse],
  * [IntMax] / [IntMin], [IntAbs]) is replaced with a fresh aux [IntRef], and auxiliary
  * constraints are emitted that pin the aux to the correct value. After lifting, the
- * top-level assertion path ([CompilerAssertions]) and the reification path
- * ([CompilerLowering]) deal only with linear forms.
+ * top-level assertion path (`CompilerAssertions`) and the reification path
+ * (`CompilerLowering`) deal only with linear forms.
  */
 internal fun Compiler.Build.lift(expr: IntExpr): IntExpr = when (expr) {
     is IntRef, is IntLit -> expr

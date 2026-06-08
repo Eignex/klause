@@ -23,7 +23,7 @@ import com.eignex.klause.ast.SetUnion
  * Set variable handle over an integer universe. Internally lowers to one indicator
  * Boolean per universe element; the decoder reads those indicators back to a [Set]<Int>.
  *
- * Use the infix operators in [com.eignex.klause.ast.SetOperators] (`inSet`, `subsetOf`,
+ * Use the infix operators in `com.eignex.klause.ast.SetOperators` (`inSet`, `subsetOf`,
  * `disjointFrom`, `union`, `intersect`, `diff`, `eq`, `ne`) and the [card] / [size]
  * function for cardinality. Set-valued combinators ([SetUnion] / [SetIntersect] /
  * [SetDiff] / [SetLiteral]) return a [SetExpr] tree that the compiler materialises into

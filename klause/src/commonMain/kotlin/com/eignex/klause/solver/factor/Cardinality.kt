@@ -58,7 +58,7 @@ class Cardinality(
     /** Pre-computed map from a Boolean var id to the sum of polarity signs across every
      *  occurrence in [literals]. Each entry is `+1` for a positive literal occurrence,
      *  `-1` for a negative occurrence, summed if the var appears multiple times. The
-     *  delta of flipping [boolVar] from `pre` to `!pre` is then
+     *  delta of flipping `boolVar` from `pre` to `!pre` is then
      *     `(if (pre then -1 else 1)) * signedOccurrencesByVar[boolVar]`
      *  computed in O(1) instead of scanning every literal in the factor. */
     private val signedOccurrencesByVar: IntIntMap = run {
@@ -514,7 +514,7 @@ class Cardinality(
         }
     }
 
-    /** Cached max |signedOccurrencesByVar[v]| across `boolVars`. Bounds the change `n` can
+    /** Cached max |`signedOccurrencesByVar[v]`| across `boolVars`. Bounds the change `n` can
      *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out: when both
      *  the pre- and post-flip `n` are far enough from the [min] / [max] boundaries that no
      *  single subsequent flip could cross either side, no break/make state needs to change. */

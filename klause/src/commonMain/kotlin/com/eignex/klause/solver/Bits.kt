@@ -2,7 +2,7 @@ package com.eignex.klause.solver
 
 /**
  * Minimal multiplatform bitset over `[0, size)` ints, backed by a [LongArray]. Carved out
- * because Kotlin's common stdlib has no `BitSet`. Used by [SetDomain] / propagation set
+ * because Kotlin's common stdlib has no `BitSet`. Used by `SetDomain` / propagation set
  * arrays — every operation we need (membership, set / clear, cardinality, union, intersect,
  * difference, equality, copy) is a one-liner over the packed words.
  *

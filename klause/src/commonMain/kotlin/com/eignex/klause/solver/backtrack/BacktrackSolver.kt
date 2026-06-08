@@ -1153,7 +1153,7 @@ class BacktrackSolver(override val problem: Problem) :
         data object BudgetCapped : AdvanceOutcome
 
         /** Non-chronological backjump requested. After the engine pops trail to
-         *  `learned.backjumpLevel`, it materialises [learned.literals] as a `Clause`,
+         *  `learned.backjumpLevel`, it materialises `learned.literals` as a `Clause`,
          *  hands it to [PropagationSession.addLearnedClause], and resumes with the new
          *  clause now constraining future search and unit-propagating the asserting
          *  literal. */
@@ -1438,8 +1438,8 @@ class BacktrackSolver(override val problem: Problem) :
 
     /**
      * Execute the CDB backjump + clause-learn sequence:
-     *   - pop trail + session to [learned.backjumpLevel];
-     *   - materialise [learned.literals] as a [Clause]
+     *   - pop trail + session to `learned.backjumpLevel`;
+     *   - materialise `learned.literals` as a [Clause]
      *     and feed it to [PropagationSession.addLearnedClause], which asserts it via
      *     propagation (forcing the asserting literal as a unit pin);
      *   - if the assertion cascades into another conflict, recurse on the new analyzer

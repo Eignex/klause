@@ -36,7 +36,7 @@ class PropagationSession(
 ) {
     private val state: PropagationState = PropagationState(problem, Assumptions.None)
 
-    /** `levelStates[L]` is the [PropagationState.LevelMark] right after level [L]'s
+    /** `levelStates[L]` is the [PropagationState.LevelMark] right after level `L`'s
      *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
      *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
     private var levelStates: Array<PropagationState.LevelMark?> = arrayOfNulls(8)
@@ -397,7 +397,7 @@ class PropagationSession(
         state.undoTo(levelLast())
     }
 
-    /** Pop until [v] of [kind] is no longer pinned. No-op if [v] is already unpinned. */
+    /** Pop until `v` of [kind] is no longer pinned. No-op if `v` is already unpinned. */
     fun popUntilUnpinned(kind: VarKind, v: Int) {
         val pinned = when (kind) {
             VarKind.Bool -> boolPinned[v] != -1

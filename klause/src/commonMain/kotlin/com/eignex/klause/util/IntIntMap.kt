@@ -73,7 +73,7 @@ internal class IntIntMap private constructor(private val backing: Backing, priva
      * sparse-key fallback for [IntIntMap.build]. Capacity is a power of two; we keep load
      * factor ≤ 0.5 so probe chains stay short. The [absent] sentinel marks empty slots;
      * if a real entry's value equals [absent] we still find it via the parallel
-     * [presentMask] bit per slot.
+     * `presentMask` bit per slot.
      */
     private class HashBacking private constructor(
         private val keys: IntArray,

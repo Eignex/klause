@@ -10,7 +10,7 @@ import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Generalised `alldifferent_except(xs, except)` — `xs[i] != xs[j]` for every pair `i < j`
- * unless one of the two values is in [except]. The classic [AllDifferentExceptZero] is the
+ * unless one of the two values is in [except]. The classic `AllDifferentExceptZero` is the
  * `except = {0}` specialisation; this factor uses a HashSet membership check so propagation
  * over arbitrary excluded-value sets remains O(N · |except|) per call.
  *
@@ -38,7 +38,7 @@ class AllDifferentExcept(
     override val intVars: IntArray = xs
 
     /** Per-value count among non-excluded values. `violatedPairs` is the number of (i, j) with
-     *  i < j and xs[i] = xs[j] ∉ except. */
+     *  i < j and `xs[i]` = `xs[j]` ∉ except. */
     private class State(val counts: MutableIntIntMap, var violatedPairs: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {

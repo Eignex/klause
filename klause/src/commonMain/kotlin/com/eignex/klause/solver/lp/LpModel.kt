@@ -62,7 +62,7 @@ internal class LpModel(
     /** Total variable count: structural plus slack. */
     val numVars: Int get() = n + m
 
-    /** Column index of row [i]'s slack variable. */
+    /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
 }
 

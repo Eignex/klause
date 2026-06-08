@@ -79,7 +79,7 @@ import com.eignex.klause.solver.factor.SymmetricAllDifferent as SymmetricAllDiff
  * ([assertAllDifferent], [assertCircuit], [assertCumulative], ...) and the integer-
  * comparison normalisation ([assertIntCompare] / [emitTopLevelCmp] / [emitSingleVar]).
  * Sub-expression-level lowering (`lowerToLit`, `reify*`, `tseitin*`) lives in
- * [CompilerLowering]; affine-fragment lift lives in [CompilerLift].
+ * `CompilerLowering`; affine-fragment lift lives in `CompilerLift`.
  */
 internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
     when (expr) {
@@ -215,7 +215,7 @@ internal fun Compiler.Build.expandTable(t: TableConstraint): BoolExpr {
 /**
  * Lower a [FloatLinearConstraint] in two parallel ways:
  *
- *  1. Bucket each referenced float variable using its declared [FloatSpec.buckets]
+ *  1. Bucket each referenced float variable using its declared `FloatSpec.buckets`
  *     and emit a scaled-integer [Linear] factor — this is what every existing
  *     backend solves over.
  *  2. Append a [RealLinearConstraint] (over float-var
@@ -311,7 +311,7 @@ internal fun Compiler.Build.assertAllDifferent(terms: List<IntExpr>) {
     }
 }
 
-/** Lift [e] to a solver int-var id, materialising an aux var pinned equal when the lifted
+/** Lift `e` to a solver int-var id, materialising an aux var pinned equal when the lifted
  *  form carries an arithmetic residual rather than being a bare variable reference. The
  *  channeling globals below need concrete var ids to post their native factor. */
 internal fun Compiler.Build.varIdOfLifted(e: IntExpr): Int {

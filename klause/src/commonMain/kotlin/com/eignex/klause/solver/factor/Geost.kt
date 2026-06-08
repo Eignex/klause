@@ -53,7 +53,7 @@ class Geost(
     /** Total pairwise overlap volume under the current assignment. */
     private class State(var rawV: Long)
 
-    /** Origin of object [i] on dim [d], applying an optional (`ov → nv`) override. */
+    /** Origin of object `i` on dim [d], applying an optional (`ov → nv`) override. */
     private fun start(state: LocalSearchState, i: Int, d: Int, ov: Int, nv: Int): Int {
         val v = origin[i * numDims + d]
         return if (v == ov) nv else state.assignment.intValue(v)
@@ -147,7 +147,7 @@ class Geost(
         }
     }
 
-    /** Append object [i]'s origin vars (all dims) to [acc]. */
+    /** Append object `i`'s origin vars (all dims) to [acc]. */
     private fun objectVarsInto(i: Int, acc: IntArrayList) {
         for (d in 0 until numDims) acc.add(origin[i * numDims + d])
     }

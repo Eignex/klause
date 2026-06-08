@@ -17,10 +17,10 @@ class IntSwapSet(capacity: Int) {
     /** True iff the set is empty. */
     fun isEmpty(): Boolean = elements.size == 0
 
-    /** True iff [x] is a member. */
+    /** True iff `x` is a member. */
     fun contains(id: Int): Boolean = position[id] >= 0
 
-    /** Add [x]; no-op if already present. */
+    /** Add `x`; no-op if already present. */
     fun add(id: Int): Boolean {
         if (position[id] >= 0) return false
         position[id] = elements.size
@@ -28,7 +28,7 @@ class IntSwapSet(capacity: Int) {
         return true
     }
 
-    /** Remove [x]; no-op if absent. */
+    /** Remove `x`; no-op if absent. */
     fun remove(id: Int): Boolean {
         val pos = position[id]
         if (pos < 0) return false
@@ -40,7 +40,7 @@ class IntSwapSet(capacity: Int) {
         return true
     }
 
-    /** Member at dense index [i] (`0 until size`). */
+    /** Member at dense index `i` (`0 until size`). */
     operator fun get(index: Int): Int = elements[index]
 
     /** A uniformly-random member. */

@@ -682,7 +682,7 @@ internal class FlatZincCompiler(
 
     internal fun arrayToFlatZincArray(arr: ParamValue.Array): FlatZincArray = arr.arr
 
-    /** Constant-evaluate [e] as an integer. */
+    /** Constant-evaluate `e` as an integer. */
     internal fun evalIntConst(e: FznExpr): Long = when (e) {
         is FznExpr.IntLit -> e.value
 
@@ -704,7 +704,7 @@ internal class FlatZincCompiler(
         else -> failHere("expected int constant, got ${e::class.simpleName}")
     }
 
-    /** Non-throwing variant of [evalIntConst]. Returns `null` when [e] refers to a
+    /** Non-throwing variant of [evalIntConst]. Returns `null` when `e` refers to a
      *  solver variable rather than a compile-time constant. */
     internal fun evalIntConstOrNull(e: FznExpr): Long? = when (e) {
         is FznExpr.IntLit -> e.value
@@ -769,7 +769,7 @@ internal class FlatZincCompiler(
         else -> failHere("expected int array, got ${e::class.simpleName}")
     }
 
-    /** Non-throwing variant of [evalIntConstArray]: returns `null` if [e] isn't a known
+    /** Non-throwing variant of [evalIntConstArray]: returns `null` if `e` isn't a known
      *  int-const array (because it's an int-var array, a non-array expression, or a
      *  different param kind). Used at call sites that accept either constant or var
      *  arrays and need to dispatch on the actual form (e.g. GCC's `counts` argument). */

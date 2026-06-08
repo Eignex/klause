@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Problem
 
 /**
  * A [Factor] that participates in local search. Adds the LS-side hooks the engine drives:
@@ -56,7 +57,7 @@ interface LocalSearchFactor : Factor {
 
     /**
      * Apply a committed move to this factor's payload. The assignment has already been
-     * updated, so factors compare current values against the saved [oldValue] (for int sets)
+     * updated, so factors compare current values against the saved `oldValue` (for int sets)
      * or recover the pre-flip value by inversion. Returns the same Δ[violationDegree] the
      * deltaIf* method would have returned before the move.
      */
@@ -117,7 +118,7 @@ interface LocalSearchFactor : Factor {
     fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {}
 
     /** Mirror of [maintainsBreakMakeIncrementally] for the int-set path. When `true`, the
-     *  LS engine skips its brute-force [boolVars] walk after an [intVar] is set and calls
+     *  LS engine skips its brute-force [boolVars] walk after an `intVar` is set and calls
      *  [updateIntBreakMakeForIntSet] instead. Factors whose [deltaIfBoolFlipped] doesn't
      *  depend on int values (e.g. pure Boolean constraints with no [intVars]) get no
      *  benefit from setting this flag — the engine already short-circuits when [intVars]

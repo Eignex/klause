@@ -18,7 +18,7 @@ import kotlin.math.abs
  *  - `succ[i] = i` → "i is excluded".
  *  - Included nodes must form a single cycle; pointing to an excluded node is a violation;
  *    sub-cycles among included nodes are a violation.
- *  - All-excluded (every succ[i] = i) is valid as the empty subcircuit.
+ *  - All-excluded (every `succ[i]` = i) is valid as the empty subcircuit.
  *  - Exactly-one-included is invalid (a single node can't form a cycle without self-loop,
  *    which would mark it excluded — contradiction).
  *

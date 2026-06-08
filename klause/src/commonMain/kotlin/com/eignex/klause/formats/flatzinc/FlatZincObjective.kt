@@ -15,7 +15,7 @@ import com.eignex.klause.solver.factor.LinearOp
  * returned objective is therefore always an *exact* mirror of the objective variable.
  *
  * See [FunctionalObjective] for why this matters: it gives CBLS a real gradient to the decision
- * variables of a decomposed objective, which a coefficient-on-V-only [LinearObjective] cannot.
+ * variables of a decomposed objective, which a coefficient-on-V-only `LinearObjective` cannot.
  */
 internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? {
     val objId = intVars[objName] ?: return null
@@ -145,7 +145,7 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
     return DefinitionalSweep(nodes)
 }
 
-/** Bool var id for [e] (a positive bool literal), else null. */
+/** Bool var id for `e` (a positive bool literal), else null. */
 private fun FlatZincCompiler.boolIdOrNull(e: FznExpr): Int? = try {
     val lit = resolveBoolLit(e)
     if (Lit.isPositive(lit)) Lit.variable(lit) else null
@@ -286,7 +286,7 @@ private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int
     }
 }
 
-/** Int var id for [e], or null if it's a constant / bool / float / unresolvable. */
+/** Int var id for `e`, or null if it's a constant / bool / float / unresolvable. */
 private fun FlatZincCompiler.varIdOrNull(e: FznExpr): Int? {
     if (evalIntConstOrNull(e) != null) return null
     return try {
@@ -296,7 +296,7 @@ private fun FlatZincCompiler.varIdOrNull(e: FznExpr): Int? {
     }
 }
 
-/** [e] as an [Operand]: a constant term or an int-var reference; null if neither. */
+/** `e` as an [Operand]: a constant term or an int-var reference; null if neither. */
 private fun FlatZincCompiler.operandOf(e: FznExpr): Operand? {
     evalIntConstOrNull(e)?.let { return Operand.c(it) }
     return try {

@@ -77,7 +77,7 @@ class Knapsack(
     }
 
     /** Repair: snap `w` / `p` to the current totals; if w/p are pinned and the totals
-     *  diverge, propose flipping a high-leverage xs[i] in the direction that closes the gap. */
+     *  diverge, propose flipping a high-leverage `xs[i]` in the direction that closes the gap. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State

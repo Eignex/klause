@@ -140,7 +140,7 @@ class SubsetSumEq(
         }
     }
 
-    /** Any common bit between [a] and [b]? */
+    /** Any common bit between `a` and `b`? */
     private fun intersectsDirect(a: LongArray, b: LongArray): Boolean {
         for (w in 0 until words) if (a[w] and b[w] != 0L) return true
         return false

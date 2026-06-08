@@ -41,7 +41,7 @@ internal class LpRelaxation(
  *  - [Cardinality], [Clause], [PseudoBoolean]: linear rows over the Boolean fan-in. A positive
  *    literal contributes `x_b`, a negative literal `1 − x_b`; the constant folds into the row's
  *    right-hand side.
- *  - [ReifiedLinear]: indicator rows via tight big-M (see [reifiedRows]).
+ *  - [ReifiedLinear]: indicator rows via tight big-M (see `reifiedRows`).
  *  - The [LinearObjective] (always minimization): a cost on each variable's column. Every variable
  *    with a nonzero objective coefficient gets a column even if no constraint mentions it, so the
  *    LP objective is the complete relaxed objective and its optimum is a valid bound.
@@ -72,7 +72,7 @@ internal class CpToLpRelaxation(private val problem: Problem, private val object
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
 
-        /** Column for integer variable [i], created on first use with its live domain bounds. */
+        /** Column for integer variable `i`, created on first use with its live domain bounds. */
         private fun intColumn(i: Int): Int {
             var c = intCol[i]
             if (c == -1) {
@@ -85,7 +85,7 @@ internal class CpToLpRelaxation(private val problem: Problem, private val object
             return c
         }
 
-        /** Column for Boolean variable [b]; bounds collapse to a point if it is pinned this node. */
+        /** Column for Boolean variable `b`; bounds collapse to a point if it is pinned this node. */
         private fun boolColumn(b: Int): Int {
             var c = boolCol[b]
             if (c == -1) {

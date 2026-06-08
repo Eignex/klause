@@ -874,7 +874,7 @@ class LocalSearchSolver(
      * if no factor proposed an improving feasibility-preserving move within the collected
      * set; the caller falls back to random pair-swap.
      *
-     * Cost: one [proposeStructuredMoves] call per factor (each factor caps its own
+     * Cost: one `proposeStructuredMoves` call per factor (each factor caps its own
      * proposal count) plus a scoring apply+revert per proposed move. Bounded by the sum
      * of per-factor caps.
      */

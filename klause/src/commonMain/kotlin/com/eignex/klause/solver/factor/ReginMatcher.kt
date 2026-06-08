@@ -7,7 +7,7 @@ import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Shared Régin domain-consistency filtering for the alldifferent family — [AllDifferent],
- * [AllDifferentExcept], and [AllDifferentExceptZero] all route their matching pass through
+ * [AllDifferentExcept], and `AllDifferentExceptZero` all route their matching pass through
  * here, so the bipartite matching / reverse-graph free-value reachability / Tarjan SCC / Hall
  * pruning machinery lives once rather than being copy-pasted (and drifting) per variant.
  *
@@ -241,7 +241,7 @@ internal class ReginCache : PropagationState.SnapshottablePayload {
     }
 }
 
-/** Augmenting-path search for maximum bipartite matching. Returns true iff variable [i] can be
+/** Augmenting-path search for maximum bipartite matching. Returns true iff variable `i` can be
  *  matched (possibly re-routing earlier matches). */
 private fun reginTryAugment(
     i: Int,

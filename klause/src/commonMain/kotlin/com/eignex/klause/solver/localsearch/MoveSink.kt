@@ -46,7 +46,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         invariants = net
     }
 
-    /** Queue a Boolean-flip move on [boolVar]. */
+    /** Queue a Boolean-flip move on `boolVar`. */
     fun addBoolFlip(varId: Int) {
         if (assumptions.isFrozenBool(varId)) return
         if (invariants?.isDefinedBool(varId) == true) return
@@ -55,7 +55,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
     }
 
-    /** Queue an int-set move on [intVar]. */
+    /** Queue an int-set move on `intVar`. */
     fun addIntSet(varId: Int, newValue: Int) {
         if (assumptions.isFrozenInt(varId)) return
         if (invariants?.isDefinedInt(varId) == true) return
@@ -118,7 +118,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      *  sibling indicators need updating, so the cost on non-channeling problems is just
      *  the occurrence-list walk.
      *
-     *  Use this in any factor's [proposeRepairMoves] when proposing an int-set move on a
+     *  Use this in any factor's `proposeRepairMoves` when proposing an int-set move on a
      *  variable that could plausibly be part of a value-to-indicator channeling cluster
      *  (the common decomposition of `x in S` / per-period choice / `course[i] = p` over
      *  int vars). Without channeling synthesis, the LS engine has to chase one indicator

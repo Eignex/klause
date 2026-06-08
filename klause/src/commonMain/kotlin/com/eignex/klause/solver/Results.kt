@@ -71,7 +71,7 @@ sealed interface SampleResult {
 /**
  * Result of [Optimizer.minimize]. Replaces `Sample?` with an explicit verdict so
  * "best-effort feasible at objective o" can't be confused with "proven optimal."
- * Only complete backends ([BacktrackSolver], [BruteForceSolver], LogicNG, SMT/Z3) can
+ * Only complete backends (`BacktrackSolver`, `BruteForceSolver`, LogicNG, SMT/Z3) can
  * ever return [Optimal] or [Infeasible]; the local-search backend returns [BestFound]
  * or [Unknown].
  *

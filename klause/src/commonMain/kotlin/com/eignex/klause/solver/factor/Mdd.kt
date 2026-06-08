@@ -13,14 +13,14 @@ import com.eignex.klause.solver.propagation.PropagationState
  * sequence of `(srcState, value, dstState[, weight])` rows; [layerStarts] indexes into it
  * (layer i spans `layerStarts[i] until layerStarts[i+1]`).
  *
- * When [weights] is non-null, each transition has a 4th field (weight) and [cost] must be
+ * When `weights` is non-null, each transition has a 4th field (weight) and [cost] must be
  * provided — the sum of edge weights along the accepted path equals [cost].
  *
  * Propagation:
  *  - Forward sweep: state `s` at layer `i` is forward-reachable iff some forward-reachable
  *    state at layer `i-1` has a transition on a feasible (in-domain) symbol leading to `s`.
  *  - Backward sweep symmetric from accepting states.
- *  - Prune seq[i] values that have no transition between forward∩backward reachable states.
+ *  - Prune `seq[i]` values that have no transition between forward∩backward reachable states.
  *  - Fail if no forward-reachable state at layer `n` is accepting.
  *  - For cost variant: tighten [cost] bounds by min/max weighted-sum path through the
  *    forward-backward reachable lattice.

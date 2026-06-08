@@ -267,11 +267,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
     }
 
-    /** Antecedents of [v], or null when [v] is a decision/leaf — or when [v] falls outside
+    /** Antecedents of `v`, or null when `v` is a decision/leaf — or when `v` falls outside
      *  the current antecedent universe. Out-of-range atom ids can be reached only through the
      *  recursive antecedent walk in [isRedundant] (the 1UIP loop stays within `seen`/`resolved`
      *  bounds); treating them as antecedent-less leaves keeps the literal, which is always sound
-     *  for minimization, rather than indexing past [PropagationState.atomAntecedents]. */
+     *  for minimization, rather than indexing past `PropagationState.atomAntecedents`. */
     private fun antecedentsOf(v: Int): IntArray? {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
@@ -310,7 +310,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /** Sorted-ascending array of distinct decision levels touched by [learned]. Shares
-     *  its scan with [lbdOf] (whose count is just `levels.size`); finalize computes both
+     *  its scan with `lbdOf` (whose count is just `levels.size`); finalize computes both
      *  in one pass via this helper. */
     private fun distinctLevelsOf(learned: IntArrayList): IntArray {
         if (learned.size == 0) return IntArray(0)
@@ -430,9 +430,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /**
-     * True iff every chain of antecedents leading to [v]'s pin terminates in either a
+     * True iff every chain of antecedents leading to `v`'s pin terminates in either a
      * variable that's *already in the learned clause* ([inClause]) or a level-0 fact.
-     * Decision-style leaves (variables with `null` antecedents) make [v] non-redundant.
+     * Decision-style leaves (variables with `null` antecedents) make `v` non-redundant.
      *
      * Cached per variable for the duration of a single [minimize] call — the recursion
      * depth is bounded by the size of the implication graph reached, but the cache
@@ -521,7 +521,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     /** Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
      *  and atom vars. Atom levels come from [PropagationState.atomLevelForConflict] — the
-     *  bound-history-derived level on the current path — never the drifted [atomLevel],
+     *  bound-history-derived level on the current path — never the drifted `atomLevel`,
      *  which would yield an unsound backjump level / LBD / asserting flag (#76). */
     private fun levelOf(v: Int): Int {
         val numBoolVars = state.problem.numBoolVars

@@ -13,7 +13,7 @@ fun max(vararg xs: IntTerm): IntExpr {
     return IntMax(xs.map { it.toIntExpr() })
 }
 
-/** Absolute value of [x]. */
+/** Absolute value of `x`. */
 fun abs(x: IntTerm): IntExpr = IntAbs(x.toIntExpr())
 
 /** `if cond then thenE else elseE` as an integer expression. */
@@ -442,7 +442,7 @@ fun networkFlow(
     nodeOffset = nodeOffset,
 )
 
-/** Network flow with cost = Σ weight[a] · flow[a]. */
+/** Network flow with cost = Σ `weight[a]` · `flow[a]`. */
 fun networkFlowCost(
     numNodes: Int,
     arcFrom: List<Int>,

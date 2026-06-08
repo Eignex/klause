@@ -28,12 +28,12 @@ enum class LinearOp {
 /**
  * `Σ coeffs[i] * intVars[i] ⟨op⟩ bound`. Payload at `intPayload[factorId]` is the current
  * weighted sum, kept in sync incrementally by [applyIntSet]. Repair moves propose, for each
- * variable, the integer value that on its own would put the sum on the right side of [bound],
+ * variable, the integer value that on its own would put the sum on the right side of `bound`,
  * clamped to the variable's domain.
  */
 class Linear private constructor(
     terms: CoalescedTerms,
-    /** Relation between the weighted sum and [bound]. */
+    /** Relation between the weighted sum and `bound`. */
     val op: LinearOp,
     /** Right-hand-side bound. */
     val bound: Int,
@@ -69,7 +69,7 @@ class Linear private constructor(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violates(state.longPayload[factorId])
 
-    /** Graded violation: the residual amount by which the sum misses [bound] — `|sum-bound|`
+    /** Graded violation: the residual amount by which the sum misses `bound` — `|sum-bound|`
      *  for EQ, `max(0, sum-bound)` for LE, `max(0, bound-sum)` for GE. NE has no natural
      *  magnitude, so it stays binary (1 when `sum == bound`). This is the descent gradient
      *  CBLS needs on tight arithmetic: a move shrinking the residual scores a real improvement
@@ -97,7 +97,7 @@ class Linear private constructor(
         propagateLinearBounds(state, coeffs, vars, op, bound.toLong())
 
     /** Reason set when [propagate] returns false. The conflict comes from exactly one sum
-     *  extreme breaching [bound]: `LE` / `EQ`-with-`sumLo>bound` from the lo side (`Σ rLo`),
+     *  extreme breaching `bound`: `LE` / `EQ`-with-`sumLo>bound` from the lo side (`Σ rLo`),
      *  `GE` / `EQ`-with-`sumHi<bound` from the hi side (`Σ rHi`). Cite only that side's
      *  driving bounds (see [collectLinearDirAntecedents]) — those alone prove infeasibility,
      *  so the nogood is sharper and more reusable than citing both bounds of every var.
@@ -434,9 +434,9 @@ internal fun collectLinearDirAntecedents(
  * never resolves through it and the historical antecedent is irrelevant. The looser cited
  * bounds make the eventual learned clause strictly more general / reusable.
  *
- * Soundness: relaxing a cited bound moves the driving sum toward [bound] by `|c|·(loosening)`;
+ * Soundness: relaxing a cited bound moves the driving sum toward `bound` by `|c|·(loosening)`;
  * the total is capped at [slack], so the relaxed bounds still imply the original deduction
- * (conflict: sum still breaches [bound]; tighten: the rounded bound on the deduced var is
+ * (conflict: sum still breaches `bound`; tighten: the rounded bound on the deduced var is
  * unchanged). [slack] MUST be a sound *under*-estimate of the true room — over-estimating drops
  * feasible solutions. Vars at their root bound are global facts (cited nothing); vars whose full
  * relaxation can't fit the remaining slack keep their current tight bound (existing behaviour,

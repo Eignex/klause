@@ -7,7 +7,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
- * `sequence(low, high, k, xs, S)` — for every length-[k] window
+ * `sequence(low, high, k, xs, S)` — for every length-`k` window
  * `xs[i..i+k-1]`, the number of `xs[j] ∈ S` lies in `[low, high]`. Used in rostering /
  * timetabling for sliding-window quotas ("at most 3 night shifts in any 7-day window").
  *
@@ -173,7 +173,7 @@ class Sequence(
         return true
     }
 
-    /** For each violated window, propose flips of in-window xs[j] that move the window
+    /** For each violated window, propose flips of in-window `xs[j]` that move the window
      *  count toward `[low, high]`. Below-low windows want a non-match → match flip;
      *  above-high windows want a match → non-match flip. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

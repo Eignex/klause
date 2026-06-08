@@ -54,11 +54,11 @@ class IntHandle(
  * Float variable represented as a native real-valued solver variable with bounds
  * `[min, max]`. Arithmetic and comparison operators build a [FloatExpr] that lowers
  * to a [FloatLinearConstraint] AST node at compile-time; the compiler converts that
- * into a [com.eignex.klause.solver.factor.FloatLinear] factor in the [com.eignex.klause.solver.Problem].
+ * into a `com.eignex.klause.solver.factor.FloatLinear` factor in the [com.eignex.klause.solver.Problem].
  *
  * The historical `buckets` parameter is preserved for source compatibility but is no
  * longer used at the schema layer — bucketing is now a per-backend concern handled by
- * [com.eignex.klause.solver.FloatLowering] at solve-time. Backends with native float
+ * `com.eignex.klause.solver.FloatLowering` at solve-time. Backends with native float
  * support (Z3) ignore the lowering entirely.
  */
 class FloatHandle(
@@ -144,7 +144,7 @@ operator fun Double.times(expr: FloatExpr): FloatExpr = expr * this
  * Linear expression `Σ c_i · h_i + offset` over one or more [FloatHandle]s, all in real
  * (Double) space. Arithmetic operators fold by merging coefficient maps; comparisons
  * against a Double or another [FloatExpr] lower to a [FloatLinearConstraint] AST node,
- * which the compiler turns into a [com.eignex.klause.solver.factor.FloatLinear] factor.
+ * which the compiler turns into a `com.eignex.klause.solver.factor.FloatLinear` factor.
  */
 class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>, private val offset: Double) {
 

@@ -50,7 +50,7 @@ class LocalSearchState(
     val intPayload: IntArray = IntArray(problem.numFactors)
 
     /** Per-factor `Long` scratch, the wide counterpart to [intPayload]. The weighted-sum
-     *  family ([Linear], [ReifiedLinear], [PseudoBoolean], [ReifiedPseudoBoolean]) keeps its
+     *  family ([Linear], [ReifiedLinear], `PseudoBoolean`, `ReifiedPseudoBoolean`) keeps its
      *  running `Σ coeff·value` here so large coefficients / wide domains can't wrap a 32-bit
      *  accumulator and silently corrupt `isViolated` / `violationDegree`. */
     val longPayload: LongArray = LongArray(problem.numFactors)
@@ -677,7 +677,7 @@ class LocalSearchState(
         }
     }
 
-    /** Walk every factor that touches bool var [v], call its `deltaIfBoolFlipped`, and
+    /** Walk every factor that touches bool var `v`, call its `deltaIfBoolFlipped`, and
      *  hand the (factorId, delta) pair to [action]. Inline so callers stay allocation-
      *  free. Shared by [breakScore], [netDelta], and DDFW's weighted-break score. */
     internal inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
@@ -686,7 +686,7 @@ class LocalSearchState(
         }
     }
 
-    /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var [v] with
+    /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var `v` with
      *  target value [newValue]. */
     internal inline fun forEachIntFactorDelta(v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in problem.intOccurrences[v]) {
@@ -696,7 +696,7 @@ class LocalSearchState(
 
     /** Pick a uniformly-random violated factor, ask it for repair-move suggestions, and
      *  return the raw list. Returns `null` when no factor is violated or the violated
-     *  factor proposed no moves. Every WalkSAT-family [Strategy.pickMove] starts the same
+     *  factor proposed no moves. Every WalkSAT-family `Strategy.pickMove` starts the same
      *  way; this method is the shared opener. */
     fun proposeMovesFromRandomViolated(): List<Move>? {
         if (violated.isEmpty()) return null
@@ -885,7 +885,7 @@ class LocalSearchState(
 
     /** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated.
      *  Ints get ±1 steps *and* the domain endpoints: on successor/path encodings the min
-     *  endpoint is the semantic "remove from the structure" eject (next[i] → 0), the move
+     *  endpoint is the semantic "remove from the structure" eject (`next[i]` → 0), the move
      *  that lets a chain dismantle a parasitic successor fragment backwards — ±1 alone
      *  cannot express that jump and the prize-collecting orbit stays closed without it. */
     private fun emitFactorPrimitives(seed: Int, nf: Int, seenFactors: IntHashSet, sink: MoveSink) {

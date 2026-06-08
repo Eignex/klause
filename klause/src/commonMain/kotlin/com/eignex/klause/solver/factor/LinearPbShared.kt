@@ -18,7 +18,7 @@ import com.eignex.klause.util.IntIntMap
  */
 
 /* ------------------------------------------------------------------ *
- *  Linear:  Σ coeffs[i] · vars[i]  ⟨op⟩  bound
+ *  Linear:  Σ `coeffs[i]` · `vars[i]`  ⟨op⟩  bound
  * ------------------------------------------------------------------ */
 
 /** True iff `sum ⟨op⟩ bound` holds. The negation is the "violated" predicate. */
@@ -93,7 +93,7 @@ internal fun snapLinearTarget(op: LinearOp, bound: Int, coeff: Int, sumWithout: 
 }
 
 /* ------------------------------------------------------------------ *
- *  PseudoBoolean:  Σ weights[i] · lit_i  ⟨op⟩  bound
+ *  PseudoBoolean:  Σ `weights[i]` · lit_i  ⟨op⟩  bound
  * ------------------------------------------------------------------ */
 
 /** True iff `sum ⟨op⟩ bound` holds for a pseudo-Boolean comparison. */

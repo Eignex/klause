@@ -95,9 +95,9 @@ class Among(
         return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
-    /** Snap `n` to the running count, and propose flips of dissenting xs[i] toward / away
+    /** Snap `n` to the running count, and propose flips of dissenting `xs[i]` toward / away
      *  from the value set [values]. When count differs from `n` by more than 1, multiple
-     *  xs[i] candidates ride alongside the n-snap so a strategy can chain them. */
+     *  `xs[i]` candidates ride alongside the n-snap so a strategy can chain them. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State

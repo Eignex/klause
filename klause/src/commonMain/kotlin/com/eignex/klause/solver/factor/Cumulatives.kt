@@ -355,7 +355,7 @@ class Cumulatives(
         return (penalty(u + amount, cap) - penalty(u, cap)).toLong()
     }
 
-    /** Penalty Δ of shifting a task `[oldS, oldS+d) → [newS, newS+d)` on machine [k] at
+    /** Penalty Δ of shifting a task `[oldS, oldS+d) → [newS, newS+d)` on machine `k` at
      *  constant [r]. Computed over the symmetric difference (overlap cells net to zero), so
      *  it stays exact and non-mutating regardless of how the intervals overlap. */
     private fun shiftDelta(ls: LsState, k: Int, cap: Int, oldS: Int, newS: Int, d: Int, r: Int): Long {
@@ -370,7 +370,7 @@ class Cumulatives(
         return delta
     }
 
-    /** Penalty Δ of adding [amount] (signed) over absolute `[s, s+d)` on machine [k]. */
+    /** Penalty Δ of adding [amount] (signed) over absolute `[s, s+d)` on machine `k`. */
     private fun spanDelta(ls: LsState, k: Int, cap: Int, s: Int, d: Int, amount: Int): Long {
         if (amount == 0 || d <= 0) return 0L
         return spanRangeDelta(ls, k, cap, s, s + d, amount)
@@ -387,7 +387,7 @@ class Cumulatives(
         return delta
     }
 
-    /** Penalty Δ of a duration change `[s,s+oldD) → [s,s+newD)` at constant [r] on machine [k]. */
+    /** Penalty Δ of a duration change `[s,s+oldD) → [s,s+newD)` at constant [r] on machine `k`. */
     private fun durDelta(ls: LsState, k: Int, cap: Int, s: Int, oldD: Int, newD: Int, r: Int): Long {
         if (oldD == newD || r <= 0) return 0L
         return if (newD > oldD) {
@@ -397,7 +397,7 @@ class Cumulatives(
         }
     }
 
-    /** Mutating: add [amount] over `[s, s+d)` on machine [k], updating usage and rawV. */
+    /** Mutating: add [amount] over `[s, s+d)` on machine `k`, updating usage and rawV. */
     private fun addSpan(ls: LsState, k: Int, cap: Int, s: Int, d: Int, amount: Int) {
         if (amount == 0 || d <= 0) return
         addSpanRange(ls, k, cap, s, s + d, amount)
@@ -416,7 +416,7 @@ class Cumulatives(
         }
     }
 
-    /** Total penalty over machine [k]'s timeline under a hypothetical [cap]. */
+    /** Total penalty over machine `k`'s timeline under a hypothetical [cap]. */
     private fun machinePenalty(ls: LsState, k: Int, cap: Int): Long {
         var sum = 0L
         val base = k * ls.horizon
@@ -505,7 +505,7 @@ class Cumulatives(
         }
     }
 
-    /** Propose moving task [i] to whichever machine in its domain currently has the most
+    /** Propose moving task `i` to whichever machine in its domain currently has the most
      *  slack at the task's interval (upper-bound case). */
     private fun proposeMachineMove(state: LocalSearchState, ls: LsState, i: Int, sink: MoveSink) {
         val mv = machines[i]
