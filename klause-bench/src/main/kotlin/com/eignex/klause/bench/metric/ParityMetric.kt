@@ -199,11 +199,13 @@ internal object ParityMetric {
         )
     }
 
-    // -Dklause.bench.parity.timed scores the real fixed-track COP goal: a single
-    // annotation-following klause worker vs Choco-CP-SAT (LCG) under the same prescribed
-    // search, where "beat" means a strictly better objective OR the same objective reached
-    // sooner. Both solvers run single-threaded; the row records each side's final value and
-    // the wall-clock at its last incumbent, and is marked ok iff klause beats.
+    // -Dklause.bench.parity.timed scores the COP goal as a free-search race: a single
+    // klause worker on its own free conflict-driven search vs Choco-CP-SAT (LCG) on its
+    // default search, where "beat" means a strictly better objective OR the same objective
+    // reached sooner. Both run single-threaded (no portfolio, no parallelism). A fixed-track
+    // variant (both following the model annotation) is not viable: choco-LCG is unsound under
+    // a mirrored fixed search (see rasros/choco-lcg-false-unsat), so each solver uses its own
+    // search — the comparison every solver actually runs in competition.
     private val timedMode = System.getProperty("klause.bench.parity.timed")?.toBoolean() ?: false
 
     private fun timedOptimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget): ParityRow {
@@ -215,10 +217,14 @@ internal object ParityMetric {
         warmup(entry, obj)
 
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        // klause: fixed-track single worker, time-stamped at each incumbent.
+        // klause: single free conflict-driven worker, time-stamped at each incumbent. (Not
+        // the model annotation — forcing it cripples klause on rows whose prescribed search
+        // suits a different engine, e.g. stochastic-fjsp where free search proves the optimum
+        // in tens of ms while the annotation stalls. Choco likewise runs its own default.)
         var kBestMillis: Long? = null
         val t0 = System.currentTimeMillis()
-        val kParams = fixedParams(entry, deadline).copy(
+        val kParams = conflictDrivenParams().copy(
+            cancellation = Cancellation { System.currentTimeMillis() > deadline },
             onEvent = { e -> if (e is SearchEvent.Incumbent) kBestMillis = System.currentTimeMillis() - t0 },
         )
         val k = runCatching { BacktrackSolver(entry.problem).minimize(obj, kParams) }
@@ -365,24 +371,20 @@ internal object ParityMetric {
         return listOfNotNull(free, free2, conflictDriven, conflictDriven2, annotated, xor)
     }
 
-    // -Dklause.bench.parity.mode=fixed scores the fixed competition track: a single
-    // klause worker that follows the model's search annotation (the engine's
-    // conflict-driven free composition where the model has none), against a reference
-    // that mirrors the same prescribed search. Default "portfolio" races the multi-worker
-    // parallel-track configuration.
+    // -Dklause.bench.parity.mode=fixed scores the single-threaded competition track: one
+    // klause worker on its own free conflict-driven search (no portfolio, no parallelism),
+    // matching choco running single-threaded on its default search. Forcing the model
+    // annotation is not done — it cripples klause where the prescribed search suits another
+    // engine. Default "portfolio" races the multi-worker parallel-track configuration.
     private val fixedMode = System.getProperty("klause.bench.parity.mode") == "fixed"
 
-    private fun fixedParams(entry: ResolvedProblem, deadline: Long): BacktrackParams =
-        (entry.searchParams ?: conflictDrivenParams()).copy(
-            randomSeed = 1L,
-            lubyRestartBase = 256L,
-            cancellation = Cancellation { System.currentTimeMillis() > deadline },
-        )
+    private fun freeParamsWithDeadline(deadline: Long): BacktrackParams =
+        conflictDrivenParams().copy(cancellation = Cancellation { System.currentTimeMillis() > deadline })
 
     @Suppress("InjectDispatcher")
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        if (fixedMode) return BacktrackSolver(entry.problem).solve(fixedParams(entry, deadline))
+        if (fixedMode) return BacktrackSolver(entry.problem).solve(freeParamsWithDeadline(deadline))
         return runBlocking(Dispatchers.Default) {
             Portfolio(workers(entry, objective = null))
                 .solve(Cancellation { System.currentTimeMillis() > deadline })
@@ -392,7 +394,7 @@ internal object ParityMetric {
     @Suppress("InjectDispatcher")
     private fun klauseMinimize(entry: ResolvedProblem, obj: Objective, budget: Budget): MinimizeResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, fixedParams(entry, deadline))
+        if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, freeParamsWithDeadline(deadline))
         return runBlocking(Dispatchers.Default) {
             Portfolio(workers(entry, obj))
                 .minimize(Cancellation { System.currentTimeMillis() > deadline })
