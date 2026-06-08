@@ -334,8 +334,38 @@ class PortfolioTest {
         }
     }
 
+    @Test
+    fun `builder backtrack pool includes the sat-optimized worker and solves`() = runTest {
+        // A single backtrack worker (i % 3 == 0) must be the SAT-optimized config; confirm the
+        // built pool both surfaces that worker and solves a conflict-heavy UNSAT instance.
+        val problem = pigeonhole(pigeons = 4, holes = 3)
+        PortfolioBuilder.build(problem, PortfolioSpec(backtrackWorkers = 1, seed = 0L)).use { p ->
+            assertTrue(p.workers.any { it.label == "backtrack#0" }, "expected a backtrack worker")
+            assertIs<SolveResult.Unsat>(p.solve())
+        }
+        // With three backtrack workers the pool cycles through all three complete configs.
+        PortfolioBuilder.build(exactlyOneOver(5), PortfolioSpec(backtrackWorkers = 3, seed = 0L)).use { p ->
+            assertEquals(3, p.workers.count { it.label.startsWith("backtrack#") })
+            assertIs<SolveResult.Sat>(p.solve())
+        }
+    }
+
     private fun exactlyOneOver(n: Int): Problem {
         val factor = Cardinality.exactlyOne(IntArray(n) { Lit.make(it, true) })
         return Problem(n, 0, emptyArray(), listOf(factor))
+    }
+
+    private fun pigeonhole(pigeons: Int, holes: Int): Problem {
+        val factors = ArrayList<Factor>()
+        fun v(p: Int, h: Int) = p * holes + h
+        for (p in 0 until pigeons) factors.add(Clause(IntArray(holes) { h -> Lit.make(v(p, h), true) }))
+        for (h in 0 until holes) {
+            for (p1 in 0 until pigeons) {
+                for (p2 in p1 + 1 until pigeons) {
+                    factors.add(Clause(intArrayOf(Lit.make(v(p1, h), false), Lit.make(v(p2, h), false))))
+                }
+            }
+        }
+        return Problem(pigeons * holes, 0, emptyArray(), factors.toTypedArray())
     }
 }
