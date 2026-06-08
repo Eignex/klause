@@ -15,6 +15,9 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.lp.CpToLpRelaxation
+import com.eignex.klause.solver.lp.DualSimplex
+import com.eignex.klause.solver.lp.LpStatus
 import com.eignex.klause.solver.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
@@ -191,6 +194,15 @@ class BacktrackSolver(override val problem: Problem) :
         // assert `objVar ≤/≥ best ∓ 1` at the root and let the defining constraint propagate.
         val singleObj = (objective as? LinearObjective)?.singleIntObjective()
         var objVarBest: Int? = null
+        val sink = SolveStatsSink(backend = "backtrack")
+        // LP-relaxation bounding (#20): build the relaxer once; it reads live bounds per node.
+        // Only a LinearObjective yields a sound LP objective, so the relaxer is null otherwise.
+        val lpRelaxer = if (params.lpBounding && objective is LinearObjective) {
+            CpToLpRelaxation(problem, objective)
+        } else {
+            null
+        }
+        var lpCheckCounter = 0
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
             is LinearObjective -> { session ->
                 // Effective bound = min(local incumbent, external supplier). External bound
@@ -198,7 +210,19 @@ class BacktrackSolver(override val problem: Problem) :
                 // their local incumbent as soon as any worker finds a better one.
                 val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
                 val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
-                linearLowerBound(objective, session) >= effectiveBound
+                when {
+                    // Cheap separable bound first — a fast filter that often prunes without an LP solve.
+                    linearLowerBound(objective, session) >= effectiveBound -> true
+
+                    // Then the LP relaxation, gated by the depth/frequency policy (the solve is the
+                    // expensive part of a node, so it does not run at every node).
+                    lpRelaxer != null &&
+                        session.decisionLevel <= params.lpBoundMaxDepth &&
+                        ++lpCheckCounter % params.lpBoundEvery == 0 ->
+                        lpPrune(lpRelaxer, session, effectiveBound, sink)
+
+                    else -> false
+                }
             }
 
             else -> null
@@ -209,7 +233,6 @@ class BacktrackSolver(override val problem: Problem) :
         // lubyRestartBase the caller is choosing anytime diversification over proof speed —
         // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
         // solved leaves.
-        val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
         for (outcome in driveSearch(
             params.copy(minHammingDistance = 0, recentWindow = 0),
@@ -317,6 +340,39 @@ class BacktrackSolver(override val problem: Problem) :
             total += if (c >= 0L) c * d.min else c * d.max
         }
         return total
+    }
+
+    /**
+     * LP-relaxation bound (#20): build and solve an exact integer LP relaxation of the live problem
+     * and decide whether this node's subtree can be cut. Prunes when the relaxation is infeasible
+     * (so the subtree is infeasible regardless of the incumbent) or when its objective bound —
+     * rounded **up** to the next integer, since the true objective is integral — is at least the
+     * incumbent [bound]. The rounded comparison is exact because the LP arithmetic is exact.
+     *
+     * Returns false (never prune) when the relaxation has no columns, i.e. the problem has no
+     * LP-emittable factors and no objective terms to bound against.
+     */
+    private fun lpPrune(
+        relaxer: CpToLpRelaxation,
+        session: PropagationSession,
+        bound: Double,
+        sink: SolveStatsSink,
+    ): Boolean {
+        val relaxation = relaxer.build(session)
+        if (relaxation.model.n == 0) return false // empty relaxation: nothing to prune with
+        val solution = DualSimplex(relaxation.model).solve()
+        val prune = when (solution.status) {
+            LpStatus.INFEASIBLE -> true
+
+            LpStatus.OPTIMAL -> {
+                val lpBound = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
+                bound.isFinite() && lpBound.toDouble() >= bound
+            }
+
+            LpStatus.UNBOUNDED -> false
+        }
+        if (prune) sink.observeLpPrune()
+        return prune
     }
 
     // ---------------------------------------------------------------------------------------
