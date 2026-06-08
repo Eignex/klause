@@ -70,11 +70,11 @@ internal object CompileAuditMetric {
                 "(ingest smoke skipped — " +
                     (
                         if (fznCli == null) {
-                        "klause-cli not installed (run :klause-cli:installJvmDist)"
-                    } else {
-                        "disabled"
-                    }
-                    ) + ")",
+                            "klause-cli not installed (run :klause-cli:installJvmDist)"
+                        } else {
+                            "disabled"
+                        }
+                        ) + ")",
             )
         }
 
@@ -116,7 +116,7 @@ internal object CompileAuditMetric {
         for (f in families) {
             println(
                 "[${f.family}] ${f.instances} inst, ${f.compileErrors} compile-err, ${f.ingestCrashes} ingest-crash, " +
-                    "avg cov ${"%.0f".format(f.avgCoverage * 100)}%",
+                    "avg cov ${"%.0f".format(java.util.Locale.ROOT, f.avgCoverage * 100)}%",
             )
         }
         val res = AuditResults(Instant.now().toString(), Reports.readGitSha(), EnvInfo.capture(), rows, families)
@@ -138,7 +138,7 @@ internal object CompileAuditMetric {
                             it.instances,
                             it.compileErrors,
                             it.ingestCrashes,
-                            "${"%.0f".format(it.avgCoverage * 100)}%",
+                            "${"%.0f".format(java.util.Locale.ROOT, it.avgCoverage * 100)}%",
                         )
                     },
                 )

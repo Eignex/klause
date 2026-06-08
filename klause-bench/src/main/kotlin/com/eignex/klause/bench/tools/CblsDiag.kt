@@ -6,8 +6,10 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import java.io.File
+import java.util.Locale
 import kotlin.random.Random
 
 /**
@@ -62,9 +64,9 @@ object CblsDiag {
             val maxNbhd = System.getProperty("klause.cblsdiag.maxnbhd")?.toInt() ?: 1
             val skew = System.getProperty("klause.cblsdiag.skew")?.toDouble() ?: 0.0
             val scoring = if (System.getProperty("klause.cblsdiag.scoring")?.lowercase() == "raw") {
-                com.eignex.klause.solver.localsearch.strategy.MoveScoring.Raw
+                MoveScoring.Raw
             } else {
-                com.eignex.klause.solver.localsearch.strategy.MoveScoring.Weighted
+                MoveScoring.Weighted
             }
             // Defaults to the shipped Cbls default (0 = plateau-buster off); override with
             // -Dklause.cblsdiag.swapcap=16 to probe the stall-swap configuration, or
@@ -139,10 +141,12 @@ object CblsDiag {
         }
         println("global best cost (sum of violation degrees): $globalBest")
 
-        if (bestBoolVals != null) {
+        val finalBool = bestBoolVals
+        val finalInt = bestIntVals
+        if (finalBool != null) {
             val st = LocalSearchState(problem, Random(7), Assumptions.None)
-            for (b in 0 until problem.numBoolVars) st.assignment.setBool(b, bestBoolVals!![b])
-            for (i in 0 until problem.numIntVars) st.assignment.setInt(i, bestIntVals!![i])
+            for (b in 0 until problem.numBoolVars) st.assignment.setBool(b, finalBool[b])
+            for (i in 0 until problem.numIntVars) st.assignment.setInt(i, requireNotNull(finalInt)[i])
             st.recompute()
             dumpMinState(st)
             val ringProbe = System.getProperty("klause.cblsdiag.ringprobe")?.toInt() ?: 0
@@ -191,7 +195,7 @@ object CblsDiag {
 
         val start = snapshot()
         val seen = HashSet<Long>().apply { add(key(start)) }
-        var frontier = mutableListOf(start)
+        var frontier: List<Pair<BooleanArray, IntArray>> = listOf(start)
         var depth = 0
         var expanded = 0
         val sink = MoveSink(Assumptions.None)
@@ -273,7 +277,11 @@ object CblsDiag {
             byClass[name] = (byClass[name] ?: 0) + 1
         }
         println("--- ${violatedIds.size} violated factor(s) at min cost ---")
-        byClass.entries.sortedByDescending { it.value }.forEach { (k, v) -> println("  %5d  %s".format(v, k)) }
+        byClass.entries.sortedByDescending { it.value }.forEach { (k, v) ->
+            println(
+                "  %5d  %s".format(Locale.ROOT, v, k),
+            )
+        }
 
         // Optional raw-state dump for semantic plateau analysis: values of the first N int
         // vars (decision arrays come first in FZN declaration order) plus each violated

@@ -25,8 +25,13 @@ import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stat.summary.ArgMinStat
 import com.eignex.kumulant.stat.summary.MinStat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.util.Locale
+import java.util.concurrent.LinkedBlockingQueue
+import kotlin.concurrent.thread
 
 /**
  * Anytime optimization comparison: run klause's local-search engine and an in-process
@@ -166,7 +171,7 @@ internal object AnytimeMetric {
     }
 
     private fun row(entry: ResolvedProblem, budget: Budget, ref: Reference): AnytimeRow {
-        val obj = entry.objective!!
+        val obj = requireNotNull(entry.objective)
         // Mirror the shipped LS configuration (klause-ls.msc → CLI): CBLS for both the satisfy
         // fight and the objective descent, with the functional (gradient-bearing) objective when
         // the model provides one. A bare LocalSearchSolver(problem) would use the ProbSat default
@@ -234,7 +239,8 @@ internal object AnytimeMetric {
                 if (r is MinimizeResult.WithSample) {
                     val now = System.currentTimeMillis() - t0
                     if (firstMs < 0) firstMs = now
-                    if (best == null || r.objective < best!!) {
+                    val prevBest = best
+                    if (prevBest == null || r.objective < prevBest) {
                         best = r.objective
                         bestMs = now
                     }
@@ -265,6 +271,7 @@ internal object AnytimeMetric {
      *  palette-tuning campaign knob. Per-worker credit is printed after each instance as a
      *  `[portfolio-stats]` line: which worker produced the first global incumbent (and when),
      *  which held the final best, and each worker's strict-improvement count. */
+    @Suppress("InjectDispatcher")
     private fun portfolioImprovements(
         entry: ResolvedProblem,
         prop: String,
@@ -291,8 +298,8 @@ internal object AnytimeMetric {
         )
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }
-        val queue = java.util.concurrent.LinkedBlockingQueue<Any>()
-        kotlin.concurrent.thread(isDaemon = true, name = "portfolio-anytime") {
+        val queue = LinkedBlockingQueue<Any>()
+        thread(isDaemon = true, name = "portfolio-anytime") {
             // Credit accumulation happens inside the (sequential) collector, so plain locals
             // suffice; the summary line prints once the stream ends.
             var first: String? = null
@@ -303,7 +310,7 @@ internal object AnytimeMetric {
                 // Dispatchers.Default → the channelFlow's per-worker launches get real OS threads
                 // and run in parallel; plain runBlocking is single-threaded and CPU-bound workers
                 // (which never suspend) would starve each other.
-                kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.Default) {
+                runBlocking(Dispatchers.Default) {
                     portfolio.improvementsAttributed(cancel).collect { a ->
                         if (first == null) {
                             first = a.workerLabel
@@ -385,5 +392,5 @@ internal object AnytimeMetric {
         else -> CostShaping.Linear(lambda = System.getProperty("klause.anytime.lambda")?.toDouble() ?: 1.0)
     }
 
-    private fun fmt(v: Double?): String = v?.let { "%.1f".format(it) } ?: "—"
+    private fun fmt(v: Double?): String = v?.let { "%.1f".format(Locale.ROOT, it) } ?: "—"
 }

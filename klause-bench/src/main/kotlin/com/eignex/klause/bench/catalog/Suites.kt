@@ -1,6 +1,8 @@
 package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.LibminizincExpected
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -39,27 +41,27 @@ internal object Suites {
     val dynamic: List<DynamicSuite> by lazy {
         listOf(
             DynamicSuite("mzn-bench", "MiniZinc Challenge benchmarks (fetched; 1/family by default)") {
-                com.eignex.klause.bench.source.CorpusSelection.select(
+                CorpusSelection.select(
                     ExternalCollections.minizincBenchmarks,
-                    com.eignex.klause.bench.source.CorpusSelection.Layout.MznChallenge(),
-                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    CorpusSelection.Layout.MznChallenge(),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.OPTIMIZATION,
                 )
             },
             DynamicSuite("libminizinc-tests", "libminizinc compiler test suite (fetched; 1/family by default)") {
-                com.eignex.klause.bench.source.CorpusSelection.select(
+                CorpusSelection.select(
                     ExternalCollections.libminizincTests,
-                    com.eignex.klause.bench.source.CorpusSelection.Layout.FlatMzn("tests/spec/unit"),
-                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    CorpusSelection.Layout.FlatMzn("tests/spec/unit"),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.CSP,
-                    expected = { com.eignex.klause.bench.source.LibminizincExpected.parse(it) },
+                    expected = { LibminizincExpected.parse(it) },
                 )
             },
             DynamicSuite("hakank", "hakank MiniZinc collection (fetched, sparse minizinc/; 1/family by default)") {
-                com.eignex.klause.bench.source.CorpusSelection.select(
+                CorpusSelection.select(
                     ExternalCollections.hakank,
-                    com.eignex.klause.bench.source.CorpusSelection.Layout.FlatMzn("minizinc"),
-                    com.eignex.klause.bench.source.CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    CorpusSelection.Layout.FlatMzn("minizinc"),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.CSP,
                 )
             },

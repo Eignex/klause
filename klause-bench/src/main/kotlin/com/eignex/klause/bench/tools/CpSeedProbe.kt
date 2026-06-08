@@ -18,6 +18,7 @@ import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.maximizeInt
 import com.eignex.klause.solver.minimizeInt
 import java.io.File
+import java.util.Locale
 
 /**
  * Hybrid CP-seeding probe: does handing LS a CP/backtrack-found *feasible* point unlock the
@@ -93,6 +94,7 @@ object CpSeedProbe {
             }
             println(
                 "  %-12s feasible=%-5s best=%-10s first=%sms n=%d".format(
+                    Locale.ROOT,
                     label,
                     (best != null).toString(),
                     best?.toString() ?: "—",

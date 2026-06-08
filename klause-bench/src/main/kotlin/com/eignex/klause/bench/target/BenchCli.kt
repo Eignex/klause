@@ -8,6 +8,7 @@ import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.tools.CblsDiag
 import com.eignex.klause.bench.tools.CpSeedProbe
+import com.eignex.klause.bench.tools.FormatCoverage
 import com.eignex.klause.bench.tools.LsConfigProbe
 import com.eignex.klause.bench.tools.MeasureBacktrack
 
@@ -38,12 +39,13 @@ object BenchCli {
             "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
             "diag:lsconfig" -> LsConfigProbe.main(args.drop(1).toTypedArray())
             "diag:cpseed" -> CpSeedProbe.main(args.drop(1).toTypedArray())
-            "coverage:xcsp3" -> com.eignex.klause.bench.tools.FormatCoverage.xcsp3()
-            "coverage:smtlib" -> com.eignex.klause.bench.tools.FormatCoverage.smtlib()
+            "coverage:xcsp3" -> FormatCoverage.xcsp3()
+            "coverage:smtlib" -> FormatCoverage.smtlib()
             else -> runTarget(cmd)
         }
     }
 
+    @Suppress("SpreadOperator")
     private fun runTarget(id: String) {
         val target = Targets.get(id)
         println("=== target '${target.id}' — ${target.description} ===")

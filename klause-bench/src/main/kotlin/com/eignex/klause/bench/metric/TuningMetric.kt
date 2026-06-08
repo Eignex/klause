@@ -15,6 +15,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.util.Locale
 
 /**
  * Solver-config tuning for a **mixed (satisfaction + optimization) workload**, run over catalog
@@ -140,12 +141,13 @@ internal object TuningMetric {
 
         for (r in ranking) {
             println(
-                "  ${r.config.padEnd(24)} overall=${"%.2f".format(r.overallRank)} " +
+                "  ${r.config.padEnd(24)} overall=${"%.2f".format(Locale.ROOT, r.overallRank)} " +
                     "sat=${r.satRank?.let {
                         "%.2f".format(
+                            Locale.ROOT,
                             it,
                         )
-                    } ?: "—"} opt=${r.optRank?.let { "%.2f".format(it) } ?: "—"}",
+                    } ?: "—"} opt=${r.optRank?.let { "%.2f".format(Locale.ROOT, it) } ?: "—"}",
             )
         }
         val best = ranking.firstOrNull()?.config
@@ -176,9 +178,9 @@ internal object TuningMetric {
                     ranking.map {
                         listOf(
                             it.config,
-                            "%.2f".format(it.overallRank),
-                            it.satRank?.let { r -> "%.2f".format(r) } ?: "—",
-                            it.optRank?.let { r -> "%.2f".format(r) } ?: "—",
+                            "%.2f".format(Locale.ROOT, it.overallRank),
+                            it.satRank?.let { r -> "%.2f".format(Locale.ROOT, r) } ?: "—",
+                            it.optRank?.let { r -> "%.2f".format(Locale.ROOT, r) } ?: "—",
                         )
                     },
                 )

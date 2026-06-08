@@ -15,6 +15,7 @@ import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import java.io.File
+import java.util.Locale
 
 /**
  * Probe: does a *single* LS instance reach feasibility on an FZN under each of several
@@ -88,6 +89,7 @@ object LsConfigProbe {
             }
             println(
                 "  %-26s feasible %d/%d%s".format(
+                    Locale.ROOT,
                     name,
                     solvedSeeds,
                     seeds,
