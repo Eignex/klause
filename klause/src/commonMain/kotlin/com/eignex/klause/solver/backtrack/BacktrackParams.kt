@@ -76,6 +76,24 @@ data class BacktrackParams(
      */
     val lbdGlueThreshold: Int = 2,
     /**
+     * Three-tier learned-clause database (#201). When true (and [maxLearnedClauses] is set),
+     * the restart-driven reduction replaces the binary glue split with three tiers: a
+     * permanent core (LBD ≤ [lbdGlueThreshold]), a mid tier (LBD ≤ [midLbdThreshold]) kept
+     * across reductions but demoted when idle, and a local tier deleted aggressively. Clauses
+     * that participate in a later conflict (detect it or force a unit) are promoted on the
+     * next reduction; mid-tier clauses idle across a reduction are demoted. This gives more
+     * selective deletion than the binary glue split and helps proof-search families (#117)
+     * where useful clauses are otherwise forgotten. Disabled by default — the binary glue
+     * policy stays the baseline.
+     */
+    val tieredLearnedDb: Boolean = false,
+    /**
+     * Mid-tier LBD threshold for [tieredLearnedDb]: a freshly learned clause with
+     * `lbdGlueThreshold < LBD ≤ midLbdThreshold` starts in the mid tier, higher LBD in the
+     * local tier. Glucose's "Tier2" cutoff is 6.
+     */
+    val midLbdThreshold: Int = 6,
+    /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
      * engines read it at each leaf-attempt and prune the subtree whenever the

@@ -259,6 +259,19 @@ class PropagationSession(
     /** True iff learned clause [learnedIndex] survives every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
+    /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
+    fun learnedClauseTier(learnedIndex: Int): Int = state.learnedClauseTier(learnedIndex)
+
+    /** Set the three-tier DB tier of learned clause [learnedIndex]. */
+    fun setLearnedClauseTier(learnedIndex: Int, tier: Int) = state.setLearnedClauseTier(learnedIndex, tier)
+
+    /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last reduction. */
+    fun learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean =
+        state.learnedClauseUsedSinceReduction(learnedIndex)
+
+    /** Clear the reuse flag of learned clause [learnedIndex] (called for survivors after a reduction). */
+    fun clearLearnedClauseUsed(learnedIndex: Int) = state.clearLearnedClauseUsed(learnedIndex)
+
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
         val want = if (value) 1 else 0
         if (boolPinned[v] == want) return PropagationResult.Implied.Empty
