@@ -192,6 +192,13 @@ object ParityMetric {
     private val timedMode = System.getProperty("klause.bench.parity.timed")?.toBoolean() ?: false
 
     private fun timedOptimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget): ParityRow {
+        // Warm the JVM before timing. The competition runs a native binary with no JIT
+        // warmup cost; on the JVM a cold first solve spends seconds in compilation, which
+        // dominates time-to-best on fast rows and would make every quick COP look slow.
+        // A short throwaway solve per engine moves the hot paths to compiled code so the
+        // timed solve reflects steady-state speed. Budget-capped small so warmup is cheap.
+        warmup(entry, obj)
+
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         // klause: fixed-track single worker, time-stamped at each incumbent.
         var kBestMillis: Long? = null
@@ -225,6 +232,26 @@ object ParityMetric {
     }
 
     private fun fmt(v: Double?): String = v?.toString() ?: "?"
+
+    /** Throwaway short solve per engine to JIT-warm the hot paths before timing (see
+     *  [timedOptimizeRow]). The warmup budget is fixed and small; cancellation cuts it off
+     *  so warming a hard row costs at most this slice. Results are discarded. */
+    private fun warmup(entry: ResolvedProblem, obj: Objective) {
+        val warmMs = System.getProperty("klause.bench.parity.warmupMs")?.toLongOrNull() ?: 2000L
+        runCatching {
+            val dl = System.currentTimeMillis() + warmMs
+            BacktrackSolver(entry.problem).minimize(
+                obj,
+                fixedParams(entry, dl),
+            )
+        }
+        runCatching {
+            ChocoSolver(entry.problem).minimizeTimed(
+                obj as LinearObjective,
+                ChocoParams(warmMs, lcg = true, fixedSearch = entry.searchParams),
+            )
+        }
+    }
 
     // Luby restarts everywhere: the anytime configuration. Branch-and-bound leaves a
     // permanent blocking nogood per incumbent, so restarts diversify without revisiting
