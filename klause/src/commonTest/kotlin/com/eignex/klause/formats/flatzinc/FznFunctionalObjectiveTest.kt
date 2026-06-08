@@ -31,7 +31,7 @@ class FznFunctionalObjectiveTest {
         val obj = program.lsObjective
         assertNotNull(obj, "expected a functional objective for the decomposed minimize")
         assertTrue(obj is FunctionalObjective)
-        val fo = obj as FunctionalObjective
+        val fo = obj
         // leaf vars should be a,b,c (the decision vars), not the aux/objective vars.
         val aId = program.intVarsByName.getValue("a")
         val bId = program.intVarsByName.getValue("b")

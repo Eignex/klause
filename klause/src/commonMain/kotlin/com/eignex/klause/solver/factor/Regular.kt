@@ -197,11 +197,11 @@ class Regular(
         return true
     }
 
-    private inline fun setBit(bits: LongArray, layer: Int, bit: Int) {
+    private fun setBit(bits: LongArray, layer: Int, bit: Int) {
         bits[layer * stateWords + (bit ushr 6)] = bits[layer * stateWords + (bit ushr 6)] or (1L shl (bit and 63))
     }
 
-    private inline fun testBit(bits: LongArray, layer: Int, bit: Int): Boolean =
+    private fun testBit(bits: LongArray, layer: Int, bit: Int): Boolean =
         (bits[layer * stateWords + (bit ushr 6)] and (1L shl (bit and 63))) != 0L
 
     private fun isLayerEmpty(bits: LongArray, layer: Int): Boolean {

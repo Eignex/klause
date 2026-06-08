@@ -232,6 +232,7 @@ sealed interface PropagationResult {
      *  not assume minimality. An empty result means the contradiction was implied by problem
      *  constraints alone (no input was load-bearing).
      */
+    @ConsistentCopyVisibility
     data class Unsat internal constructor(
         val conflictBools: Set<Int> = emptySet(),
         val conflictInts: Set<Int> = emptySet(),

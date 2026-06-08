@@ -1069,8 +1069,6 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                     current = next
                 }
-
-                else -> return BackjumpTerm.Stuck // shouldn't happen — addLearnedClause returns only Implied/Unsat
             }
         }
         return BackjumpTerm.Stuck

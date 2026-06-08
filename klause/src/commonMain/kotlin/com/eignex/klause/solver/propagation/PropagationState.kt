@@ -482,10 +482,7 @@ class PropagationState(
         learnedLbds.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
         _refPayload.add(null)
-        val watchers = clause.initialBoolWatchers
-        if (watchers != null) {
-            for (lit in watchers) installLitWatch(lit, newFid)
-        }
+        for (lit in clause.initialBoolWatchers) installLitWatch(lit, newFid)
         return newFid
     }
 

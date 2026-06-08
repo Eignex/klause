@@ -194,7 +194,7 @@ object Dimacs {
             extended[0] = Lit.make(relax, positive = true)
             for (k in lits.indices) extended[k + 1] = lits[k]
             factors.add(Clause(extended))
-            weights[relax] = w.toLong()
+            weights[relax] = w
         }
         val problem = Problem(
             numBoolVars = totalVars,
