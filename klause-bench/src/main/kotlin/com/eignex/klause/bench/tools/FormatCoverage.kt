@@ -14,7 +14,10 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
+import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -46,7 +49,7 @@ object FormatCoverage {
      *  Must be ≥ the solve budget [timeMs]. */
     private val instanceMs get() = System.getProperty("klause.coverage.instanceMs")?.toLongOrNull() ?: 30_000L
 
-    fun xcsp3() {
+    internal fun xcsp3() {
         val roots = ExternalCollections.xcsp3Competition.map { ensure(it) }
         val files = roots.flatMap { walk(it, setOf("lzma", "xz", "xml")) }.sortedBy { it.path }
         report("XCSP3 competition", files) { text ->
@@ -55,7 +58,7 @@ object FormatCoverage {
         }
     }
 
-    fun smtlib() {
+    internal fun smtlib() {
         val root = ensure(ExternalCollections.smtlibQfLia)
         val files = walk(root, setOf("smt2")).sortedBy { it.path }
         report("SMT-LIB QF_LIA", files) { text ->
@@ -73,22 +76,52 @@ object FormatCoverage {
 
     private fun report(label: String, allFiles: List<File>, parse: (String) -> Parsed) {
         val files = if (limit > 0) allFiles.take(limit) else allFiles
-        var parsed = 0; var solved = 0; var unknown = 0; var unsupported = 0; var parseError = 0; var skipped = 0; var timeout = 0
+        var parsed = 0
+        var solved = 0
+        var unknown = 0
+        var unsupported = 0
+        var parseError = 0
+        var skipped = 0
+        var timeout = 0
         val reasons = HashMap<String, Int>()
-        println("[coverage] $label: ${files.size} instances (solve=$solve, solveBudget=${timeMs}ms, instanceTimeout=${instanceMs}ms)")
+        println(
+            "[coverage] $label: ${files.size} instances " +
+                "(solve=$solve, solveBudget=${timeMs}ms, instanceTimeout=${instanceMs}ms)",
+        )
 
         files.forEachIndexed { i, f ->
             if ((i + 1) % progressEvery == 0) {
-                println("[coverage]   ${i + 1}/${files.size}  parsed=$parsed solved=$solved unsupported=$unsupported skipped=$skipped timeout=$timeout")
+                println(
+                    "[coverage]   ${i + 1}/${files.size}  parsed=$parsed solved=$solved " +
+                        "unsupported=$unsupported skipped=$skipped timeout=$timeout",
+                )
             }
             when (val r = runBounded(instanceMs) { processOne(f, parse) }) {
                 null -> timeout++
+
                 R.Skip -> skipped++
+
                 R.Parsed -> parsed++
-                R.Solved -> { parsed++; solved++ }
-                R.Unknown -> { parsed++; unknown++ }
-                is R.Unsupported -> { unsupported++; reasons.merge(r.reason, 1, Int::plus) }
-                is R.ParseError -> { parseError++; reasons.merge(r.reason, 1, Int::plus) }
+
+                R.Solved -> {
+                    parsed++
+                    solved++
+                }
+
+                R.Unknown -> {
+                    parsed++
+                    unknown++
+                }
+
+                is R.Unsupported -> {
+                    unsupported++
+                    reasons.merge(r.reason, 1, Int::plus)
+                }
+
+                is R.ParseError -> {
+                    parseError++
+                    reasons.merge(r.reason, 1, Int::plus)
+                }
             }
         }
 
@@ -106,14 +139,16 @@ object FormatCoverage {
         println("skipped (> ${maxBytes / 1_000_000}MB)   : $skipped")
         if (reasons.isNotEmpty()) {
             println("--- top unsupported constructs / parse errors ---")
-            reasons.entries.sortedByDescending { it.value }.take(40).forEach { (k, v) -> println("  %5d  %s".format(v, k)) }
+            reasons.entries.sortedByDescending { it.value }.take(
+                40,
+            ).forEach { (k, v) -> println("  %5d  %s".format(Locale.ROOT, v, k)) }
         }
     }
 
     /** Per-instance outcome, tallied by [report]. */
     private sealed interface R {
-        data object Skip : R           // too large
-        data object Parsed : R         // parsed (solve disabled)
+        data object Skip : R // too large
+        data object Parsed : R // parsed (solve disabled)
         data object Solved : R
         data object Unknown : R
         data class Unsupported(val reason: String) : R
@@ -121,23 +156,46 @@ object FormatCoverage {
     }
 
     /** Read + parse + (optionally) solve a single instance, classifying the outcome. */
+    @Suppress("TooGenericExceptionCaught")
     private fun processOne(f: File, parse: (String) -> Parsed): R {
-        val text = try { readInstance(f) } catch (e: Exception) { return R.ParseError("READ-ERROR: " + (e.message?.take(40) ?: "")) }
+        val text = try {
+            readInstance(
+                f,
+            )
+        } catch (e: Exception) {
+            return R.ParseError("READ-ERROR: " + e.message?.take(40).orEmpty())
+        }
             ?: return R.Skip
         val inst = try {
             parse(text)
-        } catch (e: UnsupportedXcsp3Exception) { return R.Unsupported(reason(e.message)) }
-        catch (e: UnsupportedSmtException) { return R.Unsupported(reason(e.message)) }
-        catch (e: Throwable) { return R.ParseError("PARSE-ERROR: " + (e.message?.take(40) ?: e::class.simpleName)) }
+        } catch (e: UnsupportedXcsp3Exception) {
+            return R.Unsupported(reason(e.message))
+        } catch (e: UnsupportedSmtException) {
+            return R.Unsupported(reason(e.message))
+        } catch (e: Throwable) {
+            return R.ParseError("PARSE-ERROR: " + (e.message?.take(40) ?: e::class.simpleName))
+        }
         if (!solve) return R.Parsed
-        return when (attemptSolve(inst)) { Outcome.SOLVED -> R.Solved; Outcome.UNKNOWN -> R.Unknown }
+        return when (attemptSolve(inst)) {
+            Outcome.SOLVED -> R.Solved
+            Outcome.UNKNOWN -> R.Unknown
+        }
     }
 
     /** Run [work] on a daemon thread, returning its result or `null` if it exceeds [ms]
      *  (the thread is abandoned — fine for a one-shot coverage scan). */
+    @Suppress("TooGenericExceptionCaught")
     private fun runBounded(ms: Long, work: () -> R): R? {
         var res: R? = null
-        val t = Thread { res = try { work() } catch (e: Throwable) { R.ParseError("ERROR: " + (e.message?.take(40) ?: "")) } }
+        val t = Thread {
+            res = try {
+                work()
+            } catch (e: Throwable) {
+                R.ParseError(
+                    "ERROR: " + e.message?.take(40).orEmpty(),
+                )
+            }
+        }
         t.isDaemon = true
         t.start()
         t.join(ms)
@@ -146,6 +204,7 @@ object FormatCoverage {
 
     private enum class Outcome { SOLVED, UNKNOWN }
 
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private fun attemptSolve(p: Parsed): Outcome = try {
         val params = BacktrackParams(cancellation = Cancellation.after(timeMs.milliseconds))
         val solver = BacktrackSolver(p.problem)
@@ -160,7 +219,9 @@ object FormatCoverage {
                 is SolveResult.Unknown -> Outcome.UNKNOWN
             }
         }
-    } catch (e: Throwable) { Outcome.UNKNOWN }
+    } catch (e: Throwable) {
+        Outcome.UNKNOWN
+    }
 
     /** Read an instance, decompressing `.lzma` / `.xz` on the fly via the `xz` CLI. Returns
      *  `null` (skip) when the decompressed size would exceed [maxBytes] — read is bounded, so
@@ -168,20 +229,25 @@ object FormatCoverage {
     private fun readInstance(f: File): String? = when (f.extension.lowercase()) {
         "lzma", "xz" -> {
             val p = ProcessBuilder("xz", "-dc", f.absolutePath).redirectErrorStream(false).start()
-            try { boundedRead(p.inputStream, maxBytes).also { p.destroyForcibly() } }
-            finally { p.destroyForcibly() }
+            try {
+                boundedRead(p.inputStream, maxBytes).also { p.destroyForcibly() }
+            } finally {
+                p.destroyForcibly()
+            }
         }
+
         else -> if (f.length() > maxBytes) null else f.readText()
     }
 
     /** Read at most [cap] bytes; return null if the stream has more (i.e. instance too big). */
-    private fun boundedRead(input: java.io.InputStream, cap: Long): String? {
-        val buf = java.io.ByteArrayOutputStream()
+    private fun boundedRead(input: InputStream, cap: Long): String? {
+        val buf = ByteArrayOutputStream()
         val chunk = ByteArray(1 shl 16)
         var total = 0L
         input.use {
             while (true) {
-                val n = it.read(chunk); if (n < 0) break
+                val n = it.read(chunk)
+                if (n < 0) break
                 total += n
                 if (total > cap) return null
                 buf.write(chunk, 0, n)
@@ -191,5 +257,5 @@ object FormatCoverage {
     }
 
     private fun reason(msg: String?): String = (msg ?: "unknown").substringAfter(": ").take(60)
-    private fun pct(n: Int, d: Int): String = if (d == 0) "0%" else "%.1f%%".format(n * 100.0 / d)
+    private fun pct(n: Int, d: Int): String = if (d == 0) "0%" else "%.1f%%".format(Locale.ROOT, n * 100.0 / d)
 }

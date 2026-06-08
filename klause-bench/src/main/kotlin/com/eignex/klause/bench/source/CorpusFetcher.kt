@@ -15,7 +15,7 @@ import java.net.URI
  *    transparently, with a clear log line) into [cacheRoot] and reused thereafter.
  *  - [ProblemSource.InCode] has no file and is resolved by the solver layer, not here.
  */
-object CorpusFetcher {
+internal object CorpusFetcher {
 
     /** Resolve the workspace root. Honors `-Dklause.workspace.root`; otherwise walks up from
      *  the working directory looking for the `klause-mzn-lib/` marker. */
@@ -40,9 +40,11 @@ object CorpusFetcher {
         is ProblemSource.Vendored -> File(workspaceRoot(), source.workspaceRelPath).also {
             require(it.isFile) { "vendored file missing: ${source.workspaceRelPath}" }
         }
+
         is ProblemSource.External -> File(ensure(source.collection), source.relPath).also {
             require(it.isFile) { "instance '${source.relPath}' not found in collection '${source.collection.id}'" }
         }
+
         is ProblemSource.InCode -> error("InCode sources have no file")
     }
 
@@ -62,7 +64,16 @@ object CorpusFetcher {
 
     private fun gitClone(c: ExternalCollection, m: FetchMethod.GitClone, dir: File) {
         if (m.sparsePath != null) {
-            run("git", "clone", "--filter=blob:none", "--no-checkout", "--depth", m.depth.toString(), c.url, dir.absolutePath)
+            run(
+                "git",
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                "--depth",
+                m.depth.toString(),
+                c.url,
+                dir.absolutePath,
+            )
             run(dir, "git", "sparse-checkout", "set", m.sparsePath)
             run(dir, "git", "checkout")
         } else {

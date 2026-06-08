@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.source
 
 import com.eignex.klause.bench.catalog.Category
-import com.eignex.klause.bench.catalog.ExternalCollection
 import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.bench.catalog.ExternalCollection
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
@@ -23,7 +23,7 @@ import kotlin.random.Random
  * Selection is independent of *how* the corpus arrived (vendored or fetched), so any metric
  * or target can reuse it; for external collections the cache is fetched on demand first.
  */
-object CorpusSelection {
+internal object CorpusSelection {
 
     /** A discovered instance: paths are relative to the corpus root. */
     data class Discovered(val name: String, val mznRelPath: String, val dznRelPath: String? = null) {
@@ -70,9 +70,16 @@ object CorpusSelection {
                     val dzns = pd.walkTopDown().maxDepth(3)
                         .filter { it.isFile && it.extension == "dzn" }
                         .sortedBy { it.relativeTo(pd).path }.toList()
-                    val instances = if (dzns.isEmpty()) listOf(Discovered(pd.name, mznRel))
-                    else dzns.map { dzn ->
-                        Discovered("${pd.name}/${dzn.relativeTo(pd).path.removeSuffix(".dzn")}", mznRel, dzn.relativeTo(root).path)
+                    val instances = if (dzns.isEmpty()) {
+                        listOf(Discovered(pd.name, mznRel))
+                    } else {
+                        dzns.map { dzn ->
+                            Discovered(
+                                "${pd.name}/${dzn.relativeTo(pd).path.removeSuffix(".dzn")}",
+                                mznRel,
+                                dzn.relativeTo(root).path,
+                            )
+                        }
                     }
                     if (instances.isNotEmpty()) perFamily += instances
                 }
@@ -146,7 +153,11 @@ object CorpusSelection {
             { it.nameWithoutExtension.equals("${familyName}_model", ignoreCase = true) },
             { it.nameWithoutExtension.equals("model", ignoreCase = true) },
             { it.nameWithoutExtension.equals("main", ignoreCase = true) },
-            { it.nameWithoutExtension.lowercase().startsWith(lower) && !it.nameWithoutExtension.lowercase().startsWith("mznc") },
+            {
+                it.nameWithoutExtension.lowercase().startsWith(
+                    lower,
+                ) && !it.nameWithoutExtension.lowercase().startsWith("mznc")
+            },
         )
         for (pred in priorities) candidates.firstOrNull(pred)?.let { return it }
         return candidates.sortedBy { it.name }.first()

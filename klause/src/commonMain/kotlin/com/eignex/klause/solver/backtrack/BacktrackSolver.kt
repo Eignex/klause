@@ -2,6 +2,7 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
@@ -14,11 +15,18 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.lp.CpToLpRelaxation
+import com.eignex.klause.solver.lp.DualSimplex
+import com.eignex.klause.solver.lp.LpStatus
 import com.eignex.klause.solver.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.solver.propagation.TIER_CORE
+import com.eignex.klause.solver.propagation.TIER_LOCAL
+import com.eignex.klause.solver.propagation.TIER_MID
+import com.eignex.klause.solver.propagation.TIER_UNSET
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
 
@@ -186,6 +194,15 @@ class BacktrackSolver(override val problem: Problem) :
         // assert `objVar ≤/≥ best ∓ 1` at the root and let the defining constraint propagate.
         val singleObj = (objective as? LinearObjective)?.singleIntObjective()
         var objVarBest: Int? = null
+        val sink = SolveStatsSink(backend = "backtrack")
+        // LP-relaxation bounding (#20): build the relaxer once; it reads live bounds per node.
+        // Only a LinearObjective yields a sound LP objective, so the relaxer is null otherwise.
+        val lpRelaxer = if (params.lpBounding && objective is LinearObjective) {
+            CpToLpRelaxation(problem, objective)
+        } else {
+            null
+        }
+        var lpCheckCounter = 0
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
             is LinearObjective -> { session ->
                 // Effective bound = min(local incumbent, external supplier). External bound
@@ -193,7 +210,19 @@ class BacktrackSolver(override val problem: Problem) :
                 // their local incumbent as soon as any worker finds a better one.
                 val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
                 val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
-                linearLowerBound(objective, session) >= effectiveBound
+                when {
+                    // Cheap separable bound first — a fast filter that often prunes without an LP solve.
+                    linearLowerBound(objective, session) >= effectiveBound -> true
+
+                    // Then the LP relaxation, gated by the depth/frequency policy (the solve is the
+                    // expensive part of a node, so it does not run at every node).
+                    lpRelaxer != null &&
+                        session.decisionLevel <= params.lpBoundMaxDepth &&
+                        ++lpCheckCounter % params.lpBoundEvery == 0 ->
+                        lpPrune(lpRelaxer, session, effectiveBound, sink)
+
+                    else -> false
+                }
             }
 
             else -> null
@@ -204,7 +233,6 @@ class BacktrackSolver(override val problem: Problem) :
         // lubyRestartBase the caller is choosing anytime diversification over proof speed —
         // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
         // solved leaves.
-        val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
         for (outcome in driveSearch(
             params.copy(minHammingDistance = 0, recentWindow = 0),
@@ -312,6 +340,39 @@ class BacktrackSolver(override val problem: Problem) :
             total += if (c >= 0L) c * d.min else c * d.max
         }
         return total
+    }
+
+    /**
+     * LP-relaxation bound (#20): build and solve an exact integer LP relaxation of the live problem
+     * and decide whether this node's subtree can be cut. Prunes when the relaxation is infeasible
+     * (so the subtree is infeasible regardless of the incumbent) or when its objective bound —
+     * rounded **up** to the next integer, since the true objective is integral — is at least the
+     * incumbent [bound]. The rounded comparison is exact because the LP arithmetic is exact.
+     *
+     * Returns false (never prune) when the relaxation has no columns, i.e. the problem has no
+     * LP-emittable factors and no objective terms to bound against.
+     */
+    private fun lpPrune(
+        relaxer: CpToLpRelaxation,
+        session: PropagationSession,
+        bound: Double,
+        sink: SolveStatsSink,
+    ): Boolean {
+        val relaxation = relaxer.build(session)
+        if (relaxation.model.n == 0) return false // empty relaxation: nothing to prune with
+        val solution = DualSimplex(relaxation.model).solve()
+        val prune = when (solution.status) {
+            LpStatus.INFEASIBLE -> true
+
+            LpStatus.OPTIMAL -> {
+                val lpBound = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
+                bound.isFinite() && lpBound.toDouble() >= bound
+            }
+
+            LpStatus.UNBOUNDED -> false
+        }
+        if (prune) sink.observeLpPrune()
+        return prune
     }
 
     // ---------------------------------------------------------------------------------------
@@ -558,6 +619,10 @@ class BacktrackSolver(override val problem: Problem) :
         // consumed at the top of the inner loop; the policy's own stats persist across restarts.
         val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
         var restartRequested = false
+        // Vivification (#203) walks the learned DB round-robin across restarts; the cursor
+        // persists between restart passes so successive passes cover the whole database.
+        val vivifyEnabled = params.vivification && params.assumptions.isEmpty
+        var vivifyCursor = 0
         var lubyIdx = 1L
         outer@ while (true) {
             val perRunBudget: Long = if (glucose != null) {
@@ -621,6 +686,9 @@ class BacktrackSolver(override val problem: Problem) :
                     // are always retained; among the rest, the lowest-LBD entries are
                     // kept up to the cap.
                     forgetIfOverCap(session, params)
+                    // Vivification inprocessing: the trail is at root here, so a bounded slice
+                    // of the learned DB can be strengthened against clean assumptions (#203).
+                    if (vivifyEnabled) vivifyCursor = vivify(session, params, vivifyCursor)
                     lubyIdx++
                     sink?.observeRestart()
                     params.onEvent?.invoke(SearchEvent.Restart(lubyIdx - 1, decisionsThisRun))
@@ -1062,13 +1130,12 @@ class BacktrackSolver(override val problem: Problem) :
      */
     private fun forgetIfOverCap(session: PropagationSession, params: BacktrackParams) {
         val cap = params.maxLearnedClauses ?: return
-        val learnedSize = session.problem.let { _ ->
-            // PropagationSession exposes the count indirectly via session.state — pull
-            // it from the state field that learnedClauses reads. We reuse the public
-            // accessor on the session here to avoid leaking the state.
-            session.learnedClauseCount
-        }
+        val learnedSize = session.learnedClauseCount
         if (learnedSize <= cap) return
+        if (params.tieredLearnedDb) {
+            forgetTiered(session, params, cap, learnedSize)
+            return
+        }
         val glueThreshold = params.lbdGlueThreshold
         // Bucket non-glue clauses by LBD and pick the lowest LBDs up to the residual
         // capacity. We do this as: compute LBD per index, sort ascending, and define
@@ -1091,6 +1158,157 @@ class BacktrackSolver(override val problem: Problem) :
         }
         val dropped = nonGlue.size - remainingCap
         params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
+    }
+
+    /**
+     * Three-tier reduction policy (#201). Each learned clause is classified by LBD into a
+     * permanent core (LBD ≤ [BacktrackParams.lbdGlueThreshold]), a mid tier
+     * (LBD ≤ [BacktrackParams.midLbdThreshold]) and a local tier; tiers persist across
+     * reductions. Reuse since the last reduction (the clause detected a conflict or forced a
+     * unit, tracked by `PropagationState.noteLearnedUse`) drives promotion and demotion:
+     *  - core: always kept;
+     *  - mid: always kept this pass, but demoted to local when idle so it can be deleted later;
+     *  - local: promoted to mid when reused, otherwise a deletion candidate.
+     * Among the local deletion candidates the lowest-LBD ones are kept up to the residual cap
+     * and the rest are dropped. Reuse flags are cleared for survivors so the next window
+     * measures fresh activity.
+     */
+    private fun forgetTiered(session: PropagationSession, params: BacktrackParams, cap: Int, learnedSize: Int) {
+        val coreThreshold = params.lbdGlueThreshold
+        val midThreshold = params.midLbdThreshold
+        val locals = ArrayList<IntArray>(learnedSize) // [lbd, index] local deletion candidates
+        for (i in 0 until learnedSize) {
+            val lbd = session.learnedClauseLbd(i)
+            val used = session.learnedClauseUsedSinceReduction(i)
+            val entryTier = session.learnedClauseTier(i).let { t ->
+                if (t != TIER_UNSET) {
+                    t
+                } else {
+                    when {
+                        lbd <= coreThreshold -> TIER_CORE
+                        lbd <= midThreshold -> TIER_MID
+                        else -> TIER_LOCAL
+                    }
+                }
+            }
+            if (session.learnedClausePermanent(i)) {
+                session.setLearnedClauseTier(i, entryTier) // permanent clauses are always kept
+                continue
+            }
+            when (entryTier) {
+                TIER_CORE -> session.setLearnedClauseTier(i, TIER_CORE)
+
+                // Mid is kept this pass; demote to local when idle so it ages out next time.
+                TIER_MID -> session.setLearnedClauseTier(i, if (used) TIER_MID else TIER_LOCAL)
+
+                else -> if (used) {
+                    session.setLearnedClauseTier(i, TIER_MID) // promote a reused local clause
+                } else {
+                    session.setLearnedClauseTier(i, TIER_LOCAL)
+                    locals.add(intArrayOf(lbd, i)) // deletion candidate
+                }
+            }
+        }
+        val kept = learnedSize - locals.size
+        val residualCap = (cap - kept).coerceAtLeast(0)
+        if (locals.size <= residualCap) {
+            for (i in 0 until learnedSize) session.clearLearnedClauseUsed(i)
+            return
+        }
+        locals.sortBy { it[0] } // ascending LBD: keep the lowest, drop the highest
+        val dropSet = HashSet<Int>(locals.size - residualCap)
+        for (k in residualCap until locals.size) dropSet.add(locals[k][1])
+        session.forgetLearnedClauses { idx, _ -> idx !in dropSet }
+        params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropSet.size, dropped = dropSet.size))
+        // Indices were compacted by the forget; reset every survivor's reuse flag.
+        val survivors = session.learnedClauseCount
+        for (i in 0 until survivors) session.clearLearnedClauseUsed(i)
+    }
+
+    /**
+     * Clause vivification inprocessing (#203) — Piette-Hamadi-Saïs 2008. Walks a bounded
+     * round-robin slice ([BacktrackParams.vivifyBatch]) of the learned-clause database and
+     * strengthens each pure-Boolean, non-permanent clause via [vivifyClause]. Must be called
+     * with the session at root (the restart boundary pops the DFS trail first). Strengthened
+     * clauses are swapped in by dropping the originals and re-adding the shortened versions;
+     * since the re-added clauses are at least binary over root-unassigned variables they don't
+     * propagate, so the session is left at root. Returns the advanced cursor for the next pass.
+     *
+     * Soundness: every clause [vivifyClause] returns is still implied by the formula (a
+     * subclause of an implied clause, or a prefix proven implied by propagation), so swapping
+     * it in cannot lose models — checked by the learned-clause / witness validation tests.
+     */
+    private fun vivify(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
+        val count = session.learnedClauseCount
+        if (count == 0) return 0
+        val numBool = session.problem.numBoolVars
+        val batch = params.vivifyBatch.coerceAtLeast(1)
+        val replacements = ArrayList<IntArray>()
+        val dropIdx = HashSet<Int>()
+        var cursor = if (startCursor in 0 until count) startCursor else 0
+        var examined = 0
+        while (examined < batch && examined < count) {
+            val idx = cursor
+            cursor = (cursor + 1) % count
+            examined++
+            if (session.learnedClausePermanent(idx)) continue
+            val clause = session.learnedClauseAt(idx)
+            val lits = clause.literals
+            // Pure-Boolean only; nothing to shorten below 3 literals (we never emit units).
+            if (lits.size < 3 || !clause.allLiteralsBool(numBool)) continue
+            val strengthened = vivifyClause(session, lits) ?: continue
+            if (strengthened.size in 2 until lits.size) {
+                dropIdx.add(idx)
+                replacements.add(strengthened)
+            }
+        }
+        if (replacements.isEmpty()) return cursor
+        session.forgetLearnedClauses { i, _ -> i !in dropIdx }
+        for (newLits in replacements) session.addLearnedClause(Clause(newLits), lbd = newLits.size)
+        // The forget renumbered the database, so resume the round-robin from the start.
+        return 0
+    }
+
+    /**
+     * Vivify one clause with the session at root: walk [lits] asserting the negation of each
+     * literal under propagation. A literal already falsified by the earlier negations is
+     * dropped (redundant); a literal forced true, or a conflict on asserting its negation,
+     * shortens the clause to the literals visited so far. Returns the strengthened literal
+     * array, or null when nothing changed. Every tentative pin is reverted before returning,
+     * so the session is left exactly as it was found.
+     */
+    private fun vivifyClause(session: PropagationSession, lits: IntArray): IntArray? {
+        val keep = ArrayList<Int>(lits.size)
+        var pushed = 0
+        var result: IntArray? = null
+        for (li in lits) {
+            when (session.litTruth(li)) {
+                // The earlier negations already force li true ⇒ (kept ∨ li) is implied.
+                true -> {
+                    keep.add(li)
+                    result = keep.toIntArray()
+                    break
+                }
+
+                // li is already falsified by the earlier negations ⇒ redundant, drop it.
+                false -> Unit
+
+                // Undetermined: assert ¬li and keep going.
+                null -> {
+                    keep.add(li)
+                    val r = session.pinBool(Lit.variable(li), !Lit.isPositive(li))
+                    if (r is PropagationResult.Unsat) {
+                        // ¬(kept) is unsatisfiable ⇒ (kept) is implied.
+                        result = keep.toIntArray()
+                        break
+                    }
+                    pushed++
+                }
+            }
+        }
+        repeat(pushed) { session.popLast() }
+        if (result == null && keep.size < lits.size) result = keep.toIntArray()
+        return result
     }
 
     /** How [backjumpAndLearn] terminated. */

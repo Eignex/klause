@@ -2,13 +2,14 @@ package com.eignex.klause.bench.tools
 
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import java.io.File
+import java.util.Locale
 import kotlin.random.Random
 
 /**
@@ -22,10 +23,11 @@ import kotlin.random.Random
  * Run: `./gradlew :klause-bench:runCblsDiag -Dklause.cblsdiag.file=klause-bench/build/easiest/amaze.fzn`
  */
 object CblsDiag {
+    /** Entry point for the CBLS diagnostic tool. */
     @JvmStatic
     fun main(args: Array<String>) {
         val path = System.getProperty("klause.cblsdiag.file") ?: args.getOrNull(0)
-        ?: error("set -Dklause.cblsdiag.file=<fzn>")
+            ?: error("set -Dklause.cblsdiag.file=<fzn>")
         val flips = System.getProperty("klause.cblsdiag.flips")?.toLong() ?: 3_000_000L
         val restarts = System.getProperty("klause.cblsdiag.restarts")?.toInt() ?: 3
         val prog = parseFlatZinc(File(path).readText())
@@ -62,9 +64,9 @@ object CblsDiag {
             val maxNbhd = System.getProperty("klause.cblsdiag.maxnbhd")?.toInt() ?: 1
             val skew = System.getProperty("klause.cblsdiag.skew")?.toDouble() ?: 0.0
             val scoring = if (System.getProperty("klause.cblsdiag.scoring")?.lowercase() == "raw") {
-                com.eignex.klause.solver.localsearch.strategy.MoveScoring.Raw
+                MoveScoring.Raw
             } else {
-                com.eignex.klause.solver.localsearch.strategy.MoveScoring.Weighted
+                MoveScoring.Weighted
             }
             // Defaults to the shipped Cbls default (0 = plateau-buster off); override with
             // -Dklause.cblsdiag.swapcap=16 to probe the stall-swap configuration, or
@@ -76,8 +78,11 @@ object CblsDiag {
             val kickVars = System.getProperty("klause.cblsdiag.kickvars")?.toInt() ?: 8
             val strat = Cbls(
                 noiseProbability = noise,
-                tabu = if (noTabu) TabuFilter.Disabled
-                else TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
+                tabu = if (noTabu) {
+                    TabuFilter.Disabled
+                } else {
+                    TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
+                },
                 maxNeighborhood = maxNbhd,
                 skewAlpha = skew,
                 scoring = scoring,
@@ -120,23 +125,28 @@ object CblsDiag {
                 nullStreak = 0
                 state.apply(move)
                 if (state.cost < minCost) {
-                    minCost = state.cost; flipsToMin = f
-                    minBool = snapshotBool(state); minInt = snapshotInt(state)
+                    minCost = state.cost
+                    flipsToMin = f
+                    minBool = snapshotBool(state)
+                    minInt = snapshotInt(state)
                 }
             }
             val solved = state.cost == 0L
             println("restart $r: min=$minCost (at flip $flipsToMin / $f)${if (solved) "  SOLVED" else ""}")
             if (minCost < globalBest) {
                 globalBest = minCost
-                bestBoolVals = minBool; bestIntVals = minInt
+                bestBoolVals = minBool
+                bestIntVals = minInt
             }
         }
         println("global best cost (sum of violation degrees): $globalBest")
 
-        if (bestBoolVals != null) {
+        val finalBool = bestBoolVals
+        val finalInt = bestIntVals
+        if (finalBool != null) {
             val st = LocalSearchState(problem, Random(7), Assumptions.None)
-            for (b in 0 until problem.numBoolVars) st.assignment.setBool(b, bestBoolVals!![b])
-            for (i in 0 until problem.numIntVars) st.assignment.setInt(i, bestIntVals!![i])
+            for (b in 0 until problem.numBoolVars) st.assignment.setBool(b, finalBool[b])
+            for (i in 0 until problem.numIntVars) st.assignment.setInt(i, requireNotNull(finalInt)[i])
             st.recompute()
             dumpMinState(st)
             val ringProbe = System.getProperty("klause.cblsdiag.ringprobe")?.toInt() ?: 0
@@ -172,14 +182,20 @@ object CblsDiag {
         }
         fun key(s: Pair<BooleanArray, IntArray>): Long {
             var h = 1469598103934665603L
-            for (b in s.first) { h = h xor (if (b) 1L else 0L); h *= 1099511628211L }
-            for (v in s.second) { h = h xor v.toLong(); h *= 1099511628211L }
+            for (b in s.first) {
+                h = h xor (if (b) 1L else 0L)
+                h *= 1099511628211L
+            }
+            for (v in s.second) {
+                h = h xor v.toLong()
+                h *= 1099511628211L
+            }
             return h
         }
 
         val start = snapshot()
         val seen = HashSet<Long>().apply { add(key(start)) }
-        var frontier = mutableListOf(start)
+        var frontier: List<Pair<BooleanArray, IntArray>> = listOf(start)
         var depth = 0
         var expanded = 0
         val sink = MoveSink(Assumptions.None)
@@ -261,7 +277,11 @@ object CblsDiag {
             byClass[name] = (byClass[name] ?: 0) + 1
         }
         println("--- ${violatedIds.size} violated factor(s) at min cost ---")
-        byClass.entries.sortedByDescending { it.value }.forEach { (k, v) -> println("  %5d  %s".format(v, k)) }
+        byClass.entries.sortedByDescending { it.value }.forEach { (k, v) ->
+            println(
+                "  %5d  %s".format(Locale.ROOT, v, k),
+            )
+        }
 
         // Optional raw-state dump for semantic plateau analysis: values of the first N int
         // vars (decision arrays come first in FZN declaration order) plus each violated
@@ -294,14 +314,27 @@ object CblsDiag {
             var bestMoveStr = "(none)"
             for (m in sink.list) {
                 val d = st.netDelta(m)
-                if (d < bestForFactor) { bestForFactor = d; bestMoveStr = "$m Δ=$d" }
+                if (d < bestForFactor) {
+                    bestForFactor = d
+                    bestMoveStr = "$m Δ=$d"
+                }
                 if (d < bestGlobal) bestGlobal = d
             }
-            println("  ${f::class.simpleName} fid=$fid degree=${f.violationDegree(st, fid)} " +
-                "moves=${sink.list.size} bestΔ=$bestMoveStr")
+            println(
+                "  ${f::class.simpleName} fid=$fid degree=${f.violationDegree(st, fid)} " +
+                    "moves=${sink.list.size} bestΔ=$bestMoveStr",
+            )
         }
-        println("--- best single repair move over all violated factors: Δ=$bestGlobal " +
-            "(${if (bestGlobal < 0) "improving — not a local min" else "≥0 — STRICT LOCAL MIN, needs worsening move/restart"}) ---")
+        println(
+            "--- best single repair move over all violated factors: Δ=$bestGlobal " +
+                "(${
+                    if (bestGlobal < 0) {
+                        "improving — not a local min"
+                    } else {
+                        "≥0 — STRICT LOCAL MIN, needs worsening move/restart"
+                    }
+                }) ---",
+        )
     }
 
     private fun snapshotBool(s: LocalSearchState): BooleanArray =
