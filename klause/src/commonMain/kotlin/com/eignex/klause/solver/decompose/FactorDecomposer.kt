@@ -347,8 +347,8 @@ internal object FactorDecomposer {
         return out
     }
 
-    /** `symmetric_alldifferent(xs, offset)` — permutation with `xs[i] = j+offset ⟺
-     *  `xs[j]` = i+offset`. We assert pairwise NE plus the involution biconditional via
+    /** `symmetric_alldifferent(xs, offset)` — permutation with
+     *  `xs[i] = j+offset ⟺ xs[j] = i+offset`. We assert pairwise NE plus the involution biconditional via
      *  reified equalities. */
     private fun decomposeSymmetricAllDifferent(f: SymmetricAllDifferent, ctx: DecompositionContext): List<Factor> {
         val out = ArrayList<Factor>()

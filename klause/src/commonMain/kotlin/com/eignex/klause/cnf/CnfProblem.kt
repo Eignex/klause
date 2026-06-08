@@ -6,7 +6,7 @@ import com.eignex.klause.formats.dimacs.Dimacs
  * Result of bit-blasting a [com.eignex.klause.solver.Problem] to propositional CNF.
  *
  * - [numVars] is the total number of CNF variables (Boolean + bit-encoded integer + Tseitin aux).
- * - [clauses] are MiniSAT-encoded; index into [clauses][i][j] yields a literal where
+ * - [clauses] are MiniSAT-encoded; index into `clauses[i][j]` yields a literal where
  *   `lit ushr 1` is the variable id and `lit and 1` is the negation flag.
  * - [boolVarToCnfVar] maps an original Boolean variable id to its CNF variable id.
  * - [intVarBits] gives, for each original integer variable, the LSB-first array of CNF

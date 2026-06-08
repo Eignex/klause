@@ -265,8 +265,8 @@ internal fun Compiler.Build.reifyCircuit(expr: CircuitExpr): Int {
  * `b ↔ subcircuit(succ, valueOffset)`. Like [reifyCircuit] but `succ[i] = i + offset`
  * marks node `i` excluded; the included nodes (non-self-loops) form a single Hamiltonian
  * cycle in the induced sub-graph. We still enforce AllDifferent over `succ` and a chain
- * structure on position vars, except the chain advance is relaxed to `pos[succ[i]] =
- * `pos[i]` + 1 ∨ pos[`succ[i]`] = pos[i]` so excluded nodes (self-loops) don't force a
+ * structure on position vars, except the chain advance is relaxed to
+ * `pos[succ[i]] = pos[i] + 1 ∨ pos[succ[i]] = pos[i]` so excluded nodes (self-loops) don't force a
  * contradiction. Closing the included sub-cycle is handled by allowing
  * `pos[succ[i]] = 0` when the edge closes the loop.
  */
