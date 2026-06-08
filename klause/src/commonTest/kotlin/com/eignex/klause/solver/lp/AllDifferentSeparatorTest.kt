@@ -18,7 +18,9 @@ class AllDifferentSeparatorTest {
             numBoolVars = 0,
             numIntVars = n,
             intDomains = Array(n) { IntDomain(domainMin, domainMax) },
-            factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = domainMin, domainSize = domainMax - domainMin + 1)),
+            factors = arrayOf<Factor>(
+                AllDifferent(IntArray(n) { it }, domainMin = domainMin, domainSize = domainMax - domainMin + 1),
+            ),
         )
         val session = PropagationSession(p)
         val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
@@ -56,9 +58,13 @@ class AllDifferentSeparatorTest {
         val (p, relaxation, solution) = setup(0, 4, 3)
         val cut = AllDifferentSeparator().separate(CutContext(p, relaxation, solution, PropagationSession(p)))
             .first { it.rel == Relation.GE }
-        for (a in 0..4) for (b in 0..4) for (c in 0..4) {
-            if (a == b || a == c || b == c) continue // only all-different points
-            assertTrue((a + b + c).toLong() >= cut.rhs, "($a,$b,$c) violates Σ >= ${cut.rhs}")
+        for (a in 0..4) {
+            for (b in 0..4) {
+                for (c in 0..4) {
+                    if (a == b || a == c || b == c) continue // only all-different points
+                    assertTrue((a + b + c).toLong() >= cut.rhs, "($a,$b,$c) violates Σ >= ${cut.rhs}")
+                }
+            }
         }
     }
 }
