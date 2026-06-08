@@ -181,6 +181,11 @@ class BacktrackSolver(override val problem: Problem) :
     override fun improvements(objective: Objective, params: BacktrackParams): Sequence<MinimizeResult> = sequence {
         var best: Sample? = null
         var bestObj = Double.POSITIVE_INFINITY
+        // Objective-bound propagation for single-variable objectives (every FlatZinc goal):
+        // track the objective variable's value in the current incumbent so the engine can
+        // assert `objVar ≤/≥ best ∓ 1` at the root and let the defining constraint propagate.
+        val singleObj = (objective as? LinearObjective)?.singleIntObjective()
+        var objVarBest: Int? = null
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
             is LinearObjective -> { session ->
                 // Effective bound = min(local incumbent, external supplier). External bound
@@ -205,6 +210,9 @@ class BacktrackSolver(override val problem: Problem) :
             params.copy(minHammingDistance = 0, recentWindow = 0),
             pruneIf = pruneIf,
             sink = sink,
+            objectiveVar = singleObj?.varId ?: -1,
+            objectiveAscending = singleObj?.ascending ?: true,
+            objectiveBest = { objVarBest },
         )) {
             when (outcome) {
                 is SearchOutcome.Found -> {
@@ -212,6 +220,7 @@ class BacktrackSolver(override val problem: Problem) :
                     if (o < bestObj) {
                         bestObj = o
                         best = outcome.sample
+                        if (singleObj != null) objVarBest = outcome.sample.ints[singleObj.varId]
                         params.onEvent?.invoke(SearchEvent.Incumbent(o))
                         // Yield each new incumbent eagerly — consumers can react to it
                         // before search continues toward the bound. The reason here is
@@ -431,6 +440,16 @@ class BacktrackSolver(override val problem: Problem) :
         params: BacktrackParams,
         pruneIf: ((PropagationSession) -> Boolean)? = null,
         sink: SolveStatsSink? = null,
+        // Objective-bound propagation (single-variable objectives only). When [objectiveVar]
+        // is set, the engine pushes each incumbent's bound onto that variable at the root —
+        // `objVar ≤ best-1` for minimise ([objectiveAscending]) or `objVar ≥ best+1` for
+        // maximise — as a permanent unit that propagates through the constraint defining the
+        // objective. [objectiveBest] returns the objective variable's value in the current
+        // incumbent, or null before one is found. Strictly stronger than the passive
+        // [pruneIf] lower-bound check, and it bounds non-linear-defined objectives too.
+        objectiveVar: Int = -1,
+        objectiveAscending: Boolean = true,
+        objectiveBest: () -> Int? = { null },
     ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted(coreOf(problem.baked)))
@@ -492,6 +511,20 @@ class BacktrackSolver(override val problem: Problem) :
         // same solution reached through a different decision order is excluded too. It is
         // registered at the root on the next backtrack (or restart) and kept permanently.
         var pendingBlock: Sample? = null
+        // Objective-bound propagation: assert the incumbent bound on the objective variable
+        // at the root, once per improving value. Returns true iff that makes the root
+        // infeasible — the remaining objective space is empty, so the search is exhausted
+        // (optimum proven). Must be called only when the session is at the root.
+        var lastObjBoundAsserted: Int? = null
+        fun assertObjectiveBoundAtRoot(): Boolean {
+            if (objectiveVar < 0) return false
+            val best = objectiveBest() ?: return false
+            val threshold = if (objectiveAscending) best - 1 else best + 1
+            if (threshold == lastObjBoundAsserted) return false
+            lastObjBoundAsserted = threshold
+            return session.assertObjectiveBound(objectiveVar, threshold, atMost = objectiveAscending) is
+                PropagationResult.Unsat
+        }
         var lubyIdx = 1L
         outer@ while (true) {
             val perRunBudget: Long = params.lubyRestartBase?.let { base ->
@@ -537,6 +570,10 @@ class BacktrackSolver(override val problem: Problem) :
                                 return@sequence
                             }
                         }
+                    }
+                    if (assertObjectiveBoundAtRoot()) {
+                        yield(SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels)))
+                        return@sequence
                     }
                     params.variableHeuristic.onRestart()
                     params.valueHeuristic.onRestart()
@@ -652,6 +689,10 @@ class BacktrackSolver(override val problem: Problem) :
                                 )
                                 return@sequence
                             }
+                        }
+                        if (assertObjectiveBoundAtRoot()) {
+                            yield(SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels)))
+                            return@sequence
                         }
                         descend = true
                         continue@inner
