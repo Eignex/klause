@@ -113,11 +113,7 @@ internal sealed interface ProblemSource {
      *  fetched [ExternalCollection]. For collections whose member filenames aren't predictable —
      *  e.g. the SATLIB random-3SAT tarballs sample instances with inconsistent zero-padding
      *  (`uf50-031.cnf`, `uf50-0433.cnf`), so a fixed [External.relPath] can't name them. */
-    data class ExternalIndexed(
-        val collection: ExternalCollection,
-        val index: Int,
-        val ext: String,
-    ) : ProblemSource
+    data class ExternalIndexed(val collection: ExternalCollection, val index: Int, val ext: String) : ProblemSource
 }
 
 /** Convenience: a vendored file under `klause-bench/corpus/<relPath>`. */
