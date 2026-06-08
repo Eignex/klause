@@ -29,6 +29,7 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
+import com.eignex.klause.ast.InverseChannel
 import com.eignex.klause.ast.MddExpr
 import com.eignex.klause.ast.NValueExprOpt
 import com.eignex.klause.ast.NValueMode
@@ -45,6 +46,7 @@ import com.eignex.klause.ast.SetIn
 import com.eignex.klause.ast.SetNominalIn
 import com.eignex.klause.ast.SetSubsetOf
 import com.eignex.klause.ast.SubcircuitExpr
+import com.eignex.klause.ast.SymmetricAllDifferent
 import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.ast.XorExpr
@@ -66,8 +68,10 @@ import com.eignex.klause.solver.factor.Count as CountFactor
 import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
 import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
 import com.eignex.klause.solver.factor.GlobalCardinality as GccFactor
+import com.eignex.klause.solver.factor.Inverse as InverseFactor
 import com.eignex.klause.solver.factor.NValue as NValueFactor
 import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
+import com.eignex.klause.solver.factor.SymmetricAllDifferent as SymmetricAllDifferentFactor
 
 /**
  * Top-level constraint assertion handlers for [Compiler.Build]. The DSL drops a tree of
@@ -118,6 +122,10 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
         is FloatLinearConstraint -> assertFloatLinear(expr)
 
         is AllDifferent -> assertAllDifferent(expr.terms)
+
+        is SymmetricAllDifferent -> assertSymmetricAllDifferent(expr)
+
+        is InverseChannel -> assertInverse(expr)
 
         is AllDifferentExceptExpr -> assertAllDifferentExcept(expr)
 
@@ -301,6 +309,28 @@ internal fun Compiler.Build.assertAllDifferent(terms: List<IntExpr>) {
             assertExpr(IntCompare(lifted[i], IntCmpOp.NE, lifted[j]))
         }
     }
+}
+
+/** Lift [e] to a solver int-var id, materialising an aux var pinned equal when the lifted
+ *  form carries an arithmetic residual rather than being a bare variable reference. The
+ *  channeling globals below need concrete var ids to post their native factor. */
+internal fun Compiler.Build.varIdOfLifted(e: IntExpr): Int {
+    val lifted = lift(e)
+    if (lifted is IntRef) return intVarOf(lifted.name)
+    val aux = newAuxIntVar(domainOf(lifted))
+    assertExpr(IntCompare(IntRef(aux), IntCmpOp.EQ, lifted))
+    return intVarOf(aux)
+}
+
+internal fun Compiler.Build.assertSymmetricAllDifferent(expr: SymmetricAllDifferent) {
+    val ids = IntArray(expr.terms.size) { varIdOfLifted(expr.terms[it]) }
+    factors += SymmetricAllDifferentFactor(ids, indexOffset = expr.indexOffset)
+}
+
+internal fun Compiler.Build.assertInverse(expr: InverseChannel) {
+    val f = IntArray(expr.f.size) { varIdOfLifted(expr.f[it]) }
+    val g = IntArray(expr.g.size) { varIdOfLifted(expr.g[it]) }
+    factors += InverseFactor(f, g, fOffset = expr.fOffset, gOffset = expr.gOffset)
 }
 
 /**

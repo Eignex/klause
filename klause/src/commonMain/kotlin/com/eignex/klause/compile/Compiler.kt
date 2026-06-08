@@ -30,6 +30,7 @@ import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntSpec
+import com.eignex.klause.ast.InverseChannel
 import com.eignex.klause.ast.MddExpr
 import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.NValueExprOpt
@@ -52,6 +53,7 @@ import com.eignex.klause.ast.SetNominalIn
 import com.eignex.klause.ast.SetSpec
 import com.eignex.klause.ast.SetSubsetOf
 import com.eignex.klause.ast.SubcircuitExpr
+import com.eignex.klause.ast.SymmetricAllDifferent
 import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.ast.XorExpr
@@ -346,6 +348,12 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
             is CardinalityExpr -> reifyCardinality(expr.children, expr.min, expr.max)
 
             is AllDifferent -> reifyAllDifferent(expr.terms.map { lift(it) })
+
+            is SymmetricAllDifferent ->
+                error("symmetric_all_different is a top-level constraint, not reifiable as a sub-expression")
+
+            is InverseChannel ->
+                error("inverse is a top-level constraint, not reifiable as a sub-expression")
 
             is AllDifferentExceptExpr -> lowerToLit(decomposeAllDifferentExcept(expr))
 
