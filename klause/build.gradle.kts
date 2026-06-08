@@ -3,7 +3,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    id("com.eignex.kmp") version "1.2.5"
+    id("com.eignex.kmp") version "1.2.6"
     kotlin("plugin.serialization")
 }
 
@@ -52,21 +52,6 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
-    }
-}
-
-// Pin the test node to 25, whose V8 has the exnref exception handling wasmWasi compiles
-// to (Kotlin 2.3 default) as stable; on the KGP-default node 24 it is experimental and
-// intermittently killed the wasi dry run on loaded CI runners. KGP registers env specs
-// on both the root and this project, and the wasi runner reads the js spec rather than
-// the wasm one — pin all four.
-val pinnedNodeVersion = "25.0.0"
-for (proj in listOf(project, rootProject)) {
-    proj.plugins.withType<org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsPlugin> {
-        proj.the<org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec>().version = pinnedNodeVersion
-    }
-    proj.plugins.withType<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin> {
-        proj.the<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec>().version = pinnedNodeVersion
     }
 }
 

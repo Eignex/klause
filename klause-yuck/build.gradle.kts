@@ -1,7 +1,7 @@
 import java.net.URI
 
 plugins {
-    id("com.eignex.kmp") version "1.2.5"
+    id("com.eignex.kmp") version "1.2.6"
 }
 
 eignexPublish {
