@@ -70,7 +70,7 @@ class SymmetricAllDifferent(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
-    /** Repair: at each broken self-inverse pair (i, xs[i]), propose Compound swaps that
+    /** Repair: at each broken self-inverse pair (i, `xs[i]`), propose Compound swaps that
      *  fix the involution and the mirroring constraint simultaneously. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return

@@ -136,7 +136,7 @@ internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
 }
 
 /** `b ↔ gcc(...)` over a presence-gated subset, with optional closed-set check.
- *  Per cover[k]: low[k] ≤ Σ_i 1{p_i ∧ x_i=cover[k]} ≤ high[k]. */
+ *  Per cover: `low[k] ≤ Σ_i 1{p_i ∧ x_i=cover[k]} ≤ high[k]`. */
 internal fun Compiler.Build.reifyGccOpt(expr: GccExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (k in expr.cover.indices) {
@@ -266,7 +266,7 @@ internal fun Compiler.Build.reifyCircuit(expr: CircuitExpr): Int {
  * marks node `i` excluded; the included nodes (non-self-loops) form a single Hamiltonian
  * cycle in the induced sub-graph. We still enforce AllDifferent over `succ` and a chain
  * structure on position vars, except the chain advance is relaxed to `pos[succ[i]] =
- * pos[i] + 1 ∨ pos[succ[i]] = pos[i]` so excluded nodes (self-loops) don't force a
+ * `pos[i]` + 1 ∨ pos[`succ[i]`] = pos[i]` so excluded nodes (self-loops) don't force a
  * contradiction. Closing the included sub-cycle is handled by allowing
  * `pos[succ[i]] = 0` when the edge closes the loop.
  */

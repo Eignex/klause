@@ -271,10 +271,10 @@ class InvariantNetwork internal constructor(
     /** Number of indexed definitions. */
     val size: Int get() = nodeArr.size
 
-    /** True iff int var [v] is definitionally determined (should not be searched). */
+    /** True iff int var `v` is definitionally determined (should not be searched). */
     fun isDefinedInt(v: Int): Boolean = definedInt[v]
 
-    /** True iff bool var [v] is definitionally determined (should not be searched). */
+    /** True iff bool var `v` is definitionally determined (should not be searched). */
     fun isDefinedBool(v: Int): Boolean = definedBool[v]
 
     /** The node at [index] (indexes ascend in topological order). */

@@ -231,7 +231,7 @@ internal class ReginCache : PropagationState.SnapshottablePayload {
     }
 }
 
-/** Augmenting-path search for maximum bipartite matching. Returns true iff variable [i] can be
+/** Augmenting-path search for maximum bipartite matching. Returns true iff variable `i` can be
  *  matched (possibly re-routing earlier matches). */
 private fun reginTryAugment(
     i: Int,

@@ -71,7 +71,7 @@ class Count(
     private fun present(state: LocalSearchState, idx: Int): Boolean =
         OptPresence.isPresentInAssignment(presents, idx, state)
 
-    /** Cached count of xs[i] satisfying the predicate under the current assignment. */
+    /** Cached count of `xs[i]` satisfying the predicate under the current assignment. */
     private class State(var count: Int)
 
     private fun matches(value: Int): Boolean = when (op) {
@@ -244,8 +244,8 @@ class Count(
 
     /** Three concurrent repair directions for a violated count:
      *  (a) snap `n` to the current count (the cheapest direction when `n` is unconstrained),
-     *  (b) flip matching xs[i] off the predicate (when count > n),
-     *  (c) flip non-matching xs[i] onto the predicate (when count < n).
+     *  (b) flip matching `xs[i]` off the predicate (when count > n),
+     *  (c) flip non-matching `xs[i]` onto the predicate (when count < n).
      *  For (b)/(c) we propose the closest-in-domain value that flips the match outcome. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return

@@ -32,7 +32,7 @@ class AllDifferentExcept(
     override val intVars: IntArray = xs
 
     /** Per-value count among non-excluded values. `violatedPairs` is the number of (i, j) with
-     *  i < j and xs[i] = xs[j] ∉ except. */
+     *  i < j and `xs[i]` = `xs[j]` ∉ except. */
     private class State(val counts: HashMap<Int, Int>, var violatedPairs: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {

@@ -61,10 +61,10 @@ class PropagationState(
         /** Valid Boolean variable id range. */
         val indices: IntRange get() = 0 until problem.numBoolVars
 
-        /** Current value of bool [v], or null if unassigned. */
+        /** Current value of bool `v`, or null if unassigned. */
         operator fun get(v: Int): Boolean? = if (boolAssigned.get(v)) boolValueBits.get(v) else null
 
-        /** Assign bool [v] to [value], or null to unassign. */
+        /** Assign bool `v` to [value], or null to unassign. */
         operator fun set(v: Int, value: Boolean?) {
             if (value == null) {
                 boolAssigned.clear(v)
@@ -190,8 +190,8 @@ class PropagationState(
     }
 
     /** Reason for `[v ≥ k]` being true: null (a root/bake fact) when no search-time move
-     *  is on record, else the recorded reason of the move that first reached ≥ [k] — the
-     *  near set when the move's requested bound already covers [k], the far (hole-snap
+     *  is on record, else the recorded reason of the move that first reached ≥ `k` — the
+     *  near set when the move's requested bound already covers `k`, the far (hole-snap
      *  chained) set otherwise. */
     private fun minReasonFor(v: Int, k: Int): IntArray? {
         if (k <= problem.intDomains[v].min) return null
@@ -218,7 +218,7 @@ class PropagationState(
         }
     }
 
-    /** Reason for the interior carve of [k] from `v`'s domain; null = bake-time fact. */
+    /** Reason for the interior carve of `k` from `v`'s domain; null = bake-time fact. */
     private fun holeReasonFor(v: Int, k: Int): IntArray? {
         val vals = holeHistVal[v] ?: return null
         for (i in 0 until vals.size) if (vals[i] == k) return requireNotNull(holeHistAnt[v])[i]
@@ -243,7 +243,7 @@ class PropagationState(
         ants.add(ant)
     }
 
-    /** Level at which interior value [k] was carved out of `v`'s domain. `0` when no
+    /** Level at which interior value `k` was carved out of `v`'s domain. `0` when no
      *  search-time carve is on record — the hole then predates the search (bake-time
      *  propagation), which is a root fact. */
     fun holeLevelFor(v: Int, k: Int): Int {
@@ -253,7 +253,7 @@ class PropagationState(
         return 0
     }
 
-    /** Level at which `v`'s min *first* reached ≥ [k]. `0` when [k] is within the root domain
+    /** Level at which `v`'s min *first* reached ≥ `k`. `0` when `k` is within the root domain
      *  (a global fact). Conservative fallback to [intLevel] if history is absent. */
     fun minLevelForGe(v: Int, k: Int): Int {
         if (k <= problem.intDomains[v].min) return 0
@@ -265,7 +265,7 @@ class PropagationState(
         return if (i < vals.size) lvls[i] else maxOf(intLevel[v], 0)
     }
 
-    /** Level at which `v`'s max *first* reached ≤ [k]. Symmetric to [minLevelForGe]. */
+    /** Level at which `v`'s max *first* reached ≤ `k`. Symmetric to [minLevelForGe]. */
     fun maxLevelForLe(v: Int, k: Int): Int {
         if (k >= problem.intDomains[v].max) return 0
         val vals = maxHistVal[v] ?: return maxOf(intLevel[v], 0)
@@ -953,7 +953,7 @@ class PropagationState(
     /** Literal for the value atom `intVar ≠ value`. */
     fun atomLitNe(intVar: Int, value: Int): Int = Lit.make(atomVarEq(intVar, value), false)
 
-    /** True iff [v] is an atom-id (past the bool var space). Used by the conflict
+    /** True iff `v` is an atom-id (past the bool var space). Used by the conflict
      *  analyzer to dispatch between bool-trail and atom-table lookups. */
     fun isAtomVar(v: Int): Boolean = v >= problem.numBoolVars
 
@@ -1129,7 +1129,7 @@ class PropagationState(
 
     /**
      * After a successful [tightenIntMinImpl] / [tightenIntMaxImpl] / [excludeIntValueImpl]
-     * on int var [v], recompute the truth of every atom that depends on [v]. Atoms whose
+     * on int var `v`, recompute the truth of every atom that depends on `v`. Atoms whose
      * truth flipped get their level / antecedents updated, and watchers on the now-false
      * atom-lit are scheduled to fire.
      *
@@ -1283,7 +1283,7 @@ class PropagationState(
         undoHoleHistLen.add(0)
     }
 
-    /** Capture int var [v]'s full prior state. Must be called *before* the mutation. */
+    /** Capture int var `v`'s full prior state. Must be called *before* the mutation. */
     private fun logIntChange(v: Int) {
         undoTag.add(1)
         undoVar.add(v)
@@ -1337,10 +1337,10 @@ class PropagationState(
      *  push incrementally instead of scanning every variable. */
     val undoTop: Int get() = undoTag.size
 
-    /** Variable id recorded by undo record [i]. */
+    /** Variable id recorded by undo record `i`. */
     fun undoVarAt(i: Int): Int = undoVar[i]
 
-    /** True iff undo record [i] is a bool pin (vs. an int-domain change). */
+    /** True iff undo record `i` is a bool pin (vs. an int-domain change). */
     fun undoIsBoolAt(i: Int): Boolean = undoTag[i] == 0
 
     init {
@@ -1355,7 +1355,7 @@ class PropagationState(
     }
 
     /**
-     * Move factor [factorId]'s registration from [oldLit] to [newLit] in
+     * Move factor `[factorId]`'s registration from [oldLit] to [newLit] in
      * [boolWatchersByLit]. Called by watcher-using factors when they relocate a watch
      * during propagation. The removal scans [oldLit]'s slot (typically a handful of
      * entries) and swap-and-pops; the insert is O(1).
@@ -1373,9 +1373,9 @@ class PropagationState(
         installLitWatch(newLit, factorId, blocker)
     }
 
-    /** O(1) removal of [factorId] from `boolWatchersByLit[lit]` via the [boolWatchPos]
+    /** O(1) removal of `[factorId]` from `boolWatchersByLit[lit]` via the [boolWatchPos]
      *  back-pointer: swap the tail entry into the freed slot and fix its recorded position.
-     *  Verifies the recorded position actually holds [factorId]; on any miss/mismatch falls
+     *  Verifies the recorded position actually holds `[factorId]`; on any miss/mismatch falls
      *  back to the linear swap-remove and self-heals the index, so a stale back-pointer can
      *  never remove the wrong watcher. */
     private fun removeBoolWatch(factorId: Int, lit: Int) {
@@ -1430,7 +1430,7 @@ class PropagationState(
         seeded = seedAssumptions(assumptions)
     }
 
-    /** Push every pin in [a] as a fresh decision; return `false` (so [seeded] becomes
+    /** Push every pin in `a` as a fresh decision; return `false` (so [seeded] becomes
      *  `false`) on the first contradiction. Direct primitive-array iteration so the early
      *  exit is a clean `return`. */
     private fun seedAssumptions(a: Assumptions): Boolean {
@@ -1515,7 +1515,7 @@ class PropagationState(
         return tightenIntMinImpl(v, lo, null)
     }
 
-    /** Force bool [v] to [value]; returns false on conflict. */
+    /** Force bool `v` to [value]; returns false on conflict. */
     fun pinBool(v: Int, value: Boolean): Boolean = pinBoolImpl(v, value, antecedents = null)
 
     /** Variant that records [antecedents] — the literals whose truth values implied this
@@ -1524,7 +1524,7 @@ class PropagationState(
      *  fine, the analyzer just treats this pin as a leaf in the implication graph. */
     fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean = pinBoolImpl(v, value, antecedents)
 
-    /** Raise int [v]'s lower bound to [lo]; returns false on conflict. */
+    /** Raise int `v`'s lower bound to [lo]; returns false on conflict. */
     fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo, null)
 
     /** Variant that records [antecedents] — bool literals (false in the current state)
@@ -1532,26 +1532,26 @@ class PropagationState(
      *  analyzer to walk the implication graph backwards through int-domain factors. */
     fun tightenIntMin(v: Int, lo: Int, antecedents: IntArray?): Boolean = tightenIntMinImpl(v, lo, antecedents)
 
-    /** Lower int [v]'s upper bound to [hi]; returns false on conflict. */
+    /** Lower int `v`'s upper bound to [hi]; returns false on conflict. */
     fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi, null)
 
     /** As [tightenIntMax] with explicit conflict [antecedents]. */
     fun tightenIntMax(v: Int, hi: Int, antecedents: IntArray?): Boolean = tightenIntMaxImpl(v, hi, antecedents)
 
-    /** Pin int [v] to [value]; returns false on conflict. */
+    /** Pin int `v` to [value]; returns false on conflict. */
     fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value, null)
 
     /** As [setInt] with explicit conflict [antecedents]. */
     fun setInt(v: Int, value: Int, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
 
-    /** Punch a hole in [v]'s domain at [value]. Returns `true` on success (including the
+    /** Punch a hole in `v`'s domain at [value]. Returns `true` on success (including the
      *  no-op case when [value] is already absent), `false` on conflict (would empty the
      *  domain). When [value] is at the current endpoint, this is equivalent to a
      *  bound-tighten by one; when it's interior, it transitions the domain to sparse
      *  representation. */
     fun excludeIntValue(v: Int, value: Int): Boolean = excludeIntValueImpl(v, value, null)
 
-    /** Forbid [value] for int [v]; returns false on conflict. */
+    /** Forbid [value] for int `v`; returns false on conflict. */
     fun excludeIntValue(v: Int, value: Int, antecedents: IntArray?): Boolean =
         excludeIntValueImpl(v, value, antecedents)
 
@@ -2183,7 +2183,7 @@ class PropagationState(
     }
 
     /**
-     * Add every factor that should fire on [v]'s newly-pinned value to `queue`, using the
+     * Add every factor that should fire on `v`'s newly-pinned value to `queue`, using the
      * split wakeup paths: occurrence-list for factors that don't watch literals, plus the
      * per-literal watcher index for those that do (currently Clauses). For watcher-using
      * factors only the literal that just transitioned to *false* triggers a fire — true

@@ -13,7 +13,7 @@ import com.eignex.klause.util.IntIntMap
 /**
  * `intVars[i] != intVars[j]` for every pair `i < j`. Stored payload:
  *
- *   refPayload[factorId] = State (counts: IntArray, duplicateCount: Int)
+ *   `refPayload[factorId]` = State (counts: IntArray, duplicateCount: Int)
  *
  * `counts` is indexed by `value - domainMin` and tracks how many vars currently hold each
  * value across the union domain `[domainMin, domainMin + domainSize)`. `duplicateCount` is the

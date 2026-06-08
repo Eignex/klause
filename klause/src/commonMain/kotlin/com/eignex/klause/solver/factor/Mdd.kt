@@ -20,7 +20,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  *  - Forward sweep: state `s` at layer `i` is forward-reachable iff some forward-reachable
  *    state at layer `i-1` has a transition on a feasible (in-domain) symbol leading to `s`.
  *  - Backward sweep symmetric from accepting states.
- *  - Prune seq[i] values that have no transition between forward∩backward reachable states.
+ *  - Prune `seq[i]` values that have no transition between forward∩backward reachable states.
  *  - Fail if no forward-reachable state at layer `n` is accepting.
  *  - For cost variant: tighten [cost] bounds by min/max weighted-sum path through the
  *    forward-backward reachable lattice.

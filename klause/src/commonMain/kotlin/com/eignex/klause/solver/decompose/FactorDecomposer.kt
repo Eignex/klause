@@ -348,7 +348,7 @@ internal object FactorDecomposer {
     }
 
     /** `symmetric_alldifferent(xs, offset)` — permutation with `xs[i] = j+offset ⟺
-     *  xs[j] = i+offset`. We assert pairwise NE plus the involution biconditional via
+     *  `xs[j]` = i+offset`. We assert pairwise NE plus the involution biconditional via
      *  reified equalities. */
     private fun decomposeSymmetricAllDifferent(f: SymmetricAllDifferent, ctx: DecompositionContext): List<Factor> {
         val out = ArrayList<Factor>()
@@ -576,7 +576,7 @@ internal object FactorDecomposer {
 
     /** `lex_less(xs, ys, strict)` — xs is lexicographically ≤ ys (strict ⇒ <). Encoded
      *  via a "first-difference" aux: per position i, aux `diff_i ↔ (xs[i] ≠ ys[i])`,
-     *  `first_i ↔ (∀ j < i: ¬diff_j) ∧ diff_i`. When first_i is true: xs[i] < ys[i].
+     *  `first_i ↔ (∀ j < i: ¬diff_j) ∧ diff_i`. When first_i is true: `xs[i]` < `ys[i]`.
      *  When all diff_i are false: xs is prefix-equal to ys (admissible iff non-strict
      *  OR xs is strictly shorter). For equal-length non-strict we require allow-equal;
      *  strict requires *some* position to differ. */
@@ -744,7 +744,7 @@ internal object FactorDecomposer {
     /** `mdd(seq, …, transitions, initial, accepting)` — layered MDD. transitions is a
      *  flat row-major sequence of `(srcState, value, dstState[, weight])`; `layerStarts`
      *  bounds each layer's rows. Per layer, an aux per transition fires when (state_i =
-     *  src ∧ seq[i] = value ∧ state_{i+1} = dst); exactly one transition fires per layer. */
+     *  src ∧ `seq[i]` = value ∧ state_{i+1} = dst); exactly one transition fires per layer. */
     private fun decomposeMdd(f: Mdd, ctx: DecompositionContext): List<Factor>? {
         val out = ArrayList<Factor>()
         val n = f.seq.size
@@ -1026,7 +1026,7 @@ internal object FactorDecomposer {
 
     /** `circuit(succ)` — succ forms a Hamiltonian cycle over `[0, n-1]`. Encoded via
      *  pairwise NE + a "level" aux per node ensuring there's exactly one cycle of
-     *  length n. Level convention: level[0] = 0; for i ≠ 0, level[i] ∈ [1, n-1]; for
+     *  length n. Level convention: level[0] = 0; for i ≠ 0, `level[i]` ∈ [1, n-1]; for
      *  any j ≠ 0, `succ[i] = j ⇒ level[j] = level[i] + 1`; node 0's predecessor has
      *  level n-1. */
     private fun decomposeCircuit(f: Circuit, ctx: DecompositionContext): List<Factor> {

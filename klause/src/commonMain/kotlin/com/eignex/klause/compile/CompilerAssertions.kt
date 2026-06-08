@@ -311,7 +311,7 @@ internal fun Compiler.Build.assertAllDifferent(terms: List<IntExpr>) {
     }
 }
 
-/** Lift [e] to a solver int-var id, materialising an aux var pinned equal when the lifted
+/** Lift `e` to a solver int-var id, materialising an aux var pinned equal when the lifted
  *  form carries an arithmetic residual rather than being a bare variable reference. The
  *  channeling globals below need concrete var ids to post their native factor. */
 internal fun Compiler.Build.varIdOfLifted(e: IntExpr): Int {

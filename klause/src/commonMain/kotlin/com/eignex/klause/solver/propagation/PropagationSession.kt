@@ -365,7 +365,7 @@ class PropagationSession(
         state.undoTo(levelLast())
     }
 
-    /** Pop until [v] of [kind] is no longer pinned. No-op if [v] is already unpinned. */
+    /** Pop until `v` of [kind] is no longer pinned. No-op if `v` is already unpinned. */
     fun popUntilUnpinned(kind: VarKind, v: Int) {
         val pinned = when (kind) {
             VarKind.Bool -> boolPinned[v] != -1

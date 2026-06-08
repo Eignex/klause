@@ -72,7 +72,7 @@ internal class CpToLpRelaxation(private val problem: Problem, private val object
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
 
-        /** Column for integer variable [i], created on first use with its live domain bounds. */
+        /** Column for integer variable `i`, created on first use with its live domain bounds. */
         private fun intColumn(i: Int): Int {
             var c = intCol[i]
             if (c == -1) {
@@ -85,7 +85,7 @@ internal class CpToLpRelaxation(private val problem: Problem, private val object
             return c
         }
 
-        /** Column for Boolean variable [b]; bounds collapse to a point if it is pinned this node. */
+        /** Column for Boolean variable `b`; bounds collapse to a point if it is pinned this node. */
         private fun boolColumn(b: Int): Int {
             var c = boolCol[b]
             if (c == -1) {

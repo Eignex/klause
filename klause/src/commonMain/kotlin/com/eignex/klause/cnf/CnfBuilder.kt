@@ -190,7 +190,7 @@ class CnfBuilder {
         return out
     }
 
-    /** Logical left-shift by [k]: new low bits filled with constant-false literals. */
+    /** Logical left-shift by `k`: new low bits filled with constant-false literals. */
     fun shiftLeft(bits: IntArray, k: Int): IntArray {
         if (k == 0) return bits
         val out = IntArray(bits.size + k)

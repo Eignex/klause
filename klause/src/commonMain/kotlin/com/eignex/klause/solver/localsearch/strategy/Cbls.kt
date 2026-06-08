@@ -712,7 +712,7 @@ class Cbls(
         return best
     }
 
-    /** Generate level-[k] candidates into [sink]. Level 1 is the single-factor repair pool
+    /** Generate level-`k` candidates into [sink]. Level 1 is the single-factor repair pool
      *  ([sampleFromViolated]); deeper levels are coordinated k-deep [couplingChain] moves. */
     private fun generateLevel(state: LocalSearchState, k: Int, sink: MoveSink) {
         if (k == 1) {
@@ -725,7 +725,7 @@ class Cbls(
     }
 
     /**
-     * Build one coordinated depth-[k] move and add it to [sink]: a primitive k-factor
+     * Build one coordinated depth-`k` move and add it to [sink]: a primitive k-factor
      * concatenation — pick `k` random violated factors and staple one random repair from each.
      */
     private fun couplingChain(state: LocalSearchState, k: Int, sink: MoveSink) {

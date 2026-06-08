@@ -673,7 +673,7 @@ class LocalSearchState(
         }
     }
 
-    /** Walk every factor that touches bool var [v], call its `deltaIfBoolFlipped`, and
+    /** Walk every factor that touches bool var `v`, call its `deltaIfBoolFlipped`, and
      *  hand the (factorId, delta) pair to [action]. Inline so callers stay allocation-
      *  free. Shared by [breakScore], [netDelta], and DDFW's weighted-break score. */
     internal inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
@@ -682,7 +682,7 @@ class LocalSearchState(
         }
     }
 
-    /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var [v] with
+    /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var `v` with
      *  target value [newValue]. */
     internal inline fun forEachIntFactorDelta(v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in problem.intOccurrences[v]) {
@@ -880,7 +880,7 @@ class LocalSearchState(
 
     /** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated.
      *  Ints get ±1 steps *and* the domain endpoints: on successor/path encodings the min
-     *  endpoint is the semantic "remove from the structure" eject (next[i] → 0), the move
+     *  endpoint is the semantic "remove from the structure" eject (`next[i]` → 0), the move
      *  that lets a chain dismantle a parasitic successor fragment backwards — ±1 alone
      *  cannot express that jump and the prize-collecting orbit stays closed without it. */
     private fun emitFactorPrimitives(seed: Int, nf: Int, seenFactors: HashSet<Int>, sink: MoveSink) {

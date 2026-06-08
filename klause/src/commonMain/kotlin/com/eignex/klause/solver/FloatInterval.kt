@@ -31,6 +31,6 @@ data class FloatInterval(
     /** True iff the interval is a single point. */
     val isSingleton: Boolean get() = lo == hi
 
-    /** True iff [v] lies in `[lo, hi]`. */
+    /** True iff `v` lies in `[lo, hi]`. */
     operator fun contains(v: Double): Boolean = v in lo..hi
 }

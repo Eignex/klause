@@ -3243,7 +3243,7 @@ internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout,
     reifyAndOfLits(auxes.toIntArray(), r)
 }
 
-/** `set_card(S, n)`. Σ indicator_S[e] = n. n can be a constant or an int var; lowers to a
+/** `set_card(S, n)`. Σ `indicator_S[e]` = n. n can be a constant or an int var; lowers to a
  *  pseudo-Boolean linear constraint either way. */
 internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
     require(c.args.size == 2)

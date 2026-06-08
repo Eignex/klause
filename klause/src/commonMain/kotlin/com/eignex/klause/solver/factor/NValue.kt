@@ -206,7 +206,7 @@ class NValue(
 
     /** Distinct-count repair: snap `n` to current `distinctCount`, plus per-mode moves
      *  that nudge the distinct count in the right direction. To increase distinctCount,
-     *  pick an xs[i] in a high-occurrence value class and shift it to a value currently
+     *  pick an `xs[i]` in a high-occurrence value class and shift it to a value currently
      *  uncovered (in its domain). To decrease, shift it to an already-covered value. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return

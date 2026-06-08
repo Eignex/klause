@@ -514,7 +514,7 @@ class Cardinality(
         }
     }
 
-    /** Cached max |signedOccurrencesByVar[v]| across `boolVars`. Bounds the change `n` can
+    /** Cached max |`signedOccurrencesByVar[v]`| across `boolVars`. Bounds the change `n` can
      *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out: when both
      *  the pre- and post-flip `n` are far enough from the [min] / [max] boundaries that no
      *  single subsequent flip could cross either side, no break/make state needs to change. */

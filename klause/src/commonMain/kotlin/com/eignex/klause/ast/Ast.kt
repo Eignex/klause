@@ -161,7 +161,7 @@ data class Iff(
     val right: BoolExpr,
 ) : BoolExpr
 
-/** At most [k] of [children] are true. */
+/** At most `k` of [children] are true. */
 @Serializable
 @SerialName("atmost")
 data class AtMost(
@@ -171,7 +171,7 @@ data class AtMost(
     val k: Int,
 ) : BoolExpr
 
-/** At least [k] of [children] are true. */
+/** At least `k` of [children] are true. */
 @Serializable
 @SerialName("atleast")
 data class AtLeast(

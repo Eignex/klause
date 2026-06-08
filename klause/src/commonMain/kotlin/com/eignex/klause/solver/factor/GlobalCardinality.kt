@@ -666,8 +666,8 @@ class GlobalCardinality(
     }
 
     /** Repair moves: for each cover index `k` whose count violates the constraint, push it
-     *  toward the target band. With [countVars], also snap each countVars[k] to the current
-     *  count. For [closed]=true, drag any out-of-cover xs[i] into the cover. */
+     *  toward the target band. With [countVars], also snap each `countVars[k]` to the current
+     *  count. For [closed]=true, drag any out-of-cover `xs[i]` into the cover. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as State

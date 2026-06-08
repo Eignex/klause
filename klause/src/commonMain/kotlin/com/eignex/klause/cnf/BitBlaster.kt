@@ -633,7 +633,7 @@ object BitBlaster {
     /** Remap a [Problem]-space Boolean literal into a CNF literal. */
     private fun presLit(boolMap: IntArray, lit: Int): Int = Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
 
-    /** Unsigned bit-vector for the *actual* value of int var [v] (`min + offset`). Requires a
+    /** Unsigned bit-vector for the *actual* value of int var `v` (`min + offset`). Requires a
      *  non-negative domain min — used only for count-style vars (counts, nvalue n). */
     private fun intActualUnsigned(b: CnfBuilder, v: Int, intBits: Array<IntArray>, intMin: IntArray): IntArray {
         val min = intMin[v]
@@ -1204,7 +1204,7 @@ object BitBlaster {
         }
     }
 
-    /** `bin_packing` — per-bin load = Σ weights·1[bins[i]=bin], bounded per `mode`. */
+    /** `bin_packing` — per-bin load = Σ weights·1[`bins[i]`=bin], bounded per `mode`. */
     private fun emitBinPacking(b: CnfBuilder, f: BinPacking, intBits: Array<IntArray>, intMin: IntArray) {
         for (bIdx in 0 until f.numBins) {
             val binVal = bIdx + f.binOffset

@@ -435,7 +435,7 @@ class Problem(
         )
     }
 
-    /** Union two `Implied`s by replaying everything from [b] into the [a] base. */
+    /** Union two `Implied`s by replaying everything from `b` into the `a` base. */
     private fun mergeImplied(a: PropagationResult.Implied, b: PropagationResult.Implied): PropagationResult.Implied {
         val bools = HashMap(a.bools)
         b.forEachBool { k, v -> bools[k] = v }

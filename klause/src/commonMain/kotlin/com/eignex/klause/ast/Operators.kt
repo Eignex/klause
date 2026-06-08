@@ -33,10 +33,10 @@ operator fun BoolTerm.not(): BoolExpr = when (val e = toExpr()) {
     else -> Not(e)
 }
 
-/** At most [k] of [terms] are true. */
+/** At most `k` of [terms] are true. */
 fun atMost(k: Int, vararg terms: BoolTerm): BoolExpr = AtMost(terms.map { it.toExpr() }, k)
 
-/** At least [k] of [terms] are true. */
+/** At least `k` of [terms] are true. */
 fun atLeast(k: Int, vararg terms: BoolTerm): BoolExpr = AtLeast(terms.map { it.toExpr() }, k)
 
 /** Between [min] and [max] of [terms] are true. */
