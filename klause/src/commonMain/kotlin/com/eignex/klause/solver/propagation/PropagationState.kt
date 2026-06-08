@@ -1037,11 +1037,29 @@ class PropagationState(
         return Lit.evaluate(lit, raw)
     }
 
-    /** True iff [lit] is currently `true` (returns false when undetermined). */
-    fun litTrue(lit: Int): Boolean = litTruth(lit) == true
+    /** True iff [lit] is currently `true` (returns false when undetermined).
+     *
+     *  Plain bool literals (the dominant BCP case) read the packed bits directly instead of
+     *  routing through [litTruth]'s boxed `Boolean?` — a literal is true iff its variable is
+     *  assigned and the stored value matches the literal's polarity. Atom literals fall back to
+     *  the general path. */
+    fun litTrue(lit: Int): Boolean {
+        val v = Lit.variable(lit)
+        if (v < problem.numBoolVars) {
+            return boolAssigned.get(v) && (boolValueBits.get(v) == Lit.isPositive(lit))
+        }
+        return litTruth(lit) == true
+    }
 
-    /** True iff [lit] is currently `false` (returns false when undetermined). */
-    fun litFalse(lit: Int): Boolean = litTruth(lit) == false
+    /** True iff [lit] is currently `false` (returns false when undetermined). Bool-literal fast
+     *  path mirrors [litTrue]; assigned with the value opposing the literal's polarity. */
+    fun litFalse(lit: Int): Boolean {
+        val v = Lit.variable(lit)
+        if (v < problem.numBoolVars) {
+            return boolAssigned.get(v) && (boolValueBits.get(v) != Lit.isPositive(lit))
+        }
+        return litTruth(lit) == false
+    }
 
     /** Assign [lit] to true, recording [antecedents]. Dispatches between bool pins
      *  ([pinBool]) and atom assignment (re-derived as the corresponding int-bound

@@ -11,18 +11,17 @@ package com.eignex.klause.solver
 internal class Bits(val size: Int) {
     @PublishedApi internal val words: LongArray = LongArray((size + 63) ushr 6)
 
-    fun get(i: Int): Boolean {
-        require(i in 0 until size)
-        return (words[i ushr 6] ushr (i and 63)) and 1L == 1L
-    }
+    // Single-bit get/set/clear sit on the propagation hot path — every BCP literal touch reads a
+    // bit, millions of times per solve — so they carry no bounds check. Callers pass in-range ids
+    // (`< size`), matching the unchecked-primitive convention of IntArrayList; an out-of-range
+    // index still faults via the backing-array access rather than silently corrupting state.
+    fun get(i: Int): Boolean = (words[i ushr 6] ushr (i and 63)) and 1L == 1L
 
     fun set(i: Int) {
-        require(i in 0 until size)
         words[i ushr 6] = words[i ushr 6] or (1L shl (i and 63))
     }
 
     fun clear(i: Int) {
-        require(i in 0 until size)
         words[i ushr 6] = words[i ushr 6] and (1L shl (i and 63)).inv()
     }
 
