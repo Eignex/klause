@@ -14,6 +14,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpAutoConfig
 import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -107,8 +108,17 @@ private class LogicNGBench(override val problem: Problem, private val params: Lo
 
 private class BacktrackBench(
     override val problem: Problem,
-    private val params: BacktrackParams = BacktrackParams(maxDecisions = 100_000L, randomSeed = 0L),
+    base: BacktrackParams = BacktrackParams(maxDecisions = 100_000L, randomSeed = 0L),
 ) : InProcessSolver {
+    // #245: `-Dklause.bench.lpauto=true` runs the backtrack backend with the structural LP
+    // auto-config applied, so a corpus sweep can measure auto-enable vs the plain backend in one
+    // flag. Off by default — the measurement (which needs CPU) is the open empirical half of #245.
+    private val params =
+        if (System.getProperty("klause.bench.lpauto")?.toBoolean() == true) {
+            LpAutoConfig.recommend(problem, base)
+        } else {
+            base
+        }
     private val s = BacktrackSolver(problem)
     override val name = "backtrack"
     override fun solve() = s.solve(params)
