@@ -240,9 +240,10 @@ internal data class LocalSearchWorkerConfig(
                 }
             },
             // Contextual-bandit move selection (#8): a fresh Linear-Thompson posterior per slot
-            // learns which repair move to take from move features. Untuned candidate — appended
-            // to [rankedOrder] so the default diverse(N) prefix is unchanged; reachable via
-            // explicit lsConfigLabels / the credit-tuning campaign until it earns a ranked slot.
+            // learns which repair move to take from move features. NOT in [rankedOrder] — the
+            // #9-lite credit pass found it a total dud (0 first/best/sole), so it is excluded from
+            // the diverse(N)/configs=all pool; kept here as a label-addressable strategy for
+            // standalone / SequentialPortfolio use and future re-evaluation.
             "thompson/fixed" to {
                 LocalSearchWorkerConfig("thompson/fixed", LinearThompsonStrategy.thompson(), FixedCadenceRestart())
             },
@@ -276,8 +277,12 @@ internal data class LocalSearchWorkerConfig(
             "adaptive-probsat/fixed", "cbls-tenure3/fixed", "cbls-stallslow/fixed", "sa/fixed",
             "cbls-plateau64/fixed", "walksat-cc/luby", "cbls-hinoise/fixed", "cbls-plateau-smooth/fixed",
             "cbls-plateau/fixed", "cbls-raw/fixed",
-            // Untuned bandit candidates (#8); kept last so the default diverse(N) prefix is unchanged.
-            "thompson/fixed", "cbls/ils-bandit", "probsat-bandit/fixed",
+            // Bandit candidates (#8); kept last so the default diverse(N) prefix is unchanged.
+            // The #9-lite credit pass (mzn-bench, configs=all) kept these two — probsat-bandit and
+            // cbls/ils-bandit each held a best — but dropped thompson/fixed as a total dud
+            // (0 first/best/sole), so it is excluded from the pool (its strategy stays available
+            // by label for standalone / SequentialPortfolio use).
+            "cbls/ils-bandit", "probsat-bandit/fixed",
         )
 
         /** Labels of every config in the pool, in credit order. */
