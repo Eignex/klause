@@ -7,8 +7,8 @@ import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.localsearch.CostShaping
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 
@@ -46,6 +46,25 @@ data class PortfolioSpec(
         require(localSearchWorkers + backtrackWorkers >= 1 || !lsConfigLabels.isNullOrEmpty()) {
             "a portfolio needs at least one worker"
         }
+    }
+
+    /** The three named portfolios every consumer (CLI, bench metrics) selects from — the single
+     *  vocabulary, so nothing hand-assembles workers. Counts are the shipped defaults; pass
+     *  explicit ones to scale a scenario without leaving the canonical path. */
+    companion object {
+        /** The open competition class: local search streams incumbents fast while the backtrack
+         *  pool tightens the bound and can prove optimality, sharing one incumbent. */
+        fun mixed(seed: Long = 0L, localSearchWorkers: Int = 4, backtrackWorkers: Int = 2): PortfolioSpec =
+            PortfolioSpec(localSearchWorkers = localSearchWorkers, backtrackWorkers = backtrackWorkers, seed = seed)
+
+        /** Pure local-search pool — no complete search, no CP dependency. */
+        fun localSearchOnly(seed: Long = 0L, workers: Int = 6): PortfolioSpec =
+            PortfolioSpec(localSearchWorkers = workers, seed = seed)
+
+        /** Pure complete backtrack pool — the diverse CDCL/CP trio (SAT-optimized,
+         *  conflict-driven, free) cycled across [workers], each on its own seed. */
+        fun backtrackOnly(seed: Long = 0L, workers: Int = 6): PortfolioSpec =
+            PortfolioSpec(backtrackWorkers = workers, seed = seed)
     }
 }
 
@@ -89,7 +108,14 @@ object PortfolioBuilder {
         // objective (matches the shipped CLI LS config). Each descends the functional/gradient
         // objective when the model provides one (falling back to the linear form otherwise).
         val lsObj = lsObjective ?: linearObjective
+        // The LS engine casts every factor to LocalSearchFactor at state construction, so a
+        // problem carrying a propagation-only factor (SubsetSumEq / GaussianXor, #250) would
+        // throw the moment an LS worker starts. Both are redundant with their LS-capable
+        // siblings, so dropping LS for the whole problem is sound — the backtrack pool still
+        // covers it (mixed degrades to backtrack-only on these models).
+        val lsCapable = problem.factors.all { it is LocalSearchFactor }
         val lsConfigs = when {
+            !lsCapable -> emptyList()
             spec.lsConfigLabels != null && spec.lsConfigLabels == listOf("all") -> LocalSearchWorkerConfig.pool()
             spec.lsConfigLabels != null -> spec.lsConfigLabels.map { LocalSearchWorkerConfig.byLabel(it) }
             spec.localSearchWorkers > 0 -> LocalSearchWorkerConfig.diverse(spec.localSearchWorkers)
@@ -119,10 +145,16 @@ object PortfolioBuilder {
         // single backtrack worker gets the strong SAT-optimized config. Each bounds on the linear
         // objective (falling back to the functional form if only that exists) and injects the
         // shared objective bound so a tighter incumbent from any worker prunes the others' subtrees.
+        // The three legs are the single-config corpus winners: SAT-optimized takes the
+        // pigeonhole / dense-random-3SAT class (#117), conflict-driven takes the scheduling /
+        // reach tail, and the bare free engine takes the plateau rows. Beyond the third worker
+        // the cycle repeats on fresh seeds, which doubles as seed-twin diversity for luck-bound
+        // close calls.
         //  - i % 3 == 0: the SAT-optimized CDCL stack ([BacktrackPresets.satOptimized]) —
         //    adaptive restarts, phase + target phasing, three-tier learned DB;
-        //  - i % 3 == 1: classic VSIDS + phase saving + Luby restarts;
-        //  - i % 3 == 2: the bare random-heuristic engine, for raw seed diversity.
+        //  - i % 3 == 1: the conflict-driven composition ([BacktrackPresets.conflictDriven]) —
+        //    last-conflict over VSIDS, solution-guided values, phase saving, Luby restarts;
+        //  - i % 3 == 2: the bare free engine on Luby restarts, for raw seed diversity.
         val btObj = linearObjective ?: lsObjective
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
@@ -131,20 +163,17 @@ object PortfolioBuilder {
             val seed = spec.seed + 1000L + i
             val params = when (i % 3) {
                 0 -> BacktrackPresets.satOptimized(randomSeed = seed, onEvent = workerEvent)
-
-                1 -> BacktrackParams(
-                    randomSeed = seed,
-                    variableHeuristic = Vsids(),
-                    phaseSaving = true,
-                    lubyRestartBase = 100L,
-                    onEvent = workerEvent,
-                )
-
-                else -> BacktrackParams(randomSeed = seed, onEvent = workerEvent)
+                1 -> BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = workerEvent)
+                else -> BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = workerEvent)
             }
             workers += PortfolioWorker.of(label, session, params, objective = btObj) { p, supplier ->
                 p.copy(objectiveBoundSupplier = supplier)
             }
+        }
+        check(workers.isNotEmpty()) {
+            "portfolio has no workers: all local-search workers were skipped on a problem with a " +
+                "non-LS factor (#250) and no backtrack workers were requested — use backtrackOnly " +
+                "or request backtrack workers for such models"
         }
         return Portfolio(workers)
     }

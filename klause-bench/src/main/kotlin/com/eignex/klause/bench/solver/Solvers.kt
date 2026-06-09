@@ -188,7 +188,7 @@ private class PortfolioBench(
     bt: Int = System.getProperty("klause.portfolio.bt")?.toIntOrNull() ?: 2,
 ) : InProcessSolver {
     private val portfolio: Portfolio =
-        PortfolioBuilder.build(problem, PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 0L))
+        PortfolioBuilder.build(problem, PortfolioSpec.mixed(localSearchWorkers = ls, backtrackWorkers = bt))
     override val name = "portfolio"
 
     @Suppress("InjectDispatcher")
