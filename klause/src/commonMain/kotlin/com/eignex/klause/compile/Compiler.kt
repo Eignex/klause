@@ -1,10 +1,8 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.AllDifferent
-import com.eignex.klause.ast.AllDifferentExceptExpr
 import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
-import com.eignex.klause.ast.ArgSortExpr
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
 import com.eignex.klause.ast.BoolExpr
@@ -14,7 +12,6 @@ import com.eignex.klause.ast.CardinalityExpr
 import com.eignex.klause.ast.CircuitExpr
 import com.eignex.klause.ast.CostMddExpr
 import com.eignex.klause.ast.CostRegularExpr
-import com.eignex.klause.ast.CountExprOpt
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.CumulativeExprOpt
 import com.eignex.klause.ast.DisjunctiveExpr
@@ -350,10 +347,6 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
             is InverseChannel ->
                 error("inverse is a top-level constraint, not reifiable as a sub-expression")
 
-            is AllDifferentExceptExpr -> lowerToLit(decomposeAllDifferentExcept(expr))
-
-            is ArgSortExpr -> lowerToLit(decomposeArgSort(expr))
-
             is MddExpr -> error("mdd: reified context not supported (use at top-level)")
 
             is CostMddExpr -> error("cost_mdd: reified context not supported (use at top-level)")
@@ -375,8 +368,6 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
             is CumulativeExprOpt -> reifyCumulativeOpt(expr)
 
             is DisjunctiveExprOpt -> reifyDisjunctiveOpt(expr)
-
-            is CountExprOpt -> reifyCountOpt(expr)
 
             is NValueExprOpt -> reifyNValueOpt(expr)
 

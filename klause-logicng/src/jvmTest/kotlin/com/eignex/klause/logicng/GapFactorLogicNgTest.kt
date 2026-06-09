@@ -4,8 +4,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.factor.ArgMinMax
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Element
@@ -17,7 +15,6 @@ import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -115,41 +112,6 @@ class GapFactorLogicNgTest {
     }
 
     private fun eq(v: Int, value: Int): Linear = Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, value)
-
-    @Test
-    fun `argmin picks the first minimum position`() {
-        // xs = [3, 1, 2] (vars 1,2,3), idx (var0) free. arg_min ⇒ idx = 1 (value 1).
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-            arrayOf<Factor>(
-                ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false, indexOffset = 0),
-                eq(1, 3),
-                eq(2, 1),
-                eq(3, 2),
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(solve(problem))
-        assertEquals(1, sat.assignment.ints[0], "arg_min should select position 1")
-    }
-
-    @Test
-    fun `argmin rejects a non-optimal forced index`() {
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-            arrayOf<Factor>(
-                ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false, indexOffset = 0),
-                eq(1, 3),
-                eq(2, 1),
-                eq(3, 2),
-                eq(0, 0), // claim position 0 (value 3) is the min — false
-            ),
-        )
-        assertIs<SolveResult.Unsat>(solve(problem))
-    }
 
     @Test
     fun `regular rejects a string the dfa does not accept`() {
@@ -258,30 +220,6 @@ class GapFactorLogicNgTest {
                 Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 2, 2, 1)),
                 eq(0, 0),
                 eq(1, 1), // (0,1) is not a listed tuple
-            ),
-        )
-        assertIs<SolveResult.Unsat>(solve(problem))
-    }
-
-    @Test
-    fun `bin_packing rejects an over-capacity bin`() {
-        // Three weight-1 items all forced into bin 1, uniform capacity 2 ⇒ overload.
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(1, 2) },
-            arrayOf<Factor>(
-                BinPacking(
-                    bins = intArrayOf(0, 1, 2),
-                    weights = intArrayOf(1, 1, 1),
-                    mode = BinPacking.Mode.UniformCapacity,
-                    uniformCapacity = 2,
-                    numBins = 2,
-                    binOffset = 1,
-                ),
-                eq(0, 1),
-                eq(1, 1),
-                eq(2, 1),
             ),
         )
         assertIs<SolveResult.Unsat>(solve(problem))

@@ -1,10 +1,8 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.ast.AllDifferent
-import com.eignex.klause.ast.AllDifferentExceptExpr
 import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
-import com.eignex.klause.ast.ArgSortExpr
 import com.eignex.klause.ast.AtLeast
 import com.eignex.klause.ast.AtMost
 import com.eignex.klause.ast.BoolExpr
@@ -13,8 +11,6 @@ import com.eignex.klause.ast.CardinalityExpr
 import com.eignex.klause.ast.CircuitExpr
 import com.eignex.klause.ast.CostMddExpr
 import com.eignex.klause.ast.CostRegularExpr
-import com.eignex.klause.ast.CountExprOpt
-import com.eignex.klause.ast.CountOp
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.CumulativeExprOpt
 import com.eignex.klause.ast.DisjunctiveExpr
@@ -59,7 +55,6 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.Circuit as CircuitFactor
-import com.eignex.klause.solver.factor.Count as CountFactor
 import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
 import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
 import com.eignex.klause.solver.factor.GlobalCardinality as GccFactor
@@ -122,10 +117,6 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
 
         is InverseChannel -> assertInverse(expr)
 
-        is AllDifferentExceptExpr -> assertAllDifferentExcept(expr)
-
-        is ArgSortExpr -> assertArgSort(expr)
-
         is MddExpr -> assertMdd(expr)
 
         is CostMddExpr -> assertCostMdd(expr)
@@ -145,8 +136,6 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
         is CumulativeExprOpt -> assertCumulativeOpt(expr)
 
         is DisjunctiveExprOpt -> assertDisjunctiveOpt(expr)
-
-        is CountExprOpt -> assertCountOpt(expr)
 
         is NValueExprOpt -> assertNValueOpt(expr)
 
@@ -439,32 +428,6 @@ internal fun Compiler.Build.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
     factors += DisjunctiveFactor(
         starts = ids,
         durations = expr.durations.toIntArray(),
-        presents = lowerPresences(expr.presents),
-    )
-}
-
-internal fun Compiler.Build.assertCountOpt(expr: CountExprOpt) {
-    val xsLifted = expr.xs.map { lift(it) }
-    require(xsLifted.all { it is IntRef }) {
-        "countOpt: every xs term must be a bare variable reference (no arithmetic)."
-    }
-    val xsIds = IntArray(xsLifted.size) { intVarOf((xsLifted[it] as IntRef).name) }
-    val nLifted = lift(expr.n)
-    require(nLifted is IntRef) { "countOpt: count target n must be a bare variable reference." }
-    val nId = intVarOf(nLifted.name)
-    val factorOp = when (expr.op) {
-        CountOp.EQ -> CountFactor.Op.Eq
-        CountOp.NE -> CountFactor.Op.Ne
-        CountOp.LE -> CountFactor.Op.Le
-        CountOp.LT -> CountFactor.Op.Lt
-        CountOp.GE -> CountFactor.Op.Ge
-        CountOp.GT -> CountFactor.Op.Gt
-    }
-    factors += CountFactor(
-        xs = xsIds,
-        v = expr.v,
-        op = factorOp,
-        n = nId,
         presents = lowerPresences(expr.presents),
     )
 }

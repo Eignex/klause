@@ -6,21 +6,15 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.Among
-import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -32,7 +26,6 @@ import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
-import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
@@ -236,12 +229,6 @@ internal object SmtTranslator {
                 )
             }
 
-            is AllDifferentExcept -> distinctExcept(factor.xs, factor.except)
-
-            is Among -> eqV(iv(factor.n), imgr.sum(factor.xs.map { oneIf(inValues(iv(it), factor.values)) }))
-
-            is Count -> translateCount(factor)
-
             is Element -> translateElement(factor)
 
             is Inverse -> channel(factor.f, factor.g, factor.fOffset, factor.gOffset)
@@ -258,28 +245,11 @@ internal object SmtTranslator {
 
             is ArrayMinMax -> arrayMinMax(factor)
 
-            is ArgMinMax -> argMinMax(factor)
-
-            is Knapsack -> bmgr.and(
-                eqV(
-                    iv(factor.w),
-                    imgr.sum(factor.xs.indices.map { imgr.multiply(num(factor.weights[it]), iv(factor.xs[it])) }),
-                ),
-                eqV(
-                    iv(factor.p),
-                    imgr.sum(factor.xs.indices.map { imgr.multiply(num(factor.profits[it]), iv(factor.xs[it])) }),
-                ),
-            )
-
             is Cumulative -> cumulative(factor)
 
             is Diffn -> diffn(factor)
 
-            is BinPacking -> binPacking(factor)
-
             is Sort -> sort(factor)
-
-            is Sequence -> sequence(factor)
 
             is Regular -> regular(factor)
 
@@ -287,51 +257,13 @@ internal object SmtTranslator {
 
             is Subcircuit -> subcircuit(factor)
 
-
             is Mdd -> mdd(factor)
 
             else -> error("SmtTranslator: unsupported factor type ${factor::class.simpleName}")
         }
 
-        /** `distinct` over [xs] except that any pair where one side ∈ [except] is exempt. */
-        private fun distinctExcept(xs: IntArray, except: IntArray): BooleanFormula {
-            val conj = ArrayList<BooleanFormula>()
-            for (i in xs.indices) {
-                for (j in i + 1 until xs.size) {
-                    conj.add(
-                        bmgr.or(
-                            inValues(iv(xs[i]), except),
-                            inValues(iv(xs[j]), except),
-                            bmgr.not(eqV(iv(xs[i]), iv(xs[j]))),
-                        ),
-                    )
-                }
-            }
-            return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
-        }
-
-        private fun translateCount(f: Count): BooleanFormula {
-            // #{i : xs[i] = v} ⟨op⟩ n. Presence-aware when per-index literals are supplied.
-            val terms = f.xs.indices.map { idx ->
-                val matches = eqN(iv(f.xs[idx]), f.v)
-                if (f.presents.isEmpty()) {
-                    oneIf(matches)
-                } else {
-                    oneIf(bmgr.and(litFormula(f.presents[idx]), matches))
-                }
-            }
-            val cnt = imgr.sum(terms)
-            val n = num(f.n)
-            return when (f.op) {
-                Count.Op.Eq -> imgr.equal(cnt, n)
-                Count.Op.Ne -> bmgr.not(imgr.equal(cnt, n))
-                Count.Op.Le -> imgr.lessOrEquals(cnt, n)
-                Count.Op.Lt -> imgr.lessOrEquals(cnt, num(f.n - 1))
-                Count.Op.Ge -> imgr.greaterOrEquals(cnt, n)
-                Count.Op.Gt -> imgr.greaterOrEquals(cnt, num(f.n + 1))
-            }
-        }
-
+        /** `result = arr[idx - indexOffset]`, as a disjunction over array slots that also
+         *  confines `idx` to a valid index. */
         private fun translateElement(f: Element): BooleanFormula {
             // result = arr[idx - indexOffset]; the disjunction also confines idx to a slot.
             val disj = f.arr.indices.map { p ->
@@ -419,22 +351,6 @@ internal object SmtTranslator {
             return bmgr.and(bmgr.and(bounds), attained)
         }
 
-        private fun argMinMax(f: ArgMinMax): BooleanFormula {
-            // idx = the lowest position p that attains the extreme value: extreme at p, and
-            // strictly beaten by no earlier position (lowest-index tie-break).
-            val disj = f.xs.indices.map { p ->
-                val xp = iv(f.xs[p])
-                val isExtreme = f.xs.indices.filter { it != p }.map {
-                    if (f.max) imgr.greaterOrEquals(xp, iv(f.xs[it])) else imgr.lessOrEquals(xp, iv(f.xs[it]))
-                }
-                val strictlyFirst = (0 until p).map {
-                    if (f.max) lt(iv(f.xs[it]), xp) else lt(xp, iv(f.xs[it]))
-                }
-                bmgr.and(listOf(eqN(iv(f.idx), p + f.indexOffset)) + isExtreme + strictlyFirst)
-            }
-            return bmgr.or(disj)
-        }
-
         private fun cumulative(f: Cumulative): BooleanFormula {
             // Capacity respected at the start time of every task: Σ height_j over tasks j
             // running at start_i ≤ capacity.
@@ -474,27 +390,6 @@ internal object SmtTranslator {
             return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
         }
 
-        private fun binPacking(f: BinPacking): BooleanFormula {
-            val conj = ArrayList<BooleanFormula>()
-            for (b in 0 until f.numBins) {
-                val load = imgr.sum(
-                    f.bins.indices.map { i ->
-                        bmgr.ifThenElse(eqN(iv(f.bins[i]), b + f.binOffset), num(f.weights[i]), num(0))
-                    },
-                )
-                when (f.mode) {
-                    BinPacking.Mode.LoadVars -> conj.add(imgr.equal(iv(requireNotNull(f.loadVars)[b]), load))
-
-                    BinPacking.Mode.UniformCapacity -> conj.add(imgr.lessOrEquals(load, num(f.uniformCapacity)))
-
-                    BinPacking.Mode.PerBinCapacity -> conj.add(
-                        imgr.lessOrEquals(load, num(requireNotNull(f.capacities)[b])),
-                    )
-                }
-            }
-            return bmgr.and(conj)
-        }
-
         private fun sort(f: Sort): BooleanFormula {
             val conj = ArrayList<BooleanFormula>()
             // ys non-decreasing.
@@ -506,15 +401,6 @@ internal object SmtTranslator {
                 val cx = imgr.sum(f.xs.map { oneIf(eqN(iv(it), v)) })
                 val cy = imgr.sum(f.ys.map { oneIf(eqN(iv(it), v)) })
                 conj.add(imgr.equal(cx, cy))
-            }
-            return bmgr.and(conj)
-        }
-
-        private fun sequence(f: Sequence): BooleanFormula {
-            val conj = ArrayList<BooleanFormula>()
-            for (start in 0..f.xs.size - f.k) {
-                val cnt = imgr.sum((start until start + f.k).map { oneIf(inValues(iv(f.xs[it]), f.values)) })
-                conj.add(bmgr.and(imgr.greaterOrEquals(cnt, num(f.low)), imgr.lessOrEquals(cnt, num(f.high))))
             }
             return bmgr.and(conj)
         }
@@ -565,7 +451,6 @@ internal object SmtTranslator {
         }
 
         private fun freshBool(): BooleanFormula = bmgr.makeVariable("aux_b${freshId++}")
-        private fun bvar(id: Int): BooleanFormula = e.boolFormulas[id]
 
         private fun subcircuit(f: Subcircuit): BooleanFormula {
             // succ is always a permutation (each node has one successor; excluded nodes

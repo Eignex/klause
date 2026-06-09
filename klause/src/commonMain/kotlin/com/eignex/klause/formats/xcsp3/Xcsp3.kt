@@ -9,7 +9,6 @@ import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.Inverse
@@ -305,7 +304,18 @@ object Xcsp3 {
             if (values.size != 1) throw UnsupportedXcsp3Exception("count: only a single value supported")
             val (op, k) = condition(requireNotNull(e.child("condition")).textContent.trim())
             val cnt = newAuxVar(0, vars.size)
-            factors.add(Count(xs = vars, v = values[0], op = Count.Op.Eq, n = cnt))
+            // cnt = #{i : vars[i] = values[0]}: reify each equality, channel to a 0/1 int,
+            // then sum the channels into cnt via a Linear EQ. Replaces the dropped Count factor.
+            val channels = IntArray(vars.size) { i ->
+                val aux = newBool()
+                factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, values[0]))
+                val ch = newAuxVar(0, 1)
+                factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
+                ch
+            }
+            val sumCoeffs = IntArray(channels.size + 1) { if (it < channels.size) 1 else -1 }
+            val sumVars = IntArray(channels.size + 1) { if (it < channels.size) channels[it] else cnt }
+            factors.add(Linear(sumCoeffs, sumVars, LinearOp.EQ, 0))
             factors.add(Linear(intArrayOf(1), intArrayOf(cnt), op, k))
         }
 

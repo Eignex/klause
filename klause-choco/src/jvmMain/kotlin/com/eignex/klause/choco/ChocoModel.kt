@@ -5,22 +5,16 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.Among
-import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GaussianXor
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -32,10 +26,8 @@ import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
-import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
-import com.eignex.klause.solver.factor.SubsetSumEq
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Xor
@@ -101,11 +93,8 @@ class ChocoModel private constructor(
 
             is Xor -> postParity(litVars(f.literals), f.targetParity)
 
-            // Redundant klause-internal propagators: each is fully implied by the Linear
-            // (SubsetSumEq) or per-row Xor factors (GaussianXor) klause posts alongside it,
-            // so the Choco model already enforces the constraint and skips these.
-            is SubsetSumEq -> {}
-
+            // Redundant klause-internal propagator: fully implied by the per-row Xor factors
+            // klause posts alongside it, so the Choco model already enforces it and skips it.
             is GaussianXor -> {}
 
             is AllDifferent -> model.allDifferent(*intVarsOf(f.vars)).post()
@@ -124,12 +113,6 @@ class ChocoModel private constructor(
 
             is ReifiedCardinality ->
                 countConstraint(litVars(f.literals), f.min, f.max).reifyWith(boolVars[f.auxBoolVar])
-
-            is AllDifferentExcept -> postAllDifferentExcept(f)
-
-            is Among -> model.among(intVars[f.n], intVarsOf(f.xs), f.values).post()
-
-            is Count -> postCountFactor(f)
 
             is Element -> // Choco: element(VALUE, table, INDEX, offset) ⇒ value = table[index - offset].
                 if (f.arrIsVars) {
@@ -158,15 +141,6 @@ class ChocoModel private constructor(
 
             is Table -> model.table(intVarsOf(f.xs), tuplesOf(f)).post()
 
-            is ArgMinMax ->
-                (
-                    if (f.max) {
-                        model.argmax(intVars[f.idx], f.indexOffset, intVarsOf(f.xs))
-                    } else {
-                        model.argmin(intVars[f.idx], f.indexOffset, intVarsOf(f.xs))
-                    }
-                    ).post()
-
             is ArrayMinMax ->
                 (
                     if (f.max) {
@@ -179,25 +153,17 @@ class ChocoModel private constructor(
                     }
                     ).post()
 
-            is Knapsack ->
-                model.knapsack(intVarsOf(f.xs), intVars[f.w], intVars[f.p], f.weights, f.profits).post()
-
             is Cumulative -> postCumulative(f)
 
             is Diffn -> postDiffn(f)
 
-            is BinPacking -> postBinPacking(f)
-
             is Sort -> model.sort(intVarsOf(f.xs), intVarsOf(f.ys)).post()
-
-            is Sequence -> postSequence(f)
 
             is Regular -> model.regular(intVarsOf(f.seq), automatonOf(f)).post()
 
             is Circuit -> model.circuit(intVarsOf(f.succ), 0).post()
 
             is Subcircuit -> model.subCircuit(intVarsOf(f.succ), 0, model.intVar(0, f.succ.size)).post()
-
 
             is Mdd -> postMdd(f)
 
@@ -259,33 +225,6 @@ class ChocoModel private constructor(
         model.member(s, allowed).post()
     }
 
-    private fun postAllDifferentExcept(f: AllDifferentExcept) {
-        // No native general-except propagator: pairwise (xi ∈ except) ∨ (xj ∈ except) ∨ (xi ≠ xj).
-        for (i in f.xs.indices) {
-            for (j in i + 1 until f.xs.size) {
-                model.or(
-                    model.member(intVars[f.xs[i]], f.except),
-                    model.member(intVars[f.xs[j]], f.except),
-                    model.arithm(intVars[f.xs[i]], "!=", intVars[f.xs[j]]),
-                ).post()
-            }
-        }
-    }
-
-    private fun postCountFactor(f: Count) {
-        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
-        // `n = #{i : xs[i] ⟨op⟩ v}` with `n` the count *variable* (intVars[f.n]). `op` is the
-        // per-element match predicate, not the count-vs-n relation. Choco's `count` only counts
-        // equality, so reify each element's match and sum the indicators into the count var —
-        // uniform across all ops. (The earlier `count(eq)` + `arithm(limit, op, f.n)` form was
-        // wrong twice: it ignored non-Eq match ops, and compared against the raw id `f.n` as a
-        // constant rather than the variable, fabricating false UNSATs when `f.n > xs.size`.)
-        val matches = Array(f.xs.size) { i ->
-            model.arithm(intVars[f.xs[i]], cmpStr(f.op), f.v).reify()
-        }
-        model.sum(matches, "=", intVars[f.n]).post()
-    }
-
     private fun postNValue(f: NValue) {
         if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
         val nVar = intVars[f.n]
@@ -341,24 +280,6 @@ class ChocoModel private constructor(
         val w = if (widthVars != null) intVarsOf(widthVars) else Array(f.widths.size) { model.intVar(f.widths[it]) }
         val h = if (heightVars != null) intVarsOf(heightVars) else Array(f.heights.size) { model.intVar(f.heights[it]) }
         model.diffN(intVarsOf(f.xs), intVarsOf(f.ys), w, h, true).post()
-    }
-
-    private fun postBinPacking(f: BinPacking) {
-        val loads: Array<IntVar> = when (f.mode) {
-            BinPacking.Mode.LoadVars -> intVarsOf(requireNotNull(f.loadVars))
-            BinPacking.Mode.UniformCapacity -> Array(f.numBins) { model.intVar(0, f.uniformCapacity) }
-            BinPacking.Mode.PerBinCapacity -> Array(f.numBins) { model.intVar(0, requireNotNull(f.capacities)[it]) }
-        }
-        model.binPacking(intVarsOf(f.bins), f.weights, loads, f.binOffset).post()
-    }
-
-    private fun postSequence(f: Sequence) {
-        // |xs| - k + 1 sliding windows, each an `among` with the count bounded to [low, high].
-        for (start in 0..f.xs.size - f.k) {
-            val window = Array(f.k) { intVars[f.xs[start + it]] }
-            val nb = model.intVar(f.low, f.high)
-            model.among(nb, window, f.values).post()
-        }
     }
 
     private fun postMdd(f: Mdd) {
@@ -494,15 +415,6 @@ class ChocoModel private constructor(
             PbOp.LE -> "<="
             PbOp.EQ -> "="
             PbOp.GE -> ">="
-        }
-
-        private fun cmpStr(op: Count.Op): String = when (op) {
-            Count.Op.Eq -> "="
-            Count.Op.Ne -> "!="
-            Count.Op.Le -> "<="
-            Count.Op.Lt -> "<"
-            Count.Op.Ge -> ">="
-            Count.Op.Gt -> ">"
         }
     }
 }
