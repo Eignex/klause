@@ -15,6 +15,7 @@ import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.LinearThompsonStrategy
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
@@ -228,6 +229,13 @@ internal data class LocalSearchWorkerConfig(
                     Cbls(tabu = TabuFilter(tenure = 3, aspiration = AspirationCriterion.OrImproving))
                 }
             },
+            // Contextual-bandit move selection (#8): a fresh Linear-Thompson posterior per slot
+            // learns which repair move to take from move features. Untuned candidate — appended
+            // to [rankedOrder] so the default diverse(N) prefix is unchanged; reachable via
+            // explicit lsConfigLabels / the credit-tuning campaign until it earns a ranked slot.
+            "thompson/fixed" to {
+                LocalSearchWorkerConfig("thompson/fixed", LinearThompsonStrategy.thompson(), FixedCadenceRestart())
+            },
         )
 
         /**
@@ -247,6 +255,8 @@ internal data class LocalSearchWorkerConfig(
             "adaptive-probsat/fixed", "cbls-tenure3/fixed", "cbls-stallslow/fixed", "sa/fixed",
             "cbls-plateau64/fixed", "walksat-cc/luby", "cbls-hinoise/fixed", "cbls-plateau-smooth/fixed",
             "cbls-plateau/fixed", "cbls-raw/fixed",
+            // Untuned bandit candidate (#8); kept last so the default diverse(N) prefix is unchanged.
+            "thompson/fixed",
         )
 
         /** Labels of every config in the pool, in credit order. */
