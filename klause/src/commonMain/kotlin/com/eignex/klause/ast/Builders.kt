@@ -215,6 +215,44 @@ fun disjunctive(starts: List<IntTerm>, durations: List<Int>): BoolExpr {
     return DisjunctiveExpr(starts.map { it.toIntExpr() }, durations)
 }
 
+/**
+ * `sort(xs, ys)` — [ys] is the non-decreasing sorted permutation of [xs] (same multiset).
+ */
+fun sort(xs: List<IntTerm>, ys: List<IntTerm>): BoolExpr {
+    require(xs.size == ys.size) { "sort(): xs and ys must have the same length" }
+    return SortExpr(xs.map { it.toIntExpr() }, ys.map { it.toIntExpr() })
+}
+
+/**
+ * `diffn(x, y, widths, heights)` — rectangles at `(x[i], y[i])` of size `widths[i] × heights[i]`
+ * do not overlap. Widths and heights are constants (the common case).
+ */
+fun diffn(x: List<IntTerm>, y: List<IntTerm>, widths: List<Int>, heights: List<Int>): BoolExpr {
+    require(x.size == y.size && x.size == widths.size && x.size == heights.size) {
+        "diffn(): x, y, widths and heights must have the same length"
+    }
+    return DiffnExpr(x.map { it.toIntExpr() }, y.map { it.toIntExpr() }, widths, heights)
+}
+
+/**
+ * `regular(seq, numStates, alphabetSize, transitions, q0, accepting)` — [seq] is accepted by the
+ * DFA with states `1..numStates`, symbols `1..alphabetSize`, row-major [transitions] (0 = no
+ * transition), start state [q0] and [accepting] states.
+ */
+fun regular(
+    seq: List<IntTerm>,
+    numStates: Int,
+    alphabetSize: Int,
+    transitions: List<Int>,
+    q0: Int,
+    accepting: List<Int>,
+): BoolExpr {
+    require(transitions.size == numStates * alphabetSize) {
+        "regular(): transitions must have numStates * alphabetSize entries"
+    }
+    return RegularExpr(seq.map { it.toIntExpr() }, numStates, alphabetSize, transitions, q0, accepting)
+}
+
 // -----------------------------------------------------------------------------------
 //  Optional-variable global builders
 // -----------------------------------------------------------------------------------

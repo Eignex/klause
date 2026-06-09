@@ -648,6 +648,75 @@ data class DisjunctiveExpr(
     }
 }
 
+/** `sort`: [ys] is the non-decreasing sorted permutation of [xs] (same multiset of values). */
+@Serializable
+@SerialName("sort_global")
+data class SortExpr(
+    /** Input variables. */
+    val xs: List<IntExpr>,
+    /** Sorted (ascending) permutation of [xs]. */
+    val ys: List<IntExpr>,
+) : BoolExpr {
+    init {
+        require(xs.size == ys.size) { "SortExpr: xs/ys size mismatch" }
+        require(xs.isNotEmpty()) { "SortExpr: empty arrays" }
+    }
+}
+
+/**
+ * `diffn`: rectangles at `(xs[i], ys[i])` of size `widths[i] × heights[i]` do not overlap.
+ * Widths and heights are constants.
+ */
+@Serializable
+@SerialName("diffn_global")
+data class DiffnExpr(
+    /** X (left) coordinates of each rectangle. */
+    val xs: List<IntExpr>,
+    /** Y (bottom) coordinates of each rectangle. */
+    val ys: List<IntExpr>,
+    /** Constant widths, parallel to [xs]. */
+    val widths: List<Int>,
+    /** Constant heights, parallel to [xs]. */
+    val heights: List<Int>,
+) : BoolExpr {
+    init {
+        require(xs.size == ys.size) { "DiffnExpr: xs/ys size mismatch" }
+        require(xs.size == widths.size) { "DiffnExpr: xs/widths size mismatch" }
+        require(xs.size == heights.size) { "DiffnExpr: xs/heights size mismatch" }
+    }
+}
+
+/**
+ * `regular`: [seq] is accepted by the DFA with states `1..numStates`, symbols `1..alphabetSize`,
+ * row-major [transitions] (0 = no transition), start state [q0] and [accepting] states.
+ */
+@Serializable
+@SerialName("regular_global")
+data class RegularExpr(
+    /** Input symbol sequence. */
+    val seq: List<IntExpr>,
+    /** Number of DFA states. */
+    val numStates: Int,
+    /** Number of input symbols. */
+    val alphabetSize: Int,
+    /** `numStates × alphabetSize` row-major transition table; 0 means no transition. */
+    val transitions: List<Int>,
+    /** Initial state. */
+    val q0: Int,
+    /** Accepting states. */
+    val accepting: List<Int>,
+) : BoolExpr {
+    init {
+        require(seq.isNotEmpty()) { "RegularExpr: empty seq" }
+        require(numStates >= 1) { "RegularExpr: numStates ≥ 1" }
+        require(alphabetSize >= 1) { "RegularExpr: alphabetSize ≥ 1" }
+        require(transitions.size == numStates * alphabetSize) {
+            "RegularExpr: transitions must be Q*S = ${numStates * alphabetSize} entries"
+        }
+        require(q0 in 1..numStates) { "RegularExpr: q0 ($q0) out of [1, $numStates]" }
+    }
+}
+
 /** Extensional (table) constraint: the tuple of [terms] must (or must not, if [negative]) appear in [tuples]. */
 @Serializable
 @SerialName("table")
