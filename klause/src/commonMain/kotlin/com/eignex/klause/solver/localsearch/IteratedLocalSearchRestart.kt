@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Sample
+import com.eignex.kumulant.bandit.ContextualBandit
 import com.eignex.kumulant.bandit.contextual.LinearRegressionSpec
 import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
 import com.eignex.kumulant.bandit.contextual.RegressionContextualSpec
@@ -67,13 +68,15 @@ class IteratedLocalSearchRestart(
      *  shred. Off by default (uniform crossover) to keep behaviour stable for callers
      *  that don't opt in. */
     val linkageAware: Boolean = false,
-    /** Optional contextual-bandit acceptance (#8): when non-null, the accept/reject of a new
-     *  local optimum is decided by a kumulant [RegressionContextualBandit] (2 arms — accept/reject)
-     *  over context features (margin vs the population's worst and best, stall fraction) instead of
-     *  the fixed [acceptance] criterion. The bandit is rewarded by whether the population best
-     *  improved by the next local optimum, so it learns *when* drifting through worse optima pays
-     *  off. Build one with [acceptanceBandit]. Null (default) keeps the fixed criterion. */
-    private val acceptanceBandit: RegressionContextualBandit<*>? = null,
+    /** Optional contextual-bandit acceptance (#8): when non-null, the accept/reject of a new local
+     *  optimum is decided by any 2-arm kumulant [ContextualBandit] (arm 0 = accept, 1 = reject) over
+     *  context features (margin vs the population's worst and best, stall fraction) instead of the
+     *  fixed [acceptance] criterion. The bandit is rewarded by whether the population best improved
+     *  by the next local optimum, so it learns *when* drifting through worse optima pays off. The
+     *  [acceptanceBandit] factory builds the default (`RegressionContextualBandit` + Thompson
+     *  posterior); any [ContextualBandit] (`Exp4Bandit`, `KnnContextualBandit`, a LinUCB-posterior
+     *  regression bandit, …) is accepted. Null (default) keeps the fixed criterion. */
+    private val acceptanceBandit: ContextualBandit? = null,
 ) : RestartPolicy {
 
     init {
@@ -138,11 +141,7 @@ class IteratedLocalSearchRestart(
     /** Decide accept/reject via the contextual bandit, first crediting the previous decision by
      *  whether the population best improved since it was made. The first local optimum (empty
      *  population) is always accepted to seed the population. */
-    private fun banditAccept(
-        bandit: RegressionContextualBandit<*>,
-        objective: Double,
-        worstObjective: Double,
-    ): Boolean {
+    private fun banditAccept(bandit: ContextualBandit, objective: Double, worstObjective: Double): Boolean {
         val bestBefore = population.firstOrNull()?.objective ?: Double.POSITIVE_INFINITY
         pendingContext?.let { ctx ->
             val reward = if (bestBefore < pendingBestBefore) 1.0 else 0.0
