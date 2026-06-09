@@ -22,6 +22,7 @@ import com.eignex.klause.solver.lp.Cut
 import com.eignex.klause.solver.lp.CutContext
 import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
+import com.eignex.klause.solver.lp.FloatSimplex
 import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRelaxation
@@ -454,7 +455,11 @@ class BacktrackSolver(override val problem: Problem) :
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
         var simplex = DualSimplex(relaxation.model)
-        var solution = simplex.solve(warmBasis)
+        // Float fast-path (#18): with no parent basis to warm from, a quick double-precision solve
+        // supplies a candidate basis for the exact solver to certify. Sound regardless — the exact
+        // solve re-optimizes to the true bound, and a bad/singular basis just cold-starts.
+        val startBasis = warmBasis ?: if (params.lpFloatWarmStart) FloatSimplex(relaxation.model).basis() else null
+        var solution = simplex.solve(startBasis)
         sink.observeLpPivots(solution.pivots)
         // Warm-start children from the initial (pre-cut) basis: cut rows vary per node, but the base
         // model structure is identical across nodes, so only this basis transfers soundly.

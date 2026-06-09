@@ -183,6 +183,14 @@ data class BacktrackParams(
      */
     val lpWarmStart: Boolean = true,
     /**
+     * Float fast-path (#18): when a node has no parent basis to warm-start from, solve the LP first
+     * in double precision and hand the resulting basis to the exact solver to certify. The bound
+     * stays exact (the exact solver re-optimizes from the float basis); this only trades a cheap
+     * float solve for fewer exact pivots, a win on larger LPs. Off by default — on the small dense
+     * per-node LPs the float solve does not pay for itself.
+     */
+    val lpFloatWarmStart: Boolean = false,
+    /**
      * Cut generation (#22): at a scheduled node, after the LP solve, run separators that add valid
      * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
      * cuts), re-solving to tighten the bound. Requires [lpBounding]; off by default.
