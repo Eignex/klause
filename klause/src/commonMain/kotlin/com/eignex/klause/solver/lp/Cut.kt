@@ -3,8 +3,39 @@ package com.eignex.klause.solver.lp
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.GlobalCardinality
+import com.eignex.klause.solver.factor.Inverse
+import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
+
+/**
+ * Variable groups that are pairwise all-different, harvested from the LP-relevant globals so the
+ * Hall-set sum cut ([AllDifferentSeparator]) and the assignment-objective cut
+ * ([AssignmentObjectiveCut]) — both valid over any all-different set — reach beyond plain
+ * [AllDifferent]:
+ *  - [AllDifferent] itself: its variables.
+ *  - [SymmetricAllDifferent]: `xs` is a self-inverse permutation, hence all-different.
+ *  - [Inverse]: each side (`f`, `g`) is injective (a channelled bijection), so each is its own
+ *    all-different set; the two are returned separately.
+ */
+internal fun allDifferentGroups(problem: Problem): List<IntArray> {
+    val groups = ArrayList<IntArray>()
+    for (factor in problem.factors) {
+        when (factor) {
+            is AllDifferent -> groups.add(factor.vars)
+
+            is SymmetricAllDifferent -> groups.add(factor.xs)
+
+            is Inverse -> {
+                groups.add(factor.f)
+                groups.add(factor.g)
+            }
+
+            else -> Unit
+        }
+    }
+    return groups
+}
 
 /**
  * A linear inequality `Σ coeffs[k]·x_{cols[k]} rel rhs` over LP columns, added to the relaxation to
@@ -44,15 +75,16 @@ internal interface CutSeparator {
  * domain as its `[min, max]` interval (ignoring holes) only widens the value pool, so the bounds stay
  * valid (a sound under-/over-estimate). The full variable set is the |S| = n Hall set; this first
  * implementation separates that set (the dominant cut) when the LP point violates it.
+ *
+ * The set S is any group from [allDifferentGroups], so this also covers [SymmetricAllDifferent] and
+ * each side of [Inverse] — all injective, hence all-different.
  */
 internal class AllDifferentSeparator : CutSeparator {
     private val tol = 1e-6
 
     override fun separate(ctx: CutContext): List<Cut> {
         val cuts = ArrayList<Cut>()
-        for (factor in ctx.problem.factors) {
-            if (factor !is AllDifferent) continue
-            val vars = factor.vars
+        for (vars in allDifferentGroups(ctx.problem)) {
             if (vars.size < 2) continue
             val cols = IntArray(vars.size)
             var ok = true
@@ -139,9 +171,7 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
 
     override fun separate(ctx: CutContext): List<Cut> {
         val cuts = ArrayList<Cut>()
-        for (factor in ctx.problem.factors) {
-            if (factor !is AllDifferent) continue
-            val vars = factor.vars
+        for (vars in allDifferentGroups(ctx.problem)) {
             if (vars.size < 2) continue
             // Need a column for every variable and at least one nonzero objective coefficient.
             if (vars.any { ctx.relaxation.intColOf[it] < 0 }) continue

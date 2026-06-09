@@ -13,6 +13,7 @@ import com.eignex.klause.ast.CostMddExpr
 import com.eignex.klause.ast.CostRegularExpr
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.CumulativeExprOpt
+import com.eignex.klause.ast.DiffnExpr
 import com.eignex.klause.ast.DisjunctiveExpr
 import com.eignex.klause.ast.DisjunctiveExprOpt
 import com.eignex.klause.ast.FloatLinearConstraint
@@ -32,11 +33,13 @@ import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.PseudoBooleanExpr
+import com.eignex.klause.ast.RegularExpr
 import com.eignex.klause.ast.SetDisjoint
 import com.eignex.klause.ast.SetEq
 import com.eignex.klause.ast.SetIn
 import com.eignex.klause.ast.SetNominalIn
 import com.eignex.klause.ast.SetSubsetOf
+import com.eignex.klause.ast.SortExpr
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.SymmetricAllDifferent
 import com.eignex.klause.ast.TableConstraint
@@ -56,10 +59,13 @@ import kotlin.math.floor
 import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.Circuit as CircuitFactor
 import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
+import com.eignex.klause.solver.factor.Diffn as DiffnFactor
 import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
 import com.eignex.klause.solver.factor.GlobalCardinality as GccFactor
 import com.eignex.klause.solver.factor.Inverse as InverseFactor
 import com.eignex.klause.solver.factor.NValue as NValueFactor
+import com.eignex.klause.solver.factor.Regular as RegularFactor
+import com.eignex.klause.solver.factor.Sort as SortFactor
 import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
 import com.eignex.klause.solver.factor.SymmetricAllDifferent as SymmetricAllDifferentFactor
 
@@ -130,6 +136,12 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
         is CumulativeExpr -> assertCumulative(expr)
 
         is DisjunctiveExpr -> assertDisjunctive(expr)
+
+        is SortExpr -> assertSort(expr)
+
+        is DiffnExpr -> assertDiffn(expr)
+
+        is RegularExpr -> assertRegular(expr)
 
         is AllDifferentOpt -> assertAllDifferentOpt(expr)
 
@@ -479,6 +491,49 @@ internal fun Compiler.Build.assertDisjunctive(expr: DisjunctiveExpr) {
     factors += DisjunctiveFactor(
         starts = ids,
         durations = expr.durations.toIntArray(),
+    )
+}
+
+internal fun Compiler.Build.assertSort(expr: SortExpr) {
+    val liftedXs = expr.xs.map { lift(it) }
+    val liftedYs = expr.ys.map { lift(it) }
+    require(liftedXs.all { it is IntRef } && liftedYs.all { it is IntRef }) {
+        "sort: every term must be a bare variable reference (no arithmetic)."
+    }
+    val xsIds = IntArray(liftedXs.size) { intVarOf((liftedXs[it] as IntRef).name) }
+    val ysIds = IntArray(liftedYs.size) { intVarOf((liftedYs[it] as IntRef).name) }
+    factors += SortFactor(xs = xsIds, ys = ysIds)
+}
+
+internal fun Compiler.Build.assertDiffn(expr: DiffnExpr) {
+    val liftedX = expr.xs.map { lift(it) }
+    val liftedY = expr.ys.map { lift(it) }
+    require(liftedX.all { it is IntRef } && liftedY.all { it is IntRef }) {
+        "diffn: every coordinate term must be a bare variable reference (no arithmetic)."
+    }
+    val xIds = IntArray(liftedX.size) { intVarOf((liftedX[it] as IntRef).name) }
+    val yIds = IntArray(liftedY.size) { intVarOf((liftedY[it] as IntRef).name) }
+    factors += DiffnFactor(
+        xs = xIds,
+        ys = yIds,
+        widths = expr.widths.toIntArray(),
+        heights = expr.heights.toIntArray(),
+    )
+}
+
+internal fun Compiler.Build.assertRegular(expr: RegularExpr) {
+    val lifted = expr.seq.map { lift(it) }
+    require(lifted.all { it is IntRef }) {
+        "regular: every sequence term must be a bare variable reference (no arithmetic)."
+    }
+    val seqIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    factors += RegularFactor(
+        seq = seqIds,
+        numStates = expr.numStates,
+        alphabetSize = expr.alphabetSize,
+        transitions = expr.transitions.toIntArray(),
+        q0 = expr.q0,
+        accepting = expr.accepting.toIntArray(),
     )
 }
 
