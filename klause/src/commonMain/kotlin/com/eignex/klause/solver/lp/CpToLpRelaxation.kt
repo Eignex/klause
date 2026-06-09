@@ -4,7 +4,6 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -237,15 +236,12 @@ internal class CpToLpRelaxation(
             // Cut generation needs columns for the globals' variables even when nothing else
             // references them, so a separator has something to write the cut over.
             if (generateCuts) {
+                // The all-different family (AllDifferent, SymmetricAllDifferent, both Inverse sides)
+                // feeds the Hall-sum and assignment cuts; closed GlobalCardinality feeds the GCC cut.
+                for (group in allDifferentGroups(problem)) for (v in group) intColumn(v)
                 for (factor in problem.factors) {
-                    when (factor) {
-                        is AllDifferent -> for (v in factor.vars) intColumn(v)
-
-                        is GlobalCardinality -> if (factor.closed && factor.presents.isEmpty()) {
-                            for (v in factor.xs) intColumn(v)
-                        }
-
-                        else -> Unit
+                    if (factor is GlobalCardinality && factor.closed && factor.presents.isEmpty()) {
+                        for (v in factor.xs) intColumn(v)
                     }
                 }
             }
