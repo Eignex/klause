@@ -262,7 +262,8 @@ internal object SmtTranslator {
             else -> error("SmtTranslator: unsupported factor type ${factor::class.simpleName}")
         }
 
-        /** `distinct` over [xs] except that any pair where one side ∈ [except] is exempt. */
+        /** `result = arr[idx - indexOffset]`, as a disjunction over array slots that also
+         *  confines `idx` to a valid index. */
         private fun translateElement(f: Element): BooleanFormula {
             // result = arr[idx - indexOffset]; the disjunction also confines idx to a slot.
             val disj = f.arr.indices.map { p ->
