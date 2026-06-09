@@ -478,6 +478,12 @@ class PropagationState(
      *  trail state); pruned by [forgetLearnedClauses]. */
     private val _learnedClauses: ArrayList<Clause> = ArrayList()
 
+    // Cached base factor table — `problem.factors` is immutable after construction, so hoist
+    // the array reference and its size out of the per-call `problem.factors` / `.size` getters
+    // that [factorAt] (a top BCP-loop method) pays on every watcher fire.
+    private val baseFactors: Array<Factor> = problem.factors
+    private val baseFactorCount: Int = problem.factors.size
+
     /** Clauses learned during conflict analysis. */
     val learnedClauses: List<Clause> get() = _learnedClauses
 
@@ -543,10 +549,10 @@ class PropagationState(
 
     /** Unified factor accessor; routes static factor ids to [Problem.factors] and learned
      *  factor ids (≥ `problem.numFactors`) to [learnedClauses]. */
-    fun factorAt(fid: Int): Factor = if (fid < problem.numFactors) {
-        problem.factors[fid]
+    fun factorAt(fid: Int): Factor = if (fid < baseFactorCount) {
+        baseFactors[fid]
     } else {
-        _learnedClauses[fid - problem.numFactors]
+        _learnedClauses[fid - baseFactorCount]
     }
 
     /**
@@ -1448,7 +1454,8 @@ class PropagationState(
         val list = boolWatchersByLit[lit]
         val blockers = boolBlockersByLit[lit]
         val key = packWatch(factorId, lit)
-        val recorded = boolWatchPos.getOrDefault(key, -1)
+        // Remove-and-read in a single table walk; the key is gone from the index either way.
+        val recorded = boolWatchPos.removeAndGet(key, -1)
         if (recorded < 0 || recorded >= list.size || list[recorded] != factorId) {
             // Index miss/desync — fall back to a linear scan, swap-pop both lists in lockstep
             // at the found index, and resync this lit's positions.
@@ -1459,7 +1466,6 @@ class PropagationState(
                     break
                 }
             }
-            boolWatchPos.remove(key)
             if (pos >= 0) swapPopWatch(list, blockers, pos)
             resyncBoolWatchPos(lit)
             return
@@ -1470,7 +1476,6 @@ class PropagationState(
             boolWatchPos.put(packWatch(movedFid, lit), recorded)
         }
         swapPopWatch(list, blockers, recorded)
-        boolWatchPos.remove(key)
     }
 
     /** Swap-pop index [pos] from a watcher list and its parallel blocker list in lockstep,
@@ -1622,9 +1627,11 @@ class PropagationState(
         excludeIntValueImpl(v, value, antecedents)
 
     private fun pinBoolImpl(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
-        val cur = boolValues[v]
-        if (cur != null) {
-            if (cur == value) return true
+        // Read the packed bits directly rather than through the boxing `boolValues[v]`
+        // accessor — this runs once per pin (≈ once per propagation) and the `Boolean?`
+        // box dominated the BCP CPU profile.
+        if (boolAssigned.get(v)) {
+            if (boolValueBits.get(v) == value) return true
             // Conflict — record levels of both contributors, and seed the factor core with
             // the prior pin's reason (whichever factor forced `cur`, if any) plus the
             // currently-running factor (if any). Also record [v] so the analyzer can
@@ -1638,7 +1645,8 @@ class PropagationState(
         }
         if (undoLogging) logBoolPin(v)
         if (currentFactor >= 0) propagations++
-        boolValues[v] = value
+        if (value) boolValueBits.set(v) else boolValueBits.clear(v)
+        boolAssigned.set(v)
         boolLevel[v] = currentLevel
         boolReason[v] = currentFactor
         noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused (#201)
@@ -2274,9 +2282,9 @@ class PropagationState(
     private fun enqueueForBoolChange(v: Int) {
         for (fid in problem.nonBoolWatcherBoolOccurrences[v]) propEnq(fid)
         // The literal that just became false is the one whose polarity opposes the pin.
-        // boolValues[v] is non-null here (the var was added to dirtyBools only after a
-        // successful pin); read it directly.
-        val falseLit = Lit.make(v, !requireNotNull(boolValues[v]))
+        // The var is assigned here (added to dirtyBools only after a successful pin), so read
+        // the packed value bit directly instead of the boxing `boolValues[v]` accessor.
+        val falseLit = Lit.make(v, !boolValueBits.get(v))
         val watchers = boolWatchersByLit[falseLit]
         val blockers = boolBlockersByLit[falseLit]
         for (i in 0 until watchers.size) {
