@@ -46,20 +46,41 @@ class BacktrackPresetsTest {
 
     @Test
     fun `sat-optimized preset finds a valid witness on a satisfiable problem`() {
-        val problem = Problem(
-            numBoolVars = 4,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-            ),
-        )
+        val problem = satisfiableChain()
         val sat = assertIs<SolveResult.Sat>(
             BacktrackSolver(problem).solve(BacktrackPresets.satOptimized(randomSeed = 2L)),
         )
+        assertChainWitness(sat)
+    }
+
+    @Test
+    fun `conflict-driven preset proves a conflict-heavy unsat instance`() {
+        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4))
+            .solve(BacktrackPresets.conflictDriven(randomSeed = 1L))
+        assertIs<SolveResult.Unsat>(verdict)
+    }
+
+    @Test
+    fun `conflict-driven preset finds a valid witness on a satisfiable problem`() {
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(satisfiableChain()).solve(BacktrackPresets.conflictDriven(randomSeed = 2L)),
+        )
+        assertChainWitness(sat)
+    }
+
+    private fun satisfiableChain(): Problem = Problem(
+        numBoolVars = 4,
+        numIntVars = 0,
+        intDomains = emptyArray(),
+        factors = arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+        ),
+    )
+
+    private fun assertChainWitness(sat: SolveResult.Sat) {
         val b = sat.assignment.bools
         assertTrue(b[0] || b[1])
         assertTrue(!b[1] || b[2])

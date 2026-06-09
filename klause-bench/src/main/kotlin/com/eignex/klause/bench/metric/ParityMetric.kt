@@ -8,8 +8,8 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
-import com.eignex.klause.portfolio.Portfolio
-import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.PortfolioBuilder
+import com.eignex.klause.portfolio.PortfolioSpec
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
@@ -19,10 +19,6 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.IndomainMin
-import com.eignex.klause.solver.backtrack.LastConflict
-import com.eignex.klause.solver.backtrack.SolutionGuided
-import com.eignex.klause.solver.backtrack.Vsids
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -224,7 +220,8 @@ internal object ParityMetric {
         // in tens of ms while the annotation stalls. Choco likewise runs its own default.)
         var kBestMillis: Long? = null
         val t0 = System.currentTimeMillis()
-        val kParams = conflictDrivenParams().copy(
+        val kParams = BacktrackPresets.conflictDriven(
+            randomSeed = 3L,
             cancellation = Cancellation { System.currentTimeMillis() > deadline },
             onEvent = { e -> if (e is SearchEvent.Incumbent) kBestMillis = System.currentTimeMillis() - t0 },
         )
@@ -270,24 +267,24 @@ internal object ParityMetric {
      *  [timedOptimizeRow]). The warmup budget is fixed and small; cancellation cuts it off
      *  so warming a hard row costs at most this slice. Results are discarded.
      *
-     *  The klause warmup must NOT share search-heuristic instances with the timed solve.
-     *  [fixedParams] returns `entry.searchParams.copy(...)`, a shallow copy that aliases the
-     *  same stateful heuristic objects, and the default fixed-track value heuristic
-     *  ([SolutionGuided]) remembers the best assignment it has seen. If the warmup solved
-     *  through those instances, the timed solve's first dive would reconstruct the warmup's
-     *  incumbent immediately, so the warmup would be solution-warming, not just JIT-warming,
-     *  and time-to-best would be measured from an unfairly warm start. The reference builds a
-     *  fresh model per call and starts cold, so we warm with [conflictDrivenParams], which
-     *  constructs its own fresh heuristics each call: it JIT-warms the shared engine hot paths
-     *  (propagation, BCP, conflict analysis, branch-and-bound) while leaving the annotated
-     *  [entry.searchParams] heuristics pristine for the timed solve. */
+     *  The klause warmup must NOT share search-heuristic instances with the timed solve: a
+     *  solution-guided value heuristic remembers the best assignment it has seen, so reusing
+     *  one would let the timed solve's first dive reconstruct the warmup's incumbent and
+     *  measure time-to-best from an unfairly warm start. [BacktrackPresets.conflictDriven]
+     *  constructs its own fresh heuristics each call — the same composition the timed solve
+     *  runs, so it JIT-warms the exact hot paths (propagation, BCP, conflict analysis,
+     *  branch-and-bound) while the timed solve still starts from pristine heuristic state. The
+     *  reference builds a fresh model per call and starts cold for the same reason. */
     private fun warmup(entry: ResolvedProblem, obj: Objective) {
         val warmMs = System.getProperty("klause.bench.parity.warmupMs")?.toLongOrNull() ?: 2000L
         runCatching {
             val dl = System.currentTimeMillis() + warmMs
             BacktrackSolver(entry.problem).minimize(
                 obj,
-                conflictDrivenParams().copy(cancellation = Cancellation { System.currentTimeMillis() > dl }),
+                BacktrackPresets.conflictDriven(
+                    randomSeed = 3L,
+                    cancellation = Cancellation { System.currentTimeMillis() > dl },
+                ),
             )
         }
         runCatching {
@@ -298,88 +295,24 @@ internal object ParityMetric {
         }
     }
 
-    // Luby restarts everywhere: the anytime configuration. Branch-and-bound leaves a
-    // permanent blocking nogood per incumbent, so restarts diversify without revisiting
-    // solved leaves; on plateau-prone instances they are the difference between stalling
-    // on the first incumbents and walking to the optimum.
-    private fun freeParams(): BacktrackParams = BacktrackParams(randomSeed = 1L, lubyRestartBase = 256L)
-
-    /** Conflict-driven free search: last-conflict probing over VSIDS activity, solution-
-     *  guided value order, phase saving. The A/B over the scheduling tail picked this
-     *  composition decisively — it proves rcpsp-wet and shortest_path in seconds and takes
-     *  celar from 9344 to 2323 where the random free worker and the annotation both stall. */
-    private fun conflictDrivenParams(): BacktrackParams = BacktrackParams(
-        randomSeed = 3L,
-        variableHeuristic = LastConflict(Vsids()),
-        valueHeuristic = SolutionGuided(IndomainMin),
-        phaseSaving = true,
-        lubyRestartBase = 256L,
-    )
-
     /**
-     * The klause side of a row: a portfolio racing the model's annotated search (when
-     * present), the engine's free default, and a conflict-driven VSIDS composition, all
-     * sharing the objective bound. The single-config sweeps split the corpus three ways —
-     * annotations win the structured reach rows, random free search wins plateau rows,
-     * and the conflict-driven worker wins the scheduling tail — so the bench measures the
-     * race, the same shape the competition entry runs.
+     * The klause side of a row in the default (parallel) track: the canonical **mixed**
+     * portfolio (local search + the diverse backtrack pool) over the model, sharing one
+     * objective bound. The backtrack pool already cycles the SAT-optimized stack (the #117
+     * pigeonhole / dense-random-3SAT class) and the conflict-driven composition (the
+     * scheduling / reach tail) natively (see [PortfolioBuilder]), so there is no per-metric
+     * worker patching. The model's search annotation is intentionally *not* a worker here —
+     * annotation-guided search is the fixed/competition track only ([fixedMode]); free and
+     * mixed both run the engine's own search.
      */
-    private fun workers(entry: ResolvedProblem, objective: Objective?): List<PortfolioWorker> {
-        val free = PortfolioWorker.of(
-            "free",
-            BacktrackSolver(entry.problem).session(),
-            freeParams(),
-            objective,
-        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
-        val conflictDriven = PortfolioWorker.of(
-            "conflict-driven",
-            BacktrackSolver(entry.problem).session(),
-            conflictDrivenParams(),
-            objective,
-        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
-        val annotated = entry.searchParams?.let { ann ->
-            PortfolioWorker.of(
-                "annotated",
-                BacktrackSolver(entry.problem).session(),
-                ann.copy(randomSeed = 2L, lubyRestartBase = 256L),
-                objective,
-            ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
-        }
-        // Seed twins for the two strongest free compositions: when a close-call row's
-        // run-to-run variance exceeds its gap to the reference, a second seed with the
-        // shared bound flips it — the five-worker sweep flipped five rows over the
-        // three-worker config with zero regressions.
-        val free2 = PortfolioWorker.of(
-            "free#2",
-            BacktrackSolver(entry.problem).session(),
-            freeParams().copy(randomSeed = 11L),
-            objective,
-        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
-        val conflictDriven2 = PortfolioWorker.of(
-            "conflict-driven#2",
-            BacktrackSolver(entry.problem).session(),
-            conflictDrivenParams().copy(randomSeed = 13L),
-            objective,
-        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
-        val xor = entry.xorSearchParams?.let { xs ->
-            PortfolioWorker.of(
-                "xor",
-                BacktrackSolver(entry.problem).session(),
-                xs.copy(randomSeed = 4L, lubyRestartBase = 256L),
-                objective,
-            ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
-        }
-        // Pure-SAT-tuned worker: VSIDS + adaptive restarts + target phasing + tiered learned
-        // DB. Pigeonhole and dense random 3-SAT (the #117 families) need this composition —
-        // the free/conflict-driven workers stall on php8 where this proves it in seconds.
-        val satOptimized = PortfolioWorker.of(
-            "sat-optimized",
-            BacktrackSolver(entry.problem).session(),
-            BacktrackPresets.satOptimized(randomSeed = 7L),
-            objective,
-        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
-        return listOfNotNull(free, free2, conflictDriven, conflictDriven2, annotated, xor, satOptimized)
-    }
+    private fun mixedPortfolio(entry: ResolvedProblem, lsObjective: Objective?, linearObjective: Objective?) =
+        PortfolioBuilder.build(
+            entry.problem,
+            PortfolioSpec.mixed(),
+            lsObjective = lsObjective,
+            linearObjective = linearObjective,
+            definitionalSweep = entry.definitionalSweep,
+        )
 
     // -Dklause.bench.parity.mode=fixed scores the single-threaded competition track: one
     // klause worker on its own free conflict-driven search (no portfolio, no parallelism),
@@ -388,16 +321,19 @@ internal object ParityMetric {
     // engine. Default "portfolio" races the multi-worker parallel-track configuration.
     private val fixedMode = System.getProperty("klause.bench.parity.mode") == "fixed"
 
-    private fun freeParamsWithDeadline(deadline: Long): BacktrackParams =
-        conflictDrivenParams().copy(cancellation = Cancellation { System.currentTimeMillis() > deadline })
+    private fun freeParamsWithDeadline(deadline: Long): BacktrackParams = BacktrackPresets.conflictDriven(
+        randomSeed = 3L,
+        cancellation = Cancellation { System.currentTimeMillis() > deadline },
+    )
 
     @Suppress("InjectDispatcher")
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).solve(freeParamsWithDeadline(deadline))
         return runBlocking(Dispatchers.Default) {
-            Portfolio(workers(entry, objective = null))
-                .solve(Cancellation { System.currentTimeMillis() > deadline })
+            mixedPortfolio(entry, lsObjective = null, linearObjective = null).use {
+                it.solve(Cancellation { System.currentTimeMillis() > deadline })
+            }
         }
     }
 
@@ -406,8 +342,9 @@ internal object ParityMetric {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, freeParamsWithDeadline(deadline))
         return runBlocking(Dispatchers.Default) {
-            Portfolio(workers(entry, obj))
-                .minimize(Cancellation { System.currentTimeMillis() > deadline })
+            mixedPortfolio(entry, lsObjective = entry.lsObjective ?: obj, linearObjective = obj).use {
+                it.minimize(Cancellation { System.currentTimeMillis() > deadline })
+            }
         }
     }
 

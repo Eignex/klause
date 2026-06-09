@@ -56,4 +56,35 @@ object BacktrackPresets {
         cancellation = cancellation,
         onEvent = onEvent,
     )
+
+    /**
+     * Conflict-driven free search: last-conflict probing over VSIDS activity, solution-guided
+     * value ordering, phase saving, Luby restarts. The strongest single free-search composition
+     * for the optimization corpus — it proves rcpsp-wet and shortest_path in seconds and takes
+     * celar from 9344 to 2323 where a random free worker and the model's own search annotation
+     * both stall.
+     *
+     * This is the configuration the single-threaded free-category measurement runs, and one leg
+     * of the [com.eignex.klause.portfolio.PortfolioBuilder] backtrack pool, so the same
+     * composition drives both the solo competition track and the parallel portfolio.
+     *
+     *  - [randomSeed] seeds the engine RNG.
+     *  - [lubyRestartBase] sets the Luby restart unit (anytime default 256).
+     *  - [cancellation] / [onEvent] thread the usual cooperative-cancellation and observation
+     *    seams through unchanged.
+     */
+    fun conflictDriven(
+        randomSeed: Long = 0L,
+        lubyRestartBase: Long = 256L,
+        cancellation: Cancellation = Cancellation.Never,
+        onEvent: ((SearchEvent) -> Unit)? = null,
+    ): BacktrackParams = BacktrackParams(
+        randomSeed = randomSeed,
+        variableHeuristic = LastConflict(Vsids()),
+        valueHeuristic = SolutionGuided(IndomainMin),
+        phaseSaving = true,
+        lubyRestartBase = lubyRestartBase,
+        cancellation = cancellation,
+        onEvent = onEvent,
+    )
 }
