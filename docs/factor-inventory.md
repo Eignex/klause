@@ -94,6 +94,20 @@ These five are the highest-ROI cuts: ~2.0 kLOC of propagation + conflict + LS + 
 BitBlaster surface removed, with LP/decomposition giving comparable bounds on the rare models
 that use them.
 
+**Done (decided to drop outright, not keep-and-decompose).** All five native factors are
+removed. Because these globals are *niche*, we also retired their user-facing surface rather
+than maintain a decomposition for an API nobody reaches:
+
+- `network_flow` / `network_flow_cost`, `path`, `tree`: library-only (no FlatZinc path) — the
+  builder, AST node, and compiler lowering are deleted entirely. No longer expressible.
+- `geost`, `cumulatives`: reachable from FlatZinc. We deleted the klause MiniZinc-library
+  shadow (`fzn_geost_nonoverlap_k.mzn`, `fzn_cumulatives.mzn`) and the FZN emit handlers, so
+  MiniZinc now decomposes them upstream with its standard library into primitives klause
+  already supports. klause ships no decomposition for them.
+- `SetBitsetAlgebra` is the exception: set vars are a *real* user feature, so the set DSL stays
+  — only the bulk bitset factor is gone, replaced by the per-element clauses the compiler
+  already emitted.
+
 ## E. Internal helpers — not factors, leave as-is
 
 `CoeffLookup`, `LinearPbShared`, `ReginMatcher`/`ReginCache`, `CumulativeThetaTree`,

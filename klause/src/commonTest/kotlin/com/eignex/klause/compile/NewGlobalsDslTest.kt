@@ -4,12 +4,7 @@ import com.eignex.klause.ast.allDifferentExcept
 import com.eignex.klause.ast.argSort
 import com.eignex.klause.ast.costMdd
 import com.eignex.klause.ast.costRegular
-import com.eignex.klause.ast.geost
 import com.eignex.klause.ast.mdd
-import com.eignex.klause.ast.networkFlow
-import com.eignex.klause.ast.networkFlowCost
-import com.eignex.klause.ast.path
-import com.eignex.klause.ast.tree
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -73,127 +68,6 @@ class NewGlobalsDslTest {
         assertTrue(sample != null, "arg_sort: solver found no sample")
         // BitBlast lowering goes through the decomposition primitives (ArgSort factor
         // itself is skipped in bit-blast).
-        BitBlaster.compile(compiled.problem)
-    }
-
-    @Test
-    fun `network_flow - simple two-arc balance`() {
-        class S : VariableSchema() {
-            // Two-node graph: node0 → node1 via arc 0. Source supplies 1 unit.
-            val f0 by intVar(0, 5)
-            val rule by constraint {
-                networkFlow(
-                    numNodes = 2,
-                    arcFrom = listOf(0),
-                    arcTo = listOf(1),
-                    balance = listOf(-1, 1),
-                    flow = listOf(f0),
-                )
-            }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        assertBitblastsAndSat(compiled)
-    }
-
-    @Test
-    fun `network_flow_cost - cost accumulates linearly`() {
-        class S : VariableSchema() {
-            val f0 by intVar(0, 5)
-            val f1 by intVar(0, 5)
-            val cost by intVar(0, 100)
-
-            // 3-node line graph 0 → 1 → 2; supply 1 at node 0, demand 1 at node 2.
-            val rule by constraint {
-                networkFlowCost(
-                    numNodes = 3,
-                    arcFrom = listOf(0, 1),
-                    arcTo = listOf(1, 2),
-                    balance = listOf(-1, 0, 1),
-                    weight = listOf(2, 3),
-                    flow = listOf(f0, f1),
-                    cost = cost,
-                )
-            }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        assertBitblastsAndSat(compiled)
-    }
-
-    @Test
-    fun `geost - 2D non-overlap`() {
-        class S : VariableSchema() {
-            val o0x by intVar(0, 4)
-            val o0y by intVar(0, 4)
-            val o1x by intVar(0, 4)
-            val o1y by intVar(0, 4)
-            val rule by constraint {
-                geost(
-                    numDims = 2,
-                    origins = listOf(o0x, o0y, o1x, o1y),
-                    sizes = listOf(2, 2, 2, 2),
-                )
-            }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        assertBitblastsAndSat(compiled)
-    }
-
-    @Test
-    fun `path - 3-node line graph`() {
-        class S : VariableSchema() {
-            val src by intVar(0, 2)
-            val snk by intVar(0, 2)
-            val np0 by boolVar()
-            val np1 by boolVar()
-            val np2 by boolVar()
-            val ep0 by boolVar() // 0→1
-            val ep1 by boolVar() // 1→2
-            val rule by constraint {
-                path(
-                    numNodes = 3,
-                    from = listOf(0, 1),
-                    to = listOf(1, 2),
-                    source = src,
-                    sink = snk,
-                    nodePresent = listOf(np0, np1, np2),
-                    edgePresent = listOf(ep0, ep1),
-                )
-            }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
-        assertTrue(sample != null, "path: solver found no sample")
-        BitBlaster.compile(compiled.problem)
-    }
-
-    @Test
-    fun `tree - 3-node in-tree`() {
-        class S : VariableSchema() {
-            val root by intVar(0, 2)
-            val np0 by boolVar()
-            val np1 by boolVar()
-            val np2 by boolVar()
-            val ep0 by boolVar() // 0→1
-            val ep1 by boolVar() // 0→2
-            val rule by constraint {
-                tree(
-                    numNodes = 3,
-                    from = listOf(0, 0),
-                    to = listOf(1, 2),
-                    root = root,
-                    nodePresent = listOf(np0, np1, np2),
-                    edgePresent = listOf(ep0, ep1),
-                )
-            }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
-        assertTrue(sample != null, "tree: solver found no sample")
         BitBlaster.compile(compiled.problem)
     }
 
