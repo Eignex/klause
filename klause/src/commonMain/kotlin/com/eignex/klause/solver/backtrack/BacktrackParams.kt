@@ -221,6 +221,14 @@ data class BacktrackParams(
      */
     val lpCircuit: Boolean = false,
     /**
+     * Linearize constant-array Element globals with a one-hot selector model (#22). When true and
+     * [lpBounding] holds, each Element over a constant table gets selector columns and channelling
+     * rows — its exact convex hull `result = Σ arr[p]·[idx=p]` — so the LP sees `result`'s dependence
+     * on `idx`. Adds O(len) columns per Element (skipped above a length cap), so it is opt-in and off
+     * by default; a no-op when no constant-array Element exists. Variable-array Element is deferred.
+     */
+    val lpElement: Boolean = false,
+    /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
      * [com.eignex.klause.solver.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
