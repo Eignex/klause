@@ -249,6 +249,14 @@ internal data class LocalSearchWorkerConfig(
             // Contextual-bandit ILS acceptance (#8): CBLS on a basin-hopping ILS restart whose
             // accept/reject is learned. Untuned candidate, appended to [rankedOrder].
             "cbls/ils-bandit" to { cblsWorker("cbls/ils-bandit", ilsBandit()) { Cbls(tabu = cblsTabu()) } },
+            // Bandit-adaptive probSAT (#8): a UCB1 bandit picks the cb noise schedule per session.
+            "probsat-bandit/fixed" to {
+                LocalSearchWorkerConfig(
+                    "probsat-bandit/fixed",
+                    ProbSat.bandit(tabu = cblsTabu()),
+                    FixedCadenceRestart(),
+                )
+            },
         )
 
         /**
@@ -269,7 +277,7 @@ internal data class LocalSearchWorkerConfig(
             "cbls-plateau64/fixed", "walksat-cc/luby", "cbls-hinoise/fixed", "cbls-plateau-smooth/fixed",
             "cbls-plateau/fixed", "cbls-raw/fixed",
             // Untuned bandit candidates (#8); kept last so the default diverse(N) prefix is unchanged.
-            "thompson/fixed", "cbls/ils-bandit",
+            "thompson/fixed", "cbls/ils-bandit", "probsat-bandit/fixed",
         )
 
         /** Labels of every config in the pool, in credit order. */
