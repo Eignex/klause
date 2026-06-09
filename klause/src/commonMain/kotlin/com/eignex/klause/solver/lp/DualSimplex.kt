@@ -375,25 +375,56 @@ internal class DualSimplex(private val model: LpModel) {
         val maxIter = 1000L + 100L * (numVars + m)
         var iter = 0L
         var pivots = 0
+        // Pricing: Dantzig (largest primal infeasibility) chooses the leaving variable by default,
+        // which takes far fewer pivots than smallest-index Bland; but Dantzig can cycle under
+        // degeneracy, so a stall detector switches to Bland — which provably terminates — once the
+        // infeasibility count stops improving for [stallLimit] iterations.
+        val stallLimit = 2 * (m + numVars) + 32
+        var bestInfeas = Int.MAX_VALUE
+        var sinceImprove = 0
+        var useBland = false
         while (true) {
             check(iter++ <= maxIter) { "dual simplex exceeded $maxIter iterations (cycling bug?)" }
             val beta = computeBeta()
 
-            // --- Leaving variable: the bound-violating basic of smallest index (Bland). ---
+            // --- Leaving variable: largest infeasibility (Dantzig), or smallest index under Bland. ---
             var r = -1
             var leavingVar = Int.MAX_VALUE
             var belowLower = false
+            var bestViol = 0L // largest |violation| numerator over |d| seen so far (Dantzig)
+            var infeas = 0
             for (i in 0 until m) {
                 val v = basicVar[i]
                 val low = compareFracToValue(beta[i], d, 0L) < 0 // x_v < 0 (its shifted lower bound)
                 val high = model.hasUpper[v] && compareFracToValue(beta[i], d, model.upper[v]) > 0
-                if ((low || high) && v < leavingVar) {
-                    leavingVar = v
-                    r = i
-                    belowLower = low
+                if (!low && !high) continue
+                infeas++
+                if (useBland) {
+                    if (v < leavingVar) {
+                        leavingVar = v;
+                        r = i;
+                        belowLower = low
+                    }
+                } else {
+                    // |violation|·|d|: distance past the violated bound (lower 0, or upper).
+                    val raw = if (low) beta[i] else subExact(beta[i], mulExact(model.upper[v], d))
+                    val viol = if (raw < 0L) -raw else raw
+                    if (viol > bestViol || r == -1) {
+                        bestViol = viol;
+                        r = i;
+                        leavingVar = v;
+                        belowLower = low
+                    }
                 }
             }
             if (r == -1) return buildSolution(beta, LpStatus.OPTIMAL, pivots)
+            // Stall detection: if the infeasibility count is not shrinking, fall back to Bland.
+            if (infeas < bestInfeas) {
+                bestInfeas = infeas;
+                sinceImprove = 0
+            } else if (++sinceImprove > stallLimit) {
+                useBland = true
+            }
 
             // --- Entering variable: dual ratio test, min |d_j / α_j|, Bland tie-break. ---
             val reduced = computeReducedCostsScaled()
