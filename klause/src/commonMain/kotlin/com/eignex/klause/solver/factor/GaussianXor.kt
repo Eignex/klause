@@ -75,12 +75,14 @@ class GaussianXor(constraints: List<Xor>) : Factor {
         for (r in 0 until n) {
             for (i in boolVars.indices) {
                 if (!getBit(rowMask[r], i)) continue
-                val assigned = state.boolValues[boolVars[i]]
-                if (assigned == null) {
+                val v = boolVars[i]
+                // Box-free read: this loop runs over every assigned var of every row on each
+                // fire (the matrix is rebuilt per propagation), so it dominated the CP profile.
+                if (!state.boolAssignedAt(v)) {
                     setBit(mask[r], i)
                 } else {
                     setBit(reason[r], i)
-                    if (assigned) rhs[r] = rhs[r] xor 1
+                    if (state.boolValueAt(v)) rhs[r] = rhs[r] xor 1
                 }
             }
         }
@@ -120,7 +122,7 @@ class GaussianXor(constraints: List<Xor>) : Factor {
             if (pop == 1) {
                 val col = firstSetBit(mask[r])
                 val v = boolVars[col]
-                if (state.boolValues[v] == null) {
+                if (!state.boolAssignedAt(v)) {
                     if (!state.pinBool(v, rhs[r] == 1, reasonLiterals(state, reason[r], excludeCol = col))) {
                         return false
                     }
@@ -147,8 +149,8 @@ class GaussianXor(constraints: List<Xor>) : Factor {
         for (i in boolVars.indices) {
             if (i == excludeCol || !getBit(reasonBits, i)) continue
             val v = boolVars[i]
-            val b = state.boolValues[v] ?: continue
-            out[w++] = Lit.make(v, !b)
+            // reasonBits only flags assigned variables, so the value bit is always meaningful.
+            out[w++] = Lit.make(v, !state.boolValueAt(v))
         }
         return out
     }
