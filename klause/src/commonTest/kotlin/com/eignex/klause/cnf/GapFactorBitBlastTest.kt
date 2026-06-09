@@ -2,14 +2,12 @@ package com.eignex.klause.cnf
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.BinPacking
-import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
@@ -22,9 +20,6 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.Sequence
-import com.eignex.klause.solver.factor.SetBitsetDisjoint
-import com.eignex.klause.solver.factor.SetBitsetEq
-import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
@@ -124,44 +119,6 @@ class GapFactorBitBlastTest {
     // Circuit / Subcircuit synthesise free position vars that aren't pinned by a problem
     // sample, so the brute-force SatCheck oracle can't validate them — they're round-tripped
     // through a real SAT solver in klause-logicng's GapFactorLogicNgTest instead.
-
-    @Test fun `set subset bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "set subset",
-        Problem(
-            4,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(
-                SetBitsetSubset(leftBools = intArrayOf(0, 1), rightBools = intArrayOf(2, 3)),
-                // Force left to be non-trivial so the implication has teeth.
-                Clause(intArrayOf(Lit.make(0, true))),
-            ),
-        ),
-    )
-
-    @Test fun `set disjoint bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "set disjoint",
-        Problem(
-            4,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(
-                SetBitsetDisjoint(leftBools = intArrayOf(0, 1), rightBools = intArrayOf(2, 3)),
-            ),
-        ),
-    )
-
-    @Test fun `set eq bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "set eq",
-        Problem(
-            4,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(
-                SetBitsetEq(leftBools = intArrayOf(0, 1), rightBools = intArrayOf(2, 3)),
-            ),
-        ),
-    )
 
     @Test fun `among bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "among",

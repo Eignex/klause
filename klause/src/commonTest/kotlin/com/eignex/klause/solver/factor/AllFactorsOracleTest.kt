@@ -17,8 +17,8 @@ import kotlin.test.Test
  *  - [MoveSetOracle.assertRepairsCoverImproving] — `proposeRepairMoves` on a violating state
  *    covers at least one strictly-improving 1-step move when brute finds one.
  *
- * Factors with intentionally weak proposers (no override, e.g. propagation-only Geost /
- * MinCostFlow / PathTree) skip the move-set oracle. Factors whose default ±1 IntSet proposer
+ * Factors with intentionally weak proposers (no override, e.g. propagation-only
+ * PathTree) skip the move-set oracle. Factors whose default ±1 IntSet proposer
  * is incomplete by design (e.g. Linear with a far-away bound) run the oracle with
  * `requireImprovement = false` so spurious non-improving proposals don't fail the test —
  * the propose-cover assertion still fires.
@@ -422,53 +422,9 @@ class AllFactorsOracleTest {
         check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)))
     }
 
-    @Test fun `cumulatives upper bound passes the propagation and repair oracles with an exact probe`() {
-        // 3 tasks (starts 0,1,2 ; machines 3,4,5), 2 machines (values 0,1), cap 2 each.
-        val f = Cumulatives(
-            starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(2, 1, 1),
-            resources = intArrayOf(1, 1, 1),
-            machines = intArrayOf(3, 4, 5),
-            bounds = intArrayOf(2, 2),
-            upper = true,
-            minMachine = 0,
-        )
-        check(
-            f,
-            intDomains = arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2), // starts
-                IntDomain(0, 1),
-                IntDomain(0, 1),
-                IntDomain(0, 1), // machines (∈ {0,1})
-            ),
-            exactProbe = true,
-        )
-    }
-
-    @Test fun `cumulatives lower bound passes the propagation and repair oracles with an exact probe`() {
-        // Minimum-load (upper=false): where a machine is in use it must carry ≥ bound.
-        val f = Cumulatives(
-            starts = intArrayOf(0, 1),
-            durations = intArrayOf(2, 2),
-            resources = intArrayOf(1, 1),
-            machines = intArrayOf(2, 3),
-            bounds = intArrayOf(1, 1),
-            upper = false,
-            minMachine = 0,
-        )
-        check(
-            f,
-            intDomains = arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 2), // starts
-                IntDomain(0, 1),
-                IntDomain(0, 1), // machines
-            ),
-            exactProbe = true,
-        )
-    }
+    // `cumulatives` is no longer a native factor (#209) — it decomposes at the FlatZinc emit
+    // site into per-machine `Cumulative` (capacity) or a time-indexed reified ≥ (min-load),
+    // covered by FznCumulativesIngestTest rather than the factor oracle here.
 
     @Test fun `diffn passes the brute-force propagation and repair oracles`() {
         val f = Diffn(
@@ -514,26 +470,6 @@ class AllFactorsOracleTest {
         )
     }
 
-    @Test fun `geost propagation is sound against brute force`() {
-        // 2 boxes in 2D, each 2×2, origins ∈ [0,2]. Row-major origin = [o0x,o0y, o1x,o1y].
-        val f = Geost(
-            numDims = 2,
-            numObjects = 2,
-            origin = intArrayOf(0, 1, 2, 3),
-            length = intArrayOf(2, 2, 2, 2),
-        )
-        check(
-            f,
-            intDomains = arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-            ),
-            exactProbe = true,
-        )
-    }
-
     // ---- Automata ----------------------------------------------------------------
 
     @Test fun `regular passes the brute-force propagation and repair oracles`() {
@@ -573,23 +509,6 @@ class AllFactorsOracleTest {
             recordStride = 3,
         )
         check(f, intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)))
-    }
-
-    // ---- Set algebra (bitset) ----------------------------------------------------
-
-    @Test fun `set bitset subset passes the brute-force propagation and repair oracles`() {
-        val f = SetBitsetSubset(leftBools = intArrayOf(0, 1, 2), rightBools = intArrayOf(3, 4, 5))
-        check(f, numBoolVars = 6)
-    }
-
-    @Test fun `set bitset disjoint passes the brute-force propagation and repair oracles`() {
-        val f = SetBitsetDisjoint(leftBools = intArrayOf(0, 1, 2), rightBools = intArrayOf(3, 4, 5))
-        check(f, numBoolVars = 6)
-    }
-
-    @Test fun `set bitset eq passes the brute-force propagation and repair oracles`() {
-        val f = SetBitsetEq(leftBools = intArrayOf(0, 1, 2), rightBools = intArrayOf(3, 4, 5))
-        check(f, numBoolVars = 6)
     }
 
     // ---- Table ------------------------------------------------------------------

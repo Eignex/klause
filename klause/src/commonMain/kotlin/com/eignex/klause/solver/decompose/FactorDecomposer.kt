@@ -17,7 +17,6 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
@@ -25,9 +24,7 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.MinCostFlow
 import com.eignex.klause.solver.factor.NValue
-import com.eignex.klause.solver.factor.Path
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Regular
@@ -39,7 +36,6 @@ import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.Tree
 
 /**
  * Allocator hook for fresh aux variables used by [FactorDecomposer]. Backends that
@@ -104,8 +100,6 @@ internal object FactorDecomposer {
 
         is BinPacking -> decomposeBinPacking(f, ctx)
 
-        is MinCostFlow -> decomposeMinCostFlow(f)
-
         // Tier 4: comparison / connectivity / misc
         is Inverse -> decomposeInverse(f, ctx)
 
@@ -124,7 +118,6 @@ internal object FactorDecomposer {
 
         is Diffn -> decomposeDiffn(f, ctx)
 
-        is Geost -> decomposeGeost(f, ctx)
 
         is Cumulative -> decomposeCumulative(f, ctx)
 
@@ -135,10 +128,6 @@ internal object FactorDecomposer {
         is Sort -> decomposeSort(f, ctx)
 
         is ArgSort -> decomposeArgSort(f, ctx)
-
-        is Path -> decomposePath(f, ctx)
-
-        is Tree -> decomposeTree(f, ctx)
 
         else -> null
     }
@@ -507,52 +496,6 @@ internal object FactorDecomposer {
         return out
     }
 
-    /** `min_cost_flow(...)` — per-node Σ_in flow − Σ_out flow = balance, plus cost = Σ
-     *  weight·flow when a cost variable is provided. Both equations are Linear EQ. */
-    private fun decomposeMinCostFlow(f: MinCostFlow): List<Factor> {
-        val out = ArrayList<Factor>()
-        val inArcs = Array(f.numNodes) { ArrayList<Int>() }
-        val outArcs = Array(f.numNodes) { ArrayList<Int>() }
-        for (a in f.arcFrom.indices) {
-            outArcs[f.arcFrom[a] - f.nodeOffset].add(a)
-            inArcs[f.arcTo[a] - f.nodeOffset].add(a)
-        }
-        for (n in 0 until f.numNodes) {
-            // Σ in − Σ out = balance[n].
-            val ins = inArcs[n]
-            val outs = outArcs[n]
-            val sz = ins.size + outs.size
-            if (sz == 0) continue
-            val coeffs = IntArray(sz)
-            val vars = IntArray(sz)
-            var w = 0
-            for (a in ins) {
-                coeffs[w] = 1
-                vars[w] = f.flow[a]
-                w++
-            }
-            for (a in outs) {
-                coeffs[w] = -1
-                vars[w] = f.flow[a]
-                w++
-            }
-            out.add(Linear(coeffs, vars, LinearOp.EQ, f.balance[n]))
-        }
-        if (f.cost >= 0 && f.weight != null) {
-            val sz = f.flow.size + 1
-            val coeffs = IntArray(sz)
-            val vars = IntArray(sz)
-            for (i in f.flow.indices) {
-                coeffs[i] = f.weight[i]
-                vars[i] = f.flow[i]
-            }
-            coeffs[f.flow.size] = -1
-            vars[f.flow.size] = f.cost
-            out.add(Linear(coeffs, vars, LinearOp.EQ, 0))
-        }
-        return out
-    }
-
     // -------- Tier 4: comparison / connectivity / misc --------
 
     /** `inverse(f, g, fOffset, gOffset)` — `f[i] = j+fOffset ⟺ g[j] = i+gOffset`. Same
@@ -905,34 +848,6 @@ internal object FactorDecomposer {
         return out
     }
 
-    /** `geost(numDims, numObjects, origin, length)` — N-dimensional non-overlap. For
-     *  each pair of objects, in at least one dimension one is to the left of the other. */
-    private fun decomposeGeost(f: Geost, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        val nObj = f.numObjects
-        val nDim = f.numDims
-        for (i in 0 until nObj - 1) {
-            for (j in i + 1 until nObj) {
-                // 2 * nDim disjuncts: in dim d, i before j or j before i.
-                val auxLits = IntArray(2 * nDim)
-                for (d in 0 until nDim) {
-                    val originI = f.origin[i * nDim + d]
-                    val originJ = f.origin[j * nDim + d]
-                    val lenI = f.length[i * nDim + d]
-                    val lenJ = f.length[j * nDim + d]
-                    val aij = ctx.freshBool()
-                    val aji = ctx.freshBool()
-                    out.add(ReifiedLinear(aij, intArrayOf(1, -1), intArrayOf(originI, originJ), LinearOp.LE, -lenI))
-                    out.add(ReifiedLinear(aji, intArrayOf(1, -1), intArrayOf(originJ, originI), LinearOp.LE, -lenJ))
-                    auxLits[2 * d] = Lit.make(aij, true)
-                    auxLits[2 * d + 1] = Lit.make(aji, true)
-                }
-                out.add(Clause(auxLits))
-            }
-        }
-        return out
-    }
-
     /** `cumulative(starts, durations, resources, capacity)` — time-indexed encoding.
      *  Horizon = max possible end time across tasks; for each integer time t ∈
      *  `[0, horizon)`, each task contributes `resources[i]` to load(t) iff its start
@@ -1205,238 +1120,6 @@ internal object FactorDecomposer {
             out.add(ReifiedLinear(lessAux, intArrayOf(1, -1), intArrayOf(f.perm[i], f.perm[i + 1]), LinearOp.LE, -1))
             // tie ⇒ less
             out.add(Clause(intArrayOf(Lit.make(tieAux, false), Lit.make(lessAux, true))))
-        }
-        return out
-    }
-
-    /** `path(numNodes, from, to, source, sink, nodePresent, edgePresent)` — degree-
-     *  based decomposition. Allocates per-node in/out aux ints summing the bool
-     *  presence of incident edges, then per-node degree constraints driven by the
-     *  source/sink role and presence. Doesn't enforce *simple-path* connectivity (no
-     *  disconnected cycle elimination) — that's the propagator's job; the
-     *  decomposition gives a sound lower-bound encoding sufficient for many
-     *  practical workloads. */
-    private fun decomposePath(f: Path, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        val n = f.numNodes
-        val m = f.from.size
-        val off = f.nodeOffset
-        val inArcs = Array(n) { ArrayList<Int>() }
-        val outArcs = Array(n) { ArrayList<Int>() }
-        for (e in 0 until m) {
-            outArcs[f.from[e] - off].add(e)
-            inArcs[f.to[e] - off].add(e)
-        }
-        // inDeg / outDeg ints in [0, max-incident].
-        val inDeg = IntArray(n) { v ->
-            val k = inArcs[v].size
-            ctx.freshInt(IntDomain(0, k))
-        }
-        val outDeg = IntArray(n) { v ->
-            val k = outArcs[v].size
-            ctx.freshInt(IntDomain(0, k))
-        }
-        // Linear: inDeg[v] − Σ edgePresent[e for e ∈ inArcs[v]] = 0; sim for out.
-        for (v in 0 until n) {
-            val inSize = inArcs[v].size
-            if (inSize > 0) {
-                val vars = IntArray(inSize + 1)
-                val coeffs = IntArray(inSize + 1)
-                for ((idx, _) in inArcs[v].withIndex()) {
-                    // bool-as-int via reified aux  bAux ↔ (edgePresent[e] = 1); fold via
-                    // PseudoBoolean instead: Σ bool − inDeg = 0 ⇒ PB with lits = edge
-                    // present positives weight 1, plus an aux equality for inDeg.
-                    vars[idx] = 0 // placeholder; rewrite via PB below
-                    coeffs[idx] = 0
-                }
-            }
-        }
-        // Simpler: for each v, PB(weights = +1 × edgePresent lits) − inDeg[v] = 0.
-        // Since PseudoBoolean only constrains lits against a constant, we instead use
-        // per-value reified equalities: for each k ∈ [0, |inArcs|], aux deg_v_k ↔ (PB
-        // = k) AND inDeg[v] = k → tie them via reified-eq on inDeg.
-        for (v in 0 until n) {
-            val inSize = inArcs[v].size
-            if (inSize == 0) {
-                // inDeg[v] must be 0.
-                out.add(Linear(intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, 0))
-            } else {
-                val lits = IntArray(inSize) { idx -> Lit.make(f.edgePresent[inArcs[v][idx]], true) }
-                for (k in 0..inSize) {
-                    val deg = ctx.freshBool()
-                    out.add(ReifiedCardinality(deg, lits, min = k, max = k))
-                    val eq = ctx.freshBool()
-                    out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, k))
-                    // deg ↔ eq
-                    out.add(Clause(intArrayOf(Lit.make(deg, false), Lit.make(eq, true))))
-                    out.add(Clause(intArrayOf(Lit.make(deg, true), Lit.make(eq, false))))
-                }
-            }
-            val outSize = outArcs[v].size
-            if (outSize == 0) {
-                out.add(Linear(intArrayOf(1), intArrayOf(outDeg[v]), LinearOp.EQ, 0))
-            } else {
-                val lits = IntArray(outSize) { idx -> Lit.make(f.edgePresent[outArcs[v][idx]], true) }
-                for (k in 0..outSize) {
-                    val deg = ctx.freshBool()
-                    out.add(ReifiedCardinality(deg, lits, min = k, max = k))
-                    val eq = ctx.freshBool()
-                    out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(outDeg[v]), LinearOp.EQ, k))
-                    out.add(Clause(intArrayOf(Lit.make(deg, false), Lit.make(eq, true))))
-                    out.add(Clause(intArrayOf(Lit.make(deg, true), Lit.make(eq, false))))
-                }
-            }
-        }
-        // Per-node role constraints.
-        for (v in 0 until n) {
-            val present = f.nodePresent[v]
-            val isSource = ctx.freshBool()
-            val isSink = ctx.freshBool()
-            out.add(ReifiedLinear(isSource, intArrayOf(1), intArrayOf(f.source), LinearOp.EQ, v + off))
-            out.add(ReifiedLinear(isSink, intArrayOf(1), intArrayOf(f.sink), LinearOp.EQ, v + off))
-            // ¬present → inDeg = 0 ∧ outDeg = 0
-            val inEq0 = ctx.freshBool()
-            val outEq0 = ctx.freshBool()
-            out.add(ReifiedLinear(inEq0, intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, 0))
-            out.add(ReifiedLinear(outEq0, intArrayOf(1), intArrayOf(outDeg[v]), LinearOp.EQ, 0))
-            out.add(Clause(intArrayOf(Lit.make(present, true), Lit.make(inEq0, true))))
-            out.add(Clause(intArrayOf(Lit.make(present, true), Lit.make(outEq0, true))))
-            // present ∧ source → inDeg = 0 ∧ outDeg = 1
-            val outEq1 = ctx.freshBool()
-            out.add(ReifiedLinear(outEq1, intArrayOf(1), intArrayOf(outDeg[v]), LinearOp.EQ, 1))
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSource, false), Lit.make(inEq0, true))))
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSource, false), Lit.make(outEq1, true))))
-            // present ∧ sink → inDeg = 1 ∧ outDeg = 0
-            val inEq1 = ctx.freshBool()
-            out.add(ReifiedLinear(inEq1, intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, 1))
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSink, false), Lit.make(inEq1, true))))
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isSink, false), Lit.make(outEq0, true))))
-            // present ∧ ¬source ∧ ¬sink → inDeg = 1 ∧ outDeg = 1
-            out.add(
-                Clause(
-                    intArrayOf(
-                        Lit.make(present, false),
-                        Lit.make(isSource, true),
-                        Lit.make(isSink, true),
-                        Lit.make(inEq1, true),
-                    ),
-                ),
-            )
-            out.add(
-                Clause(
-                    intArrayOf(
-                        Lit.make(present, false),
-                        Lit.make(isSource, true),
-                        Lit.make(isSink, true),
-                        Lit.make(outEq1, true),
-                    ),
-                ),
-            )
-            // source → present; sink → present.
-            out.add(Clause(intArrayOf(Lit.make(isSource, false), Lit.make(present, true))))
-            out.add(Clause(intArrayOf(Lit.make(isSink, false), Lit.make(present, true))))
-        }
-        // Edge present → both endpoints present.
-        for (e in 0 until m) {
-            val ep = f.edgePresent[e]
-            val fp = f.nodePresent[f.from[e] - off]
-            val tp = f.nodePresent[f.to[e] - off]
-            out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(fp, true))))
-            out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(tp, true))))
-        }
-        // Cycle elimination via per-node level (MTZ-style): `level[v] ∈ [0, n-1]`,
-        // `level[source] = 0`, and `edgePresent[e] = (u→v) ⇒ level[v] = level[u] + 1`.
-        // Around any cycle this would require level[u]+k = level[u], so all simple cycles
-        // are excluded; the only feasible subgraph is a source-to-sink path.
-        val level = IntArray(n) { ctx.freshInt(IntDomain(0, n - 1)) }
-        for (v in 0 until n) {
-            val isSourceL = ctx.freshBool()
-            out.add(ReifiedLinear(isSourceL, intArrayOf(1), intArrayOf(f.source), LinearOp.EQ, v + off))
-            val lvlEq0 = ctx.freshBool()
-            out.add(ReifiedLinear(lvlEq0, intArrayOf(1), intArrayOf(level[v]), LinearOp.EQ, 0))
-            out.add(Clause(intArrayOf(Lit.make(isSourceL, false), Lit.make(lvlEq0, true))))
-        }
-        for (e in 0 until m) {
-            val u = f.from[e] - off
-            val v = f.to[e] - off
-            val step = ctx.freshBool()
-            out.add(ReifiedLinear(step, intArrayOf(1, -1), intArrayOf(level[v], level[u]), LinearOp.EQ, 1))
-            out.add(Clause(intArrayOf(Lit.make(f.edgePresent[e], false), Lit.make(step, true))))
-        }
-        return out
-    }
-
-    /** `tree(numNodes, from, to, root, nodePresent, edgePresent)` — in-tree rooted at
-     *  `root`. Decomposition: root has in-degree 0, every other present node has
-     *  in-degree 1; plus level-based cycle elimination so a present edge `u→v`
-     *  enforces `level[v] = level[u] + 1`. Around any cycle this is infeasible, ruling
-     *  out disconnected components that the degree constraints alone permit. */
-    private fun decomposeTree(f: Tree, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        val n = f.numNodes
-        val m = f.from.size
-        val off = f.nodeOffset
-        val inArcs = Array(n) { ArrayList<Int>() }
-        for (e in 0 until m) inArcs[f.to[e] - off].add(e)
-        val inDeg = IntArray(n) { v -> ctx.freshInt(IntDomain(0, inArcs[v].size)) }
-        for (v in 0 until n) {
-            val k = inArcs[v].size
-            if (k == 0) {
-                out.add(Linear(intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, 0))
-                continue
-            }
-            val lits = IntArray(k) { idx -> Lit.make(f.edgePresent[inArcs[v][idx]], true) }
-            for (j in 0..k) {
-                val deg = ctx.freshBool()
-                out.add(ReifiedCardinality(deg, lits, min = j, max = j))
-                val eq = ctx.freshBool()
-                out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, j))
-                out.add(Clause(intArrayOf(Lit.make(deg, false), Lit.make(eq, true))))
-                out.add(Clause(intArrayOf(Lit.make(deg, true), Lit.make(eq, false))))
-            }
-        }
-        for (v in 0 until n) {
-            val present = f.nodePresent[v]
-            val isRoot = ctx.freshBool()
-            out.add(ReifiedLinear(isRoot, intArrayOf(1), intArrayOf(f.root), LinearOp.EQ, v + off))
-            val inEq0 = ctx.freshBool()
-            val inEq1 = ctx.freshBool()
-            out.add(ReifiedLinear(inEq0, intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, 0))
-            out.add(ReifiedLinear(inEq1, intArrayOf(1), intArrayOf(inDeg[v]), LinearOp.EQ, 1))
-            // ¬present → inDeg = 0
-            out.add(Clause(intArrayOf(Lit.make(present, true), Lit.make(inEq0, true))))
-            // present ∧ root → inDeg = 0
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isRoot, false), Lit.make(inEq0, true))))
-            // present ∧ ¬root → inDeg = 1
-            out.add(Clause(intArrayOf(Lit.make(present, false), Lit.make(isRoot, true), Lit.make(inEq1, true))))
-            // root → present
-            out.add(Clause(intArrayOf(Lit.make(isRoot, false), Lit.make(present, true))))
-        }
-        for (e in 0 until m) {
-            val ep = f.edgePresent[e]
-            val fp = f.nodePresent[f.from[e] - off]
-            val tp = f.nodePresent[f.to[e] - off]
-            out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(fp, true))))
-            out.add(Clause(intArrayOf(Lit.make(ep, false), Lit.make(tp, true))))
-        }
-        // Cycle elimination: `level[v] ∈ [0, n-1]`, `level[root] = 0`, and per edge
-        // `(u→v)`: `edgePresent[e] ⇒ level[v] = level[u] + 1`. This eliminates cycles
-        // (level monotonically increases along present edges) and any non-root present
-        // node is forced to descend from the root.
-        val level = IntArray(n) { ctx.freshInt(IntDomain(0, n - 1)) }
-        for (v in 0 until n) {
-            val isRootL = ctx.freshBool()
-            out.add(ReifiedLinear(isRootL, intArrayOf(1), intArrayOf(f.root), LinearOp.EQ, v + off))
-            val lvlEq0 = ctx.freshBool()
-            out.add(ReifiedLinear(lvlEq0, intArrayOf(1), intArrayOf(level[v]), LinearOp.EQ, 0))
-            out.add(Clause(intArrayOf(Lit.make(isRootL, false), Lit.make(lvlEq0, true))))
-        }
-        for (e in 0 until m) {
-            val u = f.from[e] - off
-            val v = f.to[e] - off
-            val step = ctx.freshBool()
-            out.add(ReifiedLinear(step, intArrayOf(1, -1), intArrayOf(level[v], level[u]), LinearOp.EQ, 1))
-            out.add(Clause(intArrayOf(Lit.make(f.edgePresent[e], false), Lit.make(step, true))))
         }
         return out
     }

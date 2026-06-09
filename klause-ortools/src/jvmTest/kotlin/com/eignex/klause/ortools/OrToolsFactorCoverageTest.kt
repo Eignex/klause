@@ -9,16 +9,12 @@ import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Element
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.NValue
-import com.eignex.klause.solver.factor.SetBitsetDisjoint
-import com.eignex.klause.solver.factor.SetBitsetEq
-import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import kotlin.test.Test
@@ -172,27 +168,6 @@ class OrToolsFactorCoverageTest {
         )
     }
 
-    private fun boolProblem(numBool: Int, vararg fs: Factor) =
-        Problem(numBoolVars = numBool, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf(*fs))
-
-    @Test fun `set subset allows three configs per position`() = assertEquals(
-        9,
-        OrToolsSolver(boolProblem(4, SetBitsetSubset(intArrayOf(0, 1), intArrayOf(2, 3))))
-            .enumerate(OrToolsParams()).toList().size,
-    )
-
-    @Test fun `set disjoint allows three configs per position`() = assertEquals(
-        9,
-        OrToolsSolver(boolProblem(4, SetBitsetDisjoint(intArrayOf(0, 1), intArrayOf(2, 3))))
-            .enumerate(OrToolsParams()).toList().size,
-    )
-
-    @Test fun `set equal couples the indicators`() = assertEquals(
-        4,
-        OrToolsSolver(boolProblem(4, SetBitsetEq(intArrayOf(0, 1), intArrayOf(2, 3))))
-            .enumerate(OrToolsParams()).toList().size,
-    )
-
     @Test fun `subcircuit on three nodes has six valid configurations`() =
         assertEquals(6, count(problem(3, dom(3, 0, 2), Subcircuit(intArrayOf(0, 1, 2)))))
 
@@ -215,14 +190,4 @@ class OrToolsFactorCoverageTest {
         ),
     )
 
-    @Test fun `geost keeps boxes apart`() {
-        val a = sat(
-            problem(
-                2,
-                dom(2, 0, 2),
-                Geost(numDims = 1, numObjects = 2, origin = intArrayOf(0, 1), length = intArrayOf(2, 2)),
-            ),
-        )
-        assertTrue(a.ints[0] + 2 <= a.ints[1] || a.ints[1] + 2 <= a.ints[0])
-    }
 }

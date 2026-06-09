@@ -18,7 +18,6 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
@@ -34,9 +33,6 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Sequence
-import com.eignex.klause.solver.factor.SetBitsetDisjoint
-import com.eignex.klause.solver.factor.SetBitsetEq
-import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
@@ -291,15 +287,8 @@ internal object SmtTranslator {
 
             is Subcircuit -> subcircuit(factor)
 
-            is Geost -> geost(factor)
 
             is Mdd -> mdd(factor)
-
-            is SetBitsetSubset -> setSubset(factor.leftBools, factor.rightBools)
-
-            is SetBitsetDisjoint -> setDisjoint(factor.leftBools, factor.rightBools)
-
-            is SetBitsetEq -> setEq(factor.leftBools, factor.rightBools)
 
             else -> error("SmtTranslator: unsupported factor type ${factor::class.simpleName}")
         }
@@ -613,26 +602,6 @@ internal object SmtTranslator {
             return bmgr.and(conj)
         }
 
-        private fun geost(f: Geost): BooleanFormula {
-            // Axis-aligned boxes pairwise separated in at least one dimension.
-            val conj = ArrayList<BooleanFormula>()
-            for (i in 0 until f.numObjects) {
-                for (j in i + 1 until f.numObjects) {
-                    val opts = ArrayList<BooleanFormula>()
-                    for (d in 0 until f.numDims) {
-                        val oi = iv(f.origin[i * f.numDims + d])
-                        val oj = iv(f.origin[j * f.numDims + d])
-                        val si = f.length[i * f.numDims + d]
-                        val sj = f.length[j * f.numDims + d]
-                        opts.add(imgr.lessOrEquals(imgr.add(oi, num(si)), oj))
-                        opts.add(imgr.lessOrEquals(imgr.add(oj, num(sj)), oi))
-                    }
-                    conj.add(bmgr.or(opts))
-                }
-            }
-            return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
-        }
-
         private fun mdd(f: Mdd): BooleanFormula {
             // Layered MDD acceptance: pick one transition row per layer that links the state
             // trace and matches the symbol; q[n] must be accepting. Cost = Σ chosen weights.
@@ -660,41 +629,6 @@ internal object SmtTranslator {
             conj.add(inValues(q[n], f.accepting))
             if (f.cost >= 0) conj.add(imgr.equal(iv(f.cost), if (costTerms.isEmpty()) num(0) else imgr.sum(costTerms)))
             return bmgr.and(conj)
-        }
-
-        private fun setSubset(left: IntArray, right: IntArray): BooleanFormula {
-            val conj = ArrayList<BooleanFormula>()
-            for (i in left.indices) {
-                val l = left[i]
-                val r = right[i]
-                if (l < 0) continue
-                conj.add(if (r < 0) bmgr.not(bvar(l)) else bmgr.implication(bvar(l), bvar(r)))
-            }
-            return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
-        }
-
-        private fun setDisjoint(left: IntArray, right: IntArray): BooleanFormula {
-            val conj = ArrayList<BooleanFormula>()
-            for (i in left.indices) {
-                val l = left[i]
-                val r = right[i]
-                if (l >= 0 && r >= 0) conj.add(bmgr.or(bmgr.not(bvar(l)), bmgr.not(bvar(r))))
-            }
-            return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
-        }
-
-        private fun setEq(left: IntArray, right: IntArray): BooleanFormula {
-            val conj = ArrayList<BooleanFormula>()
-            for (i in left.indices) {
-                val l = left[i]
-                val r = right[i]
-                when {
-                    l >= 0 && r >= 0 -> conj.add(bmgr.equivalence(bvar(l), bvar(r)))
-                    l >= 0 -> conj.add(bmgr.not(bvar(l)))
-                    r >= 0 -> conj.add(bmgr.not(bvar(r)))
-                }
-            }
-            return if (conj.isEmpty()) bmgr.makeTrue() else bmgr.and(conj)
         }
 
         private fun litFormula(lit: Int): BooleanFormula {
