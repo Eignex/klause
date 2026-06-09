@@ -7,6 +7,9 @@ import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.IndomainMin
+import com.eignex.klause.solver.backtrack.RegressionVariableHeuristic
+import com.eignex.klause.solver.backtrack.SolutionGuided
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -144,29 +147,42 @@ object PortfolioBuilder {
             }
         }
 
-        // Backtrack workers: a diverse trio of complete configs, cycled across workers so even a
-        // single backtrack worker gets the strong SAT-optimized config. Each bounds on the linear
+        // Backtrack workers: a diverse palette of complete configs, cycled across workers so even
+        // a single backtrack worker gets the strong SAT-optimized config. Each bounds on the linear
         // objective (falling back to the functional form if only that exists) and injects the
         // shared objective bound so a tighter incumbent from any worker prunes the others' subtrees.
-        // The three legs are the single-config corpus winners: SAT-optimized takes the
-        // pigeonhole / dense-random-3SAT class (#117), conflict-driven takes the scheduling /
-        // reach tail, and the bare free engine takes the plateau rows. Beyond the third worker
-        // the cycle repeats on fresh seeds, which doubles as seed-twin diversity for luck-bound
-        // close calls.
-        //  - i % 3 == 0: the SAT-optimized CDCL stack ([BacktrackPresets.satOptimized]) —
-        //    adaptive restarts, phase + target phasing, three-tier learned DB;
-        //  - i % 3 == 1: the conflict-driven composition ([BacktrackPresets.conflictDriven]) —
-        //    last-conflict over VSIDS, solution-guided values, phase saving, Luby restarts;
-        //  - i % 3 == 2: the bare free engine on Luby restarts, for raw seed diversity.
+        // The legs are single-config corpus winners; beyond the palette the cycle repeats on fresh
+        // seeds, which doubles as seed-twin diversity for luck-bound close calls.
+        //  - i % 4 == 0: the SAT-optimized CDCL stack ([BacktrackPresets.satOptimized]) —
+        //    adaptive restarts, phase + target phasing, three-tier learned DB (pigeonhole /
+        //    dense-random-3SAT, #117);
+        //  - i % 4 == 1: the conflict-driven composition ([BacktrackPresets.conflictDriven]) —
+        //    last-conflict over VSIDS, solution-guided values, phase saving (scheduling / reach tail);
+        //  - i % 4 == 2: conflict-driven but with the learned LinUCB variable heuristic
+        //    ([RegressionVariableHeuristic], #8) — wins routing (vrp/cvrp) where activity branching
+        //    stalls; the per-session contextual bandit needs ≥4 backtrack workers to be in the pool;
+        //  - i % 4 == 3: the bare free engine on Luby restarts, for raw seed diversity (plateau rows).
+        // SAT-optimized stays at index 0 so any pool with ≥1 backtrack worker keeps the #117 guard.
         val btObj = linearObjective ?: lsObjective
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
             val label = "backtrack#$i"
             val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(label, e) } }
             val seed = spec.seed + 1000L + i
-            val params = when (i % 3) {
+            val params = when (i % 4) {
                 0 -> BacktrackPresets.satOptimized(randomSeed = seed, onEvent = workerEvent)
+
                 1 -> BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = workerEvent)
+
+                2 -> BacktrackParams(
+                    randomSeed = seed,
+                    variableHeuristic = RegressionVariableHeuristic.linUcb(seed = seed),
+                    valueHeuristic = SolutionGuided(IndomainMin),
+                    phaseSaving = true,
+                    lubyRestartBase = 256L,
+                    onEvent = workerEvent,
+                )
+
                 else -> BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = workerEvent)
             }
             workers += PortfolioWorker.of(label, session, params, objective = btObj) { p, supplier ->
