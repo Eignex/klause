@@ -15,11 +15,9 @@ import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
-import com.eignex.klause.solver.factor.Cumulatives
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
@@ -33,12 +31,14 @@ import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SubsetSumEq
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 import kotlin.math.abs
 import kotlin.math.round
@@ -1466,8 +1466,14 @@ internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
 /**
  * `fzn_cumulatives(s, d, r, m, b, upper, min_m)` — multi-machine cumulative. Each task `i`
  * runs on machine `m[i]` (a var); per-machine bound `b[k]` is a capacity (`upper`) or a
- * minimum-load floor. Routes to the native graded [Cumulatives] factor. Durations, resources,
- * and bounds may each be constants or vars (resolved live at solve time).
+ * minimum-load floor. The former native `Cumulatives` factor was dropped (#209); we decompose:
+ *
+ *  - **upper = true** (capacity): one per-machine [Cumulative] over all tasks, each task gated
+ *    present on machine `k` by a reified `m[i] = minMachine + k`. This reuses [Cumulative]'s
+ *    time-tabling + edge-finding and handles variable durations/resources/bounds verbatim.
+ *  - **upper = false** (min-load): a time-indexed reified encoding — at each machine `k` and
+ *    integer time `t`, `usage > 0 → usage ≥ b[k]`. Only the constant duration/resource/bound
+ *    form is decomposable this way; the variable form (which the native factor handled) raises.
  */
 internal fun FlatZincCompiler.emitCumulatives(c: FznConstraint) {
     require(c.args.size == 7) { "cumulatives expects 7 args (s,d,r,m,b,upper,min_m), got ${c.args.size}" }
@@ -1478,20 +1484,82 @@ internal fun FlatZincCompiler.emitCumulatives(c: FznConstraint) {
     val (bounds, boundVars) = resolveIntArrayConstOrVars(c.args[4])
     val upper = evalBoolConst(c.args[5])
     val minMachine = evalIntConst(c.args[6]).toInt()
-    factors.add(
-        Cumulatives(
-            starts = starts,
-            durations = durations,
-            resources = resources,
-            machines = machines,
-            bounds = bounds,
-            upper = upper,
-            minMachine = minMachine,
-            durationVars = durationVars,
-            resourceVars = resourceVars,
-            boundVars = boundVars,
-        ),
-    )
+    val n = starts.size
+    val machineCount = bounds.size
+
+    // present_{i,k}: literal true iff task i runs on machine (minMachine + k).
+    fun onMachine(i: Int, k: Int): Int {
+        val b = allocBool("__cumulatives_m${i}_$numBoolVars")
+        factors.add(ReifiedLinear(b, intArrayOf(1), intArrayOf(machines[i]), LinearOp.EQ, minMachine + k))
+        return Lit.make(b, positive = true)
+    }
+
+    if (upper) {
+        for (k in 0 until machineCount) {
+            val present = IntArray(n) { i -> onMachine(i, k) }
+            factors.add(
+                Cumulative(
+                    starts = starts,
+                    durations = durations,
+                    resources = resources,
+                    capacity = bounds[k],
+                    presents = present,
+                    durationVars = durationVars,
+                    resourceVars = resourceVars,
+                    capacityVar = if (boundVars.isNotEmpty()) boundVars[k] else -1,
+                ),
+            )
+        }
+        return
+    }
+
+    // Min-load: only the all-constant form has a clean time-indexed decomposition.
+    require(durationVars.isEmpty() && resourceVars.isEmpty() && boundVars.isEmpty()) {
+        "cumulatives(upper=false) with variable durations/resources/bounds is not decomposable; " +
+            "only the constant form is supported (#209)"
+    }
+    var t0 = Int.MAX_VALUE
+    var t1 = Int.MIN_VALUE
+    for (i in 0 until n) {
+        val d = intDomains[starts[i]]
+        if (d.min < t0) t0 = d.min
+        if (d.max + durations[i] > t1) t1 = d.max + durations[i]
+    }
+    for (k in 0 until machineCount) {
+        if (bounds[k] <= 0) continue // a non-positive floor is vacuous (usage ≥ 0 always)
+        for (t in t0 until t1) {
+            val weights = IntArrayList(n)
+            val activeLits = IntArrayList(n)
+            for (i in 0 until n) {
+                if (durations[i] == 0 || resources[i] == 0) continue
+                val mEq = onMachine(i, k)
+                // start_i ≤ t ∧ start_i ≥ t − dur_i + 1  ⟺  task i is running at time t.
+                val le = allocBool("__cumulatives_le${i}_$numBoolVars")
+                factors.add(ReifiedLinear(le, intArrayOf(1), intArrayOf(starts[i]), LinearOp.LE, t))
+                val ge = allocBool("__cumulatives_ge${i}_$numBoolVars")
+                factors.add(ReifiedLinear(ge, intArrayOf(1), intArrayOf(starts[i]), LinearOp.GE, t - durations[i] + 1))
+                val act = allocBool("__cumulatives_act${i}_$numBoolVars")
+                // act ↔ (mEq ∧ le ∧ ge).
+                factors.add(Clause(intArrayOf(Lit.negate(Lit.make(act, true)), mEq)))
+                factors.add(Clause(intArrayOf(Lit.make(act, false), Lit.make(le, true))))
+                factors.add(Clause(intArrayOf(Lit.make(act, false), Lit.make(ge, true))))
+                factors.add(
+                    Clause(intArrayOf(Lit.make(act, true), Lit.negate(mEq), Lit.make(le, false), Lit.make(ge, false))),
+                )
+                activeLits.add(Lit.make(act, true))
+                weights.add(resources[i])
+            }
+            if (activeLits.isEmpty()) continue
+            val w = weights.toIntArray()
+            val lits = activeLits.toIntArray()
+            // covered ↔ (usage ≥ 1); geFloor ↔ (usage ≥ b[k]); covered → geFloor.
+            val covered = allocBool("__cumulatives_cov_$numBoolVars")
+            factors.add(ReifiedPseudoBoolean(covered, w, lits, PbOp.GE, 1))
+            val geFloor = allocBool("__cumulatives_floor_$numBoolVars")
+            factors.add(ReifiedPseudoBoolean(geFloor, w, lits, PbOp.GE, bounds[k]))
+            factors.add(Clause(intArrayOf(Lit.make(covered, false), Lit.make(geFloor, true)))) // covered → geFloor
+        }
+    }
 }
 
 /**
@@ -1515,10 +1583,10 @@ internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
 
 /**
  * `fzn_geost_nonoverlap_k(x1, w1, x2, w2)` — the k-dimensional pairwise non-overlap primitive
- * that `geost` decomposes into (two boxes must be disjoint on at least one axis). Routes to a
- * 2-object [Geost] factor (graded overlap-volume violation + separation repair) instead of the
- * `exists`-over-clauses decomposition (issue #43). General `fzn_geost` lowers to many of these,
- * so each pair gets the native graded gradient.
+ * that `geost` decomposes into (two boxes must be disjoint on at least one axis). Lowered to the
+ * exact `exists`-over-axes disjunction (issue #43): per dimension reify the two separation
+ * inequalities `x1+w1 ≤ x2` / `x2+w2 ≤ x1`, then a single Clause asserts at least one of the `2k`
+ * separations holds. The former native graded [Geost] factor was dropped (#209).
  */
 internal fun FlatZincCompiler.emitGeostNonoverlapK(c: FznConstraint) {
     require(c.args.size == 4) { "geost_nonoverlap_k expects 4 args (x1,w1,x2,w2), got ${c.args.size}" }
@@ -1528,14 +1596,18 @@ internal fun FlatZincCompiler.emitGeostNonoverlapK(c: FznConstraint) {
     val w2 = evalIntConstArray(c.args[3])
     val k = x1.size
     require(w1.size == k && x2.size == k && w2.size == k) { "geost_nonoverlap_k: dimension mismatch" }
-    factors.add(
-        Geost(
-            numDims = k,
-            numObjects = 2,
-            origin = x1 + x2,
-            length = w1 + w2,
-        ),
-    )
+    val sepLits = ArrayList<Int>(2 * k)
+    for (d in 0 until k) {
+        // x1[d] + w1[d] ≤ x2[d]  ⟺  x1[d] − x2[d] ≤ −w1[d].
+        val a = allocBool("__geost_sep_$numBoolVars")
+        factors.add(ReifiedLinear(a, intArrayOf(1, -1), intArrayOf(x1[d], x2[d]), LinearOp.LE, -w1[d]))
+        sepLits.add(Lit.make(a, true))
+        // x2[d] + w2[d] ≤ x1[d]  ⟺  x2[d] − x1[d] ≤ −w2[d].
+        val b = allocBool("__geost_sep_$numBoolVars")
+        factors.add(ReifiedLinear(b, intArrayOf(1, -1), intArrayOf(x2[d], x1[d]), LinearOp.LE, -w2[d]))
+        sepLits.add(Lit.make(b, true))
+    }
+    factors.add(Clause(sepLits.toIntArray()))
 }
 
 /** `disjunctive(starts, durations)` / `disjunctive_strict(...)`. Durations may be var. */

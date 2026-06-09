@@ -18,7 +18,6 @@ import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GaussianXor
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
@@ -34,9 +33,6 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Sequence
-import com.eignex.klause.solver.factor.SetBitsetDisjoint
-import com.eignex.klause.solver.factor.SetBitsetEq
-import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SubsetSumEq
@@ -45,7 +41,6 @@ import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Xor
 import org.chocosolver.solver.Model
 import org.chocosolver.solver.SettingsBuilder
-import org.chocosolver.solver.constraints.Constraint
 import org.chocosolver.solver.constraints.extension.Tuples
 import org.chocosolver.solver.constraints.nary.automata.FA.FiniteAutomaton
 import org.chocosolver.solver.variables.BoolVar
@@ -203,15 +198,8 @@ class ChocoModel private constructor(
 
             is Subcircuit -> model.subCircuit(intVarsOf(f.succ), 0, model.intVar(0, f.succ.size)).post()
 
-            is Geost -> postGeost(f)
 
             is Mdd -> postMdd(f)
-
-            is SetBitsetSubset -> postSetSubset(f.leftBools, f.rightBools)
-
-            is SetBitsetDisjoint -> postSetDisjoint(f.leftBools, f.rightBools)
-
-            is SetBitsetEq -> postSetEq(f.leftBools, f.rightBools)
 
             else -> throw UnsupportedFactorException(f)
         }
@@ -373,25 +361,6 @@ class ChocoModel private constructor(
         }
     }
 
-    @Suppress("SpreadOperator") // spreads feed Choco's vararg constraint API
-    private fun postGeost(f: Geost) {
-        // Pairwise separation in at least one dimension: oi+si ≤ oj  ∨  oj+sj ≤ oi (per dim).
-        for (i in 0 until f.numObjects) {
-            for (j in i + 1 until f.numObjects) {
-                val opts = ArrayList<Constraint>()
-                for (d in 0 until f.numDims) {
-                    val oi = intVars[f.origin[i * f.numDims + d]]
-                    val oj = intVars[f.origin[j * f.numDims + d]]
-                    val si = f.length[i * f.numDims + d]
-                    val sj = f.length[j * f.numDims + d]
-                    opts.add(model.scalar(arrayOf(oi, oj), intArrayOf(1, -1), "<=", -si)) // oi + si ≤ oj
-                    opts.add(model.scalar(arrayOf(oj, oi), intArrayOf(1, -1), "<=", -sj)) // oj + sj ≤ oi
-                }
-                model.or(*opts.toTypedArray()).post()
-            }
-        }
-    }
-
     private fun postMdd(f: Mdd) {
         // Each layer is a transition table over (q[i], seq[i], q[i+1][, weight]); chain the
         // state trace through them, fix q[0] = initial and require q[n] accepting.
@@ -451,39 +420,6 @@ class ChocoModel private constructor(
         }
         model.member(q[n], f.accepting).post()
         if (f.cost >= 0 && wVars != null) model.sum(wVars.toTypedArray(), "=", intVars[f.cost]).post()
-    }
-
-    private fun postSetSubset(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            if (l < 0) continue
-            if (r < 0) {
-                model.arithm(boolVars[l], "=", 0).post()
-            } else {
-                model.arithm(boolVars[l], "<=", boolVars[r]).post()
-            }
-        }
-    }
-
-    private fun postSetDisjoint(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            if (l >= 0 && r >= 0) model.arithm(boolVars[l], "+", boolVars[r], "<=", 1).post()
-        }
-    }
-
-    private fun postSetEq(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            when {
-                l >= 0 && r >= 0 -> model.arithm(boolVars[l], "=", boolVars[r]).post()
-                l >= 0 -> model.arithm(boolVars[l], "=", 0).post()
-                r >= 0 -> model.arithm(boolVars[r], "=", 0).post()
-            }
-        }
     }
 
     private fun tuplesOf(f: Table): Tuples {

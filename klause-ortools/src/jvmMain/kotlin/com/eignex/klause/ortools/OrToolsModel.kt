@@ -17,7 +17,6 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
@@ -33,9 +32,6 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Sequence
-import com.eignex.klause.solver.factor.SetBitsetDisjoint
-import com.eignex.klause.solver.factor.SetBitsetEq
-import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
@@ -230,15 +226,8 @@ class OrToolsModel private constructor(
 
             is Subcircuit -> postSubcircuit(f)
 
-            is Geost -> postGeost(f)
 
             is Mdd -> postMdd(f)
-
-            is SetBitsetSubset -> postSetSubset(f.leftBools, f.rightBools)
-
-            is SetBitsetDisjoint -> postSetDisjoint(f.leftBools, f.rightBools)
-
-            is SetBitsetEq -> postSetEq(f.leftBools, f.rightBools)
 
             else -> throw UnsupportedFactorException(f)
         }
@@ -496,26 +485,6 @@ class OrToolsModel private constructor(
         }
     }
 
-    private fun postGeost(f: Geost) {
-        for (i in 0 until f.numObjects) {
-            for (j in i + 1 until f.numObjects) {
-                val seps = ArrayList<Literal>()
-                for (d in 0 until f.numDims) {
-                    val oi = intVars[f.origin[i * f.numDims + d]]
-                    val oj = intVars[f.origin[j * f.numDims + d]]
-                    val si = f.length[i * f.numDims + d]
-                    val sj = f.length[j * f.numDims + d]
-                    val a = freshBool()
-                    model.addLessOrEqual(LinearExpr.affine(oi, 1L, si.toLong()), oj).onlyEnforceIf(a)
-                    val b = freshBool()
-                    model.addLessOrEqual(LinearExpr.affine(oj, 1L, sj.toLong()), oi).onlyEnforceIf(b)
-                    seps.add(a)
-                    seps.add(b)
-                }
-                model.addBoolOr(seps.toTypedArray())
-            }
-        }
-    }
 
     private fun postMdd(f: Mdd) {
         val n = f.seq.size
@@ -573,35 +542,6 @@ class OrToolsModel private constructor(
         }
         model.addLinearExpressionInDomain(LinearExpr.term(q[n], 1), Domain.fromValues(f.accepting.longs()))
         if (f.cost >= 0 && wVars != null) model.addEquality(intVars[f.cost], LinearExpr.sum(wVars.toTypedArray()))
-    }
-
-    private fun postSetSubset(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            if (l < 0) continue
-            if (r < 0) model.addEquality(boolVars[l], 0) else model.addImplication(boolVars[l], boolVars[r])
-        }
-    }
-
-    private fun postSetDisjoint(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            if (l >= 0 && r >= 0) model.addImplication(boolVars[l], boolVars[r].not())
-        }
-    }
-
-    private fun postSetEq(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            when {
-                l >= 0 && r >= 0 -> model.addEquality(boolVars[l], boolVars[r])
-                l >= 0 -> model.addEquality(boolVars[l], 0)
-                r >= 0 -> model.addEquality(boolVars[r], 0)
-            }
-        }
     }
 
     private fun postLinearDomain(expr: LinearExpr, domain: Domain) {

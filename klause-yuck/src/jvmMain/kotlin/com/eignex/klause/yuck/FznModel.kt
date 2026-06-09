@@ -18,7 +18,6 @@ import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Knapsack
@@ -34,9 +33,6 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Sequence
-import com.eignex.klause.solver.factor.SetBitsetDisjoint
-import com.eignex.klause.solver.factor.SetBitsetEq
-import com.eignex.klause.solver.factor.SetBitsetSubset
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
@@ -315,15 +311,8 @@ class FznModel private constructor(
                 constraint("$p(${intVarArray(f.succ)}, 0)")
             }
 
-            is Geost -> postGeost(f)
 
             is Mdd -> postMdd(f)
-
-            is SetBitsetSubset -> postSetSubset(f.leftBools, f.rightBools)
-
-            is SetBitsetDisjoint -> postSetDisjoint(f.leftBools, f.rightBools)
-
-            is SetBitsetEq -> postSetEq(f.leftBools, f.rightBools)
 
             else -> throw UnsupportedFactorException(f)
         }
@@ -565,27 +554,6 @@ class FznModel private constructor(
         }
     }
 
-    private fun postGeost(f: Geost) {
-        // Pairwise separation in at least one dimension: oi+si ≤ oj  ∨  oj+sj ≤ oi (per dim).
-        for (i in 0 until f.numObjects) {
-            for (j in i + 1 until f.numObjects) {
-                val options = ArrayList<String>(2 * f.numDims)
-                for (d in 0 until f.numDims) {
-                    val oi = intName(f.origin[i * f.numDims + d])
-                    val oj = intName(f.origin[j * f.numDims + d])
-                    val si = f.length[i * f.numDims + d]
-                    val sj = f.length[j * f.numDims + d]
-                    val before = newBoolAux()
-                    constraint("int_lin_le_reif([1, -1], [$oi, $oj], ${-si}, $before)") // oi + si ≤ oj
-                    options.add(before)
-                    val after = newBoolAux()
-                    constraint("int_lin_le_reif([1, -1], [$oj, $oi], ${-sj}, $after)") // oj + sj ≤ oi
-                    options.add(after)
-                }
-                postClause(options)
-            }
-        }
-    }
 
     private fun postMdd(f: Mdd) {
         // Each layer is a transition table over (q[i], seq[i], q[i+1][, weight]); chain the
@@ -634,39 +602,6 @@ class FznModel private constructor(
         constraint("set_in(${q[n]}, ${intSet(f.accepting)})")
         if (f.cost >= 0 && wVars != null) {
             linear(List(wVars.size) { 1 } + (-1), wVars + intName(f.cost), LinearOp.EQ, 0)
-        }
-    }
-
-    private fun postSetSubset(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            if (l < 0) continue
-            if (r < 0) {
-                constraint("bool_eq(${boolName(l)}, false)")
-            } else {
-                constraint("bool_le(${boolName(l)}, ${boolName(r)})")
-            }
-        }
-    }
-
-    private fun postSetDisjoint(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            if (l >= 0 && r >= 0) constraint("bool_clause([], ${names(listOf(boolName(l), boolName(r)))})")
-        }
-    }
-
-    private fun postSetEq(left: IntArray, right: IntArray) {
-        for (i in left.indices) {
-            val l = left[i]
-            val r = right[i]
-            when {
-                l >= 0 && r >= 0 -> constraint("bool_eq(${boolName(l)}, ${boolName(r)})")
-                l >= 0 -> constraint("bool_eq(${boolName(l)}, false)")
-                r >= 0 -> constraint("bool_eq(${boolName(r)}, false)")
-            }
         }
     }
 

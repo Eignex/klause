@@ -29,15 +29,11 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.SetBitsetDisjoint
-import com.eignex.klause.solver.factor.SetBitsetEq
-import com.eignex.klause.solver.factor.SetBitsetSubset
 
 /** Universe-size threshold (inclusive) above which set algebra constraints route through
  *  the bulk bitset factors instead of emitting one [Clause] per universe position. The
  *  bulk path collapses N watchers into one and processes the universe as a single sweep;
  *  small universes stay on clauses since N watchers + clause learning is cheaper there. */
-private const val BITSET_UNIVERSE_THRESHOLD: Int = 64
 
 /**
  * Compiler-side layout for a set variable. Mirrors FlatZinc's `SetVarLayout`: one bool
@@ -244,19 +240,9 @@ internal fun Compiler.Build.assertSetNominalIn(expr: SetNominalIn) {
 internal fun Compiler.Build.assertSetSubsetOf(expr: SetSubsetOf) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
-    if (l.universe.size >= BITSET_UNIVERSE_THRESHOLD) {
-        // Bulk path: emit one bitset-subset factor over l's universe; right is aligned by
-        // value, with -1 sentinels where the value is absent from r's universe (which
-        // forces l[i] = false, equivalent to the standalone unit clause the per-element
-        // path would emit).
-        val right = IntArray(l.universe.size) { i ->
-            val ri = r.indexOf(l.universe[i])
-            if (ri >= 0) r.indicatorBoolIds[ri] else -1
-        }
-        factors += SetBitsetSubset(l.indicatorBoolIds, right)
-        return
-    }
     // ∀ e ∈ universe(L): if e ∈ universe(R) then L[e] → R[e], else L[e] = false.
+    // (The former SetBitsetSubset bulk factor was dropped, #209 — these per-element clauses
+    // are its exact equivalent and what bit-blasting expanded it to anyway.)
     for (i in l.universe.indices) {
         val v = l.universe[i]
         val ll = Lit.make(l.indicatorBoolIds[i], positive = true)
@@ -273,17 +259,7 @@ internal fun Compiler.Build.assertSetSubsetOf(expr: SetSubsetOf) {
 internal fun Compiler.Build.assertSetDisjoint(expr: SetDisjoint) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
-    if (l.universe.size >= BITSET_UNIVERSE_THRESHOLD) {
-        // Align r against l's universe; positions absent from r get the -1 sentinel
-        // (which the disjoint factor treats as vacuous — no constraint at that position).
-        val right = IntArray(l.universe.size) { i ->
-            val ri = r.indexOf(l.universe[i])
-            if (ri >= 0) r.indicatorBoolIds[ri] else -1
-        }
-        factors += SetBitsetDisjoint(l.indicatorBoolIds, right)
-        return
-    }
-    // ∀ e ∈ universe(L) ∩ universe(R): ¬(L[e] ∧ R[e]).
+    // ∀ e ∈ universe(L) ∩ universe(R): ¬(L[e] ∧ R[e]). (SetBitsetDisjoint bulk factor dropped, #209.)
     for (i in l.universe.indices) {
         val v = l.universe[i]
         val ri = r.indexOf(v)
@@ -298,19 +274,7 @@ internal fun Compiler.Build.assertSetEq(expr: SetEq) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     val union = unionUniverse(l.universe, r.universe)
-    if (union.size >= BITSET_UNIVERSE_THRESHOLD) {
-        // Align both sides against the unified universe with -1 sentinels for absent positions.
-        val left = IntArray(union.size) { i ->
-            val li = l.indexOf(union[i])
-            if (li >= 0) l.indicatorBoolIds[li] else -1
-        }
-        val right = IntArray(union.size) { i ->
-            val ri = r.indexOf(union[i])
-            if (ri >= 0) r.indicatorBoolIds[ri] else -1
-        }
-        factors += SetBitsetEq(left, right)
-        return
-    }
+    // Per-element biconditional over the unified universe. (SetBitsetEq bulk factor dropped, #209.)
     for (v in union) {
         val li = l.indexOf(v)
         val ri = r.indexOf(v)

@@ -30,11 +30,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferentExcept
 import com.eignex.klause.solver.factor.ArgSort
-import com.eignex.klause.solver.factor.Geost
 import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.MinCostFlow
-import com.eignex.klause.solver.factor.Path
-import com.eignex.klause.solver.factor.Tree
 
 /*
  * Decompositions for the "newer" globals. Each [decomposeXxx] returns a [BoolExpr] in
@@ -166,53 +162,16 @@ internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
 //  network_flow / network_flow_cost
 // ----------------------------------------------------------------------------
 
-/** Top-level entry: emit the [MinCostFlow] factor when
- *  every flow term lifts to a bare [IntRef]. Falls back to the linear-per-node decomposition. */
+/** Top-level entry: lower `network_flow` to one flow-conservation `int_lin_eq` per node.
+ *  The former native `MinCostFlow` propagator (interval-arithmetic bounds only) was dropped —
+ *  the per-node equalities are LP-relaxation-backed and bound at least as tightly (#209). */
 internal fun Compiler.Build.assertNetworkFlow(expr: NetworkFlowExpr) {
-    val lifted = expr.flow.map { lift(it) }
-    if (lifted.all { it is IntRef }) {
-        val flowIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
-        factors += MinCostFlow(
-            numNodes = expr.numNodes,
-            arcFrom = expr.arcFrom.toIntArray(),
-            arcTo = expr.arcTo.toIntArray(),
-            balance = expr.balance.toIntArray(),
-            flow = flowIds,
-            weight = null,
-            cost = -1,
-            nodeOffset = expr.nodeOffset,
-        )
-        return
-    }
     assertExpr(decomposeNetworkFlow(expr))
 }
 
+/** Top-level entry: lower `network_flow_cost` to the per-node flow-conservation equalities plus
+ *  the `cost = Σ weight·flow` equality, all as `int_lin_eq` constraints (#209). */
 internal fun Compiler.Build.assertNetworkFlowCost(expr: NetworkFlowCostExpr) {
-    val lifted = expr.flow.map { lift(it) }
-    val liftedCost = lift(expr.cost)
-    if (lifted.all { it is IntRef } && liftedCost is IntRef) {
-        val flowIds = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
-        val costId = intVarOf(liftedCost.name)
-        factors += MinCostFlow(
-            numNodes = expr.numNodes,
-            arcFrom = expr.arcFrom.toIntArray(),
-            arcTo = expr.arcTo.toIntArray(),
-            balance = expr.balance.toIntArray(),
-            flow = flowIds,
-            weight = expr.weight.toIntArray(),
-            cost = costId,
-            nodeOffset = expr.nodeOffset,
-        )
-        // Also emit the cost equality as a Linear factor for tight bound propagation.
-        // (The MinCostFlow factor only does interval-arithmetic bounds.)
-        val sumTerms = mutableListOf<IntExpr>()
-        for (a in expr.flow.indices) {
-            sumTerms += if (expr.weight[a] == 1) expr.flow[a] else IntScale(expr.weight[a], expr.flow[a])
-        }
-        sumTerms += IntScale(-1, expr.cost)
-        assertExpr(IntCompare(IntSum(sumTerms), IntCmpOp.EQ, IntLit(0)))
-        return
-    }
     assertExpr(decomposeNetworkFlowCost(expr))
 }
 
@@ -275,22 +234,10 @@ internal fun Compiler.Build.decomposeNetworkFlowCost(expr: NetworkFlowCostExpr):
 //  geost
 // ----------------------------------------------------------------------------
 
-/** Top-level entry: emit [Geost] when every origin is
- *  a bare [IntRef]. */
+/** Top-level entry: lower `geost` to the exact pairwise OR-of-axis-separation decomposition.
+ *  The former native `Geost` graded propagator was dropped (#209) — the per-pair separation
+ *  disjunction fully enforces non-overlap and is the same encoding adapters/bit-blast already use. */
 internal fun Compiler.Build.assertGeost(expr: GeostExpr) {
-    val lifted = expr.origin.map { lift(it) }
-    if (lifted.all { it is IntRef }) {
-        val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
-        factors += Geost(
-            numDims = expr.numDims,
-            numObjects = expr.numObjects,
-            origin = ids,
-            length = expr.length.toIntArray(),
-        )
-        // Also emit the pairwise OR-decomposition so multi-free-dim cases still propagate.
-        assertExpr(decomposeGeost(expr))
-        return
-    }
     assertExpr(decomposeGeost(expr))
 }
 
@@ -348,39 +295,9 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
     val nodeP = expr.nodePresent
     val edgeP = expr.edgePresent
 
-    // Dedicated Path factor for reachability propagation (added on top of the
-    // degree/flow decomposition below).
-    val srcId = run {
-        val l = lift(expr.source)
-        require(l is IntRef) { "path: source must lift to bare var" }
-        intVarOf(l.name)
-    }
-    val sinkId = run {
-        val l = lift(expr.sink)
-        require(l is IntRef) { "path: sink must lift to bare var" }
-        intVarOf(l.name)
-    }
-    val nodeBoolIds = IntArray(n) { i ->
-        val lit = lowerToLit(nodeP[i])
-        require(Lit.isPositive(lit)) { "path: nodePresent[$i] must be a bare BoolRef" }
-        Lit.variable(lit)
-    }
-    val edgeBoolIds = IntArray(m) { e ->
-        val lit = lowerToLit(edgeP[e])
-        require(Lit.isPositive(lit)) { "path: edgePresent[$e] must be a bare BoolRef" }
-        Lit.variable(lit)
-    }
-    factors += Path(
-        numNodes = n,
-        from = expr.from.toIntArray(),
-        to = expr.to.toIntArray(),
-        source = srcId,
-        sink = sinkId,
-        nodePresent = nodeBoolIds,
-        edgePresent = edgeBoolIds,
-        nodeOffset = off,
-    )
-
+    // The former native Path reachability factor was dropped (#209); the degree/role
+    // constraints below plus MTZ-level subtour elimination fully enforce the source-to-sink
+    // path (the same encoding FactorDecomposer used for the bit-blast / adapter path).
     val inArcs = Array(n) { mutableListOf<Int>() }
     val outArcs = Array(n) { mutableListOf<Int>() }
     for (e in 0 until m) {
@@ -475,24 +392,29 @@ internal fun Compiler.Build.assertPath(expr: PathExpr) {
     assertExpr(IntCompare(expr.sink, IntCmpOp.GE, IntLit(off)))
     assertExpr(IntCompare(expr.sink, IntCmpOp.LE, IntLit(off + n - 1)))
 
-    // Subtour elimination via single-commodity flow rooted at source. Allocate flow
-    // variables on each arc, capped by edge_present; source has supply = #present_nodes - 1,
-    // sink has demand of the same magnitude (we let it be n − 1 worst-case; slack absorbs).
-    val flowVars = IntArray(m) { allocAuxBoundedInt(0, n).let { aux -> intVarOf(aux.name) } }
-    // flow ≤ n · edge_present[e]   →  flow − n · ep ≤ 0.
-    for (e in 0 until m) {
-        assertExpr(Implies(Not(edgeP[e]), IntCompare(IntRef(intVarNameById(flowVars[e])), IntCmpOp.EQ, IntLit(0))))
-    }
-    // Per-node flow conservation: nodes other than source/sink balance (out − in = 0);
-    // source has out − in = (Σ present) − 1; sink has out − in = − ((Σ present) − 1).
-    // We collapse to: at each non-source non-sink present node, the inflow ≥ 1 if present
-    // (since each present non-source node must be reached); equivalently we require the
-    // flow on its single incoming edge to be ≥ 1 when present.
-    // Simpler robust formulation: at every present non-source node, inflow ≥ 1.
+    // Subtour elimination via per-node MTZ levels: level[v] ∈ [0, n−1], level[source] = 0,
+    // and a present edge u→v forces level[v] = level[u] + 1. Around any cycle this would
+    // require level[u] + k = level[u] (infeasible), so the only feasible present subgraph is
+    // a source-to-sink path — ruling out the disconnected components degree constraints permit.
+    val level = IntArray(n) { intVarOf(newAuxIntVar(IntDomain(0, n - 1))) }
     for (v in 0 until n) {
-        val inflow = IntSum(inArcs[v].map { e -> IntRef(intVarNameById(flowVars[e])) } + IntLit(0))
         val isSource = IntCompare(expr.source, IntCmpOp.EQ, IntLit(v + off))
-        assertExpr(Implies(And(listOf(nodeP[v], Not(isSource))), IntCompare(inflow, IntCmpOp.GE, IntLit(1))))
+        assertExpr(Implies(isSource, IntCompare(IntRef(intVarNameById(level[v])), IntCmpOp.EQ, IntLit(0))))
+    }
+    for (e in 0 until m) {
+        val u = expr.from[e] - off
+        val v = expr.to[e] - off
+        // level[v] − level[u] = 1.
+        assertExpr(
+            Implies(
+                edgeP[e],
+                IntCompare(
+                    IntSum(listOf(IntRef(intVarNameById(level[v])), IntScale(-1, IntRef(intVarNameById(level[u]))))),
+                    IntCmpOp.EQ,
+                    IntLit(1),
+                ),
+            ),
+        )
     }
 }
 
@@ -503,31 +425,9 @@ internal fun Compiler.Build.assertTree(expr: TreeExpr) {
     val nodeP = expr.nodePresent
     val edgeP = expr.edgePresent
 
-    val rootId = run {
-        val l = lift(expr.root)
-        require(l is IntRef) { "tree: root must lift to bare var" }
-        intVarOf(l.name)
-    }
-    val nodeBoolIds = IntArray(n) { i ->
-        val lit = lowerToLit(nodeP[i])
-        require(Lit.isPositive(lit)) { "tree: nodePresent[$i] must be a bare BoolRef" }
-        Lit.variable(lit)
-    }
-    val edgeBoolIds = IntArray(m) { e ->
-        val lit = lowerToLit(edgeP[e])
-        require(Lit.isPositive(lit)) { "tree: edgePresent[$e] must be a bare BoolRef" }
-        Lit.variable(lit)
-    }
-    factors += Tree(
-        numNodes = n,
-        from = expr.from.toIntArray(),
-        to = expr.to.toIntArray(),
-        root = rootId,
-        nodePresent = nodeBoolIds,
-        edgePresent = edgeBoolIds,
-        nodeOffset = off,
-    )
-
+    // The former native Tree reachability factor was dropped (#209); the in-degree/root
+    // constraints below plus the rank-based acyclicity fully enforce the in-tree rooted at
+    // `root` (the same encoding FactorDecomposer used for the bit-blast / adapter path).
     val inArcs = Array(n) { mutableListOf<Int>() }
     val outArcs = Array(n) { mutableListOf<Int>() }
     for (e in 0 until m) {

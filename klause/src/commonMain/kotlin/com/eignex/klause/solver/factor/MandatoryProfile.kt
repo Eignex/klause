@@ -5,7 +5,7 @@ import kotlin.math.min
 
 /**
  * Shared mandatory-profile (compulsory-part) machinery for the time-tabling propagators
- * [Cumulative], [Cumulatives], and [Disjunctive].
+ * [Cumulative] and [Disjunctive].
  *
  * A present task with start domain `[s.min, s.max]` and fixed duration `d` has a
  * *compulsory part* `[lst, ect) = [s.max, s.min + d)` that it must occupy wherever it
@@ -21,7 +21,7 @@ import kotlin.math.min
  * unit-resource specialization (`build(cap = 1)`, `overloadsAt(..., r = 1, cap = 1, ...)`).
  *
  * One instance covers a single profile (build once, then query); callers needing several
- * profiles (e.g. one per machine in [Cumulatives]) allocate one instance each.
+ * profiles (e.g. one per machine) allocate one instance each.
  */
 internal class MandatoryProfile {
     private val events = ArrayList<IntArray>()
