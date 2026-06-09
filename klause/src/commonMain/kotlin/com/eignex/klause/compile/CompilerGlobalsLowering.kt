@@ -7,8 +7,6 @@ import com.eignex.klause.ast.ArgSortExpr
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.CostMddExpr
 import com.eignex.klause.ast.CostRegularExpr
-import com.eignex.klause.ast.Iff
-import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
 import com.eignex.klause.ast.IntElement
@@ -18,11 +16,9 @@ import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntScale
 import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.MddExpr
-import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferentExcept
 import com.eignex.klause.solver.factor.ArgSort
 import com.eignex.klause.solver.factor.Mdd

@@ -401,8 +401,8 @@ internal class DualSimplex(private val model: LpModel) {
                 infeas++
                 if (useBland) {
                     if (v < leavingVar) {
-                        leavingVar = v;
-                        r = i;
+                        leavingVar = v
+                        r = i
                         belowLower = low
                     }
                 } else {
@@ -410,9 +410,9 @@ internal class DualSimplex(private val model: LpModel) {
                     val raw = if (low) beta[i] else subExact(beta[i], mulExact(model.upper[v], d))
                     val viol = if (raw < 0L) -raw else raw
                     if (viol > bestViol || r == -1) {
-                        bestViol = viol;
-                        r = i;
-                        leavingVar = v;
+                        bestViol = viol
+                        r = i
+                        leavingVar = v
                         belowLower = low
                     }
                 }
@@ -420,7 +420,7 @@ internal class DualSimplex(private val model: LpModel) {
             if (r == -1) return buildSolution(beta, LpStatus.OPTIMAL, pivots)
             // Stall detection: if the infeasibility count is not shrinking, fall back to Bland.
             if (infeas < bestInfeas) {
-                bestInfeas = infeas;
+                bestInfeas = infeas
                 sinceImprove = 0
             } else if (++sinceImprove > stallLimit) {
                 useBland = true

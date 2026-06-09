@@ -37,15 +37,15 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
     }
 
     private fun addEdge(u: Int, v: Int, capacity: Int, edgeCost: Long) {
-        to.add(v);
-        cap.add(capacity);
-        cost.add(edgeCost);
-        nextEdge.add(head[u]);
+        to.add(v)
+        cap.add(capacity)
+        cost.add(edgeCost)
+        nextEdge.add(head[u])
         head[u] = to.size - 1
-        to.add(u);
-        cap.add(0);
-        cost.add(-edgeCost);
-        nextEdge.add(head[v]);
+        to.add(u)
+        cap.add(0)
+        cost.add(-edgeCost)
+        nextEdge.add(head[v])
         head[v] = to.size - 1
     }
 
@@ -117,7 +117,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
                         dist[to[e]] = nd
                         prevEdge[to[e]] = e
                         if (!inQueue[to[e]]) {
-                            queue.addLast(to[e]);
+                            queue.addLast(to[e])
                             inQueue[to[e]] = true
                         }
                     }

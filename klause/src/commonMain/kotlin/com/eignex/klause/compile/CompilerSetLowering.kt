@@ -30,38 +30,6 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
 
-/** Universe-size threshold (inclusive) above which set algebra constraints route through
- *  the bulk bitset factors instead of emitting one [Clause] per universe position. The
- *  bulk path collapses N watchers into one and processes the universe as a single sweep;
- *  small universes stay on clauses since N watchers + clause learning is cheaper there. */
-
-/**
- * Compiler-side layout for a set variable. Mirrors FlatZinc's `SetVarLayout`: one bool
- * per universe element, indexed in parallel arrays.
- *
- *  - `universe[i]` is the integer value of the i'th universe element. For nominal-set
- *    vars the value is the label's index in [Compiler.Build.setLabelOrder] — the actual
- *    label string lives there.
- *  - `indicatorBoolIds[i]` is the klause-side Bool var id that's true iff `universe[i]`
- *    is currently a member of the set.
- *
- * Anything that walks a [com.eignex.klause.ast.SetExpr] eventually produces one of these,
- * either by looking up an existing set var via [Compiler.Build.materializeSet] or by
- * synthesising aux indicators for `union` / `intersect` / `diff` / set literals.
- */
-internal class SetLayout(val universe: IntArray, val indicatorBoolIds: IntArray) {
-    init {
-        require(universe.size == indicatorBoolIds.size) {
-            "SetLayout parallel arrays must have equal length"
-        }
-    }
-    val size: Int get() = universe.size
-
-    /** Index of [value] in this layout's universe, or -1 if not present. Universe is
-     *  sorted ascending so a binary search is correct. */
-    fun indexOf(value: Int): Int = universe.toList().binarySearch(value).let { if (it < 0) -1 else it }
-}
-
 /**
  * Materialise a [SetExpr] into a [SetLayout]. Looks up named set vars; for compound
  * expressions (union / intersect / diff / literal) allocates aux indicator bools and

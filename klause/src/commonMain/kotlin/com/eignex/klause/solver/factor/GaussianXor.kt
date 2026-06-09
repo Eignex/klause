@@ -26,7 +26,9 @@ import com.eignex.klause.solver.propagation.PropagationState
  * so even-occurrence variables cancel and a derived row's reason is exactly its
  * odd-occurrence assigned support — the minimal sufficient set (#174).
  */
-class GaussianXor(constraints: List<Xor>) : Factor, LocalSearchFactor {
+class GaussianXor(constraints: List<Xor>) :
+    Factor,
+    LocalSearchFactor {
 
     /** Union of all variables across the constraints, in stable order; column index = position. */
     override val boolVars: IntArray

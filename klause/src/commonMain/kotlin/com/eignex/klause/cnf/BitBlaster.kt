@@ -826,7 +826,6 @@ object BitBlaster {
         return p
     }
 
-
     /** Comparator literal for `a < c` between two int vars (a − c ≤ −1). */
     private fun ltLit(b: CnfBuilder, a: Int, c: Int, intBits: Array<IntArray>, intMin: IntArray): Int =
         buildLinearComparator(b, intArrayOf(1, -1), intArrayOf(a, c), LinearOp.LE, -1, intBits, intMin)
