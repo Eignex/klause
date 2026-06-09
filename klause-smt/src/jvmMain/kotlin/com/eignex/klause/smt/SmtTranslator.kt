@@ -287,7 +287,6 @@ internal object SmtTranslator {
 
             is Subcircuit -> subcircuit(factor)
 
-
             is Mdd -> mdd(factor)
 
             else -> error("SmtTranslator: unsupported factor type ${factor::class.simpleName}")
@@ -565,7 +564,6 @@ internal object SmtTranslator {
         }
 
         private fun freshBool(): BooleanFormula = bmgr.makeVariable("aux_b${freshId++}")
-        private fun bvar(id: Int): BooleanFormula = e.boolFormulas[id]
 
         private fun subcircuit(f: Subcircuit): BooleanFormula {
             // succ is always a permutation (each node has one successor; excluded nodes
