@@ -142,6 +142,8 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
         val rest = trivialRest(session)
         val p = LongArray(multiplierCount) { startMultipliers.getOrElse(it) { 0L } }
         var bestNum = Long.MIN_VALUE
+        // Previous ascent direction, for deflected (conjugate) subgradient stabilization.
+        val prevDir = DoubleArray(multiplierCount)
 
         try {
             val steps = if (incumbent.isFinite()) iterations else 1
@@ -157,7 +159,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
                     return Result(true, num, Q, p)
                 }
                 if (!incumbent.isFinite() || multiplierCount == 0) return@repeat
-                if (!subgradientStep(assignment, valueList, p, num, incumbent)) return@repeat
+                if (!subgradientStep(assignment, valueList, p, num, incumbent, prevDir)) return@repeat
             }
         } catch (_: LpOverflowException) {
             if (bestNum == Long.MIN_VALUE) return null
@@ -187,16 +189,24 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
         return assign.solve()
     }
 
-    /** One Polyak subgradient ascent step on the multipliers; false if the subgradient is zero. */
+    /**
+     * One deflected (conjugate) subgradient ascent step on the multipliers; false if the subgradient
+     * is zero. The lightweight bundle-style stabilization (Camerini–Fratta–Maffioli with γ = 1):
+     * the step direction is `d = g + β·prevDir` with `β = max(0, −(g·prevDir)/‖prevDir‖²)`, which by
+     * Cauchy–Schwarz keeps `d·g ≥ 0` (a valid ascent direction) while damping the zigzag that slows
+     * plain subgradient. A full proximal-bundle master is deferred — it needs a free-variable QP/LP
+     * solver klause does not have, and the bound is exact for any λ regardless of how λ is chosen.
+     */
     private fun subgradientStep(
         assignment: MinCostAssignment.Result,
         valueList: IntArrayList,
         p: LongArray,
         num: Long,
         incumbent: Double,
+        prevDir: DoubleArray,
     ): Boolean {
         val g = LongArray(multiplierCount)
-        var norm2 = 0.0
+        var gNorm2 = 0.0
         for (r in 0 until multiplierCount) {
             var gr = -linkRhs[r]
             for (i in vars.indices) {
@@ -204,14 +214,30 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
                 if (a != 0L) gr += a * valueList[assignment.assignedValue[i]]
             }
             g[r] = gr
-            norm2 += (gr.toDouble() * gr.toDouble())
+            gNorm2 += (gr.toDouble() * gr.toDouble())
         }
-        if (norm2 == 0.0) return false // multipliers optimal for this subproblem
-        // Polyak: t = (UB − L) / ‖g‖²; step λ_r += t·g_r, i.e. p_r += round(Q·t·g_r), then project.
-        val lValue = num.toDouble() / Q.toDouble()
-        val t = (incumbent - lValue) / norm2
+        if (gNorm2 == 0.0) return false // multipliers optimal for this subproblem
+        // Deflection: combine with the previous direction to suppress zigzagging.
+        var gDotPrev = 0.0
+        var prevNorm2 = 0.0
         for (r in 0 until multiplierCount) {
-            val step = (Q.toDouble() * t * g[r]).toLong()
+            gDotPrev += g[r].toDouble() * prevDir[r]
+            prevNorm2 += prevDir[r] * prevDir[r]
+        }
+        val beta = if (prevNorm2 > 0.0 && gDotPrev < 0.0) -gDotPrev / prevNorm2 else 0.0
+        var dNorm2 = 0.0
+        val d = DoubleArray(multiplierCount)
+        for (r in 0 until multiplierCount) {
+            d[r] = g[r].toDouble() + beta * prevDir[r]
+            dNorm2 += d[r] * d[r]
+            prevDir[r] = d[r]
+        }
+        if (dNorm2 == 0.0) return false
+        // Polyak along the deflected direction: t = (UB − L) / ‖d‖²; p_r += round(Q·t·d_r), projected.
+        val lValue = num.toDouble() / Q.toDouble()
+        val t = (incumbent - lValue) / dNorm2
+        for (r in 0 until multiplierCount) {
+            val step = (Q.toDouble() * t * d[r]).toLong()
             var pr = p[r] + step
             when (linkSign[r]) {
                 1 -> if (pr < 0L) pr = 0L
