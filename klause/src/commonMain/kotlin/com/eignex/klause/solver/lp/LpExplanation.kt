@@ -32,6 +32,9 @@ internal object LpExplanation {
         for (k in solution.certCols.indices) {
             val col = solution.certCols[k]
             val varId = relaxation.colVarId[col]
+            // An auxiliary column (e.g. a circuit arc) has no CP bound atom; dropping it would make
+            // the clause too strong (unsound), so abandon learning when the certificate touches one.
+            if (varId < 0) return null
             val atUpper = solution.certBoundIsUpper[k]
             if (relaxation.colIsBool[col]) {
                 // Seated at upper ⇒ pinned true, at lower ⇒ pinned false; the clause negates it.
