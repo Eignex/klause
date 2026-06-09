@@ -26,6 +26,7 @@ import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
 import com.eignex.klause.solver.lp.FloatSimplex
 import com.eignex.klause.solver.lp.LagrangianBound
+import com.eignex.klause.solver.lp.LpExplanation
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRelaxation
 import com.eignex.klause.solver.lp.LpSolution
@@ -248,6 +249,9 @@ class BacktrackSolver(override val problem: Problem) :
             null
         }
         var lpCheckCounter = 0
+        // LP-learned nogoods (#247): infeasible-node Farkas clauses, collected here by the prune
+        // closure and flushed into the clause DB at each restart (where they are no longer all-false).
+        val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
         // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
         // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
         val lpBasisByDepth = ArrayList<Basis?>()
@@ -310,6 +314,7 @@ class BacktrackSolver(override val problem: Problem) :
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                             lpBasisByDepth[depth] = outcome.basis
                         }
+                        if (outcome.explanation != null) lpNogoods?.add(outcome.explanation)
                         outcome.prune
                     }
 
@@ -333,6 +338,7 @@ class BacktrackSolver(override val problem: Problem) :
             objectiveVar = singleObj?.varId ?: -1,
             objectiveAscending = singleObj?.ascending ?: true,
             objectiveBest = { objVarBest },
+            lpNogoods = lpNogoods,
         )) {
             when (outcome) {
                 is SearchOutcome.Found -> {
@@ -435,7 +441,32 @@ class BacktrackSolver(override val problem: Problem) :
     }
 
     /** Outcome of one node LP pass: whether to prune, and the basis to warm-start children from. */
-    private class LpNodeOutcome(val prune: Boolean, val basis: Basis?)
+    private class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
+
+    /**
+     * Bounded, deduplicating buffer of LP-learned Farkas nogoods (#247) awaiting registration at the
+     * next restart. Dedup is by sorted-literal key so a region pruned repeatedly is learned once; the
+     * cap bounds memory between restarts (a learned clause that matters most has the lowest LBD anyway,
+     * and the forgetting pass governs the live DB). [drain] returns and clears the pending batch but
+     * keeps the seen-set so a flushed clause is not re-queued.
+     */
+    private class LpNogoodPool(private val cap: Int = 4096) {
+        private val seen = HashSet<String>()
+        private val pending = ArrayList<IntArray>()
+
+        fun add(nogood: IntArray) {
+            if (nogood.isEmpty() || seen.size >= cap) return
+            val key = nogood.sorted().joinToString(",")
+            if (seen.add(key)) pending.add(nogood)
+        }
+
+        fun drain(): List<IntArray> {
+            if (pending.isEmpty()) return emptyList()
+            val out = ArrayList(pending)
+            pending.clear()
+            return out
+        }
+    }
 
     /** True when the relaxation's rounded objective bound is at least the incumbent. */
     private fun boundPrunes(solution: LpSolution, relaxation: LpRelaxation, bound: Double): Boolean {
@@ -468,6 +499,16 @@ class BacktrackSolver(override val problem: Problem) :
         LpNodeOutcome(false, null)
     }
 
+    /** The Farkas nogood for an infeasible node LP (#247), or null when learning is off / no
+     *  certificate. The clause is over absolute bound atoms, so it is globally valid and registered
+     *  lazily at a restart (where its literals are no longer all-false). */
+    private fun lpExplanation(
+        params: BacktrackParams,
+        relaxation: LpRelaxation,
+        solution: LpSolution,
+        session: PropagationSession,
+    ): IntArray? = if (params.lpLearn) LpExplanation.infeasibilityClause(relaxation, solution, session) else null
+
     private fun lpBoundAndFixUnsafe(
         relaxer: CpToLpRelaxation,
         session: PropagationSession,
@@ -493,7 +534,7 @@ class BacktrackSolver(override val problem: Problem) :
         when (solution.status) {
             LpStatus.INFEASIBLE -> {
                 sink.observeLpPrune()
-                return LpNodeOutcome(true, null)
+                return LpNodeOutcome(true, null, lpExplanation(params, relaxation, solution, session))
             }
 
             LpStatus.UNBOUNDED -> return LpNodeOutcome(false, null)
@@ -526,7 +567,7 @@ class BacktrackSolver(override val problem: Problem) :
                 sink.observeLpPivots(solution.pivots)
                 if (solution.status == LpStatus.INFEASIBLE) {
                     sink.observeLpPrune()
-                    return LpNodeOutcome(true, warmCache)
+                    return LpNodeOutcome(true, warmCache, lpExplanation(params, relaxation, solution, session))
                 }
                 if (solution.status != LpStatus.OPTIMAL) break
                 if (boundPrunes(solution, relaxation, bound)) {
@@ -771,6 +812,9 @@ class BacktrackSolver(override val problem: Problem) :
         objectiveVar: Int = -1,
         objectiveAscending: Boolean = true,
         objectiveBest: () -> Int? = { null },
+        // LP-learned Farkas nogoods (#247) pending registration; drained at each restart while the
+        // trail is at root, so their bound atoms are no longer all-false. Null when learning is off.
+        lpNogoods: LpNogoodPool? = null,
     ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted(coreOf(problem.baked)))
@@ -933,6 +977,23 @@ class BacktrackSolver(override val problem: Problem) :
                             // cannot re-yield the same leaf. A root-level contradiction here
                             // proves the remaining space empty.
                             val nogood = session.assignmentNogood(restartBlock.bools, restartBlock.ints)
+                            val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                            if (res is PropagationResult.Unsat) {
+                                yield(
+                                    SearchOutcome.Exhausted(
+                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
+                                    ),
+                                )
+                                return@sequence
+                            }
+                        }
+                    }
+                    // LP-learned Farkas nogoods (#247): the trail is at root, so each clause's bound
+                    // atoms are free again. Register them permanently; a root contradiction proves the
+                    // whole space empty. Globally valid (implied by the original constraints).
+                    if (lpNogoods != null) {
+                        val drained = lpNogoods.drain()
+                        for (nogood in drained) {
                             val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
                             if (res is PropagationResult.Unsat) {
                                 yield(

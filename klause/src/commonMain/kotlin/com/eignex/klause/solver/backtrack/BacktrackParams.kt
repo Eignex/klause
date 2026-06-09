@@ -221,6 +221,15 @@ data class BacktrackParams(
      * Cumulative. Currently applied on the minimization path alongside the other LP bounds.
      */
     val energeticReasoning: Boolean = false,
+    /**
+     * Learn a clause from an infeasible node LP (#247). When true, the LP's Farkas infeasibility
+     * certificate is turned into a nogood over absolute variable-bound atoms — a globally valid
+     * clause implied by the original constraints — and registered at the next restart (where its
+     * literals are no longer all-false), so the dead region is pruned in sibling subtrees. Requires
+     * [lpBounding]; takes effect only when restarts are enabled (see [lubyRestartBase] /
+     * [adaptiveRestart]). Off by default.
+     */
+    val lpLearn: Boolean = false,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

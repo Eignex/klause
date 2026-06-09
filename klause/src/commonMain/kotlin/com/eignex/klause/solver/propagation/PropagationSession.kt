@@ -90,6 +90,13 @@ class PropagationSession(
         return out
     }
 
+    /** Literal `x_v ≥ threshold` ([positive]) or its negation — for LP/energetic explanation
+     *  clauses (#247), whose reason atoms are absolute variable bounds. */
+    fun boundGeLit(v: Int, threshold: Int, positive: Boolean): Int = Lit.make(state.atomVarGe(v, threshold), positive)
+
+    /** Literal `x_v ≤ threshold` ([positive]) or its negation. See [boundGeLit]. */
+    fun boundLeLit(v: Int, threshold: Int, positive: Boolean): Int = Lit.make(state.atomVarLe(v, threshold), positive)
+
     /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
      *  All session operations short-circuit to this result. */
     private var bakedUnsat: PropagationResult.Unsat? = null
