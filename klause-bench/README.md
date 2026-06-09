@@ -99,9 +99,9 @@ Distinct from the `coverage` metric: `format-coverage:xcsp3|smtlib` fetches an e
 
 ## Catalog, corpus, and selection
 
-Suites and problems are declared in `catalog/Suites.kt`. Add a problem with `vendored` (a file under `corpus/`), `inCode` (built in Kotlin), `workspace` (a file elsewhere in the repo), or `external` (inside a fetched collection). Add a `Target` only when an invocation carries config worth a name.
+Suites and problems are declared in `catalog/Suites.kt`. Add a problem with `vendored` (a small file under `smoke-corpus/`), `inCode` (built in Kotlin), `workspace` (a file elsewhere in the repo), or `external` (inside a fetched collection). Add a `Target` only when an invocation carries config worth a name.
 
-Vendored problems live in `corpus/` (see `corpus/PROVENANCE.md`). Non-redistributable collections (MiniZinc Challenge, libminizinc, hakank, SATLIB) are fetched on first use into `build/corpus-cache/` and declared with license + reason in `ExternalCollections`; the large MiniZinc corpora are exposed as discovered suites (`mzn-bench`, `libminizinc-tests`, `hakank`) selected by the family-aware machinery in `source/CorpusSelection.kt`. For parallel sweeps, `-Dklause.bench.shard=i/n` keeps every n-th selected instance (applied before resolution, so shards never race on the mzn→fzn cache).
+Vendored problems live in `smoke-corpus/` — small, fast instances meant to exercise parsers and cross-check solvers, not to stress them (see `smoke-corpus/PROVENANCE.md`). Non-redistributable collections (MiniZinc Challenge, libminizinc, hakank, SATLIB) are fetched on first use into `build/corpus-cache/` and declared with license + reason in `ExternalCollections`; the large MiniZinc corpora are exposed as discovered suites (`mzn-bench`, `libminizinc-tests`, `hakank`) selected by the family-aware machinery in `source/CorpusSelection.kt`. For parallel sweeps, `-Dklause.bench.shard=i/n` keeps every n-th selected instance (applied before resolution, so shards never race on the mzn→fzn cache).
 
 ## Reference solvers
 

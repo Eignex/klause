@@ -70,7 +70,7 @@ tasks.register<JavaExec>("bench") {
 
 tasks.register("dumpSchema", JavaExec::class) {
     group = "tools"
-    description = "Regenerate bundled JSON SchemaDef sample at corpus/schema/campaign.json."
+    description = "Regenerate bundled JSON SchemaDef sample at smoke-corpus/schema/campaign.json."
     notCompatibleWithConfigurationCache(
         "JavaExec.standardOutput is not serialisable into the configuration cache",
     )
@@ -78,7 +78,7 @@ tasks.register("dumpSchema", JavaExec::class) {
     mainClass.set("com.eignex.klause.bench.tools.SchemaDumperKt")
     doFirst {
         standardOutput = FileOutputStream(
-            layout.projectDirectory.file("corpus/schema/campaign.json").asFile,
+            layout.projectDirectory.file("smoke-corpus/schema/campaign.json").asFile,
         )
     }
 }

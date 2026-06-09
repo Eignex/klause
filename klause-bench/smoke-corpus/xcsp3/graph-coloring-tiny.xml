@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Self-authored XCSP3 smoke instance. License: internal. -->
+<!-- 2-colouring of the 4-cycle v0-v1-v2-v3-v0 (bipartite): adjacent nodes differ. -->
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="v" size="[4]"> 1..2 </array>
+  </variables>
+  <constraints>
+    <intension> ne(v[0],v[1]) </intension>
+    <intension> ne(v[1],v[2]) </intension>
+    <intension> ne(v[2],v[3]) </intension>
+    <intension> ne(v[3],v[0]) </intension>
+  </constraints>
+</instance>
