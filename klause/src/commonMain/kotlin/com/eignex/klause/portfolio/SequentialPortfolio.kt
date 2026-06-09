@@ -45,18 +45,22 @@ class SequentialPortfolio(
     val workers: List<PortfolioWorker>,
     /** kumulant arm-selection policy; see [exp3] for the default non-stationary choice. */
     private val bandit: UnivariateBandit,
-    /** First segment's time slice; subsequent slices grow by [sliceGrowth] up to [maxSliceMillis]. */
+    /** First post-warmup time slice; subsequent slices grow by [sliceGrowth] up to [maxSliceMillis]. */
     private val baseSliceMillis: Long = 2_000,
     /** Cap on a single segment's time slice. */
     private val maxSliceMillis: Long = 60_000,
-    /** Geometric growth applied to the slice after each segment. */
+    /** Geometric growth applied to the slice after each post-warmup segment. */
     private val sliceGrowth: Double = 1.5,
+    /** Round-robin warmup slice: each arm is forced once for this long before the bandit takes
+     *  over, so a short deadline can't leave a winning arm at zero budget (EXP3 starvation). */
+    private val warmupSliceMillis: Long = 1_000,
 ) : AutoCloseable {
 
     init {
         require(workers.isNotEmpty()) { "SequentialPortfolio must have at least one worker" }
         require(baseSliceMillis > 0 && maxSliceMillis >= baseSliceMillis) { "invalid slice bounds" }
         require(sliceGrowth >= 1.0) { "sliceGrowth must be ≥ 1.0" }
+        require(warmupSliceMillis > 0) { "warmupSliceMillis must be > 0" }
     }
 
     /** A per-segment cancellation that fires when the global token fires or the slice elapses. */
@@ -73,9 +77,12 @@ class SequentialPortfolio(
     fun solve(cancellation: Cancellation = Cancellation.Never): SolveResult {
         var stats = SolveStats.EMPTY
         var slice = baseSliceMillis
+        var segment = 0
         while (!cancellation()) {
-            val arm = bandit.choose()
-            val r = runCatching { workers[arm].solve(sliceToken(cancellation, slice)) }.getOrNull()
+            val warming = segment < workers.size
+            val arm = if (warming) segment else bandit.choose()
+            val sliceMs = if (warming) warmupSliceMillis else slice
+            val r = runCatching { workers[arm].solve(sliceToken(cancellation, sliceMs)) }.getOrNull()
             if (r != null) stats = stats.mergedWith(r.stats)
             val definitive = r is SolveResult.Sat || r is SolveResult.Unsat
             bandit.update(arm, if (definitive) 1.0 else 0.0)
@@ -84,7 +91,8 @@ class SequentialPortfolio(
                 is SolveResult.Unsat -> return r.copy(stats = stats)
                 else -> Unit
             }
-            slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
+            if (!warming) slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
+            segment++
         }
         return SolveResult.Unknown(TerminationReason.Cancelled, stats)
     }
@@ -107,15 +115,20 @@ class SequentialPortfolio(
         var rewardScale = 0.0
         var stats = SolveStats.EMPTY
         var slice = baseSliceMillis
+        var segment = 0
         val readBound = { bound }
 
         while (!cancellation()) {
-            val arm = bandit.choose()
+            // Round-robin warmup: force every arm once (at the short warmup slice) before the
+            // bandit free-selects, so a backtrack arm a COP needs can't be starved to zero budget.
+            val warming = segment < workers.size
+            val arm = if (warming) segment else bandit.choose()
+            val sliceMs = if (warming) warmupSliceMillis else slice
             val hadIncumbent = best != null
             val before = bound
             var terminal: MinimizeResult? = null
             runCatching {
-                for (r in workers[arm].improvements(readBound, sliceToken(cancellation, slice), warmStart = best)) {
+                for (r in workers[arm].improvements(readBound, sliceToken(cancellation, sliceMs), warmStart = best)) {
                     terminal = r
                     if (r is MinimizeResult.WithSample && r.objectiveValue < bound) {
                         bound = r.objectiveValue
@@ -143,7 +156,8 @@ class SequentialPortfolio(
                     MinimizeResult.Infeasible(stats = stats)
                 }
             }
-            slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
+            if (!warming) slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
+            segment++
         }
         val b = best
         return if (b != null) {
@@ -180,12 +194,14 @@ class SequentialPortfolio(
             baseSliceMillis: Long = 2_000,
             maxSliceMillis: Long = 60_000,
             sliceGrowth: Double = 1.5,
+            warmupSliceMillis: Long = 1_000,
         ): SequentialPortfolio = SequentialPortfolio(
             workers = workers,
             bandit = Exp3Bandit(workers.size, eta, gamma, Random(seed)),
             baseSliceMillis = baseSliceMillis,
             maxSliceMillis = maxSliceMillis,
             sliceGrowth = sliceGrowth,
+            warmupSliceMillis = warmupSliceMillis,
         )
     }
 }
