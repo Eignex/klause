@@ -137,7 +137,16 @@ object PortfolioBuilder {
                     costShaping = CostShaping.Linear(lambda = spec.lsLambda),
                     onEvent = onEvent?.let { sink -> { e -> sink(label, e) } },
                 )
-                workers += PortfolioWorker.of(label, session, params, objective = lsObj)
+                // Expose the LS warm-start seam so a single-threaded SequentialPortfolio can
+                // descend a fresh LS segment from the shared incumbent instead of a random
+                // restart; the concurrent Portfolio passes no warm-start and this stays inert.
+                workers += PortfolioWorker.of(
+                    label,
+                    session,
+                    params,
+                    objective = lsObj,
+                    withWarmStart = { p, sample -> p.copy(initialAssignment = sample) },
+                )
             }
         }
 
