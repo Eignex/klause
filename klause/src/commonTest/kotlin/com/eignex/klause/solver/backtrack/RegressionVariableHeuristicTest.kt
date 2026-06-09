@@ -3,6 +3,7 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
+import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferent
@@ -48,6 +49,6 @@ class RegressionVariableHeuristicTest {
             obj,
             BacktrackParams(variableHeuristic = RegressionVariableHeuristic.linUcb(seed = 2L), randomSeed = 0L),
         )
-        assertEquals(3.0, assertIs<com.eignex.klause.solver.MinimizeResult.Optimal>(r).objectiveValue)
+        assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
     }
 }

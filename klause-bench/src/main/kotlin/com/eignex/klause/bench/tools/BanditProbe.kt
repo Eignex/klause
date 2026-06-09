@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.tools
 
+import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.portfolio.PortfolioBuilder
@@ -8,6 +9,7 @@ import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
@@ -70,7 +72,7 @@ internal object BanditProbe {
         }
     }
 
-    private fun objectiveOf(program: com.eignex.klause.formats.flatzinc.FlatZincProgram): Objective? {
+    private fun objectiveOf(program: FlatZincProgram): Objective? {
         val (objName, maximize) = when (val s = program.solve) {
             is SolveDirective.Minimize -> s.objVar to false
             is SolveDirective.Maximize -> s.objVar to true
@@ -81,7 +83,7 @@ internal object BanditProbe {
     }
 
     private fun runBacktrack(
-        problem: com.eignex.klause.solver.Problem,
+        problem: Problem,
         obj: Objective,
         budget: Long,
         params: (Cancellation, (SearchEvent) -> Unit) -> BacktrackParams,
@@ -103,11 +105,7 @@ internal object BanditProbe {
         return Run(firstMs, valueOf(r), bestMs, r.stats.nodes.sum.toLong())
     }
 
-    private fun runSequential(
-        program: com.eignex.klause.formats.flatzinc.FlatZincProgram,
-        obj: Objective,
-        budget: Long,
-    ): Run {
+    private fun runSequential(program: FlatZincProgram, obj: Objective, budget: Long): Run {
         val t0 = System.currentTimeMillis()
         val deadline = t0 + budget
         var firstMs: Long? = null
