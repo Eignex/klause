@@ -165,7 +165,6 @@ class ChocoModel private constructor(
 
             is Subcircuit -> model.subCircuit(intVarsOf(f.succ), 0, model.intVar(0, f.succ.size)).post()
 
-
             is Mdd -> postMdd(f)
 
             else -> throw UnsupportedFactorException(f)
