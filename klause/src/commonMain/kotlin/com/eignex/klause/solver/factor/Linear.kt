@@ -560,6 +560,65 @@ internal fun collectLinearTightenAntecedents(
 }
 
 /**
+ * Above this arity the per-variable weakest-bound relaxation ([collectLinearRelaxedAntecedents])
+ * becomes the dominant cost: a single [propagateLinearBounds] call can tighten O(arity) vars and
+ * each relaxation is O(arity), so the reason work is O(arity²) per propagation — and it is pure
+ * waste on the large set-partitioning / `int_lin_eq` systems that drive feasibility, which run
+ * with essentially no conflicts (the reasons are never consumed). For such wide constraints we
+ * fall back to a single shared start-of-call reason ([collectLinearStartBoundAntecedents], O(arity)
+ * built once and reused across every tighten in the call). Below the threshold the relaxation is
+ * cheap and its sharper, more reusable clauses are worth keeping, so small constraints are
+ * unaffected.
+ */
+private const val LINEAR_SHARED_REASON_ARITY = 32
+
+/**
+ * A single O(arity) reason citing every variable's **start-of-call** driving bound on [useLo]'s
+ * sum-side, reconstructed from the pre-tighten contributions [rLo]/[rHi] (so it is unaffected by
+ * tightenings made earlier in the same [propagateLinearBounds] call). Every deduced bound in that
+ * call is `floor`/`ceil` of a sum over exactly these start-of-call bounds, so this set soundly
+ * implies all of them, and because the bounds predate every tighten it is acyclic. It cites the
+ * deduced var's own start bound too (a harmless extra true literal — the deduction excludes it),
+ * which keeps the array shareable across all tightens. Vars at their root bound are global facts
+ * and cited nothing; [extraLit], when non-zero, is prepended.
+ *
+ * This is the wide-constraint counterpart to [collectLinearRelaxedAntecedents]: it drops the
+ * weakest-bound relaxation (slightly less general learned clauses) in exchange for O(arity) total
+ * instead of O(arity²) per propagation. See [LINEAR_SHARED_REASON_ARITY].
+ */
+internal fun collectLinearStartBoundAntecedents(
+    state: PropagationState,
+    coeffs: IntArray,
+    vars: IntArray,
+    rLo: LongArray,
+    rHi: LongArray,
+    useLo: Boolean,
+    extraLit: Int,
+): IntArray? {
+    val out = IntArrayList()
+    if (extraLit != 0) out.add(extraLit)
+    for (j in vars.indices) {
+        val c = coeffs[j]
+        if (c == 0) continue
+        val v = vars[j]
+        // Start-of-call bounds recovered from the contribution ranges: rLo/rHi hold c·min and
+        // c·max (ordered), so dividing by c (exact) recovers the pre-tighten min/max.
+        val startMin = if (c > 0) rLo[j] / c else rHi[j] / c
+        val startMax = if (c > 0) rHi[j] / c else rLo[j] / c
+        val citeMin = if (useLo) c > 0 else c < 0
+        if (citeMin) {
+            if (startMin <= state.problem.intDomains[v].min) continue // at root → global fact
+            out.add(Lit.make(state.atomVarGe(v, startMin.toInt()), false))
+        } else {
+            if (startMax >= state.problem.intDomains[v].max) continue
+            out.add(Lit.make(state.atomVarLe(v, startMax.toInt()), false))
+        }
+    }
+    if (out.size == 0) return null
+    return out.toIntArray()
+}
+
+/**
  * Shared bounds-propagation routine for `Σ coeffs[i] * vars[i] ⟨op⟩ bound`. Used by [Linear]
  * directly and by [ReifiedLinear] when its aux Boolean is pinned. Returns `false` iff the
  * domains became jointly infeasible. [extraLit] is an optional context literal (typically the
@@ -616,6 +675,31 @@ internal fun propagateLinearBounds(
         }
         return true
     }
+    // Wide constraints (set-partitioning / large int_lin_eq) use one shared start-of-call reason
+    // per sum-side, built once and reused across every tighten — O(arity) total instead of the
+    // relaxation's O(arity²). Narrow constraints keep the sharper per-var relaxation. See
+    // [LINEAR_SHARED_REASON_ARITY] / [collectLinearStartBoundAntecedents].
+    val wide = n > LINEAR_SHARED_REASON_ARITY
+    var loBase: IntArray? = null
+    var loBaseBuilt = false
+    var hiBase: IntArray? = null
+    var hiBaseBuilt = false
+    fun loReason(i: Int, relax: Long): IntArray? {
+        if (!wide) return collectLinearRelaxedAntecedents(state, coeffs, vars, i, relax, useLo = true, extraLit)
+        if (!loBaseBuilt) {
+            loBase = collectLinearStartBoundAntecedents(state, coeffs, vars, rLo, rHi, useLo = true, extraLit)
+            loBaseBuilt = true
+        }
+        return loBase
+    }
+    fun hiReason(i: Int, relax: Long): IntArray? {
+        if (!wide) return collectLinearRelaxedAntecedents(state, coeffs, vars, i, relax, useLo = false, extraLit)
+        if (!hiBaseBuilt) {
+            hiBase = collectLinearStartBoundAntecedents(state, coeffs, vars, rLo, rHi, useLo = false, extraLit)
+            hiBaseBuilt = true
+        }
+        return hiBase
+    }
     for (i in 0 until n) {
         val c = coeffs[i].toLong()
         if (c == 0L) continue
@@ -630,11 +714,9 @@ internal fun propagateLinearBounds(
             if (c > 0) {
                 val t = floorDivLong(slack0, c)
                 val relax = c * (t + 1) - 1 - slack0
-                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, relax, useLo = true, extraLit)
-                if (!tightenMaxClamped(state, v, t, ant)) return false
+                if (!tightenMaxClamped(state, v, t, loReason(i, relax))) return false
             } else {
-                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, 0L, useLo = true, extraLit)
-                if (!tightenMinClamped(state, v, ceilDivLong(slack0, c), ant)) return false
+                if (!tightenMinClamped(state, v, ceilDivLong(slack0, c), loReason(i, 0L))) return false
             }
         }
         if (op == LinearOp.GE || op == LinearOp.EQ) {
@@ -644,11 +726,9 @@ internal fun propagateLinearBounds(
             if (c > 0) {
                 val t = ceilDivLong(needed, c)
                 val relax = needed - c * (t - 1) - 1
-                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, relax, useLo = false, extraLit)
-                if (!tightenMinClamped(state, v, t, ant)) return false
+                if (!tightenMinClamped(state, v, t, hiReason(i, relax))) return false
             } else {
-                val ant = collectLinearRelaxedAntecedents(state, coeffs, vars, i, 0L, useLo = false, extraLit)
-                if (!tightenMaxClamped(state, v, floorDivLong(needed, c), ant)) return false
+                if (!tightenMaxClamped(state, v, floorDivLong(needed, c), hiReason(i, 0L))) return false
             }
         }
     }
