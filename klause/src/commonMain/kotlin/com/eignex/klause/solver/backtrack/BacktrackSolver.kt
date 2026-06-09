@@ -25,6 +25,7 @@ import com.eignex.klause.solver.lp.CutContext
 import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
 import com.eignex.klause.solver.lp.FloatSimplex
+import com.eignex.klause.solver.lp.GccSeparator
 import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRelaxation
@@ -225,6 +226,7 @@ class BacktrackSolver(override val problem: Problem) :
         val lpSeparators: List<CutSeparator> = if (params.lpCuts) {
             buildList {
                 add(AllDifferentSeparator())
+                add(GccSeparator())
                 // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
                 (objective as? LinearObjective)?.let { obj ->
                     val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
