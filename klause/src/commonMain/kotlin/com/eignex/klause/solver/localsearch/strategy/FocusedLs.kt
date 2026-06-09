@@ -73,7 +73,7 @@ internal sealed interface MoveSelection {
  * the smallest shaped break score (ties broken uniformly). When [controller] is non-null the
  * noise level is steered adaptively, overriding [noise].
  */
-internal class NoiseGreedy(val noise: Double = 0.5, private val controller: NoiseController? = null) : MoveSelection {
+internal class NoiseGreedy(val noise: Double = 0.5, private val controller: NoiseSchedule? = null) : MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         val n = controller?.also { it.observe(state.cost) }?.level ?: noise
         if (state.rng.nextDouble() < n) return moves[state.rng.nextInt(moves.size)]
@@ -92,7 +92,7 @@ internal class NoiseGreedy(val noise: Double = 0.5, private val controller: Nois
 internal class ProbSatWeighted(
     val cb: Double = 2.06,
     val eps: Double = 1.0,
-    private val controller: NoiseController? = null,
+    private val controller: NoiseSchedule? = null,
 ) : MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         if (moves.size == 1) return moves[0]
@@ -231,6 +231,28 @@ object ProbSat {
             cb = baselineCb,
             eps = eps,
             controller = NoiseController(initial = 0.0, theta = theta, phi = phi, ewmaAlpha = ewmaAlpha),
+        ),
+        tabu,
+        configurationChecking,
+    )
+
+    /**
+     * Bandit-adaptive probSAT (#8): the `cb` schedule is driven by a [BanditNoiseController] — a
+     * kumulant UCB1 bandit over aggressive/moderate/patient bump-on-stall profiles — instead of a
+     * single fixed [NoiseController]. The bandit learns per session which schedule profile suits
+     * the instance.
+     */
+    fun bandit(
+        baselineCb: Double = 2.06,
+        eps: Double = 1.0,
+        tabu: TabuFilter = TabuFilter(tenure = 10),
+        seed: Long = 0L,
+        configurationChecking: Boolean = false,
+    ): FocusedLs = FocusedLs(
+        ProbSatWeighted(
+            cb = baselineCb,
+            eps = eps,
+            controller = BanditNoiseController.default(baseline = 0.0, seed = seed),
         ),
         tabu,
         configurationChecking,

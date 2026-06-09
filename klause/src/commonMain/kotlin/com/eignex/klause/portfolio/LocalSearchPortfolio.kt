@@ -15,6 +15,7 @@ import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.LinearThompsonStrategy
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
@@ -72,6 +73,16 @@ internal data class LocalSearchWorkerConfig(
             crossoverRate = 0.25,
             perturbationKind = PerturbationKind.BasinHopping,
             acceptance = AcceptanceCriterion.Improving,
+        )
+
+        /** ILS basin-hopping whose accept/reject is driven by the contextual acceptance bandit
+         *  (#8) — learns when drifting through worse optima pays off, rather than the fixed
+         *  improving-only rule. Fresh bandit per slot. */
+        private fun ilsBandit() = IteratedLocalSearchRestart(
+            populationSize = 3,
+            crossoverRate = 0.25,
+            perturbationKind = PerturbationKind.BasinHopping,
+            acceptanceBandit = IteratedLocalSearchRestart.acceptanceBandit(),
         )
 
         /** A CBLS worker with the unified minimize path: [make] is invoked twice so the satisfy
@@ -228,6 +239,25 @@ internal data class LocalSearchWorkerConfig(
                     Cbls(tabu = TabuFilter(tenure = 3, aspiration = AspirationCriterion.OrImproving))
                 }
             },
+            // Contextual-bandit move selection (#8): a fresh Linear-Thompson posterior per slot
+            // learns which repair move to take from move features. NOT in [rankedOrder] — the
+            // #9-lite credit pass found it a total dud (0 first/best/sole), so it is excluded from
+            // the diverse(N)/configs=all pool; kept here as a label-addressable strategy for
+            // standalone / SequentialPortfolio use and future re-evaluation.
+            "thompson/fixed" to {
+                LocalSearchWorkerConfig("thompson/fixed", LinearThompsonStrategy.thompson(), FixedCadenceRestart())
+            },
+            // Contextual-bandit ILS acceptance (#8): CBLS on a basin-hopping ILS restart whose
+            // accept/reject is learned. Untuned candidate, appended to [rankedOrder].
+            "cbls/ils-bandit" to { cblsWorker("cbls/ils-bandit", ilsBandit()) { Cbls(tabu = cblsTabu()) } },
+            // Bandit-adaptive probSAT (#8): a UCB1 bandit picks the cb noise schedule per session.
+            "probsat-bandit/fixed" to {
+                LocalSearchWorkerConfig(
+                    "probsat-bandit/fixed",
+                    ProbSat.bandit(tabu = cblsTabu()),
+                    FixedCadenceRestart(),
+                )
+            },
         )
 
         /**
@@ -247,6 +277,12 @@ internal data class LocalSearchWorkerConfig(
             "adaptive-probsat/fixed", "cbls-tenure3/fixed", "cbls-stallslow/fixed", "sa/fixed",
             "cbls-plateau64/fixed", "walksat-cc/luby", "cbls-hinoise/fixed", "cbls-plateau-smooth/fixed",
             "cbls-plateau/fixed", "cbls-raw/fixed",
+            // Bandit candidates (#8); kept last so the default diverse(N) prefix is unchanged.
+            // The #9-lite credit pass (mzn-bench, configs=all) kept these two — probsat-bandit and
+            // cbls/ils-bandit each held a best — but dropped thompson/fixed as a total dud
+            // (0 first/best/sole), so it is excluded from the pool (its strategy stays available
+            // by label for standalone / SequentialPortfolio use).
+            "cbls/ils-bandit", "probsat-bandit/fixed",
         )
 
         /** Labels of every config in the pool, in credit order. */
