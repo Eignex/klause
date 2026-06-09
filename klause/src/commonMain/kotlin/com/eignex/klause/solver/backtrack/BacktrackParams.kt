@@ -221,6 +221,14 @@ data class BacktrackParams(
      */
     val lpCircuit: Boolean = false,
     /**
+     * Linearize constant-array Element globals with a one-hot selector model (#22). When true and
+     * [lpBounding] holds, each Element over a constant table gets selector columns and channelling
+     * rows — its exact convex hull `result = Σ arr[p]·[idx=p]` — so the LP sees `result`'s dependence
+     * on `idx`. Adds O(len) columns per Element (skipped above a length cap), so it is opt-in and off
+     * by default; a no-op when no constant-array Element exists. Variable-array Element is deferred.
+     */
+    val lpElement: Boolean = false,
+    /**
      * Linearize Table globals with their convex hull (#22). When true and [lpBounding] holds, each
      * Table gets one selector column per allowed tuple with `Σ y_t = 1` and per-column channels
      * `xs[j] = Σ tuple_t[j]·y_t`, so the LP sees the exact convex hull of the allowed tuples. Adds

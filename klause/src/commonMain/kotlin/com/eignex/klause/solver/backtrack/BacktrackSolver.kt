@@ -226,6 +226,7 @@ class BacktrackSolver(override val problem: Problem) :
                 objective,
                 generateCuts = params.lpCuts,
                 circuitArcs = params.lpCircuit,
+                elementHull = params.lpElement,
                 tableHull = params.lpTable,
             )
         } else {

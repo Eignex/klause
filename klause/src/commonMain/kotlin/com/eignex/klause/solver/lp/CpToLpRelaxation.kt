@@ -8,6 +8,7 @@ import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -79,6 +80,9 @@ internal class CpToLpRelaxation(
     /** When true, build the arc-indicator relaxation of each Circuit (degree + channelling rows) so
      *  [CircuitSeparator] can separate subtour-elimination cuts. Adds O(n²) columns, so it is gated. */
     private val circuitArcs: Boolean = false,
+    /** When true, linearize each constant-array Element with a one-hot selector model (its exact
+     *  convex hull). Adds O(len) columns, so it is gated; variable arrays are skipped. */
+    private val elementHull: Boolean = false,
     /** When true, linearize each Table with one selector column per allowed tuple — its exact convex
      *  hull. Adds O(numTuples) columns, so it is gated. */
     private val tableHull: Boolean = false,
@@ -86,6 +90,9 @@ internal class CpToLpRelaxation(
     private companion object {
         /** Above this node count the O(n²)-column circuit arc model is skipped. */
         const val MAX_NODES: Int = 24
+
+        /** Above this array length the O(len)-column Element selector model is skipped. */
+        const val MAX_ELEM: Int = 256
 
         /** Above this tuple count the O(numTuples)-column Table hull is skipped. */
         const val MAX_TUPLES: Int = 1024
@@ -275,6 +282,9 @@ internal class CpToLpRelaxation(
             if (circuitArcs) {
                 for (factor in problem.factors) if (factor is Circuit) buildCircuitArcs(factor)
             }
+            if (elementHull) {
+                for (factor in problem.factors) if (factor is Element) buildElementHull(factor)
+            }
             if (tableHull) {
                 for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
             }
@@ -442,6 +452,55 @@ internal class CpToLpRelaxation(
                 vals[k] = 1L
                 builder.addRow(cols, vals, Relation.EQ, 0L)
             }
+        }
+
+        /**
+         * One-hot selector linearization of one [Element] `result = arr[idx − indexOffset]` over a
+         * *constant* array — the exact convex hull. A selector column `y_p ∈ [0,1]` for each position
+         * `p` whose index value `p + indexOffset` is in `idx`'s declared domain (layout stable across
+         * nodes; pinned to 0 when that value left the live domain). Rows: `Σ_p y_p = 1`, index channel
+         * `Σ_p (p + off)·y_p = idx`, and result channel `Σ_p arr[p]·y_p = result`. Arrays longer than
+         * [MAX_ELEM] are skipped (the added columns would dominate). Variable arrays are not handled
+         * here — their channel is bilinear, so a sound big-M form is a separate follow-up.
+         */
+        private fun buildElementHull(factor: Element) {
+            if (factor.arrIsVars) return
+            val len = factor.arr.size
+            if (len > MAX_ELEM) return
+            val off = factor.indexOffset
+            val declared = problem.intDomains[factor.idx]
+            val live = session.intDomain(factor.idx)
+            val selCols = IntArrayList()
+            val positions = IntArrayList()
+            for (p in 0 until len) {
+                val idxVal = p + off
+                if (idxVal !in declared) continue
+                selCols.add(auxColumn(0L, if (idxVal in live) 1L else 0L))
+                positions.add(p)
+            }
+            val k = selCols.size
+            if (k == 0) return
+            builder.addRow(selCols.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L)
+            // Σ_p (p + off)·y_p − idx = 0.
+            val idxCols = IntArray(k + 1)
+            val idxVals = LongArray(k + 1)
+            for (t in 0 until k) {
+                idxCols[t] = selCols[t]
+                idxVals[t] = (positions[t] + off).toLong()
+            }
+            idxCols[k] = intColumn(factor.idx)
+            idxVals[k] = -1L
+            builder.addRow(idxCols, idxVals, Relation.EQ, 0L)
+            // Σ_p arr[p]·y_p − result = 0: the exact convex hull of the constant table.
+            val resCols = IntArray(k + 1)
+            val resVals = LongArray(k + 1)
+            for (t in 0 until k) {
+                resCols[t] = selCols[t]
+                resVals[t] = factor.arr[positions[t]].toLong()
+            }
+            resCols[k] = intColumn(factor.result)
+            resVals[k] = -1L
+            builder.addRow(resCols, resVals, Relation.EQ, 0L)
         }
 
         private fun linearRow(op: LinearOp, vars: IntArray, coeffs: IntArray, bound: Long) {

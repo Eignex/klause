@@ -74,6 +74,16 @@ internal data class LocalSearchWorkerConfig(
             acceptance = AcceptanceCriterion.Improving,
         )
 
+        /** ILS basin-hopping whose accept/reject is driven by the contextual acceptance bandit
+         *  (#8) — learns when drifting through worse optima pays off, rather than the fixed
+         *  improving-only rule. Fresh bandit per slot. */
+        private fun ilsBandit() = IteratedLocalSearchRestart(
+            populationSize = 3,
+            crossoverRate = 0.25,
+            perturbationKind = PerturbationKind.BasinHopping,
+            acceptanceBandit = IteratedLocalSearchRestart.acceptanceBandit(),
+        )
+
         /** A CBLS worker with the unified minimize path: [make] is invoked twice so the satisfy
          *  and optimize strategies are independent instances (Cbls carries per-search state). */
         private fun cblsWorker(
@@ -228,6 +238,17 @@ internal data class LocalSearchWorkerConfig(
                     Cbls(tabu = TabuFilter(tenure = 3, aspiration = AspirationCriterion.OrImproving))
                 }
             },
+            // Contextual-bandit ILS acceptance (#8): CBLS on a basin-hopping ILS restart whose
+            // accept/reject is learned. Untuned candidate, appended to [rankedOrder].
+            "cbls/ils-bandit" to { cblsWorker("cbls/ils-bandit", ilsBandit()) { Cbls(tabu = cblsTabu()) } },
+            // Bandit-adaptive probSAT (#8): a UCB1 bandit picks the cb noise schedule per session.
+            "probsat-bandit/fixed" to {
+                LocalSearchWorkerConfig(
+                    "probsat-bandit/fixed",
+                    ProbSat.bandit(tabu = cblsTabu()),
+                    FixedCadenceRestart(),
+                )
+            },
         )
 
         /**
@@ -247,6 +268,11 @@ internal data class LocalSearchWorkerConfig(
             "adaptive-probsat/fixed", "cbls-tenure3/fixed", "cbls-stallslow/fixed", "sa/fixed",
             "cbls-plateau64/fixed", "walksat-cc/luby", "cbls-hinoise/fixed", "cbls-plateau-smooth/fixed",
             "cbls-plateau/fixed", "cbls-raw/fixed",
+            // Bandit candidates (#8); kept last so the default diverse(N) prefix is unchanged.
+            // The #9-lite credit pass (mzn-bench, configs=all) kept these two — probsat-bandit and
+            // cbls/ils-bandit each held a best. The third, thompson/fixed (LS move bandit), was a
+            // total dud (0 first/best/sole) and was removed entirely.
+            "cbls/ils-bandit", "probsat-bandit/fixed",
         )
 
         /** Labels of every config in the pool, in credit order. */

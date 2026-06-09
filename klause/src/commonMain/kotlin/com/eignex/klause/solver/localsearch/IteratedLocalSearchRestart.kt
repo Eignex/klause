@@ -1,6 +1,15 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Sample
+import com.eignex.kumulant.bandit.ContextualBandit
+import com.eignex.kumulant.bandit.contextual.LinearRegressionSpec
+import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
+import com.eignex.kumulant.bandit.contextual.RegressionContextualSpec
+import com.eignex.kumulant.bandit.materialize
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.math.DenseVector
+import com.eignex.kumulant.stat.regression.glm.MultivariateGaussian
+import kotlin.math.abs
 import kotlin.random.Random
 
 /**
@@ -59,6 +68,15 @@ class IteratedLocalSearchRestart(
      *  shred. Off by default (uniform crossover) to keep behaviour stable for callers
      *  that don't opt in. */
     val linkageAware: Boolean = false,
+    /** Optional contextual-bandit acceptance (#8): when non-null, the accept/reject of a new local
+     *  optimum is decided by any 2-arm kumulant [ContextualBandit] (arm 0 = accept, 1 = reject) over
+     *  context features (margin vs the population's worst and best, stall fraction) instead of the
+     *  fixed [acceptance] criterion. The bandit is rewarded by whether the population best improved
+     *  by the next local optimum, so it learns *when* drifting through worse optima pays off. The
+     *  [acceptanceBandit] factory builds the default (`RegressionContextualBandit` + Thompson
+     *  posterior); any [ContextualBandit] (`Exp4Bandit`, `KnnContextualBandit`, a LinUCB-posterior
+     *  regression bandit, …) is accepted. Null (default) keeps the fixed criterion. */
+    private val acceptanceBandit: ContextualBandit? = null,
 ) : RestartPolicy {
 
     init {
@@ -72,6 +90,12 @@ class IteratedLocalSearchRestart(
     var perturbationStrength: Int = initialPerturbationStrength
         private set
     private var stallCount: Int = 0
+
+    // Pending bandit decision, rewarded at the next local optimum by whether the population best
+    // improved since (delayed credit, the standard meta-bandit signal). -1 = nothing pending.
+    private var pendingArm: Int = -1
+    private var pendingContext: DoubleArray? = null
+    private var pendingBestBefore: Double = Double.POSITIVE_INFINITY
 
     /** Read-only view for tests / diagnostics. */
     val incumbents: List<Incumbent> get() = population
@@ -92,7 +116,11 @@ class IteratedLocalSearchRestart(
         } else {
             population.last().objective
         }
-        val accept = population.isEmpty() || acceptance.accept(objective, worstObjective, state.rng)
+        val accept = if (acceptanceBandit != null) {
+            banditAccept(acceptanceBandit, objective, worstObjective)
+        } else {
+            population.isEmpty() || acceptance.accept(objective, worstObjective, state.rng)
+        }
         if (accept) {
             insertSortedByObjective(Incumbent(sample, objective))
             // Evict the worst (last) when over capacity.
@@ -108,6 +136,36 @@ class IteratedLocalSearchRestart(
                 stallCount = 0
             }
         }
+    }
+
+    /** Decide accept/reject via the contextual bandit, first crediting the previous decision by
+     *  whether the population best improved since it was made. The first local optimum (empty
+     *  population) is always accepted to seed the population. */
+    private fun banditAccept(bandit: ContextualBandit, objective: Double, worstObjective: Double): Boolean {
+        val bestBefore = population.firstOrNull()?.objective ?: Double.POSITIVE_INFINITY
+        pendingContext?.let { ctx ->
+            val reward = if (bestBefore < pendingBestBefore) 1.0 else 0.0
+            bandit.update(pendingArm, DenseVector.of(ctx), reward, 1.0)
+        }
+        if (population.isEmpty()) {
+            pendingContext = null
+            return true
+        }
+        val ctx = acceptanceFeatures(objective, worstObjective, bestBefore)
+        val arm = bandit.choose(DenseVector.of(ctx))
+        pendingArm = arm
+        pendingContext = ctx
+        pendingBestBefore = bestBefore
+        return arm == ACCEPT_ARM
+    }
+
+    /** Context for the acceptance bandit: how the candidate compares to the population's worst and
+     *  best incumbents, and how deep the current stall is — all normalised to roughly [-1, 1]. */
+    private fun acceptanceFeatures(objective: Double, worstObjective: Double, bestObjective: Double): DoubleArray {
+        val vsWorst = if (worstObjective.isFinite()) (worstObjective - objective) / (abs(worstObjective) + 1.0) else 1.0
+        val vsBest = if (bestObjective.isFinite()) (bestObjective - objective) / (abs(bestObjective) + 1.0) else 0.0
+        val stallFrac = (stallCount.toDouble() / adaptiveStallThreshold).coerceIn(0.0, 1.0)
+        return doubleArrayOf(vsWorst.coerceIn(-1.0, 1.0), vsBest.coerceIn(-1.0, 1.0), stallFrac)
     }
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
@@ -206,5 +264,25 @@ class IteratedLocalSearchRestart(
         var idx = 0
         while (idx < population.size && population[idx].objective <= item.objective) idx++
         population.add(idx, item)
+    }
+
+    /** Factory for the [acceptanceBandit] constructor argument. */
+    companion object {
+        private const val ACCEPT_ARM = 0
+        private const val ACCEPT_FEATURES = 3
+
+        /** A 2-arm (accept / reject) contextual bandit over the acceptance features, mirroring the
+         *  kumulant construction the CP/LS move bandits use (Bayesian linear regression +
+         *  [MultivariateGaussian] Thompson posterior). Pass to [IteratedLocalSearchRestart]'s
+         *  `acceptanceBandit`. */
+        fun acceptanceBandit(
+            seed: Long = 0L,
+            exploration: Double = 1.0,
+            priorVariance: Double = 1.0,
+        ): RegressionContextualBandit<*> {
+            val regression = LinearRegressionSpec.Bayesian(ACCEPT_FEATURES, priorVariance)
+            val spec = RegressionContextualSpec(2, regression, MultivariateGaussian, exploration, regression)
+            return spec.materialize(Random(seed), Concurrency.None)
+        }
     }
 }
