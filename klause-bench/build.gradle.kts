@@ -60,7 +60,10 @@ tasks.register<JavaExec>("bench") {
     (findProperty("asyncProfiler") as String?)?.let { agent ->
         val out = (findProperty("profOut") as String?) ?: "$workspaceRoot/build/prof.txt"
         val event = (findProperty("profEvent") as String?) ?: "cpu" // cpu | alloc | wall
-        jvmArgs("-agentpath:$agent=start,event=$event,flat=60,file=$out")
+        // -PprofFormat overrides the output mode: "flat=60" (default top-method list) or e.g.
+        // "traces=30" for the hottest call stacks (shows callers, not just self-time).
+        val format = (findProperty("profFormat") as String?) ?: "flat=60"
+        jvmArgs("-agentpath:$agent=start,event=$event,$format,file=$out")
     }
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
