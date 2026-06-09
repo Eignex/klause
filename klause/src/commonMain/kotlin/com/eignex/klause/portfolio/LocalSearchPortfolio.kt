@@ -15,7 +15,6 @@ import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.LinearThompsonStrategy
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
@@ -239,14 +238,6 @@ internal data class LocalSearchWorkerConfig(
                     Cbls(tabu = TabuFilter(tenure = 3, aspiration = AspirationCriterion.OrImproving))
                 }
             },
-            // Contextual-bandit move selection (#8): a fresh Linear-Thompson posterior per slot
-            // learns which repair move to take from move features. NOT in [rankedOrder] — the
-            // #9-lite credit pass found it a total dud (0 first/best/sole), so it is excluded from
-            // the diverse(N)/configs=all pool; kept here as a label-addressable strategy for
-            // standalone / SequentialPortfolio use and future re-evaluation.
-            "thompson/fixed" to {
-                LocalSearchWorkerConfig("thompson/fixed", LinearThompsonStrategy.thompson(), FixedCadenceRestart())
-            },
             // Contextual-bandit ILS acceptance (#8): CBLS on a basin-hopping ILS restart whose
             // accept/reject is learned. Untuned candidate, appended to [rankedOrder].
             "cbls/ils-bandit" to { cblsWorker("cbls/ils-bandit", ilsBandit()) { Cbls(tabu = cblsTabu()) } },
@@ -279,9 +270,8 @@ internal data class LocalSearchWorkerConfig(
             "cbls-plateau/fixed", "cbls-raw/fixed",
             // Bandit candidates (#8); kept last so the default diverse(N) prefix is unchanged.
             // The #9-lite credit pass (mzn-bench, configs=all) kept these two — probsat-bandit and
-            // cbls/ils-bandit each held a best — but dropped thompson/fixed as a total dud
-            // (0 first/best/sole), so it is excluded from the pool (its strategy stays available
-            // by label for standalone / SequentialPortfolio use).
+            // cbls/ils-bandit each held a best. The third, thompson/fixed (LS move bandit), was a
+            // total dud (0 first/best/sole) and was removed entirely.
             "cbls/ils-bandit", "probsat-bandit/fixed",
         )
 
