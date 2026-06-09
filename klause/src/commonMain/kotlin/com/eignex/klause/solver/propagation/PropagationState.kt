@@ -891,6 +891,15 @@ class PropagationState(
      *  → atomId. Allows O(1) re-allocation checks. */
     private val atomByKey: MutableLongIntMap = MutableLongIntMap()
 
+    /** One-slot-per-`(intVar, kind)` memo in front of [atomByKey]. Reason building (the
+     *  dominant CP-engine cost) cites each var's *current* bound — `atomVarGe(v, curMin)` etc.
+     *  — so the same `(v, kind, threshold)` is looked up over and over until that var next
+     *  tightens. Caching the last `threshold → id` per slot turns the hot [allocAtom] hash
+     *  probe into an int compare. Always correct: an atom id for a given key never changes.
+     *  `atomMemoId[slot] < 0` marks an empty slot. Slot = `intVar * 3 + kind`. */
+    private val atomMemoThr: IntArray = IntArray(problem.numIntVars * 3)
+    private val atomMemoId: IntArray = IntArray(problem.numIntVars * 3) { -1 }
+
     /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions
      *  to false. Mirrors [boolWatchersByLit] for atoms; keyed by atom-lit id rather than
      *  fixed-array indexed because atoms are allocated dynamically. */
@@ -1049,6 +1058,15 @@ class PropagationState(
         }
     }
 
+    /** True iff bool [v] is currently assigned (by decision or propagation). Primitive — lets
+     *  hot factor loops test assignment without the `Boolean?` box that `boolValues[v]` allocates.
+     *  Pair with [boolValueAt] (only meaningful when this returns true). */
+    fun boolAssignedAt(v: Int): Boolean = boolAssigned.get(v)
+
+    /** Stored value of bool [v]; meaningful only when [boolAssignedAt] is true (undefined
+     *  otherwise). Primitive companion to [boolAssignedAt] for box-free hot-loop reads. */
+    fun boolValueAt(v: Int): Boolean = boolValueBits.get(v)
+
     /** Unified truth lookup over bool literals and atom-lit literals. Returns `null`
      *  when undetermined. Pair with [Lit.evaluate] / explicit polarity branching to
      *  reason about literal truth. */
@@ -1122,15 +1140,25 @@ class PropagationState(
     }
 
     private fun allocAtom(intVar: Int, kind: Int, threshold: Int): Int {
+        val slot = intVar * 3 + kind
+        if (atomMemoId[slot] >= 0 && atomMemoThr[slot] == threshold) {
+            return problem.numBoolVars + atomMemoId[slot]
+        }
         val key = atomKey(intVar, kind, threshold)
         val existing = atomByKey.getOrDefault(key, -1)
-        if (existing >= 0) return problem.numBoolVars + existing
+        if (existing >= 0) {
+            atomMemoThr[slot] = threshold
+            atomMemoId[slot] = existing
+            return problem.numBoolVars + existing
+        }
         val id = atomIntVar.size
         atomIntVar.add(intVar)
         atomKind.add(kind)
         atomThreshold.add(threshold)
         atomByKey.put(key, id)
         atomsByIntVar.getOrPut(intVar) { VarAtomIndex() }.insert(kind, threshold, id)
+        atomMemoThr[slot] = threshold
+        atomMemoId[slot] = id
         return problem.numBoolVars + id
     }
 

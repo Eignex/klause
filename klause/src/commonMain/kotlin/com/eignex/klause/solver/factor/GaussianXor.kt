@@ -73,14 +73,22 @@ class GaussianXor(constraints: List<Xor>) : Factor {
         val reason = Array(n) { LongArray(words) }
         val rhs = rowRhs.copyOf()
         for (r in 0 until n) {
-            for (i in boolVars.indices) {
-                if (!getBit(rowMask[r], i)) continue
-                val assigned = state.boolValues[boolVars[i]]
-                if (assigned == null) {
-                    setBit(mask[r], i)
-                } else {
-                    setBit(reason[r], i)
-                    if (assigned) rhs[r] = rhs[r] xor 1
+            // Iterate only the row's *set* bits (its member variables) word by word, rather than
+            // testing getBit for every variable — XOR rows are sparse, so this turns the per-fire
+            // matrix rebuild from O(rows · totalVars) into O(rows · setBits). Box-free bool reads.
+            val rm = rowMask[r]
+            for (wi in rm.indices) {
+                var w = rm[wi]
+                while (w != 0L) {
+                    val i = (wi shl 6) + w.countTrailingZeroBits()
+                    w = w and (w - 1L) // clear the lowest set bit
+                    val v = boolVars[i]
+                    if (!state.boolAssignedAt(v)) {
+                        setBit(mask[r], i)
+                    } else {
+                        setBit(reason[r], i)
+                        if (state.boolValueAt(v)) rhs[r] = rhs[r] xor 1
+                    }
                 }
             }
         }
@@ -120,7 +128,7 @@ class GaussianXor(constraints: List<Xor>) : Factor {
             if (pop == 1) {
                 val col = firstSetBit(mask[r])
                 val v = boolVars[col]
-                if (state.boolValues[v] == null) {
+                if (!state.boolAssignedAt(v)) {
                     if (!state.pinBool(v, rhs[r] == 1, reasonLiterals(state, reason[r], excludeCol = col))) {
                         return false
                     }
@@ -147,8 +155,8 @@ class GaussianXor(constraints: List<Xor>) : Factor {
         for (i in boolVars.indices) {
             if (i == excludeCol || !getBit(reasonBits, i)) continue
             val v = boolVars[i]
-            val b = state.boolValues[v] ?: continue
-            out[w++] = Lit.make(v, !b)
+            // reasonBits only flags assigned variables, so the value bit is always meaningful.
+            out[w++] = Lit.make(v, !state.boolValueAt(v))
         }
         return out
     }

@@ -10,6 +10,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IndexedMaxHeap
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.random.Random
@@ -1084,20 +1085,44 @@ object IndomainRandom : ValueHeuristic {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            // Materialise the actual non-hole values via valueAt, then Fisher-Yates shuffle in
-            // place. Kotlin has no primitive-array shuffle, so shuffling the raw IntArray avoids
-            // boxing every value into a MutableList<Int> on each branching node.
-            val arr = IntArray(d.size) { d.valueAt(it) }
-            for (i in arr.size - 1 downTo 1) {
-                val j = rng.nextInt(i + 1)
-                val tmp = arr[i]
-                arr[i] = arr[j]
-                arr[j] = tmp
+            val n = d.size
+            when {
+                n <= 1 -> sequenceOf(d.min)
+                n <= INDOMAIN_EAGER_MAX -> {
+                    // Small domain: materialise the non-hole values and Fisher-Yates shuffle in
+                    // place (cheaper than the lazy coroutine + map for a handful of values).
+                    val arr = IntArray(n) { d.valueAt(it) }
+                    for (i in n - 1 downTo 1) {
+                        val j = rng.nextInt(i + 1)
+                        val tmp = arr[i]
+                        arr[i] = arr[j]
+                        arr[j] = tmp
+                    }
+                    arr.asSequence()
+                }
+                else -> sequence {
+                    // Lazy Fisher-Yates over domain indices: emit a uniform random permutation
+                    // doing O(consumed) work, not O(n). Branch nodes typically read only the first
+                    // value (IntNode bound-splits around it), so eagerly shuffling a large domain
+                    // was almost pure waste — it dominated large-domain CSP profiles (e.g. gbac at
+                    // ~77%). `swap` records only the touched index slots (≈ O(consumed)).
+                    val swap = MutableIntIntMap()
+                    for (k in 0 until n) {
+                        val j = k + rng.nextInt(n - k)
+                        val ak = swap.getOrDefault(k, k)
+                        val aj = if (j == k) ak else swap.getOrDefault(j, j)
+                        if (j != k) swap.put(j, ak)
+                        yield(d.valueAt(aj))
+                    }
+                }
             }
-            arr.asSequence()
         }
     }
 }
+
+/** Domains at or below this size use the eager shuffle in [IndomainRandom]; larger ones use the
+ *  lazy Fisher-Yates so an unconsumed tail (the common case) costs nothing. */
+private const val INDOMAIN_EAGER_MAX = 32
 
 /**
  * Allow-list value selection: tries only [allowedValues] (in order) intersected with the

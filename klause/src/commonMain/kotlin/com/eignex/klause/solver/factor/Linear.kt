@@ -309,7 +309,7 @@ class Linear private constructor(
  * tighter than the original (caller falls back to default antecedents).
  */
 internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntArray): IntArray? {
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     // Sweep-prefix tightening: collect *only* antecedents tied to decision levels > 0 when
     // any such exist in scope. A var with `intLevel[v] <= 0` was tightened at root level —
@@ -340,8 +340,12 @@ internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntAr
         }
         val lo = maxOf(d.min, orig.min)
         val hi = minOf(d.max, orig.max)
-        for (value in lo..hi) {
-            if (value in orig && value !in d) {
+        // Iterate only the values actually carved out of `d` in `[lo, hi]` (O(holes), not
+        // O(span)): each such value was in `orig` and is now excluded, so it is a search-time
+        // hole premise. A value that is also a hole of `orig` was never present, so guard on
+        // `value in orig`.
+        d.forEachHoleInRange(lo, hi) { value ->
+            if (value in orig) {
                 // Antecedent literals are the implication-clause form: the *negation* of each
                 // currently-true premise, so each is currently false — exactly like the bound
                 // entries above (¬[v ≥ min] / ¬[v ≤ max]). The hole premise is `v ≠ value`, so
@@ -381,7 +385,7 @@ internal fun collectLinearDirAntecedents(
     extraLit: Int,
     useLo: Boolean,
 ): IntArray? {
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
@@ -467,7 +471,7 @@ internal fun collectLinearRelaxedAntecedents(
     }
     val currentLevel = state.currentLevel
     var remaining = if (slack < 0) 0 else slack
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
@@ -524,7 +528,7 @@ internal fun collectLinearTightenAntecedents(
     excludeIdx: Int,
     extraLit: Int,
 ): IntArray? {
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
