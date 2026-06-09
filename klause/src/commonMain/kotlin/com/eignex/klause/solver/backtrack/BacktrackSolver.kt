@@ -19,6 +19,7 @@ import com.eignex.klause.solver.lp.AllDifferentSeparator
 import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CpToLpRelaxation
+import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.Cut
 import com.eignex.klause.solver.lp.CutContext
 import com.eignex.klause.solver.lp.CutSeparator
@@ -240,6 +241,12 @@ class BacktrackSolver(override val problem: Problem) :
             null
         }
         var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
+        // Energetic-reasoning Cumulative feasibility check (#22/#23); objective-independent prune.
+        val energeticBound = if (params.energeticReasoning) {
+            CumulativeEnergeticBound(problem).takeIf { it.applicable }
+        } else {
+            null
+        }
         var lpCheckCounter = 0
         // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
         // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
@@ -254,6 +261,12 @@ class BacktrackSolver(override val problem: Problem) :
                 when {
                     // Cheap separable bound first — a fast filter that often prunes without an LP solve.
                     linearLowerBound(objective, session) >= effectiveBound -> true
+
+                    // Energetic-reasoning feasibility: prune if a Cumulative is over-subscribed.
+                    energeticBound != null && energeticBound.isInfeasible(session) -> {
+                        sink.observeEnergeticPrune()
+                        true
+                    }
 
                     // Lagrangian bound (cheaper than the LP); updates persisted multipliers as a side
                     // effect and prunes when its bound reaches the incumbent or the subproblem is infeasible.
