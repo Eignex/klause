@@ -16,6 +16,7 @@ import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.lp.AllDifferentSeparator
+import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.Cut
@@ -219,7 +220,18 @@ class BacktrackSolver(override val problem: Problem) :
         } else {
             null
         }
-        val lpSeparators: List<CutSeparator> = if (params.lpCuts) listOf(AllDifferentSeparator()) else emptyList()
+        val lpSeparators: List<CutSeparator> = if (params.lpCuts) {
+            buildList {
+                add(AllDifferentSeparator())
+                // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
+                (objective as? LinearObjective)?.let { obj ->
+                    val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
+                    add(AssignmentObjectiveCut(coef))
+                }
+            }
+        } else {
+            emptyList()
+        }
         // Lagrangian bound (#23): built once; multipliers persist across nodes (rolling warm start).
         val lagBound = if (params.lagrangian && objective is LinearObjective) {
             LagrangianBound(problem, objective).takeIf { it.applicable }
