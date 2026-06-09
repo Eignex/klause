@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -233,7 +234,15 @@ internal class CpToLpRelaxation(
             // references them, so a separator has something to write the cut over.
             if (generateCuts) {
                 for (factor in problem.factors) {
-                    if (factor is AllDifferent) for (v in factor.vars) intColumn(v)
+                    when (factor) {
+                        is AllDifferent -> for (v in factor.vars) intColumn(v)
+
+                        is GlobalCardinality -> if (factor.closed && factor.presents.isEmpty()) {
+                            for (v in factor.xs) intColumn(v)
+                        }
+
+                        else -> Unit
+                    }
                 }
             }
 
