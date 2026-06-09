@@ -22,7 +22,7 @@ class PortfolioWorker private constructor(
     /** Human-readable id for progress / telemetry (e.g. "cbls/fixed", "backtrack#2"). */
     val label: String,
     private val solveFn: (Cancellation) -> SolveResult,
-    private val improvementsFn: (() -> Double, Cancellation) -> Sequence<MinimizeResult>,
+    private val improvementsFn: (() -> Double, Sample?, Cancellation) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
     private val closeFn: () -> Unit,
 ) : AutoCloseable {
@@ -35,9 +35,18 @@ class PortfolioWorker private constructor(
      *  scalar; workers that prune on it (backtrack) read it via their injected bound supplier,
      *  workers that don't (LS) simply ignore it. The two representations stay comparable because
      *  both minimise the same FlatZinc objective var, so [MinimizeResult.objectiveValue] is one
-     *  scalar the portfolio can fold across a heterogeneous pool. */
-    fun improvements(readBound: () -> Double, cancel: Cancellation): Sequence<MinimizeResult> =
-        improvementsFn(readBound, cancel)
+     *  scalar the portfolio can fold across a heterogeneous pool.
+     *
+     *  [warmStart] is the portfolio's current incumbent assignment, handed to workers that can
+     *  resume from it (local search via its `initialAssignment` seam; see [of]'s `withWarmStart`).
+     *  Workers without that seam ignore it. The concurrent [Portfolio] passes null (workers share
+     *  the live bound, not a snapshot); the single-threaded [SequentialPortfolio] passes the
+     *  incumbent so a fresh LS segment descends from it rather than a random restart. */
+    fun improvements(
+        readBound: () -> Double,
+        cancel: Cancellation,
+        warmStart: Sample? = null,
+    ): Sequence<MinimizeResult> = improvementsFn(readBound, warmStart, cancel)
 
     /** Stream diverse samples, honouring [cancel] (set when the collector stops). */
     fun samples(cancel: Cancellation): Sequence<Sample> = samplesFn(cancel)
@@ -57,13 +66,17 @@ class PortfolioWorker private constructor(
          * [improvements]; calling [improvements] on such a worker fails fast. [withBound] injects
          * the portfolio's shared objective bound into the params for [improvements] (e.g.
          * `{ p, supplier -> p.copy(objectiveBoundSupplier = supplier) }` for backtrack); pass
-         * null for engines that don't bound-prune (local search).
+         * null for engines that don't bound-prune (local search). [withWarmStart] injects a
+         * portfolio incumbent assignment into the params for [improvements] (e.g.
+         * `{ p, sample -> p.copy(initialAssignment = sample) }` for local search); pass null for
+         * engines with no warm-start seam (backtrack, which only consumes the shared bound).
          */
         fun <P : SolverParams> of(
             label: String,
             session: Session<P>,
             params: P,
             objective: Objective? = null,
+            withWarmStart: ((P, Sample) -> P)? = null,
             withBound: ((P, () -> Double) -> P)? = null,
         ): PortfolioWorker {
             // withCancellation declares a SolverParams return on the interface but every
@@ -73,12 +86,14 @@ class PortfolioWorker private constructor(
             return PortfolioWorker(
                 label = label,
                 solveFn = { c -> session.solve(withCancel(c)) },
-                improvementsFn = { readBound, c ->
+                improvementsFn = { readBound, warmStart, c ->
                     val obj = requireNotNull(objective) {
                         "PortfolioWorker '$label' was built without an objective; cannot stream improvements"
                     }
-                    val p = withCancel(c)
-                    session.improvements(obj, withBound?.invoke(p, readBound) ?: p)
+                    var p = withCancel(c)
+                    p = withBound?.invoke(p, readBound) ?: p
+                    if (warmStart != null && withWarmStart != null) p = withWarmStart(p, warmStart)
+                    session.improvements(obj, p)
                 },
                 samplesFn = { c -> session.samples(withCancel(c)) },
                 closeFn = { session.close() },
