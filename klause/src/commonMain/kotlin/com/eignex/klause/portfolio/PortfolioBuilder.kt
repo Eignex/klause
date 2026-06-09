@@ -63,8 +63,8 @@ data class PortfolioSpec(
         fun localSearchOnly(seed: Long = 0L, workers: Int = 6): PortfolioSpec =
             PortfolioSpec(localSearchWorkers = workers, seed = seed)
 
-        /** Pure complete backtrack pool — the diverse CDCL/CP trio (SAT-optimized,
-         *  conflict-driven, free) cycled across [workers], each on its own seed. */
+        /** Pure complete backtrack pool — the diverse CDCL/CP palette (SAT-optimized,
+         *  conflict-driven, LinUCB, free) cycled across [workers], each on its own seed. */
         fun backtrackOnly(seed: Long = 0L, workers: Int = 6): PortfolioSpec =
             PortfolioSpec(backtrackWorkers = workers, seed = seed)
     }
