@@ -2,6 +2,8 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
@@ -31,10 +33,19 @@ class SubsetSumEq(
     val coeffs: IntArray,
     /** Required exact sum; positive. */
     val target: Int,
-) : Factor {
+) : Factor, LocalSearchFactor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
+
+    /**
+     * LS no-op: this filter is *redundant* with the [Linear] posted alongside it, which carries
+     * the same `Σ coeffs·xs == target` semantics with LS support. LS enforces the constraint via
+     * that sibling, so here the factor reports always-satisfied (degree 0, zero deltas via the
+     * [LocalSearchFactor] defaults) — present only to keep the LS-cast in [LocalSearchState] from
+     * throwing. See issue #250.
+     */
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
 
     init {
         require(xs.size == coeffs.size) { "SubsetSumEq: parallel arrays of unequal length" }

@@ -8,7 +8,6 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.CostShaping
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 
@@ -108,14 +107,9 @@ object PortfolioBuilder {
         // objective (matches the shipped CLI LS config). Each descends the functional/gradient
         // objective when the model provides one (falling back to the linear form otherwise).
         val lsObj = lsObjective ?: linearObjective
-        // The LS engine casts every factor to LocalSearchFactor at state construction, so a
-        // problem carrying a propagation-only factor (SubsetSumEq / GaussianXor, #250) would
-        // throw the moment an LS worker starts. Both are redundant with their LS-capable
-        // siblings, so dropping LS for the whole problem is sound — the backtrack pool still
-        // covers it (mixed degrades to backtrack-only on these models).
-        val lsCapable = problem.factors.all { it is LocalSearchFactor }
+        // Every factor implements LocalSearchFactor (the formerly propagation-only SubsetSumEq /
+        // GaussianXor now carry redundant LS no-ops, #250), so LS workers run on any model.
         val lsConfigs = when {
-            !lsCapable -> emptyList()
             spec.lsConfigLabels != null && spec.lsConfigLabels == listOf("all") -> LocalSearchWorkerConfig.pool()
             spec.lsConfigLabels != null -> spec.lsConfigLabels.map { LocalSearchWorkerConfig.byLabel(it) }
             spec.localSearchWorkers > 0 -> LocalSearchWorkerConfig.diverse(spec.localSearchWorkers)
@@ -180,9 +174,7 @@ object PortfolioBuilder {
             }
         }
         check(workers.isNotEmpty()) {
-            "portfolio has no workers: all local-search workers were skipped on a problem with a " +
-                "non-LS factor (#250) and no backtrack workers were requested — use backtrackOnly " +
-                "or request backtrack workers for such models"
+            "portfolio has no workers: no local-search or backtrack workers were requested"
         }
         return Portfolio(workers)
     }

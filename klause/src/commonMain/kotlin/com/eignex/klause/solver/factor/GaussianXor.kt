@@ -3,6 +3,8 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -24,11 +26,20 @@ import com.eignex.klause.solver.propagation.PropagationState
  * so even-occurrence variables cancel and a derived row's reason is exactly its
  * odd-occurrence assigned support — the minimal sufficient set (#174).
  */
-class GaussianXor(constraints: List<Xor>) : Factor {
+class GaussianXor(constraints: List<Xor>) : Factor, LocalSearchFactor {
 
     /** Union of all variables across the constraints, in stable order; column index = position. */
     override val boolVars: IntArray
     override val intVars: IntArray = EmptyIntArray
+
+    /**
+     * LS no-op: this Gaussian system is *redundant* with the per-row [Xor] factors posted
+     * alongside it, which carry the same parity semantics with LS support. LS enforces each
+     * parity row via those siblings, so here the factor reports always-satisfied (degree 0,
+     * zero deltas via the [LocalSearchFactor] defaults) — present only to keep the LS-cast in
+     * [LocalSearchState] from throwing. See issue #250.
+     */
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
 
     private val colOfVar: HashMap<Int, Int>
     private val words: Int
