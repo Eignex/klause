@@ -75,6 +75,16 @@ internal data class LocalSearchWorkerConfig(
             acceptance = AcceptanceCriterion.Improving,
         )
 
+        /** ILS basin-hopping whose accept/reject is driven by the contextual acceptance bandit
+         *  (#8) — learns when drifting through worse optima pays off, rather than the fixed
+         *  improving-only rule. Fresh bandit per slot. */
+        private fun ilsBandit() = IteratedLocalSearchRestart(
+            populationSize = 3,
+            crossoverRate = 0.25,
+            perturbationKind = PerturbationKind.BasinHopping,
+            acceptanceBandit = IteratedLocalSearchRestart.acceptanceBandit(),
+        )
+
         /** A CBLS worker with the unified minimize path: [make] is invoked twice so the satisfy
          *  and optimize strategies are independent instances (Cbls carries per-search state). */
         private fun cblsWorker(
@@ -236,6 +246,9 @@ internal data class LocalSearchWorkerConfig(
             "thompson/fixed" to {
                 LocalSearchWorkerConfig("thompson/fixed", LinearThompsonStrategy.thompson(), FixedCadenceRestart())
             },
+            // Contextual-bandit ILS acceptance (#8): CBLS on a basin-hopping ILS restart whose
+            // accept/reject is learned. Untuned candidate, appended to [rankedOrder].
+            "cbls/ils-bandit" to { cblsWorker("cbls/ils-bandit", ilsBandit()) { Cbls(tabu = cblsTabu()) } },
         )
 
         /**
@@ -255,8 +268,8 @@ internal data class LocalSearchWorkerConfig(
             "adaptive-probsat/fixed", "cbls-tenure3/fixed", "cbls-stallslow/fixed", "sa/fixed",
             "cbls-plateau64/fixed", "walksat-cc/luby", "cbls-hinoise/fixed", "cbls-plateau-smooth/fixed",
             "cbls-plateau/fixed", "cbls-raw/fixed",
-            // Untuned bandit candidate (#8); kept last so the default diverse(N) prefix is unchanged.
-            "thompson/fixed",
+            // Untuned bandit candidates (#8); kept last so the default diverse(N) prefix is unchanged.
+            "thompson/fixed", "cbls/ils-bandit",
         )
 
         /** Labels of every config in the pool, in credit order. */
