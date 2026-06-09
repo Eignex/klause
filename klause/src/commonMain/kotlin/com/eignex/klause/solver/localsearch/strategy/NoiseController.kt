@@ -1,7 +1,20 @@
 package com.eignex.klause.solver.localsearch.strategy
 
+import com.eignex.kumulant.bandit.UnivariateBandit
+import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
+import com.eignex.kumulant.bandit.univariate.UCB1
 import com.eignex.kumulant.stat.decay.EwmaMeanStat
 import kotlin.math.sqrt
+import kotlin.random.Random
+
+/** Adaptive noise/cb schedule the focused-LS move selections consume: [level] in [0, 1] scales
+ *  diversification (higher = more random), and [observe] is fed each step's cost so the schedule
+ *  may adapt. [NoiseController] is the hand-tuned bump-on-stall implementation;
+ *  [BanditNoiseController] learns which schedule profile to run (#8). */
+internal interface NoiseSchedule {
+    val level: Double
+    fun observe(cost: Long)
+}
 
 /**
  * Adaptive parameter controller in the spirit of Hoos 2002's adaptive WalkSAT noise.
@@ -36,7 +49,7 @@ internal class NoiseController(
     val minLevel: Double = 0.0,
     val maxLevel: Double = 1.0,
     val ewmaAlpha: Double? = null,
-) {
+) : NoiseSchedule {
     init {
         require(initial in minLevel..maxLevel) { "initial $initial outside [$minLevel, $maxLevel]" }
         require(theta > 0) { "theta must be positive, got $theta" }
@@ -46,7 +59,7 @@ internal class NoiseController(
         }
     }
 
-    var level: Double = initial
+    override var level: Double = initial
         private set
 
     private val ewma: EwmaMeanStat? = ewmaAlpha?.let { EwmaMeanStat(alpha = it) }
@@ -54,7 +67,7 @@ internal class NoiseController(
     private var stallCount: Int = 0
 
     /** Observe the current cost; mutates [level] if the trajectory warrants. */
-    fun observe(cost: Long) {
+    override fun observe(cost: Long) {
         val improving = if (ewma != null) {
             // EWMA-trend mode: update the smoother and check whether the latest cost
             // lies strictly below the smoothed average. Smoothing rejects single-step
@@ -117,6 +130,58 @@ internal class NoiseController(
             val budgetWindow = (flipBudget / 20).coerceAtLeast(5).toDouble()
             val window = minOf(sizeWindow, budgetWindow)
             return (1.0 / window).coerceIn(0.02, 0.5)
+        }
+    }
+}
+
+/**
+ * [NoiseSchedule] whose active profile is chosen by a kumulant bandit (#8): instead of one
+ * hand-tuned bump-on-stall schedule, it runs one of several [NoiseController] profiles and, every
+ * [window] observations, rewards the active profile by whether the cost improved over that window,
+ * then lets a [MultiArmedBandit] pick the next. Per-session learning, so the schedule that suits
+ * the instance wins out — a learned replacement for the single fixed controller.
+ */
+internal class BanditNoiseController(
+    private val profiles: List<NoiseController>,
+    private val bandit: UnivariateBandit,
+    private val window: Int = 200,
+) : NoiseSchedule {
+    init {
+        require(profiles.isNotEmpty()) { "need at least one noise profile" }
+        require(window > 0) { "window must be positive, got $window" }
+    }
+
+    private var current = bandit.choose()
+    private var sinceSwitch = 0
+    private var windowStartCost = Long.MAX_VALUE
+
+    override val level: Double get() = profiles[current].level
+
+    override fun observe(cost: Long) {
+        if (windowStartCost == Long.MAX_VALUE) windowStartCost = cost
+        profiles[current].observe(cost)
+        if (++sinceSwitch >= window) {
+            bandit.update(current, if (cost < windowStartCost) 1.0 else 0.0, 1.0)
+            current = bandit.choose()
+            sinceSwitch = 0
+            windowStartCost = cost
+        }
+    }
+
+    companion object {
+        /** Three (aggressive / moderate / patient) bump-on-stall profiles under UCB1, all anchored
+         *  to [baseline] so the strategy's baseline noise/cb is preserved. */
+        fun default(baseline: Double = 0.2, seed: Long = 0L, window: Int = 200): BanditNoiseController {
+            val profiles = listOf(
+                NoiseController(initial = baseline, theta = 20, phi = 0.3, minLevel = baseline),
+                NoiseController(initial = baseline, theta = 50, phi = 0.2, minLevel = baseline),
+                NoiseController(initial = baseline, theta = 100, phi = 0.1, minLevel = baseline),
+            )
+            return BanditNoiseController(
+                profiles,
+                MultiArmedBandit(profiles.size, UCB1(alpha = 1.0), Random(seed)),
+                window,
+            )
         }
     }
 }
