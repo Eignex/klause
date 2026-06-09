@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.lp.CpToLpRelaxation
@@ -86,5 +87,31 @@ class LpLearnTest {
         assertTrue(learned is MinimizeResult.Optimal, "lp-learning run must still prove optimality")
         assertEquals(5.0, baseline.objectiveValue)
         assertEquals(5.0, learned.objectiveValue)
+    }
+
+    @Test
+    fun `energetic learning preserves the optimum`() {
+        // 4 disjunctive tasks (length 3, capacity 1) over [0,11]; minimize Σ start. The only feasible
+        // arrangement spaces them ≥3 apart → optimum 0+3+6+9 = 18. Branches that pack starts create
+        // over-subscribed windows, so energetic learning runs; the optimum must be preserved.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 11) },
+            factors = arrayOf<Factor>(
+                Cumulative(intArrayOf(0, 1, 2, 3), intArrayOf(3, 3, 3, 3), intArrayOf(1, 1, 1, 1), capacity = 1),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val baseline = BacktrackSolver(problem)
+            .minimize(obj, BacktrackParams(randomSeed = 2L, energeticReasoning = true))
+        val learned = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 2L, energeticReasoning = true, lpLearn = true, lubyRestartBase = 12L),
+        )
+        assertTrue(baseline is MinimizeResult.Optimal)
+        assertTrue(learned is MinimizeResult.Optimal, "energetic-learning run must still prove optimality")
+        assertEquals(18.0, baseline.objectiveValue)
+        assertEquals(18.0, learned.objectiveValue)
     }
 }

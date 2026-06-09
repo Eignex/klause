@@ -269,6 +269,7 @@ class BacktrackSolver(override val problem: Problem) :
                     // Energetic-reasoning feasibility: prune if a Cumulative is over-subscribed.
                     energeticBound != null && energeticBound.isInfeasible(session) -> {
                         sink.observeEnergeticPrune()
+                        if (lpNogoods != null) energeticBound.explain(session)?.let { lpNogoods.add(it) }
                         true
                     }
 
