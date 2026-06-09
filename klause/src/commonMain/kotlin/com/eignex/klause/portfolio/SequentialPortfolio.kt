@@ -8,6 +8,8 @@ import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.TerminationReason
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.Exp3Bandit
+import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
+import com.eignex.kumulant.bandit.univariate.UCB1
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -182,10 +184,12 @@ class SequentialPortfolio(
         workers.forEach { runCatching { it.close() } }
     }
 
-    /** Factories for the default (non-stationary) arm-selection policy. */
+    /** Named-policy convenience factories. The primary constructor takes any kumulant
+     *  [UnivariateBandit], so these are just conveniences for the common policies — add more (or
+     *  call the constructor directly) for `KlUcb`, `Boltzmann`, `RouletteWheel`, etc. */
     companion object {
-        /** Default arm-selection policy: kumulant [Exp3Bandit] (non-stationary — the right fit for
-         *  a reward that shifts as the search moves from feasibility-finding to bound-improving). */
+        /** [Exp3Bandit] arm selection (non-stationary — the right fit for a reward that shifts as
+         *  the search moves from feasibility-finding to bound-improving). */
         fun exp3(
             workers: List<PortfolioWorker>,
             seed: Long = 0L,
@@ -195,9 +199,44 @@ class SequentialPortfolio(
             maxSliceMillis: Long = 60_000,
             sliceGrowth: Double = 1.5,
             warmupSliceMillis: Long = 1_000,
+        ): SequentialPortfolio = withBandit(
+            workers,
+            Exp3Bandit(workers.size, eta, gamma, Random(seed)),
+            baseSliceMillis,
+            maxSliceMillis,
+            sliceGrowth,
+            warmupSliceMillis,
+        )
+
+        /** UCB1 arm selection (stationary, deterministic given the seed) — the alternative to
+         *  [exp3] when arm utility is roughly fixed over the run. */
+        fun ucb1(
+            workers: List<PortfolioWorker>,
+            seed: Long = 0L,
+            alpha: Double = 1.0,
+            baseSliceMillis: Long = 2_000,
+            maxSliceMillis: Long = 60_000,
+            sliceGrowth: Double = 1.5,
+            warmupSliceMillis: Long = 1_000,
+        ): SequentialPortfolio = withBandit(
+            workers,
+            MultiArmedBandit(workers.size, UCB1(alpha = alpha), Random(seed)),
+            baseSliceMillis,
+            maxSliceMillis,
+            sliceGrowth,
+            warmupSliceMillis,
+        )
+
+        private fun withBandit(
+            workers: List<PortfolioWorker>,
+            bandit: UnivariateBandit,
+            baseSliceMillis: Long,
+            maxSliceMillis: Long,
+            sliceGrowth: Double,
+            warmupSliceMillis: Long,
         ): SequentialPortfolio = SequentialPortfolio(
             workers = workers,
-            bandit = Exp3Bandit(workers.size, eta, gamma, Random(seed)),
+            bandit = bandit,
             baseSliceMillis = baseSliceMillis,
             maxSliceMillis = maxSliceMillis,
             sliceGrowth = sliceGrowth,

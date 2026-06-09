@@ -75,4 +75,19 @@ class SequentialPortfolioTest {
         val r = SequentialPortfolio.exp3(btArms(problem, 3, obj)).use { it.minimize() }
         assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
     }
+
+    @Test
+    fun `ucb1 policy factory also proves the optimum`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
+        val r = SequentialPortfolio.ucb1(btArms(problem, 3, obj)).use { it.minimize() }
+        assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
+    }
 }
