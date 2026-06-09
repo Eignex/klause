@@ -5,7 +5,6 @@ import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.DisjunctiveExpr
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.allDifferentOpt
-import com.eignex.klause.ast.countEqOpt
 import com.eignex.klause.ast.cumulativeOpt
 import com.eignex.klause.ast.disjunctiveOpt
 import com.eignex.klause.ast.gccOpt
@@ -136,27 +135,6 @@ class ReifiedGlobalTest {
     @Test
     fun `reified allDifferentOpt bit-blasts`() {
         val cnf = BitBlaster.compile(AllDifferentOptReifiedSchema().compile().problem)
-        assertTrue(cnf.clauses.isNotEmpty())
-    }
-
-    private class CountOptReifiedSchema : VariableSchema() {
-        val a by optIntVar(min = 0, max = 2)
-        val b by optIntVar(min = 0, max = 2)
-        val n by intVar(min = 0, max = 2)
-        val flag by boolVar()
-        val r by constraint {
-            flag iff countEqOpt(
-                xs = listOf(a.value, b.value),
-                v = 1,
-                n = n,
-                presents = listOf(a.present, b.present),
-            )
-        }
-    }
-
-    @Test
-    fun `reified countEqOpt bit-blasts`() {
-        val cnf = BitBlaster.compile(CountOptReifiedSchema().compile().problem)
         assertTrue(cnf.clauses.isNotEmpty())
     }
 

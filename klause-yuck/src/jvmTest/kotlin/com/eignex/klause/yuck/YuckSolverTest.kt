@@ -8,12 +8,10 @@ import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Linear
@@ -113,11 +111,9 @@ class YuckSolverTest {
         // Independent factor groups in a single Yuck run (each subprocess pays a JVM spawn).
         // Group vars:           ids        semantics
         //   Element (const)     6,7        i7 = [5,7,9][i6], i6 pinned to 2 ⇒ i7 = 9
-        //   Among               8..10      i10 = #{i8, i9} ∈ {1,2}
         //   Table               11,12      (i11,i12) ∈ {(0,1),(2,2)}
         //   Circuit             13..15     one 3-cycle, no self-loops
         //   Inverse             16..19     f = (i16,i17), g = (i18,i19) channel each other
-        //   Count(Ge)           20..22     i22 = #{i20, i21 ≥ 2}
         //   ArrayMinMax(max)    23..25     i25 = max(i23, i24)
         // Bool groups:
         //   Cardinality         b0..b2     exactly one true
@@ -141,11 +137,9 @@ class YuckSolverTest {
             factors = arrayOf<Factor>(
                 Element(idx = 6, result = 7, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 0),
                 Linear(intArrayOf(1), intArrayOf(6), LinearOp.EQ, 2),
-                Among(n = 10, xs = intArrayOf(8, 9), values = intArrayOf(1, 2)),
                 Table(intArrayOf(11, 12), intArrayOf(0, 1, 2, 2)),
                 Circuit(intArrayOf(13, 14, 15)),
                 Inverse(intArrayOf(16, 17), intArrayOf(18, 19)),
-                Count(xs = intArrayOf(20, 21), v = 2, op = Count.Op.Ge, n = 22),
                 ArrayMinMax(result = 25, xs = intArrayOf(23, 24), max = true),
                 Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 1, 1),
                 Xor(intArrayOf(Lit.make(3, true), Lit.make(4, true)), 1),
@@ -156,7 +150,6 @@ class YuckSolverTest {
         val a = r.assignment
         assertEquals(2, a.ints[6])
         assertEquals(9, a.ints[7])
-        assertEquals(listOf(a.ints[8], a.ints[9]).count { it in 1..2 }, a.ints[10])
         assertTrue(
             (a.ints[11] == 0 && a.ints[12] == 1) || (a.ints[11] == 2 && a.ints[12] == 2),
             "table violated: ${a.ints[11]}, ${a.ints[12]}",
@@ -176,7 +169,6 @@ class YuckSolverTest {
             val g = a.ints.slice(18..19)
             for (i in f.indices) assertEquals(i, g[f[i]], "inverse violated: f=$f g=$g")
         }
-        assertEquals(listOf(a.ints[20], a.ints[21]).count { it >= 2 }, a.ints[22])
         assertEquals(maxOf(a.ints[23], a.ints[24]), a.ints[25])
         assertEquals(1, a.bools.slice(0..2).count { it })
         assertTrue(a.bools[3] xor a.bools[4])

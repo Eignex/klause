@@ -7,12 +7,9 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
@@ -127,19 +124,6 @@ class FznModelTest {
     }
 
     @Test
-    fun `count reifies per element and sums into the count var`() {
-        val fzn = FznModel.emit(
-            problem(
-                0,
-                dom(3, 0, 3),
-                Count(xs = intArrayOf(0, 1), v = 2, op = Count.Op.Ge, n = 2),
-            ),
-        )
-        assertContains(fzn, "constraint int_le_reif(2, i0, t0);")
-        assertContains(fzn, "constraint int_lin_eq([1, 1, -1], [t2, t3, i2], 0);")
-    }
-
-    @Test
     fun `gcc closed adds cover membership`() {
         val fzn = FznModel.emit(
             problem(
@@ -223,33 +207,6 @@ class FznModelTest {
             ),
         )
         assertContains(fzn, "constraint yuck_diffn([i0, i1], [i2, i3], [1, 1], [1, 1], true);")
-    }
-
-    @Test
-    fun `bin packing load vars channel directly`() {
-        val fzn = FznModel.emit(
-            problem(
-                0,
-                arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(0, 5), IntDomain(0, 5)),
-                BinPacking(
-                    bins = intArrayOf(0, 1),
-                    weights = intArrayOf(3, 4),
-                    mode = BinPacking.Mode.LoadVars,
-                    loadVars = intArrayOf(2, 3),
-                    numBins = 2,
-                    binOffset = 1,
-                ),
-            ),
-        )
-        assertContains(fzn, "constraint yuck_bin_packing_load([i2, i3], [i0, i1], [3, 4], 1);")
-    }
-
-    @Test
-    fun `alldifferent except passes the exclusion set`() {
-        val fzn = FznModel.emit(
-            problem(0, dom(2, 0, 3), AllDifferentExcept(intArrayOf(0, 1), intArrayOf(0, 3))),
-        )
-        assertContains(fzn, "constraint fzn_alldifferent_except([i0, i1], {0, 3});")
     }
 
     @Test

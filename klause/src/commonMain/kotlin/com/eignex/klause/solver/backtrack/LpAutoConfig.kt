@@ -2,7 +2,6 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllDifferentExcept
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
@@ -37,7 +36,7 @@ object LpAutoConfig {
         for (f in problem.factors) {
             when (f) {
                 is Linear, is ReifiedLinear -> lpEmittable = true
-                is AllDifferent, is AllDifferentExcept -> allDifferent = true
+                is AllDifferent -> allDifferent = true
                 is GlobalCardinality -> globalCardinality = true
                 is Cumulative -> cumulative = true
                 else -> Unit

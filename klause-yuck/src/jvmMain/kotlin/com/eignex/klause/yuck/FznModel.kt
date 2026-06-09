@@ -6,21 +6,15 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.Among
-import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -32,7 +26,6 @@ import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
-import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
@@ -176,13 +169,6 @@ class FznModel private constructor(
         PbOp.GE -> LinearOp.GE
     }
 
-    /** Emit `Σ lits = into` (a count/cardinality channel onto an int var name). */
-    private fun sumOfBools(boolNames: List<String>, into: String) {
-        val coeffs = MutableList(boolNames.size) { 1 }
-        coeffs.add(-1)
-        constraint("int_lin_eq(${coeffs.joinToString(", ", "[", "]")}, ${names(boolNames + into)}, 0)")
-    }
-
     /** Declare a native (bare-declaration) Yuck predicate once and return its name. */
     private fun native(name: String, signature: String): String {
         predicates.add("predicate $name($signature);")
@@ -229,20 +215,6 @@ class FznModel private constructor(
 
             is ReifiedCardinality -> postReifiedCardinality(f)
 
-            is AllDifferentExcept -> {
-                val p = native("fzn_alldifferent_except", "array [int] of var int: x, set of int: S")
-                constraint("$p(${intVarArray(f.xs)}, ${intSet(f.except)})")
-            }
-
-            is Among -> {
-                val matches = f.xs.map { x ->
-                    newBoolAux().also { constraint("set_in_reif(${intName(x)}, ${intSet(f.values)}, $it)") }
-                }
-                sumOfBools(matches.map { boolAsIntByName(it) }, intName(f.n))
-            }
-
-            is Count -> postCountFactor(f)
-
             is Element -> postElement(f)
 
             is Inverse -> {
@@ -273,27 +245,16 @@ class FznModel private constructor(
                 constraint("$p(${intVarArray(f.xs)}, ${intArray(f.tuples)})")
             }
 
-            is ArgMinMax -> postArgMinMax(f)
-
             is ArrayMinMax -> {
                 val builtin = if (f.max) "array_int_maximum" else "array_int_minimum"
                 constraint("$builtin(${intName(f.result)}, ${intVarArray(f.xs)})")
-            }
-
-            is Knapsack -> {
-                linear(f.weights.toList() + (-1), f.xs.map { intName(it) } + intName(f.w), LinearOp.EQ, 0)
-                linear(f.profits.toList() + (-1), f.xs.map { intName(it) } + intName(f.p), LinearOp.EQ, 0)
             }
 
             is Cumulative -> postCumulative(f)
 
             is Diffn -> postDiffn(f)
 
-            is BinPacking -> postBinPacking(f)
-
             is Sort -> postSort(f)
-
-            is Sequence -> postSequence(f)
 
             is Regular -> {
                 val p = native(
@@ -333,10 +294,6 @@ class FznModel private constructor(
         constraint("bool_clause(${names(positives)}, [])")
     }
 
-    /** bool2int channel for an aux bool created by this factor (not a problem var). */
-    private fun boolAsIntByName(boolAux: String): String =
-        newIntAux(0, 1).also { constraint("bool2int($boolAux, $it)") }
-
     private fun postXor(f: Xor) {
         val terms = f.literals.map { litBool(it) }.toMutableList()
         // array_bool_xor holds iff an odd number of terms are true; a constant `true` flips
@@ -366,27 +323,6 @@ class FznModel private constructor(
             // 0 ≤ count ≤ n is vacuously true, so the reification literal is forced.
             else -> constraint("bool_eq($r, true)")
         }
-    }
-
-    private fun postCountFactor(f: Count) {
-        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
-        // `n = #{i : xs[i] ⟨op⟩ v}` with `n` the count *variable*. Reify each element's match
-        // against the constant and sum the indicators — uniform across all ops. GE/GT have no
-        // FlatZinc reified builtin, so flip the operands of LE/LT.
-        val matches = f.xs.map { x ->
-            val b = newBoolAux()
-            val c = when (f.op) {
-                Count.Op.Eq -> "int_eq_reif(${intName(x)}, ${f.v}, $b)"
-                Count.Op.Ne -> "int_ne_reif(${intName(x)}, ${f.v}, $b)"
-                Count.Op.Le -> "int_le_reif(${intName(x)}, ${f.v}, $b)"
-                Count.Op.Lt -> "int_lt_reif(${intName(x)}, ${f.v}, $b)"
-                Count.Op.Ge -> "int_le_reif(${f.v}, ${intName(x)}, $b)"
-                Count.Op.Gt -> "int_lt_reif(${f.v}, ${intName(x)}, $b)"
-            }
-            constraint(c)
-            b
-        }
-        sumOfBools(matches.map { boolAsIntByName(it) }, intName(f.n))
     }
 
     private fun postElement(f: Element) {
@@ -454,35 +390,6 @@ class FznModel private constructor(
         }
     }
 
-    private fun postArgMinMax(f: ArgMinMax) {
-        // m = extremum(xs); idx names the first position attaining it (klause/MiniZinc
-        // tie-breaking): positions before idx are strictly off the extremum, idx itself is on it.
-        var lo = Int.MAX_VALUE
-        var hi = Int.MIN_VALUE
-        for (x in f.xs) {
-            val d = problem.intDomains[x]
-            if (d.min < lo) lo = d.min
-            if (d.max > hi) hi = d.max
-        }
-        val m = newIntAux(lo, hi)
-        val builtin = if (f.max) "array_int_maximum" else "array_int_minimum"
-        constraint("$builtin($m, ${intVarArray(f.xs)})")
-        constraint("set_in(${intName(f.idx)}, ${f.indexOffset}..${f.indexOffset + f.xs.size - 1})")
-        for (j in f.xs.indices) {
-            val idxVal = f.indexOffset + j
-            val here = newBoolAux()
-            constraint("int_eq_reif(${intName(f.idx)}, $idxVal, $here)")
-            val hit = newBoolAux()
-            constraint("int_eq_reif(${intName(f.xs[j])}, $m, $hit)")
-            // idx = idxVal → xs[j] = m
-            constraint("bool_clause(${names(listOf(hit))}, ${names(listOf(here))})")
-            val after = newBoolAux()
-            constraint("int_lt_reif($idxVal, ${intName(f.idx)}, $after)")
-            // idx > idxVal → xs[j] ≠ m (first-occurrence tie-break)
-            constraint("bool_clause([], ${names(listOf(after, hit))})")
-        }
-    }
-
     private fun postCumulative(f: Cumulative) {
         if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
         // durations/resources/capacity are constants; the var forms live in the *Vars arrays
@@ -512,20 +419,6 @@ class FznModel private constructor(
         constraint("$p(${intVarArray(f.xs)}, ${intVarArray(f.ys)}, $w, $h, ${!f.nonStrict})")
     }
 
-    private fun postBinPacking(f: BinPacking) {
-        val loads: List<String> = when (f.mode) {
-            BinPacking.Mode.LoadVars -> requireNotNull(f.loadVars).map { intName(it) }
-            BinPacking.Mode.UniformCapacity -> List(f.numBins) { newIntAux(0, f.uniformCapacity) }
-            BinPacking.Mode.PerBinCapacity -> List(f.numBins) { newIntAux(0, requireNotNull(f.capacities)[it]) }
-        }
-        val p = native(
-            "yuck_bin_packing_load",
-            "array [int] of var int: load, array [int] of var int: bin, " +
-                "array [int] of int: weight, int: minLoadIndex",
-        )
-        constraint("$p(${names(loads)}, ${intVarArray(f.bins)}, ${intArray(f.weights)}, ${f.binOffset})")
-    }
-
     private fun postSort(f: Sort) {
         // ys is xs sorted ascending: ys[j] = xs[perm[j]] with perm a permutation, ys increasing.
         val n = f.xs.size
@@ -538,22 +431,6 @@ class FznModel private constructor(
         val inc = native("yuck_increasing_int", "array [int] of var int: x, bool: strict")
         constraint("$inc(${intVarArray(f.ys)}, false)")
     }
-
-    private fun postSequence(f: Sequence) {
-        // Every length-k window has between low and high elements inside the value set. The
-        // membership indicators are shared across overlapping windows.
-        val member = f.xs.map { x ->
-            val b = newBoolAux()
-            constraint("set_in_reif(${intName(x)}, ${intSet(f.values)}, $b)")
-            boolAsIntByName(b)
-        }
-        for (start in 0..f.xs.size - f.k) {
-            val window = member.subList(start, start + f.k)
-            if (f.low > 0) linear(List(f.k) { 1 }, window, LinearOp.GE, f.low)
-            if (f.high < f.k) linear(List(f.k) { 1 }, window, LinearOp.LE, f.high)
-        }
-    }
-
 
     private fun postMdd(f: Mdd) {
         // Each layer is a transition table over (q[i], seq[i], q[i+1][, weight]); chain the

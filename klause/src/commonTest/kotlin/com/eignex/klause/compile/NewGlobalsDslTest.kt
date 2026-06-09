@@ -1,11 +1,8 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.allDifferentExcept
-import com.eignex.klause.ast.argSort
 import com.eignex.klause.ast.costMdd
 import com.eignex.klause.ast.costRegular
 import com.eignex.klause.ast.mdd
-import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -19,57 +16,6 @@ import kotlin.test.assertTrue
  * same sample (proves the decomposition emits only bit-blastable primitives).
  */
 class NewGlobalsDslTest {
-
-    private fun assertBitblastsAndSat(compiled: CompiledProblem) {
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
-        assertTrue(sample != null, "solver found no sample")
-        // BitBlast.compile throws on any unsupported factor type, which is the
-        // bit-blastability claim. SAT-oracle round-trip is omitted because problems
-        // with this many bool vars exceed the test oracle's 20-var brute-force cap.
-        BitBlaster.compile(compiled.problem)
-    }
-
-    @Test
-    fun `alldifferent_except - except set ignored`() {
-        class S : VariableSchema() {
-            val a by intVar(0, 3)
-            val b by intVar(0, 3)
-            val c by intVar(0, 3)
-
-            // a, b, c are pairwise distinct unless they equal 0 (free sentinel).
-            val rule by constraint { allDifferentExcept(listOf(a, b, c), except = setOf(0)) }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        assertBitblastsAndSat(compiled)
-    }
-
-    @Test
-    fun `arg_sort - permutation ordering`() {
-        class S : VariableSchema() {
-            val v0 by intVar(0, 2)
-            val v1 by intVar(0, 2)
-            val v2 by intVar(0, 2)
-            val p0 by intVar(0, 2)
-            val p1 by intVar(0, 2)
-            val p2 by intVar(0, 2)
-            val rule by constraint {
-                argSort(listOf(v0, v1, v2), listOf(p0, p1, p2), permOffset = 0)
-            }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        // Pin a deterministic seed — the default-Random path makes search-budget timeouts
-        // flaky depending on prior tests' RNG consumption. With a fixed seed the heuristic
-        // choice sequence is reproducible and the budget margin holds.
-        val sample = BacktrackSolver(compiled.problem)
-            .enumerate(BacktrackParams(maxDecisions = 5_000_000L, randomSeed = 1L))
-            .firstOrNull()
-        assertTrue(sample != null, "arg_sort: solver found no sample")
-        // BitBlast lowering goes through the decomposition primitives (ArgSort factor
-        // itself is skipped in bit-blast).
-        BitBlaster.compile(compiled.problem)
-    }
 
     @Test
     fun `mdd - 2-layer MDD accepts a sample`() {
