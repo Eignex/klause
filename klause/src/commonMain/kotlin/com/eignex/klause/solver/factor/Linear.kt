@@ -309,7 +309,7 @@ class Linear private constructor(
  * tighter than the original (caller falls back to default antecedents).
  */
 internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntArray): IntArray? {
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     // Sweep-prefix tightening: collect *only* antecedents tied to decision levels > 0 when
     // any such exist in scope. A var with `intLevel[v] <= 0` was tightened at root level —
@@ -385,7 +385,7 @@ internal fun collectLinearDirAntecedents(
     extraLit: Int,
     useLo: Boolean,
 ): IntArray? {
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
@@ -471,7 +471,7 @@ internal fun collectLinearRelaxedAntecedents(
     }
     val currentLevel = state.currentLevel
     var remaining = if (slack < 0) 0 else slack
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
@@ -528,7 +528,7 @@ internal fun collectLinearTightenAntecedents(
     excludeIdx: Int,
     extraLit: Int,
 ): IntArray? {
-    val seen = IntHashSet()
+    val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
     if (extraLit != 0) {
         out.add(extraLit)
