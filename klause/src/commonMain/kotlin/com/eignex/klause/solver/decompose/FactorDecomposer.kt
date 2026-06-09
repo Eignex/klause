@@ -118,7 +118,6 @@ internal object FactorDecomposer {
 
         is Diffn -> decomposeDiffn(f, ctx)
 
-
         is Cumulative -> decomposeCumulative(f, ctx)
 
         is Circuit -> decomposeCircuit(f, ctx)

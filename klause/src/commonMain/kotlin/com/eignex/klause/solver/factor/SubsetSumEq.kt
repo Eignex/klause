@@ -33,7 +33,8 @@ class SubsetSumEq(
     val coeffs: IntArray,
     /** Required exact sum; positive. */
     val target: Int,
-) : Factor, LocalSearchFactor {
+) : Factor,
+    LocalSearchFactor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
