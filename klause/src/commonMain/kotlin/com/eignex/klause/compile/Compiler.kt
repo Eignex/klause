@@ -14,6 +14,7 @@ import com.eignex.klause.ast.CostMddExpr
 import com.eignex.klause.ast.CostRegularExpr
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.CumulativeExprOpt
+import com.eignex.klause.ast.DiffnExpr
 import com.eignex.klause.ast.DisjunctiveExpr
 import com.eignex.klause.ast.DisjunctiveExprOpt
 import com.eignex.klause.ast.FloatLinearConstraint
@@ -37,6 +38,7 @@ import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.PseudoBooleanExpr
+import com.eignex.klause.ast.RegularExpr
 import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.ast.SearchAnnotation
 import com.eignex.klause.ast.SetDisjoint
@@ -45,6 +47,7 @@ import com.eignex.klause.ast.SetIn
 import com.eignex.klause.ast.SetNominalIn
 import com.eignex.klause.ast.SetSpec
 import com.eignex.klause.ast.SetSubsetOf
+import com.eignex.klause.ast.SortExpr
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.SymmetricAllDifferent
 import com.eignex.klause.ast.TableConstraint
@@ -362,6 +365,12 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
             is CumulativeExpr -> reifyCumulative(expr)
 
             is DisjunctiveExpr -> reifyDisjunctive(expr)
+
+            is SortExpr -> error("sort: reified context not supported (use at top-level)")
+
+            is DiffnExpr -> error("diffn: reified context not supported (use at top-level)")
+
+            is RegularExpr -> error("regular: reified context not supported (use at top-level)")
 
             is AllDifferentOpt -> reifyAllDifferentOpt(expr)
 
