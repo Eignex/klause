@@ -103,37 +103,10 @@ predicate float_div(var float: a, var float: b, var float: c);
 % klause's FlatZinc compiler instead of decomposing in its standard library.
 predicate all_different_int(array[int] of var int: x);
 predicate all_equal_int(array[int] of var int: x);
-predicate alldifferent_except_0(array[int] of var int: x);
-predicate alldifferent_except(array[int] of var int: x, set of int: S);
 predicate symmetric_all_different(array[int] of var int: x);
 predicate member_int(array[int] of var int: x, var int: y);
 predicate sort(array[int] of var int: x, array[int] of var int: y);
 
-% Counting.
-predicate count_eq(array[int] of var int: x, var int: y, var int: c);
-predicate count_neq(array[int] of var int: x, var int: y, var int: c);
-predicate count_le(array[int] of var int: x, var int: y, var int: c);
-predicate count_lt(array[int] of var int: x, var int: y, var int: c);
-predicate count_ge(array[int] of var int: x, var int: y, var int: c);
-predicate count_gt(array[int] of var int: x, var int: y, var int: c);
-
-% Reified count_*: b ↔ |{i : x[i] ⟨op⟩ y}| = c. Decompose through klause's non-reified
-% count_* (above) plus an elementary reified int equality on the count var. Without these
-% MiniZinc's flattener fails with "count_X is used in a reified context but no reified
-% version is available" whenever a model wraps a count in an implication / iff / etc.
-predicate count_eq_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
-  let { var 0..length(x): cnt; } in count_eq(x, y, cnt) /\ int_eq_reif(cnt, c, b);
-predicate count_neq_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
-  let { var 0..length(x): cnt; } in count_neq(x, y, cnt) /\ int_eq_reif(cnt, c, b);
-predicate count_le_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
-  let { var 0..length(x): cnt; } in count_le(x, y, cnt) /\ int_eq_reif(cnt, c, b);
-predicate count_lt_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
-  let { var 0..length(x): cnt; } in count_lt(x, y, cnt) /\ int_eq_reif(cnt, c, b);
-predicate count_ge_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
-  let { var 0..length(x): cnt; } in count_ge(x, y, cnt) /\ int_eq_reif(cnt, c, b);
-predicate count_gt_reif(array[int] of var int: x, var int: y, var int: c, var bool: b) =
-  let { var 0..length(x): cnt; } in count_gt(x, y, cnt) /\ int_eq_reif(cnt, c, b);
-predicate among(var int: n, array[int] of var int: x, set of int: v);
 
 % Cardinality.
 predicate global_cardinality(array[int] of var int: x,
@@ -166,9 +139,6 @@ predicate array_int_maximum(var int: m, array[int] of var int: x);
 predicate array_int_minimum(var int: m, array[int] of var int: x);
 predicate maximum_int(var int: m, array[int] of var int: x);
 predicate minimum_int(var int: m, array[int] of var int: x);
-predicate arg_max_int(array[int] of var int: x, var int: i);
-predicate arg_min_int(array[int] of var int: x, var int: i);
-predicate exactly_int(int: n, array[int] of var int: x, int: v);
 
 % Ordering.
 predicate increasing_int(array[int] of var int: x);
@@ -182,15 +152,7 @@ predicate lex_lesseq_int(array[int] of var int: x, array[int] of var int: y);
 predicate value_precede_int(int: s, int: t, array[int] of var int: x);
 predicate value_precede_chain_int(array[int] of int: values, array[int] of var int: x);
 
-% Sliding-window cardinality.
-predicate sequence(array[int] of var int: x, int: low, int: high, int: k, set of int: s);
-
 % Packing.
-predicate bin_packing(int: c, array[int] of var int: bin, array[int] of int: w);
-predicate bin_packing_capa(array[int] of int: c, array[int] of var int: bin, array[int] of int: w);
-predicate bin_packing_load(array[int] of var int: load, array[int] of var int: bin, array[int] of int: w);
-predicate knapsack(array[int] of int: w, array[int] of int: p,
-                   array[int] of var int: x, var int: weight, var int: profit);
 predicate diffn(array[int] of var int: x, array[int] of var int: y,
                 array[int] of int: w, array[int] of int: h);
 predicate diffn_nonstrict(array[int] of var int: x, array[int] of var int: y,
