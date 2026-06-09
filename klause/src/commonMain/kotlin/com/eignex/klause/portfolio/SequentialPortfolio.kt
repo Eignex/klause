@@ -136,8 +136,12 @@ class SequentialPortfolio(
             bandit.update(arm, reward)
 
             if (isExhausted(terminal)) {
-                val b = best
-                return if (b != null) MinimizeResult.Optimal(b, bound, stats) else MinimizeResult.Infeasible(stats = stats)
+                val exhaustedBest = best
+                return if (exhaustedBest != null) {
+                    MinimizeResult.Optimal(exhaustedBest, bound, stats)
+                } else {
+                    MinimizeResult.Infeasible(stats = stats)
+                }
             }
             slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
         }
@@ -164,6 +168,7 @@ class SequentialPortfolio(
         workers.forEach { runCatching { it.close() } }
     }
 
+    /** Factories for the default (non-stationary) arm-selection policy. */
     companion object {
         /** Default arm-selection policy: kumulant [Exp3Bandit] (non-stationary — the right fit for
          *  a reward that shifts as the search moves from feasibility-finding to bound-improving). */

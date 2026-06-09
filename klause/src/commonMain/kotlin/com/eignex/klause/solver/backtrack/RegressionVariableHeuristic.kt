@@ -139,7 +139,9 @@ class RegressionVariableHeuristic private constructor(
 
     override fun onSolution(snapshot: Sample) = Unit
 
+    /** Feature-vector size and the [linUcb] factory. */
     companion object {
+        /** Number of per-variable features the LinUCB context vector carries (see [features]). */
         const val FEATURE_SIZE: Int = 5
         private const val PROP_SQUASH = 16.0
         private const val LN_SCALE = 8.0

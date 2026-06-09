@@ -6,6 +6,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.tools.BanditProbe
 import com.eignex.klause.bench.tools.CblsDiag
 import com.eignex.klause.bench.tools.CpSeedProbe
 import com.eignex.klause.bench.tools.FormatCoverage
@@ -39,6 +40,7 @@ object BenchCli {
             "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
             "diag:lsconfig" -> LsConfigProbe.main(args.drop(1).toTypedArray())
             "diag:cpseed" -> CpSeedProbe.main(args.drop(1).toTypedArray())
+            "diag:bandit" -> BanditProbe.main(args.drop(1).toTypedArray())
             "coverage:xcsp3" -> FormatCoverage.xcsp3()
             "coverage:smtlib" -> FormatCoverage.smtlib()
             else -> runTarget(cmd)
