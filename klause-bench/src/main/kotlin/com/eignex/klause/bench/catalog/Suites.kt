@@ -22,7 +22,7 @@ import com.eignex.klause.solver.factor.Xor
  * from.
  *
  *  - [handwrittenCore] — small SAT/CSP instances built directly in Kotlin (`InCode`).
- *  - [dimacsCore]/[opbCore]/[schemaCore]/[flatzincCore] — vendored under `klause-bench/corpus/`.
+ *  - [dimacsCore]/[opbCore]/[schemaCore]/[flatzincCore] — vendored under `klause-bench/smoke-corpus/`.
  *  - [mznSmoke] — the in-tree `klause-mzn-lib/test-models/` smoke set (referenced, not copied).
  *  - external MiniZinc/SAT collections (fetched on demand) are declared in [ExternalCollections].
  */
@@ -351,12 +351,15 @@ internal object Suites {
         }
     }
 
-    // --- Vendored corpus suites (klause-bench/corpus/) ---
+    // --- Vendored smoke-corpus suites (klause-bench/smoke-corpus/) ---
 
     private val dimacsCore = suite("dimacs-core", "Curated small DIMACS CNF (SAT + UNSAT)") {
         format = Format.DIMACS
         license = "SATLIB-style (public benchmarks)"
         vendored("php4", Category.UNSAT, Expected.Unsat)
+        vendored("php3", Category.UNSAT, Expected.Unsat)
+        vendored("implication-chain", Category.SAT, Expected.Sat)
+        vendored("bipartite-2col", Category.SAT, Expected.Sat)
         vendored("random3sat-20-80", Category.SAT, Expected.Sat)
         vendored("random3sat-50-200", Category.SAT, Expected.Sat)
     }
@@ -365,12 +368,14 @@ internal object Suites {
         format = Format.OPB
         license = "internal"
         vendored("setcover-tiny", Category.PACKING, Expected.Sat)
+        vendored("pb-cardinality", Category.SAT, Expected.Sat)
     }
 
     private val schemaCore = suite("schema-core", "klause JSON schema instances") {
         format = Format.JSON_SCHEMA
         license = "internal"
         vendored("campaign", Category.ASSIGNMENT, Expected.Sat)
+        vendored("roster", Category.ASSIGNMENT, Expected.Sat)
     }
 
     private val flatzincCore = suite("flatzinc-core", "Curated small FlatZinc (satisfaction)") {
@@ -379,6 +384,9 @@ internal object Suites {
         vendored("cardinality", Category.CSP, Expected.Sat)
         vendored("permutation4", Category.CSP, Expected.Sat)
         vendored("small-linear", Category.CSP, Expected.Sat)
+        vendored("magic-square-3", Category.CSP, Expected.Sat)
+        vendored("graph-coloring-4cycle", Category.CSP, Expected.Sat)
+        vendored("element-channel", Category.CSP, Expected.Sat)
     }
 
     private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA instances") {
@@ -386,6 +394,8 @@ internal object Suites {
         license = "internal"
         vendored("lia-basic", Category.CSP, Expected.Sat)
         vendored("lia-opt", Category.OPTIMIZATION, Expected.Opt(7))
+        vendored("lia-unsat", Category.UNSAT, Expected.Unsat)
+        vendored("lia-disjunction", Category.CSP, Expected.Sat)
     }
 
     private val xcsp3Core = suite("xcsp3-core", "Curated XCSP3 integer CSP/COP instances") {
@@ -393,6 +403,8 @@ internal object Suites {
         license = "internal"
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
+        vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
+        vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
     }
 
     // --- External SAT collection (auto-fetched SATLIB tarball) ---
