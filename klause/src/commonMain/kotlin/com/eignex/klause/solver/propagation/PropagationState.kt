@@ -1058,6 +1058,15 @@ class PropagationState(
         }
     }
 
+    /** True iff bool [v] is currently assigned (by decision or propagation). Primitive — lets
+     *  hot factor loops test assignment without the `Boolean?` box that `boolValues[v]` allocates.
+     *  Pair with [boolValueAt] (only meaningful when this returns true). */
+    fun boolAssignedAt(v: Int): Boolean = boolAssigned.get(v)
+
+    /** Stored value of bool [v]; meaningful only when [boolAssignedAt] is true (undefined
+     *  otherwise). Primitive companion to [boolAssignedAt] for box-free hot-loop reads. */
+    fun boolValueAt(v: Int): Boolean = boolValueBits.get(v)
+
     /** Unified truth lookup over bool literals and atom-lit literals. Returns `null`
      *  when undetermined. Pair with [Lit.evaluate] / explicit polarity branching to
      *  reason about literal truth. */
