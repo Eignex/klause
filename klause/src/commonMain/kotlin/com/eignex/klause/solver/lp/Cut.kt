@@ -3,6 +3,7 @@ package com.eignex.klause.solver.lp
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.util.IntArrayList
 
 /**
  * A linear inequality `Σ coeffs[k]·x_{cols[k]} rel rhs` over LP columns, added to the relaxation to
@@ -119,5 +120,85 @@ internal class AllDifferentSeparator : CutSeparator {
             if (taken == n) break
         }
         return minSum to maxSum
+    }
+}
+
+/**
+ * Lagrangian-augmented LP cut (#23 ↔ #22): the objective-weighted AllDifferent bound. For an
+ * AllDifferent over variables `V`, the minimum of `Σ_{i∈V} c_i·x_i` subject to all-different is the
+ * exact min-cost assignment of the objective coefficients to distinct values ([MinCostAssignment]) —
+ * a stronger statement than the unweighted Hall sum cut whenever the `c_i` differ. Emitting
+ * `Σ_{i∈V} c_i·x_i ≥ assignmentMin` as a cut injects that global, integral bound into the LP, which
+ * is exactly the synergy the Lagrangian-augmented LP path provides: a plain multiplier→coefficient
+ * adjustment buys nothing for an LP relaxation (LP strong duality), but the integral assignment bound
+ * does. The cut is emitted only when the LP point violates it.
+ */
+internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSeparator {
+    private val tol = 1e-6
+
+    override fun separate(ctx: CutContext): List<Cut> {
+        val cuts = ArrayList<Cut>()
+        for (factor in ctx.problem.factors) {
+            if (factor !is AllDifferent) continue
+            val vars = factor.vars
+            if (vars.size < 2) continue
+            // Need a column for every variable and at least one nonzero objective coefficient.
+            if (vars.any { ctx.relaxation.intColOf[it] < 0 }) continue
+            if (vars.none { intCoef.getOrElse(it) { 0L } != 0L }) continue
+
+            val assignmentMin = assignmentMin(vars, ctx.session) ?: continue
+            // Cut is over the nonzero-cost columns; zero-cost variables only shaped the assignment.
+            val cols = ArrayList<Int>()
+            val coeffs = ArrayList<Long>()
+            var lpLhs = 0.0
+            for (v in vars) {
+                val c = intCoef.getOrElse(v) { 0L }
+                if (c == 0L) continue
+                val col = ctx.relaxation.intColOf[v]
+                cols.add(col)
+                coeffs.add(c)
+                lpLhs += c.toDouble() * ctx.solution.primal(col)
+            }
+            if (lpLhs < assignmentMin - tol) {
+                cuts.add(Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.GE, assignmentMin))
+            }
+        }
+        return cuts
+    }
+
+    /**
+     * Exact minimum of `Σ_{i∈V} c_i·x_i` over distinct assignments of the live domains, via
+     * [MinCostAssignment]. Returns null when the value set is too large to assign over or the
+     * arithmetic overflows (then no cut is produced — sound, just no strengthening).
+     */
+    private fun assignmentMin(vars: IntArray, session: PropagationSession): Long? {
+        val valueIndex = HashMap<Int, Int>()
+        val values = IntArrayList()
+        for (v in vars) {
+            session.intDomain(v).forEach { value ->
+                if (value !in valueIndex) {
+                    valueIndex[value] = values.size
+                    values.add(value)
+                }
+            }
+        }
+        if (values.size > MAX_VALUES || values.size < vars.size) return null
+        return try {
+            val assign = MinCostAssignment(vars.size, values.size)
+            for (i in vars.indices) {
+                val c = intCoef.getOrElse(vars[i]) { 0L }
+                session.intDomain(vars[i]).forEach { value ->
+                    assign.addOption(i, valueIndex.getValue(value), mulExact(c, value.toLong()))
+                }
+            }
+            val r = assign.solve()
+            if (r.feasible) r.cost else null
+        } catch (_: LpOverflowException) {
+            null
+        }
+    }
+
+    private companion object {
+        const val MAX_VALUES: Int = 512
     }
 }
