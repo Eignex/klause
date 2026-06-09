@@ -53,6 +53,8 @@ data class SolveStats(
     val lpCuts: SumResult = ZERO_COUNT,
     /** Nodes pruned by the Lagrangian bound (#23). */
     val lagrangianPruned: SumResult = ZERO_COUNT,
+    /** Nodes pruned by the Cumulative energetic-reasoning check (#22/#23). */
+    val energeticPruned: SumResult = ZERO_COUNT,
     val peakDepth: MaxResult = NO_MAX,
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     val wallMs: Long = 0L,
@@ -89,6 +91,7 @@ data class SolveStats(
             lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
             lpCuts = SumResult(lpCuts.sum + other.lpCuts.sum),
             lagrangianPruned = SumResult(lagrangianPruned.sum + other.lagrangianPruned.sum),
+            energeticPruned = SumResult(energeticPruned.sum + other.energeticPruned.sum),
             peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
             depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
             wallMs = maxOf(wallMs, other.wallMs),
@@ -126,6 +129,7 @@ internal class SolveStatsSink(val backend: String) {
     val lpPivots: CountStat = CountStat()
     val lpCuts: CountStat = CountStat()
     val lagrangianPruned: CountStat = CountStat()
+    val energeticPruned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
 
@@ -203,6 +207,11 @@ internal class SolveStatsSink(val backend: String) {
         lagrangianPruned.update(1.0)
     }
 
+    /** A node whose subtree was cut by the Cumulative energetic check (#22/#23). */
+    fun observeEnergeticPrune() {
+        energeticPruned.update(1.0)
+    }
+
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
      *  uses the most recent [start] / [stop] window; if [stop] hasn't been called yet, we
      *  read the elapsed time from now. */
@@ -223,6 +232,7 @@ internal class SolveStatsSink(val backend: String) {
             lpPivots = lpPivots.read(),
             lpCuts = lpCuts.read(),
             lagrangianPruned = lagrangianPruned.read(),
+            energeticPruned = energeticPruned.read(),
             peakDepth = peakDepth.read(),
             depthMean = depthMean.read(),
             wallMs = elapsedMs,
