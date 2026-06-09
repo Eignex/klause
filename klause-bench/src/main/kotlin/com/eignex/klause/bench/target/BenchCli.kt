@@ -12,21 +12,29 @@ import com.eignex.klause.bench.tools.CpSeedProbe
 import com.eignex.klause.bench.tools.FormatCoverage
 import com.eignex.klause.bench.tools.LsConfigProbe
 import com.eignex.klause.bench.tools.MeasureBacktrack
+import com.eignex.klause.bench.tools.ProfileConfig
+import com.eignex.klause.bench.tools.ProfileEvent
+import com.eignex.klause.bench.tools.ProfileScope
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
  *
- * Commands:
- *  - `<target-id>` — run a predefined [Target] (see `list`).
- *  - `run <metric> [filters…]` — ad-hoc: run any metric over any selection, no predefined
- *    target needed. Filters: `suite=a,b` `category=SAT,OPT` `tag=…` `name=<glob>`
- *    `per-family=N` `max=N` `seed=N` `reference=choco|ortools` `timeout=<ms>`.
- *  - `preview <metric> [filters…]` — print the instances a `run` would cover, without running.
- *  - `list` — targets + suites; `list <suite>` — problems in a suite.
- *  - `diag:backtrack` / `diag:cbls <name|fzn>` / `diag:lsconfig <fzn>` — diagnostics.
+ * A run is fully described by a **metric** (what to measure) over a **selection** of problems
+ * (which ones), with an optional **reference** solver and **budget**. That is exactly the
+ * primary form:
  *
- * Metric selection lives in the catalog; comparison selection lives in targets/filters — the
- * two stay independent.
+ *   `bench <metric> [filters…]`   e.g. `bench parity suite=smtlib-core reference=ortools`
+ *
+ * Filters: `suite=a,b` (the token `core` expands to the in-process core) `category=SAT,OPT`
+ * `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N` `reference=choco|ortools|yuck`
+ * `timeout=<ms>` `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
+ *
+ * Other commands:
+ *  - `<preset-id>` — run a saved [Target] preset (see `list`); a preset is just a named
+ *    `bench <metric> [filters]` that carries a tuned budget / curated suite mix.
+ *  - `preview <metric> [filters…]` — print the instances a run would cover, without running.
+ *  - `list` — presets + suites; `list <suite>` — problems in a suite.
+ *  - `diag:* ` / `coverage:*` — diagnostics and format-coverage tools.
  */
 object BenchCli {
     /** CLI entry point dispatching bench subcommands. */
@@ -34,23 +42,35 @@ object BenchCli {
     fun main(args: Array<String>) {
         when (val cmd = args.firstOrNull() ?: "list") {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
-            "run" -> adHoc(args.drop(1), preview = false)
+
             "preview" -> adHoc(args.drop(1), preview = true)
+
+            // `run` is kept as a back-compat alias for the primary `bench <metric>` form.
+            "run" -> adHoc(args.drop(1), preview = false)
+
             "diag:backtrack" -> MeasureBacktrack.run()
+
             "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
+
             "diag:lsconfig" -> LsConfigProbe.main(args.drop(1).toTypedArray())
+
             "diag:cpseed" -> CpSeedProbe.main(args.drop(1).toTypedArray())
+
             "diag:bandit" -> BanditProbe.main(args.drop(1).toTypedArray())
+
             "coverage:xcsp3" -> FormatCoverage.xcsp3()
+
             "coverage:smtlib" -> FormatCoverage.smtlib()
-            else -> runTarget(cmd)
+
+            // `bench <metric> [filters]` is the primary form; fall back to a preset id.
+            else -> if (metricOrNull(cmd) != null) adHoc(args.toList(), preview = false) else runTarget(cmd)
         }
     }
 
     @Suppress("SpreadOperator")
     private fun runTarget(id: String) {
         val target = Targets.get(id)
-        println("=== target '${target.id}' — ${target.description} ===")
+        println("=== preset '${target.id}' — ${target.description} ===")
         MetricRunner.run(
             target.metric,
             Catalog.problems(*target.suiteIds.toTypedArray()),
@@ -60,7 +80,7 @@ object BenchCli {
     }
 
     private fun adHoc(args: List<String>, preview: Boolean) {
-        val metricName = args.firstOrNull() ?: error("usage: ${if (preview) "preview" else "run"} <metric> [filters…]")
+        val metricName = args.firstOrNull() ?: error("usage: <metric> [filters…] (metrics: ${metricNames()})")
         val metric = parseMetric(metricName)
         val f = args.drop(1).filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
@@ -76,14 +96,15 @@ object BenchCli {
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         val reference = f["reference"]?.let { Backend.valueOf(it.uppercase().replace("-", "")) }
+        val profile = parseProfile(f)
         println("=== run: $metricName over ${refs.size} instance(s) ===")
-        MetricRunner.run(metric, refs, budget, reference)
+        MetricRunner.run(metric, refs, budget, reference, profile)
     }
 
-    /** Build the selection from filters: suites (static-only unless named) → category/tag/name
-     *  filter → family-aware caps/sampling. */
+    /** Build the selection from filters: suites (`core` expands to the in-process core;
+     *  static-only unless named) → category/tag/name filter → family-aware caps/sampling. */
     private fun select(f: Map<String, String>): List<ProblemRef> {
-        var refs: List<ProblemRef> = f["suite"]?.split(",")?.flatMap { Catalog.suite(it.trim()).problems }
+        var refs: List<ProblemRef> = f["suite"]?.split(",")?.flatMap { expandSuite(it.trim()) }
             ?: Catalog.suites.flatMap { it.problems }
         f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
             refs = refs.filter { it.category in cats }
@@ -107,13 +128,32 @@ object BenchCli {
         return selected.filterIndexed { i, _ -> i % n == idx }
     }
 
+    /** Expand a suite token: `core` → every in-process core suite; otherwise the named suite. */
+    private fun expandSuite(token: String): List<ProblemRef> = when (token) {
+        "core" -> Targets.IN_PROCESS_CORE.flatMap { Catalog.suite(it).problems }
+        else -> Catalog.suite(token).problems
+    }
+
+    private fun parseProfile(f: Map<String, String>): ProfileConfig? {
+        val ev = f["profile"] ?: return null
+        val event = runCatching { ProfileEvent.valueOf(ev.uppercase()) }
+            .getOrElse { error("profile must be one of cpu|wall|alloc, got '$ev'") }
+        val scope = f["profile-scope"]?.let {
+            runCatching { ProfileScope.valueOf(it.uppercase()) }
+                .getOrElse { _ -> error("profile-scope must be solve|all, got '${f["profile-scope"]}'") }
+        } ?: ProfileScope.SOLVE
+        return ProfileConfig(event = event, scope = scope, topN = f["profile-top"]?.toIntOrNull() ?: 40)
+    }
+
     private fun matches(pattern: String, name: String): Boolean = if ('*' in pattern) {
         Regex("^" + Regex.escape(pattern).replace("\\*", ".*") + "$").containsMatchIn(name)
     } else {
         name.contains(pattern)
     }
 
-    private fun parseMetric(name: String): MetricKind = when (name.lowercase()) {
+    private fun metricNames(): String = MetricKind.entries.joinToString(", ") { it.name.lowercase() }
+
+    private fun metricOrNull(name: String): MetricKind? = when (name.lowercase()) {
         "time" -> MetricKind.TIME
         "uniformness", "uniform" -> MetricKind.UNIFORMNESS
         "completeness", "complete" -> MetricKind.COMPLETENESS
@@ -125,8 +165,11 @@ object BenchCli {
         "tuning", "tune" -> MetricKind.TUNING
         "search" -> MetricKind.SEARCH
         "credit" -> MetricKind.CREDIT
-        else -> error("unknown metric '$name' (have ${MetricKind.entries.map { it.name.lowercase() }})")
+        else -> null
     }
+
+    private fun parseMetric(name: String): MetricKind =
+        metricOrNull(name) ?: error("unknown metric '$name' (have ${metricNames()})")
 
     private fun listProblems(suite: String) {
         val s = Catalog.suite(suite)
@@ -135,23 +178,30 @@ object BenchCli {
     }
 
     private fun printListing() {
-        println("Targets:")
-        for (t in Targets.all) println("  ${t.id.padEnd(20)} ${t.description}")
+        println("Presets:")
+        for (t in Targets.all) println("  ${t.id.padEnd(22)} ${t.description}")
         println("\nSuites:")
-        for (s in Catalog.suites) println("  ${s.id.padEnd(20)} ${s.problems.size} problems — ${s.description}")
-        for (d in Catalog.dynamicSuites) println("  ${d.id.padEnd(20)} (discovered) — ${d.description}")
-        println("\nMetrics (for `run`/`preview`): ${MetricKind.entries.joinToString(", ") { it.name.lowercase() }}")
+        for (s in Catalog.suites) println("  ${s.id.padEnd(22)} ${s.problems.size} problems — ${s.description}")
+        for (d in Catalog.dynamicSuites) println("  ${d.id.padEnd(22)} (discovered) — ${d.description}")
+        println("\nMetrics: ${metricNames()}")
         println(
             """
             |
             |Usage:
-            |  bench <target-id>                     run a predefined target
-            |  bench run <metric> [filters…]         ad-hoc: any metric over any selection
+            |  bench <metric> [filters…]             run a metric over a selection (primary form)
+            |  bench <preset-id>                     run a saved preset (see Presets above)
             |  bench preview <metric> [filters…]     show what a run would cover
-            |  bench list [<suite>]                  list targets+suites, or problems in a suite
+            |  bench list [<suite>]                  list presets+suites, or problems in a suite
             |  bench diag:backtrack | diag:cbls <x>  diagnostics
             |
-            |Filters: suite=a,b category=SAT,OPTIMIZATION tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools timeout=<ms>
+            |Filters: suite=a,b (suite=core = in-process core) category=SAT,OPTIMIZATION tag=… name=<glob>
+            |         per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>
+            |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
+            |
+            |Examples:
+            |  bench parity suite=smtlib-core reference=ortools
+            |  bench coverage suite=mzn-bench
+            |  bench search suite=slack-alldiff timeout=30000 profile=cpu
             """.trimMargin(),
         )
     }
