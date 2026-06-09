@@ -82,17 +82,26 @@ internal class MandatoryProfile {
      * is `[lstI, ectI)`).
      */
     fun overloadsAt(s: Int, sPlusD: Int, r: Int, cap: Int, ownsMandatory: Boolean, lstI: Int, ectI: Int): Boolean {
-        for (k in 0 until segCount) {
-            val from = segFromA[k]
-            val to = segToA[k]
-            if (to <= s || from >= sPlusD) continue
+        // Segments are sorted ascending by time (see [build]), so binary-search the first one
+        // that ends past [s] instead of scanning every segment — this runs once per task per
+        // propagation and dominated dense-Cumulative profiles. Then walk forward while segments
+        // still start before [sPlusD] (the overlapping window).
+        var lo = 0
+        var hi = segCount
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (segToA[mid] <= s) lo = mid + 1 else hi = mid
+        }
+        var k = lo
+        while (k < segCount && segFromA[k] < sPlusD) {
             var effective = segLevelA[k]
             if (ownsMandatory) {
-                val ovFrom = max(from, lstI)
-                val ovTo = min(to, ectI)
+                val ovFrom = max(segFromA[k], lstI)
+                val ovTo = min(segToA[k], ectI)
                 if (ovFrom < ovTo) effective -= r
             }
             if (effective + r > cap) return true
+            k++
         }
         return false
     }
