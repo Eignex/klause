@@ -251,6 +251,8 @@ class BacktrackSolver(override val problem: Problem) :
         // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
         // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
         val lpBasisByDepth = ArrayList<Basis?>()
+        // LP-guided value ordering (#246): the node LP records its fractional primal here.
+        val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
             is LinearObjective -> { session ->
                 // Effective bound = min(local incumbent, external supplier). External bound
@@ -305,6 +307,7 @@ class BacktrackSolver(override val problem: Problem) :
                             warm,
                             params,
                             lpSeparators,
+                            lpHints,
                         )
                         if (outcome.basis != null) {
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
@@ -333,6 +336,7 @@ class BacktrackSolver(override val problem: Problem) :
             objectiveVar = singleObj?.varId ?: -1,
             objectiveAscending = singleObj?.ascending ?: true,
             objectiveBest = { objVarBest },
+            lpHints = lpHints,
         )) {
             when (outcome) {
                 is SearchOutcome.Found -> {
@@ -460,8 +464,9 @@ class BacktrackSolver(override val problem: Problem) :
         warmBasis: Basis?,
         params: BacktrackParams,
         separators: List<CutSeparator>,
+        hints: LpHints?,
     ): LpNodeOutcome = try {
-        lpBoundAndFixUnsafe(relaxer, session, bound, sink, warmBasis, params, separators)
+        lpBoundAndFixUnsafe(relaxer, session, bound, sink, warmBasis, params, separators, hints)
     } catch (_: LpOverflowException) {
         // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
         // bound or reduction only loses pruning, never soundness — keep the node and move on.
@@ -476,6 +481,7 @@ class BacktrackSolver(override val problem: Problem) :
         warmBasis: Basis?,
         params: BacktrackParams,
         separators: List<CutSeparator>,
+        hints: LpHints?,
     ): LpNodeOutcome {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
@@ -535,6 +541,9 @@ class BacktrackSolver(override val problem: Problem) :
                 }
             }
         }
+
+        // LP-guided value ordering (#246): record the final fractional primal for diving.
+        if (solution.status == LpStatus.OPTIMAL) hints?.record(relaxation, solution)
 
         // Reduced-cost fixing (#21) on the final, cut-strengthened solution; needs a finite gap.
         val prune = bound.isFinite() && solution.status == LpStatus.OPTIMAL &&
@@ -771,6 +780,9 @@ class BacktrackSolver(override val problem: Problem) :
         objectiveVar: Int = -1,
         objectiveAscending: Boolean = true,
         objectiveBest: () -> Int? = { null },
+        // LP-guided value ordering (#246): when non-null, branch values are ordered toward the
+        // variable's fractional LP value. Populated by the node LP solve via [pruneIf].
+        lpHints: LpHints? = null,
     ): Sequence<SearchOutcome> = sequence {
         if (problem.baked is PropagationResult.Unsat) {
             yield(SearchOutcome.Exhausted(coreOf(problem.baked)))
@@ -977,10 +989,12 @@ class BacktrackSolver(override val problem: Problem) :
                         continue@inner
                     }
                     val values = params.valueHeuristic.values(session, varRef, rng)
-                    val ordered = applyPhase(
+                    val phased = applyPhase(
                         varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
                         boolTarget, boolTargetSet, rephaseMode, rng,
                     )
+                    // LP-guided diving reorders toward the LP value; no-op when no hint (#246).
+                    val ordered = lpHints?.order(varRef, phased) ?: phased
                     val node = makeNode(varRef, ordered)
                     val decsBefore = decisionsLeft
                     val out = advance(

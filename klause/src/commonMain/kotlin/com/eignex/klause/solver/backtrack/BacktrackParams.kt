@@ -191,6 +191,14 @@ data class BacktrackParams(
      */
     val lpFloatWarmStart: Boolean = false,
     /**
+     * LP-guided value ordering (#246): when the per-node LP has solved (requires [lpBounding]), order
+     * each branch variable's candidate values by closeness to its fractional LP value
+     * (round-toward-LP diving). Pure search-order guidance — it changes which solutions are found
+     * first, never the optimum or feasibility — so it is correctness-neutral. Off by default; a no-op
+     * for variables with no current LP value.
+     */
+    val lpBranching: Boolean = false,
+    /**
      * Cut generation (#22): at a scheduled node, after the LP solve, run separators that add valid
      * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
      * cuts), re-solving to tighten the bound. Requires [lpBounding]; off by default.
