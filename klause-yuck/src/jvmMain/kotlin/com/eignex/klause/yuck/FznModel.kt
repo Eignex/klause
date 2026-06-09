@@ -272,7 +272,6 @@ class FznModel private constructor(
                 constraint("$p(${intVarArray(f.succ)}, 0)")
             }
 
-
             is Mdd -> postMdd(f)
 
             else -> throw UnsupportedFactorException(f)
@@ -287,11 +286,6 @@ class FznModel private constructor(
             (if (Lit.isPositive(lit)) pos else neg).add(boolName(Lit.variable(lit)))
         }
         constraint("bool_clause(${names(pos)}, ${names(neg)})")
-    }
-
-    /** `bool_clause` over already-bool-typed aux names (all positive). */
-    private fun postClause(positives: List<String>) {
-        constraint("bool_clause(${names(positives)}, [])")
     }
 
     private fun postXor(f: Xor) {

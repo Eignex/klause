@@ -184,7 +184,6 @@ class OrToolsModel private constructor(
 
             is Subcircuit -> postSubcircuit(f)
 
-
             is Mdd -> postMdd(f)
 
             else -> throw UnsupportedFactorException(f)
@@ -370,7 +369,6 @@ class OrToolsModel private constructor(
             }
         }
     }
-
 
     private fun postMdd(f: Mdd) {
         val n = f.seq.size
