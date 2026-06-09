@@ -570,7 +570,8 @@ class BacktrackSolver(override val problem: Problem) :
                 val ctx = CutContext(problem, relaxation, solution, session)
                 // Structure-based separators run on the LP point; Gomory cuts come from the tableau.
                 val separated = separators.flatMap { it.separate(ctx) }
-                val gomory = if (params.lpCuts && params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+                val gomory =
+                    if (params.lpCuts && params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
                 val fresh = (separated + gomory).filter { pool.add(it.key()) }
                 if (fresh.isEmpty()) break
                 cuts.addAll(fresh)
