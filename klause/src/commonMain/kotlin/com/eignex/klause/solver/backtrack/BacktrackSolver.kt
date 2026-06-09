@@ -221,7 +221,13 @@ class BacktrackSolver(override val problem: Problem) :
         // LP-relaxation bounding (#20): build the relaxer once; it reads live bounds per node.
         // Only a LinearObjective yields a sound LP objective, so the relaxer is null otherwise.
         val lpRelaxer = if (params.lpBounding && objective is LinearObjective) {
-            CpToLpRelaxation(problem, objective, generateCuts = params.lpCuts, circuitArcs = params.lpCircuit)
+            CpToLpRelaxation(
+                problem,
+                objective,
+                generateCuts = params.lpCuts,
+                circuitArcs = params.lpCircuit,
+                tableHull = params.lpTable,
+            )
         } else {
             null
         }
