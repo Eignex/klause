@@ -76,6 +76,7 @@ internal data class SearchEffortResults(
 internal object SearchEffortMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget) {
         val seed = System.getProperty("klause.bench.search.seed")?.toLongOrNull() ?: 1L
+        val runLogicNg = System.getProperty("klause.bench.search.logicng")?.toBooleanStrictOrNull() ?: true
         println()
         println(
             "=== search-effort A/B (baseline VSIDS+phase+Luby vs SAT-optimized preset vs LogicNG, " +
@@ -111,7 +112,14 @@ internal object SearchEffortMetric {
                     cancellation = Cancellation { System.currentTimeMillis() > deadline },
                 )
             }
-            val logicNg = solveLogicNg(e, budget.timeoutMillis)
+            // The LogicNG reference leg translates CP problems to CNF, which on large
+            // instances dominates allocation/GC and pollutes a klause CPU profile. Set
+            // -Dklause.bench.search.logicng=false to skip it for clean engine profiling.
+            val logicNg = if (runLogicNg) {
+                solveLogicNg(e, budget.timeoutMillis)
+            } else {
+                SearchEffortReport(e.name, "off", solved = false, 0, 0, 0, 0, wallMs = 0, timedOut = false)
+            }
             pairs += SearchEffortPair(e.name, baseline, satOpt, logicNg)
             println(
                 "%-20s %10s/%-7d %10s/%-7d %16s %7d %7d %7d".format(
