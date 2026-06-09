@@ -213,6 +213,14 @@ data class BacktrackParams(
      */
     val lpGomory: Boolean = true,
     /**
+     * Genuine subtour-elimination cuts for Circuit globals (#22). When true and [lpBounding] holds,
+     * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
+     * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
+     * Adds O(n²) columns per circuit (skipped above a node-count cap), so it is opt-in and off by
+     * default; a no-op when no Circuit exists.
+     */
+    val lpCircuit: Boolean = false,
+    /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
      * [com.eignex.klause.solver.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear

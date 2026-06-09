@@ -22,6 +22,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) {
     fun record(relaxation: LpRelaxation, solution: LpSolution) {
         for (col in relaxation.colVarId.indices) {
             val v = relaxation.colVarId[col]
+            if (v < 0) continue // auxiliary column (e.g. circuit arc) — no CP variable to hint
             val value = solution.primal(col)
             if (relaxation.colIsBool[col]) boolVal[v] = value else intVal[v] = value
         }

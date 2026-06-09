@@ -18,6 +18,7 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.lp.AllDifferentSeparator
 import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
+import com.eignex.klause.solver.lp.CircuitSeparator
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.Cut
@@ -220,19 +221,23 @@ class BacktrackSolver(override val problem: Problem) :
         // LP-relaxation bounding (#20): build the relaxer once; it reads live bounds per node.
         // Only a LinearObjective yields a sound LP objective, so the relaxer is null otherwise.
         val lpRelaxer = if (params.lpBounding && objective is LinearObjective) {
-            CpToLpRelaxation(problem, objective, generateCuts = params.lpCuts)
+            CpToLpRelaxation(problem, objective, generateCuts = params.lpCuts, circuitArcs = params.lpCircuit)
         } else {
             null
         }
-        val lpSeparators: List<CutSeparator> = if (params.lpCuts) {
+        val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
             buildList {
-                add(AllDifferentSeparator())
-                add(GccSeparator())
-                // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
-                (objective as? LinearObjective)?.let { obj ->
-                    val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
-                    add(AssignmentObjectiveCut(coef))
+                if (params.lpCuts) {
+                    add(AllDifferentSeparator())
+                    add(GccSeparator())
+                    // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
+                    (objective as? LinearObjective)?.let { obj ->
+                        val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
+                        add(AssignmentObjectiveCut(coef))
+                    }
                 }
+                // Genuine subtour-elimination cuts over the circuit arc relaxation.
+                if (params.lpCircuit) add(CircuitSeparator())
             }
         } else {
             emptyList()
@@ -557,7 +562,7 @@ class BacktrackSolver(override val problem: Problem) :
 
         // Cut rounds (#22): separate violated cuts from the LP point and re-solve. Cuts add rows, so
         // the structure changes — re-solve cold. Cuts are valid, so infeasibility under them prunes.
-        if (params.lpCuts && separators.isNotEmpty()) {
+        if (separators.isNotEmpty()) {
             val pool = HashSet<String>()
             val cuts = ArrayList<Cut>()
             var round = 0
@@ -565,7 +570,7 @@ class BacktrackSolver(override val problem: Problem) :
                 val ctx = CutContext(problem, relaxation, solution, session)
                 // Structure-based separators run on the LP point; Gomory cuts come from the tableau.
                 val separated = separators.flatMap { it.separate(ctx) }
-                val gomory = if (params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+                val gomory = if (params.lpCuts && params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
                 val fresh = (separated + gomory).filter { pool.add(it.key()) }
                 if (fresh.isEmpty()) break
                 cuts.addAll(fresh)
@@ -630,6 +635,7 @@ class BacktrackSolver(override val problem: Problem) :
             val st = status[col]
             if (st == VarStatus.BASIC) continue
             val varId = relaxation.colVarId[col]
+            if (varId < 0) continue // auxiliary column (e.g. circuit arc) — no CP variable to fix
             val isBool = relaxation.colIsBool[col]
             val dNum = solution.reducedCostNumerator[col]
             if (isBool && session.boolValue(varId) != null) continue // already pinned
