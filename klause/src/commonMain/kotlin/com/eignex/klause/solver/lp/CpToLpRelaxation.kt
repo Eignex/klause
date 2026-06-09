@@ -5,6 +5,7 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.GlobalCardinality
@@ -48,6 +49,9 @@ internal class LpRelaxation(
  *    literal contributes `x_b`, a negative literal `1 − x_b`; the constant folds into the row's
  *    right-hand side.
  *  - [ReifiedLinear]: indicator rows via tight big-M (see `reifiedRows`).
+ *  - [ArrayMinMax]: the extremum's envelope — `result ≥ xs[i]` for `max`, `result ≤ xs[i]` for
+ *    `min`, one row per operand. Sound; the tight face (result equals some operand) is not a
+ *    single LP cut, so only the envelope side is emitted.
  *  - The [LinearObjective] (always minimization): a cost on each variable's column. Every variable
  *    with a nonzero objective coefficient gets a column even if no constraint mentions it, so the
  *    LP objective is the complete relaxed objective and its optimum is a valid bound.
@@ -258,6 +262,23 @@ internal class CpToLpRelaxation(
                     }
 
                     is Clause -> addBoolRow(factor.literals, null, Relation.GE, 1L)
+
+                    // result = max(xs) / min(xs) — the extremum is the envelope of its operands:
+                    // result ≥ xs[i] for max, result ≤ xs[i] for min. One row per operand, sound
+                    // (the opposite face, result tight to some operand, is not a single LP cut).
+                    is ArrayMinMax -> {
+                        val rel = if (factor.max) Relation.GE else Relation.LE
+                        for (x in factor.xs) {
+                            addIntRow(
+                                intArrayOf(factor.result),
+                                intArrayOf(1),
+                                auxCol = intColumn(x),
+                                auxCoeff = -1L,
+                                rel = rel,
+                                rhs = 0L,
+                            )
+                        }
+                    }
 
                     is PseudoBoolean -> {
                         val rel = when (factor.op) {
