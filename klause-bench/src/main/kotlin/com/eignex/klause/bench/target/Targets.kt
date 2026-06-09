@@ -19,9 +19,11 @@ internal enum class MetricKind {
 }
 
 /**
- * A pre-configured bench: a set of catalog suites bound to a [metric] (and a [budget]). The
- * single `bench` CLI takes a target id and runs exactly this. Adding/removing problems is a
- * catalog edit; adding a new comparison is a [Target] entry — the two stay independent.
+ * A named preset: a set of catalog suites bound to a [metric] (plus a [budget]/[reference]).
+ * Presets are saved shorthands for a `bench <metric> [filters]` invocation — the general form
+ * always works, so a preset only earns its place by carrying non-obvious config (a tuned
+ * budget, a curated multi-suite mix). Per-suite / per-reference variants are *not* presets;
+ * spell them with filters, e.g. `bench parity suite=smtlib-core reference=ortools`.
  */
 internal data class Target(
     val id: String,
@@ -30,15 +32,14 @@ internal data class Target(
     val metric: MetricKind,
     val budget: Budget = Budget(),
     /** Reference solver for differential metrics (PARITY / ANYTIME). `null` = the metric's
-     *  own default (Choco for parity, OR-Tools for anytime). Overridable at run time with
-     *  `-Dklause.bench.parity.reference` / `-Dklause.bench.anytime.reference`. */
+     *  own default (Choco for parity, OR-Tools for anytime). */
     val reference: Backend? = null,
 )
 
 internal object Targets {
     /** Suites resolvable fully in-process (everything except the MiniZinc smoke set, which
-     *  needs the `minizinc` compile step). */
-    private val IN_PROCESS_CORE = listOf(
+     *  needs the `minizinc` compile step). Exposed as the `suite=core` selection token. */
+    val IN_PROCESS_CORE = listOf(
         "handwritten-core",
         "dimacs-core",
         "opb-core",
@@ -46,25 +47,12 @@ internal object Targets {
         "flatzinc-core",
     )
 
+    /**
+     * The kept presets. Each carries config that isn't obvious from a one-line filter — a tuned
+     * budget or a curated suite mix. Everything else is a filter spell against the general
+     * `bench <metric> [filters]` form (see the CLI `list` output).
+     */
     val all: List<Target> = listOf(
-        Target(
-            "time-core",
-            "Wall-time + propagation microbench over the in-process core",
-            IN_PROCESS_CORE,
-            MetricKind.TIME,
-        ),
-        Target(
-            "uniformness-core",
-            "Sampling uniformness over the in-process core",
-            IN_PROCESS_CORE,
-            MetricKind.UNIFORMNESS,
-        ),
-        Target(
-            "completeness-core",
-            "Enumeration reach-under-budget over the in-process core",
-            IN_PROCESS_CORE,
-            MetricKind.COMPLETENESS,
-        ),
         Target(
             "verify-core",
             "Cross-backend agreement + sample-validity gate over the in-process core",
@@ -72,65 +60,17 @@ internal object Targets {
             MetricKind.VERIFY,
         ),
         Target(
-            "parity-core",
-            "Differential parity (klause vs Choco) over the in-process core",
+            "time-core",
+            "Wall-time + propagation microbench over the in-process core",
             IN_PROCESS_CORE,
-            MetricKind.PARITY,
+            MetricKind.TIME,
         ),
         Target(
-            "mzn-parity-smoke",
-            "Differential parity (klause vs Choco) over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.PARITY,
-        ),
-        Target(
-            "satlib-parity",
-            "Differential parity (klause vs Choco) over the auto-fetched SATLIB sample",
-            listOf("satlib-uf20"),
-            MetricKind.PARITY,
-        ),
-        Target(
-            "mzn-anytime",
+            "anytime",
             "Anytime optimization (klause-LS vs OR-Tools) over the MiniZinc smoke set",
             listOf("mzn-smoke"),
             MetricKind.ANYTIME,
             Budget(timeoutMillis = 5_000),
-        ),
-        Target(
-            "smtlib-parity",
-            "Differential parity (klause vs Choco) over the SMT-LIB QF_LIA set",
-            listOf("smtlib-core"),
-            MetricKind.PARITY,
-        ),
-        Target(
-            "xcsp3-parity",
-            "Differential parity (klause vs Choco) over the XCSP3 set",
-            listOf("xcsp3-core"),
-            MetricKind.PARITY,
-        ),
-        Target(
-            "mzn-coverage-smoke",
-            "Native-predicate coverage over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.COVERAGE,
-        ),
-        Target(
-            "mzn-coverage",
-            "Native-predicate coverage over the MiniZinc Challenge benchmarks (fetched)",
-            listOf("mzn-bench"),
-            MetricKind.COVERAGE,
-        ),
-        Target(
-            "mzn-audit-smoke",
-            "Compile audit (native|decomposed + ingest smoke) over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.AUDIT,
-        ),
-        Target(
-            "mzn-audit",
-            "Compile audit over the MiniZinc Challenge benchmarks (fetched)",
-            listOf("mzn-bench"),
-            MetricKind.AUDIT,
         ),
         Target(
             "tune-mixed",
@@ -146,56 +86,12 @@ internal object Targets {
             MetricKind.SEARCH,
             Budget(timeoutMillis = 30_000),
         ),
-        // Portfolio credit campaigns: per-worker attribution (first/best/sole + marginal
-        // ranking) over the Challenge corpus. Composition via -Dklause.bench.credit.portfolio
-        // (<ls>:<bt>; ls/cp/mixed all supported) and -Dklause.bench.credit.configs (named LS
-        // pool selection, e.g. `all`); the targets below bind the common shapes.
         Target(
             "mzn-credit-ls",
             "LS portfolio credit campaign (top-8 palette prefix) over the MiniZinc Challenge benchmarks",
             listOf("mzn-bench"),
             MetricKind.CREDIT,
             Budget(timeoutMillis = 10_000),
-        ),
-        // OR-Tools-referenced variants (same suites, OR-Tools CP-SAT as the trusted reference).
-        Target(
-            "parity-core-ortools",
-            "Differential parity (klause vs OR-Tools) over the in-process core",
-            IN_PROCESS_CORE,
-            MetricKind.PARITY,
-            reference = Backend.ORTOOLS,
-        ),
-        Target(
-            "mzn-parity-ortools",
-            "Differential parity (klause vs OR-Tools) over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.PARITY,
-            reference = Backend.ORTOOLS,
-        ),
-        Target(
-            "mzn-anytime-choco",
-            "Anytime optimization (klause-LS vs Choco) over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.ANYTIME,
-            Budget(timeoutMillis = 5_000),
-            reference = Backend.CHOCO,
-        ),
-        // Yuck-referenced variants (LS-vs-LS; requires a provisioned Yuck distribution, see
-        // `:klause-yuck:installYuck`). Temporary, for the LS parity sweep.
-        Target(
-            "mzn-parity-yuck",
-            "Differential parity (klause vs Yuck LS) over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.PARITY,
-            reference = Backend.YUCK,
-        ),
-        Target(
-            "mzn-anytime-yuck",
-            "Anytime optimization (klause-LS vs Yuck LS) over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.ANYTIME,
-            Budget(timeoutMillis = 5_000),
-            reference = Backend.YUCK,
         ),
     )
 

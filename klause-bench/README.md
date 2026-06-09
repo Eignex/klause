@@ -2,30 +2,38 @@
 
 The benchmarking harness for klause. It separates four orthogonal axes so you control exactly what runs, and drives everything from a single bench CLI.
 
-The axes are: format (how an instance is encoded), source (where the bytes come from), solver (which engine solves), and metric (what is measured). A target binds a set of catalog suites to a metric. The catalog (catalog/Suites.kt) is the single source of truth for which problems exist; nothing discovers instances from random directories.
+The axes are: format (how an instance is encoded), source (where the bytes come from), solver (which engine solves), and metric (what is measured). The catalog (catalog/Suites.kt) is the single source of truth for which problems exist; nothing discovers instances from random directories.
+
+A run is fully described by a metric over a selection of problems, with an optional reference solver and budget — that is the primary command, `bench <metric> [filters]`. Presets (target/Targets.kt) are just saved shorthands for a `bench <metric> [filters]` line that carry a tuned budget or a curated suite mix; per-suite or per-reference variants are spelled with filters, not added as presets.
 
 No external solver binaries are used. The minizinc CLI only compiles models to FlatZinc; everything is solved in-process. Reference solvers for differential metrics are the klause-choco (Choco, complete search) and klause-ortools (OR-Tools CP-SAT, anytime) adapter modules.
 
 ## Quick start
 
-  ./gradlew :klause-bench:bench --args="list"            targets, suites, metrics, usage
-  ./gradlew :klause-bench:bench --args="parity-core"     klause vs Choco on the in-process core
-  ./gradlew :klause-bench:bench --args="mzn-coverage-smoke"   percent native-predicate coverage
+  ./gradlew :klause-bench:bench --args="list"                          presets, suites, metrics, usage
+  ./gradlew :klause-bench:bench --args="parity suite=core"             klause vs Choco on the in-process core
+  ./gradlew :klause-bench:bench --args="coverage suite=mzn-smoke"      percent native-predicate coverage
 
 Tune any knob with -Dklause.* properties (all forwarded to the run), e.g. -Dklause.bench.mzn.timeoutSec=30.
 
 ## Commands
 
-  bench <target-id>                   run a predefined target
-  bench run <metric> [filters]        ad-hoc: run any metric over any selection, no target needed
+  bench <metric> [filters]            run a metric over a selection (primary form)
+  bench <preset-id>                   run a saved preset (see `list`)
   bench preview <metric> [filters]    print the instances a run would cover, without running
-  bench list [<suite>]                list targets+suites, or the problems in one suite
+  bench list [<suite>]                list presets+suites, or the problems in one suite
   bench diag:backtrack                BacktrackSolver SolveStats over a generated PHP/3-SAT series
   bench diag:cbls <name|fzn>          CBLS feasibility-plateau diagnostic
 
-Filters for run/preview: suite=a,b, category=SAT,OPTIMIZATION, tag=..., name=<glob>, per-family=N, max=N, seed=N, reference=choco|ortools, timeout=<ms>.
+Filters: suite=a,b (the token `core` expands to the in-process core), category=SAT,OPTIMIZATION, tag=..., name=<glob>, per-family=N, max=N, seed=N, reference=choco|ortools|yuck, timeout=<ms>, profile=cpu|wall|alloc, profile-scope=solve|all, profile-top=N.
 
-Example: bench run parity suite=handwritten-core category=UNSAT reference=ortools
+Example: bench parity suite=handwritten-core category=UNSAT reference=ortools
+
+## Profiling
+
+Add profile=cpu|wall|alloc to any run to record it with Java Flight Recorder and print a flat top-method table; the raw .jfr is left under build/bench-prof.jfr for JMC / `jfr print`. profile-scope=solve (the default) wraps only the measurement, so corpus fetch, format parse, and MiniZinc compile are discounted; profile-scope=all wraps the whole run. Sampling is statistical, so pair profile= with a long-running selection. The deeper, whole-JVM native profile is still available via the gradle -PasyncProfiler=/path/to/libasyncProfiler.so option.
+
+Example: bench search suite=slack-alldiff timeout=30000 profile=cpu
 
 ## Metrics
 
@@ -37,7 +45,7 @@ Parity defaults to the Choco reference, anytime to OR-Tools; override per run wi
 
 ## The catalog
 
-Suites and problems are declared in catalog/Suites.kt with a small DSL. To add a problem, edit a suite with one of: vendored (a file under corpus/), inCode (built in Kotlin), workspace (a file elsewhere in the repo), or external (inside a fetched collection). To add a comparison, add a Target in target/Targets.kt. The two stay independent.
+Suites and problems are declared in catalog/Suites.kt with a small DSL. To add a problem, edit a suite with one of: vendored (a file under corpus/), inCode (built in Kotlin), workspace (a file elsewhere in the repo), or external (inside a fetched collection). To run a new comparison, spell it as `bench <metric> [filters]`; only add a Target in target/Targets.kt when the invocation carries non-obvious config worth a name. The two stay independent.
 
 ## Corpus and fetching
 
@@ -49,7 +57,7 @@ klause-choco and klause-ortools map a klause Problem into Choco and OR-Tools CP-
 
 ## Verifying a change
 
-  ./gradlew :klause-bench:test                               unit, parser, and selection tests
-  ./gradlew :klause-bench:bench --args="verify-core"         cross-backend agreement gate
-  ./gradlew :klause-bench:bench --args="parity-core"         klause vs Choco, vs recorded Expected
-  ./gradlew :klause-cli:installJvmDist && ./gradlew :klause-bench:bench --args="mzn-audit-smoke"
+  ./gradlew :klause-bench:test                                   unit, parser, and selection tests
+  ./gradlew :klause-bench:bench --args="verify-core"             cross-backend agreement gate
+  ./gradlew :klause-bench:bench --args="parity suite=core"       klause vs Choco, vs recorded Expected
+  ./gradlew :klause-cli:installJvmDist && ./gradlew :klause-bench:bench --args="audit suite=mzn-smoke"
