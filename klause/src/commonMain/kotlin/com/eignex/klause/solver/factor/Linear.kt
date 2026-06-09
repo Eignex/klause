@@ -340,8 +340,12 @@ internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntAr
         }
         val lo = maxOf(d.min, orig.min)
         val hi = minOf(d.max, orig.max)
-        for (value in lo..hi) {
-            if (value in orig && value !in d) {
+        // Iterate only the values actually carved out of `d` in `[lo, hi]` (O(holes), not
+        // O(span)): each such value was in `orig` and is now excluded, so it is a search-time
+        // hole premise. A value that is also a hole of `orig` was never present, so guard on
+        // `value in orig`.
+        d.forEachHoleInRange(lo, hi) { value ->
+            if (value in orig) {
                 // Antecedent literals are the implication-clause form: the *negation* of each
                 // currently-true premise, so each is currently false — exactly like the bound
                 // entries above (¬[v ≥ min] / ¬[v ≤ max]). The hole premise is `v ≠ value`, so

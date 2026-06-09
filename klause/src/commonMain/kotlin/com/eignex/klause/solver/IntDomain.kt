@@ -85,6 +85,37 @@ class IntDomain private constructor(
         return holes.binarySearchInt(value) < 0
     }
 
+    /** Invoke [action] for each value in `[lo, hi]` carved *out* of the domain (an interior
+     *  hole), ascending. O(holes in range) for the holes rep, O(span ≤ [BITSET_THRESHOLD]) for
+     *  the bitset rep, and O(1) for a contiguous domain — unlike scanning the range and calling
+     *  [contains] on every value. The scan is clamped to `[min, max]`: values beyond the bounds
+     *  are excluded by the bound itself, not carved, so they are never reported here. */
+    internal inline fun forEachHoleInRange(lo: Int, hi: Int, action: (Int) -> Unit) {
+        val from = if (lo > min) lo else min
+        val to = if (hi < max) hi else max
+        if (from > to) return
+        val hs = holes
+        if (hs != null) {
+            var i = hs.binarySearchInt(from)
+            if (i < 0) i = -i - 1 // not a hole itself → insertion point is the first hole > from
+            while (i < hs.size && hs[i] <= to) {
+                action(hs[i])
+                i++
+            }
+            return
+        }
+        val bs = bitset
+        if (bs != null) {
+            var v = from
+            while (v <= to) {
+                if (!bitsetHasBit(bs, v - bitsetLo)) action(v)
+                v++
+            }
+            return
+        }
+        // Contiguous [min, max]: no interior holes.
+    }
+
     /** Nearest in-domain value to [value]. */
     fun clamp(value: Int): Int = if (value < min) {
         min
