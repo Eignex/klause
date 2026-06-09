@@ -91,6 +91,22 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
         return delta
     }
 
+    /** Remove [key] and return its prior value, or [default] if absent. One table walk — for
+     *  hot callers that would otherwise pair a [getOrDefault] with a [remove] on the same key. */
+    fun removeAndGet(key: Long, default: Int): Int {
+        var i = mix(key) and mask
+        while (used[i]) {
+            if (keys[i] == key) {
+                val v = values[i]
+                deleteSlot(i)
+                size--
+                return v
+            }
+            i = (i + 1) and mask
+        }
+        return default
+    }
+
     /** Remove [key]; returns true if it was present. Backward-shift keeps the table tombstone-free. */
     fun remove(key: Long): Boolean {
         var i = mix(key) and mask
