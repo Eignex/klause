@@ -4,22 +4,15 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.Among
-import com.eignex.klause.solver.factor.ArgMinMax
-import com.eignex.klause.solver.factor.ArgSort
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -31,7 +24,6 @@ import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
-import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
@@ -79,12 +71,6 @@ internal object FactorDecomposer {
      *  Mid-IR factors map to themselves; callers should check via [isMidIR] before
      *  calling decompose to avoid pointless lookups. */
     fun decompose(f: Factor, ctx: DecompositionContext): List<Factor>? = when (f) {
-        is AllDifferentExcept -> decomposeAllDifferentExcept(f, ctx)
-
-        is Among -> decomposeAmong(f, ctx)
-
-        is Count -> decomposeCount(f, ctx)
-
         is NValue -> decomposeNValue(f, ctx)
 
         is SymmetricAllDifferent -> decomposeSymmetricAllDifferent(f, ctx)
@@ -92,20 +78,12 @@ internal object FactorDecomposer {
         is GlobalCardinality -> decomposeGlobalCardinality(f, ctx)
 
         // Tier 3: arithmetic
-        is Knapsack -> decomposeKnapsack(f)
-
         is ArrayMinMax -> decomposeArrayMinMax(f, ctx)
-
-        is ArgMinMax -> decomposeArgMinMax(f, ctx)
-
-        is BinPacking -> decomposeBinPacking(f, ctx)
 
         // Tier 4: comparison / connectivity / misc
         is Inverse -> decomposeInverse(f, ctx)
 
         is LexLess -> decomposeLexLess(f, ctx)
-
-        is Sequence -> decomposeSequence(f, ctx)
 
         // Tier 4 (automaton + geometry)
         is Table -> decomposeTable(f, ctx)
@@ -125,8 +103,6 @@ internal object FactorDecomposer {
         is Subcircuit -> decomposeSubcircuit(f, ctx)
 
         is Sort -> decomposeSort(f, ctx)
-
-        is ArgSort -> decomposeArgSort(f, ctx)
 
         else -> null
     }
@@ -149,144 +125,6 @@ internal object FactorDecomposer {
     }
 
     // ---------------- per-factor decompositions ----------------
-
-    /** `all_different_except(xs, except)` → for each pair (i, j), require
-     *  `(xᵢ ∈ except) ∨ (xⱼ ∈ except) ∨ (xᵢ ≠ xⱼ)`. We allocate per-var "in-except"
-     *  aux and per-pair "ne" aux, then assert the disjunction as a Clause. */
-    private fun decomposeAllDifferentExcept(f: AllDifferentExcept, ctx: DecompositionContext): List<Factor> {
-        if (f.except.isEmpty()) return decomposePairwiseNE(f.xs)
-        return decomposeGatedPairwiseNE(f.xs, f.except, ctx)
-    }
-
-    /** Shared gated-pairwise-NE encoding used by AllDifferentExcept. For each var an aux
-     *  "is in except" bool is reified
-     *  via the disjunction of equality reifications across the exception set; for
-     *  each pair an aux "ne" bool is reified as the negation of equality, then a
-     *  Clause asserts that for each pair at least one of the three release
-     *  conditions holds. */
-    private fun decomposeGatedPairwiseNE(xs: IntArray, except: IntArray, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        // inExcept[i] = OR over v in except of (xs[i] = v).
-        val inExcept = IntArray(xs.size) { ctx.freshBool() }
-        for (i in xs.indices) {
-            val eqLits = IntArray(except.size) { v ->
-                val eqV = ctx.freshBool()
-                out.add(ReifiedLinear(eqV, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, except[v]))
-                Lit.make(eqV, true)
-            }
-            // inExcept[i] ↔ (Σ eqLits ≥ 1).
-            out.add(ReifiedCardinality(inExcept[i], eqLits, min = 1, max = except.size))
-        }
-        // For each pair, ne_ij ↔ xs[i] ≠ xs[j]; assert (inExcept[i] ∨ inExcept[j] ∨ ne_ij).
-        for (i in 0 until xs.size - 1) {
-            for (j in i + 1 until xs.size) {
-                val neAux = ctx.freshBool()
-                out.add(ReifiedLinear(neAux, intArrayOf(1, -1), intArrayOf(xs[i], xs[j]), LinearOp.NE, 0))
-                out.add(
-                    Clause(
-                        intArrayOf(
-                            Lit.make(inExcept[i], true),
-                            Lit.make(inExcept[j], true),
-                            Lit.make(neAux, true),
-                        ),
-                    ),
-                )
-            }
-        }
-        return out
-    }
-
-    /** Pairwise NE over [xs]: one Linear NE factor per pair. */
-    private fun decomposePairwiseNE(xs: IntArray): List<Factor> {
-        val out = ArrayList<Factor>(xs.size * (xs.size - 1) / 2)
-        for (i in 0 until xs.size - 1) {
-            for (j in i + 1 until xs.size) {
-                out.add(Linear(intArrayOf(1, -1), intArrayOf(xs[i], xs[j]), LinearOp.NE, 0))
-            }
-        }
-        return out
-    }
-
-    /** `among(xs, S) = n` — exactly `n` of `xs` take values in `S`. Per index, reified
-     *  membership in `S` via OR of equalities; total is fixed via Cardinality. */
-    private fun decomposeAmong(f: Among, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        val inLits = IntArray(f.xs.size) { ctx.freshBool() }
-        for (i in f.xs.indices) {
-            val eqLits = IntArray(f.values.size) { vi ->
-                val eqV = ctx.freshBool()
-                out.add(ReifiedLinear(eqV, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, f.values[vi]))
-                Lit.make(eqV, true)
-            }
-            out.add(ReifiedCardinality(inLits[i], eqLits, min = 1, max = f.values.size))
-        }
-        val inLitsPositive = IntArray(f.xs.size) { Lit.make(inLits[it], true) }
-        out.add(Cardinality(inLitsPositive, min = f.n, max = f.n))
-        return out
-    }
-
-    /** `count(xs, v, op, n)` — number of `xs[i] = v` ⟨op⟩ `n`. With `presents` non-empty,
-     *  the contributing lits are gated by presence: `inCount_i ↔ present_i ∧ (xs[i] = v)`. */
-    private fun decomposeCount(f: Count, ctx: DecompositionContext): List<Factor>? {
-        val out = ArrayList<Factor>()
-        val eqLits = IntArray(f.xs.size) { i ->
-            val eq = ctx.freshBool()
-            out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.xs[i]), LinearOp.EQ, f.v))
-            if (f.presents.isEmpty()) {
-                Lit.make(eq, true)
-            } else {
-                val pres = f.presents[i]
-                val gated = ctx.freshBool()
-                out.add(Clause(intArrayOf(Lit.make(gated, false), Lit.make(eq, true))))
-                out.add(Clause(intArrayOf(Lit.make(gated, false), pres)))
-                out.add(Clause(intArrayOf(Lit.make(gated, true), Lit.make(eq, false), Lit.negate(pres))))
-                Lit.make(gated, true)
-            }
-        }
-        val xn = f.xs.size
-        val (lo, hi) = when (f.op) {
-            Count.Op.Eq -> f.n to f.n
-
-            Count.Op.Le -> 0 to f.n
-
-            Count.Op.Lt -> 0 to (f.n - 1)
-
-            Count.Op.Ge -> f.n to xn
-
-            Count.Op.Gt -> (f.n + 1) to xn
-
-            Count.Op.Ne -> {
-                // PbOp doesn't carry NE; split into the disjunction
-                // `(Σ ≤ n−1) ∨ (Σ ≥ n+1)` via two reified cardinalities + a clause.
-                val lo = ctx.freshBool()
-                val hi = ctx.freshBool()
-                if (f.n - 1 >= 0) {
-                    out.add(ReifiedCardinality(lo, eqLits, min = 0, max = f.n - 1))
-                } else {
-                    // n - 1 < 0 → Σ ≤ n-1 is impossible (Σ ≥ 0). Pin lo = false.
-                    out.add(Clause(intArrayOf(Lit.make(lo, false))))
-                }
-                if (f.n + 1 <= xn) {
-                    out.add(ReifiedCardinality(hi, eqLits, min = f.n + 1, max = xn))
-                } else {
-                    // n + 1 > xn → Σ ≥ n+1 is impossible. Pin hi = false.
-                    out.add(Clause(intArrayOf(Lit.make(hi, false))))
-                }
-                out.add(Clause(intArrayOf(Lit.make(lo, true), Lit.make(hi, true))))
-                return out
-            }
-        }
-        if (lo > hi || hi < 0 || lo > xn) {
-            // Bound interval doesn't intersect [0, xn] → always unsat. Emit a unit
-            // clause that's unsatisfiable (a fresh aux pinned both ways) to signal it.
-            val sat = ctx.freshBool()
-            out.add(Clause(intArrayOf(Lit.make(sat, true))))
-            out.add(Clause(intArrayOf(Lit.make(sat, false))))
-            return out
-        }
-        out.add(Cardinality(eqLits, min = lo.coerceAtLeast(0), max = hi.coerceAtMost(xn)))
-        return out
-    }
 
     /** `nvalue(n, xs, mode)` — number of distinct values in `xs` ⟨mode⟩ `n`. Iterates
      *  over the union of `xs` domains, allocates a "used_v" aux per candidate, and
@@ -364,33 +202,6 @@ internal object FactorDecomposer {
 
     // -------- Tier 3: arithmetic --------
 
-    /** `knapsack(weights, profits, xs, w, p)` — `w = Σ weights·xs` and `p = Σ profits·xs`,
-     *  where `w` and `p` are int var ids. Each side is one Linear EQ with the var
-     *  pulled to the LHS via a `-1` coefficient. */
-    private fun decomposeKnapsack(f: Knapsack): List<Factor> {
-        val n = f.xs.size
-        val wCoeffs = IntArray(n + 1).apply {
-            for (i in 0 until n) this[i] = f.weights[i]
-            this[n] = -1
-        }
-        val wVars = IntArray(n + 1).apply {
-            for (i in 0 until n) this[i] = f.xs[i]
-            this[n] = f.w
-        }
-        val pCoeffs = IntArray(n + 1).apply {
-            for (i in 0 until n) this[i] = f.profits[i]
-            this[n] = -1
-        }
-        val pVars = IntArray(n + 1).apply {
-            for (i in 0 until n) this[i] = f.xs[i]
-            this[n] = f.p
-        }
-        return listOf(
-            Linear(wCoeffs, wVars, LinearOp.EQ, 0),
-            Linear(pCoeffs, pVars, LinearOp.EQ, 0),
-        )
-    }
-
     /** `result = max(xs)` (when [max] true) or `result = min(xs)`. Encoded as:
      *  - `max`: `result ≥ xs[i]` ∀i, plus `result = xs[j]` for at least one j (cardinality
      *    of reified equalities ≥ 1).
@@ -409,93 +220,6 @@ internal object FactorDecomposer {
         out.add(Cardinality(eqLits, min = 1, max = f.xs.size))
         return out
     }
-
-    /** `idx = argmin(xs)` / `argmax(xs)` with `idx ∈ [indexOffset, indexOffset+|xs|−1]`.
-     *  Decompose via:
-     *  - aux winner indicators `win_i ↔ (xs[i] is the extreme)` — i.e. `xs[i] ≥ xs[j]` ∀j
-     *    for max (symmetric for min), encoded via `result_value` aux + ArrayMinMax-style
-     *    inequalities;
-     *  - aux `eqIdx_i ↔ (idx = i + indexOffset)`;
-     *  - `eqIdx_i → win_i` plus exactly-one-of-eqIdx selected. */
-    private fun decomposeArgMinMax(f: ArgMinMax, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        // result_value bounds = union of xs domains.
-        var lo = Int.MAX_VALUE
-        var hi = Int.MIN_VALUE
-        for (x in f.xs) {
-            val d = ctx.intDomainOf(x)
-            if (d.min < lo) lo = d.min
-            if (d.max > hi) hi = d.max
-        }
-        val resultValue = ctx.freshInt(IntDomain(lo, hi))
-        // result_value relates to xs[i] via ≥ or ≤ per max/min, plus an equality witness.
-        val winLits = IntArray(f.xs.size) { i ->
-            val aux = ctx.freshBool()
-            out.add(ReifiedLinear(aux, intArrayOf(1, -1), intArrayOf(resultValue, f.xs[i]), LinearOp.EQ, 0))
-            Lit.make(aux, true)
-        }
-        for (i in f.xs.indices) {
-            val (a, b) = if (f.max) resultValue to f.xs[i] else f.xs[i] to resultValue
-            out.add(Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.GE, 0))
-        }
-        out.add(Cardinality(winLits, min = 1, max = f.xs.size))
-        // eqIdx_i ↔ (idx = i + indexOffset); exactly one chosen.
-        val eqIdxLits = IntArray(f.xs.size) { i ->
-            val aux = ctx.freshBool()
-            out.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(f.idx), LinearOp.EQ, i + f.indexOffset))
-            Lit.make(aux, true)
-        }
-        out.add(Cardinality(eqIdxLits, min = 1, max = 1))
-        // eqIdx_i → win_i:  (¬eqIdx_i ∨ win_i)
-        for (i in f.xs.indices) {
-            out.add(Clause(intArrayOf(Lit.make(Lit.variable(eqIdxLits[i]), false), winLits[i])))
-        }
-        return out
-    }
-
-    /** `bin_packing(bins, weights, mode, ...)`. All three modes decompose to
-     *  per-(item, bin) reified equalities plus per-bin sum constraints. UniformCapacity
-     *  and PerBinCapacity become a `≤ cap` PB; LoadVars equates the per-bin PB sum to the
-     *  load var by enumerating its domain and tying `(Σ = k) ↔ (load = k)` per value. */
-    private fun decomposeBinPacking(f: BinPacking, ctx: DecompositionContext): List<Factor>? {
-        val out = ArrayList<Factor>()
-        val inBin = Array(f.numBins) { IntArray(f.bins.size) }
-        for (i in f.bins.indices) {
-            for (k in 0 until f.numBins) {
-                val aux = ctx.freshBool()
-                out.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(f.bins[i]), LinearOp.EQ, k + f.binOffset))
-                inBin[k][i] = aux
-            }
-            val perItem = IntArray(f.numBins) { Lit.make(inBin[it][i], true) }
-            out.add(Cardinality(perItem, min = 1, max = 1))
-        }
-        for (k in 0 until f.numBins) {
-            val lits = IntArray(f.bins.size) { Lit.make(inBin[k][it], true) }
-            when (f.mode) {
-                BinPacking.Mode.UniformCapacity ->
-                    out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, f.uniformCapacity))
-
-                BinPacking.Mode.PerBinCapacity ->
-                    out.add(PseudoBoolean(f.weights.copyOf(), lits, PbOp.LE, requireNotNull(f.capacities)[k]))
-
-                BinPacking.Mode.LoadVars -> {
-                    val loadVar = requireNotNull(f.loadVars)[k]
-                    val dom = ctx.intDomainOf(loadVar)
-                    for (v in dom.min..dom.max) {
-                        val sumEqV = ctx.freshBool()
-                        out.add(ReifiedPseudoBoolean(sumEqV, f.weights.copyOf(), lits, PbOp.EQ, v))
-                        val loadEqV = ctx.freshBool()
-                        out.add(ReifiedLinear(loadEqV, intArrayOf(1), intArrayOf(loadVar), LinearOp.EQ, v))
-                        out.add(Clause(intArrayOf(Lit.make(sumEqV, false), Lit.make(loadEqV, true))))
-                        out.add(Clause(intArrayOf(Lit.make(sumEqV, true), Lit.make(loadEqV, false))))
-                    }
-                }
-            }
-        }
-        return out
-    }
-
-    // -------- Tier 4: comparison / connectivity / misc --------
 
     /** `inverse(f, g, fOffset, gOffset)` — `f[i] = j+fOffset ⟺ g[j] = i+gOffset`. Same
      *  shape as [SymmetricAllDifferent] but across two arrays. */
@@ -582,33 +306,6 @@ internal object FactorDecomposer {
         out.add(Clause(winLits.toIntArray()))
         return out
     }
-
-    /** `sequence(low, high, k, xs, values)` — every length-k window of xs has between
-     *  `low` and `high` entries in `values`. Decompose via reified membership per index
-     *  and per-window Cardinality. */
-    private fun decomposeSequence(fac: Sequence, ctx: DecompositionContext): List<Factor>? {
-        if (fac.xs.size < fac.k) return null
-        val out = ArrayList<Factor>()
-        val values = fac.values
-        // For each index i, in_i ↔ (xs[i] ∈ values).
-        val inLits = IntArray(fac.xs.size) { ctx.freshBool() }
-        for (i in fac.xs.indices) {
-            val eqLits = IntArray(values.size) { vi ->
-                val aux = ctx.freshBool()
-                out.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(fac.xs[i]), LinearOp.EQ, values[vi]))
-                Lit.make(aux, true)
-            }
-            out.add(ReifiedCardinality(inLits[i], eqLits, min = 1, max = values.size))
-        }
-        // For each window [start, start+k): low ≤ Σ in_{start..start+k-1} ≤ high.
-        for (start in 0..fac.xs.size - fac.k) {
-            val windowLits = IntArray(fac.k) { Lit.make(inLits[start + it], true) }
-            out.add(Cardinality(windowLits, min = fac.low, max = fac.high))
-        }
-        return out
-    }
-
-    // -------- Tier 4 (automaton / geometry) --------
 
     /** `table(xs, tuples)` — xs takes one of the allowed tuples. Tuple rows live in
      *  [Table.tuples] row-major. Decompose: per tuple t, aux `match_t ↔ Λ (xs[i] = t[i])`;
@@ -1067,58 +764,6 @@ internal object FactorDecomposer {
                 allWeights[xsEq.size + i] = -1
             }
             out.add(PseudoBoolean(allWeights, allLits, PbOp.EQ, 0))
-        }
-        return out
-    }
-
-    /** `arg_sort(values, perm, permOffset)` — `perm` is a permutation of
-     *  `[permOffset, permOffset + n − 1]` such that `values[perm[i] − permOffset]` is
-     *  non-decreasing with ties broken by smaller pre-image index. */
-    private fun decomposeArgSort(f: ArgSort, ctx: DecompositionContext): List<Factor> {
-        val out = ArrayList<Factor>()
-        val n = f.perm.size
-        // Permutation: pairwise NE + range constraints on perm.
-        for (i in 0 until n - 1) {
-            for (j in i + 1 until n) {
-                out.add(Linear(intArrayOf(1, -1), intArrayOf(f.perm[i], f.perm[j]), LinearOp.NE, 0))
-            }
-        }
-        // For each i, allocate an "indexed-value" aux: valAt_i ∈ values domain.
-        val unionDom = run {
-            var lo = Int.MAX_VALUE
-            var hi = Int.MIN_VALUE
-            for (v in f.values) {
-                val d = ctx.intDomainOf(v)
-                if (d.min < lo) lo = d.min
-                if (d.max > hi) hi = d.max
-            }
-            IntDomain(lo, hi)
-        }
-        val valAt = IntArray(n) { ctx.freshInt(unionDom) }
-        // Element constraint: valAt[i] = values[perm[i] − permOffset]. For each i, for
-        // each j ∈ [0, n-1]: aux eq_ij ↔ (perm[i] = j + permOffset); eq_ij ⇒ valAt[i]
-        // = values[j].
-        for (i in 0 until n) {
-            for (j in 0 until n) {
-                val eq = ctx.freshBool()
-                out.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(f.perm[i]), LinearOp.EQ, j + f.permOffset))
-                val veq = ctx.freshBool()
-                out.add(ReifiedLinear(veq, intArrayOf(1, -1), intArrayOf(valAt[i], f.values[j]), LinearOp.EQ, 0))
-                out.add(Clause(intArrayOf(Lit.make(eq, false), Lit.make(veq, true))))
-            }
-        }
-        // valAt non-decreasing.
-        for (i in 0 until n - 1) {
-            out.add(Linear(intArrayOf(1, -1), intArrayOf(valAt[i], valAt[i + 1]), LinearOp.LE, 0))
-        }
-        // Tie-break: if valAt[i] = valAt[i+1], then perm[i] < perm[i+1].
-        for (i in 0 until n - 1) {
-            val tieAux = ctx.freshBool()
-            out.add(ReifiedLinear(tieAux, intArrayOf(1, -1), intArrayOf(valAt[i], valAt[i + 1]), LinearOp.EQ, 0))
-            val lessAux = ctx.freshBool()
-            out.add(ReifiedLinear(lessAux, intArrayOf(1, -1), intArrayOf(f.perm[i], f.perm[i + 1]), LinearOp.LE, -1))
-            // tie ⇒ less
-            out.add(Clause(intArrayOf(Lit.make(tieAux, false), Lit.make(lessAux, true))))
         }
         return out
     }

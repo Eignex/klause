@@ -125,27 +125,4 @@ class IntOverflowTest {
         assertEquals(0, BIG * BIG, "2^40 wraps to 0 in Int") // documents the hazard
         assertTrue(factor.isViolated(state, 0), "true product 2^40 != 0 must be violated")
     }
-
-    @Test
-    fun `Knapsack maintained weight is Long-clean`() {
-        // single item, weight BIG, xs ∈ [0, WIDE]. xs=WIDE drives the total weight to 2^32.
-        val factor = Knapsack(
-            weights = intArrayOf(BIG),
-            profits = intArrayOf(0),
-            xs = intArrayOf(0),
-            w = 1,
-            p = 2,
-        )
-        val state = stateFor(0, arrayOf(IntDomain(0, WIDE), IntDomain(0, 100), IntDomain(0, 0)), factor)
-        state.assignment.setInt(0, 0) // xs
-        state.assignment.setInt(1, 0) // w
-        state.assignment.setInt(2, 0) // p
-        state.recompute()
-        assertFalse(factor.isViolated(state, 0))
-
-        val predicted = factor.deltaIfIntSet(state, 0, 0, WIDE)
-        state.apply(Move.IntSet(0, WIDE))
-        assertTrue(factor.isViolated(state, 0), "weight total 2^32 != w(0) must be violated")
-        assertEquals(1, predicted, "delta must see the true Long weight, not a wrapped 0")
-    }
 }

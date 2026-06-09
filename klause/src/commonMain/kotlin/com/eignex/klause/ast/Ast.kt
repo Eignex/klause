@@ -463,46 +463,6 @@ data class InverseChannel(
 }
 
 /**
- * Generalized alldifferent_except: every pair of distinct positions must take different
- * values, unless one of them takes a value in [except]. [except] is the set of "ignored"
- * sentinel values (e.g., {0} for the classic alldifferent_except_0).
- */
-@Serializable
-@SerialName("alldiff_except")
-data class AllDifferentExceptExpr(
-    /** The terms required to be pairwise distinct outside [except]. */
-    val terms: List<IntExpr>,
-    /** Sentinel values exempt from the distinctness requirement. */
-    val except: List<Int>,
-) : BoolExpr {
-    init {
-        require(terms.size >= 2) { "AllDifferentExcept needs at least two terms" }
-    }
-}
-
-/**
- * `arg_sort(values, perm)` — `perm` is a permutation of `0..n-1` such that
- * `values[perm[0]] ≤ values[perm[1]] ≤ … ≤ values[perm[n-1]]`. Ties are broken by index.
- * [permOffset] is the integer that represents index 0 in `perm` (0 for klause native,
- * 1 for FlatZinc-style 1-indexed inputs).
- */
-@Serializable
-@SerialName("arg_sort")
-data class ArgSortExpr(
-    /** The values being ranked. */
-    val values: List<IntExpr>,
-    /** Output permutation of indices that sorts [values] ascending. */
-    val perm: List<IntExpr>,
-    /** Integer representing index 0 in [perm] (0 native, 1 for FlatZinc). */
-    val permOffset: Int = 0,
-) : BoolExpr {
-    init {
-        require(values.size == perm.size) { "arg_sort: values and perm must have the same length" }
-        require(values.isNotEmpty()) { "arg_sort: values must be non-empty" }
-    }
-}
-
-/**
  * MDD — sequence acceptance by a layered multi-valued decision diagram. Layer `i` of
  * the MDD restricts `seq[i]`. [transitions] is a row-major list of triples
  * `(srcState, value, dstState)` per layer; [layerStarts] is the prefix-sum index into
@@ -992,49 +952,6 @@ data class DisjunctiveExprOpt(
             require(durations[i] >= 0) { "DisjunctiveExprOpt durations[$i] must be ≥ 0" }
         }
     }
-}
-
-/** count_⟨op⟩(xs, v, n) over a presence-gated subset of xs. */
-@Serializable
-@SerialName("countopt")
-data class CountExprOpt(
-    /** The variables being counted over. */
-    val xs: List<IntExpr>,
-    /** The value being counted. */
-    val v: Int,
-    /** Comparison relating the count to [n]. */
-    val op: CountOp,
-    /** Target count expression. */
-    val n: IntExpr,
-    /** Presence literal per element, parallel to [xs]. */
-    val presents: List<BoolExpr>,
-) : BoolExpr {
-    init {
-        require(xs.isNotEmpty()) { "CountExprOpt: xs must be non-empty" }
-        require(presents.size == xs.size) { "CountExprOpt: presents must match xs arity" }
-    }
-}
-
-/** Comparison operator for a count constraint. */
-@Serializable
-enum class CountOp {
-    /** `=`. */
-    EQ,
-
-    /** `≠`. */
-    NE,
-
-    /** `≤`. */
-    LE,
-
-    /** `<`. */
-    LT,
-
-    /** `≥`. */
-    GE,
-
-    /** `>`. */
-    GT,
 }
 
 /** nvalue over a presence-gated subset of xs. */

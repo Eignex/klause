@@ -1,15 +1,9 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.AllDifferent
-import com.eignex.klause.ast.AllDifferentExceptExpr
-import com.eignex.klause.ast.And
-import com.eignex.klause.ast.ArgSortExpr
-import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.CostMddExpr
 import com.eignex.klause.ast.CostRegularExpr
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.IntCompare
-import com.eignex.klause.ast.IntElement
 import com.eignex.klause.ast.IntExpr
 import com.eignex.klause.ast.IntLit
 import com.eignex.klause.ast.IntRef
@@ -19,8 +13,6 @@ import com.eignex.klause.ast.MddExpr
 import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.ArgSort
 import com.eignex.klause.solver.factor.Mdd
 
 /*
@@ -35,119 +27,6 @@ import com.eignex.klause.solver.factor.Mdd
  * aux-state machinery doesn't compose cleanly with reified lowering; calling them inside
  * a reified context raises an error.
  */
-
-// ----------------------------------------------------------------------------
-//  alldifferent_except
-// ----------------------------------------------------------------------------
-
-/** Top-level entry: emit the native [AllDifferentExcept]
- *  factor when every operand lifts to a bare [IntRef]. Otherwise fall back to the
- *  BoolExpr decomposition routed through [assertExpr]. */
-internal fun Compiler.Build.assertAllDifferentExcept(expr: AllDifferentExceptExpr) {
-    val lifted = expr.terms.map { lift(it) }
-    if (lifted.all { it is IntRef } && expr.except.isNotEmpty()) {
-        val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
-        if (ids.toSet().size == ids.size) {
-            factors += AllDifferentExcept(
-                xs = ids,
-                except = expr.except.toIntArray(),
-            )
-            return
-        }
-    }
-    assertExpr(decomposeAllDifferentExcept(expr))
-}
-
-internal fun Compiler.Build.decomposeAllDifferentExcept(expr: AllDifferentExceptExpr): BoolExpr {
-    val xs = expr.terms
-    val except = expr.except
-    if (except.isEmpty()) return AllDifferent(xs)
-    val clauses = mutableListOf<BoolExpr>()
-    val inExceptCache = HashMap<Int, BoolExpr>()
-    fun inExcept(idx: Int): BoolExpr = inExceptCache.getOrPut(idx) {
-        if (except.size == 1) {
-            IntCompare(xs[idx], IntCmpOp.EQ, IntLit(except[0]))
-        } else {
-            Or(except.map { e -> IntCompare(xs[idx], IntCmpOp.EQ, IntLit(e)) })
-        }
-    }
-    for (i in xs.indices) {
-        for (j in i + 1 until xs.size) {
-            clauses += Or(
-                listOf(
-                    inExcept(i),
-                    inExcept(j),
-                    IntCompare(xs[i], IntCmpOp.NE, xs[j]),
-                ),
-            )
-        }
-    }
-    return if (clauses.size == 1) clauses[0] else And(clauses)
-}
-
-// ----------------------------------------------------------------------------
-//  arg_sort
-// ----------------------------------------------------------------------------
-
-/** Top-level entry: emit the [ArgSort] factor when both
- *  arrays lift to bare [IntRef]s. Also emit the AST decomposition so the bit-blast path
- *  (which skips propagation-only factors) still enforces the constraint. */
-internal fun Compiler.Build.assertArgSort(expr: ArgSortExpr) {
-    val liftedValues = expr.values.map { lift(it) }
-    val liftedPerm = expr.perm.map { lift(it) }
-    if (liftedValues.all { it is IntRef } && liftedPerm.all { it is IntRef }) {
-        val valueIds = IntArray(liftedValues.size) { intVarOf((liftedValues[it] as IntRef).name) }
-        val permIds = IntArray(liftedPerm.size) { intVarOf((liftedPerm[it] as IntRef).name) }
-        if (valueIds.toSet().size == valueIds.size && permIds.toSet().size == permIds.size) {
-            factors += ArgSort(
-                values = valueIds,
-                perm = permIds,
-                permOffset = expr.permOffset,
-            )
-            assertExpr(decomposeArgSort(expr))
-            return
-        }
-    }
-    assertExpr(decomposeArgSort(expr))
-}
-
-internal fun Compiler.Build.decomposeArgSort(expr: ArgSortExpr): BoolExpr {
-    val n = expr.values.size
-    val perm = expr.perm
-    val values = expr.values
-    val off = expr.permOffset
-
-    fun permIndex(i: Int): IntExpr = if (off == 0) {
-        perm[i]
-    } else {
-        IntSum(listOf(perm[i], IntLit(-off)))
-    }
-
-    // Each consecutive pair must be ascending in value, with ties broken by index.
-    val clauses = mutableListOf<BoolExpr>()
-    for (i in 0 until n - 1) {
-        val a = IntElement(permIndex(i), values)
-        val b = IntElement(permIndex(i + 1), values)
-        clauses += Or(
-            listOf(
-                IntCompare(a, IntCmpOp.LT, b),
-                And(
-                    listOf(
-                        IntCompare(a, IntCmpOp.EQ, b),
-                        IntCompare(perm[i], IntCmpOp.LT, perm[i + 1]),
-                    ),
-                ),
-            ),
-        )
-    }
-    // perm is a permutation of [off, off+n−1]: allDifferent + each in range.
-    clauses += AllDifferent(perm)
-    for (i in 0 until n) {
-        clauses += IntCompare(perm[i], IntCmpOp.GE, IntLit(off))
-        clauses += IntCompare(perm[i], IntCmpOp.LE, IntLit(off + n - 1))
-    }
-    return And(clauses)
-}
 
 // ----------------------------------------------------------------------------
 //  MDD / cost_mdd / cost_regular — table-based state-channel decompositions
