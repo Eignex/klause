@@ -68,7 +68,8 @@ internal object BanditProbe {
                     )
                 },
             )
-            report("  seq-mixed     ", runSequential(program, obj, budget))
+            report("  seq-mixed     ", runSequential(program, obj, budget, PortfolioSpec.mixed()))
+            report("  seq-backtrack ", runSequential(program, obj, budget, PortfolioSpec.backtrackOnly()))
         }
     }
 
@@ -105,14 +106,14 @@ internal object BanditProbe {
         return Run(firstMs, valueOf(r), bestMs, r.stats.nodes.sum.toLong())
     }
 
-    private fun runSequential(program: FlatZincProgram, obj: Objective, budget: Long): Run {
+    private fun runSequential(program: FlatZincProgram, obj: Objective, budget: Long, spec: PortfolioSpec): Run {
         val t0 = System.currentTimeMillis()
         val deadline = t0 + budget
         var firstMs: Long? = null
         var bestMs: Long? = null
         val portfolio = PortfolioBuilder.build(
             program.problem,
-            PortfolioSpec.mixed(),
+            spec,
             lsObjective = program.lsObjective ?: obj,
             linearObjective = obj,
             definitionalSweep = program.definitionalSweep,
