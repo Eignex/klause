@@ -29,7 +29,16 @@ internal class CumulativeEnergeticBound(problem: Problem) {
     /** True if some Cumulative is energetically infeasible at the current node (⇒ prune the subtree). */
     fun isInfeasible(session: PropagationSession): Boolean = factors.any { overSubscribed(it, session) }
 
-    private fun overSubscribed(c: Cumulative, session: PropagationSession): Boolean {
+    // All energy/capacity products use checked arithmetic: an overflow must NOT wrap into a spurious
+    // "infeasible" (that would drop valid schedules), so it is caught and reported as "cannot prove
+    // infeasible" (false) — the same sound skip the exact LP path takes on overflow.
+    private fun overSubscribed(c: Cumulative, session: PropagationSession): Boolean = try {
+        overSubscribedChecked(c, session)
+    } catch (_: LpOverflowException) {
+        false
+    }
+
+    private fun overSubscribedChecked(c: Cumulative, session: PropagationSession): Boolean {
         val n = c.starts.size
         if (n == 0 || n > MAX_TASKS) return false
         val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max.toLong() else c.capacity.toLong()
@@ -52,7 +61,7 @@ internal class CumulativeEnergeticBound(problem: Problem) {
             if (dur[i] <= 0L || dem[i] <= 0L) continue
             present[i] = true
             starts.add(est[i])
-            ends.add(lst[i] + dur[i]) // latest completion
+            ends.add(addExact(lst[i], dur[i])) // latest completion
         }
 
         // Sound subset of the energetic window set: left edges from earliest starts, right edges from
@@ -62,14 +71,14 @@ internal class CumulativeEnergeticBound(problem: Problem) {
             for (b in 0 until ends.size) {
                 val t2 = ends[b]
                 if (t2 <= t1) continue
-                val width = t2 - t1
+                val width = subExact(t2, t1)
                 var required = 0L
                 for (i in 0 until n) {
                     if (!present[i]) continue
                     val overlap = mandatoryOverlap(est[i], lst[i], dur[i], t1, t2)
-                    if (overlap > 0L) required += dem[i] * overlap
+                    if (overlap > 0L) required = addExact(required, mulExact(dem[i], overlap))
                 }
-                if (required > capacity * width) return true
+                if (required > mulExact(capacity, width)) return true
             }
         }
         return false
@@ -81,9 +90,9 @@ internal class CumulativeEnergeticBound(problem: Problem) {
 
     /** Minimum time task `[est, lst]+dur` must spend inside `[t1, t2)` over all its placements. */
     private fun mandatoryOverlap(est: Long, lst: Long, dur: Long, t1: Long, t2: Long): Long {
-        val left = est + dur - t1 // must lie after t1 if pushed fully left
-        val right = t2 - lst // must lie before t2 if pushed fully right
-        val m = minOf(dur, t2 - t1, left, right)
+        val left = subExact(addExact(est, dur), t1) // must lie after t1 if pushed fully left
+        val right = subExact(t2, lst) // must lie before t2 if pushed fully right
+        val m = minOf(dur, subExact(t2, t1), left, right)
         return if (m > 0L) m else 0L
     }
 
