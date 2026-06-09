@@ -14,6 +14,7 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
 
@@ -82,6 +83,9 @@ internal class CpToLpRelaxation(
     /** When true, linearize each constant-array Element with a one-hot selector model (its exact
      *  convex hull). Adds O(len) columns, so it is gated; variable arrays are skipped. */
     private val elementHull: Boolean = false,
+    /** When true, linearize each Table with one selector column per allowed tuple — its exact convex
+     *  hull. Adds O(numTuples) columns, so it is gated. */
+    private val tableHull: Boolean = false,
 ) {
     private companion object {
         /** Above this node count the O(n²)-column circuit arc model is skipped. */
@@ -89,6 +93,9 @@ internal class CpToLpRelaxation(
 
         /** Above this array length the O(len)-column Element selector model is skipped. */
         const val MAX_ELEM: Int = 256
+
+        /** Above this tuple count the O(numTuples)-column Table hull is skipped. */
+        const val MAX_TUPLES: Int = 1024
     }
 
     /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
@@ -278,6 +285,9 @@ internal class CpToLpRelaxation(
             if (elementHull) {
                 for (factor in problem.factors) if (factor is Element) buildElementHull(factor)
             }
+            if (tableHull) {
+                for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
+            }
 
             for (factor in problem.factors) {
                 when (factor) {
@@ -394,6 +404,54 @@ internal class CpToLpRelaxation(
                 }
             }
             circuitModels.add(CircuitArcModel(n, arcCol))
+        }
+
+        /**
+         * Convex-hull linearization of one [Table] `(xs) ∈ tuples`: a selector column `y_t ∈ [0,1]`
+         * per allowed tuple, with `Σ_t y_t = 1` and a per-column channel `xs[j] = Σ_t tuple_t[j]·y_t`.
+         * The projection onto `xs` is exactly the convex hull of the allowed tuples — the strongest
+         * linear relaxation of the table. A tuple's column exists when every entry is in the declared
+         * domain of its variable (layout stable across nodes), and is pinned to 0 when any entry has
+         * left the live domain. Tables with more than [MAX_TUPLES] rows are skipped.
+         */
+        private fun buildTableHull(factor: Table) {
+            val numTuples = factor.numTuples
+            if (numTuples > MAX_TUPLES) return
+            val arity = factor.arity
+            val declared = Array(arity) { c -> problem.intDomains[factor.xs[c]] }
+            val live = Array(arity) { c -> session.intDomain(factor.xs[c]) }
+            val selCols = IntArrayList()
+            val rows = IntArrayList()
+            for (t in 0 until numTuples) {
+                var declaredFeasible = true
+                var liveFeasible = true
+                for (col in 0 until arity) {
+                    val v = factor.tuples[t * arity + col]
+                    if (v !in declared[col]) {
+                        declaredFeasible = false
+                        break
+                    }
+                    if (v !in live[col]) liveFeasible = false
+                }
+                if (!declaredFeasible) continue
+                selCols.add(auxColumn(0L, if (liveFeasible) 1L else 0L))
+                rows.add(t)
+            }
+            val k = selCols.size
+            if (k == 0) return // no tuple feasible under the declared domains — leave it to propagation
+            builder.addRow(selCols.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L)
+            // xs[col] − Σ_t tuple_t[col]·y_t = 0 for each column.
+            for (col in 0 until arity) {
+                val cols = IntArray(k + 1)
+                val vals = LongArray(k + 1)
+                for (s in 0 until k) {
+                    cols[s] = selCols[s]
+                    vals[s] = -factor.tuples[rows[s] * arity + col].toLong()
+                }
+                cols[k] = intColumn(factor.xs[col])
+                vals[k] = 1L
+                builder.addRow(cols, vals, Relation.EQ, 0L)
+            }
         }
 
         /**

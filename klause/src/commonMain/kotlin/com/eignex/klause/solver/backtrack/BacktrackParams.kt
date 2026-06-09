@@ -229,6 +229,14 @@ data class BacktrackParams(
      */
     val lpElement: Boolean = false,
     /**
+     * Linearize Table globals with their convex hull (#22). When true and [lpBounding] holds, each
+     * Table gets one selector column per allowed tuple with `Σ y_t = 1` and per-column channels
+     * `xs[j] = Σ tuple_t[j]·y_t`, so the LP sees the exact convex hull of the allowed tuples. Adds
+     * O(numTuples) columns per Table (skipped above a tuple-count cap), so it is opt-in and off by
+     * default; a no-op when no Table exists.
+     */
+    val lpTable: Boolean = false,
+    /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
      * [com.eignex.klause.solver.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
