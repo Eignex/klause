@@ -22,7 +22,6 @@ import com.eignex.klause.ast.DisjunctiveExprOpt
 import com.eignex.klause.ast.FloatLinearConstraint
 import com.eignex.klause.ast.FloatSpec
 import com.eignex.klause.ast.GccExprOpt
-import com.eignex.klause.ast.GeostExpr
 import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
@@ -35,13 +34,10 @@ import com.eignex.klause.ast.MddExpr
 import com.eignex.klause.ast.MultipleSpec
 import com.eignex.klause.ast.NValueExprOpt
 import com.eignex.klause.ast.NamedConstraint
-import com.eignex.klause.ast.NetworkFlowCostExpr
-import com.eignex.klause.ast.NetworkFlowExpr
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.PathExpr
 import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.SchemaEntry
@@ -55,7 +51,6 @@ import com.eignex.klause.ast.SetSubsetOf
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.SymmetricAllDifferent
 import com.eignex.klause.ast.TableConstraint
-import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.schema.VariableSchema
@@ -358,16 +353,6 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
             is AllDifferentExceptExpr -> lowerToLit(decomposeAllDifferentExcept(expr))
 
             is ArgSortExpr -> lowerToLit(decomposeArgSort(expr))
-
-            is NetworkFlowExpr -> lowerToLit(decomposeNetworkFlow(expr))
-
-            is NetworkFlowCostExpr -> lowerToLit(decomposeNetworkFlowCost(expr))
-
-            is GeostExpr -> lowerToLit(decomposeGeost(expr))
-
-            is PathExpr -> error("path: reified context not supported (use at top-level)")
-
-            is TreeExpr -> error("tree: reified context not supported (use at top-level)")
 
             is MddExpr -> error("mdd: reified context not supported (use at top-level)")
 

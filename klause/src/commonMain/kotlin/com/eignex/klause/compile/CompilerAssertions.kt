@@ -21,7 +21,6 @@ import com.eignex.klause.ast.DisjunctiveExpr
 import com.eignex.klause.ast.DisjunctiveExprOpt
 import com.eignex.klause.ast.FloatLinearConstraint
 import com.eignex.klause.ast.GccExprOpt
-import com.eignex.klause.ast.GeostExpr
 import com.eignex.klause.ast.Iff
 import com.eignex.klause.ast.Implies
 import com.eignex.klause.ast.IntCmpOp
@@ -33,12 +32,9 @@ import com.eignex.klause.ast.InverseChannel
 import com.eignex.klause.ast.MddExpr
 import com.eignex.klause.ast.NValueExprOpt
 import com.eignex.klause.ast.NValueMode
-import com.eignex.klause.ast.NetworkFlowCostExpr
-import com.eignex.klause.ast.NetworkFlowExpr
 import com.eignex.klause.ast.NominalEq
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.PathExpr
 import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.SetDisjoint
 import com.eignex.klause.ast.SetEq
@@ -48,7 +44,6 @@ import com.eignex.klause.ast.SetSubsetOf
 import com.eignex.klause.ast.SubcircuitExpr
 import com.eignex.klause.ast.SymmetricAllDifferent
 import com.eignex.klause.ast.TableConstraint
-import com.eignex.klause.ast.TreeExpr
 import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -130,16 +125,6 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
         is AllDifferentExceptExpr -> assertAllDifferentExcept(expr)
 
         is ArgSortExpr -> assertArgSort(expr)
-
-        is NetworkFlowExpr -> assertNetworkFlow(expr)
-
-        is NetworkFlowCostExpr -> assertNetworkFlowCost(expr)
-
-        is GeostExpr -> assertGeost(expr)
-
-        is PathExpr -> assertPath(expr)
-
-        is TreeExpr -> assertTree(expr)
 
         is MddExpr -> assertMdd(expr)
 
