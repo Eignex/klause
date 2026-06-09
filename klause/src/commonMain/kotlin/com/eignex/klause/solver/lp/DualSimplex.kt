@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.util.IntArrayList
+
 /** Outcome of an LP solve. */
 internal enum class LpStatus {
     /** An optimal vertex was found; [LpSolution] carries the bound, primal, duals and basis. */
@@ -55,6 +57,15 @@ internal class LpSolution(
     private val sense: Sense,
     /** Dual-simplex pivots taken to reach this solution; lower with a good warm start. */
     val pivots: Int = 0,
+    /**
+     * Farkas infeasibility certificate (#247), set only when [status] is [LpStatus.INFEASIBLE]. The
+     * structural columns whose currently-seated bound participates in the dual ray that proves the LP
+     * infeasible — together they are a sufficient reason. [certBoundIsUpper] is the parallel array of
+     * the seated bound's side (true = the column's upper bound, false = its lower bound). Empty when
+     * the solve was feasible. See [DualSimplex.runDualSimplex] for how the leaving row is the ray.
+     */
+    val certCols: IntArray = IntArray(0),
+    val certBoundIsUpper: BooleanArray = BooleanArray(0),
 ) {
     /** The objective in the model's original sense as a floating value (convenience only). */
     val objectiveValue: Double
@@ -401,8 +412,8 @@ internal class DualSimplex(private val model: LpModel) {
                 infeas++
                 if (useBland) {
                     if (v < leavingVar) {
-                        leavingVar = v;
-                        r = i;
+                        leavingVar = v
+                        r = i
                         belowLower = low
                     }
                 } else {
@@ -410,9 +421,9 @@ internal class DualSimplex(private val model: LpModel) {
                     val raw = if (low) beta[i] else subExact(beta[i], mulExact(model.upper[v], d))
                     val viol = if (raw < 0L) -raw else raw
                     if (viol > bestViol || r == -1) {
-                        bestViol = viol;
-                        r = i;
-                        leavingVar = v;
+                        bestViol = viol
+                        r = i
+                        leavingVar = v
                         belowLower = low
                     }
                 }
@@ -420,7 +431,7 @@ internal class DualSimplex(private val model: LpModel) {
             if (r == -1) return buildSolution(beta, LpStatus.OPTIMAL, pivots)
             // Stall detection: if the infeasibility count is not shrinking, fall back to Bland.
             if (infeas < bestInfeas) {
-                bestInfeas = infeas;
+                bestInfeas = infeas
                 sinceImprove = 0
             } else if (++sinceImprove > stallLimit) {
                 useBland = true
@@ -455,8 +466,10 @@ internal class DualSimplex(private val model: LpModel) {
                     bestRatioDen = rd
                 }
             }
-            // No entering variable: the dual is unbounded, so the primal is infeasible.
-            if (q == -1) return buildSolution(beta, LpStatus.INFEASIBLE, pivots)
+            // No entering variable: the dual is unbounded, so the primal is infeasible. The leaving
+            // row [r] (basic variable past bound [belowLower], no column able to repair it) is the
+            // Farkas dual ray — record its support as the infeasibility certificate (#247).
+            if (q == -1) return buildSolution(beta, LpStatus.INFEASIBLE, pivots, r, belowLower)
 
             // The leaving variable settles at the bound it was driven to.
             status[leavingVar] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
@@ -467,7 +480,13 @@ internal class DualSimplex(private val model: LpModel) {
         }
     }
 
-    private fun buildSolution(beta: LongArray, st: LpStatus, pivots: Int): LpSolution {
+    private fun buildSolution(
+        beta: LongArray,
+        st: LpStatus,
+        pivots: Int,
+        infeasibleRow: Int = -1,
+        infeasibleBelowLower: Boolean = false,
+    ): LpSolution {
         // Map each basic variable to its row for primal extraction.
         val varRow = IntArray(numVars) { -1 }
         for (i in 0 until m) varRow[basicVar[i]] = i
@@ -515,6 +534,8 @@ internal class DualSimplex(private val model: LpModel) {
             for (j in redNum.indices) redNum[j] = -redNum[j]
         }
 
+        val (certCols, certUpper) = infeasibilityCertificate(st, infeasibleRow, infeasibleBelowLower)
+
         return LpSolution(
             status = st,
             denominator = den,
@@ -525,6 +546,41 @@ internal class DualSimplex(private val model: LpModel) {
             basis = Basis(basicVars = basicVar.copyOf(), status = status.copyOf()),
             sense = model.sense,
             pivots = pivots,
+            certCols = certCols,
+            certBoundIsUpper = certUpper,
         )
+    }
+
+    /**
+     * The structural columns in the support of the infeasibility dual ray (#247). The leaving row
+     * `x_lv = β/d − Σ_j (N[r][j]/d)·t_j` is an equality implied by the model's constraints; with the
+     * leaving basic variable forced past its violated bound and every nonbasic seated at the bound the
+     * row references, the bounds are jointly inconsistent. The reason is therefore the leaving
+     * variable's violated bound plus the seated bound of each nonbasic *structural* column with a
+     * nonzero row coefficient. Slack columns map to model rows (always present, not branch bounds), so
+     * they are not part of the bound reason. Sign of the determinant does not affect which side a
+     * column is seated at, so this needs no normalization.
+     */
+    private fun infeasibilityCertificate(
+        st: LpStatus,
+        infeasibleRow: Int,
+        belowLower: Boolean,
+    ): Pair<IntArray, BooleanArray> {
+        if (st != LpStatus.INFEASIBLE || infeasibleRow < 0) return IntArray(0) to BooleanArray(0)
+        val cols = IntArrayList()
+        val upper = ArrayList<Boolean>()
+        val lv = basicVar[infeasibleRow]
+        if (lv < model.n) {
+            // The leaving variable is driven past its lower bound (belowLower) or upper bound.
+            cols.add(lv)
+            upper.add(!belowLower)
+        }
+        val row = nMat[infeasibleRow]
+        for (j in 0 until numVars) {
+            if (j >= model.n || status[j] == VarStatus.BASIC || row[j] == 0L) continue
+            cols.add(j)
+            upper.add(status[j] == VarStatus.AT_UPPER)
+        }
+        return cols.toIntArray() to BooleanArray(upper.size) { upper[it] }
     }
 }

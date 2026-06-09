@@ -36,6 +36,21 @@ class CumulativeEnergeticBoundTest {
     }
 
     @Test
+    fun `over-subscription yields a bound-atom explanation`() {
+        // Same disjunctive over-subscription as above; explain must return a well-formed nogood.
+        val p = problem(3, 3, intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1)
+        val clause = CumulativeEnergeticBound(p).explain(PropagationSession(p))
+        assertTrue(clause != null && clause.isNotEmpty(), "expected a non-empty energetic explanation")
+        assertTrue(clause.all { it >= 0 }, "every literal must be a well-formed atom")
+    }
+
+    @Test
+    fun `feasible cumulative has no explanation`() {
+        val p = problem(2, 5, intArrayOf(2, 2), intArrayOf(1, 1), capacity = 2)
+        assertTrue(CumulativeEnergeticBound(p).explain(PropagationSession(p)) == null)
+    }
+
+    @Test
     fun `never flags a schedulable instance - soundness vs brute force`() {
         val rng = Random(20260609)
         var flagged = 0
