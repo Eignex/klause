@@ -5,7 +5,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.factor.Among
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Element
@@ -78,18 +77,6 @@ class ChocoFactorCoverageTest {
         )
         assertEquals(2, a.ints[0])
         assertEquals(9, a.ints[1])
-    }
-
-    @Test fun `among counts membership`() {
-        val a = sat(
-            problem(
-                3,
-                arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 2)),
-                Among(n = 2, xs = intArrayOf(0, 1), values = intArrayOf(1, 2)),
-            ),
-        )
-        val expected = listOf(a.ints[0], a.ints[1]).count { it == 1 || it == 2 }
-        assertEquals(expected, a.ints[2])
     }
 
     @Test fun `nvalue equals the distinct count`() {

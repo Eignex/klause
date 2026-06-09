@@ -4,22 +4,16 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.Among
-import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.BinPacking
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Regular
-import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
@@ -74,19 +68,6 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun `count bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "count",
-        // n (var 3) = #{i : xs[i] = 1}, xs = vars 0..2 ∈ [0,2], n ∈ [0,3].
-        Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
-            arrayOf<Factor>(
-                Count(xs = intArrayOf(0, 1, 2), v = 1, op = Count.Op.Eq, n = 3),
-            ),
-        ),
-    )
-
     @Test fun `nvalue bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "nvalue",
         Problem(
@@ -119,18 +100,6 @@ class GapFactorBitBlastTest {
     // Circuit / Subcircuit synthesise free position vars that aren't pinned by a problem
     // sample, so the brute-force SatCheck oracle can't validate them — they're round-tripped
     // through a real SAT solver in klause-logicng's GapFactorLogicNgTest instead.
-
-    @Test fun `among bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "among",
-        Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
-            arrayOf<Factor>(
-                Among(n = 3, xs = intArrayOf(0, 1, 2), values = intArrayOf(1, 2)),
-            ),
-        ),
-    )
 
     @Test fun `lex less bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "lex less",
@@ -218,18 +187,6 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun `arg min bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "arg min",
-        Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-            arrayOf<Factor>(
-                ArgMinMax(idx = 0, xs = intArrayOf(1, 2, 3), max = false, indexOffset = 0),
-            ),
-        ),
-    )
-
     @Test fun `diffn bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "diffn",
         Problem(
@@ -247,38 +204,6 @@ class GapFactorBitBlastTest {
         ),
     )
 
-    @Test fun `bin packing bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "bin packing",
-        Problem(
-            0,
-            3,
-            Array(3) { IntDomain(1, 2) },
-            arrayOf<Factor>(
-                BinPacking(
-                    bins = intArrayOf(0, 1, 2),
-                    weights = intArrayOf(1, 1, 1),
-                    mode = BinPacking.Mode.UniformCapacity,
-                    uniformCapacity = 3,
-                    numBins = 2,
-                    binOffset = 1,
-                ),
-            ),
-        ),
-    )
-
-    @Test fun `knapsack bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "knapsack",
-        // xs = vars 0,1 ∈ {0,1}; w (var2) = Σ weights·xs; p (var3) = Σ profits·xs.
-        Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 5), IntDomain(0, 9)),
-            arrayOf<Factor>(
-                Knapsack(weights = intArrayOf(2, 3), profits = intArrayOf(5, 4), xs = intArrayOf(0, 1), w = 2, p = 3),
-            ),
-        ),
-    )
-
     @Test fun `table bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "table",
         Problem(
@@ -287,18 +212,6 @@ class GapFactorBitBlastTest {
             Array(2) { IntDomain(0, 2) },
             arrayOf<Factor>(
                 Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 2, 2, 1)),
-            ),
-        ),
-    )
-
-    @Test fun `sequence bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
-        "sequence",
-        Problem(
-            0,
-            5,
-            Array(5) { IntDomain(0, 1) },
-            arrayOf<Factor>(
-                Sequence(low = 1, high = 2, k = 3, xs = intArrayOf(0, 1, 2, 3, 4), values = intArrayOf(1)),
             ),
         ),
     )

@@ -269,30 +269,6 @@ fun disjunctiveOpt(starts: List<IntTerm>, durations: List<Int>, presents: List<B
     )
 }
 
-/** Count over a presence-gated subset: `n = #{i : xs[i] ⟨op⟩ v ∧ present[i]}`. */
-fun countEqOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
-    countOptCommon(xs, v, n, presents, CountOp.EQ)
-
-/** Presence-gated count `n ≠ #{i : xs[i] = v ∧ present[i]}`. */
-fun countNeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
-    countOptCommon(xs, v, n, presents, CountOp.NE)
-
-/** Presence-gated count `n ≤ #{i : xs[i] = v ∧ present[i]}`. */
-fun countLeOpt(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>): BoolExpr =
-    countOptCommon(xs, v, n, presents, CountOp.LE)
-
-private fun countOptCommon(xs: List<IntTerm>, v: Int, n: IntTerm, presents: List<BoolTerm>, op: CountOp): BoolExpr {
-    require(xs.isNotEmpty()) { "countOpt: xs must be non-empty" }
-    require(presents.size == xs.size) { "countOpt: presents must match xs arity" }
-    return CountExprOpt(
-        xs = xs.map { it.toIntExpr() },
-        v = v,
-        op = op,
-        n = n.toIntExpr(),
-        presents = presents.map { it.toExpr() },
-    )
-}
-
 /** Number of distinct values among the presence-gated subset of xs. */
 fun nValueOpt(n: IntTerm, xs: List<IntTerm>, presents: List<BoolTerm>, mode: NValueMode = NValueMode.EQ): BoolExpr {
     require(xs.isNotEmpty()) { "nValueOpt: xs must be non-empty" }
@@ -340,17 +316,6 @@ fun gccOpt(
 // -----------------------------------------------------------------------------------
 
 /**
- * Generalised `alldifferent_except`: pairs of distinct positions must take different values
- * unless one of them takes a value in [except]. `except.isEmpty()` collapses to [allDifferent].
- */
-@Suppress("SpreadOperator") // forwards a list to the vararg allDifferent
-fun allDifferentExcept(xs: List<IntTerm>, except: Set<Int>): BoolExpr {
-    require(xs.size >= 2) { "allDifferentExcept: need at least two terms" }
-    if (except.isEmpty()) return allDifferent(*xs.toTypedArray())
-    return AllDifferentExceptExpr(xs.map { it.toIntExpr() }, except.sorted())
-}
-
-/**
  * `symmetric_all_different(xs)` — the map `i -> xs[i] − indexOffset` is a self-inverse
  * permutation: `xs[i] = j + indexOffset` iff `xs[j] = i + indexOffset`.
  */
@@ -366,20 +331,6 @@ fun inverse(f: List<IntTerm>, g: List<IntTerm>, fOffset: Int = 0, gOffset: Int =
     require(f.size == g.size) { "inverse: f and g must have equal length" }
     require(f.isNotEmpty()) { "inverse: arrays must be non-empty" }
     return InverseChannel(f.map { it.toIntExpr() }, g.map { it.toIntExpr() }, fOffset, gOffset)
-}
-
-/**
- * `arg_sort(values, perm)` — perm is a permutation of `[permOffset, permOffset + n − 1]`
- * such that `values[perm[i] − permOffset]` is non-decreasing. Ties broken by index.
- */
-fun argSort(values: List<IntTerm>, perm: List<IntTerm>, permOffset: Int = 0): BoolExpr {
-    require(values.size == perm.size) { "argSort: values and perm length mismatch" }
-    require(values.isNotEmpty()) { "argSort: values must be non-empty" }
-    return ArgSortExpr(
-        values = values.map { it.toIntExpr() },
-        perm = perm.map { it.toIntExpr() },
-        permOffset = permOffset,
-    )
 }
 
 /**

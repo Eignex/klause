@@ -1088,6 +1088,7 @@ object IndomainRandom : ValueHeuristic {
             val n = d.size
             when {
                 n <= 1 -> sequenceOf(d.min)
+
                 n <= INDOMAIN_EAGER_MAX -> {
                     // Small domain: materialise the non-hole values and Fisher-Yates shuffle in
                     // place (cheaper than the lazy coroutine + map for a handful of values).
@@ -1100,6 +1101,7 @@ object IndomainRandom : ValueHeuristic {
                     }
                     arr.asSequence()
                 }
+
                 else -> sequence {
                     // Lazy Fisher-Yates over domain indices: emit a uniform random permutation
                     // doing O(consumed) work, not O(n). Branch nodes typically read only the first

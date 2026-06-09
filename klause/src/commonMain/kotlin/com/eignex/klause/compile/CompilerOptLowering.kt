@@ -4,8 +4,6 @@ import com.eignex.klause.ast.AllDifferentOpt
 import com.eignex.klause.ast.And
 import com.eignex.klause.ast.BoolExpr
 import com.eignex.klause.ast.CircuitExpr
-import com.eignex.klause.ast.CountExprOpt
-import com.eignex.klause.ast.CountOp
 import com.eignex.klause.ast.CumulativeExpr
 import com.eignex.klause.ast.CumulativeExprOpt
 import com.eignex.klause.ast.DisjunctiveExpr
@@ -54,17 +52,6 @@ import com.eignex.klause.solver.IntDomain
  *  affine-lift turns this into an aux int + reified equalities. */
 private fun indicatorInt(cond: BoolExpr): IntExpr = IntIfThenElse(cond, IntLit(1), IntLit(0))
 
-/** Match predicate `x ⟨op⟩ v`. Mirrors the Count factor's matches() over an arbitrary
- *  IntExpr (not just a var ref) so callers can pass already-lifted expressions. */
-private fun matchesPred(x: IntExpr, op: CountOp, v: Int): BoolExpr = when (op) {
-    CountOp.EQ -> IntCompare(x, IntCmpOp.EQ, IntLit(v))
-    CountOp.NE -> IntCompare(x, IntCmpOp.NE, IntLit(v))
-    CountOp.LE -> IntCompare(x, IntCmpOp.LE, IntLit(v))
-    CountOp.LT -> IntCompare(x, IntCmpOp.LT, IntLit(v))
-    CountOp.GE -> IntCompare(x, IntCmpOp.GE, IntLit(v))
-    CountOp.GT -> IntCompare(x, IntCmpOp.GT, IntLit(v))
-}
-
 /** `b ↔ AllDifferent(terms)` (non-opt). Pairwise NE conjuncted via Tseitin. */
 internal fun Compiler.Build.reifyAllDifferent(terms: List<IntExpr>): Int {
     val pairs = mutableListOf<BoolExpr>()
@@ -92,15 +79,6 @@ internal fun Compiler.Build.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
         }
     }
     return tseitinAnd(pairs)
-}
-
-/** `b ↔ count_⟨op⟩(xs, v, n)` over a presence-gated subset. */
-internal fun Compiler.Build.reifyCountOpt(expr: CountExprOpt): Int {
-    val perTerm: List<IntExpr> = expr.xs.indices.map { i ->
-        indicatorInt(And(listOf(expr.presents[i], matchesPred(expr.xs[i], expr.op, expr.v))))
-    }
-    val sum: IntExpr = if (perTerm.size == 1) perTerm[0] else IntSum(perTerm)
-    return reifyIntCompare(IntCompare(expr.n, IntCmpOp.EQ, sum))
 }
 
 /** `b ↔ nvalue(n, xs, mode)` over a presence-gated subset. Enumerate the union domain;

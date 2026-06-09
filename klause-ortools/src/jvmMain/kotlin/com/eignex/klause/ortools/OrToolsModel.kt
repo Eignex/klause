@@ -5,21 +5,15 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.Among
-import com.eignex.klause.solver.factor.ArgMinMax
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -31,7 +25,6 @@ import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
-import com.eignex.klause.solver.factor.Sequence
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
@@ -101,17 +94,6 @@ class OrToolsModel private constructor(
         model.addDifferent(a, c).onlyEnforceIf(b.not())
         return b
     }
-
-    /** Fresh literal `b ⟺ (x ∈ values)`. */
-    private fun reifyInValues(x: LinearArgument, values: IntArray): Literal {
-        val b = freshBool()
-        val expr = LinearExpr.term(x, 1)
-        val d = Domain.fromValues(values.longs())
-        model.addLinearExpressionInDomain(expr, d).onlyEnforceIf(b)
-        model.addLinearExpressionInDomain(expr, d.complement()).onlyEnforceIf(b.not())
-        return b
-    }
-
     private fun postFactor(f: Factor) {
         when (f) {
             is Clause -> model.addBoolOr(Array(f.literals.size) { lit(f.literals[it]) })
@@ -166,19 +148,6 @@ class OrToolsModel private constructor(
                 model.addLinearExpressionInDomain(sum, d.complement()).onlyEnforceIf(aux.not())
             }
 
-            is AllDifferentExcept -> postDistinctExcept(f.xs, f.except)
-
-            is Among -> model.addEquality(
-                intVars[f.n],
-                LinearExpr.sum(
-                    Array(f.xs.size) {
-                        reifyInValues(intVars[f.xs[it]], f.values) as LinearArgument
-                    },
-                ),
-            )
-
-            is Count -> postCount(f)
-
             is Element -> postElement(f)
 
             is Inverse -> postChannel(f.f, f.g, f.fOffset, f.gOffset)
@@ -203,22 +172,11 @@ class OrToolsModel private constructor(
                     model.addMinEquality(intVars[f.result], Array(f.xs.size) { intVars[f.xs[it]] })
                 }
 
-            is ArgMinMax -> postArgMinMax(f)
-
-            is Knapsack -> {
-                model.addEquality(intVars[f.w], LinearExpr.weightedSum(intArgs(f.xs), f.weights.longs()))
-                model.addEquality(intVars[f.p], LinearExpr.weightedSum(intArgs(f.xs), f.profits.longs()))
-            }
-
             is Cumulative -> postCumulative(f)
 
             is Diffn -> postDiffn(f)
 
-            is BinPacking -> postBinPacking(f)
-
             is Sort -> postSort(f)
-
-            is Sequence -> postSequence(f)
 
             is Regular -> postRegular(f)
 
@@ -230,32 +188,6 @@ class OrToolsModel private constructor(
             is Mdd -> postMdd(f)
 
             else -> throw UnsupportedFactorException(f)
-        }
-    }
-
-    private fun postDistinctExcept(xs: IntArray, except: IntArray) {
-        for (i in xs.indices) {
-            for (j in i + 1 until xs.size) {
-                // (xi = xj) ⇒ (xi ∈ except): equal pairs are only allowed on exempt values.
-                val eq = reifyEqVar(intVars[xs[i]], intVars[xs[j]])
-                val inExc = reifyInValues(intVars[xs[i]], except)
-                model.addImplication(eq, inExc)
-            }
-        }
-    }
-
-    private fun postCount(f: Count) {
-        if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
-        val matches = Array(f.xs.size) { reifyEq(intVars[f.xs[it]], f.v) as LinearArgument }
-        val sum = LinearExpr.sum(matches)
-        val n = f.n.toLong()
-        when (f.op) {
-            Count.Op.Eq -> model.addEquality(sum, n)
-            Count.Op.Ne -> model.addDifferent(sum, n)
-            Count.Op.Le -> model.addLessOrEqual(sum, n)
-            Count.Op.Lt -> model.addLessOrEqual(sum, n - 1)
-            Count.Op.Ge -> model.addGreaterOrEqual(sum, n)
-            Count.Op.Gt -> model.addGreaterOrEqual(sum, n + 1)
         }
     }
 
@@ -342,32 +274,6 @@ class OrToolsModel private constructor(
         }
     }
 
-    private fun postArgMinMax(f: ArgMinMax) {
-        val isArg = Array(f.xs.size) { freshBool() }
-        model.addExactlyOne(Array(f.xs.size) { isArg[it] as Literal })
-        for (p in f.xs.indices) {
-            model.addEquality(intVars[f.idx], (p + f.indexOffset).toLong()).onlyEnforceIf(isArg[p])
-            for (i in f.xs.indices) {
-                if (i != p) {
-                    val c = if (f.max) {
-                        model.addGreaterOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
-                    } else {
-                        model.addLessOrEqual(intVars[f.xs[p]], intVars[f.xs[i]])
-                    }
-                    c.onlyEnforceIf(isArg[p])
-                }
-            }
-            for (i in 0 until p) { // strict over earlier — lowest-index tie-break
-                val c = if (f.max) {
-                    model.addGreaterThan(intVars[f.xs[p]], intVars[f.xs[i]])
-                } else {
-                    model.addLessThan(intVars[f.xs[p]], intVars[f.xs[i]])
-                }
-                c.onlyEnforceIf(isArg[p])
-            }
-        }
-    }
-
     private fun postCumulative(f: Cumulative) {
         if (f.presents.isNotEmpty()) throw UnsupportedFactorException(f)
         // durations/resources/capacity are constants; their var forms live in the *Vars arrays
@@ -421,32 +327,12 @@ class OrToolsModel private constructor(
         }
     }
 
-    private fun postBinPacking(f: BinPacking) {
-        for (b in 0 until f.numBins) {
-            val picks = Array(f.bins.size) { reifyEq(intVars[f.bins[it]], b + f.binOffset) as LinearArgument }
-            val load = LinearExpr.weightedSum(picks, f.weights.longs())
-            when (f.mode) {
-                BinPacking.Mode.LoadVars -> model.addEquality(intVars[requireNotNull(f.loadVars)[b]], load)
-                BinPacking.Mode.UniformCapacity -> model.addLessOrEqual(load, f.uniformCapacity.toLong())
-                BinPacking.Mode.PerBinCapacity -> model.addLessOrEqual(load, requireNotNull(f.capacities)[b].toLong())
-            }
-        }
-    }
-
     private fun postSort(f: Sort) {
         for (i in 0 until f.ys.size - 1) model.addLessOrEqual(intVars[f.ys[i]], intVars[f.ys[i + 1]])
         for (v in unionValues(f.xs + f.ys)) {
             val cx = LinearExpr.sum(Array(f.xs.size) { reifyEq(intVars[f.xs[it]], v) as LinearArgument })
             val cy = LinearExpr.sum(Array(f.ys.size) { reifyEq(intVars[f.ys[it]], v) as LinearArgument })
             model.addEquality(cx, cy)
-        }
-    }
-
-    private fun postSequence(f: Sequence) {
-        for (start in 0..f.xs.size - f.k) {
-            val inWin = Array(f.k) { reifyInValues(intVars[f.xs[start + it]], f.values) as LinearArgument }
-            val cnt = LinearExpr.sum(inWin)
-            model.addLinearConstraint(cnt, f.low.toLong(), f.high.toLong())
         }
     }
 

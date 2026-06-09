@@ -3,7 +3,6 @@ package com.eignex.klause.schema
 import com.eignex.klause.ast.IntSpec
 import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.allDifferentOpt
-import com.eignex.klause.ast.countEqOpt
 import com.eignex.klause.ast.cumulativeOpt
 import com.eignex.klause.ast.disjunctiveOpt
 import com.eignex.klause.ast.gccOpt
@@ -14,7 +13,6 @@ import com.eignex.klause.ast.nValueOpt
 import com.eignex.klause.compile.compile
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.GlobalCardinality
@@ -147,51 +145,6 @@ class OptAllDifferentTest {
                 presentVals.size,
                 presentVals.toSet().size,
                 "Present-only values must be distinct: pa=$pa pb=$pb pc=$pc va=$va vb=$vb vc=$vc",
-            )
-        }
-    }
-}
-
-class OptCountTest {
-    private class S : VariableSchema() {
-        val a by optIntVar(min = 0, max = 2)
-        val b by optIntVar(min = 0, max = 2)
-        val c by optIntVar(min = 0, max = 2)
-        val cnt by intVar(min = 0, max = 3)
-        val countOnes by constraint {
-            countEqOpt(
-                xs = listOf(a.value, b.value, c.value),
-                v = 1,
-                n = cnt,
-                presents = listOf(a.present, b.present, c.present),
-            )
-        }
-    }
-
-    @Test
-    fun `count tracks only present 1-valued positions`() {
-        val s = S()
-        val compiled = s.compile()
-        val countFactor = compiled.problem.factors.filterIsInstance<Count>().single()
-        assertEquals(3, countFactor.presents.size)
-        val solver = LocalSearchSolver(
-            compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
-        )
-        val samples = solver.samples(LocalSearchParams(maxFlips = 8_000, randomSeed = 17)).take(40).toList()
-        for (sample in samples) {
-            val pa = compiled.decode(s.a.present, sample)
-            val pb = compiled.decode(s.b.present, sample)
-            val pc = compiled.decode(s.c.present, sample)
-            val va = sample.ints[compiled.intVarIdByName.getValue("a")]
-            val vb = sample.ints[compiled.intVarIdByName.getValue("b")]
-            val vc = sample.ints[compiled.intVarIdByName.getValue("c")]
-            val expected = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 1 }
-            val actual = compiled.decode(s.cnt, sample)
-            assertEquals(
-                expected,
-                actual,
-                "count opt mismatch: presents=($pa,$pb,$pc) values=($va,$vb,$vc) cnt=$actual",
             )
         }
     }

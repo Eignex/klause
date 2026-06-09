@@ -4,23 +4,16 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.AllDifferentExcept
-import com.eignex.klause.solver.factor.Among
-import com.eignex.klause.solver.factor.ArgMinMax
-import com.eignex.klause.solver.factor.ArgSort
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.BinPacking
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Count
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.Knapsack
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -33,7 +26,6 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
-import com.eignex.klause.solver.factor.SubsetSumEq
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Xor
@@ -41,7 +33,6 @@ import com.eignex.klause.util.binarySearchInt
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
-import com.eignex.klause.solver.factor.Sequence as SequenceFactor
 
 /**
  * Per-builtin constraint emitters for [FlatZincCompiler], factored out of the main
@@ -155,15 +146,11 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
 
-    "alldifferent_except", "fzn_alldifferent_except" -> emitAllDifferentExcept(c)
-
     "all_equal_int", "fzn_all_equal_int", "klause_all_equal_int" -> emitAllEqual(c)
 
     "member_int", "fzn_member_int", "klause_member_int" -> emitMember(c)
 
     "sort", "fzn_sort", "klause_sort" -> emitSort(c)
-
-    "arg_sort_int", "fzn_arg_sort_int", "klause_arg_sort_int", "arg_sort" -> emitArgSort(c)
 
     "symmetric_all_different", "fzn_symmetric_all_different", "klause_symmetric_all_different" ->
         emitSymmetricAllDifferent(c)
@@ -182,28 +169,11 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "lex_lesseq_int", "fzn_lex_lesseq_int", "klause_lex_lesseq_int" -> emitLexLess(c, strict = false)
 
-    "arg_max_int", "fzn_arg_max_int" -> emitArgMinMax(c, max = true)
-
-    "arg_min_int", "fzn_arg_min_int" -> emitArgMinMax(c, max = false)
-
     "value_precede_int", "fzn_value_precede_int", "klause_value_precede_int" -> emitValuePrecede(c)
 
     "value_precede_chain_int", "fzn_value_precede_chain_int", "klause_value_precede_chain_int" -> emitValuePrecedeChain(
         c,
     )
-
-    "sequence", "fzn_sequence" -> emitSequence(c)
-
-    "knapsack", "fzn_knapsack", "klause_knapsack" -> emitKnapsack(c)
-
-    "bin_packing", "fzn_bin_packing", "klause_bin_packing" -> emitBinPacking(c, BinPacking.Mode.UniformCapacity)
-
-    "bin_packing_capa", "fzn_bin_packing_capa", "klause_bin_packing_capa" -> emitBinPacking(
-        c,
-        BinPacking.Mode.PerBinCapacity,
-    )
-
-    "bin_packing_load", "fzn_bin_packing_load", "klause_bin_packing_load" -> emitBinPacking(c, BinPacking.Mode.LoadVars)
 
     "diffn", "fzn_diffn", "klause_diffn" -> emitDiffn(c, nonStrict = false)
 
@@ -258,20 +228,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "at_most_int" -> emitAtMost(c)
 
-    "count_eq", "fzn_count_eq" -> emitCountOp(c, Count.Op.Eq)
-
-    "count_neq", "fzn_count_neq" -> emitCountOp(c, Count.Op.Ne)
-
-    "count_le", "fzn_count_leq", "count_leq" -> emitCountOp(c, Count.Op.Le)
-
-    "count_lt", "fzn_count_lt" -> emitCountOp(c, Count.Op.Lt)
-
-    "count_ge", "fzn_count_geq", "count_geq" -> emitCountOp(c, Count.Op.Ge)
-
-    "count_gt", "fzn_count_gt" -> emitCountOp(c, Count.Op.Gt)
-
-    "among", "fzn_among", "klause_among" -> emitAmong(c)
-
     "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, lowUp = false, closed = false)
 
     "global_cardinality_closed", "fzn_global_cardinality_closed" -> emitGcc(c, lowUp = false, closed = true)
@@ -324,10 +280,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "lex_less_bool", "fzn_lex_less_bool" -> emitLexLessBool(c, strict = true)
 
     "lex_lesseq_bool", "fzn_lex_lesseq_bool" -> emitLexLessBool(c, strict = false)
-
-    "arg_max_bool", "fzn_arg_max_bool" -> emitArgMinMaxBool(c, max = true)
-
-    "arg_min_bool", "fzn_arg_min_bool" -> emitArgMinMaxBool(c, max = false)
 
     "table_bool", "fzn_table_bool" -> emitTableBool(c)
 
@@ -598,15 +550,6 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
         factors.add(ReifiedLinear(Lit.variable(aux), coeffs, vars, op, bound))
     } else {
         factors.add(Linear(coeffs, vars, op, bound))
-        // Subset-sum shape: an exact sum over 0/1 vars with positive coefficients gets the
-        // dynamic-programming reachability filter alongside. The Linear's bounds
-        // propagation sees almost nothing on this shape (every partial sum admits wide
-        // completions until nearly all vars are pinned); the DP filter is exact.
-        if (op == LinearOp.EQ && bound > 0 && coeffs.all { it > 0 } &&
-            vars.all { intDomains[it].min >= 0 && intDomains[it].max <= 1 }
-        ) {
-            factors.add(SubsetSumEq(vars, coeffs, bound))
-        }
     }
 }
 
@@ -993,19 +936,6 @@ private fun FlatZincCompiler.emitGatedPairwiseNe(xs: IntArray, except: IntArray)
     }
 }
 
-/** `alldifferent_except(xs, S)` where S is a constant set of int (the sentinel values). */
-internal fun FlatZincCompiler.emitAllDifferentExcept(c: FznConstraint) {
-    require(c.args.size == 2)
-    val vars = evalIntVarArray(c.args[0])
-    val setArg = c.args[1]
-    val except: IntArray = when (setArg) {
-        is FznExpr.IntSetLit -> IntArray(setArg.values.size) { setArg.values[it].toInt() }
-        is FznExpr.IntRangeLit -> IntArray((setArg.hi - setArg.lo + 1).toInt()) { (setArg.lo + it).toInt() }
-        else -> failHere("alldifferent_except: expected set literal for S, got ${setArg::class.simpleName}")
-    }
-    factors.add(AllDifferentExcept(vars, except))
-}
-
 internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
@@ -1030,17 +960,6 @@ internal fun FlatZincCompiler.emitMember(c: FznConstraint) {
     factors.add(Cardinality(eqLits, min = 1, max = xs.size))
 }
 
-/** `arg_sort_int(values, perm)` — perm is a permutation of `1..n` (or `0..n-1` if domains
- *  start at 0) such that `values[perm[i]]` is non-decreasing. */
-internal fun FlatZincCompiler.emitArgSort(c: FznConstraint) {
-    require(c.args.size == 2)
-    val values = evalIntVarArray(c.args[0])
-    val perm = evalIntVarArray(c.args[1])
-    val offset = if (perm.isNotEmpty()) intDomains[perm[0]].min else 0
-    factors.add(ArgSort(values, perm, permOffset = offset))
-}
-
-/** `sort(xs, ys)` — ys is the non-decreasing sorted permutation of xs. */
 internal fun FlatZincCompiler.emitSort(c: FznConstraint) {
     require(c.args.size == 2)
     val xs = evalIntVarArray(c.args[0])
@@ -1195,93 +1114,7 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
     )
 }
 
-/**
- * `bin_packing(capacity, bins, weights)` — `mode = UniformCapacity`.
- * `bin_packing_capa(capacities, bins, weights)` — `mode = PerBinCapacity`.
- * `bin_packing_load(load, bins, weights)` — `mode = LoadVars`.
- *
- * Bin index offset is inferred from the first item's bin-var domain (MZN's 1-based default).
- */
-internal fun FlatZincCompiler.emitBinPacking(c: FznConstraint, mode: BinPacking.Mode) {
-    require(c.args.size == 3)
-    val bins: IntArray
-    val weights: IntArray
-    var uniformCap = 0
-    var caps: IntArray? = null
-    var loads: IntArray? = null
-    when (mode) {
-        BinPacking.Mode.UniformCapacity -> {
-            uniformCap = evalIntConst(c.args[0]).toInt()
-            bins = evalIntVarArray(c.args[1])
-            weights = evalIntConstArray(c.args[2])
-        }
-
-        BinPacking.Mode.PerBinCapacity -> {
-            caps = evalIntConstArray(c.args[0])
-            bins = evalIntVarArray(c.args[1])
-            weights = evalIntConstArray(c.args[2])
-        }
-
-        BinPacking.Mode.LoadVars -> {
-            loads = evalIntVarArray(c.args[0])
-            bins = evalIntVarArray(c.args[1])
-            weights = evalIntConstArray(c.args[2])
-        }
-    }
-    val numBins = caps?.size ?: loads?.size ?: run {
-        // Uniform capacity has no array sizing the bin count; infer from the bin vars'
-        // max declared domain.
-        var maxBin = Int.MIN_VALUE
-        for (b in bins) {
-            val d = intDomains[b]
-            if (d.max > maxBin) maxBin = d.max
-        }
-        if (maxBin == Int.MIN_VALUE) 0 else maxBin
-    }
-    val offset = if (bins.isNotEmpty()) intDomains[bins[0]].min else 1
-    factors.add(
-        BinPacking(
-            bins = bins,
-            weights = weights,
-            mode = mode,
-            uniformCapacity = uniformCap,
-            capacities = caps,
-            loadVars = loads,
-            numBins = numBins,
-            binOffset = offset,
-        ),
-    )
-}
-
-/** `knapsack(weights, profits, xs, w, p)`. */
-internal fun FlatZincCompiler.emitKnapsack(c: FznConstraint) {
-    require(c.args.size == 5)
-    val weights = evalIntConstArray(c.args[0])
-    val profits = evalIntConstArray(c.args[1])
-    val xs = evalIntVarArray(c.args[2])
-    val w = resolveIntVar(c.args[3])
-    val p = resolveIntVar(c.args[4])
-    factors.add(Knapsack(weights, profits, xs, w, p))
-}
-
-/** `sequence(xs, low, high, k, S)` — sliding-window cardinality. Argument order in MZN's
- *  FZN emission is `xs, low, high, k, S`. */
-internal fun FlatZincCompiler.emitSequence(c: FznConstraint) {
-    require(c.args.size == 5)
-    val xs = evalIntVarArray(c.args[0])
-    val low = evalIntConst(c.args[1]).toInt()
-    val high = evalIntConst(c.args[2]).toInt()
-    val k = evalIntConst(c.args[3]).toInt()
-    val setLit = c.args[4]
-    val values: IntArray = when (setLit) {
-        is FznExpr.IntSetLit -> IntArray(setLit.values.size) { setLit.values[it].toInt() }
-        is FznExpr.IntRangeLit -> IntArray((setLit.hi - setLit.lo + 1).toInt()) { (setLit.lo + it).toInt() }
-        else -> failHere("sequence: expected set literal as 5th arg, got ${setLit::class.simpleName}")
-    }
-    factors.add(SequenceFactor(low, high, k, xs, values))
-}
-
-/** `value_precede_int(s, t, xs)` — single pair-of-values predicate. */
+/** `value_precede(s, t, xs)`: t may only appear in xs after s has. */
 internal fun FlatZincCompiler.emitValuePrecede(c: FznConstraint) {
     require(c.args.size == 3)
     val s = evalIntConst(c.args[0]).toInt()
@@ -1330,18 +1163,6 @@ internal fun FlatZincCompiler.emitValuePrecedeChain(c: FznConstraint) {
     }
 }
 
-/** `arg_max_int(xs, idx)` / `arg_min_int(xs, idx)`. MiniZinc emits arg-of-extreme with the
- *  array first, idx second; the FZN form is identical. Index offset is inferred from idx's
- *  declared domain (MZN's 1-based default → domain.min = 1). */
-internal fun FlatZincCompiler.emitArgMinMax(c: FznConstraint, max: Boolean) {
-    require(c.args.size == 2)
-    val xs = evalIntVarArray(c.args[0])
-    val idx = resolveIntVar(c.args[1])
-    val offset = intDomains[idx].min // typically 1 for MiniZinc default
-    factors.add(ArgMinMax(idx = idx, xs = xs, max = max, indexOffset = offset))
-}
-
-/** `lex_less_int(xs, ys)` / `lex_lesseq_int(xs, ys)`. */
 internal fun FlatZincCompiler.emitLexLess(c: FznConstraint, strict: Boolean) {
     require(c.args.size == 2)
     val xs = evalIntVarArray(c.args[0])
@@ -1857,15 +1678,19 @@ internal fun FlatZincCompiler.emitArrayMinMax(c: FznConstraint, max: Boolean) {
     factors.add(ArrayMinMax(result = result, xs = xs, max = max))
 }
 
-/** `exactly_int(n, xs, v)` — n equals `#{i : xs[i] = v}`. Reuses the [Count] factor with
- *  `op = Eq` and a constant target count channeled through an aux singleton int. */
+/** `exactly_int(n, xs, v)` — n equals `#{i : xs[i] = v}`. Reifies `xs[i] = v` per position
+ *  and pins the count via an exact [Cardinality]. */
 internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
     require(c.args.size == 3)
     val n = evalIntConst(c.args[0]).toInt()
     val xs = evalIntVarArray(c.args[1])
     val v = evalIntConst(c.args[2]).toInt()
-    val nVar = allocInt("__exactly_n_$v", n, n)
-    factors.add(Count(xs, v, Count.Op.Eq, nVar))
+    val lits = IntArray(xs.size) { i ->
+        val aux = allocBool("__exactly_${xs[i]}_eq_$v")
+        factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
+        Lit.make(aux, true)
+    }
+    factors.add(Cardinality(lits, min = n, max = n))
 }
 
 /* `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
@@ -1921,15 +1746,6 @@ internal fun FlatZincCompiler.emitLexLessBool(c: FznConstraint, strict: Boolean)
     factors.add(LexLess(xs, ys, strict))
 }
 
-internal fun FlatZincCompiler.emitArgMinMaxBool(c: FznConstraint, max: Boolean) {
-    require(c.args.size == 2)
-    val xLits = evalBoolVarArray(c.args[0])
-    val idx = resolveIntVar(c.args[1])
-    val xs = channelBoolsToInts(xLits, "argmm")
-    val offset = intDomains[idx].min
-    factors.add(ArgMinMax(idx = idx, xs = xs, max = max, indexOffset = offset))
-}
-
 internal fun FlatZincCompiler.emitTableBool(c: FznConstraint) {
     require(c.args.size == 2)
     val xLits = evalBoolVarArray(c.args[0])
@@ -1973,71 +1789,6 @@ internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) {
     factors.add(Cardinality(lits, min = 0, max = n))
 }
 
-/** Unified `count_{eq,neq,le,lt,ge,gt}(xs, v, n)`. When `v` is a constant int the dispatch
- *  lands on the [Count] factor directly. When `v` is a variable (only emitted for count_eq
- *  in practice) we fall back to the existing reified-decomposition path. */
-internal fun FlatZincCompiler.emitCountOp(c: FznConstraint, op: Count.Op) {
-    require(c.args.size == 3)
-    // FZN occasionally emits count over a const-folded xs array (e.g. groupsplitter's
-    // `count_eq([1,1,1,...], 1, n)` after the flattener inferred xs's values). Handle
-    // it at compile time: collapse to `n op cnt` where cnt is the static count.
-    val xsConst = tryEvalIntConstArray(c.args[0])
-    val vConst = evalIntConstOrNull(c.args[1])?.toInt()
-    val n = resolveIntVar(c.args[2])
-    if (xsConst != null && vConst != null) {
-        val cnt = xsConst.count { it == vConst }
-        // Map count's op into LE/EQ/GE/NE on n (Linear factor's vocabulary).
-        val (linOp, rhs) = when (op) {
-            Count.Op.Eq -> LinearOp.EQ to cnt
-            Count.Op.Ne -> LinearOp.NE to cnt
-            Count.Op.Le -> LinearOp.LE to cnt
-            Count.Op.Lt -> LinearOp.LE to (cnt - 1)
-            Count.Op.Ge -> LinearOp.GE to cnt
-            Count.Op.Gt -> LinearOp.GE to (cnt + 1)
-        }
-        factors.add(Linear(intArrayOf(1), intArrayOf(n), linOp, rhs))
-        return
-    }
-    if (xsConst != null) {
-        // xs is a par int array, v is a var: reify `v = xsConst[i]` per position, channel
-        // each bool to a 0/1 int, then constrain sum(channels) op n.
-        val vVar = resolveIntVar(c.args[1])
-        val channels = IntArray(xsConst.size) { i ->
-            val aux = allocBool("__count_const_b_$i")
-            factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(vVar), LinearOp.EQ, xsConst[i]))
-            val ch = allocInt("__count_const_ch_$i", 0, 1)
-            factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
-            ch
-        }
-        val (linOp, rhs) = when (op) {
-            Count.Op.Eq -> LinearOp.EQ to 0
-            Count.Op.Ne -> LinearOp.NE to 0
-            Count.Op.Le -> LinearOp.LE to 0
-            Count.Op.Lt -> LinearOp.LE to -1
-            Count.Op.Ge -> LinearOp.GE to 0
-            Count.Op.Gt -> LinearOp.GE to 1
-        }
-        val coefs = IntArray(channels.size + 1) { if (it < channels.size) 1 else -1 }
-        val vars = IntArray(channels.size + 1) { if (it < channels.size) channels[it] else n }
-        factors.add(Linear(coefs, vars, linOp, rhs))
-        return
-    }
-    val xs = evalIntVarArray(c.args[0])
-    if (vConst != null) {
-        factors.add(Count(xs, vConst, op, n))
-    } else {
-        if (op != Count.Op.Eq) failHere("count_$op with variable v not supported; only count_eq")
-        emitCountEq(c)
-    }
-}
-
-/**
- * Unified `global_cardinality*` dispatch. Signatures:
- *  - `gcc(xs, cover[], counts[])`
- *  - `gcc_closed(xs, cover[], counts[])`
- *  - `gcc_low_up(xs, cover[], lo[], up[])`
- *  - `gcc_low_up_closed(xs, cover[], lo[], up[])`
- */
 internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: Boolean) {
     require(c.args.size == if (lowUp) 4 else 3)
     val xs = evalIntVarArray(c.args[0])
@@ -2092,79 +1843,6 @@ internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
     val value = evalIntConstArray(c.args[1])
     val base = evalIntVarArray(c.args[2])
     factors.add(GlobalCardinality(xs = base, cover = value, countVars = card))
-}
-
-/** `among(n, xs, S)` — `S` is a constant set literal or range. */
-internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
-    require(c.args.size == 3)
-    val n = resolveIntVar(c.args[0])
-    val xs = evalIntVarArray(c.args[1])
-    val setLit = c.args[2]
-    val values: IntArray = when (setLit) {
-        is FznExpr.IntSetLit -> IntArray(setLit.values.size) { setLit.values[it].toInt() }
-
-        is FznExpr.IntRangeLit -> IntArray((setLit.hi - setLit.lo + 1).toInt()) { (setLit.lo + it).toInt() }
-
-        is FznExpr.Ident -> {
-            val p = params[setLit.name] ?: failHere("undefined parameter `${setLit.name}` in among")
-            (p as? FlatZincCompiler.ParamValue.IntSet)?.values?.let { vs ->
-                IntArray(vs.size) { vs[it].toInt() }
-            } ?: failHere("`${setLit.name}` is not an int-set parameter")
-        }
-
-        else -> failHere("among: expected set literal or parameter, got ${setLit::class.simpleName}")
-    }
-    factors.add(Among(n, xs, values))
-}
-
-internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
-    // count_eq(x[], v, n): #{i : x[i] = v} = n. Any of v, n may be a constant or
-    // a variable; FlatZinc allows all four combinations.
-    require(c.args.size == 3)
-    val xs = evalIntVarArray(c.args[0])
-    val vConst = evalIntConstOrNull(c.args[1])?.toInt()
-    val nConst = evalIntConstOrNull(c.args[2])?.toInt()
-
-    // Build one bool indicator per xs[i] satisfying `b_i ↔ (xs[i] = v)`.
-    val indicatorBools = IntArray(xs.size) { i ->
-        val aux = allocBool("__count_${xs[i]}_eq_$i")
-        if (vConst != null) {
-            factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, vConst))
-        } else {
-            // v is a variable: encode b_i ↔ (xs[i] - v = 0).
-            val vVar = resolveIntVar(c.args[1])
-            factors.add(ReifiedLinear(aux, intArrayOf(1, -1), intArrayOf(xs[i], vVar), LinearOp.EQ, 0))
-        }
-        aux
-    }
-
-    if (nConst != null) {
-        // Pure cardinality constraint: exactly nConst indicators true.
-        val lits = IntArray(xs.size) { Lit.make(indicatorBools[it], true) }
-        factors.add(Cardinality(lits, min = nConst, max = nConst))
-    } else {
-        // n is a variable. Channel each b_i to a 0/1 int via a second reified
-        // factor, then sum the channels and constrain the sum to equal n.
-        val channels = IntArray(xs.size) { i ->
-            val name = "__count_chan_$i"
-            val id = allocInt(name, 0, 1)
-            // `b_i ↔ (chan_i = 1)` — bidirectional channeling.
-            factors.add(
-                ReifiedLinear(
-                    auxBoolVar = indicatorBools[i],
-                    coeffs = intArrayOf(1),
-                    vars = intArrayOf(id),
-                    op = LinearOp.EQ,
-                    bound = 1,
-                ),
-            )
-            id
-        }
-        val nVar = resolveIntVar(c.args[2])
-        val coefs = IntArray(xs.size + 1) { if (it < xs.size) 1 else -1 }
-        val vars = IntArray(xs.size + 1) { if (it < xs.size) channels[it] else nVar }
-        factors.add(Linear(coefs, vars, LinearOp.EQ, 0))
-    }
 }
 
 internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
