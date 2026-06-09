@@ -17,6 +17,7 @@ import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.LastConflict
@@ -368,7 +369,16 @@ internal object ParityMetric {
                 objective,
             ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
         }
-        return listOfNotNull(free, free2, conflictDriven, conflictDriven2, annotated, xor)
+        // Pure-SAT-tuned worker: VSIDS + adaptive restarts + target phasing + tiered learned
+        // DB. Pigeonhole and dense random 3-SAT (the #117 families) need this composition —
+        // the free/conflict-driven workers stall on php8 where this proves it in seconds.
+        val satOptimized = PortfolioWorker.of(
+            "sat-optimized",
+            BacktrackSolver(entry.problem).session(),
+            BacktrackPresets.satOptimized(randomSeed = 7L),
+            objective,
+        ) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) }
+        return listOfNotNull(free, free2, conflictDriven, conflictDriven2, annotated, xor, satOptimized)
     }
 
     // -Dklause.bench.parity.mode=fixed scores the single-threaded competition track: one
