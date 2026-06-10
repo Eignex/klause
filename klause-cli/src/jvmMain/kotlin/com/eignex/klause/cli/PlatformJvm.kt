@@ -17,15 +17,4 @@ internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
 internal actual fun readTextFile(path: String): String = File(path).readText()
 
-internal actual fun isDirectory(path: String): Boolean = File(path).isDirectory
-
-internal actual fun walkFiles(root: String): List<String> {
-    val r = File(root)
-    return if (r.isDirectory) {
-        r.walkTopDown().filter { it.isFile }.map { it.path }.toList()
-    } else {
-        listOf(root)
-    }
-}
-
 internal actual fun <T> runBlockingBridge(block: suspend () -> T): T = runBlocking { block() }

@@ -3,14 +3,10 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.pointed
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.runBlocking
-import platform.posix.DT_DIR
-import platform.posix.DT_UNKNOWN
 import platform.posix.SEEK_END
-import platform.posix.closedir
 import platform.posix.fclose
 import platform.posix.fopen
 import platform.posix.fprintf
@@ -18,8 +14,6 @@ import platform.posix.fread
 import platform.posix.fseek
 import platform.posix.ftell
 import platform.posix.getenv
-import platform.posix.opendir
-import platform.posix.readdir
 import platform.posix.rewind
 import platform.posix.stderr
 import kotlin.system.exitProcess
@@ -64,43 +58,6 @@ internal actual fun readTextFile(path: String): String {
     } finally {
         fclose(f)
     }
-}
-
-@OptIn(ExperimentalForeignApi::class)
-internal actual fun isDirectory(path: String): Boolean {
-    val d = opendir(path) ?: return false
-    closedir(d)
-    return true
-}
-
-@OptIn(ExperimentalForeignApi::class)
-internal actual fun walkFiles(root: String): List<String> {
-    if (!isDirectory(root)) return listOf(root)
-    val out = mutableListOf<String>()
-    fun walk(dir: String) {
-        val d = opendir(dir) ?: return
-        try {
-            while (true) {
-                val e = readdir(d) ?: break
-                val name = e.pointed.d_name.toKString()
-                if (name == "." || name == "..") continue
-                val child = "$dir/$name"
-                val type = e.pointed.d_type.toInt()
-                when {
-                    type == DT_DIR -> walk(child)
-
-                    // DT_UNKNOWN (some filesystems): fall back to an opendir probe.
-                    type == DT_UNKNOWN && isDirectory(child) -> walk(child)
-
-                    else -> out.add(child)
-                }
-            }
-        } finally {
-            closedir(d)
-        }
-    }
-    walk(root)
-    return out
 }
 
 internal actual fun <T> runBlockingBridge(block: suspend () -> T): T = runBlocking { block() }

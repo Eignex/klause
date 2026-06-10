@@ -728,30 +728,71 @@ class BacktrackSolver(override val problem: Problem) :
             }
         }
 
-        // LP-guided value ordering (#246): record the final fractional primal for diving.
-        if (solution.status == LpStatus.OPTIMAL) hints?.record(relaxation, solution)
+        // Apply the LP's domain deductions and, with lpFixpoint (#283), drive the LP and propagation
+        // to a joint fixpoint: re-solve and re-apply while a round keeps tightening domains (detected
+        // via the session's propagation counter), capped at [LP_FIXPOINT_ITERS]. Each deduction is
+        // independently sound, so iterating them is sound; cut separation is not repeated (it ran
+        // above). With lpFixpoint off this is a single pass, identical to the prior behaviour.
+        var iter = 0
+        while (true) {
+            // LP-guided value ordering (#246): record the current fractional primal for diving.
+            if (solution.status == LpStatus.OPTIMAL) hints?.record(relaxation, solution)
 
-        // Objective dual-bound propagation (#281): push the LP lower bound onto a single-variable
-        // minimisation objective, with the reduced-cost certificate as the (learnable) reason, so it
-        // propagates through the objective-defining constraint. A resulting conflict prunes the node.
-        if (params.lpObjectiveBound && objectiveVar >= 0 && objectiveAscending &&
-            solution.status == LpStatus.OPTIMAL
-        ) {
-            val lpFloor = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
-            val reason = LpExplanation.objectiveBoundReason(relaxation, solution, session)
-            if (reason != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
-                val res = session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
-                if (res is PropagationResult.Unsat) {
+            val before = session.propagationCount
+            // Objective dual-bound propagation (#281): push the LP lower bound onto a single-variable
+            // minimisation objective with the reduced-cost certificate as the (learnable) reason.
+            if (params.lpObjectiveBound && objectiveVar >= 0 && objectiveAscending &&
+                solution.status == LpStatus.OPTIMAL
+            ) {
+                val lpFloor = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
+                val reason = LpExplanation.objectiveBoundReason(relaxation, solution, session)
+                if (reason != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+                    if (session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
+                            is PropagationResult.Unsat
+                    ) {
+                        sink.observeLpPrune()
+                        return LpNodeOutcome(true, warmCache)
+                    }
+                }
+            }
+            // Reduced-cost fixing (#21/#282) on the cut-strengthened solution; needs a finite gap.
+            val prune = bound.isFinite() && solution.status == LpStatus.OPTIMAL &&
+                applyReducedCostFixing(
+                    relaxation,
+                    solution,
+                    session,
+                    bound,
+                    sink,
+                    params,
+                    objectiveVar,
+                    objectiveAscending,
+                )
+            if (prune) return LpNodeOutcome(true, warmCache)
+
+            // Stop unless the joint fixpoint is enabled, this round tightened a domain, and budget remains.
+            if (!params.lpFixpoint || session.propagationCount == before || ++iter >= LP_FIXPOINT_ITERS) {
+                return LpNodeOutcome(false, warmCache)
+            }
+            // Re-solve on the tightened domains and loop, keeping the global cut pool in the model.
+            relaxation = relaxer.build(session, globalCuts)
+            if (relaxation.model.n == 0) return LpNodeOutcome(false, warmCache)
+            simplex = DualSimplex(relaxation.model)
+            solution = simplex.solve()
+            sink.observeLpPivots(solution.pivots)
+            when (solution.status) {
+                LpStatus.INFEASIBLE -> {
+                    sink.observeLpPrune()
+                    return LpNodeOutcome(true, warmCache, lpExplanation(params, relaxation, solution, session))
+                }
+
+                LpStatus.UNBOUNDED -> return LpNodeOutcome(false, warmCache)
+
+                LpStatus.OPTIMAL -> if (boundPrunes(solution, relaxation, bound)) {
                     sink.observeLpPrune()
                     return LpNodeOutcome(true, warmCache)
                 }
             }
         }
-
-        // Reduced-cost fixing (#21) on the final, cut-strengthened solution; needs a finite gap.
-        val prune = bound.isFinite() && solution.status == LpStatus.OPTIMAL &&
-            applyReducedCostFixing(relaxation, solution, session, bound, sink, params, objectiveVar, objectiveAscending)
-        return LpNodeOutcome(prune, warmCache)
     }
 
     /**
@@ -1988,6 +2029,9 @@ class BacktrackSolver(override val problem: Problem) :
 
         /** Separation rounds when harvesting the persistent root cut pool. */
         const val CUT_POOL_ROUNDS: Int = 8
+
+        /** Maximum LP↔propagation re-solve rounds per node under `lpFixpoint` (#283). */
+        const val LP_FIXPOINT_ITERS: Int = 4
 
         /** Cap on cascading CDB backjumps within a single search step. Defensive; under
          *  a well-formed analyzer the loop terminates well before this. */

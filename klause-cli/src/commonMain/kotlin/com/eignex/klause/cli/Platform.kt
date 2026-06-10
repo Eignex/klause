@@ -22,11 +22,6 @@ internal expect fun exitCli(code: Int): Nothing
 
 internal expect fun readTextFile(path: String): String
 
-internal expect fun isDirectory(path: String): Boolean
-
-/** All regular files under [root], recursively; just `[root]` when it is a regular file. */
-internal expect fun walkFiles(root: String): List<String>
-
 /** Bridge the suspend Portfolio API into the synchronous CLI (`runBlocking` exists on
  *  both JVM and native but is not in the common coroutines surface). */
 internal expect fun <T> runBlockingBridge(block: suspend () -> T): T

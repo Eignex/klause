@@ -188,6 +188,41 @@ class LpLearnTest {
     }
 
     @Test
+    fun `lp-propagation fixpoint preserves the optimum`() {
+        // Same single-variable objective t = x0+x1+x2 with triangle covers (optimum 3). With #283 the
+        // node LP, objective-bound propagation, and reduced-cost fixing iterate to a joint fixpoint;
+        // the proven optimum must be unchanged from a single LP pass.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 15), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1, 1, -1), intArrayOf(1, 2, 3, 0), LinearOp.EQ, 0),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
+        val single = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 4L, lpBounding = true, lpObjectiveBound = true),
+        )
+        val fixpoint = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 4L, lpBounding = true, lpObjectiveBound = true, lpFixpoint = true),
+        )
+        assertTrue(single is MinimizeResult.Optimal)
+        assertTrue(fixpoint is MinimizeResult.Optimal, "lp fixpoint must preserve optimality")
+        assertEquals(3.0, single.objectiveValue)
+        assertEquals(3.0, fixpoint.objectiveValue)
+        assertTrue(
+            fixpoint.stats.nodes.sum <= single.stats.nodes.sum,
+            "lp fixpoint explored more nodes: ${fixpoint.stats.nodes.sum} vs ${single.stats.nodes.sum}",
+        )
+    }
+
+    @Test
     fun `energetic learning preserves the optimum`() {
         // 4 disjunctive tasks (length 3, capacity 1) over [0,11]; minimize Σ start. The only feasible
         // arrangement spaces them ≥3 apart → optimum 0+3+6+9 = 18. Branches that pack starts create

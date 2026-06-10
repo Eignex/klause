@@ -297,6 +297,15 @@ data class BacktrackParams(
      * default; a no-op unless the objective is a single integer variable being minimised.
      */
     val lpObjectiveBound: Boolean = false,
+    /**
+     * Drive the node LP and propagation to a joint fixpoint (#283). When true (and [lpBounding]),
+     * after the LP's domain deductions (objective bound #281, reduced-cost fixing #21/#282) tighten
+     * domains and propagate, the LP is re-solved and the deductions re-applied, repeating while a
+     * round keeps tightening (capped). This lets a fixing that improves the bound enable further
+     * fixings in the same node, instead of waiting for a deeper node. Off by default; a no-op when
+     * the deductions never tighten anything. Cut separation is not repeated (it runs once per node).
+     */
+    val lpFixpoint: Boolean = false,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**
