@@ -48,4 +48,38 @@ internal object LpExplanation {
         }
         return lits.toIntArray()
     }
+
+    /**
+     * Reason atoms certifying the LP's objective lower bound (#281), for an OPTIMAL solve, or null
+     * when the solve was not optimal or the certificate touches an auxiliary column. By LP duality the
+     * optimum `L = c·x*` is held in place by the nonbasic structural variables seated at a bound with a
+     * nonzero reduced cost: relaxing any of those bounds is the only way the objective could fall below
+     * `L`; basic variables and zero-reduced-cost nonbasics do not move it. So those seated bounds, with
+     * the (always-valid) constraints, imply `objective ≥ L`, and the returned literals are their
+     * negations `¬(seated bound)` — exactly the antecedent shape [infeasibilityClause] produces, ready
+     * to record as the reason for a propagated objective-variable bound. The constraints stay implicit
+     * (globally valid), so they are not part of the reason.
+     */
+    fun objectiveBoundReason(relaxation: LpRelaxation, solution: LpSolution, session: PropagationSession): IntArray? {
+        if (solution.status != LpStatus.OPTIMAL) return null
+        val model = relaxation.model
+        val status = solution.basis.status
+        val lits = IntArrayList()
+        for (col in relaxation.colVarId.indices) {
+            if (status[col] == VarStatus.BASIC) continue
+            if (solution.reducedCostNumerator[col] == 0L) continue // not load-bearing for the bound
+            val varId = relaxation.colVarId[col]
+            if (varId < 0) return null // auxiliary column — no CP bound atom to cite; abandon the reason
+            val atUpper = status[col] == VarStatus.AT_UPPER
+            if (relaxation.colIsBool[col]) {
+                lits.add(Lit.make(varId, !atUpper))
+            } else if (atUpper) {
+                val ub = model.loShift[col] + model.upper[col]
+                lits.add(session.boundLeLit(varId, ub.toInt(), positive = false))
+            } else {
+                lits.add(session.boundGeLit(varId, model.loShift[col].toInt(), positive = false))
+            }
+        }
+        return lits.toIntArray()
+    }
 }

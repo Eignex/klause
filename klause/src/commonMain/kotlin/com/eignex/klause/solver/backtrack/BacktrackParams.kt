@@ -259,10 +259,19 @@ data class BacktrackParams(
      * constraints — and registered at the next restart (where its literals are no longer all-false),
      * so the dead region is pruned in sibling subtrees. Two sources: the node LP's Farkas
      * infeasibility certificate (requires [lpBounding]) and the energetic over-subscription window
-     * (requires [energeticReasoning]). Takes effect only when restarts are enabled (see
-     * [lubyRestartBase] / [adaptiveRestart]). Off by default.
+     * (requires [energeticReasoning]). When the certificate resolves to an asserting 1UIP clause the
+     * engine backjumps and learns immediately (#280), so this now helps even with restarts off;
+     * non-asserting certificates still fall back to restart-time registration. Off by default.
      */
     val lpLearn: Boolean = false,
+    /**
+     * Propagate the LP objective lower bound onto a single-variable objective (#281). When true and
+     * [lpBounding] holds, a feasible node LP tightens the objective variable's bound to the rounded LP
+     * optimum, with the reduced-cost dual certificate recorded as the reason so the bound is learnable
+     * and propagates through the objective-defining constraint to its component variables. Off by
+     * default; a no-op unless the objective is a single integer variable being minimised.
+     */
+    val lpObjectiveBound: Boolean = false,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

@@ -132,6 +132,34 @@ class LpLearnTest {
     }
 
     @Test
+    fun `objective dual-bound propagation preserves the optimum`() {
+        // t = x0 + x1 + x2 with the triangle covers x0+x1>=2, x1+x2>=2, x0+x2>=2 over [0,5]; summing
+        // the covers gives 2*Σx >= 6 so the LP bound on t is 3 (optimum at (1,1,1)). #281 propagates
+        // t >= ceil(LP) = 3 with the reduced-cost reason. The optimum must be preserved.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4, // 0 = t, 1..3 = x0,x1,x2
+            intDomains = arrayOf(IntDomain(0, 15), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1, 1, -1), intArrayOf(1, 2, 3, 0), LinearOp.EQ, 0),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
+        val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val on = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 1L, lpBounding = true, lpObjectiveBound = true),
+        )
+        assertTrue(off is MinimizeResult.Optimal)
+        assertTrue(on is MinimizeResult.Optimal, "objective-bound propagation must preserve optimality")
+        assertEquals(3.0, off.objectiveValue)
+        assertEquals(3.0, on.objectiveValue)
+    }
+
+    @Test
     fun `energetic learning preserves the optimum`() {
         // 4 disjunctive tasks (length 3, capacity 1) over [0,11]; minimize Σ start. The only feasible
         // arrangement spaces them ≥3 apart → optimum 0+3+6+9 = 18. Branches that pack starts create
