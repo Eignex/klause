@@ -160,6 +160,34 @@ class LpLearnTest {
     }
 
     @Test
+    fun `reduced-cost fixing reasons preserve the optimum`() {
+        // Single-variable objective t = x0+x1+x2 with triangle covers (optimum 3). With lpLearn the
+        // reduced-cost fixings carry their dual reason (#282); the optimum must be unchanged from the
+        // reasonless reduced-cost fixing (#21).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 15), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1, 1, -1), intArrayOf(1, 2, 3, 0), LinearOp.EQ, 0),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
+        val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 4L, lpBounding = true))
+        val on = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 4L, lpBounding = true, lpLearn = true),
+        )
+        assertTrue(off is MinimizeResult.Optimal)
+        assertTrue(on is MinimizeResult.Optimal, "reduced-cost reasons must preserve optimality")
+        assertEquals(3.0, off.objectiveValue)
+        assertEquals(3.0, on.objectiveValue)
+    }
+
+    @Test
     fun `energetic learning preserves the optimum`() {
         // 4 disjunctive tasks (length 3, capacity 1) over [0,11]; minimize Σ start. The only feasible
         // arrangement spaces them ≥3 apart → optimum 0+3+6+9 = 18. Branches that pack starts create

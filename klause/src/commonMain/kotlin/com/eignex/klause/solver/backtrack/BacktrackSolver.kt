@@ -647,7 +647,7 @@ class BacktrackSolver(override val problem: Problem) :
 
         // Reduced-cost fixing (#21) on the final, cut-strengthened solution; needs a finite gap.
         val prune = bound.isFinite() && solution.status == LpStatus.OPTIMAL &&
-            applyReducedCostFixing(relaxation, solution, session, bound, sink)
+            applyReducedCostFixing(relaxation, solution, session, bound, sink, params, objectiveVar, objectiveAscending)
         return LpNodeOutcome(prune, warmCache)
     }
 
@@ -669,6 +669,9 @@ class BacktrackSolver(override val problem: Problem) :
         session: PropagationSession,
         bound: Double,
         sink: SolveStatsSink,
+        params: BacktrackParams,
+        objectiveVar: Int,
+        objectiveAscending: Boolean,
     ): Boolean {
         val den = solution.denominator // > 0
         val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
@@ -682,6 +685,46 @@ class BacktrackSolver(override val problem: Problem) :
         }
         if (slack < 0L) return false
         val status = solution.basis.status
+        // Learnable reasons for each fixing (#282): a fixing of column `col` is justified by the LP's
+        // dual decomposition under the OTHER support columns' seated bounds, plus the incumbent bound
+        // `objVar ≤ improvingMax`. We can only express the incumbent half when there is a single-var
+        // minimisation objective whose live upper bound is already ≤ improvingMax (so the atom holds).
+        val learn = params.lpLearn && objectiveVar >= 0 && objectiveAscending &&
+            improvingMax in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
+            session.intDomain(objectiveVar).max.toLong() <= improvingMax
+        val supportCols = IntArrayList()
+        val supportLits = IntArrayList()
+        if (learn) {
+            for (c in relaxation.colVarId.indices) {
+                if (status[c] == VarStatus.BASIC || solution.reducedCostNumerator[c] == 0L) continue
+                val vid = relaxation.colVarId[c]
+                if (vid < 0 || vid == objectiveVar) continue
+                val atUpper = status[c] == VarStatus.AT_UPPER
+                val lit = when {
+                    relaxation.colIsBool[c] -> Lit.make(vid, !atUpper)
+
+                    atUpper -> session.boundLeLit(
+                        vid,
+                        (relaxation.model.loShift[c] + relaxation.model.upper[c]).toInt(),
+                        false,
+                    )
+
+                    else -> session.boundGeLit(vid, relaxation.model.loShift[c].toInt(), false)
+                }
+                supportCols.add(c)
+                supportLits.add(lit)
+            }
+        }
+        val incumbentLit = if (learn) session.boundLeLit(objectiveVar, improvingMax.toInt(), positive = false) else 0
+
+        // Reason for fixing `col`: every support column's seated-bound negation except col's own, plus
+        // the incumbent objective bound. (col's own bound is the variable moving, not a premise.)
+        fun reasonFor(col: Int): IntArray {
+            val out = IntArrayList(supportCols.size + 1)
+            for (k in 0 until supportCols.size) if (supportCols[k] != col) out.add(supportLits[k])
+            out.add(incumbentLit)
+            return out.toIntArray()
+        }
         for (col in relaxation.colVarId.indices) {
             val st = status[col]
             if (st == VarStatus.BASIC) continue
@@ -714,6 +757,8 @@ class BacktrackSolver(override val problem: Problem) :
                             varId,
                             false,
                         )
+                    } else if (learn) {
+                        session.implyIntAtMostWithReason(varId, (liveMin + dMax).toInt(), reasonFor(col))
                     } else {
                         session.implyIntAtMost(varId, (liveMin + dMax).toInt())
                     }
@@ -729,6 +774,8 @@ class BacktrackSolver(override val problem: Problem) :
                             varId,
                             true,
                         )
+                    } else if (learn) {
+                        session.implyIntAtLeastWithReason(varId, (liveMax - dMax).toInt(), reasonFor(col))
                     } else {
                         session.implyIntAtLeast(varId, (liveMax - dMax).toInt())
                     }
