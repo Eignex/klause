@@ -34,7 +34,7 @@ bench preview <metric> [filters…]    print the instances a run would cover, wi
 bench list [<suite>]                 list presets+suites, or the problems in one suite
 bench diag:backtrack                 BacktrackSolver SolveStats over a generated PHP/3-SAT series
 bench diag:cbls <name|fzn>           CBLS feasibility-plateau diagnostic
-bench format-coverage:xcsp3|smtlib   parse/solve rates over a whole format library
+bench coverage:xcsp3|smtlib          parse/solve rates over a whole format library
 ```
 
 `run` is accepted as a back-compat alias for the primary form, so `bench run parity …` and `bench parity …` are identical.
@@ -200,11 +200,11 @@ For a deeper, whole-JVM native profile, the gradle async-profiler hook is still 
 
 ### Whole-library format coverage
 
-Distinct from the `coverage` metric: `format-coverage:*` fetches an entire external format library and reports how many instances **parse** into a klause `Problem`, how many **solve** within a budget, and which **unsupported constructs** account for the rest (the actionable bucket for closing parser/factor gaps).
+Distinct from the bare `coverage` metric: the colon-suffixed `coverage:*` fetches an entire external format library and reports how many instances **parse** into a klause `Problem`, how many **solve** within a budget, and which **unsupported constructs** account for the rest (the actionable bucket for closing parser/factor gaps).
 
 ```
-./gradlew :klause-bench:bench --args="format-coverage:xcsp3"
-./gradlew :klause-bench:bench --args="format-coverage:smtlib" \
+./gradlew :klause-bench:bench --args="coverage:xcsp3"
+./gradlew :klause-bench:bench --args="coverage:smtlib" \
   -Dklause.coverage.solve=false      # parse-only
 ```
 

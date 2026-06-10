@@ -38,7 +38,6 @@ internal class CommonOptions {
     var parallel: Int? = null
     var freeSearch = false
     var cpSeed = false
-    var coverage = false
 
     /** `--format NAME` / `--mode NAME`: force a specific mode regardless of file extension. */
     var formatOverride: String? = null
@@ -73,7 +72,6 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     },
     FlagSpec(listOf("--cp-seed"), false) { o.cpSeed = true },
     FlagSpec(listOf("--param"), true) { o.engineParams.add(requireNotNull(it)) },
-    FlagSpec(listOf("--coverage"), false) { o.coverage = true },
     FlagSpec(listOf("--format", "--mode"), true) { o.formatOverride = it },
 )
 
