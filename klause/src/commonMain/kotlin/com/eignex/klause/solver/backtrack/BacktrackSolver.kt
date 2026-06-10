@@ -252,7 +252,7 @@ class BacktrackSolver(override val problem: Problem) :
         } else {
             emptyList()
         }
-        // Persistent global cut pool (#285): harvest the structural separators' cuts at the root once;
+        // Persistent global cut pool: harvest the structural separators' cuts at the root once;
         // they are globally valid, so they are re-added to every node's relaxation below.
         val lpGlobalCuts: List<Cut> = if (params.lpCutPool && lpRelaxer != null && lpSeparators.isNotEmpty()) {
             harvestRootCuts(lpRelaxer, PropagationSession(problem), lpSeparators)
@@ -575,7 +575,7 @@ class BacktrackSolver(override val problem: Problem) :
     }
 
     /**
-     * Persistent global cut pool (#285): separate the structural separators at the root once and
+     * Persistent global cut pool: separate the structural separators at the root once and
      * return their cuts. Root domains equal the declared domains, so these cuts are globally valid —
      * a root Hall / cover / assignment / subtour cut stays a valid (if weaker) bound at every tighter
      * descendant — and re-adding them at every node avoids re-separating them. Gomory cuts are excluded
@@ -1986,7 +1986,7 @@ class BacktrackSolver(override val problem: Problem) :
         /** Most Gomory cuts to draw from one tableau per separation round (#22). */
         const val GOMORY_CUTS_PER_ROUND: Int = 8
 
-        /** Separation rounds when harvesting the persistent root cut pool (#285). */
+        /** Separation rounds when harvesting the persistent root cut pool. */
         const val CUT_POOL_ROUNDS: Int = 8
 
         /** Cap on cascading CDB backjumps within a single search step. Defensive; under

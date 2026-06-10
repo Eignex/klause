@@ -223,7 +223,7 @@ data class BacktrackParams(
      */
     val lpRootCutRounds: Int = 16,
     /**
-     * Persistent global cut pool (#285). When true (and [lpCuts]), the structural separators are run
+     * Persistent global cut pool. When true (and [lpCuts]), the structural separators are run
      * once at the root and the cuts they find are cached and re-added to every node's relaxation,
      * instead of being re-separated per node. These cuts are computed from the root (= declared)
      * domains and problem structure, so they are globally valid — a root Hall/cover/assignment/subtour

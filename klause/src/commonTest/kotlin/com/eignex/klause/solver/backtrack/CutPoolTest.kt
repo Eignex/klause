@@ -10,7 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #285: persistent global cut pool — root-harvested structural cuts re-added at every node. */
+/** Persistent global cut pool — root-harvested structural cuts re-added at every node. */
 class CutPoolTest {
 
     // all_different(x0,x1,x2) over [0,4]; minimize 3x0+2x1+x2. Smallest values go to the largest
