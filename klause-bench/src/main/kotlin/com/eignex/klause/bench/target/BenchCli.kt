@@ -47,9 +47,6 @@ object BenchCli {
 
             "preview" -> adHoc(args.drop(1), preview = true)
 
-            // `run` is kept as a back-compat alias for the primary `bench <metric>` form.
-            "run" -> adHoc(args.drop(1), preview = false)
-
             "diag:backtrack" -> MeasureBacktrack.run()
 
             "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
@@ -155,19 +152,16 @@ object BenchCli {
 
     private fun metricNames(): String = MetricKind.entries.joinToString(", ") { it.name.lowercase() }
 
-    private fun metricOrNull(name: String): MetricKind? = when (name.lowercase()) {
-        "time" -> MetricKind.TIME
-        "uniformness", "uniform" -> MetricKind.UNIFORMNESS
-        "completeness", "complete" -> MetricKind.COMPLETENESS
-        "verify" -> MetricKind.VERIFY
-        "parity" -> MetricKind.PARITY
-        "anytime" -> MetricKind.ANYTIME
-        "coverage" -> MetricKind.COVERAGE
-        "audit" -> MetricKind.AUDIT
-        "tuning", "tune" -> MetricKind.TUNING
-        "search" -> MetricKind.SEARCH
-        "credit" -> MetricKind.CREDIT
-        else -> null
+    /** Short aliases that don't match a [MetricKind] name verbatim. */
+    private val metricAliases = mapOf(
+        "uniform" to MetricKind.UNIFORMNESS,
+        "complete" to MetricKind.COMPLETENESS,
+        "tune" to MetricKind.TUNING,
+    )
+
+    /** Resolve a metric by its enum name (case-insensitive) or a short [metricAliases] alias. */
+    private fun metricOrNull(name: String): MetricKind? = name.lowercase().let { n ->
+        MetricKind.entries.firstOrNull { it.name.equals(n, ignoreCase = true) } ?: metricAliases[n]
     }
 
     private fun parseMetric(name: String): MetricKind =
@@ -202,6 +196,7 @@ object BenchCli {
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
+            |  bench verify suite=core
             |  bench parity suite=smtlib-core reference=ortools
             |  bench coverage suite=mzn-bench
             |  bench search suite=slack-alldiff timeout=30000 profile=cpu

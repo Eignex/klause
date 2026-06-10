@@ -48,23 +48,11 @@ internal object Targets {
     )
 
     /**
-     * The kept presets. Each carries config that isn't obvious from a one-line filter — a tuned
-     * budget or a curated suite mix. Everything else is a filter spell against the general
-     * `bench <metric> [filters]` form (see the CLI `list` output).
+     * The kept presets. A preset earns its place only by carrying config that *isn't* obvious
+     * from a one-line filter — a tuned budget or a curated suite mix. A preset that would just
+     * be `bench <metric> suite=core` is not kept: spell it with the `suite=core` token instead.
      */
     val all: List<Target> = listOf(
-        Target(
-            "verify-core",
-            "Cross-backend agreement + sample-validity gate over the in-process core",
-            IN_PROCESS_CORE,
-            MetricKind.VERIFY,
-        ),
-        Target(
-            "time-core",
-            "Wall-time + propagation microbench over the in-process core",
-            IN_PROCESS_CORE,
-            MetricKind.TIME,
-        ),
         Target(
             "anytime",
             "Anytime optimization (klause-LS vs OR-Tools) over the MiniZinc smoke set",
