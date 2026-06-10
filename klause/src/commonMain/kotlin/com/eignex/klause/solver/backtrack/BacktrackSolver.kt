@@ -599,7 +599,13 @@ class BacktrackSolver(override val problem: Problem) :
             val pool = HashSet<String>()
             val cuts = ArrayList<Cut>()
             var round = 0
-            while (round++ < params.lpCutRounds) {
+            // The root relaxation bounds the whole tree, so close it harder there (#285).
+            val maxRounds = if (session.decisionLevel == 0) {
+                maxOf(params.lpRootCutRounds, params.lpCutRounds)
+            } else {
+                params.lpCutRounds
+            }
+            while (round++ < maxRounds) {
                 val ctx = CutContext(problem, relaxation, solution, session)
                 // Structure-based separators run on the LP point; Gomory cuts come from the tableau.
                 val separated = separators.flatMap { it.separate(ctx) }
