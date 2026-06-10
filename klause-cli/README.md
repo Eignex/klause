@@ -97,5 +97,5 @@ MiniZinc-mode-only flags:
 
 `:klause` (parsers and all three engines live there) and kotlinx-coroutines
 (bridges the suspend Portfolio API from the synchronous CLI). Other adapter
-modules (`klause-logicng`, `klause-smt`, `klause-choco`, `klause-ortools`)
+modules (`klause-logicng`, `klause-choco`, `klause-ortools`)
 are library/bench side doors and are not wired into the CLI.
