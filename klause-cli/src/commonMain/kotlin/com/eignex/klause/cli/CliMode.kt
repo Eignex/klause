@@ -45,7 +45,7 @@ internal class CommonOptions {
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
     val engineParams = mutableListOf<String>()
 
-    /** The single positional input file (or directory, under `--coverage`). */
+    /** The single positional input file. */
     var inputPath: String? = null
 }
 
