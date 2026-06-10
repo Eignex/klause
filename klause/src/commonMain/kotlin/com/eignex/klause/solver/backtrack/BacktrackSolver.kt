@@ -30,6 +30,7 @@ import com.eignex.klause.solver.lp.GccSeparator
 import com.eignex.klause.solver.lp.KnapsackCoverSeparator
 import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.lp.LpExplanation
+import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRelaxation
 import com.eignex.klause.solver.lp.LpSolution
@@ -605,6 +606,30 @@ class BacktrackSolver(override val problem: Problem) :
         session: PropagationSession,
     ): IntArray? = if (params.lpLearn) LpExplanation.infeasibilityClause(relaxation, solution, session) else null
 
+    /**
+     * Extend a basis optimal for the [prevRows]-row relaxation to the cut-augmented [model] — same
+     * structural columns, the first [prevRows] rows unchanged — by seating each newly appended cut
+     * row's slack as basic. The structural and prior-slack statuses carry over verbatim, so the
+     * basis stays dual-feasible and the dual re-solve resumes near the optimum. Returns null if the
+     * prior basis does not match the pre-cut shape (then the re-solve cold-starts; same optimum).
+     */
+    private fun extendBasisWithSlacks(prev: Basis, model: LpModel, prevRows: Int): Basis? {
+        val n = model.n
+        val newRows = model.m
+        if (newRows < prevRows || prev.basicVars.size != prevRows || prev.status.size != n + prevRows) {
+            return null
+        }
+        val basicVars = IntArray(newRows)
+        prev.basicVars.copyInto(basicVars)
+        val status = IntArray(model.numVars)
+        prev.status.copyInto(status)
+        for (i in prevRows until newRows) {
+            basicVars[i] = n + i // the new row i's slack column
+            status[n + i] = VarStatus.BASIC
+        }
+        return Basis(basicVars, status)
+    }
+
     private fun lpBoundAndFixUnsafe(
         relaxer: CpToLpRelaxation,
         session: PropagationSession,
@@ -645,12 +670,16 @@ class BacktrackSolver(override val problem: Problem) :
                 }
         }
 
-        // Cut rounds (#22): separate violated cuts from the LP point and re-solve. Cuts add rows, so
-        // the structure changes — re-solve cold. Cuts are valid, so infeasibility under them prunes.
+        // Cut rounds (#22): separate violated cuts from the LP point and re-solve. Cuts only append
+        // rows (structural columns are unchanged), so with lpWarmCuts the previous round's optimal
+        // basis — extended with the new rows' slacks — warm-starts the dual re-solve. Cuts are valid,
+        // so infeasibility under them prunes.
         if (separators.isNotEmpty()) {
             val pool = HashSet<String>()
             val cuts = ArrayList<Cut>()
             var round = 0
+            var prevBasis = warmCache // last optimal basis, extended each round to warm the re-solve
+            var prevRows = relaxation.model.m // row count whose slacks `prevBasis` already covers
             // The root relaxation bounds the whole tree, so close it harder there (#285).
             val maxRounds = if (session.decisionLevel == 0) {
                 maxOf(params.lpRootCutRounds, params.lpCutRounds)
@@ -669,8 +698,15 @@ class BacktrackSolver(override val problem: Problem) :
                 sink.observeLpCuts(fresh.size)
                 relaxation = relaxer.build(session, cuts)
                 simplex = DualSimplex(relaxation.model)
-                solution = simplex.solve()
+                val warmStart = if (params.lpWarmCuts && prevBasis != null) {
+                    extendBasisWithSlacks(prevBasis, relaxation.model, prevRows)
+                } else {
+                    null
+                }
+                solution = simplex.solve(warmStart)
                 sink.observeLpPivots(solution.pivots)
+                prevBasis = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
+                prevRows = relaxation.model.m
                 if (solution.status == LpStatus.INFEASIBLE) {
                     sink.observeLpPrune()
                     return LpNodeOutcome(true, warmCache, lpExplanation(params, relaxation, solution, session))
