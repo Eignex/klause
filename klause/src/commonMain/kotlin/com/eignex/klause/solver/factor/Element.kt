@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -35,7 +35,7 @@ class Element(
     val arrIsVars: Boolean,
     /** Integer representing index 0 of [arr]. */
     val indexOffset: Int = 1,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(arr.isNotEmpty()) { "element: empty array" }

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -20,7 +20,7 @@ import com.eignex.klause.util.IntIntMap
  * Tautologies (a variable appearing as both `+v` and `-v`) are detected at construction; we
  * pick those two indices as the watches and the clause is permanently satisfied.
  */
-class Clause(val literals: IntArray) : LocalSearchFactor {
+class Clause(val literals: IntArray) : Factor {
 
     init {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }

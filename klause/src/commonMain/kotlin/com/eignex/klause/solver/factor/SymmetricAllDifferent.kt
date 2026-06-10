@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -23,7 +23,7 @@ class SymmetricAllDifferent(
     val xs: IntArray,
     /** Integer representing index 0 of [xs]. */
     val indexOffset: Int = 0,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(xs.isNotEmpty()) { "symmetric_all_different: empty xs" }
@@ -32,41 +32,38 @@ class SymmetricAllDifferent(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val seen = IntHashSet()
+    /** Number of positions `i` whose involution obligation is broken — either `xs[i]` points
+     *  out of range, or the back-pointer `xs[xs[i]-offset]` doesn't equal `i+offset`. Zero iff
+     *  `xs` is a valid self-inverse permutation (an involution is automatically distinct, so
+     *  this single measure subsumes the all-different check). `ov` = override var id, -1 = none. */
+    private fun brokenPositions(state: LocalSearchState, ov: Int, nv: Int): Int {
+        var bad = 0
         for (i in xs.indices) {
-            val v = state.assignment.intValue(xs[i])
-            if (!seen.add(v)) return true
-            // Self-inverse: xs[xs[i] - offset] = i + offset.
-            val target = v - indexOffset
-            if (target !in xs.indices) return true
-            if (state.assignment.intValue(xs[target]) != i + indexOffset) return true
-        }
-        return false
-    }
-
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val wasViolated = isViolated(state, factorId)
-        val seen = IntHashSet()
-        var willViolate = false
-        for (i in xs.indices) {
-            val v = if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
-            if (!seen.add(v)) {
-                willViolate = true
-                break
-            }
+            val v = if (xs[i] == ov) nv else state.assignment.intValue(xs[i])
             val target = v - indexOffset
             if (target !in xs.indices) {
-                willViolate = true
-                break
+                bad++
+                continue
             }
-            val backVal = if (xs[target] == intVar) newValue else state.assignment.intValue(xs[target])
-            if (backVal != i + indexOffset) {
-                willViolate = true
-                break
-            }
+            val backVal = if (xs[target] == ov) nv else state.assignment.intValue(xs[target])
+            if (backVal != i + indexOffset) bad++
         }
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return bad
+    }
+
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = brokenPositions(
+        state,
+        ov = -1,
+        nv = 0,
+    ) > 0
+
+    /** Graded violation: count of broken involution positions, compressed. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation(brokenPositions(state, ov = -1, nv = 0).toLong())
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val after = brokenPositions(state, ov = intVar, nv = newValue)
+        return compressViolation(after.toLong()) - compressViolation(brokenPositions(state, ov = -1, nv = 0).toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

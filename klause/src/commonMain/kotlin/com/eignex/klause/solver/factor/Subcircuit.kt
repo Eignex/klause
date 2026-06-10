@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -36,7 +36,7 @@ import kotlin.math.abs
 class Subcircuit(
     /** Successor variable id per node; `succ[i] = i` excludes node i, the rest form one cycle. */
     val succ: IntArray,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(succ.isNotEmpty()) { "Subcircuit needs at least one var, got ${succ.size}" }

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move.IntSet
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -31,7 +31,7 @@ class Diffn(
     val widthVars: IntArray? = null,
     val heightVars: IntArray? = null,
     val nonStrict: Boolean = false,
-) : LocalSearchFactor {
+) : Factor {
 
     private val n: Int = xs.size
 
@@ -162,6 +162,11 @@ class Diffn(
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         (state.refPayload[factorId] as State).overlappingPairs > 0
 
+    /** Graded violation: the number of overlapping rectangle pairs, compressed — a move that
+     *  separates some (but not all) overlaps scores a real improvement instead of 0. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation((state.refPayload[factorId] as State).overlappingPairs.toLong())
+
     /** Affected-pair delta: a single-var move (position OR size) only changes the overlap
      *  status of pairs that include the moved rectangle, so the new total is
      *  `overlappingPairs − oldPairsInvolving(r) + newPairsInvolving(r)` in O(n). The stored
@@ -170,25 +175,23 @@ class Diffn(
      *  shared across rectangles (`varToRect == -1`). */
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val wasViolated = s.overlappingPairs > 0
         val r = varToRect[intVar]
-        val willViolate = if (r == null || r < 0) {
-            countOverlaps(state, intVar, newValue) > 0
+        val after = if (r == null || r < 0) {
+            countOverlaps(state, intVar, newValue)
         } else {
             val oldPairsR = pairsInvolvingRect(state, r, ov = -1, nv = 0)
             val newPairsR = pairsInvolvingRect(state, r, ov = intVar, nv = newValue)
-            s.overlappingPairs - oldPairsR + newPairsR > 0
+            s.overlappingPairs - oldPairsR + newPairsR
         }
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(after.toLong()) - compressViolation(s.overlappingPairs.toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         if (state.assignment.intValue(intVar) == oldValue) return 0
-        val wasViolated = s.overlappingPairs > 0
+        val before = s.overlappingPairs
         s.overlappingPairs = countOverlaps(state, ov = -1, nv = 0)
-        val nowViolated = s.overlappingPairs > 0
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(s.overlappingPairs.toLong()) - compressViolation(before.toLong())
     }
 
     /**

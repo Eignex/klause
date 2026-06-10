@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -26,7 +26,7 @@ class Inverse(
     val fOffset: Int = 0,
     /** Index offset for the [g] domain. */
     val gOffset: Int = 0,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(f.size == g.size) { "inverse: f and g must have equal length" }
@@ -75,25 +75,26 @@ class Inverse(
         return s.violated > 0
     }
 
+    /** Graded violation: the number of mismatched channel cells, compressed — a move that
+     *  repairs some (but not all) cells scores a real improvement instead of 0. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation((state.refPayload[factorId] as State).violated.toLong())
+
     /** Default brute-force: simulate, recount, return delta. Cost O(n) per query — fine
      *  for the structurally simple inverse but sub-optimal vs. an incremental Δ. */
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val current = state.assignment.intValue(intVar)
         if (current == newValue) return 0
-        val before = s.violated
         val after = simulateViolations(state, intVar, newValue)
-        val wasViolated = before > 0
-        val willViolate = after > 0
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(after.toLong()) - compressViolation(s.violated.toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val wasViolated = s.violated > 0
+        val before = s.violated
         s.violated = countViolations(state)
-        val nowViolated = s.violated > 0
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(s.violated.toLong()) - compressViolation(before.toLong())
     }
 
     private fun countViolations(state: LocalSearchState): Int {

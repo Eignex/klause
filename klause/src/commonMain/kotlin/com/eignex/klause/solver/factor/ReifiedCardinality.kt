@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -24,7 +24,7 @@ class ReifiedCardinality(
     val min: Int,
     /** Inclusive upper bound on the true count. */
     val max: Int,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
@@ -75,34 +75,44 @@ class ReifiedCardinality(
         return aux != holds
     }
 
+    /** Graded violation for `aux ↔ (count ∈ [min, max])`: `0` when they agree; when the
+     *  indicator wants the count in range but it isn't, the compressed distance to the window
+     *  `max(0, min − n) + max(0, n − max)` (so body flips that close the gap score); when the
+     *  indicator wants it out of range but it's in, `1`. Mirrors the [ReifiedLinear] gradient. */
+    private fun degreeFor(n: Int, aux: Boolean): Int {
+        val h = inRange(n)
+        return when {
+            aux == h -> 0
+            aux -> compressViolation(((if (n < min) min - n else 0) + (if (n > max) n - max else 0)).toLong())
+            else -> 1
+        }
+    }
+
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        degreeFor(state.intPayload[factorId], state.assignment.boolValue(auxBoolVar))
+
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val n = state.intPayload[factorId]
-        val wasViolated = aux != inRange(n)
-        if (boolVar == auxBoolVar) {
-            // aux flips; payload unchanged.
-            return if (wasViolated) -1 else +1
+        return if (boolVar == auxBoolVar) {
+            degreeFor(n, !aux) - degreeFor(n, aux)
+        } else {
+            val change = changeOnFlip(state, boolVar, current = true)
+            degreeFor(n + change, aux) - degreeFor(n, aux)
         }
-        // Some constrained literal flips: count changes by net effect.
-        val change = changeOnFlip(state, boolVar, current = true)
-        val newN = n + change
-        val willViolate = aux != inRange(newN)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val aux = state.assignment.boolValue(auxBoolVar)
         val oldN = state.intPayload[factorId]
         if (boolVar == auxBoolVar) {
-            val nowViolated = aux != inRange(oldN)
-            return if (nowViolated) +1 else -1
+            val newAux = state.assignment.boolValue(auxBoolVar)
+            return degreeFor(oldN, newAux) - degreeFor(oldN, !newAux)
         }
         val change = changeOnFlip(state, boolVar, current = false)
         val newN = oldN + change
         state.intPayload[factorId] = newN
-        val wasViolated = aux != inRange(oldN)
-        val nowViolated = aux != inRange(newN)
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        val aux = state.assignment.boolValue(auxBoolVar)
+        return degreeFor(newN, aux) - degreeFor(oldN, aux)
     }
 
     /**
@@ -277,32 +287,34 @@ class ReifiedCardinality(
             val changeV = if (flippedPost) signedFlipped else -signedFlipped
             oldN = newN - changeV
         }
-        val oldViolated = oldAux != inRange(oldN)
-        val newViolated = newAux != inRange(newN)
+        val oldDeg = degreeFor(oldN, oldAux)
+        val newDeg = degreeFor(newN, newAux)
         for (u in boolVars) {
-            val preViolatedIfU: Boolean
-            val postViolatedIfU: Boolean
+            // Graded Δ each var's flip would produce (the value deltaIfBoolFlipped returns),
+            // evaluated against the pre- and post-flip (count, aux) — break/make track its sign.
+            val preDelta: Int
+            val postDelta: Int
             if (u == auxBoolVar) {
-                preViolatedIfU = !oldAux != inRange(oldN)
-                postViolatedIfU = !newAux != inRange(newN)
+                preDelta = degreeFor(oldN, !oldAux) - oldDeg
+                postDelta = degreeFor(newN, !newAux) - newDeg
             } else {
                 val signedU = signedOccurrencesByVar[u]
                 if (signedU == 0) {
-                    preViolatedIfU = oldViolated
-                    postViolatedIfU = newViolated
+                    preDelta = 0
+                    postDelta = 0
                 } else {
                     val uPost = state.assignment.boolValue(u)
                     val uPre = if (u == flippedVar) !uPost else uPost
                     val preChangeU = if (uPre) -signedU else signedU
                     val postChangeU = if (uPost) -signedU else signedU
-                    preViolatedIfU = oldAux != inRange(oldN + preChangeU)
-                    postViolatedIfU = newAux != inRange(newN + postChangeU)
+                    preDelta = degreeFor(oldN + preChangeU, oldAux) - oldDeg
+                    postDelta = degreeFor(newN + postChangeU, newAux) - newDeg
                 }
             }
-            val preBreak = !oldViolated && preViolatedIfU
-            val preMake = oldViolated && !preViolatedIfU
-            val postBreak = !newViolated && postViolatedIfU
-            val postMake = newViolated && !postViolatedIfU
+            val preBreak = preDelta > 0
+            val preMake = preDelta < 0
+            val postBreak = postDelta > 0
+            val postMake = postDelta < 0
             if (preBreak != postBreak) {
                 if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
             }

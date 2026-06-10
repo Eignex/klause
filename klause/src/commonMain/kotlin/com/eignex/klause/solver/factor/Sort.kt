@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -16,7 +16,7 @@ import com.eignex.klause.util.MutableIntIntMap
  * Propagation: chain bound-tightening on `ys` (non-decreasing) and matching bounds
  * between `ys[0]` ↔ `min(xs)` / `ys[n-1]` ↔ `max(xs)`.
  */
-class Sort(val xs: IntArray, val ys: IntArray) : LocalSearchFactor {
+class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     init {
         require(xs.size == ys.size) { "sort: xs/ys size mismatch" }
@@ -26,32 +26,31 @@ class Sort(val xs: IntArray, val ys: IntArray) : LocalSearchFactor {
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val xsVals = IntArray(xs.size) { state.assignment.intValue(xs[it]) }.toSortedArray()
-        val ysVals = IntArray(ys.size) { state.assignment.intValue(ys[it]) }
-        // ys must equal sorted xs.
-        for (i in ysVals.indices) if (ysVals[i] != xsVals[i]) return true
-        return false
-    }
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = mismatches(state, ov = -1, nv = 0) > 0
 
     private fun IntArray.toSortedArray(): IntArray = copyOf().also { it.sort() }
 
+    /** Number of positions where `ys` differs from `sorted(xs)`, under an optional single-var
+     *  override (`ov` = var id to substitute, or -1 for none). Counts both the order and the
+     *  multiset discrepancy, so it shrinks monotonically as the search aligns the two. */
+    private fun mismatches(state: LocalSearchState, ov: Int, nv: Int): Int {
+        val xsVals = IntArray(
+            xs.size,
+        ) { i -> if (xs[i] == ov) nv else state.assignment.intValue(xs[i]) }.toSortedArray()
+        val ysVals = IntArray(ys.size) { i -> if (ys[i] == ov) nv else state.assignment.intValue(ys[i]) }
+        var m = 0
+        for (i in ysVals.indices) if (ysVals[i] != xsVals[i]) m++
+        return m
+    }
+
+    /** Graded violation: count of sorted-position mismatches, compressed. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation(mismatches(state, ov = -1, nv = 0).toLong())
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val wasViolated = isViolated(state, factorId)
-        val xsVals = IntArray(xs.size) { i ->
-            if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
-        }.toSortedArray()
-        val ysVals = IntArray(ys.size) { i ->
-            if (ys[i] == intVar) newValue else state.assignment.intValue(ys[i])
-        }
-        var willViolate = false
-        for (i in ysVals.indices) {
-            if (ysVals[i] != xsVals[i]) {
-                willViolate = true
-                break
-            }
-        }
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        val before = mismatches(state, ov = -1, nv = 0)
+        val after = mismatches(state, ov = intVar, nv = newValue)
+        return compressViolation(after.toLong()) - compressViolation(before.toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -20,7 +20,7 @@ class Cardinality(
     val min: Int,
     /** Inclusive upper bound on the number of true literals. */
     val max: Int,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
@@ -88,20 +88,26 @@ class Cardinality(
         return n < min || n > max
     }
 
-    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val pre = state.assignment.boolValue(boolVar)
-        // Flipping `boolVar` from `pre` to `!pre` shifts each occurrence's truth by
-        // ±1; the per-occurrence sign is +1 for positive literals, -1 for negatives.
-        // Aggregated as `signedOccurrencesByVar`; the direction depends on `pre`.
-        val signed = signedOccurrencesByVar[boolVar]
-        if (signed == 0) return 0
-        val change = if (pre) -signed else signed
-        val n = state.intPayload[factorId]
-        val newN = n + change
-        val wasViolated = n < min || n > max
-        val willViolate = newN < min || newN > max
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+    /** Graded violation: how many true-literal flips away from the `[min, max]` window the
+     *  current true-count is — `max(0, min − n) + max(0, n − max)`, compressed. Gives CBLS a
+     *  gradient toward the cardinality bound instead of a flat boolean. */
+    private fun cardDegree(n: Int): Int = (if (n < min) min - n else 0) + (if (n > max) n - max else 0)
+
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation(cardDegree(state.intPayload[factorId]).toLong())
+
+    /** Compressed Δ violation-degree if [u] (currently [uVal]) were flipped while the true-count
+     *  is [n] — exactly what [deltaIfBoolFlipped] returns. Shared by the break/make updater so
+     *  the incremental counts track the graded delta sign. */
+    private fun signedDelta(n: Int, u: Int, uVal: Boolean): Int {
+        val signedU = signedOccurrencesByVar[u]
+        if (signedU == 0) return 0
+        val changeU = if (uVal) -signedU else signedU
+        return compressViolation(cardDegree(n + changeU).toLong()) - compressViolation(cardDegree(n).toLong())
     }
+
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        signedDelta(state.intPayload[factorId], boolVar, state.assignment.boolValue(boolVar))
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val post = state.assignment.boolValue(boolVar)
@@ -111,9 +117,7 @@ class Cardinality(
         val oldN = state.intPayload[factorId]
         val newN = oldN + change
         state.intPayload[factorId] = newN
-        val wasViolated = oldN < min || oldN > max
-        val willViolate = newN < min || newN > max
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(cardDegree(newN).toLong()) - compressViolation(cardDegree(oldN).toLong())
     }
 
     /**
@@ -556,16 +560,14 @@ class Cardinality(
             if (signedU == 0) continue
             val uPost = state.assignment.boolValue(u)
             val uPre = if (u == flippedVar) !uPost else uPost
-            val oldChangeU = if (uPre) -signedU else signedU
-            val newChangeU = if (uPost) -signedU else signedU
-            val preTotal = oldN + oldChangeU
-            val postTotal = newN + newChangeU
-            val preViolatedIfU = preTotal < min || preTotal > max
-            val postViolatedIfU = postTotal < min || postTotal > max
-            val preBreak = !oldViolated && preViolatedIfU
-            val preMake = oldViolated && !preViolatedIfU
-            val postBreak = !newViolated && postViolatedIfU
-            val postMake = newViolated && !postViolatedIfU
+            // Break/make track the sign of the graded Δ each var's flip would produce — the same
+            // value brute-force reads from deltaIfBoolFlipped — evaluated pre- and post-flip.
+            val preDelta = signedDelta(oldN, u, uPre)
+            val postDelta = signedDelta(newN, u, uPost)
+            val preBreak = preDelta > 0
+            val preMake = preDelta < 0
+            val postBreak = postDelta > 0
+            val postMake = postDelta < 0
             if (preBreak != postBreak) {
                 if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
             }

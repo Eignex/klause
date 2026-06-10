@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -21,7 +21,7 @@ class Table(
     val xs: IntArray,
     /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
     val tuples: IntArray, // row-major; length must be a multiple of xs.size
-) : LocalSearchFactor {
+) : Factor {
 
     /** Number of variables per tuple. */
     val arity: Int = xs.size

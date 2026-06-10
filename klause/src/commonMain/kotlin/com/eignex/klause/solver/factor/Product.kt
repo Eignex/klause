@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -22,7 +22,7 @@ class Product(
     val b: Int,
     /** Result variable id (`result = a * b`). */
     val result: Int,
-) : LocalSearchFactor {
+) : Factor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = intArrayOf(a, b, result)
@@ -34,32 +34,41 @@ class Product(
         return av.toLong() * bv != rv.toLong()
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val av = state.assignment.intValue(a)
-        val bv = state.assignment.intValue(b)
+    /** Graded violation: `|a·b − result|` residual, compressed — gives CBLS a gradient toward
+     *  the correct product instead of a flat boolean. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val av = state.assignment.intValue(a).toLong()
+        val bv = state.assignment.intValue(b).toLong()
         val rv = state.assignment.intValue(result).toLong()
-        val was = av.toLong() * bv != rv
-        val will = when (intVar) {
-            a -> newValue.toLong() * bv != rv
-            b -> av.toLong() * newValue != rv
-            result -> av.toLong() * bv != newValue.toLong()
+        return compressViolation(abs(av * bv - rv))
+    }
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val av = state.assignment.intValue(a).toLong()
+        val bv = state.assignment.intValue(b).toLong()
+        val rv = state.assignment.intValue(result).toLong()
+        val nv = newValue.toLong()
+        val after = when (intVar) {
+            a -> abs(nv * bv - rv)
+            b -> abs(av * nv - rv)
+            result -> abs(av * bv - nv)
             else -> return 0
         }
-        return (if (will) 1 else 0) - (if (was) 1 else 0)
+        return compressViolation(after) - compressViolation(abs(av * bv - rv))
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        val av = state.assignment.intValue(a)
-        val bv = state.assignment.intValue(b)
+        val av = state.assignment.intValue(a).toLong()
+        val bv = state.assignment.intValue(b).toLong()
         val rv = state.assignment.intValue(result).toLong()
-        val now = av.toLong() * bv != rv
-        val was = when (intVar) {
-            a -> oldValue.toLong() * bv != rv
-            b -> av.toLong() * oldValue != rv
-            result -> av.toLong() * bv != oldValue.toLong()
+        val ov = oldValue.toLong()
+        val before = when (intVar) {
+            a -> abs(ov * bv - rv)
+            b -> abs(av * ov - rv)
+            result -> abs(av * bv - ov)
             else -> return 0
         }
-        return (if (now) 1 else 0) - (if (was) 1 else 0)
+        return compressViolation(abs(av * bv - rv)) - compressViolation(before)
     }
 
     /** Bound-only conflict reason. */
@@ -204,12 +213,22 @@ class Product(
         } else if (av != 0) {
             proposeClosestOperand(state, operandVar = b, otherValue = av, currentValue = bv, sink)
         }
-        // Fall back to ±1 nudges if none of the snap candidates apply.
+        // Fall back to ±1 nudges that do not worsen the `|a·b − result|` residual (a blind
+        // nudge in the wrong direction would increase the graded violation).
+        val rvL = rv.toLong()
+        val curResidual = abs(av.toLong() * bv - rvL)
         for (v in intArrayOf(a, b, result)) {
             val cur = state.assignment.intValue(v)
             val d = state.problem.intDomains[v]
-            if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
-            if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
+            for (cand in intArrayOf(cur + 1, cur - 1)) {
+                if (cand !in d) continue
+                val res = when (v) {
+                    a -> abs(cand.toLong() * bv - rvL)
+                    b -> abs(av.toLong() * cand - rvL)
+                    else -> abs(av.toLong() * bv - cand.toLong())
+                }
+                if (res <= curResidual) sink.addChannelingIntSet(state, v, cand)
+            }
         }
     }
 
