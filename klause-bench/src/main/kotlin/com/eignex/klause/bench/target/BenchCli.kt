@@ -160,7 +160,10 @@ object BenchCli {
     }
 
     private fun matches(pattern: String, name: String): Boolean = if ('*' in pattern) {
-        Regex("^" + Regex.escape(pattern).replace("\\*", ".*") + "$").containsMatchIn(name)
+        // Escape each literal segment between `*`s (Regex.escape wraps in \Q…\E, so escaping the
+        // whole pattern then substituting `*` doesn't work), and join with `.*`.
+        val rx = pattern.split('*').joinToString(".*") { Regex.escape(it) }
+        Regex("^$rx$").containsMatchIn(name)
     } else {
         name.contains(pattern)
     }
