@@ -47,7 +47,27 @@ class RegressionVariableHeuristic private constructor(
     private var pendingPropCount: Long = 0L
     private var conflictSincePick: Boolean = false
 
+    // Self-maintained VSIDS-style activity + last-conflict step (the engine exposes neither to a
+    // heuristic). Slot-indexed: bool var v → v, int var v → numBoolVars + v. Allocated lazily on
+    // the first pick (problem size isn't known at construction). With these as features the linear
+    // model can express VSIDS (weight on activity) and LastConflict (weight on recency) as well as
+    // fail-first, so it can learn the right family per instance (#8).
+    private var activity: DoubleArray? = null
+    private var lastConflict: LongArray? = null
+    private var numBoolVars: Int = 0
+    private var conflicts: Long = 0L
+    private var bumpInc: Double = 1.0
+    private var maxActivity: Double = 1.0
+
+    // Instance-relative feature scales, computed once from the problem in ensureState (so the
+    // unbounded structural features land in ~[0,1] off the instance's own maxima, not magic
+    // constants). degree ÷ max degree, ln(domSize) ÷ ln(max domain), depth ÷ variable count.
+    private var degreeScale: Double = 1.0
+    private var lnDomScale: Double = 1.0
+    private var depthScale: Double = 1.0
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        ensureState(session)
         rewardPending(session)
 
         val candidates = collectCandidates(session)
@@ -112,13 +132,62 @@ class RegressionVariableHeuristic private constructor(
         } else {
             problem.intOccurrences[c.ref.varId].size
         }
+        val slot = if (isBool) c.ref.varId else numBoolVars + c.ref.varId
+        val act = checkNotNull(activity)[slot] / maxActivity // VSIDS-style decayed activity, ∈ [0,1]
+        val lc = checkNotNull(lastConflict)[slot]
+        val recency = if (lc < 0L) 0.0 else 1.0 / (1.0 + (conflicts - lc)) // LastConflict signal
         return doubleArrayOf(
-            1.0 / c.domSize, // fail-first: small domain → large value
-            ln((c.domSize + 1).toDouble()) / LN_SCALE, // domain scale
-            min(degree / DEGREE_SCALE, 1.0), // constraint degree
-            min(session.decisionLevel / DEPTH_SCALE, 1.0), // search depth context
+            1.0 / c.domSize, // fail-first: small domain → large value (already ∈ (0, 0.5])
+            ln((c.domSize + 1).toDouble()) / lnDomScale, // domain scale ÷ the instance's max
+            min(degree / degreeScale, 1.0), // constraint degree ÷ the instance's max degree
+            min(session.decisionLevel / depthScale, 1.0), // depth ÷ var count (max possible depth)
             if (isBool) 1.0 else 0.0, // variable kind
+            act, // conflict activity — weight→1 here recovers VSIDS branching
+            recency, // last-conflict recency — weight→1 here recovers LastConflict branching
         )
+    }
+
+    /** Lazily size the activity/last-conflict arrays and compute the instance-relative feature
+     *  scales (max degree, max domain, variable count) on the first pick — problem size isn't known
+     *  at construction. */
+    private fun ensureState(session: PropagationSession) {
+        if (activity != null) return
+        val problem = session.problem
+        numBoolVars = problem.numBoolVars
+        val n = numBoolVars + problem.numIntVars
+        activity = DoubleArray(n)
+        lastConflict = LongArray(n) { -1L }
+        var maxDegree = 1
+        for (v in 0 until problem.numBoolVars) maxDegree = maxOf(maxDegree, problem.boolOccurrences[v].size)
+        for (v in 0 until problem.numIntVars) maxDegree = maxOf(maxDegree, problem.intOccurrences[v].size)
+        degreeScale = maxDegree.toDouble()
+        var maxDom = 2
+        for (v in 0 until problem.numIntVars) maxDom = maxOf(maxDom, problem.intDomains[v].size)
+        lnDomScale = ln((maxDom + 1).toDouble())
+        depthScale = maxOf(1, n).toDouble()
+    }
+
+    /** VSIDS-style bump of the variables involved in a conflict, with the inc-grows decay trick
+     *  (no O(n) per-conflict pass; rescale when the increment overflows). Also records the conflict
+     *  step for each involved var (the LastConflict recency signal). */
+    private fun bumpConflict(boolVars: IntArray, intVars: IntArray) {
+        val act = activity ?: return
+        val lc = lastConflict ?: return
+        conflicts++
+        for (v in boolVars) bump(act, lc, v)
+        for (v in intVars) bump(act, lc, numBoolVars + v)
+        bumpInc /= ACTIVITY_DECAY
+        if (bumpInc > RESCALE_THRESHOLD) {
+            for (i in act.indices) act[i] /= RESCALE_THRESHOLD
+            maxActivity /= RESCALE_THRESHOLD
+            bumpInc /= RESCALE_THRESHOLD
+        }
+    }
+
+    private fun bump(act: DoubleArray, lc: LongArray, slot: Int) {
+        act[slot] += bumpInc
+        if (act[slot] > maxActivity) maxActivity = act[slot]
+        lc[slot] = conflicts
     }
 
     override fun onConflict(varRef: VarRef) {
@@ -127,6 +196,7 @@ class RegressionVariableHeuristic private constructor(
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
         conflictSincePick = true
+        bumpConflict(unsat.conflictBools, unsat.conflictInts)
     }
 
     override fun onPropagation(implied: PropagationResult.Implied) = Unit
@@ -141,12 +211,12 @@ class RegressionVariableHeuristic private constructor(
 
     /** Feature-vector size and the [linUcb] factory. */
     companion object {
-        /** Number of per-variable features the LinUCB context vector carries (see [features]). */
-        const val FEATURE_SIZE: Int = 5
+        /** Number of per-variable features the LinUCB context vector carries (see [features]):
+         *  fail-first (1/domSize), domain scale, degree, depth, kind, conflict activity, recency. */
+        const val FEATURE_SIZE: Int = 7
         private const val PROP_SQUASH = 16.0
-        private const val LN_SCALE = 8.0
-        private const val DEGREE_SCALE = 16.0
-        private const val DEPTH_SCALE = 64.0
+        private const val ACTIVITY_DECAY = 0.95 // VSIDS-style: increment grows by 1/decay per conflict
+        private const val RESCALE_THRESHOLD = 1e100
 
         /**
          * Build a LinUCB-backed variable heuristic. [exploration] scales the LinUCB upper-confidence
