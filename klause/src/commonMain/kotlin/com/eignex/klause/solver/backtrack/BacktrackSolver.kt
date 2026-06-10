@@ -1312,6 +1312,11 @@ class BacktrackSolver(override val problem: Problem) :
                             }
                         }
                     }
+                    // Cross-arm clause exchange (portfolio): at root, import nogoods other arms
+                    // learned and export this arm's new glue clauses. Imports register without
+                    // immediate propagation (their literals are free at root) — a root contradiction
+                    // surfaces on the next fixpoint, not here. No-op when not in a sharing portfolio.
+                    params.clauseExchange?.onRestart(session)
                     if (assertObjectiveBoundAtRoot()) {
                         yield(SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels)))
                         return@sequence
