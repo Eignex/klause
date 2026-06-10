@@ -28,6 +28,12 @@ data class Xcsp3Problem(
     val problem: Problem,
     /** The objective, or null for a pure satisfaction instance. */
     val objective: LinearObjective?,
+    /** Declared variable name (including array cells as `id[i]`) → int var id, in
+     *  declaration order. Lets a CLI render named solutions (XCSP3 `v <instantiation>`). */
+    val intVarNames: Map<String, Int> = emptyMap(),
+    /** True when the original `<objectives>` was a `maximize` (the [objective] negates so
+     *  the engine minimises). Lets a CLI report the true objective value in the `o` line. */
+    val maximize: Boolean = false,
 )
 
 /**
@@ -65,6 +71,7 @@ object Xcsp3 {
         private val factors = ArrayList<Factor>()
         private var nextBool = 0
         private var objective: LinearObjective? = null
+        private var objectiveMaximize = false
 
         // --- variables ---
 
@@ -448,6 +455,7 @@ object Xcsp3 {
 
         fun objective(e: XmlElement) {
             val maximize = e.tag == "maximize"
+            objectiveMaximize = maximize
             val type = e.attr("type").ifBlank { "sum" }
             val vars = refList(e.child("list")?.textContent ?: e.textContent).toIntArray()
             when (type) {
@@ -588,6 +596,8 @@ object Xcsp3 {
                 factors = factors.toTypedArray(),
             ),
             objective,
+            intVarNames = LinkedHashMap(varIds),
+            maximize = objectiveMaximize,
         )
 
         companion object {
