@@ -125,8 +125,8 @@ internal object PortfolioCreditMetric {
                 backtrackWorkers = bt,
                 kind = Kind.COP,
                 seed = seed,
-                lsObjective = entry.lsObjective ?: entry.objective,
-                linearObjective = entry.objective,
+                objective = entry.objective,
+                lsObjective = entry.lsObjective,
                 definitionalSweep = entry.definitionalSweep,
             )
         } else {
@@ -138,8 +138,8 @@ internal object PortfolioCreditMetric {
                     engine = if (bt > 0) EngineMix.MIXED else EngineMix.LOCAL_SEARCH,
                     seed = seed,
                 ),
-                lsObjective = entry.lsObjective ?: entry.objective,
-                linearObjective = entry.objective,
+                objective = entry.objective,
+                lsObjective = entry.lsObjective,
                 definitionalSweep = entry.definitionalSweep,
             )
         }

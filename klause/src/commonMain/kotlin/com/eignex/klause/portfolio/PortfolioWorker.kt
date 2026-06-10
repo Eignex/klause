@@ -1,8 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
@@ -59,11 +59,10 @@ class PortfolioWorker private constructor(
     companion object {
         /**
          * Wrap a typed [session] + base [params] as a type-erased worker. [objective] is the
-         * worker's *own* objective representation — the functional/gradient objective for a
-         * local-search worker, the [com.eignex.klause.solver.LinearObjective] for a backtrack
-         * worker — so a heterogeneous pool no longer forces one representation on every engine
-         * (see #63). It may be null for a satisfaction-only worker that never streams
-         * [improvements]; calling [improvements] on such a worker fails fast. [withBound] injects
+         * canonical [LinearObjective] the worker minimises (engine-specific views, like the LS
+         * gradient objective, travel inside the worker's own params). It may be null for a
+         * satisfaction-only worker that never streams [improvements]; calling [improvements] on
+         * such a worker fails fast. [withBound] injects
          * the portfolio's shared objective bound into the params for [improvements] (e.g.
          * `{ p, supplier -> p.copy(objectiveBoundSupplier = supplier) }` for backtrack); pass
          * null for engines that don't bound-prune (local search). [withWarmStart] injects a
@@ -75,7 +74,7 @@ class PortfolioWorker private constructor(
             label: String,
             session: Session<P>,
             params: P,
-            objective: Objective? = null,
+            objective: LinearObjective? = null,
             withWarmStart: ((P, Sample) -> P)? = null,
             withBound: ((P, () -> Double) -> P)? = null,
         ): PortfolioWorker {

@@ -9,8 +9,8 @@ import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -81,7 +81,7 @@ internal object BanditProbe {
         }
     }
 
-    private fun objectiveOf(program: FlatZincProgram): Objective? {
+    private fun objectiveOf(program: FlatZincProgram): LinearObjective? {
         val (objName, maximize) = when (val s = program.solve) {
             is SolveDirective.Minimize -> s.objVar to false
             is SolveDirective.Maximize -> s.objVar to true
@@ -93,7 +93,7 @@ internal object BanditProbe {
 
     private fun runBacktrack(
         problem: Problem,
-        obj: Objective,
+        obj: LinearObjective,
         budget: Long,
         params: (Cancellation, (SearchEvent) -> Unit) -> BacktrackParams,
     ): Run {
@@ -116,7 +116,7 @@ internal object BanditProbe {
 
     private fun runSequential(
         program: FlatZincProgram,
-        obj: Objective,
+        obj: LinearObjective,
         budget: Long,
         scenario: PortfolioScenario,
     ): Run {
@@ -127,8 +127,8 @@ internal object BanditProbe {
         val workers = PortfolioBuilder.build(
             program.problem,
             scenario,
-            lsObjective = program.lsObjective ?: obj,
-            linearObjective = obj,
+            objective = obj,
+            lsObjective = program.lsObjective,
             definitionalSweep = program.definitionalSweep,
         )
         val seq = SequentialPortfolio.exp3(workers)

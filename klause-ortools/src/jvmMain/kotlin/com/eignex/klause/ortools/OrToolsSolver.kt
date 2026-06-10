@@ -2,7 +2,6 @@ package com.eignex.klause.ortools
 
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -61,13 +60,10 @@ class OrToolsSolver(override val problem: Problem) : Optimizer<OrToolsParams> {
         return out.asSequence()
     }
 
-    override fun minimize(objective: Objective, params: OrToolsParams): MinimizeResult =
+    override fun minimize(objective: LinearObjective, params: OrToolsParams): MinimizeResult =
         improvements(objective, params).last()
 
-    override fun improvements(objective: Objective, params: OrToolsParams): Sequence<MinimizeResult> {
-        require(objective is LinearObjective) {
-            "klause-ortools only optimizes LinearObjective (got ${objective::class.simpleName})"
-        }
+    override fun improvements(objective: LinearObjective, params: OrToolsParams): Sequence<MinimizeResult> {
         val m = OrToolsModel.build(problem)
         val solver = newSolver(params)
         val objExpr = buildObjective(m, objective)

@@ -84,7 +84,7 @@ interface Session<P : SolverParams> : AutoCloseable {
      * [UnsupportedOperationException]. Subclasses that maintain incremental cross-call
      * optimisation state (B&B incumbent caching, warm-starts) override.
      */
-    fun minimize(objective: Objective, params: P): MinimizeResult {
+    fun minimize(objective: LinearObjective, params: P): MinimizeResult {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
                 "Solver ${solver::class.simpleName} does not implement Optimizer",
@@ -93,7 +93,7 @@ interface Session<P : SolverParams> : AutoCloseable {
     }
 
     /** Streaming variant of [minimize]. See [Optimizer.improvements]. */
-    fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> {
+    fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
                 "Solver ${solver::class.simpleName} does not implement Optimizer",
@@ -155,7 +155,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun samples(config: SamplingConfig, params: P): Sequence<Sample> =
         solver.samples(config, applyStack(params))
 
-    override fun minimize(objective: Objective, params: P): MinimizeResult {
+    override fun minimize(objective: LinearObjective, params: P): MinimizeResult {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
                 "Solver ${solver::class.simpleName} does not implement Optimizer",
@@ -163,7 +163,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
         return opt.minimize(objective, applyStack(params))
     }
 
-    override fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> {
+    override fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> {
         val opt = solver as? Optimizer<P>
             ?: throw UnsupportedOperationException(
                 "Solver ${solver::class.simpleName} does not implement Optimizer",

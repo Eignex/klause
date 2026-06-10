@@ -285,6 +285,21 @@ class LpReasonSoundnessTest {
 
                 else -> error("unexpected non-terminal result $res on instance #$it")
             }
+            // The one-flag auto path (the LP-focused portfolio arm's configuration) must agree too.
+            val autoParams = BacktrackParams(randomSeed = 7L, lubyRestartBase = 8L, lpAuto = true)
+            when (val res = BacktrackSolver(p).minimize(objective, autoParams)) {
+                is MinimizeResult.Optimal -> assertEquals(
+                    bruteBest.toDouble(),
+                    res.objective,
+                    1e-9,
+                    "lpAuto wrong optimum on instance #$it",
+                )
+
+                is MinimizeResult.Infeasible ->
+                    assertEquals(Long.MAX_VALUE, bruteBest, "lpAuto Infeasible on brute-feasible instance #$it")
+
+                else -> error("unexpected non-terminal lpAuto result $res on instance #$it")
+            }
         }
         assertTrue(optimal > 60, "covered only $optimal optimal instances")
         assertTrue(infeasible > 20, "covered only $infeasible infeasible instances")

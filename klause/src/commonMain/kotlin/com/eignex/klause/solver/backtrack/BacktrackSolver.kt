@@ -4,7 +4,6 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -198,11 +197,9 @@ class BacktrackSolver(override val problem: Problem) :
      *
      * Sound: every completion can only *raise* the contribution of unpinned vars from
      * the minimum, so an LB that already equals or exceeds the incumbent guarantees no
-     * descendant leaf beats it. For arbitrary [Objective] subtypes the predicate
-     * degrades to "never prune," so correctness is preserved at the cost of falling
-     * back to full enumeration.
+     * descendant leaf beats it.
      */
-    override fun minimize(objective: Objective, params: BacktrackParams): MinimizeResult =
+    override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult =
         improvements(objective, params).last()
 
     /**
@@ -212,84 +209,93 @@ class BacktrackSolver(override val problem: Problem) :
      * [MinimizeResult.BestFound] / [MinimizeResult.Unknown]). Same B&B engine as
      * [minimize]; just exposes the search's intermediate bests as they land instead of
      * collapsing them into a single return value.
+     *
+     * With [BacktrackParams.lpAuto] the LP-relaxation family is enabled here, structurally:
+     * [LpAutoConfig.recommend] ORs on exactly the techniques whose target structure the problem
+     * contains. The objective is statically linear, so no objective-shape check is involved —
+     * LP enablement is purely a params decision.
      */
-    override fun improvements(objective: Objective, params: BacktrackParams): Sequence<MinimizeResult> = sequence {
-        var best: Sample? = null
-        var bestObj = Double.POSITIVE_INFINITY
-        // Objective-bound propagation for single-variable objectives (every FlatZinc goal):
-        // track the objective variable's value in the current incumbent so the engine can
-        // assert `objVar ≤/≥ best ∓ 1` at the root and let the defining constraint propagate.
-        val singleObj = (objective as? LinearObjective)?.singleIntObjective()
-        var objVarBest: Int? = null
-        val sink = SolveStatsSink(backend = "backtrack")
-        // LP-relaxation bounding (#20): build the relaxer once; it reads live bounds per node.
-        // Only a LinearObjective yields a sound LP objective, so the relaxer is null otherwise.
-        val lpRelaxer = if (params.lpBounding && objective is LinearObjective) {
-            CpToLpRelaxation(
-                problem,
-                objective,
-                generateCuts = params.lpCuts,
-                circuitArcs = params.lpCircuit,
-                elementHull = params.lpElement,
-                tableHull = params.lpTable,
-            )
-        } else {
-            null
+    override fun improvements(objective: LinearObjective, baseParams: BacktrackParams): Sequence<MinimizeResult> =
+        sequence {
+            val params = if (baseParams.lpAuto) LpAutoConfig.recommend(problem, baseParams) else baseParams
+            yieldAll(improvementsConfigured(objective, params))
         }
-        val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
-            buildList {
-                if (params.lpCuts) {
-                    add(AllDifferentSeparator())
-                    add(GccSeparator())
-                    add(KnapsackCoverSeparator())
-                    add(CliqueCutSeparator())
-                    // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
-                    (objective as? LinearObjective)?.let { obj ->
-                        val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
+
+    /** [improvements] after the [BacktrackParams.lpAuto] resolution. */
+    private fun improvementsConfigured(objective: LinearObjective, params: BacktrackParams): Sequence<MinimizeResult> =
+        sequence {
+            var best: Sample? = null
+            var bestObj = Double.POSITIVE_INFINITY
+            // Objective-bound propagation for single-variable objectives (every FlatZinc goal):
+            // track the objective variable's value in the current incumbent so the engine can
+            // assert `objVar ≤/≥ best ∓ 1` at the root and let the defining constraint propagate.
+            val singleObj = objective.singleIntObjective()
+            var objVarBest: Int? = null
+            val sink = SolveStatsSink(backend = "backtrack")
+            // LP-relaxation bounding (#20): build the relaxer once; it reads live bounds per node.
+            val lpRelaxer = if (params.lpBounding) {
+                CpToLpRelaxation(
+                    problem,
+                    objective,
+                    generateCuts = params.lpCuts,
+                    circuitArcs = params.lpCircuit,
+                    elementHull = params.lpElement,
+                    tableHull = params.lpTable,
+                )
+            } else {
+                null
+            }
+            val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
+                buildList {
+                    if (params.lpCuts) {
+                        add(AllDifferentSeparator())
+                        add(GccSeparator())
+                        add(KnapsackCoverSeparator())
+                        add(CliqueCutSeparator())
+                        // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
+                        val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
                         add(AssignmentObjectiveCut(coef))
                     }
+                    // Genuine subtour-elimination cuts over the circuit arc relaxation.
+                    if (params.lpCircuit) add(CircuitSeparator())
                 }
-                // Genuine subtour-elimination cuts over the circuit arc relaxation.
-                if (params.lpCircuit) add(CircuitSeparator())
+            } else {
+                emptyList()
             }
-        } else {
-            emptyList()
-        }
-        // Persistent global cut pool: harvest the structural separators' cuts at the root once;
-        // they are globally valid, so they are re-added to every node's relaxation below.
-        val lpGlobalCuts: List<Cut> = if (params.lpCutPool && lpRelaxer != null && lpSeparators.isNotEmpty()) {
-            harvestRootCuts(lpRelaxer, PropagationSession(problem), lpSeparators)
-        } else {
-            emptyList()
-        }
-        // Lagrangian bound (#23): built once; multipliers persist across nodes (rolling warm start).
-        val lagBound = if (params.lagrangian && objective is LinearObjective) {
-            LagrangianBound(problem, objective).takeIf { it.applicable }
-        } else {
-            null
-        }
-        var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
-        // Energetic-reasoning Cumulative feasibility check (#22/#23); objective-independent prune.
-        val energeticBound = if (params.energeticReasoning) {
-            CumulativeEnergeticBound(problem).takeIf { it.applicable }
-        } else {
-            null
-        }
-        var lpCheckCounter = 0
-        // LP-learned nogoods (#247): infeasible-node Farkas clauses, collected here by the prune
-        // closure and flushed into the clause DB at each restart (where they are no longer all-false).
-        val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
-        // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
-        // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
-        val lpBasisByDepth = ArrayList<Basis?>()
-        // LP-guided value ordering (#246): the node LP records its fractional primal here.
-        val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
-        // Immediate LP backjump (#280): when a node's LP is infeasible and its Farkas certificate
-        // resolves to an asserting 1UIP clause, [pruneIf] stashes it here and [advance] turns the
-        // prune into a non-chronological backjump-and-learn instead of a one-level chronological pop.
-        var lpBackjump: Learned? = null
-        val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
-            is LinearObjective -> { session ->
+            // Persistent global cut pool: harvest the structural separators' cuts at the root once;
+            // they are globally valid, so they are re-added to every node's relaxation below.
+            val lpGlobalCuts: List<Cut> = if (params.lpCutPool && lpRelaxer != null && lpSeparators.isNotEmpty()) {
+                harvestRootCuts(lpRelaxer, PropagationSession(problem), lpSeparators)
+            } else {
+                emptyList()
+            }
+            // Lagrangian bound (#23): built once; multipliers persist across nodes (rolling warm start).
+            val lagBound = if (params.lagrangian) {
+                LagrangianBound(problem, objective).takeIf { it.applicable }
+            } else {
+                null
+            }
+            var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
+            // Energetic-reasoning Cumulative feasibility check (#22/#23); objective-independent prune.
+            val energeticBound = if (params.energeticReasoning) {
+                CumulativeEnergeticBound(problem).takeIf { it.applicable }
+            } else {
+                null
+            }
+            var lpCheckCounter = 0
+            // LP-learned nogoods (#247): infeasible-node Farkas clauses, collected here by the prune
+            // closure and flushed into the clause DB at each restart (where they are no longer all-false).
+            val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
+            // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
+            // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
+            val lpBasisByDepth = ArrayList<Basis?>()
+            // LP-guided value ordering (#246): the node LP records its fractional primal here.
+            val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+            // Immediate LP backjump (#280): when a node's LP is infeasible and its Farkas certificate
+            // resolves to an asserting 1UIP clause, [pruneIf] stashes it here and [advance] turns the
+            // prune into a non-chronological backjump-and-learn instead of a one-level chronological pop.
+            var lpBackjump: Learned? = null
+            val pruneIf: (PropagationSession) -> Boolean = { session ->
                 lpBackjump = null
                 // Effective bound = min(local incumbent, external supplier). External bound
                 // sharing lets a parallel CP portfolio tighten every worker's pruning past
@@ -372,112 +378,109 @@ class BacktrackSolver(override val problem: Problem) :
                     else -> false
                 }
             }
-
-            else -> null
-        }
-        // Restarts stay off unless the caller asks: a restart pops to root and re-traverses
-        // the bound-pruned tree (the objective bound is a predicate, not a learned clause),
-        // which can keep an optimality proof from terminating in budget. With an explicit
-        // lubyRestartBase the caller is choosing anytime diversification over proof speed —
-        // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
-        // solved leaves.
-        sink.start()
-        // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes
-        // and reduced-cost fixing bite from the first node. Sound — the probe returns only a fully
-        // propagated, feasible assignment.
-        if (params.lpProbe && objective is LinearObjective) {
-            val seed = lpRoundingProbe(objective)
-            if (seed != null) {
-                val o = objective.evaluate(seed)
-                if (o < bestObj) {
-                    bestObj = o
-                    best = seed
-                    if (singleObj != null) objVarBest = seed.ints[singleObj.varId]
-                    params.onEvent?.invoke(SearchEvent.Incumbent(o))
-                    yield(MinimizeResult.BestFound(seed, o, TerminationReason.BudgetExhausted))
-                }
-            }
-        }
-        for (outcome in driveSearch(
-            params.copy(minHammingDistance = 0, recentWindow = 0),
-            pruneIf = pruneIf,
-            pruneLearned = { lpBackjump },
-            sink = sink,
-            objectiveVar = singleObj?.varId ?: -1,
-            objectiveAscending = singleObj?.ascending ?: true,
-            objectiveBest = { objVarBest },
-            lpNogoods = lpNogoods,
-            lpHints = lpHints,
-        )) {
-            when (outcome) {
-                is SearchOutcome.Found -> {
-                    val o = objective.evaluate(outcome.sample)
+            // Restarts stay off unless the caller asks: a restart pops to root and re-traverses
+            // the bound-pruned tree (the objective bound is a predicate, not a learned clause),
+            // which can keep an optimality proof from terminating in budget. With an explicit
+            // lubyRestartBase the caller is choosing anytime diversification over proof speed —
+            // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
+            // solved leaves.
+            sink.start()
+            // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes
+            // and reduced-cost fixing bite from the first node. Sound — the probe returns only a fully
+            // propagated, feasible assignment.
+            if (params.lpProbe) {
+                val seed = lpRoundingProbe(objective)
+                if (seed != null) {
+                    val o = objective.evaluate(seed)
                     if (o < bestObj) {
                         bestObj = o
-                        best = outcome.sample
-                        if (singleObj != null) objVarBest = outcome.sample.ints[singleObj.varId]
+                        best = seed
+                        if (singleObj != null) objVarBest = seed.ints[singleObj.varId]
                         params.onEvent?.invoke(SearchEvent.Incumbent(o))
-                        // Yield each new incumbent eagerly — consumers can react to it
-                        // before search continues toward the bound. The reason here is
-                        // a hint ("more might come"); the terminal yield carries the
-                        // real verdict.
-                        yield(MinimizeResult.BestFound(outcome.sample, o, TerminationReason.BudgetExhausted))
+                        yield(MinimizeResult.BestFound(seed, o, TerminationReason.BudgetExhausted))
                     }
                 }
+            }
+            for (outcome in driveSearch(
+                params.copy(minHammingDistance = 0, recentWindow = 0),
+                pruneIf = pruneIf,
+                pruneLearned = { lpBackjump },
+                sink = sink,
+                objectiveVar = singleObj?.varId ?: -1,
+                objectiveAscending = singleObj?.ascending ?: true,
+                objectiveBest = { objVarBest },
+                lpNogoods = lpNogoods,
+                lpHints = lpHints,
+            )) {
+                when (outcome) {
+                    is SearchOutcome.Found -> {
+                        val o = objective.evaluate(outcome.sample)
+                        if (o < bestObj) {
+                            bestObj = o
+                            best = outcome.sample
+                            if (singleObj != null) objVarBest = outcome.sample.ints[singleObj.varId]
+                            params.onEvent?.invoke(SearchEvent.Incumbent(o))
+                            // Yield each new incumbent eagerly — consumers can react to it
+                            // before search continues toward the bound. The reason here is
+                            // a hint ("more might come"); the terminal yield carries the
+                            // real verdict.
+                            yield(MinimizeResult.BestFound(outcome.sample, o, TerminationReason.BudgetExhausted))
+                        }
+                    }
 
-                is SearchOutcome.Exhausted -> {
-                    // When an external bound supplier is active, the engine has pruned
-                    // subtrees against bounds that may be tighter than the local incumbent.
-                    // Its terminal verdict can therefore no longer claim local-Optimal nor
-                    // global-Infeasible soundly — the unpruned space proves a property
-                    // relative to the shared bound, not absolutely. Downgrade to BestFound
-                    // (when a local incumbent exists) or Unknown (when none does); the
-                    // calling portfolio can upgrade to Optimal/Infeasible after combining
-                    // every worker's verdict.
-                    val externalShared = params.objectiveBoundSupplier != null
-                    sink.stop()
-                    val stats = sink.snapshot()
-                    yield(
-                        when {
-                            externalShared && best != null ->
-                                MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted, stats)
+                    is SearchOutcome.Exhausted -> {
+                        // When an external bound supplier is active, the engine has pruned
+                        // subtrees against bounds that may be tighter than the local incumbent.
+                        // Its terminal verdict can therefore no longer claim local-Optimal nor
+                        // global-Infeasible soundly — the unpruned space proves a property
+                        // relative to the shared bound, not absolutely. Downgrade to BestFound
+                        // (when a local incumbent exists) or Unknown (when none does); the
+                        // calling portfolio can upgrade to Optimal/Infeasible after combining
+                        // every worker's verdict.
+                        val externalShared = params.objectiveBoundSupplier != null
+                        sink.stop()
+                        val stats = sink.snapshot()
+                        yield(
+                            when {
+                                externalShared && best != null ->
+                                    MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted, stats)
 
-                            externalShared ->
-                                MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
+                                externalShared ->
+                                    MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
-                            best != null -> MinimizeResult.Optimal(best, bestObj, stats)
+                                best != null -> MinimizeResult.Optimal(best, bestObj, stats)
 
-                            else -> MinimizeResult.Infeasible(outcome.core, stats)
-                        },
-                    )
-                    return@sequence
-                }
+                                else -> MinimizeResult.Infeasible(outcome.core, stats)
+                            },
+                        )
+                        return@sequence
+                    }
 
-                SearchOutcome.BudgetCapped -> {
-                    sink.stop()
-                    sink.timedOut = true
-                    val stats = sink.snapshot()
-                    yield(
-                        if (best != null) {
-                            MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted, stats)
-                        } else {
-                            MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
-                        },
-                    )
-                    return@sequence
+                    SearchOutcome.BudgetCapped -> {
+                        sink.stop()
+                        sink.timedOut = true
+                        val stats = sink.snapshot()
+                        yield(
+                            if (best != null) {
+                                MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted, stats)
+                            } else {
+                                MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+                            },
+                        )
+                        return@sequence
+                    }
                 }
             }
+            // Sequence drained without a terminal outcome — treat as exhausted.
+            sink.stop()
+            yield(
+                if (best != null) {
+                    MinimizeResult.Optimal(best, bestObj, sink.snapshot())
+                } else {
+                    MinimizeResult.Infeasible(stats = sink.snapshot())
+                },
+            )
         }
-        // Sequence drained without a terminal outcome — treat as exhausted.
-        sink.stop()
-        yield(
-            if (best != null) {
-                MinimizeResult.Optimal(best, bestObj, sink.snapshot())
-            } else {
-                MinimizeResult.Infeasible(stats = sink.snapshot())
-            },
-        )
-    }
 
     /**
      * Sound lower bound on a [LinearObjective] given the current partial assignment in

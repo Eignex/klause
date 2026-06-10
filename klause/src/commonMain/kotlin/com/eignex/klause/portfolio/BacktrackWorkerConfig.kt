@@ -1,7 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.IncrementalObjective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -21,10 +22,12 @@ import com.eignex.klause.solver.backtrack.SolutionGuided
  * and event sink), so the same config value is safe to reuse across slots.
  *
  * **Per-kind ranking** ([ranked]) is the backtrack half of the #9 tuning surface:
- *  - **COP**: `satOptimized · conflictDriven · linucb · free` — SAT-optimized first (the #117
+ *  - **COP**: `satOptimized · conflictDriven · lp · linucb · free` — SAT-optimized first (the #117
  *    pigeonhole/dense-3SAT guard stays at slot 0 for any pool with ≥1 backtrack worker), then the
- *    conflict-driven workhorse, then the learned LinUCB routing/feasibility-reach arm, then the bare
- *    free engine for plateau diversity. Each prunes on the shared objective bound.
+ *    conflict-driven workhorse, then the LP-focused arm (the conflict-driven core with the whole
+ *    structurally-applicable LP-relaxation family on, [BacktrackParams.lpAuto]), then the learned
+ *    LinUCB routing/feasibility-reach arm, then the bare free engine for plateau diversity. Each
+ *    prunes on the shared objective bound.
  *  - **CSP**: `satOptimized · conflictDriven · free` — **linucb dropped**: it is the COP routing
  *    arm and its per-decision contextual scoring buys nothing on pure satisfaction (objective-
  *    independent features, no bound to exploit), so a CSP would only pay the overhead.
@@ -37,15 +40,16 @@ internal data class BacktrackWorkerConfig(
 
     /** Build a backtrack worker: fresh [BacktrackSolver] session + params from [build], bound-pruning
      *  on the shared incumbent when an objective is present, and a per-arm [PoolClauseExchange] when
-     *  [clausePool] is supplied (cross-arm learned-clause sharing). LS-only knobs ([lsLambda],
-     *  [definitionalSweep]) are ignored. The label is `backtrack#<index>`. */
+     *  [clausePool] is supplied (cross-arm learned-clause sharing — the lp arm's globally valid
+     *  Farkas nogoods travel through it like any other glue clause). LS-only knobs ([lsLambda],
+     *  [lsObjective], [definitionalSweep]) are ignored. The label is `backtrack#<index>`. */
     override fun materialize(
         problem: Problem,
         index: Int,
         seed: Long,
         lsLambda: Double,
-        lsObjective: Objective?,
-        linearObjective: Objective?,
+        objective: LinearObjective?,
+        lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         clausePool: SharedClausePool?,
@@ -54,9 +58,7 @@ internal data class BacktrackWorkerConfig(
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = build(seed + 1000L + index, workerEvent)
         if (clausePool != null) params = params.copy(clauseExchange = PoolClauseExchange(clausePool))
-        // Backtrack prefers the linear objective form (falls back to the LS one); a pure CSP has no
-        // bound to prune on, so withBound is wired only when an objective is present.
-        val objective = linearObjective ?: lsObjective
+        // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
             if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
         return PortfolioWorker.of(
@@ -98,7 +100,16 @@ internal data class BacktrackWorkerConfig(
             BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = onEvent)
         }
 
-        private val copOrder = listOf(satOptimized(), conflictDriven(), linUcb(), free())
+        /** The LP-focused arm: the conflict-driven core with the whole structurally-applicable
+         *  LP-relaxation family enabled via [BacktrackParams.lpAuto] (relaxation bounding, cuts +
+         *  pool, Farkas learning, objective propagation, fixpoint, rounding probe — see
+         *  `LpAutoConfig`). A no-op fallback to plain conflict-driven on models with no
+         *  LP-applicable structure. COP-only: the LP machinery lives on the minimisation path. */
+        fun lpFocused() = BacktrackWorkerConfig("lp") { seed, onEvent ->
+            BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpAuto = true)
+        }
+
+        private val copOrder = listOf(satOptimized(), conflictDriven(), lpFocused(), linUcb(), free())
         private val cspOrder = listOf(satOptimized(), conflictDriven(), free())
 
         /** The credit-ordered backtrack pool for [kind] (see the class KDoc). */

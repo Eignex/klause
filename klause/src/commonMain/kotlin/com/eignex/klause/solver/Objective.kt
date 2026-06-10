@@ -1,14 +1,15 @@
 package com.eignex.klause.solver
 
 /**
- * Anything an [Optimizer] can score an assignment by. The contract is "lower is better" —
- * optimisation backends minimise this. To maximise, negate the weights.
+ * Anything the local-search internals can score an assignment by; "lower is better".
  *
- * The primary subtype is [LinearObjective] — the native, integer-coefficient linear
- * objective every FlatZinc `solve minimize` and the SAT/PB/XCSP/LIA front-ends produce.
- * Backends pattern-match on it for exact integer bounding and fast incremental deltas.
- * Float-variable objectives are not a distinct type: klause optimises the integer bucket
- * variable and recovers the real value only at output.
+ * This is **not** the optimizer API type: [Optimizer.minimize] is statically typed
+ * [LinearObjective] — the one canonical objective every front-end produces — so backends enable
+ * their objective machinery (LP bounding, branch-and-bound bounds, native translations) from
+ * params alone, with no objective-shape dispatch. This interface remains as the local-search
+ * engine's *internal* abstraction over the two scoring views it can descend: the linear
+ * objective itself and an optional [IncrementalObjective] gradient view of it
+ * (`LocalSearchParams.lsObjective`).
  */
 interface Objective {
     /** Objective value of [sample]; lower is better. */
@@ -16,21 +17,18 @@ interface Objective {
 }
 
 /**
- * Opt-in extension for non-[LinearObjective] objectives that can compute their per-move
- * change incrementally. The local-search engine's cost-shaping path (see
+ * A per-move *gradient view* of the (linear) objective for the local-search engine, supplied via
+ * `LocalSearchParams.lsObjective`. The engine's cost-shaping path (see
  * `LocalSearchState.shapedObjectiveDelta`) calls [deltaIfApplied] to fold the objective into
- * per-move scoring without materialising a [Sample] for every candidate move. Without this
- * interface, non-Linear objectives are only considered at "best feasible" evaluation time —
- * the descent itself is objective-blind.
+ * per-move scoring without materialising a [Sample] for every candidate move.
  *
- * Implementations must return the exact value `evaluate(applyMove(current)) − evaluate(current)`
- * for the current [Assignment] and the proposed [Move]. The move is *not* applied — the
- * engine asks about hypothetical deltas while picking the next step.
- *
- * For piecewise-linear or coordinate-separable objectives the body is typically O(1) per
- * Bool/IntSet move and O(parts) per Compound. If your objective can't compute an
- * incremental delta cheaper than full re-evaluation, prefer not to implement this — the
- * default unshaped path is faster than apply/evaluate/revert per scored move.
+ * The canonical implementation is [FunctionalObjective]: a `minimizeInt(V)` objective on a
+ * *derived* variable has zero linear gradient on decision moves (moving a decision variable
+ * merely violates `V`'s defining constraint), so the view recomputes `V` from the decision
+ * leaves. Implementations must agree with the linear objective at every **feasible** assignment
+ * — incumbent objectives must stay comparable across engines — and must return the exact value
+ * `evaluate(applyMove(current)) − evaluate(current)` for the current [Assignment] and the
+ * proposed [Move] without applying it.
  */
 interface IncrementalObjective : Objective {
     /** Change in objective if [move] were applied to [assignment]. */

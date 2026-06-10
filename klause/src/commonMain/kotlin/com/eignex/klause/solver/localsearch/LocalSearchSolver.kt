@@ -3,7 +3,6 @@ package com.eignex.klause.solver.localsearch
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.IncrementalObjective
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Move
@@ -185,14 +184,14 @@ class LocalSearchSolver(
      * randomized assignment; the best feasible objective seen across all attempts is
      * returned.
      *
-     * Specialises on [LinearObjective] for an O(arity) per-move delta. Other [Objective]
-     * subtypes fall back to a full [Objective.evaluate] re-score per candidate move, which
-     * is correct but slow.
+     * Scores moves by the O(arity) incremental [LinearObjective] delta, or by
+     * [LocalSearchParams.lsObjective]'s `deltaIfApplied` when the caller supplies that gradient
+     * view of the same objective (the functionally-defined-cone case).
      */
-    override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult =
+    override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
         improvementsInternal(objective, params, warm = null).last()
 
-    override fun improvements(objective: Objective, params: LocalSearchParams): Sequence<MinimizeResult> =
+    override fun improvements(objective: LinearObjective, params: LocalSearchParams): Sequence<MinimizeResult> =
         improvementsInternal(objective, params, warm = null)
 
     /**
@@ -202,8 +201,11 @@ class LocalSearchSolver(
      * (budget gone before feasibility). Bake-time-Unsat is the one case we can prove
      * Infeasible — propagation derived it before LS started.
      */
-    internal fun minimizeInternal(objective: Objective, params: LocalSearchParams, warm: WarmState?): MinimizeResult =
-        improvementsInternal(objective, params, warm).last()
+    internal fun minimizeInternal(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+        warm: WarmState?,
+    ): MinimizeResult = improvementsInternal(objective, params, warm).last()
 
     /**
      * Streaming search. Yields one [MinimizeResult.BestFound] per new incumbent
@@ -219,7 +221,7 @@ class LocalSearchSolver(
      * never reached feasibility.
      */
     internal fun improvementsInternal(
-        objective: Objective,
+        objective: LinearObjective,
         params: LocalSearchParams,
         warm: WarmState?,
     ): Sequence<MinimizeResult> = sequence {
@@ -232,7 +234,9 @@ class LocalSearchSolver(
             yield(MinimizeResult.Infeasible(stats = sink.snapshot()))
             return@sequence
         }
-        runMinimizeStream(objective, params, eff, warm, sink)
+        // Descend the caller's gradient view when one is supplied (it agrees with the linear
+        // objective at every feasible point, see [LocalSearchParams.lsObjective]).
+        runMinimizeStream(params.lsObjective ?: objective, params, eff, warm, sink)
     }
 
     /** Solve once and return a [SolveResult]. */
@@ -248,7 +252,7 @@ class LocalSearchSolver(
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
 
     /** Optimise against [objective] under the hard constraints. */
-    fun minimize(objective: Objective): MinimizeResult = minimize(objective, LocalSearchParams())
+    fun minimize(objective: LinearObjective): MinimizeResult = minimize(objective, LocalSearchParams())
 
     private fun streamImpl(
         params: LocalSearchParams,
@@ -553,9 +557,10 @@ class LocalSearchSolver(
         objective: Objective,
         cancellation: Cancellation,
     ): Boolean {
-        if (!isIncremental(objective)) return greedyObjectiveStepByEvaluate(state, objective, cancellation)
-        // Incremental path: score each candidate via netDelta (post-move cost, no commit) +
-        // objectiveDelta (O(arity)), so no snapshot/evaluate per candidate — only on commit.
+        // Score each candidate via netDelta (post-move cost, no commit) + objectiveDelta
+        // (O(arity)), so no snapshot/evaluate per candidate — only on commit. Every objective
+        // that can reach the descent is incremental ([LinearObjective] or the caller's
+        // [LocalSearchParams.lsObjective] gradient view), so there is no evaluate fallback.
         val baseCost = state.cost
         val poll = IntArray(1)
         var bestDelta = 0.0
@@ -616,69 +621,6 @@ class LocalSearchSolver(
         return true
     }
 
-    /** Non-incremental fallback for [greedyObjectiveStep]: apply-then-revert each candidate
-     *  and re-[Objective.evaluate] the snapshot. Used only for objectives that expose no
-     *  incremental delta (neither [LinearObjective] nor [IncrementalObjective]). */
-    private fun greedyObjectiveStepByEvaluate(
-        state: LocalSearchState,
-        objective: Objective,
-        cancellation: Cancellation,
-    ): Boolean {
-        val baselineSnap = state.assignment.snapshot()
-        val baselineObj = objective.evaluate(baselineSnap)
-        val poll = IntArray(1)
-        var bestDelta = 0.0
-        var bestMove: Move? = null
-
-        var b = 0
-        while (b < problem.numBoolVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = b++
-            if (state.assumptions.isFrozenBool(v)) continue
-            state.apply(Move.BoolFlip(v))
-            if (state.cost == 0L) {
-                val obj = objective.evaluate(state.assignment.snapshot())
-                val delta = obj - baselineObj
-                if (delta < bestDelta) {
-                    bestDelta = delta
-                    bestMove = Move.BoolFlip(v)
-                }
-            }
-            state.apply(Move.BoolFlip(v)) // revert
-        }
-
-        var i = 0
-        while (i < problem.numIntVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = i++
-            if (state.assumptions.isFrozenInt(v)) continue
-            val cur = state.assignment.intValue(v)
-            val d = problem.intDomains[v]
-            for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue // sparse-aware: rejects holes
-                state.apply(Move.IntSet(v, target))
-                if (state.cost == 0L) {
-                    val obj = objective.evaluate(state.assignment.snapshot())
-                    val delta = obj - baselineObj
-                    if (delta < bestDelta) {
-                        bestDelta = delta
-                        bestMove = Move.IntSet(v, target)
-                    }
-                }
-                state.apply(Move.IntSet(v, cur)) // revert
-            }
-        }
-
-        return commitBest(state, bestMove)
-    }
-
-    /** True when [objective] exposes an incremental per-move delta ([LinearObjective] or
-     *  [IncrementalObjective]); the descent steps then score moves via
-     *  [LocalSearchState.netDelta] + [LocalSearchState.objectiveDelta] instead of
-     *  snapshot + [Objective.evaluate] per candidate. */
-    private fun isIncremental(objective: Objective): Boolean =
-        objective is LinearObjective || objective is IncrementalObjective
-
     /**
      * Shaped-cost greedy step. Picks the single-variable move (bool flip / int ±1) whose
      * post-state shaped score `shape(violationCount, objective)` is strictly less than
@@ -691,10 +633,10 @@ class LocalSearchSolver(
         shaping: CostShaping,
         cancellation: Cancellation,
     ): Boolean {
-        if (!isIncremental(objective)) return shapedDescentStepByEvaluate(state, objective, shaping, cancellation)
-        // Incremental path: anchor on one baseline evaluate, then score each candidate's shaped
-        // value from (baseCost + netDelta, baselineObj + objectiveDelta) — no per-candidate
+        // Anchor on one baseline evaluate, then score each candidate's shaped value from
+        // (baseCost + netDelta, baselineObj + objectiveDelta) — no per-candidate
         // snapshot/evaluate, and no apply/revert (objectiveDelta reads the live assignment).
+        // Every reachable objective is incremental; there is no evaluate fallback.
         val baseCost = state.cost
         val baselineObj = objective.evaluate(state.assignment.snapshot())
         val poll = IntArray(1)
@@ -731,58 +673,6 @@ class LocalSearchSolver(
                     bestShaped = shaped
                     bestMove = move
                 }
-            }
-        }
-
-        return commitBest(state, bestMove)
-    }
-
-    /** Non-incremental fallback for [shapedDescentStep]: apply-then-revert each candidate and
-     *  re-[Objective.evaluate] the snapshot to read its shaped score. */
-    private fun shapedDescentStepByEvaluate(
-        state: LocalSearchState,
-        objective: Objective,
-        shaping: CostShaping,
-        cancellation: Cancellation,
-    ): Boolean {
-        val baselineSnap = state.assignment.snapshot()
-        val baselineObj = objective.evaluate(baselineSnap)
-        val poll = IntArray(1)
-        var bestShaped = shaping.shape(state.cost, baselineObj)
-        var bestMove: Move? = null
-
-        var b = 0
-        while (b < problem.numBoolVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = b++
-            if (state.assumptions.isFrozenBool(v)) continue
-            state.apply(Move.BoolFlip(v))
-            val obj = objective.evaluate(state.assignment.snapshot())
-            val shaped = shaping.shape(state.cost, obj)
-            if (shaped < bestShaped) {
-                bestShaped = shaped
-                bestMove = Move.BoolFlip(v)
-            }
-            state.apply(Move.BoolFlip(v)) // revert
-        }
-
-        var i = 0
-        while (i < problem.numIntVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = i++
-            if (state.assumptions.isFrozenInt(v)) continue
-            val cur = state.assignment.intValue(v)
-            val d = problem.intDomains[v]
-            for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue // sparse-aware: rejects holes
-                state.apply(Move.IntSet(v, target))
-                val obj = objective.evaluate(state.assignment.snapshot())
-                val shaped = shaping.shape(state.cost, obj)
-                if (shaped < bestShaped) {
-                    bestShaped = shaped
-                    bestMove = Move.IntSet(v, target)
-                }
-                state.apply(Move.IntSet(v, cur)) // revert
             }
         }
 
@@ -894,11 +784,7 @@ class LocalSearchSolver(
         val proposed = sink.list
         if (proposed.isEmpty()) return false
         val poll = IntArray(1)
-        val best = if (isIncremental(objective)) {
-            bestStructuredIncremental(state, objective, proposed, poll, cancellation)
-        } else {
-            bestStructuredByEvaluate(state, objective, proposed, poll, cancellation)
-        }
+        val best = bestStructuredIncremental(state, objective, proposed, poll, cancellation)
         sink.clear()
         return commitBest(state, best)
     }
@@ -925,38 +811,6 @@ class LocalSearchSolver(
                 bestDelta = delta
                 bestMove = move
             }
-        }
-        return bestMove
-    }
-
-    /** Non-incremental fallback for structured-move scoring: apply-then-revert each proposed
-     *  move and re-[Objective.evaluate] the snapshot. Returns the best move (or the best found
-     *  so far on cancellation). */
-    private fun bestStructuredByEvaluate(
-        state: LocalSearchState,
-        objective: Objective,
-        proposed: List<Move>,
-        poll: IntArray,
-        cancellation: Cancellation,
-    ): Move? {
-        val baselineSnap = state.assignment.snapshot()
-        val baselineObj = objective.evaluate(baselineSnap)
-        var bestDelta = 0.0
-        var bestMove: Move? = null
-        for (move in proposed) {
-            if (pollCancel(poll, cancellation)) return bestMove
-            state.apply(move)
-            if (state.cost == 0L) {
-                val obj = objective.evaluate(state.assignment.snapshot())
-                val delta = obj - baselineObj
-                if (delta < bestDelta) {
-                    bestDelta = delta
-                    bestMove = move
-                }
-            }
-            // Revert by re-applying the move's inverse. BoolFlip self-inverts; IntSet needs
-            // the original value; Compound reverts each part in reverse order.
-            revertMove(state, move, baselineSnap)
         }
         return bestMove
     }
@@ -999,10 +853,7 @@ class LocalSearchSolver(
         budget: Int,
         cancellation: Cancellation,
     ): Boolean {
-        val incremental = isIncremental(objective)
         val baseCost = state.cost
-        // baselineObj only feeds the non-incremental apply+evaluate path.
-        val baselineObj = if (incremental) 0.0 else objective.evaluate(state.assignment.snapshot())
         val rng = state.rng
         val poll = IntArray(1)
         var tried = 0
@@ -1019,26 +870,15 @@ class LocalSearchSolver(
                 val va = state.assignment.boolValue(a)
                 val vb = state.assignment.boolValue(b)
                 if (va == vb) continue
-                if (incremental) {
-                    // Score the joint swap without committing: netDelta (apply/revert-backed for
-                    // the Compound) for feasibility, objectiveDelta for the improvement test.
-                    val swap = Move.Compound(listOf(Move.BoolFlip(a), Move.BoolFlip(b)))
-                    if (baseCost + state.netDelta(swap) == 0L) {
-                        val od = state.objectiveDelta(objective, swap)
-                        if (od != null && od < 0.0) {
-                            state.apply(swap)
-                            return true
-                        }
+                // Score the joint swap without committing: netDelta (apply/revert-backed for
+                // the Compound) for feasibility, objectiveDelta for the improvement test.
+                val swap = Move.Compound(listOf(Move.BoolFlip(a), Move.BoolFlip(b)))
+                if (baseCost + state.netDelta(swap) == 0L) {
+                    val od = state.objectiveDelta(objective, swap)
+                    if (od != null && od < 0.0) {
+                        state.apply(swap)
+                        return true
                     }
-                } else {
-                    state.apply(Move.BoolFlip(a))
-                    state.apply(Move.BoolFlip(b))
-                    if (state.cost == 0L) {
-                        val obj = objective.evaluate(state.assignment.snapshot())
-                        if (obj < baselineObj) return true
-                    }
-                    state.apply(Move.BoolFlip(b))
-                    state.apply(Move.BoolFlip(a))
                 }
             }
         }
@@ -1059,24 +899,13 @@ class LocalSearchSolver(
                 val vb = state.assignment.intValue(b)
                 if (va == vb) continue
                 if (vb !in problem.intDomains[a] || va !in problem.intDomains[b]) continue
-                if (incremental) {
-                    val swap = Move.Compound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
-                    if (baseCost + state.netDelta(swap) == 0L) {
-                        val od = state.objectiveDelta(objective, swap)
-                        if (od != null && od < 0.0) {
-                            state.apply(swap)
-                            return true
-                        }
+                val swap = Move.Compound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+                if (baseCost + state.netDelta(swap) == 0L) {
+                    val od = state.objectiveDelta(objective, swap)
+                    if (od != null && od < 0.0) {
+                        state.apply(swap)
+                        return true
                     }
-                } else {
-                    state.apply(Move.IntSet(a, vb))
-                    state.apply(Move.IntSet(b, va))
-                    if (state.cost == 0L) {
-                        val obj = objective.evaluate(state.assignment.snapshot())
-                        if (obj < baselineObj) return true
-                    }
-                    state.apply(Move.IntSet(b, vb))
-                    state.apply(Move.IntSet(a, va))
                 }
             }
         }

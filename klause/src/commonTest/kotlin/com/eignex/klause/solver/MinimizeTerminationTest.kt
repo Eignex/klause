@@ -76,8 +76,13 @@ class MinimizeTerminationTest {
         // (deltaCalls == 0 until greedy descent starts probing).
         val cancellation = Cancellation { deltaCalls >= 100 }
         val result = solver.minimize(
-            objective,
-            LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 7L, cancellation = cancellation),
+            LinearObjective(boolWeights = LongArray(n) { 1L }),
+            LocalSearchParams(
+                maxFlips = Long.MAX_VALUE,
+                randomSeed = 7L,
+                cancellation = cancellation,
+                lsObjective = objective,
+            ),
         )
         assertEquals(
             TerminationReason.Cancelled,

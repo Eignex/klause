@@ -28,21 +28,28 @@ class LpAutoConfigTest {
         Problem(0, intVars, Array(intVars) { IntDomain(0, 5) }, arrayOf(*factors))
 
     @Test
-    fun `linear structure enables lp bounding only`() {
+    fun `linear structure enables the bounding stack but no cuts`() {
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
         val r = LpAutoConfig.recommend(p)
         assertTrue(r.lpBounding)
+        // The bounding-stack techniques that need no extra structure ride along.
+        assertTrue(r.lpLearn)
+        assertTrue(r.lpObjectiveBound)
+        assertTrue(r.lpFixpoint)
+        assertTrue(r.lpProbe)
         assertFalse(r.lpCuts)
+        assertFalse(r.lpCutPool)
         assertFalse(r.lagrangian)
         assertFalse(r.energeticReasoning)
     }
 
     @Test
-    fun `all-different enables bounding and cuts and lagrangian`() {
+    fun `all-different enables bounding and cuts and pool and lagrangian`() {
         val p = problem(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6))
         val r = LpAutoConfig.recommend(p)
         assertTrue(r.lpBounding)
         assertTrue(r.lpCuts)
+        assertTrue(r.lpCutPool)
         assertTrue(r.lagrangian)
         assertFalse(r.energeticReasoning)
     }
@@ -69,6 +76,46 @@ class LpAutoConfigTest {
         assertTrue(r.energeticReasoning)
         assertFalse(r.lpBounding)
         assertFalse(r.lpCuts)
+        assertFalse(r.lpLearn)
+        assertFalse(r.lpProbe)
+    }
+
+    @Test
+    fun `oversized model declines the lp family but keeps the structure-capped bounds`() {
+        // 2000 unit rows over 2000 vars estimate a dense tableau of ~8M cells — past the auto
+        // guard — so the LP-relaxation flags stay off; the Lagrangian/energetic bounds (own
+        // internal caps) are not size-gated.
+        val n = 2000
+        val factors = ArrayList<Factor>(n + 1)
+        repeat(n) { i -> factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, 0)) }
+        factors.add(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6))
+        val p = Problem(0, n, Array(n) { IntDomain(0, 5) }, factors.toTypedArray())
+        val r = LpAutoConfig.recommend(p)
+        assertFalse(r.lpBounding)
+        assertFalse(r.lpCuts)
+        assertFalse(r.lpProbe)
+        assertTrue(r.lagrangian)
+    }
+
+    @Test
+    fun `lpAuto resolves at minimize and engages the lp machinery`() {
+        // Triangle covering: optimum 3. With lpAuto the node LPs must actually run (pivots
+        // observed); without it the default params leave the LP family off.
+        val p = problem(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 2),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val auto = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpAuto = true))
+        assertTrue(auto is MinimizeResult.Optimal)
+        assertEquals(3.0, auto.objectiveValue)
+        assertTrue(auto.stats.lpPivots.sum > 0.0, "lpAuto must engage the node LP")
+
+        val plain = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
+        assertTrue(plain is MinimizeResult.Optimal)
+        assertEquals(3.0, plain.objectiveValue)
+        assertEquals(0.0, plain.stats.lpPivots.sum, "without lpAuto the LP family stays off")
     }
 
     @Test

@@ -5,8 +5,8 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -122,6 +122,8 @@ internal object SolveCore {
             costShaping = CostShaping.Linear(lambda = setup.lambda),
             cancellation = cancel,
             initialAssignment = initial,
+            // The model's per-move gradient view of the objective, when it provides one.
+            lsObjective = solvable.lsObjective,
             onEvent = verboseListener(common.verbose),
         )
         cliLogger(common.verbose).v {
@@ -163,8 +165,8 @@ internal object SolveCore {
             PortfolioBuilder.build(
                 solvable.problem,
                 scenario,
+                objective = solvable.linearObjective,
                 lsObjective = solvable.lsObjective,
-                linearObjective = solvable.linearObjective,
                 definitionalSweep = solvable.definitionalSweep,
                 onEvent = portfolioVerboseListener(common.verbose),
             ),
@@ -300,13 +302,9 @@ internal object SolveCore {
             runOptimizeViaEnumerate(solver, params, solvable, common, output, complete)
             return
         }
-        // LS descends a decomposed objective with a per-move gradient; complete backends keep
-        // the linear form for bounding.
-        val objective: Objective = if (solver is LocalSearchSolver) {
-            solvable.lsObjective ?: requireNotNull(solvable.linearObjective)
-        } else {
-            requireNotNull(solvable.linearObjective)
-        }
+        // Every backend minimises the canonical linear objective; the LS engine additionally
+        // descends the model's per-move gradient view, threaded through its params by the caller.
+        val objective: LinearObjective = requireNotNull(solvable.linearObjective)
         var produced = 0
         val t0 = nowMillis()
         var lastStats = SolveStats.EMPTY

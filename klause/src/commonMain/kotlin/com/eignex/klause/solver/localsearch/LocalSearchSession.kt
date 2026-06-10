@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
@@ -65,12 +65,12 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
         solver.enumerateInternal(applyStack(params), warm)
 
     /** Optimisation entry point — overrides [Session.minimize] with warm-start support. */
-    override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult =
+    override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
         solver.minimizeInternal(objective, applyStack(params), warm)
 
     /** Streaming optimisation — yields each new incumbent then a terminal verdict.
      *  Mirrors [com.eignex.klause.solver.Optimizer.improvements]. */
-    override fun improvements(objective: Objective, params: LocalSearchParams): Sequence<MinimizeResult> =
+    override fun improvements(objective: LinearObjective, params: LocalSearchParams): Sequence<MinimizeResult> =
         solver.improvementsInternal(objective, applyStack(params), warm)
 
     private fun applyStack(params: LocalSearchParams): LocalSearchParams {

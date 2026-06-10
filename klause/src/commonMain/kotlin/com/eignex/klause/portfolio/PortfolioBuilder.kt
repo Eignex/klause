@@ -1,7 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.IncrementalObjective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.kumulant.core.Concurrency
@@ -23,11 +24,10 @@ object PortfolioBuilder {
     /**
      * Compose [scenario] and materialise its arms over [problem].
      *
-     * For optimisation the two objective representations differ per engine but agree on the scalar
-     * bound (#63): [lsObjective] is the functional/gradient objective the local-search workers
-     * descend, [linearObjective] is the [com.eignex.klause.solver.LinearObjective] the backtrack
-     * workers bound-prune on. Either may be null: pass both null for a satisfaction-only portfolio,
-     * or just one if the model only provides that form (each engine falls back to the other).
+     * [objective] is the canonical [LinearObjective] every optimising worker minimises (null for a
+     * satisfaction-only portfolio). [lsObjective] is the optional per-move gradient view of the
+     * same objective for the local-search workers (see `LocalSearchParams.lsObjective`); backtrack
+     * workers ignore it.
      *
      * [definitionalSweep] is threaded into every LS worker (per-move invariants, #153). [onEvent]
      * threads the [SearchEvent] seam through to every worker tagged with its label; workers run
@@ -36,8 +36,8 @@ object PortfolioBuilder {
     fun build(
         problem: Problem,
         scenario: PortfolioScenario,
-        lsObjective: Objective? = null,
-        linearObjective: Objective? = null,
+        objective: LinearObjective? = null,
+        lsObjective: IncrementalObjective? = null,
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): List<PortfolioWorker> = materialize(
@@ -45,8 +45,8 @@ object PortfolioBuilder {
         PortfolioComposition.compose(scenario),
         scenario.seed,
         scenario.lsLambda,
+        objective,
         lsObjective,
-        linearObjective,
         definitionalSweep,
         onEvent,
         clausePool = clausePoolFor(scenario),
@@ -65,8 +65,8 @@ object PortfolioBuilder {
         kind: Kind,
         seed: Long = 0L,
         lsLambda: Double = 1.0,
-        lsObjective: Objective? = null,
-        linearObjective: Objective? = null,
+        objective: LinearObjective? = null,
+        lsObjective: IncrementalObjective? = null,
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): List<PortfolioWorker> {
@@ -83,7 +83,7 @@ object PortfolioBuilder {
         // The credit campaign measures per-worker attribution, which cross-arm clause sharing would
         // confound, so the explicit path never shares.
         return materialize(
-            problem, arms, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent,
+            problem, arms, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent,
             clausePool = null,
         )
     }
@@ -96,15 +96,15 @@ object PortfolioBuilder {
         arms: List<WorkerConfig>,
         seed: Long,
         lsLambda: Double,
-        lsObjective: Objective?,
-        linearObjective: Objective?,
+        objective: LinearObjective?,
+        lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         clausePool: SharedClausePool?,
     ): List<PortfolioWorker> {
         val workers = arms.mapIndexed { i, config ->
             config.materialize(
-                problem, i, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent, clausePool,
+                problem, i, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, clausePool,
             )
         }
         check(workers.isNotEmpty()) { "portfolio produced no workers" }

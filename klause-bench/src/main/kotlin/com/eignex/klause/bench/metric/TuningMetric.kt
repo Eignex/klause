@@ -6,7 +6,7 @@ import com.eignex.klause.bench.report.markdown
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -62,7 +62,7 @@ private data class RunResult(val feasible: Boolean, val objective: Double?, val 
 private interface TuneConfig {
     val id: String
     fun satisfy(p: Problem, seed: Long, budget: Budget): RunResult
-    fun optimize(p: Problem, obj: Objective, seed: Long, budget: Budget): RunResult
+    fun optimize(p: Problem, obj: LinearObjective, seed: Long, budget: Budget): RunResult
 }
 
 private class LsConfig(override val id: String, val shaping: CostShaping) : TuneConfig {
@@ -76,7 +76,7 @@ private class LsConfig(override val id: String, val shaping: CostShaping) : Tune
         val s = LocalSearchSolver(p).sample(params(seed, budget))
         return RunResult(s.assignment != null, null, System.currentTimeMillis() - t0)
     }
-    override fun optimize(p: Problem, obj: Objective, seed: Long, budget: Budget): RunResult {
+    override fun optimize(p: Problem, obj: LinearObjective, seed: Long, budget: Budget): RunResult {
         val t0 = System.currentTimeMillis()
         val r = LocalSearchSolver(p).minimize(obj, params(seed, budget))
         return RunResult(r.assignment != null, r.objectiveValue, System.currentTimeMillis() - t0)
@@ -93,7 +93,7 @@ private class BtConfig(override val id: String) : TuneConfig {
         val s = BacktrackSolver(p).sample(params(seed, budget))
         return RunResult(s.assignment != null, null, System.currentTimeMillis() - t0)
     }
-    override fun optimize(p: Problem, obj: Objective, seed: Long, budget: Budget): RunResult {
+    override fun optimize(p: Problem, obj: LinearObjective, seed: Long, budget: Budget): RunResult {
         val t0 = System.currentTimeMillis()
         val r = BacktrackSolver(p).minimize(obj, params(seed, budget))
         return RunResult(r.assignment != null, r.objectiveValue, System.currentTimeMillis() - t0)

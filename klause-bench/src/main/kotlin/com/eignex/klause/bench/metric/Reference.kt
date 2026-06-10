@@ -6,8 +6,8 @@ import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.ortools.OrToolsParams
 import com.eignex.klause.ortools.OrToolsSolver
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -28,14 +28,14 @@ internal interface Reference {
     fun solve(problem: Problem, budget: Budget, search: BacktrackParams? = null): SolveResult
     fun minimize(
         problem: Problem,
-        objective: Objective,
+        objective: LinearObjective,
         budget: Budget,
         search: BacktrackParams? = null,
     ): MinimizeResult
 
     /** Anytime incumbent stream for the anytime metric. OR-Tools yields each new incumbent
      *  over time; Choco (complete) yields its single optimum. */
-    fun improvements(problem: Problem, objective: Objective, budget: Budget): Sequence<MinimizeResult>
+    fun improvements(problem: Problem, objective: LinearObjective, budget: Budget): Sequence<MinimizeResult>
 
     companion object {
         /** The reference backends a metric may diff against. */
@@ -74,9 +74,9 @@ private object ChocoReference : Reference {
         ChocoParams(b.timeoutMillis, workers = workers, fixedSearch = search, lcg = lcg)
     override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
         ChocoSolver(problem).solve(params(budget, search))
-    override fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams?) =
+    override fun minimize(problem: Problem, objective: LinearObjective, budget: Budget, search: BacktrackParams?) =
         ChocoSolver(problem).minimize(objective, params(budget, search))
-    override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
+    override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
         ChocoSolver(problem).improvements(objective, params(budget))
 }
 
@@ -88,9 +88,9 @@ private object YuckReference : Reference {
     private fun params(b: Budget) = YuckParams(timeoutMillis = b.timeoutMillis)
     override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
         YuckSolver(problem).solve(params(budget))
-    override fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams?) =
+    override fun minimize(problem: Problem, objective: LinearObjective, budget: Budget, search: BacktrackParams?) =
         YuckSolver(problem).minimize(objective, params(budget))
-    override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
+    override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
         YuckSolver(problem).improvements(objective, params(budget))
 }
 
@@ -99,8 +99,8 @@ private object OrToolsReference : Reference {
     private fun params(b: Budget) = OrToolsParams(timeoutMillis = b.timeoutMillis)
     override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
         OrToolsSolver(problem).solve(params(budget))
-    override fun minimize(problem: Problem, objective: Objective, budget: Budget, search: BacktrackParams?) =
+    override fun minimize(problem: Problem, objective: LinearObjective, budget: Budget, search: BacktrackParams?) =
         OrToolsSolver(problem).minimize(objective, params(budget))
-    override fun improvements(problem: Problem, objective: Objective, budget: Budget) =
+    override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
         OrToolsSolver(problem).improvements(objective, params(budget))
 }
