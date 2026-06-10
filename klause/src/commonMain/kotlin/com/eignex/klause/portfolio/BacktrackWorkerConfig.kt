@@ -1,8 +1,12 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.DefinitionalSweep
+import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
+import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.RegressionVariableHeuristic
 import com.eignex.klause.solver.backtrack.SolutionGuided
@@ -26,10 +30,41 @@ import com.eignex.klause.solver.backtrack.SolutionGuided
  *    independent features, no bound to exploit), so a CSP would only pay the overhead.
  */
 internal data class BacktrackWorkerConfig(
-    val label: String,
+    override val label: String,
     /** Fresh params for a worker on the given seed, wired to emit [SearchEvent]s through the sink. */
     val build: (seed: Long, onEvent: ((SearchEvent) -> Unit)?) -> BacktrackParams,
-) {
+) : WorkerConfig {
+
+    /** Build a backtrack worker: fresh [BacktrackSolver] session + params from [build], bound-pruning
+     *  on the shared incumbent when an objective is present. LS-only knobs ([lsLambda],
+     *  [definitionalSweep]) are ignored. The label is `backtrack#<index>`. */
+    override fun materialize(
+        problem: Problem,
+        index: Int,
+        seed: Long,
+        lsLambda: Double,
+        lsObjective: Objective?,
+        linearObjective: Objective?,
+        definitionalSweep: DefinitionalSweep?,
+        onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    ): PortfolioWorker {
+        val workerLabel = "backtrack#$index"
+        val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
+        val params = build(seed + 1000L + index, workerEvent)
+        // Backtrack prefers the linear objective form (falls back to the LS one); a pure CSP has no
+        // bound to prune on, so withBound is wired only when an objective is present.
+        val objective = linearObjective ?: lsObjective
+        val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
+            if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
+        return PortfolioWorker.of(
+            workerLabel,
+            BacktrackSolver(problem).session(),
+            params,
+            objective = objective,
+            withBound = withBound,
+        )
+    }
+
     companion object {
         /** The strong CDCL/SAT stack (adaptive restarts, target phasing, 3-tier learned DB,
          *  vivification); the #117 guard. Kept at rank 0 for both kinds. */
