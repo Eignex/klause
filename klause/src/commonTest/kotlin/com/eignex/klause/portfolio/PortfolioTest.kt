@@ -345,7 +345,9 @@ class PortfolioTest {
         // A single backtrack worker (i % 3 == 0) must be the SAT-optimized config; confirm the
         // built pool both surfaces that worker and solves a conflict-heavy UNSAT instance.
         val problem = pigeonhole(pigeons = 4, holes = 3)
-        Portfolio(PortfolioBuilder.buildExplicit(problem, emptyList(), backtrackWorkers = 1, kind = Kind.CSP)).use { p ->
+        Portfolio(
+            PortfolioBuilder.buildExplicit(problem, emptyList(), backtrackWorkers = 1, kind = Kind.CSP),
+        ).use { p ->
             assertTrue(p.workers.any { it.label == "backtrack#0" }, "expected a backtrack worker")
             assertIs<SolveResult.Unsat>(p.solve())
         }

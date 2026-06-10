@@ -92,6 +92,7 @@ internal object PortfolioComposition {
     fun lsShare(kind: Kind): Double = when (kind) {
         // COP leans LS — it streams good incumbents while backtrack tightens the bound (≈ 4 LS : 2 BT).
         Kind.COP -> 2.0 / 3.0
+
         // CSP leans backtrack — only complete search proves UNSAT / reliably reaches a first feasible.
         Kind.CSP -> 1.0 / 3.0
     }
