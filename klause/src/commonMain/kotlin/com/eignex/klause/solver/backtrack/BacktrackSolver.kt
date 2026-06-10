@@ -19,6 +19,7 @@ import com.eignex.klause.solver.lp.AllDifferentSeparator
 import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CircuitSeparator
+import com.eignex.klause.solver.lp.CliqueCutSeparator
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.Cut
@@ -240,6 +241,7 @@ class BacktrackSolver(override val problem: Problem) :
                     add(AllDifferentSeparator())
                     add(GccSeparator())
                     add(KnapsackCoverSeparator())
+                    add(CliqueCutSeparator())
                     // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
                     (objective as? LinearObjective)?.let { obj ->
                         val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
