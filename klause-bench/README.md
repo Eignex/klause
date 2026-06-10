@@ -39,6 +39,7 @@ bench format-coverage:xcsp3|smtlib   parse/solve rates over a whole format libra
 | filter | meaning |
 |---|---|
 | `suite=a,b` | restrict to named suites; `suite=core` expands to the in-process core |
+| `kind=cop\|csp` | keep optimization (COP) or satisfaction (CSP) problems |
 | `category=SAT,UNSAT,CSP,OPTIMIZATION,…` | keep only these categories |
 | `tag=…` / `name=<glob>` | tag membership / substring-or-`*`-glob on the instance name |
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |

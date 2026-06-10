@@ -2,6 +2,7 @@ package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
@@ -25,9 +26,10 @@ import com.eignex.klause.bench.tools.ProfileScope
  *
  *   `bench <metric> [filters…]`   e.g. `bench parity suite=smtlib-core reference=ortools`
  *
- * Filters: `suite=a,b` (the token `core` expands to the in-process core) `category=SAT,OPT`
- * `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N` `reference=choco|ortools|yuck`
- * `timeout=<ms>` `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
+ * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
+ * `category=SAT,OPT` `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N`
+ * `reference=choco|ortools|yuck` `timeout=<ms>` `profile=cpu|wall|alloc` `profile-scope=solve|all`
+ * `profile-top=N`.
  *
  * Other commands:
  *  - `<preset-id>` — run a saved [Target] preset (see `list`); a preset is just a named
@@ -101,10 +103,14 @@ object BenchCli {
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
-     *  static-only unless named) → category/tag/name filter → family-aware caps/sampling. */
+     *  static-only unless named) → kind/category/tag/name filter → family-aware caps/sampling. */
     private fun select(f: Map<String, String>): List<ProblemRef> {
         var refs: List<ProblemRef> = f["suite"]?.split(",")?.flatMap { expandSuite(it.trim()) }
             ?: Catalog.suites.flatMap { it.problems }
+        f["kind"]?.let { kind ->
+            val wantCop = parseKind(kind)
+            refs = refs.filter { isOptimization(it) == wantCop }
+        }
         f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
             refs = refs.filter { it.category in cats }
         }
@@ -126,6 +132,18 @@ object BenchCli {
         require(n > 0 && idx in 0 until n) { "klause.bench.shard must be i/n with 0 <= i < n, got $shard" }
         return selected.filterIndexed { i, _ -> i % n == idx }
     }
+
+    /** `kind=cop` keeps optimization problems, `kind=csp` keeps satisfaction problems. */
+    private fun parseKind(kind: String): Boolean = when (kind.lowercase()) {
+        "cop", "opt", "optimization" -> true
+        "csp", "sat", "satisfaction" -> false
+        else -> error("kind must be cop|csp, got '$kind'")
+    }
+
+    /** Whether [r] is a constraint *optimization* problem (COP) rather than pure satisfaction
+     *  (CSP), judged from the catalog: an OPTIMIZATION category or a known-optimum oracle. */
+    private fun isOptimization(r: ProblemRef): Boolean =
+        r.category == Category.OPTIMIZATION || r.expected is Expected.Opt
 
     /** Expand a suite token: `core` → every in-process core suite; otherwise the named suite. */
     private fun expandSuite(token: String): List<ProblemRef> = when (token) {
@@ -191,14 +209,14 @@ object BenchCli {
             |  bench diag:backtrack | diag:cbls <x>  diagnostics
             |  bench format-coverage:xcsp3|smtlib    parse/solve rates over a whole format library
             |
-            |Filters: suite=a,b (suite=core = in-process core) category=SAT,OPTIMIZATION tag=… name=<glob>
-            |         per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>
+            |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
+            |         tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
             |  bench verify suite=core
+            |  bench parity suite=mzn-bench kind=cop per-family=1
             |  bench parity suite=smtlib-core reference=ortools
-            |  bench coverage suite=mzn-bench
             |  bench search suite=slack-alldiff timeout=30000 profile=cpu
             """.trimMargin(),
         )
