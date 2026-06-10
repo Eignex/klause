@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -30,7 +30,7 @@ class NValue(
     val mode: Mode = Mode.Eq,
     /** Per-index presence literals; empty for the non-opt fast path. */
     val presents: IntArray = EmptyIntArray,
-) : LocalSearchFactor {
+) : Factor {
 
     /** How an `nvalue` constraint's target relates to the actual distinct-value count. */
     enum class Mode {
@@ -76,33 +76,30 @@ class NValue(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val s = state.refPayload[factorId] as State
-        val nVal = state.assignment.intValue(n)
-        return when (mode) {
-            Mode.Eq -> nVal != s.distinctCount
-            Mode.AtLeast -> nVal > s.distinctCount
-            Mode.AtMost -> nVal < s.distinctCount
-        }
+        return nvDegree(s.distinctCount, state.assignment.intValue(n)) > 0
+    }
+
+    /** Graded violation: distance between [n] and the actual distinct count — `|n − distinct|`
+     *  for Eq, the one-sided shortfall/excess for AtLeast/AtMost — compressed. Gives CBLS a
+     *  gradient toward the target count instead of a flat boolean. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val s = state.refPayload[factorId] as State
+        return compressViolation(nvDegree(s.distinctCount, state.assignment.intValue(n)).toLong())
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val wasViolated = isViolatedInternal(s, state.assignment.intValue(n))
+        val before = nvDegree(s.distinctCount, state.assignment.intValue(n))
         val newDistinct = simulateDistinct(state, s, intVar, newValue)
         val newN = if (intVar == n) newValue else state.assignment.intValue(n)
-        val willViolate = isViolatedInternal(newDistinct, newN)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(nvDegree(newDistinct, newN).toLong()) - compressViolation(before.toLong())
     }
 
-    private fun isViolatedInternal(s: State, nVal: Int): Boolean = when (mode) {
-        Mode.Eq -> nVal != s.distinctCount
-        Mode.AtLeast -> nVal > s.distinctCount
-        Mode.AtMost -> nVal < s.distinctCount
-    }
-
-    private fun isViolatedInternal(distinct: Int, nVal: Int): Boolean = when (mode) {
-        Mode.Eq -> nVal != distinct
-        Mode.AtLeast -> nVal > distinct
-        Mode.AtMost -> nVal < distinct
+    /** Graded distance of a `distinct`-count against the target [n] value, per [mode]. */
+    private fun nvDegree(distinct: Int, nVal: Int): Int = when (mode) {
+        Mode.Eq -> if (nVal >= distinct) nVal - distinct else distinct - nVal
+        Mode.AtLeast -> if (nVal > distinct) nVal - distinct else 0
+        Mode.AtMost -> if (distinct > nVal) distinct - nVal else 0
     }
 
     private fun simulateDistinct(state: LocalSearchState, s: State, intVar: Int, newValue: Int): Int {
@@ -126,8 +123,8 @@ class NValue(
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
-        val nVal = state.assignment.intValue(n)
-        val wasViolated = isViolatedInternal(s, nVal)
+        val nBefore = if (intVar == n) oldValue else state.assignment.intValue(n)
+        val beforeDeg = nvDegree(s.distinctCount, nBefore)
         var occurrences = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrences++
         if (occurrences > 0) {
@@ -143,14 +140,15 @@ class NValue(
             if (newCount == 0) s.distinctCount++
             s.counts.put(cur, newCount + occurrences)
         }
-        val nowViolated = isViolatedInternal(s, state.assignment.intValue(n))
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        val afterDeg = nvDegree(s.distinctCount, state.assignment.intValue(n))
+        return compressViolation(afterDeg.toLong()) - compressViolation(beforeDeg.toLong())
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = isViolatedInternal(s, state.assignment.intValue(n))
+        val nVal = state.assignment.intValue(n)
+        val before = nvDegree(s.distinctCount, nVal)
         // Simulate the flip's net effect on distinct.
         var distinct = s.distinctCount
         val touched = MutableIntIntMap() // value → delta to counts[value]
@@ -161,19 +159,19 @@ class NValue(
             touched.addTo(value, if (wasP) -1 else 1)
         }
         touched.forEach { value, delta ->
-            val before = s.counts.getOrDefault(value, 0)
-            val after = before + delta
-            if (before == 0 && after > 0) distinct++
-            if (before > 0 && after == 0) distinct--
+            val cntBefore = s.counts.getOrDefault(value, 0)
+            val cntAfter = cntBefore + delta
+            if (cntBefore == 0 && cntAfter > 0) distinct++
+            if (cntBefore > 0 && cntAfter == 0) distinct--
         }
-        val willViolate = isViolatedInternal(distinct, state.assignment.intValue(n))
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(nvDegree(distinct, nVal).toLong()) - compressViolation(before.toLong())
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = isViolatedInternal(s, state.assignment.intValue(n))
+        val nVal = state.assignment.intValue(n)
+        val beforeDeg = nvDegree(s.distinctCount, nVal)
         // The flip has already landed in [state.assignment]; recompute affected counts.
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
@@ -194,8 +192,8 @@ class NValue(
                 }
             }
         }
-        val nowViolated = isViolatedInternal(s, state.assignment.intValue(n))
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        val afterDeg = nvDegree(s.distinctCount, state.assignment.intValue(n))
+        return compressViolation(afterDeg.toLong()) - compressViolation(beforeDeg.toLong())
     }
 
     /*

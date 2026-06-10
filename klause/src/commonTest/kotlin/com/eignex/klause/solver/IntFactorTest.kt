@@ -1,9 +1,9 @@
 package com.eignex.klause.solver
 import com.eignex.klause.ast.IntCmpOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.reifiedIntCompare
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class IntFactorTest {
 
-    private fun stateFor(numIntVars: Int, domains: Array<IntDomain>, factor: LocalSearchFactor): LocalSearchState {
+    private fun stateFor(numIntVars: Int, domains: Array<IntDomain>, factor: Factor): LocalSearchState {
         val problem = Problem(0, numIntVars, domains, listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         state.recompute()

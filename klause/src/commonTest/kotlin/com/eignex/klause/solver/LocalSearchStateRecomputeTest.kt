@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -11,7 +12,6 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.factor.reifiedIntCompare
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
@@ -67,7 +67,7 @@ class LocalSearchStateRecomputeTest {
                         state.longPayload[fid],
                         "${case.name} seed=$seed: longPayload[$fid] drifted",
                     )
-                    val fa = case.problem.factors[fid] as LocalSearchFactor
+                    val fa = case.problem.factors[fid]
                     assertEquals(
                         fa.isViolated(sibling, fid),
                         fa.isViolated(state, fid),

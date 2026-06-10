@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -42,7 +42,7 @@ class Mdd(
     val recordStride: Int, // 3 for plain MDD, 4 for cost MDD
     /** Cost variable id, or -1 for a plain (non-cost) MDD. */
     val cost: Int = -1,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(seq.isNotEmpty()) { "Mdd: empty seq" }
@@ -58,10 +58,49 @@ class Mdd(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !pathExists(state, -1, 0)
 
+    /** Graded violation: the minimum number of sequence positions whose symbol must change for
+     *  a valid path through the layered DAG to reach an accepting state — an edit-distance over
+     *  layers — compressed. `0` iff a path currently exists; saturates at `seq.size + 1` when no
+     *  symbol assignment admits an accepting path. Gives CBLS a gradient toward a feasible path. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation(acceptDistance { state.assignment.intValue(seq[it]) }.toLong())
+
+    /** Min symbol changes for a layer-by-layer path to an accepting state, where `getSym(i)` is
+     *  layer `i`'s current symbol (a matching transition costs 0, any other costs 1). State ids
+     *  are layer-local, sized by [numStatesPerLayer]. */
+    private inline fun acceptDistance(getSym: (Int) -> Int): Int {
+        val inf = seq.size + 1
+        var dp = IntArray(numStatesPerLayer[0]) { inf }
+        if (initial < dp.size) dp[initial] = 0
+        for (i in 0 until seq.size) {
+            val cur = getSym(i)
+            val ndp = IntArray(numStatesPerLayer[i + 1]) { inf }
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                val from = transitions[p]
+                val base = dp[from]
+                if (base < inf) {
+                    val cost = base + (if (transitions[p + 1] == cur) 0 else 1)
+                    val to = transitions[p + 2]
+                    if (cost < ndp[to]) ndp[to] = cost
+                }
+                p += recordStride
+            }
+            dp = ndp
+        }
+        var best = inf
+        for (s in accepting) if (s < dp.size && dp[s] < best) best = dp[s]
+        return best
+    }
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val wasViolated = !pathExists(state, -1, 0)
-        val willViolate = !pathExists(state, intVar, newValue)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        val before = acceptDistance { state.assignment.intValue(seq[it]) }
+        val after = acceptDistance {
+            val v = seq[it]
+            if (v == intVar) newValue else state.assignment.intValue(v)
+        }
+        return compressViolation(after.toLong()) - compressViolation(before.toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

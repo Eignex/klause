@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.factor
 import com.eignex.klause.ast.IntCmpOp
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
@@ -247,7 +247,7 @@ class FactorPropertyTest {
     }
 
     @Test fun `propose repair moves are valid`() {
-        val cases: List<Pair<LocalSearchFactor, FactorEnv>> = listOf(
+        val cases: List<Pair<Factor, FactorEnv>> = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)))
                 to FactorEnv(numBoolVars = 3),
             Cardinality(
@@ -315,7 +315,7 @@ class FactorPropertyTest {
 
     private data class FactorEnv(val numBoolVars: Int = 0, val intDomains: Array<IntDomain> = emptyArray())
 
-    private fun checkRepairValidity(factor: LocalSearchFactor, env: FactorEnv) {
+    private fun checkRepairValidity(factor: Factor, env: FactorEnv) {
         val problem = Problem(env.numBoolVars, env.intDomains.size, env.intDomains, listOf(factor))
         val rng = Random(0xfeed)
         val sink = MoveSink()
@@ -371,7 +371,7 @@ class FactorPropertyTest {
     }
 
     private fun runFactorPropertyCheck(
-        factor: LocalSearchFactor,
+        factor: Factor,
         numBoolVars: Int,
         intDomains: Array<IntDomain>,
         seed: Int,
@@ -446,7 +446,7 @@ class FactorPropertyTest {
     }
 
     private fun pickRandomMove(
-        factor: LocalSearchFactor,
+        factor: Factor,
         state: LocalSearchState,
         intDomains: Array<IntDomain>,
         rng: Random,

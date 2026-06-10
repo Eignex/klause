@@ -864,7 +864,7 @@ class LocalSearchSolver(
     }
 
     /**
-     * Factor-aware structured descent step. Collects [LocalSearchFactor.proposeStructuredMoves]
+     * Factor-aware structured descent step. Collects [com.eignex.klause.solver.Factor.proposeStructuredMoves]
      * from every factor — each factor pushes moves it knows preserve its own satisfaction
      * (e.g. `Linear EQ` pair-shifts that keep the sum, `Cardinality.exactlyOne` swaps that
      * keep the count). The engine scores each by objective delta on a temporary apply,

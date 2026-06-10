@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -27,7 +27,7 @@ class LexLess(
     val ys: IntArray,
     /** When true the relation is strict (`xs < ys`); otherwise `xs ≤ ys`. */
     val strict: Boolean,
-) : LocalSearchFactor {
+) : Factor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
@@ -38,10 +38,48 @@ class LexLess(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !satisfied(state)
 
+    /** Graded violation: at the first position `k` that decides the comparison, the overshoot
+     *  `xs[k] − ys[k]` when `xs[k] > ys[k]` (compressed) — a move shrinking that gap scores a
+     *  real improvement. When the comparable prefix is fully equal the violation is structural
+     *  (strict equal-length, or `xs` a longer extension), graded as `1`. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = lexDegree(
+        getX = { state.assignment.intValue(xs[it]) },
+        getY = { state.assignment.intValue(ys[it]) },
+    )
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val wasViolated = !satisfied(state)
-        val willViolate = !satisfiedWithOverride(state, intVar, newValue)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        val before = lexDegree(
+            getX = { state.assignment.intValue(xs[it]) },
+            getY = { state.assignment.intValue(ys[it]) },
+        )
+        val after = lexDegree(
+            getX = {
+                val v = xs[it]
+                if (v == intVar) newValue else state.assignment.intValue(v)
+            },
+            getY = {
+                val v = ys[it]
+                if (v == intVar) newValue else state.assignment.intValue(v)
+            },
+        )
+        return after - before
+    }
+
+    /** Graded lex violation under the given value accessors — mirrors [compare] but returns the
+     *  first-deciding-position overshoot magnitude instead of a boolean. `0` iff satisfied. */
+    private inline fun lexDegree(getX: (Int) -> Int, getY: (Int) -> Int): Int {
+        val len = minOf(xs.size, ys.size)
+        for (i in 0 until len) {
+            val a = getX(i)
+            val b = getY(i)
+            if (a < b) return 0
+            if (a > b) return compressViolation(a.toLong() - b)
+        }
+        return when {
+            xs.size == ys.size -> if (strict) 1 else 0
+            xs.size < ys.size -> 0
+            else -> 1
+        }
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -132,18 +170,6 @@ class LexLess(
     private fun satisfied(state: LocalSearchState): Boolean = compare(
         getX = { state.assignment.intValue(xs[it]) },
         getY = { state.assignment.intValue(ys[it]) },
-    )
-
-    /** Same but with a single var overridden by [override]. */
-    private fun satisfiedWithOverride(state: LocalSearchState, intVar: Int, override: Int): Boolean = compare(
-        getX = {
-            val v = xs[it]
-            if (v == intVar) override else state.assignment.intValue(v)
-        },
-        getY = {
-            val v = ys[it]
-            if (v == intVar) override else state.assignment.intValue(v)
-        },
     )
 
     private inline fun compare(getX: (Int) -> Int, getY: (Int) -> Int): Boolean {

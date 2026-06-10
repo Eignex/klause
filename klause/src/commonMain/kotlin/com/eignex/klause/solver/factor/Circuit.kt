@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -45,7 +45,7 @@ import kotlin.math.abs
 class Circuit(
     /** Successor variable id per node; the assignment must form one Hamiltonian cycle. */
     val succ: IntArray,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }

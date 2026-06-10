@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 /**
- * Compress a raw violation residual into the graded [com.eignex.klause.solver.localsearch.LocalSearchFactor.violationDegree]
+ * Compress a raw violation residual into the graded [com.eignex.klause.solver.Factor.violationDegree]
  * the LS cost sums. Two regimes:
  *
  *  - **`raw ≤ [SOFT]`** — returned verbatim, so the near-feasibility region (the last few

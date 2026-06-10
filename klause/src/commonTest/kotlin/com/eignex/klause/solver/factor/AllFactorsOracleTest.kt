@@ -38,7 +38,7 @@ class AllFactorsOracleTest {
             min = 1,
             max = 2,
         )
-        check(f, numBoolVars = 3)
+        check(f, numBoolVars = 3, exactProbe = true)
     }
 
     @Test fun `pseudo-boolean passes the brute-force propagation and repair oracles`() {
@@ -48,7 +48,7 @@ class AllFactorsOracleTest {
             op = PbOp.LE,
             bound = 4,
         )
-        check(f, numBoolVars = 3)
+        check(f, numBoolVars = 3, exactProbe = true)
     }
 
     @Test fun `xor passes the brute-force propagation and repair oracles`() {
@@ -80,7 +80,7 @@ class AllFactorsOracleTest {
             op = PbOp.LE,
             bound = 1,
         )
-        check(f, numBoolVars = 4)
+        check(f, numBoolVars = 4, exactProbe = true)
     }
 
     @Test fun `reified cardinality passes the brute-force propagation and repair oracles`() {
@@ -90,7 +90,7 @@ class AllFactorsOracleTest {
             min = 1,
             max = 2,
         )
-        check(f, numBoolVars = 4)
+        check(f, numBoolVars = 4, exactProbe = true)
     }
 
     @Test fun `reified int compare passes the brute-force propagation and repair oracles for every operator`() {
@@ -101,6 +101,7 @@ class AllFactorsOracleTest {
                 numBoolVars = 1,
                 intDomains = arrayOf(IntDomain(-1, 2)),
                 label = "reifiedIntCompare.$op",
+                exactProbe = true,
             )
         }
     }
@@ -129,21 +130,22 @@ class AllFactorsOracleTest {
 
     @Test fun `product passes the brute-force propagation and repair oracles`() {
         val f = Product(a = 0, b = 1, result = 2)
-        check(f, intDomains = arrayOf(IntDomain(-2, 2), IntDomain(-2, 2), IntDomain(-4, 4)))
+        check(f, intDomains = arrayOf(IntDomain(-2, 2), IntDomain(-2, 2), IntDomain(-4, 4)), exactProbe = true)
     }
 
     // ---- Counting / occurrence ---------------------------------------------------
 
     @Test fun `nvalue passes the brute-force propagation and repair oracles`() {
-        val f = NValue(n = 0, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.Eq)
+        val f = NValue(n = 3, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.Eq)
         check(
             f,
             intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
                 IntDomain(1, 3), // n
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
             ),
+            exactProbe = true,
         )
     }
 
@@ -152,7 +154,7 @@ class AllFactorsOracleTest {
         // always 2 ⟹ n ≥ 2. Exercises the greedy independent-set lower bound (sound-only;
         // nvalue is not GAC).
         val f = NValue(n = 0, xs = intArrayOf(1, 2), mode = NValue.Mode.AtMost)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 1), IntDomain(2, 3)))
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 1), IntDomain(2, 3)), exactProbe = true)
     }
 
     @Test fun `global cardinality passes the GAC propagation and repair oracles`() {
@@ -172,6 +174,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 1),
             ),
             gac = true,
+            exactProbe = true,
         )
     }
 
@@ -179,17 +182,25 @@ class AllFactorsOracleTest {
 
     @Test fun `all different passes the GAC propagation and repair oracles`() {
         val f = AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 1, domainSize = 3)
-        check(f, intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)), gac = true)
+        check(f, intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)), gac = true, exactProbe = true)
     }
 
     @Test fun `symmetric all different passes the brute-force propagation and repair oracles`() {
         val f = SymmetricAllDifferent(xs = intArrayOf(0, 1, 2, 3))
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)))
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            exactProbe = true,
+        )
     }
 
     @Test fun `lex less passes the brute-force propagation and repair oracles`() {
         val f = LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = false)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            exactProbe = true,
+        )
     }
 
     // ---- Array / extremum --------------------------------------------------------
@@ -246,6 +257,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
             ),
+            exactProbe = true,
         )
     }
 
@@ -261,6 +273,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
             ),
+            exactProbe = true,
         )
     }
 
@@ -285,12 +298,12 @@ class AllFactorsOracleTest {
             resources = intArrayOf(1, 1, 1),
             capacity = 2,
         )
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
     }
 
     @Test fun `disjunctive passes the brute-force propagation and repair oracles`() {
         val f = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(2, 1))
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)))
+        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
     }
 
     // `cumulatives` is no longer a native factor (#209) — it decomposes at the FlatZinc emit
@@ -312,6 +325,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
                 IntDomain(0, 2),
             ),
+            exactProbe = true,
         )
     }
 
@@ -338,6 +352,7 @@ class AllFactorsOracleTest {
                 IntDomain(1, 2),
                 IntDomain(1, 2), // height vars
             ),
+            exactProbe = true,
         )
     }
 
@@ -360,7 +375,7 @@ class AllFactorsOracleTest {
             q0 = 1,
             accepting = intArrayOf(1),
         )
-        check(f, intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 2)))
+        check(f, intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 2)), exactProbe = true)
     }
 
     @Test fun `mdd passes the brute-force propagation and repair oracles`() {
@@ -379,7 +394,7 @@ class AllFactorsOracleTest {
             accepting = intArrayOf(0),
             recordStride = 3,
         )
-        check(f, intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)))
+        check(f, intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)), exactProbe = true)
     }
 
     // ---- Table ------------------------------------------------------------------

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -40,7 +40,7 @@ class GlobalCardinality(
     /** Per-xs presence literals; empty for the non-opt fast path. Absent positions
      *  contribute nothing to any cover-value count and don't trip the closed check. */
     val presents: IntArray = EmptyIntArray,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(xs.isNotEmpty()) { "gcc: empty xs" }
@@ -88,107 +88,101 @@ class GlobalCardinality(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val s = state.refPayload[factorId] as State
-        // Per-cover constraint check.
+        return rawDegree(state, s.counts, ovVar = -1, ovVal = 0) > 0L
+    }
+
+    /** Graded violation: per-cover count error (`|count − countVar|`, or the bound shortfall
+     *  `max(0, lo − count) + max(0, count − hi)`) summed over the cover, plus — for the closed
+     *  variant — one unit per present `xs[i]` whose value falls outside the cover. Compressed so
+     *  a wide cover can't dominate the global cost. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val s = state.refPayload[factorId] as State
+        return compressViolation(rawDegree(state, s.counts, ovVar = -1, ovVal = 0))
+    }
+
+    /** Per-cover count-error term over [simCounts]; `(ovVar, ovVal)` overrides one count-var's
+     *  value when reading the target. */
+    private fun countsDegree(state: LocalSearchState, simCounts: IntArray, ovVar: Int, ovVal: Int): Long {
+        var deg = 0L
         for (k in cover.indices) {
             if (countVars != null) {
-                if (state.assignment.intValue(countVars[k]) != s.counts[k]) return true
+                val expected = if (countVars[k] == ovVar) ovVal else state.assignment.intValue(countVars[k])
+                val d = expected.toLong() - simCounts[k]
+                deg += if (d < 0) -d else d
             } else {
-                val cnt = s.counts[k]
-                if (cnt < requireNotNull(countLow)[k] || cnt > requireNotNull(countHigh)[k]) return true
+                val cnt = simCounts[k]
+                val lo = requireNotNull(countLow)[k]
+                val hi = requireNotNull(countHigh)[k]
+                if (cnt < lo) {
+                    deg += (lo - cnt).toLong()
+                } else if (cnt > hi) {
+                    deg += (cnt - hi).toLong()
+                }
             }
         }
-        // Closed variant: every present xs[i] must be in cover.
-        if (closed) {
-            for (i in xs.indices) {
-                if (!present(state, i)) continue
-                if (state.assignment.intValue(xs[i]) !in coverIndexByValue) return true
-            }
-        }
-        return false
+        return deg
     }
+
+    /** Closed-variant term: present `xs[i]` whose value is outside the cover. `(ovVar, ovVal)`
+     *  overrides one xs value; `flipVar >= 0` inverts the presence of positions controlled by
+     *  that presence-var (used to evaluate a candidate bool flip). */
+    private fun closedDegree(state: LocalSearchState, ovVar: Int, ovVal: Int, flipVar: Int = -1): Long {
+        if (!closed) return 0L
+        var deg = 0L
+        for (i in xs.indices) {
+            val controlled = flipVar >= 0 && presents.isNotEmpty() && Lit.variable(presents[i]) == flipVar
+            val p = if (controlled) !present(state, i) else present(state, i)
+            if (!p) continue
+            val v = if (xs[i] == ovVar) ovVal else state.assignment.intValue(xs[i])
+            if (v !in coverIndexByValue) deg++
+        }
+        return deg
+    }
+
+    private fun rawDegree(state: LocalSearchState, simCounts: IntArray, ovVar: Int, ovVal: Int): Long =
+        countsDegree(state, simCounts, ovVar, ovVal) + closedDegree(state, ovVar, ovVal)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val wasViolated = isViolated(state, factorId)
-        // Simulate the change by adjusting a counts copy.
+        val before = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
         val sim = s.counts.copyOf()
         var occurrencesInXs = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
             val old = state.assignment.intValue(intVar)
-            val oldIdx = coverIndexByValue[old]
-            if (oldIdx != null) sim[oldIdx] -= occurrencesInXs
-            val newIdx = coverIndexByValue[newValue]
-            if (newIdx != null) sim[newIdx] += occurrencesInXs
+            coverIndexByValue[old]?.let { sim[it] -= occurrencesInXs }
+            coverIndexByValue[newValue]?.let { sim[it] += occurrencesInXs }
         }
-        val willViolate = simulatedViolation(state, intVar, newValue, sim)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
-    }
-
-    private fun simulatedViolation(state: LocalSearchState, intVar: Int, newValue: Int, simCounts: IntArray): Boolean {
-        for (k in cover.indices) {
-            if (countVars != null) {
-                val expected = if (countVars[k] == intVar) {
-                    newValue
-                } else {
-                    state.assignment.intValue(countVars[k])
-                }
-                if (expected != simCounts[k]) return true
-            } else {
-                if (simCounts[k] < requireNotNull(
-                        countLow,
-                    )[k] || simCounts[k] > requireNotNull(countHigh)[k]
-                ) {
-                    return true
-                }
-            }
-        }
-        if (closed) {
-            for (i in xs.indices) {
-                if (!present(state, i)) continue
-                val x = xs[i]
-                val v = if (x == intVar) newValue else state.assignment.intValue(x)
-                if (v !in coverIndexByValue) return true
-            }
-        }
-        return false
+        val after = rawDegree(state, sim, ovVar = intVar, ovVal = newValue)
+        return compressViolation(after) - compressViolation(before)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
-        val wasViolated = state.refPayload[factorId].let { p ->
-            // Use the existing isViolated against pre-update counts.
-            // The counts haven't been updated yet — we compare against assignment which IS post-update.
-            // To compare against pre-update, simulate the inverse.
-            val sim = s.counts.copyOf()
-            var occ = 0
-            for (x in xs) if (x == intVar) occ++
-            if (occ > 0) {
-                val oldIdx = coverIndexByValue[oldValue]
-                val newIdx = coverIndexByValue[cur]
-                if (newIdx != null) sim[newIdx] -= occ // undo post-update
-                if (oldIdx != null) sim[oldIdx] += occ // restore pre-update
-            }
-            simulatedViolation(state, intVar, oldValue, sim)
-        }
         var occurrencesInXs = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
+        // Pre-update degree: reconstruct the prior counts by inverting this move, and read the
+        // prior value (oldValue) for the count-var / closed overrides.
+        val simInv = s.counts.copyOf()
         if (occurrencesInXs > 0) {
-            val oldIdx = coverIndexByValue[oldValue]
-            val newIdx = coverIndexByValue[cur]
-            if (oldIdx != null) s.counts[oldIdx] -= occurrencesInXs
-            if (newIdx != null) s.counts[newIdx] += occurrencesInXs
+            coverIndexByValue[cur]?.let { simInv[it] -= occurrencesInXs }
+            coverIndexByValue[oldValue]?.let { simInv[it] += occurrencesInXs }
         }
-        val nowViolated = isViolated(state, factorId)
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        val beforeDeg = rawDegree(state, simInv, ovVar = intVar, ovVal = oldValue)
+        if (occurrencesInXs > 0) {
+            coverIndexByValue[oldValue]?.let { s.counts[it] -= occurrencesInXs }
+            coverIndexByValue[cur]?.let { s.counts[it] += occurrencesInXs }
+        }
+        val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
+        return compressViolation(afterDeg) - compressViolation(beforeDeg)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = isViolated(state, factorId)
+        val before = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
         val sim = s.counts.copyOf()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
@@ -196,46 +190,27 @@ class GlobalCardinality(
             val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
             sim[coverIdx] += if (wasP) -1 else +1
         }
-        val willViolate = simulatedViolationOnly(state, sim)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        // Counts term uses the simulated counts; closed term re-evaluates with the flip applied.
+        val after = countsDegree(state, sim, ovVar = -1, ovVal = 0) +
+            closedDegree(state, ovVar = -1, ovVal = 0, flipVar = boolVar)
+        return compressViolation(after) - compressViolation(before)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = isViolated(state, factorId)
+        // Flip is already applied to the assignment; reconstruct the pre-flip degree by inverting
+        // the presence of boolVar's positions for the closed term, against the un-mutated counts.
+        val beforeDeg = countsDegree(state, s.counts, ovVar = -1, ovVal = 0) +
+            closedDegree(state, ovVar = -1, ovVal = 0, flipVar = boolVar)
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val nowP = present(state, i)
             val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
             s.counts[coverIdx] += if (nowP) +1 else -1
         }
-        val nowViolated = isViolated(state, factorId)
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
-    }
-
-    /** Check counts-only violation given a simulated counts vector. Skips the closed-set
-     *  check (which is unaffected by presence flips on already-in-cover values). */
-    private fun simulatedViolationOnly(state: LocalSearchState, simCounts: IntArray): Boolean {
-        for (k in cover.indices) {
-            if (countVars != null) {
-                if (state.assignment.intValue(countVars[k]) != simCounts[k]) return true
-            } else {
-                if (simCounts[k] < requireNotNull(
-                        countLow,
-                    )[k] || simCounts[k] > requireNotNull(countHigh)[k]
-                ) {
-                    return true
-                }
-            }
-        }
-        if (closed) {
-            for (i in xs.indices) {
-                if (!OptPresence.isPresentInAssignment(presents, i, state)) continue
-                if (state.assignment.intValue(xs[i]) !in coverIndexByValue) return true
-            }
-        }
-        return false
+        val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
+        return compressViolation(afterDeg) - compressViolation(beforeDeg)
     }
 
     /** Vars currently pinned (singleton) to [value], among [scope]. */
