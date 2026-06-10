@@ -51,6 +51,8 @@ data class SolveStats(
     val lpPivots: SumResult = ZERO_COUNT,
     /** LP cuts added by separators (#22). */
     val lpCuts: SumResult = ZERO_COUNT,
+    /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate (#280). */
+    val lpBackjumps: SumResult = ZERO_COUNT,
     /** Nodes pruned by the Lagrangian bound (#23). */
     val lagrangianPruned: SumResult = ZERO_COUNT,
     /** Nodes pruned by the Cumulative energetic-reasoning check (#22/#23). */
@@ -90,6 +92,7 @@ data class SolveStats(
             lpFixed = SumResult(lpFixed.sum + other.lpFixed.sum),
             lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
             lpCuts = SumResult(lpCuts.sum + other.lpCuts.sum),
+            lpBackjumps = SumResult(lpBackjumps.sum + other.lpBackjumps.sum),
             lagrangianPruned = SumResult(lagrangianPruned.sum + other.lagrangianPruned.sum),
             energeticPruned = SumResult(energeticPruned.sum + other.energeticPruned.sum),
             peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
@@ -128,6 +131,7 @@ internal class SolveStatsSink(val backend: String) {
     val lpFixed: CountStat = CountStat()
     val lpPivots: CountStat = CountStat()
     val lpCuts: CountStat = CountStat()
+    val lpBackjumps: CountStat = CountStat()
     val lagrangianPruned: CountStat = CountStat()
     val energeticPruned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
@@ -202,6 +206,11 @@ internal class SolveStatsSink(val backend: String) {
         repeat(count) { lpCuts.update(1.0) }
     }
 
+    /** A non-chronological backjump driven by an LP infeasibility certificate (#280). */
+    fun observeLpBackjump() {
+        lpBackjumps.update(1.0)
+    }
+
     /** A node whose subtree was cut by the Lagrangian bound (#23). */
     fun observeLagrangianPrune() {
         lagrangianPruned.update(1.0)
@@ -231,6 +240,7 @@ internal class SolveStatsSink(val backend: String) {
             lpFixed = lpFixed.read(),
             lpPivots = lpPivots.read(),
             lpCuts = lpCuts.read(),
+            lpBackjumps = lpBackjumps.read(),
             lagrangianPruned = lagrangianPruned.read(),
             energeticPruned = energeticPruned.read(),
             peakDepth = peakDepth.read(),

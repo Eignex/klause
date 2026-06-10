@@ -1503,6 +1503,7 @@ class BacktrackSolver(override val problem: Problem) :
                     lpLearned.literals.none { session.litTruth(it) == true } &&
                     relearnTripped?.invoke(lpLearned) != true
                 ) {
+                    sink?.observeLpBackjump()
                     session.popLast()
                     return AdvanceOutcome.Backjump(lpLearned)
                 }
