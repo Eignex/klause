@@ -79,40 +79,42 @@ class ReifiedCardinality(
      *  indicator wants the count in range but it isn't, the compressed distance to the window
      *  `max(0, min − n) + max(0, n − max)` (so body flips that close the gap score); when the
      *  indicator wants it out of range but it's in, `1`. Mirrors the [ReifiedLinear] gradient. */
-    private fun degreeFor(n: Int, aux: Boolean): Int {
+    private fun degreeFor(n: Int, aux: Boolean, softCap: Int): Int {
         val h = inRange(n)
         return when {
             aux == h -> 0
-            aux -> compressViolation(((if (n < min) min - n else 0) + (if (n > max) n - max else 0)).toLong())
+            aux -> compressViolation(((if (n < min) min - n else 0) + (if (n > max) n - max else 0)).toLong(), softCap)
             else -> 1
         }
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeFor(state.intPayload[factorId], state.assignment.boolValue(auxBoolVar))
+        degreeFor(state.intPayload[factorId], state.assignment.boolValue(auxBoolVar), state.violationSoftCap)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val n = state.intPayload[factorId]
+        val cap = state.violationSoftCap
         return if (boolVar == auxBoolVar) {
-            degreeFor(n, !aux) - degreeFor(n, aux)
+            degreeFor(n, !aux, cap) - degreeFor(n, aux, cap)
         } else {
             val change = changeOnFlip(state, boolVar, current = true)
-            degreeFor(n + change, aux) - degreeFor(n, aux)
+            degreeFor(n + change, aux, cap) - degreeFor(n, aux, cap)
         }
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val oldN = state.intPayload[factorId]
+        val cap = state.violationSoftCap
         if (boolVar == auxBoolVar) {
             val newAux = state.assignment.boolValue(auxBoolVar)
-            return degreeFor(oldN, newAux) - degreeFor(oldN, !newAux)
+            return degreeFor(oldN, newAux, cap) - degreeFor(oldN, !newAux, cap)
         }
         val change = changeOnFlip(state, boolVar, current = false)
         val newN = oldN + change
         state.intPayload[factorId] = newN
         val aux = state.assignment.boolValue(auxBoolVar)
-        return degreeFor(newN, aux) - degreeFor(oldN, aux)
+        return degreeFor(newN, aux, cap) - degreeFor(oldN, aux, cap)
     }
 
     /**
@@ -287,16 +289,17 @@ class ReifiedCardinality(
             val changeV = if (flippedPost) signedFlipped else -signedFlipped
             oldN = newN - changeV
         }
-        val oldDeg = degreeFor(oldN, oldAux)
-        val newDeg = degreeFor(newN, newAux)
+        val cap = state.violationSoftCap
+        val oldDeg = degreeFor(oldN, oldAux, cap)
+        val newDeg = degreeFor(newN, newAux, cap)
         for (u in boolVars) {
             // Graded Δ each var's flip would produce (the value deltaIfBoolFlipped returns),
             // evaluated against the pre- and post-flip (count, aux) — break/make track its sign.
             val preDelta: Int
             val postDelta: Int
             if (u == auxBoolVar) {
-                preDelta = degreeFor(oldN, !oldAux) - oldDeg
-                postDelta = degreeFor(newN, !newAux) - newDeg
+                preDelta = degreeFor(oldN, !oldAux, cap) - oldDeg
+                postDelta = degreeFor(newN, !newAux, cap) - newDeg
             } else {
                 val signedU = signedOccurrencesByVar[u]
                 if (signedU == 0) {
@@ -307,8 +310,8 @@ class ReifiedCardinality(
                     val uPre = if (u == flippedVar) !uPost else uPost
                     val preChangeU = if (uPre) -signedU else signedU
                     val postChangeU = if (uPost) -signedU else signedU
-                    preDelta = degreeFor(oldN + preChangeU, oldAux) - oldDeg
-                    postDelta = degreeFor(newN + postChangeU, newAux) - newDeg
+                    preDelta = degreeFor(oldN + preChangeU, oldAux, cap) - oldDeg
+                    postDelta = degreeFor(newN + postChangeU, newAux, cap) - newDeg
                 }
             }
             val preBreak = preDelta > 0

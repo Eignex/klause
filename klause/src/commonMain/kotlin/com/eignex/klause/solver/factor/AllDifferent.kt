@@ -99,7 +99,7 @@ class AllDifferent(
     /** Graded degree: total clash excess `Σ max(0, count - 1)`, run through [compressViolation]
      *  so a wide all-different with many clashes can't dominate the global cost sum. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation((state.refPayload[factorId] as State).excess.toLong())
+        compressViolation((state.refPayload[factorId] as State).excess.toLong(), state.violationSoftCap)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
@@ -111,7 +111,8 @@ class AllDifferent(
         val newCount = s.counts[newValue - domainMin]
         val rawDelta = (excessOf(oldCount - n) - excessOf(oldCount)) +
             (excessOf(newCount + n) - excessOf(newCount))
-        return compressViolation((s.excess + rawDelta).toLong()) - compressViolation(s.excess.toLong())
+        return compressViolation((s.excess + rawDelta).toLong(), state.violationSoftCap) -
+            compressViolation(s.excess.toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -129,7 +130,8 @@ class AllDifferent(
         val newCount = s.counts[newIdx]
         s.counts[newIdx] = newCount + n
         s.excess += excessOf(newCount + n) - excessOf(newCount)
-        return compressViolation(s.excess.toLong()) - compressViolation(before.toLong())
+        return compressViolation(s.excess.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     /** Clash excess contributed by a single value held by [count] vars: `max(0, count - 1)`. */
@@ -172,7 +174,8 @@ class AllDifferent(
         val snapshot = s.counts
         for (k in 0 until touchedIdx.size) excessDelta += adjustExcess(snapshot, touchedIdx[k], touchedDelta[k])
         for (k in touchedIdx.size - 1 downTo 0) adjustExcess(snapshot, touchedIdx[k], -touchedDelta[k])
-        return compressViolation((s.excess + excessDelta).toLong()) - compressViolation(s.excess.toLong())
+        return compressViolation((s.excess + excessDelta).toLong(), state.violationSoftCap) -
+            compressViolation(s.excess.toLong(), state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -186,7 +189,8 @@ class AllDifferent(
             val valueIdx = state.assignment.intValue(vars[i]) - domainMin
             s.excess += adjustExcess(s.counts, valueIdx, delta)
         }
-        return compressViolation(s.excess.toLong()) - compressViolation(before.toLong())
+        return compressViolation(s.excess.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     /** Hall-style conflict reason: bound + `[v ≠ value]` hole literals confining each

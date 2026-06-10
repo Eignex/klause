@@ -40,12 +40,20 @@ object DegreeConsistencyOracle {
         iters: Int = 200,
         seed: Long = 0xD0E5L,
         exactProbe: Boolean = false,
+        softCap: Int? = null,
     ) {
         require(problem.factors.size == 1) { "DegreeConsistencyOracle expects a single-factor Problem" }
         val factor = problem.factors[0]
         val rng = Random(seed)
         val state = LocalSearchState(problem, rng)
         val fresh = LocalSearchState(problem, Random(seed xor 0x5A5AL))
+        // A non-default cap must be set on BOTH states (the fresh-recompute comparison uses it too)
+        // before any recompute. Exercises the violationSoftCap threading: a compress call left on
+        // the default cap would desync the maintained cost from the fresh recompute here.
+        if (softCap != null) {
+            state.violationSoftCap = softCap
+            fresh.violationSoftCap = softCap
+        }
 
         randomize(state, problem, rng)
         state.recompute()

@@ -69,7 +69,7 @@ class Regular(
      *  accepted word saturates at `seq.size + 1`. Gives CBLS a gradient toward acceptance
      *  instead of a flat boolean. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation(acceptDistance { state.assignment.intValue(seq[it]) }.toLong())
+        compressViolation(acceptDistance { state.assignment.intValue(seq[it]) }.toLong(), state.violationSoftCap)
 
     /** Min symbol changes to reach an accepting run, where `getSym(i)` is position `i`'s current
      *  symbol (a transition on it costs 0, any other symbol costs 1). */
@@ -103,7 +103,8 @@ class Regular(
             val v = seq[it]
             if (v == intVar) newValue else state.assignment.intValue(v)
         }
-        return compressViolation(after.toLong()) - compressViolation(before.toLong())
+        return compressViolation(after.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

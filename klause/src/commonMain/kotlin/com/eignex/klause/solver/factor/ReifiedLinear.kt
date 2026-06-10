@@ -66,15 +66,15 @@ class ReifiedLinear private constructor(
      *  but the linear holds, the natural one-step repair is to flip the indicator, so the
      *  degree is 1 (pushing the sum out of the satisfied region is rarely the right move). */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar))
+        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar), state.violationSoftCap)
 
-    private fun degreeFor(sum: Long, aux: Boolean): Int {
+    private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int {
         val h = holds(sum)
         return when {
             aux == h -> 0
 
             // indicator wants it to hold; grade by how far off (shared residual)
-            aux -> linearResidual(sum, op, bound)
+            aux -> linearResidual(sum, op, bound, softCap)
 
             else -> 1 // indicator wants it false but it holds; flip the aux
         }
@@ -83,7 +83,7 @@ class ReifiedLinear private constructor(
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
-        return degreeFor(sum, !aux) - degreeFor(sum, aux)
+        return degreeFor(sum, !aux, state.violationSoftCap) - degreeFor(sum, aux, state.violationSoftCap)
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
@@ -91,14 +91,14 @@ class ReifiedLinear private constructor(
         val sum = state.longPayload[factorId]
         val coeff = coeffOf(intVar)
         val newSum = sum + coeff.toLong() * (newValue - state.assignment.intValue(intVar))
-        return degreeFor(newSum, aux) - degreeFor(sum, aux)
+        return degreeFor(newSum, aux, state.violationSoftCap) - degreeFor(sum, aux, state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         // aux already flipped in the assignment; report Δdegree (cost is reconciled by the engine).
         val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
-        return degreeFor(sum, aux) - degreeFor(sum, !aux)
+        return degreeFor(sum, aux, state.violationSoftCap) - degreeFor(sum, !aux, state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -107,7 +107,7 @@ class ReifiedLinear private constructor(
         val oldSum = state.longPayload[factorId]
         val newSum = oldSum + coeff.toLong() * (state.assignment.intValue(intVar) - oldValue)
         state.longPayload[factorId] = newSum
-        return degreeFor(newSum, aux) - degreeFor(oldSum, aux)
+        return degreeFor(newSum, aux, state.violationSoftCap) - degreeFor(oldSum, aux, state.violationSoftCap)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {

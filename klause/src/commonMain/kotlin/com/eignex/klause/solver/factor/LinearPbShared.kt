@@ -35,22 +35,22 @@ internal fun linearHolds(sum: Long, op: LinearOp, bound: Int): Boolean = when (o
  * behind [linearHolds] (a satisfied relation has degree 0). `NE` has no natural magnitude, so it
  * is the unit residual (sum is pinned to `bound`).
  */
-internal fun linearResidual(sum: Long, op: LinearOp, bound: Int): Int = when (op) {
-    LinearOp.LE -> compressViolation(sum - bound)
+internal fun linearResidual(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int = when (op) {
+    LinearOp.LE -> compressViolation(sum - bound, softCap)
 
-    LinearOp.GE -> compressViolation(bound.toLong() - sum)
+    LinearOp.GE -> compressViolation(bound.toLong() - sum, softCap)
 
     LinearOp.EQ -> {
         val d = sum - bound
-        compressViolation(if (d < 0) -d else d)
+        compressViolation(if (d < 0) -d else d, softCap)
     }
 
     LinearOp.NE -> 1
 }
 
 /** Graded violation degree: `0` when satisfied, otherwise [linearResidual]. */
-internal fun linearDegree(sum: Long, op: LinearOp, bound: Int): Int =
-    if (linearHolds(sum, op, bound)) 0 else linearResidual(sum, op, bound)
+internal fun linearDegree(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int =
+    if (linearHolds(sum, op, bound)) 0 else linearResidual(sum, op, bound, softCap)
 
 /**
  * Integer value for a single variable (whose other terms sum to [sumWithout], coefficient

@@ -45,12 +45,15 @@ class LexLess(
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int = lexDegree(
         getX = { state.assignment.intValue(xs[it]) },
         getY = { state.assignment.intValue(ys[it]) },
+        softCap = state.violationSoftCap,
     )
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val cap = state.violationSoftCap
         val before = lexDegree(
             getX = { state.assignment.intValue(xs[it]) },
             getY = { state.assignment.intValue(ys[it]) },
+            softCap = cap,
         )
         val after = lexDegree(
             getX = {
@@ -61,19 +64,20 @@ class LexLess(
                 val v = ys[it]
                 if (v == intVar) newValue else state.assignment.intValue(v)
             },
+            softCap = cap,
         )
         return after - before
     }
 
     /** Graded lex violation under the given value accessors — mirrors [compare] but returns the
      *  first-deciding-position overshoot magnitude instead of a boolean. `0` iff satisfied. */
-    private inline fun lexDegree(getX: (Int) -> Int, getY: (Int) -> Int): Int {
+    private inline fun lexDegree(getX: (Int) -> Int, getY: (Int) -> Int, softCap: Int): Int {
         val len = minOf(xs.size, ys.size)
         for (i in 0 until len) {
             val a = getX(i)
             val b = getY(i)
             if (a < b) return 0
-            if (a > b) return compressViolation(a.toLong() - b)
+            if (a > b) return compressViolation(a.toLong() - b, softCap)
         }
         return when {
             xs.size == ys.size -> if (strict) 1 else 0

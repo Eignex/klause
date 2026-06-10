@@ -58,13 +58,13 @@ class Element(
 
     /** Graded degree for hypothetical (idxVal, resultVal); [elemAt] supplies the selected
      *  element's value (allowing a hypothetical change to a var-array entry). */
-    private inline fun degreeAt(idxVal: Int, resultVal: Int, elemAt: (pos: Int) -> Int): Int {
+    private inline fun degreeAt(idxVal: Int, resultVal: Int, softCap: Int, elemAt: (pos: Int) -> Int): Int {
         val pos = idxVal - indexOffset
-        if (pos < 0) return compressViolation((indexOffset - idxVal).toLong())
-        if (pos >= len) return compressViolation((idxVal - (indexOffset + len - 1)).toLong())
+        if (pos < 0) return compressViolation((indexOffset - idxVal).toLong(), softCap)
+        if (pos >= len) return compressViolation((idxVal - (indexOffset + len - 1)).toLong(), softCap)
         val ev = elemAt(pos)
         val d = resultVal.toLong() - ev
-        return compressViolation(if (d < 0) -d else d)
+        return compressViolation(if (d < 0) -d else d, softCap)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -74,7 +74,7 @@ class Element(
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeAt(state.assignment.intValue(idx), state.assignment.intValue(result)) { pos ->
+        degreeAt(state.assignment.intValue(idx), state.assignment.intValue(result), state.violationSoftCap) { pos ->
             elementValue(state, pos)
         }
 
@@ -83,10 +83,11 @@ class Element(
         val curResult = state.assignment.intValue(result)
         val newIdx = if (intVar == idx) newValue else curIdx
         val newResult = if (intVar == result) newValue else curResult
-        val newDeg = degreeAt(newIdx, newResult) { pos ->
+        val cap = state.violationSoftCap
+        val newDeg = degreeAt(newIdx, newResult, cap) { pos ->
             if (arrIsVars && arr[pos] == intVar) newValue else elementValue(state, pos)
         }
-        val oldDeg = degreeAt(curIdx, curResult) { pos -> elementValue(state, pos) }
+        val oldDeg = degreeAt(curIdx, curResult, cap) { pos -> elementValue(state, pos) }
         return newDeg - oldDeg
     }
 

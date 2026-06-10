@@ -10,6 +10,7 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
@@ -124,6 +125,14 @@ class LocalSearchState(
      *  outside a `minimize` call or under
      *  [com.eignex.klause.solver.localsearch.CostShaping.FeasibilityFirst]. */
     var shapingLambda: Double = 0.0
+        internal set
+
+    /** Soft cap for [com.eignex.klause.solver.factor.compressViolation]: residuals at or below it
+     *  keep exact unit resolution, above it a log tail bounds how much one large-magnitude factor
+     *  can dominate the cost sum. Set by the engine from [LocalSearchParams.violationSoftCap] once
+     *  per solve, before the first [recompute]; every graded factor reads it so the whole cost
+     *  model shares one cap. */
+    var violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP
         internal set
 
     /** Per-factor weight, default 1.0. Not read by the engine itself — every factor

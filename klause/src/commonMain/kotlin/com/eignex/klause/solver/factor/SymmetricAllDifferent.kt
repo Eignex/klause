@@ -59,11 +59,12 @@ class SymmetricAllDifferent(
 
     /** Graded violation: count of broken involution positions, compressed. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation(brokenPositions(state, ov = -1, nv = 0).toLong())
+        compressViolation(brokenPositions(state, ov = -1, nv = 0).toLong(), state.violationSoftCap)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val after = brokenPositions(state, ov = intVar, nv = newValue)
-        return compressViolation(after.toLong()) - compressViolation(brokenPositions(state, ov = -1, nv = 0).toLong())
+        return compressViolation(after.toLong(), state.violationSoftCap) -
+            compressViolation(brokenPositions(state, ov = -1, nv = 0).toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

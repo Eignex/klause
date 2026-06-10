@@ -94,20 +94,21 @@ class Cardinality(
     private fun cardDegree(n: Int): Int = (if (n < min) min - n else 0) + (if (n > max) n - max else 0)
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation(cardDegree(state.intPayload[factorId]).toLong())
+        compressViolation(cardDegree(state.intPayload[factorId]).toLong(), state.violationSoftCap)
 
     /** Compressed Δ violation-degree if [u] (currently [uVal]) were flipped while the true-count
      *  is [n] — exactly what [deltaIfBoolFlipped] returns. Shared by the break/make updater so
      *  the incremental counts track the graded delta sign. */
-    private fun signedDelta(n: Int, u: Int, uVal: Boolean): Int {
+    private fun signedDelta(n: Int, u: Int, uVal: Boolean, softCap: Int): Int {
         val signedU = signedOccurrencesByVar[u]
         if (signedU == 0) return 0
         val changeU = if (uVal) -signedU else signedU
-        return compressViolation(cardDegree(n + changeU).toLong()) - compressViolation(cardDegree(n).toLong())
+        return compressViolation(cardDegree(n + changeU).toLong(), softCap) -
+            compressViolation(cardDegree(n).toLong(), softCap)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
-        signedDelta(state.intPayload[factorId], boolVar, state.assignment.boolValue(boolVar))
+        signedDelta(state.intPayload[factorId], boolVar, state.assignment.boolValue(boolVar), state.violationSoftCap)
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val post = state.assignment.boolValue(boolVar)
@@ -117,7 +118,8 @@ class Cardinality(
         val oldN = state.intPayload[factorId]
         val newN = oldN + change
         state.intPayload[factorId] = newN
-        return compressViolation(cardDegree(newN).toLong()) - compressViolation(cardDegree(oldN).toLong())
+        return compressViolation(cardDegree(newN).toLong(), state.violationSoftCap) -
+            compressViolation(cardDegree(oldN).toLong(), state.violationSoftCap)
     }
 
     /**
@@ -562,8 +564,8 @@ class Cardinality(
             val uPre = if (u == flippedVar) !uPost else uPost
             // Break/make track the sign of the graded Δ each var's flip would produce — the same
             // value brute-force reads from deltaIfBoolFlipped — evaluated pre- and post-flip.
-            val preDelta = signedDelta(oldN, u, uPre)
-            val postDelta = signedDelta(newN, u, uPost)
+            val preDelta = signedDelta(oldN, u, uPre, state.violationSoftCap)
+            val postDelta = signedDelta(newN, u, uPost, state.violationSoftCap)
             val preBreak = preDelta > 0
             val preMake = preDelta < 0
             val postBreak = postDelta > 0

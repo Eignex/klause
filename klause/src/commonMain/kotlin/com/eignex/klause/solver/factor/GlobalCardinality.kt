@@ -97,7 +97,7 @@ class GlobalCardinality(
      *  a wide cover can't dominate the global cost. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
         val s = state.refPayload[factorId] as State
-        return compressViolation(rawDegree(state, s.counts, ovVar = -1, ovVal = 0))
+        return compressViolation(rawDegree(state, s.counts, ovVar = -1, ovVal = 0), state.violationSoftCap)
     }
 
     /** Per-cover count-error term over [simCounts]; `(ovVar, ovVal)` overrides one count-var's
@@ -154,7 +154,7 @@ class GlobalCardinality(
             coverIndexByValue[newValue]?.let { sim[it] += occurrencesInXs }
         }
         val after = rawDegree(state, sim, ovVar = intVar, ovVal = newValue)
-        return compressViolation(after) - compressViolation(before)
+        return compressViolation(after, state.violationSoftCap) - compressViolation(before, state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -176,7 +176,8 @@ class GlobalCardinality(
             coverIndexByValue[cur]?.let { s.counts[it] += occurrencesInXs }
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
-        return compressViolation(afterDeg) - compressViolation(beforeDeg)
+        return compressViolation(afterDeg, state.violationSoftCap) -
+            compressViolation(beforeDeg, state.violationSoftCap)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -193,7 +194,7 @@ class GlobalCardinality(
         // Counts term uses the simulated counts; closed term re-evaluates with the flip applied.
         val after = countsDegree(state, sim, ovVar = -1, ovVal = 0) +
             closedDegree(state, ovVar = -1, ovVal = 0, flipVar = boolVar)
-        return compressViolation(after) - compressViolation(before)
+        return compressViolation(after, state.violationSoftCap) - compressViolation(before, state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -210,7 +211,8 @@ class GlobalCardinality(
             s.counts[coverIdx] += if (nowP) +1 else -1
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
-        return compressViolation(afterDeg) - compressViolation(beforeDeg)
+        return compressViolation(afterDeg, state.violationSoftCap) -
+            compressViolation(beforeDeg, state.violationSoftCap)
     }
 
     /** Vars currently pinned (singleton) to [value], among [scope]. */

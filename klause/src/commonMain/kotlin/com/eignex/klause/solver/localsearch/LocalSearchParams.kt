@@ -7,6 +7,7 @@ import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
 
 /**
  * Per-call params for the local-search [LocalSearchSolver]. Engine setup
@@ -76,6 +77,16 @@ data class LocalSearchParams(
      * `solve` / `samples` / `enumerate`.
      */
     val initialAssignment: Sample? = null,
+    /**
+     * Soft cap for the graded violation cost (see
+     * [com.eignex.klause.solver.factor.compressViolation]). Per-factor residuals at or below this
+     * contribute their exact magnitude; above it they grow only logarithmically, so a handful of
+     * large-magnitude constraints (a wide `int_lin_eq`, a deep cumulative overload) can't dominate
+     * the cost sum and starve the many small violations feasibility needs. Lower it toward `0` for
+     * a near-pure "count of violations" cost; raise it for raw-magnitude descent. Defaults to
+     * [com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP]; shared by every factor in the solve.
+     */
+    val violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
