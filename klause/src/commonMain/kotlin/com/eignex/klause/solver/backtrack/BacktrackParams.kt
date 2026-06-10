@@ -216,6 +216,13 @@ data class BacktrackParams(
     /** Maximum separation rounds per node for [lpCuts]; each round adds cuts and re-solves. */
     val lpCutRounds: Int = 4,
     /**
+     * Separation rounds at the root node (decision level 0) for [lpCuts] (#285). The root relaxation
+     * is solved once and bounds the whole tree, so spending more rounds there to drive a strong root
+     * cut closure pays off broadly; deeper nodes keep the cheaper [lpCutRounds]. Defaults to a deeper
+     * closure than per-node; capped to at least [lpCutRounds].
+     */
+    val lpRootCutRounds: Int = 16,
+    /**
      * Include Gomory integrality cuts among the [lpCuts] separators. These come from the simplex
      * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
      * tableau makes them numerically clean. On by default when [lpCuts] is set.
