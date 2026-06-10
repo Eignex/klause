@@ -148,6 +148,17 @@ internal class DualSimplex(private val model: LpModel) {
     /** Per-variable status; see [VarStatus]. */
     private val status = IntArray(numVars)
 
+    /** Per-row max `|entry|` (clamped to `Long.MAX_VALUE`), maintained by [loadOriginalMatrix] and
+     *  [pivot]. Drives the pivot's bulk overflow precheck: when the bound proves a whole row's
+     *  Bareiss update cannot overflow, the row runs through an unchecked loop the JIT can
+     *  vectorize instead of the branch-per-element checked fallback. */
+    private val rowMaxAbs = LongArray(m)
+
+    private fun absClamped(x: Long): Long {
+        val a = if (x < 0L) -x else x
+        return if (a < 0L) Long.MAX_VALUE else a // -Long.MIN_VALUE overflows back to MIN
+    }
+
     /** Reset [nMat] to the original `[A | I | b]` and `det = 1`. */
     private fun loadOriginalMatrix() {
         for (i in 0 until m) {
@@ -155,6 +166,12 @@ internal class DualSimplex(private val model: LpModel) {
             for (j in 0 until model.n) row[j] = model.a[i][j]
             for (s in 0 until m) row[model.n + s] = if (s == i) 1L else 0L
             row[rhsCol] = model.rhs[i]
+            var mx = 0L
+            for (j in 0..numVars) {
+                val a = absClamped(row[j])
+                if (a > mx) mx = a
+            }
+            rowMaxAbs[i] = mx
         }
         d = 1L
     }
@@ -204,20 +221,80 @@ internal class DualSimplex(private val model: LpModel) {
      * One fraction-free pivot turning column [q] basic in row [r]. Updates every non-pivot row by
      * the Bareiss formula (which keeps all entries integer), leaves the pivot row unchanged, and
      * advances the shared determinant to the pivot element. Caller updates [basicVar]/[status].
+     *
+     * Hot path: a per-row bulk precheck against [rowMaxAbs] proves `|p·x| ≤ Long.MAX/2` and
+     * `|niq·z| ≤ Long.MAX/2` for the whole row at once, so the row updates in a tight unchecked
+     * loop (the divisions stay exact by the fraction-free invariant); only rows the bound cannot
+     * clear take the element-wise overflow-checked fallback. Rows with `niq == 0` reduce to a pure
+     * rescale by `p/dPrev` — the identity when `p == dPrev`.
      */
     private fun pivot(r: Int, q: Int) {
         val pivotRow = nMat[r]
         val p = pivotRow[q]
         val dPrev = d
+        val half = Long.MAX_VALUE / 2
+        val pSafe = half / absClamped(p) // max |x| with |p·x| ≤ half; p != 0 for a pivot
+        val pivMax = rowMaxAbs[r]
         for (i in 0 until m) {
             if (i == r) continue
             val row = nMat[i]
             val niq = row[q]
-            // Apply to ALL columns, including when niq == 0: the whole tableau rescales by p/dPrev,
-            // so skipping a row would desynchronize its scale from the rest of the matrix.
-            for (j in 0..numVars) {
-                row[j] = bareissStep(p, row[j], niq, pivotRow[j], dPrev)
+            var mx = 0L
+            if (niq == 0L) {
+                // The whole tableau rescales by p/dPrev; a zero-coefficient row still rescales,
+                // else its scale desynchronizes from the rest of the matrix.
+                if (p == dPrev) continue // identity rescale: row (and its max) unchanged
+                if (rowMaxAbs[i] <= pSafe) {
+                    if (dPrev == 1L) {
+                        for (j in 0..numVars) {
+                            val v = p * row[j]
+                            row[j] = v
+                            val a = if (v < 0L) -v else v
+                            if (a > mx) mx = a
+                        }
+                    } else {
+                        for (j in 0..numVars) {
+                            val v = p * row[j] / dPrev
+                            row[j] = v
+                            val a = if (v < 0L) -v else v
+                            if (a > mx) mx = a
+                        }
+                    }
+                } else {
+                    for (j in 0..numVars) {
+                        val v = bareissStep(p, row[j], 0L, 0L, dPrev)
+                        row[j] = v
+                        val a = absClamped(v)
+                        if (a > mx) mx = a
+                    }
+                }
+            } else if (rowMaxAbs[i] <= pSafe && pivMax <= half / absClamped(niq)) {
+                // The exact division dominates the near-totally-unimodular phases where the
+                // determinant sits at 1 — split it out of the kernel there.
+                if (dPrev == 1L) {
+                    for (j in 0..numVars) {
+                        val v = p * row[j] - niq * pivotRow[j]
+                        row[j] = v
+                        val a = if (v < 0L) -v else v
+                        if (a > mx) mx = a
+                    }
+                } else {
+                    for (j in 0..numVars) {
+                        val v = (p * row[j] - niq * pivotRow[j]) / dPrev
+                        row[j] = v
+                        val a = if (v < 0L) -v else v
+                        if (a > mx) mx = a
+                    }
+                }
+            } else {
+                for (j in 0..numVars) {
+                    val v = bareissStep(p, row[j], niq, pivotRow[j], dPrev)
+                    row[j] = v
+                    val a = absClamped(v)
+                    if (a > mx) mx = a
+                }
             }
+            rowMaxAbs[i] = mx
         }
         d = p
     }
@@ -452,9 +529,16 @@ internal class DualSimplex(private val model: LpModel) {
         var bestInfeas = Int.MAX_VALUE
         var sinceImprove = 0
         var useBland = false
+        // Basic values and reduced costs are computed once and then maintained incrementally:
+        // both are linear functionals of the tableau rows (beta over the rhs/at-upper columns,
+        // reduced costs over the virtual cost row), so each transforms under exactly the same
+        // Bareiss step as the tableau itself — one O(m)+O(numVars) update per pivot instead of
+        // the O(m·numVars) recompute per iteration this loop used to pay twice.
+        val beta = computeBeta()
+        val reduced = computeReducedCostsScaled()
+        val colScratch = LongArray(m) // pre-pivot entering column, for the beta update
         while (true) {
             check(iter++ <= maxIter) { "dual simplex exceeded $maxIter iterations (cycling bug?)" }
-            val beta = computeBeta()
 
             // --- Leaving variable: largest infeasibility (Dantzig), or smallest index under Bland. ---
             var r = -1
@@ -486,7 +570,7 @@ internal class DualSimplex(private val model: LpModel) {
                     }
                 }
             }
-            if (r == -1) return buildSolution(beta, LpStatus.OPTIMAL, pivots)
+            if (r == -1) return buildSolution(beta, reduced, LpStatus.OPTIMAL, pivots)
             // Stall detection: if the infeasibility count is not shrinking, fall back to Bland.
             if (infeas < bestInfeas) {
                 bestInfeas = infeas
@@ -496,7 +580,6 @@ internal class DualSimplex(private val model: LpModel) {
             }
 
             // --- Entering variable: dual ratio test, min |d_j / α_j|, Bland tie-break. ---
-            val reduced = computeReducedCostsScaled()
             val pivotRow = nMat[r]
             var q = -1
             var bestRatioNum = 0L // |reduced[q]|
@@ -527,7 +610,17 @@ internal class DualSimplex(private val model: LpModel) {
             // No entering variable: the dual is unbounded, so the primal is infeasible. The leaving
             // row [r] (basic variable past bound [belowLower], no column able to repair it) is the
             // Farkas dual ray — record its support as the infeasibility certificate.
-            if (q == -1) return buildSolution(beta, LpStatus.INFEASIBLE, pivots, r, belowLower)
+            if (q == -1) return buildSolution(beta, reduced, LpStatus.INFEASIBLE, pivots, r, belowLower)
+
+            // Capture what the incremental updates need before the tableau mutates: the entering
+            // column (pivot() rewrites it), the pivot element/determinant, and the two scalars the
+            // Bareiss updates overwrite. The pivot row itself survives pivot() unchanged.
+            val p = pivotRow[q]
+            val dPrev = d
+            for (i in 0 until m) colScratch[i] = nMat[i][q]
+            val betaR = beta[r]
+            val redQ = reduced[q]
+            val qWasUpper = status[q] == VarStatus.AT_UPPER
 
             // The leaving variable settles at the bound it was driven to.
             status[leavingVar] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
@@ -535,11 +628,34 @@ internal class DualSimplex(private val model: LpModel) {
             pivot(r, q)
             basicVar[r] = q
             status[q] = VarStatus.BASIC
+
+            // Reduced costs: the virtual cost row pivots like any other row (and lands exactly on
+            // 0 for the now-basic column q).
+            for (j in 0 until numVars) {
+                reduced[j] = bareissStep(p, reduced[j], redQ, pivotRow[j], dPrev)
+            }
+            // Basic values over the *old* seat set: the same Bareiss step, with the captured
+            // entering column standing in for N[i][q] (row r is unchanged by the pivot).
+            for (i in 0 until m) {
+                if (i != r) beta[i] = bareissStep(p, beta[i], colScratch[i], betaR, dPrev)
+            }
+            // Seat-set delta. q left the nonbasic set: its post-pivot column is det·e_r, so the
+            // at-upper contribution it used to carry survives only in row r. The leaving variable
+            // entered it: subtract its column when it settled at its upper bound (at lower it
+            // contributes nothing in the shifted space).
+            if (qWasUpper) beta[r] = addExact(beta[r], mulExact(p, model.upper[q]))
+            if (!belowLower) {
+                val ub = model.upper[leavingVar]
+                if (ub != 0L) {
+                    for (i in 0 until m) beta[i] = subExact(beta[i], mulExact(nMat[i][leavingVar], ub))
+                }
+            }
         }
     }
 
     private fun buildSolution(
         beta: LongArray,
+        reduced: LongArray,
         st: LpStatus,
         pivots: Int,
         infeasibleRow: Int = -1,
@@ -548,8 +664,6 @@ internal class DualSimplex(private val model: LpModel) {
         // Map each basic variable to its row for primal extraction.
         val varRow = IntArray(numVars) { -1 }
         for (i in 0 until m) varRow[basicVar[i]] = i
-
-        val reduced = computeReducedCostsScaled()
 
         // Objective (shifted, scaled by d): Σ_basic c·beta_i + d·Σ_{nonbasic at upper} c_j·ub_j.
         var objShifted = 0L
