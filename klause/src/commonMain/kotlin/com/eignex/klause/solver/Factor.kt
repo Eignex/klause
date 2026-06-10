@@ -20,9 +20,10 @@ internal val EmptyIntArray: IntArray = IntArray(0)
  * A factor carries two contracts. The **deductive** half — the var sets plus [propagate] —
  * is what every solver backend needs. The **local-search** half — `initialize` /
  * `isViolated` / `applyBoolFlip` / `applyIntSet` / `deltaIf*` / `proposeRepairMoves` — is
- * what the LS engine ([LocalSearchSolver]) drives. Both halves default to a sound no-op, so
- * a factor that only propagates (no LS support) just inherits the LS defaults — it reports
- * always-satisfied with zero deltas — and a pure-LS factor leaves [propagate] at its no-op.
+ * what the LS engine ([com.eignex.klause.solver.localsearch.LocalSearchSolver]) drives. Both
+ * halves default to a sound no-op, so a factor that only propagates (no LS support) just
+ * inherits the LS defaults — it reports always-satisfied with zero deltas — and a pure-LS
+ * factor leaves [propagate] at its no-op.
  */
 interface Factor {
     val boolVars: IntArray
