@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Self-authored XCSP3 smoke instance. License: internal. -->
+<!-- 3x3 magic square: a permutation of 1..9 with every line summing to 15. -->
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" size="[9]"> 1..9 </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[] </allDifferent>
+    <sum> <list> x[0] x[1] x[2] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+    <sum> <list> x[3] x[4] x[5] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+    <sum> <list> x[6] x[7] x[8] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+    <sum> <list> x[0] x[3] x[6] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+    <sum> <list> x[1] x[4] x[7] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+    <sum> <list> x[2] x[5] x[8] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+    <sum> <list> x[0] x[4] x[8] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+    <sum> <list> x[2] x[4] x[6] </list> <coeffs> 1 1 1 </coeffs> <condition> (eq,15) </condition> </sum>
+  </constraints>
+</instance>

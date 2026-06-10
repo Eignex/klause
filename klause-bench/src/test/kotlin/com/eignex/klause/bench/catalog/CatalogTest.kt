@@ -17,8 +17,9 @@ class CatalogTest {
     @Test
     fun `dimacs-core resolves with expected shapes and oracles`() {
         val byName = Catalog.suite("dimacs-core").problems.associateBy { it.name }
-        assertEquals(3, byName.size)
+        assertEquals(6, byName.size)
         assertEquals(Expected.Unsat, byName.getValue("php4").expected)
+        assertEquals(Expected.Unsat, byName.getValue("php3").expected)
         assertEquals(Expected.Sat, byName.getValue("random3sat-20-80").expected)
 
         val php4 = InProcessRunner.resolve(ref("dimacs-core", "php4")).problem

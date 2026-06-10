@@ -1,0 +1,7 @@
+c Unit + implication chain x1 -> x2 -> ... -> x5, with x1 asserted. SAT (all true).
+p cnf 5 5
+1 0
+-1 2 0
+-2 3 0
+-3 4 0
+-4 5 0

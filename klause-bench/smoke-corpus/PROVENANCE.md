@@ -1,0 +1,31 @@
+# Smoke-corpus provenance
+
+This is the **smoke corpus**: a small set of tiny, fast instances tracked in
+source, grouped by format. Every instance is deliberately small — enough to
+exercise a parser and cross-check solvers, not to stress them. Everything here
+is either self-authored (license: internal) or a small curated sample of a
+permissively-licensed public benchmark. Larger or non-redistributable
+collections are not vendored — they are fetched on demand into
+`build/corpus-cache/` by `source.CorpusFetcher` and declared in
+`catalog/Suites.kt → ExternalCollections` with their license and the reason they
+aren't copied here. Run `./gradlew :klause-bench:bench --args="list"` to see all
+catalog suites, including the discovered MiniZinc corpora.
+
+Vendored directories and their provenance:
+
+- `dimacs/` (DIMACS CNF): SATLIB-style random 3-SAT, plus self-authored
+  pigeonhole (PHP(4,3)/PHP(3,2), UNSAT), an implication chain, and a bipartite
+  2-colouring — small SAT/UNSAT shapes from public benchmarks / internal.
+- `opb/` (Pseudo-Boolean): self-authored, internal (set-cover, cardinality).
+- `schema/` (klause JSON): self-authored, internal (campaign, roster);
+  regenerate the campaign sample via `:klause-bench:dumpSchema`.
+- `flatzinc/` (FlatZinc): self-authored, internal — cardinality, permutation,
+  linear, 3x3 magic square, 4-cycle graph colouring, element channeling.
+- `smtlib/` (SMT-LIB QF_LIA): self-authored, internal — basic, optimization,
+  infeasible, and a disjunction.
+- `xcsp3/` (XCSP3): self-authored, internal — magic series, sum COP, 3x3 magic
+  square, graph colouring.
+
+MiniZinc smoke models are not copied here. They live at
+`klause-mzn-lib/test-models/` and are referenced by the `mzn-smoke` suite; they
+are also owned by klause-mzn-lib's own docs and tests.
