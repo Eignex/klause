@@ -110,8 +110,8 @@ object PortfolioBuilder {
         // objective (matches the shipped CLI LS config). Each descends the functional/gradient
         // objective when the model provides one (falling back to the linear form otherwise).
         val lsObj = lsObjective ?: linearObjective
-        // Every factor implements LocalSearchFactor (the formerly propagation-only SubsetSumEq /
-        // GaussianXor now carry redundant LS no-ops, #250), so LS workers run on any model.
+        // Every factor carries the local-search contract via its no-op defaults (the
+        // propagation-only GaussianXor just inherits them), so LS workers run on any model.
         val lsConfigs = when {
             spec.lsConfigLabels != null && spec.lsConfigLabels == listOf("all") -> LocalSearchWorkerConfig.pool()
             spec.lsConfigLabels != null -> spec.lsConfigLabels.map { LocalSearchWorkerConfig.byLabel(it) }
