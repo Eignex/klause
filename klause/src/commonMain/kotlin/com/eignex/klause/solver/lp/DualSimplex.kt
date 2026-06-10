@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.lp
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /** Outcome of an LP solve. */
 internal enum class LpStatus {
@@ -356,20 +357,131 @@ internal class DualSimplex(private val model: LpModel) {
     }
 
     /**
-     * Solve, optionally warm-starting from [warmBasis]. A warm basis is a pure speedup, so any
-     * failure to load it — a singular basis, or determinant overflow during the fraction-free
-     * reload (whose pivot order is arbitrary, unlike the ratio-test-guided cold solve) — falls
-     * back to the cold start instead of giving up on the solve.
+     * Solve, optionally warm-starting from a sibling tableau ([seedTableau], cheapest) or from
+     * [warmBasis]. Both are pure speedups, so any failure — a shape/coefficient mismatch the seed
+     * cannot absorb, a singular basis, or determinant overflow during either load — falls through
+     * to the next option and finally to the cold start instead of giving up on the solve.
      */
-    fun solve(warmBasis: Basis? = null): LpSolution {
-        val warmed = warmBasis != null &&
+    fun solve(warmBasis: Basis? = null, seedTableau: DualSimplex? = null): LpSolution {
+        lastSolveSeeded = seedTableau != null &&
             try {
-                loadBasis(warmBasis)
+                seedFrom(seedTableau)
             } catch (_: LpOverflowException) {
                 false
             }
-        if (!warmed) coldStart()
+        if (!lastSolveSeeded) {
+            val warmed = warmBasis != null &&
+                try {
+                    loadBasis(warmBasis)
+                } catch (_: LpOverflowException) {
+                    false
+                }
+            if (!warmed) coldStart()
+        }
         return runDualSimplex()
+    }
+
+    /** True when the last [solve] started from a seeded tableau (observability for tests). */
+    var lastSolveSeeded: Boolean = false
+        private set
+
+    /**
+     * Seed this solve from [prev]'s solved tableau instead of re-pivoting the basis from scratch.
+     * Between a branch-and-bound parent and child the row *structure* is identical and only live
+     * information moves: variable bounds (which never enter the tableau), the lower-bound shift
+     * folded into [LpModel.rhs], and the live big-M coefficients of reified rows — confined to
+     * their aux Boolean columns. As long as every changed coefficient lies in a column that is
+     * **nonbasic** in [prev]'s basis, the basis matrix `B` is bit-identical, so the carried
+     * determinant and the tableau's slack block `det·B⁻¹` stay exact, and the differences patch in
+     * through that block with pure integer arithmetic:
+     *
+     *  - a changed nonbasic column `q`: `N[·][q] += Σ_{i ∈ changed rows} Δa[i][q] · N[·][slack(i)]`
+     *  - the rhs column: `N[·][rhs] += Σ_{k: Δb_k ≠ 0} Δb_k · N[·][slack(k)]`
+     *
+     * — O(m · |changes|) plus an O(m·numVars) array copy, against the O(m²·numVars) pivot reload
+     * of [loadBasis]. A patched column's reduced cost moves, so its seat is re-derived from the
+     * reduced-cost sign to keep the start dual feasible (changed columns are bounded — they are
+     * structural — so both seats exist). Returns false when the shapes, costs, row relations or a
+     * basic column differ: the caller then falls back to the basis reload.
+     */
+    private fun seedFrom(prev: DualSimplex): Boolean {
+        val pm = prev.model
+        if (pm.m != m || pm.n != model.n) return false
+        if (!pm.cost.contentEquals(model.cost) || !pm.hasUpper.contentEquals(model.hasUpper)) return false
+
+        // Diff the constraint coefficients; reject a change in any column basic in prev (it would
+        // change B itself). Collect per-change (row, col, delta) for the patch pass.
+        val changeRow = IntArrayList()
+        val changeCol = IntArrayList()
+        val changeDelta = LongArrayList()
+        for (i in 0 until m) {
+            val a = model.a[i]
+            val pa = pm.a[i]
+            for (j in 0 until model.n) {
+                if (a[j] == pa[j]) continue
+                if (prev.status[j] == VarStatus.BASIC) return false
+                changeRow.add(i)
+                changeCol.add(j)
+                changeDelta.add(subExact(a[j], pa[j]))
+            }
+        }
+
+        // Carry the solved state over.
+        for (i in 0 until m) {
+            prev.nMat[i].copyInto(nMat[i])
+            rowMaxAbs[i] = prev.rowMaxAbs[i]
+        }
+        prev.basicVar.copyInto(basicVar)
+        prev.status.copyInto(status)
+        d = prev.d
+
+        // Patch the changed nonbasic columns through the slack block (unchanged by these writes:
+        // every patched column is structural).
+        for (c in 0 until changeRow.size) {
+            val sCol = model.slackCol(changeRow[c])
+            val q = changeCol[c]
+            val delta = changeDelta[c]
+            for (i in 0 until m) {
+                val add = mulExact(delta, nMat[i][sCol])
+                if (add != 0L) {
+                    val v = addExact(nMat[i][q], add)
+                    nMat[i][q] = v
+                    val abs = absClamped(v)
+                    if (abs > rowMaxAbs[i]) rowMaxAbs[i] = abs
+                }
+            }
+        }
+        // Patch the rhs column the same way.
+        for (k in 0 until m) {
+            val db = subExact(model.rhs[k], pm.rhs[k])
+            if (db == 0L) continue
+            val sCol = model.slackCol(k)
+            for (i in 0 until m) {
+                val add = mulExact(db, nMat[i][sCol])
+                if (add != 0L) {
+                    val v = addExact(nMat[i][rhsCol], add)
+                    nMat[i][rhsCol] = v
+                    val abs = absClamped(v)
+                    if (abs > rowMaxAbs[i]) rowMaxAbs[i] = abs
+                }
+            }
+        }
+
+        // Re-derive the seat of each patched column from its (new) reduced-cost sign: the dual
+        // simplex requires a dual-feasible start, and only the patched columns can have drifted.
+        for (c in 0 until changeRow.size) {
+            val q = changeCol[c]
+            if (status[q] == VarStatus.BASIC) continue // unreachable (checked above); defensive
+            var red = mulExact(d, model.cost[q])
+            for (i in 0 until m) {
+                val cb = model.cost[basicVar[i]]
+                if (cb != 0L) red = subExact(red, mulExact(cb, nMat[i][q]))
+            }
+            val sign = fracSign(red)
+            if (sign < 0) status[q] = VarStatus.AT_UPPER
+            if (sign > 0) status[q] = VarStatus.AT_LOWER
+        }
+        return true
     }
 
     /**
