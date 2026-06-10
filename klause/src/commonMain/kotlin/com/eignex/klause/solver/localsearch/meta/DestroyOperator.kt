@@ -3,7 +3,6 @@ package com.eignex.klause.solver.localsearch.meta
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.util.IntArrayList
@@ -123,7 +122,7 @@ internal fun interface DestroyOperator {
             // Union the vars across all violated factors.
             val freedSlots = HashSet<Int>()
             for (fid in violatedFactors) {
-                val f = problem.factors[fid] as LocalSearchFactor
+                val f = problem.factors[fid]
                 for (v in f.boolVars) freedSlots.add(v)
                 for (v in f.intVars) freedSlots.add(problem.numBoolVars + v)
             }

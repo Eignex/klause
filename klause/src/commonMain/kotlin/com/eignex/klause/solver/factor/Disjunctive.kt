@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -52,7 +52,7 @@ class Disjunctive(
     val presents: IntArray = EmptyIntArray,
     /** Per-task duration variables; empty = use [durations] as constants. */
     val durationVars: IntArray = EmptyIntArray,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(starts.size == durations.size) {
@@ -87,6 +87,11 @@ class Disjunctive(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         cumulativeBacking.isViolated(state, factorId)
+
+    /** Graded violation: delegates to the unit-capacity [Cumulative] backing, so the degree is
+     *  the total time-overlap energy `Σ_t max(0, concurrency_t − 1)` — a real gradient. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        cumulativeBacking.violationDegree(state, factorId)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int =
         cumulativeBacking.deltaIfIntSet(state, factorId, intVar, newValue)

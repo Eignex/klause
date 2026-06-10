@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.IntSet
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -26,10 +26,11 @@ import kotlin.math.min
  * LS cost is graded:
  *   `cost = Σ_t max(0, usage`t` − capacity)`
  * — broken assignments rank by total energy overflow rather than by a flat boolean,
- * giving the search a real gradient toward the cumulative bound. The factor's binary
- * violation status (returned through [deltaIfIntSet] / [applyIntSet]) flips only on the
- * 0 ↔ positive boundary, matching the rest of the factor catalog; strategies that want
- * the graded value read `state.intPayload[factorId]` directly (as ALNS does).
+ * giving the search a real gradient toward the cumulative bound. This energy overage is
+ * the factor's [violationDegree] (run through [compressViolation] so a deeply-overloaded
+ * profile can't dominate the global cost); [deltaIfIntSet] / [applyIntSet] and the
+ * bool-flip paths return its compressed delta. The raw overage is also mirrored to
+ * `state.intPayload[factorId]` for strategies that read it directly (as ALNS does).
  *
  * Propagation: **time-tabling**. For every task with overlap window `[lst_i, ect_i)`
  * (latest-start to earliest-completion), `resources[i]` is *mandatory* throughout that
@@ -74,7 +75,7 @@ class Cumulative(
     val resourceVars: IntArray = EmptyIntArray,
     /** Capacity variable id; -1 = use [capacity] as a constant. */
     val capacityVar: Int = -1,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(starts.size == durations.size && starts.size == resources.size) {
@@ -165,9 +166,13 @@ class Cumulative(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
 
+    /** Graded degree: total resource overage `Σ_t max(0, usage_t - cap)`, compressed so a
+     *  deeply-overloaded profile can't dominate the global cost sum. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation(state.intPayload[factorId].toLong())
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val ls = state.refPayload[factorId] as LsState
-        val oldViolated = ls.overage > 0
         val oldVal = state.assignment.intValue(intVar)
         if (oldVal == newValue) return 0
         val delta = when {
@@ -222,14 +227,13 @@ class Cumulative(
                 }
             }
         }
-        val newViolated = (ls.overage + delta) > 0
-        return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
+        return compressViolation((ls.overage + delta).toLong()) - compressViolation(ls.overage.toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val ls = state.refPayload[factorId] as LsState
         val newValue = state.assignment.intValue(intVar)
-        val oldViolated = ls.overage > 0
+        val before = ls.overage
         if (oldValue == newValue) return 0
         when {
             intVar == capacityVar -> applyCapacityDelta(ls, newValue)
@@ -262,15 +266,13 @@ class Cumulative(
             }
         }
         state.intPayload[factorId] = ls.overage
-        val newViolated = ls.overage > 0
-        return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
+        return compressViolation(ls.overage.toLong()) - compressViolation(before.toLong())
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val ls = state.refPayload[factorId] as LsState
         val cap = ls.cap
-        val oldViolated = ls.overage > 0
         var deltaOv = 0
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
@@ -288,15 +290,14 @@ class Cumulative(
                 deltaOv += max(0, nu - cap) - max(0, u - cap)
             }
         }
-        val newViolated = (ls.overage + deltaOv) > 0
-        return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
+        return compressViolation((ls.overage + deltaOv).toLong()) - compressViolation(ls.overage.toLong())
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val ls = state.refPayload[factorId] as LsState
         val cap = ls.cap
-        val oldViolated = ls.overage > 0
+        val before = ls.overage
         var deltaOv = 0
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
@@ -317,8 +318,7 @@ class Cumulative(
         }
         ls.overage += deltaOv
         state.intPayload[factorId] = ls.overage
-        val newViolated = ls.overage > 0
-        return (if (newViolated) 1 else 0) - (if (oldViolated) 1 else 0)
+        return compressViolation(ls.overage.toLong()) - compressViolation(before.toLong())
     }
 
     /** Overage Δ of shifting task from [oldStart,+d) → [newStart,+d). Pure simulation. */

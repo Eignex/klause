@@ -3,6 +3,7 @@ package com.eignex.klause.solver.localsearch
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.DefinitionalSweep
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IncrementalObjective
 import com.eignex.klause.solver.InvariantNetwork
 import com.eignex.klause.solver.LinearObjective
@@ -43,7 +44,7 @@ class LocalSearchState(
     /** Per-factor graded violation degree (0 = satisfied), the source of truth for both
      *  [violated]-set membership (`degree > 0`) and [cost] (`Σ factorDegree`). Maintained
      *  incrementally from each factor's `deltaIf*`/`apply*` return value (Δdegree) and
-     *  recomputed from [LocalSearchFactor.violationDegree] at [recompute]. Lets [cost] be a
+     *  recomputed from [Factor.violationDegree] at [recompute]. Lets [cost] be a
      *  graded sum-of-degrees rather than a flat count of violated factors, giving CBLS a
      *  descent gradient on tight arithmetic/global constraints. */
     val factorDegree: IntArray = IntArray(problem.numFactors)
@@ -59,15 +60,10 @@ class LocalSearchState(
     /** Buffer that strategies push candidate moves into. */
     val moveSink: MoveSink = MoveSink(assumptions)
 
-    /**
-     * LS-cast view over [Problem.factors]. Every factor used by [LocalSearchSolver] must
-     * implement [LocalSearchFactor]; this array is the pre-checked cast so factor-method
-     * call sites avoid `as LocalSearchFactor` noise. Throws [ClassCastException] at
-     * construction if any factor is propagation-only.
-     */
-    val factors: Array<LocalSearchFactor> = Array(problem.numFactors) {
-        problem.factors[it] as LocalSearchFactor
-    }
+    /** The problem's factors. Aliased here so the hot LS loops read `factors` directly;
+     *  every [Factor] carries the local-search contract (with sound no-op defaults), so no
+     *  cast or capability check is needed. */
+    val factors: Array<Factor> = problem.factors
 
     /** Step counter incremented on every accepted move. Strategies use this together with
      *  [lastTouched] to enforce a tabu list. */
@@ -1079,7 +1075,7 @@ class LocalSearchState(
         private val EMPTY_INTS = IntArray(0)
     }
 
-    /** Re-read the factor's [LocalSearchFactor.violationDegree] from its just-updated payload
+    /** Re-read the factor's [Factor.violationDegree] from its just-updated payload
      *  and reconcile the maintained [factorDegree], [cost] (`Σ degree`), and [violated]-set
      *  membership (`degree > 0`). Called after the factor's `apply*` has refreshed its payload.
      *  Using the recomputed degree (rather than `apply*`'s returned delta) makes cost tracking

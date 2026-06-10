@@ -2,9 +2,9 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -25,7 +25,7 @@ class ReifiedPseudoBoolean(
     val op: PbOp,
     /** Right-hand-side bound. */
     val bound: Int,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(weights.size == literals.size) { "weights/literals length mismatch" }
@@ -61,32 +61,44 @@ class ReifiedPseudoBoolean(
         return aux != predHolds(state.longPayload[factorId])
     }
 
+    /** Graded violation for the reification `aux ↔ (sum op bound)`: `0` when they agree; when
+     *  the indicator wants the relation to hold but it doesn't, the compressed weighted-sum
+     *  residual (so body moves that shrink the gap score); when the indicator wants it false
+     *  but it holds, `1` (a single aux flip repairs). Mirrors the [ReifiedLinear] gradient. */
+    private fun degreeFor(sum: Long, aux: Boolean): Int {
+        val h = predHolds(sum)
+        return when {
+            aux == h -> 0
+            aux -> compressViolation(distanceToInRange(sum))
+            else -> 1
+        }
+    }
+
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar))
+
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.longPayload[factorId]
-        val wasViolated = aux != predHolds(sum)
-        if (boolVar == auxBoolVar) {
-            return if (wasViolated) -1 else +1
+        return if (boolVar == auxBoolVar) {
+            degreeFor(sum, !aux) - degreeFor(sum, aux)
+        } else {
+            val change = changeOnFlip(state, boolVar, current = true)
+            degreeFor(sum + change, aux) - degreeFor(sum, aux)
         }
-        val change = changeOnFlip(state, boolVar, current = true)
-        val newSum = sum + change
-        val willViolate = aux != predHolds(newSum)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val aux = state.assignment.boolValue(auxBoolVar)
         val oldSum = state.longPayload[factorId]
         if (boolVar == auxBoolVar) {
-            val nowViolated = aux != predHolds(oldSum)
-            return if (nowViolated) +1 else -1
+            val newAux = state.assignment.boolValue(auxBoolVar)
+            return degreeFor(oldSum, newAux) - degreeFor(oldSum, !newAux)
         }
         val change = changeOnFlip(state, boolVar, current = false)
         val newSum = oldSum + change
         state.longPayload[factorId] = newSum
-        val wasViolated = aux != predHolds(oldSum)
-        val nowViolated = aux != predHolds(newSum)
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        val aux = state.assignment.boolValue(auxBoolVar)
+        return degreeFor(newSum, aux) - degreeFor(oldSum, aux)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -267,32 +279,34 @@ class ReifiedPseudoBoolean(
             val changeV = if (flippedPost) signedFlipped else -signedFlipped
             oldSum = newSum - changeV
         }
-        val oldViolated = oldAux != predHolds(oldSum)
-        val newViolated = newAux != predHolds(newSum)
+        val oldDeg = degreeFor(oldSum, oldAux)
+        val newDeg = degreeFor(newSum, newAux)
         for (u in boolVars) {
-            val preViolatedIfU: Boolean
-            val postViolatedIfU: Boolean
+            // Graded Δ each var's flip would produce (the value deltaIfBoolFlipped returns),
+            // evaluated against the pre- and post-flip (sum, aux) — break/make track its sign.
+            val preDelta: Int
+            val postDelta: Int
             if (u == auxBoolVar) {
-                preViolatedIfU = !oldAux != predHolds(oldSum)
-                postViolatedIfU = !newAux != predHolds(newSum)
+                preDelta = degreeFor(oldSum, !oldAux) - oldDeg
+                postDelta = degreeFor(newSum, !newAux) - newDeg
             } else {
                 val signedU = signedWeightByVar[u]
                 if (signedU == 0) {
-                    preViolatedIfU = oldViolated
-                    postViolatedIfU = newViolated
+                    preDelta = 0
+                    postDelta = 0
                 } else {
                     val uPost = state.assignment.boolValue(u)
                     val uPre = if (u == flippedVar) !uPost else uPost
                     val preChangeU = if (uPre) -signedU else signedU
                     val postChangeU = if (uPost) -signedU else signedU
-                    preViolatedIfU = oldAux != predHolds(oldSum + preChangeU)
-                    postViolatedIfU = newAux != predHolds(newSum + postChangeU)
+                    preDelta = degreeFor(oldSum + preChangeU, oldAux) - oldDeg
+                    postDelta = degreeFor(newSum + postChangeU, newAux) - newDeg
                 }
             }
-            val preBreak = !oldViolated && preViolatedIfU
-            val preMake = oldViolated && !preViolatedIfU
-            val postBreak = !newViolated && postViolatedIfU
-            val postMake = newViolated && !postViolatedIfU
+            val preBreak = preDelta > 0
+            val preMake = preDelta < 0
+            val postBreak = postDelta > 0
+            val postMake = postDelta < 0
             if (preBreak != postBreak) {
                 if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
             }

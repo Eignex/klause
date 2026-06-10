@@ -1,21 +1,21 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Pins the graded-violation contract for a [LocalSearchFactor]: `deltaIf*` and `apply*` must
+ * Pins the graded-violation contract for a [Factor]: `deltaIf*` and `apply*` must
  * each return exactly `violationDegree(after) - violationDegree(before)`, and the engine's
  * incrementally-maintained [LocalSearchState.cost] (`Σ violationDegree`) must stay in lockstep
  * with a fresh [LocalSearchState.recompute].
  *
- * A factor whose graded delta disagrees with its [LocalSearchFactor.violationDegree] silently
+ * A factor whose graded delta disagrees with its [Factor.violationDegree] silently
  * desyncs the global cost and corrupts the CBLS gradient; this oracle catches that by random-
  * walking the assignment space and checking, after every move:
  *  - `netDelta(move)` (the summed `deltaIf*`) predicted the actual `cost` change, and
@@ -42,7 +42,7 @@ object DegreeConsistencyOracle {
         exactProbe: Boolean = false,
     ) {
         require(problem.factors.size == 1) { "DegreeConsistencyOracle expects a single-factor Problem" }
-        val factor = problem.factors[0] as LocalSearchFactor
+        val factor = problem.factors[0]
         val rng = Random(seed)
         val state = LocalSearchState(problem, rng)
         val fresh = LocalSearchState(problem, Random(seed xor 0x5A5AL))
@@ -74,12 +74,7 @@ object DegreeConsistencyOracle {
         }
     }
 
-    private fun assertDegreeInvariants(
-        state: LocalSearchState,
-        factor: LocalSearchFactor,
-        label: String,
-        where: String,
-    ) {
+    private fun assertDegreeInvariants(state: LocalSearchState, factor: Factor, label: String, where: String) {
         val deg = factor.violationDegree(state, 0)
         assertTrue(deg >= 0, "$label: violationDegree=$deg is negative ($where)")
         assertEquals(

@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Move.IntSet
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -22,7 +22,7 @@ class ReifiedLinear private constructor(
     val op: LinearOp,
     /** Right-hand-side bound. */
     val bound: Int,
-) : LocalSearchFactor {
+) : Factor {
 
     /** Integer variable ids, parallel to [coeffs]; each variable appears at most once. */
     val vars: IntArray = terms.vars

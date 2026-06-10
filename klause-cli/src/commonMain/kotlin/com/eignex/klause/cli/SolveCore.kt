@@ -4,6 +4,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
+import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
@@ -161,59 +162,84 @@ internal object SolveCore {
         val (_, cancel) = deadlineCancellation(common)
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
-        val portfolio = Portfolio(
-            PortfolioBuilder.build(
-                solvable.problem,
-                scenario,
-                objective = solvable.linearObjective,
-                lsObjective = solvable.lsObjective,
-                definitionalSweep = solvable.definitionalSweep,
-                onEvent = portfolioVerboseListener(common.verbose),
-            ),
+        val workers = PortfolioBuilder.build(
+            solvable.problem,
+            scenario,
+            objective = solvable.linearObjective,
+            lsObjective = solvable.lsObjective,
+            definitionalSweep = solvable.definitionalSweep,
+            onEvent = portfolioVerboseListener(common.verbose),
         )
         val t0 = nowMillis()
-        try {
-            if (!solvable.optimize) {
-                val r = runBlockingBridge { portfolio.solve(cancel) }
-                var produced = 0L
-                when (r) {
-                    is SolveResult.Sat -> {
-                        emit(output, solvable, r.assignment)
-                        produced = 1L
-                        output.onComplete(Verdict.SATISFIABLE)
-                    }
-
-                    is SolveResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-                    is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+        // threads == 1 → the single-core bandit-scheduled SequentialPortfolio (it persists/shares
+        // learned clauses across its segments); threads > 1 → the concurrent Portfolio. Both yield
+        // the same result types, so only the call differs (blocking vs the suspend bridge).
+        if (scenario.threads == 1) {
+            SequentialPortfolio.exp3(workers).use { seq ->
+                if (solvable.optimize) {
+                    emitMinimize(seq.minimize(cancel), solvable, common, output, complete, t0)
+                } else {
+                    emitSolve(seq.solve(cancel), solvable, common, output, t0)
                 }
-                stats(common, output, r.stats, nowMillis() - t0, produced)
-            } else {
-                val r = runBlockingBridge { portfolio.minimize(cancel) }
-                var produced = 0L
-                when (r) {
-                    is MinimizeResult.Optimal -> {
-                        emit(output, solvable, r.sample)
-                        produced = 1L
-                        output.onComplete(Verdict.OPTIMAL)
-                    }
-
-                    is MinimizeResult.BestFound -> {
-                        emit(output, solvable, r.sample)
-                        produced = 1L
-                        output.onComplete(Verdict.BEST_FOUND)
-                    }
-
-                    is MinimizeResult.Infeasible ->
-                        output.onComplete(if (complete) Verdict.UNSATISFIABLE else Verdict.UNKNOWN)
-
-                    is MinimizeResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-                }
-                stats(common, output, r.stats, nowMillis() - t0, produced)
             }
-        } finally {
-            portfolio.close()
+        } else {
+            Portfolio(workers).use { par ->
+                if (solvable.optimize) {
+                    emitMinimize(runBlockingBridge { par.minimize(cancel) }, solvable, common, output, complete, t0)
+                } else {
+                    emitSolve(runBlockingBridge { par.solve(cancel) }, solvable, common, output, t0)
+                }
+            }
         }
+    }
+
+    /** Emit a satisfaction verdict + the sole model (if any) + stats. */
+    private fun emitSolve(r: SolveResult, solvable: Solvable, common: CommonOptions, output: OutputProtocol, t0: Long) {
+        var produced = 0L
+        when (r) {
+            is SolveResult.Sat -> {
+                emit(output, solvable, r.assignment)
+                produced = 1L
+                output.onComplete(Verdict.SATISFIABLE)
+            }
+
+            is SolveResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
+            is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+        }
+        stats(common, output, r.stats, nowMillis() - t0, produced)
+    }
+
+    /** Emit an optimization verdict + the best model (if any) + stats. [complete] gates whether an
+     *  Infeasible result reports UNSATISFIABLE (a complete pool proved it) or UNKNOWN (LS only). */
+    private fun emitMinimize(
+        r: MinimizeResult,
+        solvable: Solvable,
+        common: CommonOptions,
+        output: OutputProtocol,
+        complete: Boolean,
+        t0: Long,
+    ) {
+        var produced = 0L
+        when (r) {
+            is MinimizeResult.Optimal -> {
+                emit(output, solvable, r.sample)
+                produced = 1L
+                output.onComplete(Verdict.OPTIMAL)
+            }
+
+            is MinimizeResult.BestFound -> {
+                emit(output, solvable, r.sample)
+                produced = 1L
+                output.onComplete(Verdict.BEST_FOUND)
+            }
+
+            is MinimizeResult.Infeasible ->
+                output.onComplete(if (complete) Verdict.UNSATISFIABLE else Verdict.UNKNOWN)
+
+            is MinimizeResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+        }
+        stats(common, output, r.stats, nowMillis() - t0, produced)
     }
 
     // --- generic per-engine satisfy / optimize ---

@@ -6,7 +6,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
@@ -29,8 +28,8 @@ class IntOverflowTest {
         const val PRODUCT = BIG.toLong() * WIDE // 2^32 = 4_294_967_296
     }
 
-    private fun stateFor(numBool: Int, domains: Array<IntDomain>, factor: LocalSearchFactor): LocalSearchState {
-        val problem = Problem(numBool, domains.size, domains, listOf(factor as Factor))
+    private fun stateFor(numBool: Int, domains: Array<IntDomain>, factor: Factor): LocalSearchState {
+        val problem = Problem(numBool, domains.size, domains, listOf(factor))
         return LocalSearchState(problem, Random(0))
     }
 

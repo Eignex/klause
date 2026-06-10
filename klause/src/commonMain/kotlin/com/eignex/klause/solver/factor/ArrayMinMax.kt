@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -15,7 +15,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * a payload holding the index of the current best operand and its value, with a fallback
  * full scan when the best slot changes.
  */
-class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : LocalSearchFactor {
+class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor {
 
     init {
         require(xs.isNotEmpty()) { "ArrayMinMax needs at least one operand" }

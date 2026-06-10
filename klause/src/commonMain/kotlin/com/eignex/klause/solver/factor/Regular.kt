@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -31,7 +31,7 @@ class Regular(
     val q0: Int,
     /** Accepting states. */
     val accepting: IntArray,
-) : LocalSearchFactor {
+) : Factor {
 
     /** Accepting states as a primitive set for O(1) boxing-free membership in the hot
      *  acceptance checks (`q in acceptingSet`). */
@@ -63,10 +63,47 @@ class Regular(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !accepts(state)
 
+    /** Graded violation: the minimum number of sequence positions whose symbol must change for
+     *  the DFA to accept — an edit-distance-to-language computed by a forward DP over states —
+     *  compressed. `0` iff the current string is accepted; a string whose length admits no
+     *  accepted word saturates at `seq.size + 1`. Gives CBLS a gradient toward acceptance
+     *  instead of a flat boolean. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation(acceptDistance { state.assignment.intValue(seq[it]) }.toLong())
+
+    /** Min symbol changes to reach an accepting run, where `getSym(i)` is position `i`'s current
+     *  symbol (a transition on it costs 0, any other symbol costs 1). */
+    private inline fun acceptDistance(getSym: (Int) -> Int): Int {
+        val inf = seq.size + 1
+        var dp = IntArray(numStates + 1) { inf }
+        dp[q0] = 0
+        for (i in seq.indices) {
+            val cur = getSym(i)
+            val ndp = IntArray(numStates + 1) { inf }
+            for (q in 1..numStates) {
+                val base = dp[q]
+                if (base >= inf) continue
+                for (sym in 1..alphabetSize) {
+                    val nq = delta(q, sym)
+                    if (nq == 0) continue
+                    val cost = base + (if (sym == cur) 0 else 1)
+                    if (cost < ndp[nq]) ndp[nq] = cost
+                }
+            }
+            dp = ndp
+        }
+        var best = inf
+        for (q in 1..numStates) if (q in acceptingSet && dp[q] < best) best = dp[q]
+        return best
+    }
+
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val wasViolated = !accepts(state)
-        val willViolate = !acceptsWithOverride(state, intVar, newValue)
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        val before = acceptDistance { state.assignment.intValue(seq[it]) }
+        val after = acceptDistance {
+            val v = seq[it]
+            if (v == intVar) newValue else state.assignment.intValue(v)
+        }
+        return compressViolation(after.toLong()) - compressViolation(before.toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
@@ -106,15 +143,10 @@ class Regular(
         }
     }
 
-    private fun accepts(state: LocalSearchState): Boolean = run(false, state, 0, 0)
-    private fun acceptsWithOverride(state: LocalSearchState, intVar: Int, value: Int): Boolean =
-        run(true, state, intVar, value)
-
-    private fun run(useOverride: Boolean, state: LocalSearchState, intVar: Int, value: Int): Boolean {
+    private fun accepts(state: LocalSearchState): Boolean {
         var q = q0
         for (i in seq.indices) {
-            val s = if (useOverride && seq[i] == intVar) value else state.assignment.intValue(seq[i])
-            q = delta(q, s)
+            q = delta(q, state.assignment.intValue(seq[i]))
             if (q == 0) return false
         }
         return q in acceptingSet

@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -14,11 +14,12 @@ import com.eignex.klause.util.IntIntMap
 /**
  * `intVars[i] != intVars[j]` for every pair `i < j`. Stored payload:
  *
- *   `refPayload[factorId]` = State (counts: IntArray, duplicateCount: Int)
+ *   `refPayload[factorId]` = State (counts: IntArray, excess: Int)
  *
  * `counts` is indexed by `value - domainMin` and tracks how many vars currently hold each
- * value across the union domain `[domainMin, domainMin + domainSize)`. `duplicateCount` is the
- * number of distinct values whose count is > 1; the factor is violated iff that's positive.
+ * value across the union domain `[domainMin, domainMin + domainSize)`. `excess` is the graded
+ * violation `Σ max(0, count - 1)` — the number of vars that must move to clear every clash; the
+ * factor is violated iff that's positive, and it is the [violationDegree] CBLS descends.
  */
 class AllDifferent(
     /** Integer variable ids required to be pairwise distinct. */
@@ -32,7 +33,7 @@ class AllDifferent(
      *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
      *  slot nor block other positions from claiming their value. */
     val presents: IntArray = EmptyIntArray,
-) : LocalSearchFactor {
+) : Factor {
 
     init {
         require(vars.size >= 2) { "AllDifferent needs at least two variables" }
@@ -67,7 +68,7 @@ class AllDifferent(
         )
     }
 
-    private class State(val counts: IntArray, var duplicateCount: Int)
+    private class State(val counts: IntArray, var excess: Int)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         // Sanity: every operand's domain must lie within the declared union range.
@@ -79,68 +80,63 @@ class AllDifferent(
             }
         }
         val counts = IntArray(domainSize)
-        var dups = 0
+        var excess = 0
         for (i in vars.indices) {
             if (!present(state, i)) continue
             val idx = state.assignment.intValue(vars[i]) - domainMin
             val prev = counts[idx]
             counts[idx] = prev + 1
-            if (prev == 1) dups++ // count goes 1 -> 2: new duplicate value.
+            if (prev >= 1) excess++ // each extra occupant of an already-held value adds one excess.
         }
-        state.refPayload[factorId] = State(counts, dups)
+        state.refPayload[factorId] = State(counts, excess)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val s = state.refPayload[factorId] as State
-        return s.duplicateCount > 0
+        return s.excess > 0
     }
+
+    /** Graded degree: total clash excess `Σ max(0, count - 1)`, run through [compressViolation]
+     *  so a wide all-different with many clashes can't dominate the global cost sum. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation((state.refPayload[factorId] as State).excess.toLong())
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return 0
-        val (oldDup, newDup) = simulate(s, presentOccurrences(state, intVar), old, newValue)
-        val wasViolated = s.duplicateCount > 0
-        val willViolate = (s.duplicateCount + newDup - oldDup) > 0
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        val n = presentOccurrences(state, intVar)
+        if (n == 0) return 0 // every occurrence of [intVar] is currently absent.
+        val oldCount = s.counts[old - domainMin]
+        val newCount = s.counts[newValue - domainMin]
+        val rawDelta = (excessOf(oldCount - n) - excessOf(oldCount)) +
+            (excessOf(newCount + n) - excessOf(newCount))
+        return compressViolation((s.excess + rawDelta).toLong()) - compressViolation(s.excess.toLong())
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
-        val wasViolated = s.duplicateCount > 0
         val n = presentOccurrences(state, intVar)
         if (n == 0) return 0 // every occurrence of [intVar] is currently absent.
+        val before = s.excess
         val oldIdx = oldValue - domainMin
         val oldCount = s.counts[oldIdx]
-        if (oldCount == 2) s.duplicateCount--
         s.counts[oldIdx] = oldCount - n
+        s.excess += excessOf(oldCount - n) - excessOf(oldCount)
         val newIdx = cur - domainMin
         val newCount = s.counts[newIdx]
-        val newPlus = newCount + n
-        s.counts[newIdx] = newPlus
-        if (newCount <= 1 && newPlus >= 2) s.duplicateCount++
-        val nowViolated = s.duplicateCount > 0
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        s.counts[newIdx] = newCount + n
+        s.excess += excessOf(newCount + n) - excessOf(newCount)
+        return compressViolation(s.excess.toLong()) - compressViolation(before.toLong())
     }
 
-    /** Compute (oldDuplicateDelta, newDuplicateDelta) without mutating state. */
-    private fun simulate(s: State, occurrences: Int, oldValue: Int, newValue: Int): Pair<Int, Int> {
-        if (oldValue == newValue) return 0 to 0
-        val oldCount = s.counts[oldValue - domainMin]
-        val newCount = s.counts[newValue - domainMin]
-        var lostDup = 0
-        var gainedDup = 0
-        if (oldCount >= 2 && oldCount - occurrences <= 1) lostDup = 1
-        if (newCount <= 1 && newCount + occurrences >= 2) gainedDup = 1
-        return lostDup to gainedDup
-    }
-
-    private fun occurrences(intVar: Int): Int = occurrencesByVar[intVar]
+    /** Clash excess contributed by a single value held by [count] vars: `max(0, count - 1)`. */
+    private fun excessOf(count: Int): Int = if (count > 1) count - 1 else 0
 
     /** Count of indices where `vars[i] == intVar` AND position `i` is currently present.
-     *  Falls back to [occurrences] in the non-opt case for the precomputed O(1) lookup. */
+     *  Falls back to [occurrencesByVar] in the non-opt case for the precomputed O(1) lookup. */
     private fun presentOccurrences(state: LocalSearchState, intVar: Int): Int {
         if (presents.isEmpty()) return occurrencesByVar[intVar]
         var c = 0
@@ -148,22 +144,18 @@ class AllDifferent(
         return c
     }
 
-    /** Delta on `duplicateCount` from adjusting a value's count by [delta] (±1). */
-    private fun adjustDuplicates(counts: IntArray, valueIdx: Int, delta: Int): Int {
+    /** Mutate `counts[valueIdx]` by [delta] (±1) and return the resulting change in clash
+     *  excess `Σ max(0, count - 1)`. */
+    private fun adjustExcess(counts: IntArray, valueIdx: Int, delta: Int): Int {
         val before = counts[valueIdx]
         val after = before + delta
         counts[valueIdx] = after
-        return when {
-            before <= 1 && after >= 2 -> +1
-            before >= 2 && after <= 1 -> -1
-            else -> 0
-        }
+        return excessOf(after) - excessOf(before)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = s.duplicateCount > 0
         // Simulate on a counts snapshot — touch only indices the flip would toggle. Parallel
         // primitive lists (valueIdx, delta) avoid boxing an IntArray pair per touched position.
         val touchedIdx = IntArrayList()
@@ -176,27 +168,25 @@ class AllDifferent(
             touchedIdx.add(valueIdx)
             touchedDelta.add(delta)
         }
-        var dupDelta = 0
+        var excessDelta = 0
         val snapshot = s.counts
-        for (k in 0 until touchedIdx.size) dupDelta += adjustDuplicates(snapshot, touchedIdx[k], touchedDelta[k])
-        for (k in touchedIdx.size - 1 downTo 0) adjustDuplicates(snapshot, touchedIdx[k], -touchedDelta[k])
-        val willViolate = (s.duplicateCount + dupDelta) > 0
-        return (if (willViolate) 1 else 0) - (if (wasViolated) 1 else 0)
+        for (k in 0 until touchedIdx.size) excessDelta += adjustExcess(snapshot, touchedIdx[k], touchedDelta[k])
+        for (k in touchedIdx.size - 1 downTo 0) adjustExcess(snapshot, touchedIdx[k], -touchedDelta[k])
+        return compressViolation((s.excess + excessDelta).toLong()) - compressViolation(s.excess.toLong())
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val wasViolated = s.duplicateCount > 0
+        val before = s.excess
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val nowP = present(state, i)
             val delta = if (nowP) +1 else -1
             val valueIdx = state.assignment.intValue(vars[i]) - domainMin
-            s.duplicateCount += adjustDuplicates(s.counts, valueIdx, delta)
+            s.excess += adjustExcess(s.counts, valueIdx, delta)
         }
-        val nowViolated = s.duplicateCount > 0
-        return (if (nowViolated) 1 else 0) - (if (wasViolated) 1 else 0)
+        return compressViolation(s.excess.toLong()) - compressViolation(before.toLong())
     }
 
     /** Hall-style conflict reason: bound + `[v ≠ value]` hole literals confining each
@@ -246,7 +236,7 @@ class AllDifferent(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val s = state.refPayload[factorId] as State
-        if (s.duplicateCount == 0) return
+        if (s.excess == 0) return
         // Reservoir-sample a duplicated value (uniform across all values whose count > 1).
         var pickedIdx = -1
         var seenDups = 0

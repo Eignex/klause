@@ -1,16 +1,16 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.localsearch.LocalSearchFactor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.assertTrue
 
 /**
- * Brute-force oracle for [LocalSearchFactor.proposeRepairMoves]. Builds the ground-truth set
+ * Brute-force oracle for [Factor.proposeRepairMoves]. Builds the ground-truth set
  * of single-step repairs from a violating assignment by enumerating the 1-flip / 1-IntSet
  * neighborhood, then asserts the factor's proposed moves cover at least one improving move
  * whenever one exists.
@@ -36,7 +36,7 @@ object MoveSetOracle {
         requireImprovement: Boolean = true,
     ) {
         require(problem.factors.size == 1) { "MoveSetOracle expects a single-factor Problem" }
-        val factor = problem.factors[0] as LocalSearchFactor
+        val factor = problem.factors[0]
         val rng = Random(seed)
 
         repeat(iters) { iter ->
@@ -75,13 +75,7 @@ object MoveSetOracle {
         }
     }
 
-    private fun assertLegal(
-        move: Move,
-        problem: Problem,
-        state: LocalSearchState,
-        factor: LocalSearchFactor,
-        label: String,
-    ) {
+    private fun assertLegal(move: Move, problem: Problem, state: LocalSearchState, factor: Factor, label: String) {
         when (move) {
             is Move.BoolFlip -> {
                 assertTrue(
@@ -114,7 +108,7 @@ object MoveSetOracle {
 
     /** Returns the delta in this factor's violation status when [move] is applied to a fresh
      *  copy of [state]. Does not mutate [state]. */
-    private fun applyAndReport(problem: Problem, state: LocalSearchState, factor: LocalSearchFactor, move: Move): Int {
+    private fun applyAndReport(problem: Problem, state: LocalSearchState, factor: Factor, move: Move): Int {
         val before = if (factor.isViolated(state, 0)) 1 else 0
         val sibling = LocalSearchState(problem, Random(0))
         copyAssignment(state, sibling)
@@ -124,7 +118,7 @@ object MoveSetOracle {
         return after - before
     }
 
-    private fun bruteImproving(problem: Problem, state: LocalSearchState, factor: LocalSearchFactor): List<Move> {
+    private fun bruteImproving(problem: Problem, state: LocalSearchState, factor: Factor): List<Move> {
         val out = ArrayList<Move>()
         for (b in factor.boolVars) {
             val move = Move.BoolFlip(b)
