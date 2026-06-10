@@ -332,6 +332,8 @@ class BacktrackSolver(override val problem: Problem) :
                             params,
                             lpSeparators,
                             lpHints,
+                            objectiveVar = singleObj?.varId ?: -1,
+                            objectiveAscending = singleObj?.ascending ?: true,
                         )
                         if (outcome.basis != null) {
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
@@ -529,8 +531,12 @@ class BacktrackSolver(override val problem: Problem) :
         params: BacktrackParams,
         separators: List<CutSeparator>,
         hints: LpHints?,
+        objectiveVar: Int,
+        objectiveAscending: Boolean,
     ): LpNodeOutcome = try {
-        lpBoundAndFixUnsafe(relaxer, session, bound, sink, warmBasis, params, separators, hints)
+        lpBoundAndFixUnsafe(
+            relaxer, session, bound, sink, warmBasis, params, separators, hints, objectiveVar, objectiveAscending,
+        )
     } catch (_: LpOverflowException) {
         // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
         // bound or reduction only loses pruning, never soundness — keep the node and move on.
@@ -556,6 +562,8 @@ class BacktrackSolver(override val problem: Problem) :
         params: BacktrackParams,
         separators: List<CutSeparator>,
         hints: LpHints?,
+        objectiveVar: Int,
+        objectiveAscending: Boolean,
     ): LpNodeOutcome {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
@@ -619,6 +627,23 @@ class BacktrackSolver(override val problem: Problem) :
 
         // LP-guided value ordering (#246): record the final fractional primal for diving.
         if (solution.status == LpStatus.OPTIMAL) hints?.record(relaxation, solution)
+
+        // Objective dual-bound propagation (#281): push the LP lower bound onto a single-variable
+        // minimisation objective, with the reduced-cost certificate as the (learnable) reason, so it
+        // propagates through the objective-defining constraint. A resulting conflict prunes the node.
+        if (params.lpObjectiveBound && objectiveVar >= 0 && objectiveAscending &&
+            solution.status == LpStatus.OPTIMAL
+        ) {
+            val lpFloor = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
+            val reason = LpExplanation.objectiveBoundReason(relaxation, solution, session)
+            if (reason != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+                val res = session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
+                if (res is PropagationResult.Unsat) {
+                    sink.observeLpPrune()
+                    return LpNodeOutcome(true, warmCache)
+                }
+            }
+        }
 
         // Reduced-cost fixing (#21) on the final, cut-strengthened solution; needs a finite gap.
         val prune = bound.isFinite() && solution.status == LpStatus.OPTIMAL &&
