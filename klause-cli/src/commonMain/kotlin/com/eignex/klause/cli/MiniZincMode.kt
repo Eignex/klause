@@ -81,7 +81,7 @@ internal object MiniZincMode : CliMode {
                         problem = program.problem,
                         optimize = true,
                         maximize = maximize,
-                        lsObjective = program.lsObjective ?: linear,
+                        lsObjective = program.lsObjective,
                         linearObjective = linear,
                         objVarId = objVarId,
                         definitionalSweep = program.definitionalSweep,

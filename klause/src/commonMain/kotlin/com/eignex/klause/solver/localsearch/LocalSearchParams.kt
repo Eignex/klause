@@ -2,6 +2,8 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.IncrementalObjective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
@@ -47,6 +49,20 @@ data class LocalSearchParams(
      *  [CostShaping.linear] or [CostShaping.saturating] on tight problems where the
      *  feasible region is narrow. Ignored by `solve` / `samples` / `enumerate`. */
     val costShaping: CostShaping = CostShaping.FeasibilityFirst,
+    /**
+     * Optional per-move *gradient view* of the objective for [LocalSearchSolver.minimize] /
+     * `improvements`: when non-null, the descent scores and evaluates against this
+     * [com.eignex.klause.solver.IncrementalObjective] instead of the [LinearObjective] passed to
+     * `minimize`. The canonical use is a functionally-defined MiniZinc objective (the
+     * `defines_var` cone behind `minimizeInt(V)`): the linear form has zero gradient on decision
+     * moves — moving a decision variable merely violates `V`'s defining constraint — while this
+     * view recomputes `V` from the leaves, giving CBLS the gradient that matters (see
+     * [com.eignex.klause.solver.FunctionalObjective]). Must agree with the linear objective on
+     * every *feasible* assignment, so incumbent objectives stay comparable across engines.
+     * `null` (default) descends the linear objective directly. Ignored by `solve` / `samples` /
+     * `enumerate`.
+     */
+    val lsObjective: IncrementalObjective? = null,
     /**
      * Optional warm-start *assignment* for [LocalSearchSolver.minimize] / `improvements`: when
      * non-null, the descent begins from this assignment instead of a random restart, then

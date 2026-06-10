@@ -67,10 +67,7 @@ class SmtSolver(override val problem: Problem) :
      * [Objective] subtypes throw at runtime — JavaSMT has no generic objective callback.
      */
     @Suppress("IgnoredReturnValue") // the objective handle is not needed; we only check()/getModel()
-    override fun minimize(objective: Objective, params: SmtParams): MinimizeResult {
-        require(objective is LinearObjective) {
-            "SmtSolver only supports LinearObjective; got ${objective::class.simpleName}"
-        }
+    override fun minimize(objective: LinearObjective, params: SmtParams): MinimizeResult {
         val context = newContext(params)
         try {
             val opt: OptimizationProverEnvironment =

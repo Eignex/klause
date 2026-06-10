@@ -16,7 +16,6 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -160,7 +159,7 @@ internal object ParityMetric {
 
     private fun optimizeRow(
         entry: ResolvedProblem,
-        obj: Objective,
+        obj: LinearObjective,
         budget: Budget,
         ref: Reference,
         cached: CachedRef?,
@@ -208,7 +207,7 @@ internal object ParityMetric {
     // search — the comparison every solver actually runs in competition.
     private val timedMode = System.getProperty("klause.bench.parity.timed")?.toBoolean() ?: false
 
-    private fun timedOptimizeRow(entry: ResolvedProblem, obj: Objective, budget: Budget): ParityRow {
+    private fun timedOptimizeRow(entry: ResolvedProblem, obj: LinearObjective, budget: Budget): ParityRow {
         // Warm the JVM before timing. The competition runs a native binary with no JIT
         // warmup cost; on the JVM a cold first solve spends seconds in compilation, which
         // dominates time-to-best on fast rows and would make every quick COP look slow.
@@ -278,7 +277,7 @@ internal object ParityMetric {
      *  runs, so it JIT-warms the exact hot paths (propagation, BCP, conflict analysis,
      *  branch-and-bound) while the timed solve still starts from pristine heuristic state. The
      *  reference builds a fresh model per call and starts cold for the same reason. */
-    private fun warmup(entry: ResolvedProblem, obj: Objective) {
+    private fun warmup(entry: ResolvedProblem, obj: LinearObjective) {
         val warmMs = System.getProperty("klause.bench.parity.warmupMs")?.toLongOrNull() ?: 2000L
         runCatching {
             val dl = System.currentTimeMillis() + warmMs
@@ -292,7 +291,7 @@ internal object ParityMetric {
         }
         runCatching {
             ChocoSolver(entry.problem).minimizeTimed(
-                obj as LinearObjective,
+                obj,
                 ChocoParams(warmMs, lcg = true),
             )
         }
@@ -308,20 +307,19 @@ internal object ParityMetric {
      * annotation-guided search is the fixed/competition track only ([fixedMode]); free and
      * mixed both run the engine's own search.
      */
-    private fun mixedPortfolio(entry: ResolvedProblem, lsObjective: Objective?, linearObjective: Objective?) =
-        Portfolio(
-            PortfolioBuilder.build(
-                entry.problem,
-                PortfolioScenario.parallel(
-                    threads = 6,
-                    kind = if (lsObjective != null || linearObjective != null) Kind.COP else Kind.CSP,
-                    engine = EngineMix.MIXED,
-                ),
-                lsObjective = lsObjective,
-                linearObjective = linearObjective,
-                definitionalSweep = entry.definitionalSweep,
+    private fun mixedPortfolio(entry: ResolvedProblem, objective: LinearObjective?) = Portfolio(
+        PortfolioBuilder.build(
+            entry.problem,
+            PortfolioScenario.parallel(
+                threads = 6,
+                kind = if (objective != null) Kind.COP else Kind.CSP,
+                engine = EngineMix.MIXED,
             ),
-        )
+            objective = objective,
+            lsObjective = entry.lsObjective,
+            definitionalSweep = entry.definitionalSweep,
+        ),
+    )
 
     // -Dklause.bench.parity.mode=fixed scores the single-threaded competition track: one
     // klause worker on its own free conflict-driven search (no portfolio, no parallelism),
@@ -340,18 +338,18 @@ internal object ParityMetric {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).solve(freeParamsWithDeadline(deadline))
         return runBlocking(Dispatchers.Default) {
-            mixedPortfolio(entry, lsObjective = null, linearObjective = null).use {
+            mixedPortfolio(entry, objective = null).use {
                 it.solve(Cancellation { System.currentTimeMillis() > deadline })
             }
         }
     }
 
     @Suppress("InjectDispatcher")
-    private fun klauseMinimize(entry: ResolvedProblem, obj: Objective, budget: Budget): MinimizeResult {
+    private fun klauseMinimize(entry: ResolvedProblem, obj: LinearObjective, budget: Budget): MinimizeResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, freeParamsWithDeadline(deadline))
         return runBlocking(Dispatchers.Default) {
-            mixedPortfolio(entry, lsObjective = entry.lsObjective ?: obj, linearObjective = obj).use {
+            mixedPortfolio(entry, objective = obj).use {
                 it.minimize(Cancellation { System.currentTimeMillis() > deadline })
             }
         }

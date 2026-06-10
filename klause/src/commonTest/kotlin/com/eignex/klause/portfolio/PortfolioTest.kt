@@ -38,6 +38,20 @@ import kotlin.time.TimeSource
 class PortfolioTest {
 
     @Test
+    fun `cop backtrack palette includes the lp-focused arm and csp does not`() {
+        val cop = BacktrackWorkerConfig.ranked(Kind.COP).map { it.label }
+        assertTrue("lp" in cop, "COP palette must carry the LP-focused arm, got $cop")
+        // The arm's params carry the one-flag LP enablement.
+        val lpArm = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp" }
+        assertTrue(lpArm.build(1L, null).lpAuto)
+        // The #117 guard stays at slot 0.
+        assertEquals("satOptimized", cop.first())
+
+        val csp = BacktrackWorkerConfig.ranked(Kind.CSP).map { it.label }
+        assertTrue("lp" !in csp, "the LP machinery lives on the minimisation path; CSP skips it")
+    }
+
+    @Test
     fun `portfolio solve on satisfiable problem returns sat`() = runTest {
         val problem = exactlyOneOver(4)
         val workers = List(4) { i ->
@@ -257,8 +271,7 @@ class PortfolioTest {
             PortfolioBuilder.build(
                 problem,
                 PortfolioScenario.parallel(threads = 4, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
-                lsObjective = obj,
-                linearObjective = obj,
+                objective = obj,
                 onEvent = { _, e ->
                     if (e is SearchEvent.Incumbent && e.objective <= 3.0) sawOptimum.store(true)
                 },
@@ -292,8 +305,7 @@ class PortfolioTest {
             PortfolioBuilder.build(
                 problem,
                 PortfolioScenario.parallel(threads = 2, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
-                lsObjective = obj,
-                linearObjective = obj,
+                objective = obj,
                 onEvent = { worker, e ->
                     while (true) {
                         val cur = events.load()

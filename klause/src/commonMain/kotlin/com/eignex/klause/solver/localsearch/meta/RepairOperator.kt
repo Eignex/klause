@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.localsearch.meta
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -43,7 +43,7 @@ internal fun interface RepairOperator {
 internal data class RepairContext(
     val inner: Optimizer<LocalSearchParams>,
     val params: LocalSearchParams,
-    val objective: Objective,
+    val objective: LinearObjective,
     val pinAssumptions: Assumptions,
     val incumbent: Sample,
     val freed: FreedVars,

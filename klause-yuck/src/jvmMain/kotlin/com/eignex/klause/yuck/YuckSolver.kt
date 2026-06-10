@@ -2,7 +2,6 @@ package com.eignex.klause.yuck
 
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -52,13 +51,10 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
         }
     }
 
-    override fun minimize(objective: Objective, params: YuckParams): MinimizeResult =
+    override fun minimize(objective: LinearObjective, params: YuckParams): MinimizeResult =
         improvements(objective, params).last()
 
-    override fun improvements(objective: Objective, params: YuckParams): Sequence<MinimizeResult> {
-        require(objective is LinearObjective) {
-            "klause-yuck only optimizes LinearObjective (got ${objective::class.simpleName})"
-        }
+    override fun improvements(objective: LinearObjective, params: YuckParams): Sequence<MinimizeResult> {
         val run = execute(FznModel.emit(problem, objective), params, intermediate = true)
         val incumbents = run.solutions.map { solution ->
             MinimizeResult.BestFound(

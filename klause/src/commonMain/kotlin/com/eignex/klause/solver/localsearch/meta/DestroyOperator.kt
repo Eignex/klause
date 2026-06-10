@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.localsearch.meta
 
 import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchFactor
@@ -18,7 +17,13 @@ import kotlin.random.Random
  * cheap; they're invoked once per ALNS iteration.
  */
 internal fun interface DestroyOperator {
-    fun destroy(rng: Random, problem: Problem, incumbent: Sample, objective: Objective, fraction: Double): FreedVars
+    fun destroy(
+        rng: Random,
+        problem: Problem,
+        incumbent: Sample,
+        objective: LinearObjective,
+        fraction: Double,
+    ): FreedVars
 
     companion object {
         /** Free a uniformly-random subset of `fraction * totalVars` variables. The classic
@@ -31,31 +36,19 @@ internal fun interface DestroyOperator {
         }
 
         /** Free the `fraction * totalVars` variables that contribute the most to the current
-         *  objective (by `|coefficient * value|` for linear objectives, or by single-flip /
-         *  single-set delta for arbitrary objectives). Targets the variables most likely to
-         *  move the objective if re-optimised. Falls back to random for objectives whose
-         *  contribution can't be cheaply estimated. */
-        val WorstObjective: DestroyOperator = DestroyOperator { rng, problem, incumbent, objective, fraction ->
+         *  objective, by `|coefficient * value|` — the variables most likely to move the
+         *  objective if re-optimised. */
+        val WorstObjective: DestroyOperator = DestroyOperator { _, problem, incumbent, objective, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             val contribs = DoubleArray(totalVars)
-            when (objective) {
-                is LinearObjective -> {
-                    for (b in 0 until problem.numBoolVars) {
-                        contribs[b] = abs(objective.boolWeights[b].toDouble()) * (if (incumbent.bools[b]) 1.0 else 0.0)
-                    }
-                    for (i in 0 until problem.numIntVars) {
-                        contribs[problem.numBoolVars + i] = abs(
-                            (objective.intCoefficients[i] * incumbent.ints[i]).toDouble(),
-                        )
-                    }
-                }
-
-                else -> {
-                    // Fall back to random for non-linear objectives — full single-flip evaluation
-                    // would be O(totalVars) objective evaluations per destroy call.
-                    return@DestroyOperator Random.destroy(rng, problem, incumbent, objective, fraction)
-                }
+            for (b in 0 until problem.numBoolVars) {
+                contribs[b] = abs(objective.boolWeights[b].toDouble()) * (if (incumbent.bools[b]) 1.0 else 0.0)
+            }
+            for (i in 0 until problem.numIntVars) {
+                contribs[problem.numBoolVars + i] = abs(
+                    (objective.intCoefficients[i] * incumbent.ints[i]).toDouble(),
+                )
             }
             val indexed = (0 until totalVars).sortedByDescending { contribs[it] }
             split(indexed.take(k), problem.numBoolVars)

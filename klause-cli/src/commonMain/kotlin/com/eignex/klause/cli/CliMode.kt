@@ -1,8 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.DefinitionalSweep
+import com.eignex.klause.solver.IncrementalObjective
 import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveStats
@@ -161,10 +161,11 @@ internal class Solvable(
     val optimize: Boolean,
     /** True when the user goal is maximisation (the objectives below already negate for it). */
     val maximize: Boolean,
-    /** Gradient-bearing objective the LS workers descend (null for satisfy / when none). */
-    val lsObjective: Objective?,
-    /** Linear objective the complete backends bound-prune on (null for satisfy). */
-    val linearObjective: Objective?,
+    /** Per-move gradient view of the objective for the LS workers (null for satisfy / when
+     *  none); rides into `LocalSearchParams.lsObjective`. */
+    val lsObjective: IncrementalObjective?,
+    /** The canonical linear objective every optimising backend minimises (null for satisfy). */
+    val linearObjective: LinearObjective?,
     /** Single objective int var id, when the objective is one variable — enables the
      *  enumerate-over-objective fallback. Null for weighted-sum objectives / satisfy. */
     val objVarId: Int?,
@@ -212,7 +213,8 @@ internal fun linearSolvable(
         problem = problem,
         optimize = true,
         maximize = maximize,
-        lsObjective = objective,
+        // No gradient view for these modes: LS descends the linear objective directly.
+        lsObjective = null,
         linearObjective = objective,
         objVarId = objective.singleIntObjective()?.varId,
         definitionalSweep = null,

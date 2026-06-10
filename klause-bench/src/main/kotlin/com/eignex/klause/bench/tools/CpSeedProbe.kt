@@ -4,7 +4,6 @@ import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -51,7 +50,6 @@ object CpSeedProbe {
         }
         val objVarId = prog.intVarsByName[objName] ?: error("objective var '$objName' not in int map")
         val linear = if (maximize) problem.maximizeInt(objVarId) else problem.minimizeInt(objVarId)
-        val objective: Objective = prog.lsObjective ?: linear
         println(
             "=== ${File(path).name}  bool=${problem.numBoolVars} int=${problem.numIntVars} " +
                 "factors=${problem.numFactors}  ${if (maximize) "max" else "min"} $objName ===",
@@ -81,11 +79,12 @@ object CpSeedProbe {
                 costShaping = CostShaping.Linear(lambda = 1.0),
                 cancellation = Cancellation { System.currentTimeMillis() > deadline },
                 initialAssignment = initial,
+                lsObjective = prog.lsObjective,
             )
             var best: Double? = null
             var firstMs = -1L
             var n = 0
-            for (r in solver.improvements(objective, params)) {
+            for (r in solver.improvements(linear, params)) {
                 if (r is MinimizeResult.WithSample) {
                     if (firstMs < 0) firstMs = System.currentTimeMillis() - start
                     if (best == null || r.objective < best) best = r.objective

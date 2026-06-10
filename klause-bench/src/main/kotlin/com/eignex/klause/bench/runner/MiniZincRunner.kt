@@ -5,7 +5,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.maximizeInt
 import com.eignex.klause.solver.minimizeInt
 import java.io.File
@@ -26,7 +26,7 @@ internal class MiniZincRunner(
 
     override fun resolve(ref: ProblemRef): ResolvedProblem {
         val program = parseFlatZinc(compileFzn(ref).readText())
-        val objective: Objective? = when (val s = program.solve) {
+        val objective: LinearObjective? = when (val s = program.solve) {
             is SolveDirective.Minimize -> program.intVarsByName[s.objVar]?.let { program.problem.minimizeInt(it) }
             is SolveDirective.Maximize -> program.intVarsByName[s.objVar]?.let { program.problem.maximizeInt(it) }
             is SolveDirective.Satisfy -> null

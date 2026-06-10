@@ -152,13 +152,22 @@ data class BacktrackParams(
      */
     val objectiveBoundSupplier: (() -> Double)? = null,
     /**
-     * Native LP-relaxation bounding for branch-and-bound minimisation (#20). When true and the
-     * objective is a [com.eignex.klause.solver.LinearObjective], scheduled nodes solve an exact
-     * integer LP relaxation of the live problem and prune when the relaxation is infeasible or its
-     * objective bound, rounded up to the next integer, is `≥` the incumbent. This strictly
-     * dominates the cheap per-term lower bound (which still runs first as a fast pre-filter) but
-     * costs an LP solve per scheduled node. Disabled by default; ignored for non-linear objectives
-     * and for problems with no LP-emittable factors (the relaxation is then empty and never prunes).
+     * One-flag enablement of the whole LP-relaxation family: when true, `minimize`/`improvements`
+     * first pass these params through [LpAutoConfig.recommend], which ORs on exactly the LP
+     * techniques whose target structure the problem contains ([lpBounding], [lpCuts] + the cut
+     * pool and learning machinery, the hull relaxations, [lagrangian], [energeticReasoning] — see
+     * [LpAutoConfig]). Explicitly set flags are never turned *off*, so this composes with manual
+     * tuning. This is the single knob an LP-focused portfolio arm sets; off by default so the
+     * plain backtrack arms keep their lean per-node cost.
+     */
+    val lpAuto: Boolean = false,
+    /**
+     * Native LP-relaxation bounding for branch-and-bound minimisation (#20). When true, scheduled
+     * nodes solve an exact integer LP relaxation of the live problem and prune when the relaxation
+     * is infeasible or its objective bound, rounded up to the next integer, is `≥` the incumbent.
+     * This strictly dominates the cheap per-term lower bound (which still runs first as a fast
+     * pre-filter) but costs an LP solve per scheduled node. Disabled by default; a no-op for
+     * problems with no LP-emittable factors (the relaxation is then empty and never prunes).
      */
     val lpBounding: Boolean = false,
     /**

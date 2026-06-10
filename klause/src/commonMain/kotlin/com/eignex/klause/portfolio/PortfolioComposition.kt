@@ -1,7 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.IncrementalObjective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 import kotlin.math.roundToInt
@@ -83,18 +84,19 @@ internal sealed interface WorkerConfig {
 
     /**
      * Build the runnable worker. [index] is the arm's position in the pool (offsets the seed and,
-     * for backtrack, numbers the label). [lsObjective]/[linearObjective] are the two objective
-     * representations (#63) — each engine picks its preferred form and falls back to the other.
-     * [lsLambda]/[definitionalSweep] are LS-only (backtrack ignores them). [onEvent] is the shared
-     * [SearchEvent] sink, tagged here with the worker's label.
+     * for backtrack, numbers the label). [objective] is the canonical [LinearObjective] every
+     * optimising worker minimises; [lsObjective] is the optional LS gradient view of the same
+     * objective (backtrack ignores it). [lsLambda]/[definitionalSweep] are LS-only (backtrack
+     * ignores them). [onEvent] is the shared [SearchEvent] sink, tagged here with the worker's
+     * label.
      */
     fun materialize(
         problem: Problem,
         index: Int,
         seed: Long,
         lsLambda: Double,
-        lsObjective: Objective?,
-        linearObjective: Objective?,
+        objective: LinearObjective?,
+        lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     ): PortfolioWorker

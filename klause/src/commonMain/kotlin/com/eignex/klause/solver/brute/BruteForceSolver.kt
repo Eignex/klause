@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.brute
 
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -81,7 +81,7 @@ class BruteForceSolver(override val problem: Problem) :
      * If the cap is generous enough to exhaust the assignment space, the result is the
      * exact global minimum; otherwise it's the best-seen-so-far.
      */
-    override fun minimize(objective: Objective, params: BruteForceParams): MinimizeResult {
+    override fun minimize(objective: LinearObjective, params: BruteForceParams): MinimizeResult {
         var bestObj = Double.POSITIVE_INFINITY
         var best: Sample? = null
         val budget = StepBudget(params.effectiveStepCap)

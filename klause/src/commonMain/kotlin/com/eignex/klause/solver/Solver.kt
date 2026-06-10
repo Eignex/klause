@@ -183,15 +183,17 @@ interface Solver<P : SolverParams> {
 }
 
 /**
- * A [Solver] that also returns a feasible assignment minimising a linear (or other)
- * objective.
+ * A [Solver] that also returns a feasible assignment minimising a [LinearObjective].
  *
- * Calls carry the [Objective] per-invocation so the same backend can be reused across
+ * Calls carry the objective per-invocation so the same backend can be reused across
  * differently-weighted optimisation queries (e.g. Thompson-sampled weight vectors).
  *
- * Backends typically specialise on [LinearObjective] for a fast path (incremental delta in
- * local search, native `mkAdd` translation in Z3) and either fall back to
- * [Objective.evaluate] for arbitrary subtypes or refuse to optimise them.
+ * The objective is **statically** the native integer-linear form — the one every front-end
+ * produces — so backends enable their objective machinery (LP relaxation bounding, branch-and-bound
+ * bounds, native `mkAdd` translation in Z3) from params alone, with no runtime objective-type
+ * dispatch. The local-search engines additionally accept a per-move gradient view of the same
+ * objective via `LocalSearchParams.lsObjective` (see
+ * [com.eignex.klause.solver.IncrementalObjective]).
  */
 interface Optimizer<P : SolverParams> : Solver<P> {
     /**
@@ -206,7 +208,7 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      * Local-search backends can never return [MinimizeResult.Optimal] or
      * [MinimizeResult.Infeasible].
      */
-    fun minimize(objective: Objective, params: P): MinimizeResult
+    fun minimize(objective: LinearObjective, params: P): MinimizeResult
 
     /**
      * Streaming variant of [minimize]: yields one [MinimizeResult] per *new incumbent*
@@ -228,6 +230,6 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      * with an inner anytime loop ([BacktrackSolver], `LocalSearchSolver`) override to
      * yield each improvement as it lands.
      */
-    fun improvements(objective: Objective, params: P): Sequence<MinimizeResult> =
+    fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> =
         sequenceOf(minimize(objective, params))
 }

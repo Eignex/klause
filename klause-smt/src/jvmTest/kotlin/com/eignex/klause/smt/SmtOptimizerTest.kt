@@ -3,10 +3,8 @@ package com.eignex.klause.smt
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.Cardinality
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -35,27 +33,6 @@ class SmtOptimizerTest {
         )
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L))
         assertFailsWith<UnsupportedOperationException> {
-            SmtSolver(problem).minimize(objective, SmtParams())
-        }
-    }
-
-    /**
-     * Non-LinearObjective objectives are rejected up front with a clear message — JavaSMT
-     * has no generic objective callback, so trying to support arbitrary subtypes would
-     * require apply-revert tooling that isn't justified for an SMT adapter.
-     */
-    @Test
-    fun `non-linear objective rejected`() {
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(),
-        )
-        val objective = object : Objective {
-            override fun evaluate(sample: Sample): Double = 0.0
-        }
-        assertFailsWith<IllegalArgumentException> {
             SmtSolver(problem).minimize(objective, SmtParams())
         }
     }

@@ -3,7 +3,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.IncrementalObjective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchEvent
@@ -78,8 +79,8 @@ internal data class LocalSearchWorkerConfig(
         index: Int,
         seed: Long,
         lsLambda: Double,
-        lsObjective: Objective?,
-        linearObjective: Objective?,
+        objective: LinearObjective?,
+        lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     ): PortfolioWorker {
@@ -95,13 +96,15 @@ internal data class LocalSearchWorkerConfig(
         val params = LocalSearchParams(
             randomSeed = seed + index,
             costShaping = CostShaping.Linear(lambda = lsLambda),
+            // The per-move gradient view of the objective, when the model provides one.
+            lsObjective = lsObjective,
             onEvent = onEvent?.let { sink -> { e -> sink(workerLabel, e) } },
         )
         return PortfolioWorker.of(
             workerLabel,
             session,
             params,
-            objective = lsObjective ?: linearObjective,
+            objective = objective,
             withWarmStart = { p, sample -> p.copy(initialAssignment = sample) },
         )
     }

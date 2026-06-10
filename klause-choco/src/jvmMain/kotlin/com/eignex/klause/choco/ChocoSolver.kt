@@ -2,7 +2,6 @@ package com.eignex.klause.choco
 
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -98,10 +97,7 @@ class ChocoSolver(override val problem: Problem) : Optimizer<ChocoParams> {
         return TimedMin(bestVal, bestMillis, proven = !cm.model.solver.isStopCriterionMet())
     }
 
-    override fun minimize(objective: Objective, params: ChocoParams): MinimizeResult {
-        require(objective is LinearObjective) {
-            "klause-choco only optimizes LinearObjective (got ${objective::class.simpleName})"
-        }
+    override fun minimize(objective: LinearObjective, params: ChocoParams): MinimizeResult {
         if (params.workers > 1) return minimizeParallel(objective, params)
         val cm = ChocoModel.build(problem, params.lcg)
         applyLimits(cm.model, params)

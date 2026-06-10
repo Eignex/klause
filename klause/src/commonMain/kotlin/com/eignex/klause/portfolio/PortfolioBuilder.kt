@@ -1,7 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.IncrementalObjective
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
 
@@ -21,11 +22,10 @@ object PortfolioBuilder {
     /**
      * Compose [scenario] and materialise its arms over [problem].
      *
-     * For optimisation the two objective representations differ per engine but agree on the scalar
-     * bound (#63): [lsObjective] is the functional/gradient objective the local-search workers
-     * descend, [linearObjective] is the [com.eignex.klause.solver.LinearObjective] the backtrack
-     * workers bound-prune on. Either may be null: pass both null for a satisfaction-only portfolio,
-     * or just one if the model only provides that form (each engine falls back to the other).
+     * [objective] is the canonical [LinearObjective] every optimising worker minimises (null for a
+     * satisfaction-only portfolio). [lsObjective] is the optional per-move gradient view of the
+     * same objective for the local-search workers (see `LocalSearchParams.lsObjective`); backtrack
+     * workers ignore it.
      *
      * [definitionalSweep] is threaded into every LS worker (per-move invariants, #153). [onEvent]
      * threads the [SearchEvent] seam through to every worker tagged with its label; workers run
@@ -34,8 +34,8 @@ object PortfolioBuilder {
     fun build(
         problem: Problem,
         scenario: PortfolioScenario,
-        lsObjective: Objective? = null,
-        linearObjective: Objective? = null,
+        objective: LinearObjective? = null,
+        lsObjective: IncrementalObjective? = null,
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): List<PortfolioWorker> = materialize(
@@ -43,8 +43,8 @@ object PortfolioBuilder {
         PortfolioComposition.compose(scenario),
         scenario.seed,
         scenario.lsLambda,
+        objective,
         lsObjective,
-        linearObjective,
         definitionalSweep,
         onEvent,
     )
@@ -62,8 +62,8 @@ object PortfolioBuilder {
         kind: Kind,
         seed: Long = 0L,
         lsLambda: Double = 1.0,
-        lsObjective: Objective? = null,
-        linearObjective: Objective? = null,
+        objective: LinearObjective? = null,
+        lsObjective: IncrementalObjective? = null,
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): List<PortfolioWorker> {
@@ -77,7 +77,7 @@ object PortfolioBuilder {
             addAll(lsConfigs)
             if (backtrackWorkers > 0) addAll(BacktrackWorkerConfig.diverse(kind, backtrackWorkers))
         }
-        return materialize(problem, arms, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent)
+        return materialize(problem, arms, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent)
     }
 
     /** Materialise each composed arm via its own [WorkerConfig.materialize] — the shared body of
@@ -87,13 +87,13 @@ object PortfolioBuilder {
         arms: List<WorkerConfig>,
         seed: Long,
         lsLambda: Double,
-        lsObjective: Objective?,
-        linearObjective: Objective?,
+        objective: LinearObjective?,
+        lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     ): List<PortfolioWorker> {
         val workers = arms.mapIndexed { i, config ->
-            config.materialize(problem, i, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent)
+            config.materialize(problem, i, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent)
         }
         check(workers.isNotEmpty()) { "portfolio produced no workers" }
         return workers

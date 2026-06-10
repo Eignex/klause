@@ -12,8 +12,8 @@ import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
@@ -191,11 +191,10 @@ internal object AnytimeMetric {
             // -Dklause.anytime.invariants=false reverts to restart-only sweeping for A/B runs.
             perMoveInvariants = System.getProperty("klause.anytime.invariants")?.toBoolean() != false,
         )
-        val klauseObj = entry.lsObjective ?: obj
         // Optional portfolio mode: -Dklause.anytime.portfolio=<ls>:<bt> runs a multi-core
         // Portfolio (ls local-search + bt backtrack workers) instead of the single CBLS solver,
-        // streaming its fanned-in incumbents. Mixed pools use the linear objective both engines
-        // share; pure-LS pools keep the functional/gradient objective.
+        // streaming its fanned-in incumbents. Every engine minimises the linear objective; the
+        // LS workers additionally descend the model's gradient view via params.lsObjective.
         val portfolioProp = System.getProperty("klause.anytime.portfolio")
         // Optional CP-seeding (#65, OFF by default): -Dklause.anytime.cpseed=true runs a short
         // backtrack solve for a *feasible* point and warm-starts LS from it (the #54 misses reach
@@ -209,11 +208,13 @@ internal object AnytimeMetric {
         val engine = EngineTimes()
         val k = when {
             portfolioProp != null ->
-                anytime(engine) { portfolioImprovements(entry, portfolioProp, klauseObj, obj, budget, engine.listener) }
+                anytime(engine) { portfolioImprovements(entry, portfolioProp, obj, budget, engine.listener) }
 
-            cpseed -> anytime(engine) { cpSeededImprovements(entry, solver, klauseObj, budget, engine.listener) }
+            cpseed -> anytime(engine) { cpSeededImprovements(entry, solver, obj, budget, engine.listener) }
 
-            else -> anytime(engine) { solver.improvements(klauseObj, lsParams(budget, engine.listener)) }
+            else -> anytime(engine) {
+                solver.improvements(obj, lsParams(budget, engine.listener).copy(lsObjective = entry.lsObjective))
+            }
         }
         val r = anytime { ref.improvements(entry.problem, obj, budget) }
         val gap = if (k.best != null && r.best != null) k.best - r.best else null
@@ -278,8 +279,7 @@ internal object AnytimeMetric {
     private fun portfolioImprovements(
         entry: ResolvedProblem,
         prop: String,
-        klauseObj: Objective,
-        linearObj: Objective,
+        objective: LinearObjective,
         budget: Budget,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): Sequence<MinimizeResult> {
@@ -288,9 +288,9 @@ internal object AnytimeMetric {
         val bt = parts.getOrNull(1)?.toIntOrNull() ?: 0
         val configsProp = System.getProperty("klause.anytime.portfolio.configs")
             ?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }
-        // Per-worker objectives (#63): the LS workers descend the functional/gradient objective
-        // (klauseObj), the backtrack workers bound the linear one (linearObj). A mixed pool no
-        // longer collapses the LS workers onto the linear objective and loses the gradient.
+        // Every worker minimises the linear objective; the LS workers additionally receive the
+        // model's gradient view (entry.lsObjective) through their params, keeping the per-move
+        // gradient without collapsing the pool onto two objective representations.
         val portfolioEvent: (worker: String, event: SearchEvent) -> Unit = { _, e -> onEvent?.invoke(e) }
         val workers = if (configsProp != null) {
             // Explicit config mix (the campaign override).
@@ -300,8 +300,8 @@ internal object AnytimeMetric {
                 backtrackWorkers = bt,
                 kind = Kind.COP,
                 seed = 1L,
-                lsObjective = klauseObj,
-                linearObjective = linearObj,
+                objective = objective,
+                lsObjective = entry.lsObjective,
                 definitionalSweep = entry.definitionalSweep,
                 onEvent = if (onEvent != null) portfolioEvent else null,
             )
@@ -314,8 +314,8 @@ internal object AnytimeMetric {
                     engine = if (bt > 0) EngineMix.MIXED else EngineMix.LOCAL_SEARCH,
                     seed = 1L,
                 ),
-                lsObjective = klauseObj,
-                linearObjective = linearObj,
+                objective = objective,
+                lsObjective = entry.lsObjective,
                 definitionalSweep = entry.definitionalSweep,
                 onEvent = if (onEvent != null) portfolioEvent else null,
             )
@@ -374,7 +374,7 @@ internal object AnytimeMetric {
     private fun cpSeededImprovements(
         entry: ResolvedProblem,
         solver: LocalSearchSolver,
-        klauseObj: Objective,
+        objective: LinearObjective,
         budget: Budget,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): Sequence<MinimizeResult> {
@@ -393,9 +393,10 @@ internal object AnytimeMetric {
             randomSeed = 1L,
             costShaping = shapingFromProps(),
             initialAssignment = seed,
+            lsObjective = entry.lsObjective,
             onEvent = onEvent,
         ).withCancellation(Cancellation { System.currentTimeMillis() > overallDeadline })
-        return solver.improvements(klauseObj, params)
+        return solver.improvements(objective, params)
     }
 
     private fun lsParams(budget: Budget, onEvent: ((SearchEvent) -> Unit)? = null): LocalSearchParams {

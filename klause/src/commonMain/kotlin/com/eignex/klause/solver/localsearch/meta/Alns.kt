@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch.meta
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
@@ -106,14 +107,17 @@ internal class Alns(
         val newBest: Boolean,
     )
 
-    override fun minimize(objective: Objective, params: LocalSearchParams): MinimizeResult {
+    override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
         _iterationLog.clear()
+        // Score with the caller's gradient view when one is supplied (it agrees with the linear
+        // objective at every feasible point); the inner solves resolve the same view from params.
+        val scoring: Objective = params.lsObjective ?: objective
         // Initial solve to get an incumbent. Route through the session when present so the
         // first solve seeds DDFW weights / recency for later activity-biased destroys.
         val initialResult = session?.minimize(objective, params) ?: inner.minimize(objective, params)
         val initialSample = initialResult.assignment ?: return initialResult
         var bestSample: Sample = initialSample
-        var bestObj = objective.evaluate(bestSample)
+        var bestObj = scoring.evaluate(bestSample)
         var incumbent = bestSample
         var incumbentObj = bestObj
 
@@ -147,7 +151,7 @@ internal class Alns(
                 iter++
                 continue
             }
-            val repairedObj = objective.evaluate(repaired)
+            val repairedObj = scoring.evaluate(repaired)
 
             val isNewBest = repairedObj < bestObj
             val accept = isNewBest || acceptance.accept(repairedObj, incumbentObj, rng)
