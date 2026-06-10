@@ -485,28 +485,35 @@ class BacktrackSolver(override val problem: Problem) :
      * weight (or 0) that makes their contribution smallest; unpinned int vars take the
      * domain endpoint matching the coefficient's sign.
      */
-    private fun linearLowerBound(obj: LinearObjective, session: PropagationSession): Long {
+    private fun linearLowerBound(obj: LinearObjective, session: PropagationSession): Long = try {
         var total = obj.constant
         val sp = session.problem
         val nb = minOf(sp.numBoolVars, obj.boolWeights.size)
         for (b in 0 until nb) {
             val w = obj.boolWeights[b]
             val v = session.boolValue(b)
-            total += when {
-                v == true -> w
-                v == false -> 0L
-                w < 0L -> w
-                else -> 0L
-            }
+            total = addExact(
+                total,
+                when {
+                    v == true -> w
+                    v == false -> 0L
+                    w < 0L -> w
+                    else -> 0L
+                },
+            )
         }
         val ni = minOf(sp.numIntVars, obj.intCoefficients.size)
         for (i in 0 until ni) {
             val c = obj.intCoefficients[i]
             if (c == 0L) continue
             val d = session.intDomain(i)
-            total += if (c >= 0L) c * d.min else c * d.max
+            total = addExact(total, mulExact(c, if (c >= 0L) d.min.toLong() else d.max.toLong()))
         }
-        return total
+        total
+    } catch (_: LpOverflowException) {
+        // A wrapped accumulation could overshoot the incumbent and prune wrongly; no bound is the
+        // sound fallback.
+        Long.MIN_VALUE
     }
 
     /** Outcome of one node LP pass: whether to prune, and the basis to warm-start children from. */
@@ -543,9 +550,14 @@ class BacktrackSolver(override val problem: Problem) :
      * pins. A complete conflict-free pass is a feasible incumbent — propagation enforces every factor,
      * so the snapshot is sound by construction. Returns null when the LP is not optimal, a pin
      * conflicts (single pass, no backtracking), or a rounded value is not in the live domain.
+     *
+     * A bake-time root conflict must be checked explicitly: the bake fixpoint stops at the first
+     * conflict, which can leave every variable "already pinned" — the pin loop then never observes
+     * the Unsat and would snapshot a factor-violating assignment as a feasible incumbent.
      */
     private fun lpRoundingProbe(objective: LinearObjective): Sample? {
         val session = PropagationSession(problem)
+        if (session.isUnsatAtRoot) return null
         val relaxation = CpToLpRelaxation(problem, objective).build(session)
         if (relaxation.model.n == 0) return null
         val solution = try {
@@ -570,40 +582,52 @@ class BacktrackSolver(override val problem: Problem) :
         return snapshotAssignment(session)
     }
 
-    /** True when the relaxation's rounded objective bound is at least the incumbent. */
+    /** True when the relaxation's rounded objective bound is at least the incumbent. The checked
+     *  add matters: a silent wrap on extreme data could flip into a false prune, and the enclosing
+     *  overflow handler already treats a throw as "no bound". */
     private fun boundPrunes(solution: LpSolution, relaxation: LpRelaxation, bound: Double): Boolean {
         if (!bound.isFinite()) return false
-        val lpBound = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
+        val lpBound = addExact(solution.objectiveLowerBoundCeil(), relaxation.objectiveConstant)
         return lpBound.toDouble() >= bound
     }
 
     /**
      * Persistent global cut pool: separate the structural separators at the root once and
-     * return their cuts. Root domains equal the declared domains, so these cuts are globally valid —
-     * a root Hall / cover / assignment / subtour cut stays a valid (if weaker) bound at every tighter
-     * descendant — and re-adding them at every node avoids re-separating them. Gomory cuts are excluded
-     * (they come from the live tableau in the per-node loop and are only locally valid).
+     * return their cuts. Every root deduction holds at every solution, so root-separated cuts are
+     * globally valid — a root Hall / cover / assignment / subtour cut stays a valid (if weaker)
+     * bound at every tighter descendant — and re-adding them at every node avoids re-separating
+     * them. They are re-tagged [Cut.global] accordingly (the separators can only prove globality
+     * against declared domains, not against root-propagated ones). Gomory cuts are excluded (they
+     * come from the live tableau in the per-node loop and are only locally valid). Each re-solve
+     * warm-starts from the previous round's basis extended with the new cut slacks, like the
+     * per-node cut loop.
      */
     private fun harvestRootCuts(
         relaxer: CpToLpRelaxation,
         session: PropagationSession,
         separators: List<CutSeparator>,
     ): List<Cut> {
-        if (separators.isEmpty()) return emptyList()
+        if (separators.isEmpty() || session.isUnsatAtRoot) return emptyList()
         val pool = HashSet<String>()
         val cuts = ArrayList<Cut>()
         try {
             var relaxation = relaxer.build(session)
             if (relaxation.model.n == 0) return emptyList()
             var solution = DualSimplex(relaxation.model).solve()
+            var prevRows = relaxation.model.m
             var round = 0
             while (round++ < CUT_POOL_ROUNDS && solution.status == LpStatus.OPTIMAL) {
+                val prevBasis = solution.basis
                 val ctx = CutContext(problem, relaxation, solution, session)
-                val fresh = separators.flatMap { it.separate(ctx) }.filter { pool.add(it.key()) }
+                val fresh = separators.flatMap { it.separate(ctx) }
+                    .filter { pool.add(it.key()) }
+                    .map { if (it.global) it else Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true) }
                 if (fresh.isEmpty()) break
                 cuts.addAll(fresh)
                 relaxation = relaxer.build(session, cuts)
-                solution = DualSimplex(relaxation.model).solve()
+                solution = DualSimplex(relaxation.model)
+                    .solve(extendBasisWithSlacks(prevBasis, relaxation.model, prevRows))
+                prevRows = relaxation.model.m
             }
         } catch (_: LpOverflowException) {
             return cuts // keep whatever stayed within 64-bit determinants — still globally valid
@@ -720,13 +744,15 @@ class BacktrackSolver(override val problem: Problem) :
         // Cut rounds (#22): separate violated cuts from the LP point and re-solve. Cuts only append
         // rows (structural columns are unchanged), so with lpWarmCuts the previous round's optimal
         // basis — extended with the new rows' slacks — warm-starts the dual re-solve. Cuts are valid,
-        // so infeasibility under them prunes.
+        // so infeasibility under them prunes. The cut list and warm-start state outlive the loop:
+        // the fixpoint re-solves below keep the cuts (they stay valid as the box only shrinks) and
+        // resume from the same basis.
+        val cuts = ArrayList<Cut>()
+        var prevBasis = warmCache // last optimal basis, extended each round to warm the re-solve
+        var prevRows = relaxation.model.m // row count whose slacks `prevBasis` already covers
         if (separators.isNotEmpty()) {
             val pool = HashSet<String>()
-            val cuts = ArrayList<Cut>()
             var round = 0
-            var prevBasis = warmCache // last optimal basis, extended each round to warm the re-solve
-            var prevRows = relaxation.model.m // row count whose slacks `prevBasis` already covers
             // The root relaxation bounds the whole tree, so close it harder there (#285).
             val maxRounds = if (session.decisionLevel == 0) {
                 maxOf(params.lpRootCutRounds, params.lpCutRounds)
@@ -780,16 +806,23 @@ class BacktrackSolver(override val problem: Problem) :
 
             val before = session.propagationCount
             // Objective dual-bound propagation (#281): push the LP lower bound onto a single-variable
-            // minimisation objective with the reduced-cost certificate as the (learnable) reason.
+            // minimisation objective, with the reduced-cost certificate as the learnable reason when
+            // it is expressible. When the reason is withheld (an auxiliary column or a node-local
+            // row carries dual weight), the bound itself still holds at this node, so it is applied
+            // as a reason-less, level-local tightening — a leaf for conflict analysis, like the
+            // reason-less reduced-cost fixings.
             if (params.lpObjectiveBound && objectiveVar >= 0 && objectiveAscending &&
                 solution.status == LpStatus.OPTIMAL
             ) {
-                val lpFloor = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
-                val reason = LpExplanation.objectiveBoundReason(relaxation, solution, session)
-                if (reason != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
-                    if (session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
-                            is PropagationResult.Unsat
-                    ) {
+                val lpFloor = addExact(solution.objectiveLowerBoundCeil(), relaxation.objectiveConstant)
+                if (lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+                    val reason = LpExplanation.objectiveBoundReason(relaxation, solution, session)
+                    val res = if (reason != null) {
+                        session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
+                    } else {
+                        session.implyIntAtLeast(objectiveVar, lpFloor.toInt())
+                    }
+                    if (res is PropagationResult.Unsat) {
                         sink.observeLpPrune()
                         return LpNodeOutcome(true, warmCache)
                     }
@@ -813,11 +846,21 @@ class BacktrackSolver(override val problem: Problem) :
             if (!params.lpFixpoint || session.propagationCount == before || ++iter >= LP_FIXPOINT_ITERS) {
                 return LpNodeOutcome(false, warmCache)
             }
-            // Re-solve on the tightened domains and loop, keeping the global cut pool in the model.
-            relaxation = relaxer.build(session, globalCuts)
+            // Re-solve on the tightened domains and loop. The pool cuts AND this node's local cuts
+            // stay in the model — fixing/propagation only shrinks the node's box, inside which the
+            // local cuts remain valid — and the re-solve warm-starts from the last optimal basis
+            // (identical row layout), so the re-optimisation costs a few dual pivots, not a cold solve.
+            relaxation = relaxer.build(session, globalCuts + cuts)
             if (relaxation.model.n == 0) return LpNodeOutcome(false, warmCache)
             simplex = DualSimplex(relaxation.model)
-            solution = simplex.solve()
+            val fixWarm = if (params.lpWarmCuts && prevBasis != null) {
+                extendBasisWithSlacks(prevBasis, relaxation.model, prevRows)
+            } else {
+                null
+            }
+            solution = simplex.solve(fixWarm)
+            prevBasis = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
+            prevRows = relaxation.model.m
             sink.observeLpPivots(solution.pivots)
             when (solution.status) {
                 LpStatus.INFEASIBLE -> {
@@ -870,31 +913,34 @@ class BacktrackSolver(override val problem: Problem) :
         if (slack < 0L) return false
         val status = solution.basis.status
         // Learnable reasons for each fixing (#282): a fixing of column `col` is justified by the LP's
-        // dual decomposition under the OTHER support columns' seated bounds, plus the incumbent bound
-        // `objVar ≤ improvingMax`. We can only express the incumbent half when there is a single-var
-        // minimisation objective whose live upper bound is already ≤ improvingMax (so the atom holds).
-        val learn = params.lpLearn && objectiveVar >= 0 && objectiveAscending &&
+        // dual decomposition under the OTHER support columns' seated bounds — including the objective
+        // variable's own seated bound when it carries a reduced cost — plus the incumbent bound
+        // `objVar ≤ improvingMax`. Expressible only when: there is a single-var minimisation
+        // objective whose live upper bound is already ≤ improvingMax (so the incumbent atom holds);
+        // every row with dual weight is globally valid (the rows stay implicit, see
+        // [LpExplanation]); and no support premise sits on an auxiliary column. Otherwise the
+        // fixings stay reason-less level-local tightenings, which conflict analysis treats as leaves.
+        var learn = params.lpLearn && objectiveVar >= 0 && objectiveAscending &&
             improvingMax in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
-            session.intDomain(objectiveVar).max.toLong() <= improvingMax
+            session.intDomain(objectiveVar).max.toLong() <= improvingMax &&
+            (0 until relaxation.model.m).all {
+                solution.dualNumerator[it] == 0L || relaxation.model.rowGlobal[it]
+            }
         val supportCols = IntArrayList()
         val supportLits = IntArrayList()
         if (learn) {
             for (c in relaxation.colVarId.indices) {
-                if (status[c] == VarStatus.BASIC || solution.reducedCostNumerator[c] == 0L) continue
-                val vid = relaxation.colVarId[c]
-                if (vid < 0 || vid == objectiveVar) continue
-                val atUpper = status[c] == VarStatus.AT_UPPER
-                val lit = when {
-                    relaxation.colIsBool[c] -> Lit.make(vid, !atUpper)
-
-                    atUpper -> session.boundLeLit(
-                        vid,
-                        (relaxation.model.loShift[c] + relaxation.model.upper[c]).toInt(),
-                        false,
-                    )
-
-                    else -> session.boundGeLit(vid, relaxation.model.loShift[c].toInt(), false)
+                if (status[c] == VarStatus.BASIC) continue
+                val dNum = solution.reducedCostNumerator[c]
+                if (dNum == 0L) continue
+                // The premise side follows the reduced cost's sign, not the seat name — a collapsed
+                // (pinned) column's recorded seat is arbitrary. See [LpExplanation.premiseLit].
+                val lit = LpExplanation.premiseLit(relaxation, session, c, lowerSide = dNum > 0L)
+                if (lit == LpExplanation.PREMISE_AUX) {
+                    learn = false
+                    break
                 }
+                if (lit == LpExplanation.PREMISE_NONE) continue
                 supportCols.add(c)
                 supportLits.add(lit)
             }

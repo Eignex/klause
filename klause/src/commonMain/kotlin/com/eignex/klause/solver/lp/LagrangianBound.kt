@@ -139,13 +139,15 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
             }
         }
 
-        val rest = trivialRest(session)
         val p = LongArray(multiplierCount) { startMultipliers.getOrElse(it) { 0L } }
         var bestNum = Long.MIN_VALUE
         // Previous ascent direction, for deflected (conjugate) subgradient stabilization.
         val prevDir = DoubleArray(multiplierCount)
 
         try {
+            // Inside the try: a checked-arithmetic overflow here means "bound unavailable", the
+            // same sound skip as everywhere else — never a silently wrapped (wrong) bound.
+            val rest = trivialRest(session)
             val steps = if (incumbent.isFinite()) iterations else 1
             repeat(steps) {
                 val assignment = solveAssignment(session, valueIndex, valueList, p)
@@ -255,30 +257,34 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
         return 0L
     }
 
-    /** Objective contribution of everything outside the assignment: non-V ints, bools, constant. */
+    /** Objective contribution of everything outside the assignment: non-V ints, bools, constant.
+     *  Checked arithmetic throughout — called inside [computeBound]'s overflow guard. */
     private fun trivialRest(session: PropagationSession): Long {
         var total = objConstant
         for (b in boolWeight.indices) {
             val w = boolWeight[b]
             if (w == 0L) continue
             val pinned = session.boolValue(b)
-            total += when {
-                pinned == true -> w
+            total = addExact(
+                total,
+                when {
+                    pinned == true -> w
 
-                pinned == false -> 0L
+                    pinned == false -> 0L
 
-                w < 0L -> w
+                    w < 0L -> w
 
-                // free: cheapest is true when the weight is negative
-                else -> 0L
-            }
+                    // free: cheapest is true when the weight is negative
+                    else -> 0L
+                },
+            )
         }
         for (i in intCoef.indices) {
             if (inV[i]) continue // handled exactly by the assignment
             val c = intCoef[i]
             if (c == 0L) continue
             val dom = session.intDomain(i)
-            total += if (c >= 0L) c * dom.min else c * dom.max
+            total = addExact(total, mulExact(c, if (c >= 0L) dom.min.toLong() else dom.max.toLong()))
         }
         return total
     }

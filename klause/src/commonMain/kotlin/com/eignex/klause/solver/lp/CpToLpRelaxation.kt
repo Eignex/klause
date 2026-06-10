@@ -151,7 +151,10 @@ internal class CpToLpRelaxation(
             return c
         }
 
-        /** Emit `Σ coeffs[k]·x_{vars[k]} (+ auxCoeff·x_aux) rel rhs`; pass `auxCol = -1` for no aux. */
+        /** Emit `Σ coeffs[k]·x_{vars[k]} (+ auxCoeff·x_aux) rel rhs`; pass `auxCol = -1` for no aux.
+         *  [global] marks whether the row holds at every solution (see [LpModel.rowGlobal]); only
+         *  rows whose constants baked in live domain bounds pass `false`. */
+        @Suppress("LongParameterList")
         private fun addIntRow(
             vars: IntArray,
             coeffs: IntArray,
@@ -159,6 +162,7 @@ internal class CpToLpRelaxation(
             auxCoeff: Long,
             rel: Relation,
             rhs: Long,
+            global: Boolean = true,
         ) {
             val extra = if (auxCol >= 0) 1 else 0
             val cols = IntArray(vars.size + extra)
@@ -171,7 +175,7 @@ internal class CpToLpRelaxation(
                 cols[vars.size] = auxCol
                 vals[vars.size] = auxCoeff
             }
-            builder.addRow(cols, vals, rel, rhs)
+            builder.addRow(cols, vals, rel, rhs, global)
         }
 
         /**
@@ -206,21 +210,31 @@ internal class CpToLpRelaxation(
          * For `EQ` only the `aux = 1 ⇒ L = bound` direction is emitted, and for `NE` only the
          * `aux = 0 ⇒ L = bound` direction: the complementary side is the disjunction `L ≠ bound`,
          * whose convex hull is the whole interval, so it yields no valid LP cut and is dropped.
+         *
+         * A live big-M bakes branch-tightened bounds into the row's constants, so the row only holds
+         * inside the node's box. Each row is therefore marked global exactly when its M equals the
+         * M the *declared* range `[lMinD, lMaxD]` would give — then the relaxed face spans the whole
+         * declared box and the row holds at every solution (see [LpModel.rowGlobal]).
          */
         private fun reifiedRows(rl: ReifiedLinear) {
             var lMin = 0L
             var lMax = 0L
+            var lMinD = 0L
+            var lMaxD = 0L
             for (k in rl.vars.indices) {
                 val c = rl.coeffs[k].toLong()
                 val dom = session.intDomain(rl.vars[k])
-                val lo = dom.min.toLong()
-                val hi = dom.max.toLong()
+                val dec = problem.intDomains[rl.vars[k]]
                 if (c >= 0L) {
-                    lMin = addExact(lMin, mulExact(c, lo))
-                    lMax = addExact(lMax, mulExact(c, hi))
+                    lMin = addExact(lMin, mulExact(c, dom.min.toLong()))
+                    lMax = addExact(lMax, mulExact(c, dom.max.toLong()))
+                    lMinD = addExact(lMinD, mulExact(c, dec.min.toLong()))
+                    lMaxD = addExact(lMaxD, mulExact(c, dec.max.toLong()))
                 } else {
-                    lMin = addExact(lMin, mulExact(c, hi))
-                    lMax = addExact(lMax, mulExact(c, lo))
+                    lMin = addExact(lMin, mulExact(c, dom.max.toLong()))
+                    lMax = addExact(lMax, mulExact(c, dom.min.toLong()))
+                    lMinD = addExact(lMinD, mulExact(c, dec.max.toLong()))
+                    lMaxD = addExact(lMaxD, mulExact(c, dec.min.toLong()))
                 }
             }
             val a = boolColumn(rl.auxBoolVar)
@@ -228,35 +242,36 @@ internal class CpToLpRelaxation(
             val boundUp = addExact(bound, 1L) // L ≥ bound + 1 is the integer negation of L ≤ bound
             val boundDown = subExact(bound, 1L)
 
-            fun row(auxCoeff: Long, rel: Relation, rhs: Long) = addIntRow(rl.vars, rl.coeffs, a, auxCoeff, rel, rhs)
+            fun row(auxCoeff: Long, rel: Relation, rhs: Long, global: Boolean) =
+                addIntRow(rl.vars, rl.coeffs, a, auxCoeff, rel, rhs, global)
 
             when (rl.op) {
                 LinearOp.LE -> {
                     val m1 = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    row(m1, Relation.LE, addExact(bound, m1))
+                    row(m1, Relation.LE, addExact(bound, m1), m1 == maxOf(0L, subExact(lMaxD, bound)))
                     val m2 = maxOf(0L, subExact(boundUp, lMin)) // aux=0 ⇒ L ≥ bound+1
-                    row(m2, Relation.GE, boundUp)
+                    row(m2, Relation.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)))
                 }
 
                 LinearOp.GE -> {
                     val m1 = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
-                    row(-m1, Relation.GE, subExact(bound, m1))
+                    row(-m1, Relation.GE, subExact(bound, m1), m1 == maxOf(0L, subExact(bound, lMinD)))
                     val m2 = maxOf(0L, subExact(lMax, boundDown)) // aux=0 ⇒ L ≤ bound-1
-                    row(-m2, Relation.LE, boundDown)
+                    row(-m2, Relation.LE, boundDown, m2 == maxOf(0L, subExact(lMaxD, boundDown)))
                 }
 
                 LinearOp.EQ -> {
                     val mHi = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    row(mHi, Relation.LE, addExact(bound, mHi))
+                    row(mHi, Relation.LE, addExact(bound, mHi), mHi == maxOf(0L, subExact(lMaxD, bound)))
                     val mLo = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
-                    row(-mLo, Relation.GE, subExact(bound, mLo))
+                    row(-mLo, Relation.GE, subExact(bound, mLo), mLo == maxOf(0L, subExact(bound, lMinD)))
                 }
 
                 LinearOp.NE -> {
                     val mHi = maxOf(0L, subExact(lMax, bound)) // aux=0 ⇒ L ≤ bound
-                    row(-mHi, Relation.LE, bound)
+                    row(-mHi, Relation.LE, bound, mHi == maxOf(0L, subExact(lMaxD, bound)))
                     val mLo = maxOf(0L, subExact(bound, lMin)) // aux=0 ⇒ L ≥ bound
-                    row(mLo, Relation.GE, bound)
+                    row(mLo, Relation.GE, bound, mLo == maxOf(0L, subExact(bound, lMinD)))
                 }
             }
         }
@@ -336,7 +351,7 @@ internal class CpToLpRelaxation(
             // column is dropped (defensive — separators should only emit over existing columns).
             for (cut in extraCuts) {
                 if (cut.cols.all { it in 0 until builder.varCount }) {
-                    builder.addRow(cut.cols, cut.coeffs, cut.rel, cut.rhs)
+                    builder.addRow(cut.cols, cut.coeffs, cut.rel, cut.rhs, cut.global)
                 }
             }
 

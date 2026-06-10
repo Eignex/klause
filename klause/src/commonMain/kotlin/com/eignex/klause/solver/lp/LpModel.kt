@@ -58,6 +58,16 @@ internal class LpModel(
     val sense: Sense,
     /** Caller tag per structural column, for mapping LP columns back to `(varId, value)`. */
     val tag: IntArray,
+    /**
+     * Per-row global validity: `true` when row `i` holds at **every integer solution of the
+     * problem** — not merely inside the current search node's box. Rows built from live
+     * (branch-tightened) information — a [com.eignex.klause.solver.factor.ReifiedLinear] big-M row
+     * whose M came from tightened domains, a locally separated cut, a Gomory/MIR tableau cut — are
+     * marked `false`. Learned artifacts (Farkas nogoods, objective-bound and reduced-cost reasons)
+     * cite only variable-bound atoms and keep the rows implicit, so they are only valid when every
+     * row their dual certificate leans on is globally valid; this array is what they check.
+     */
+    val rowGlobal: BooleanArray = BooleanArray(m) { true },
 ) {
     /** Total variable count: structural plus slack. */
     val numVars: Int get() = n + m
@@ -82,7 +92,13 @@ internal class LpBuilder {
     private val tags = IntArrayList()
 
     // A row's coefficients as parallel primitive arrays (column index, value); no boxed map.
-    private class RawRow(val cols: IntArray, val vals: LongArray, val rel: Relation, val rhs: Long)
+    private class RawRow(
+        val cols: IntArray,
+        val vals: LongArray,
+        val rel: Relation,
+        val rhs: Long,
+        val global: Boolean,
+    )
 
     private val rows = ArrayList<RawRow>()
 
@@ -106,11 +122,13 @@ internal class LpBuilder {
     /**
      * Add a constraint `Σ vals[k]·x_{cols[k]}  rel  rhs`. [cols] are structural column indices as
      * returned by [addVar]; absent columns are zero, repeated columns are summed. The arrays are
-     * copied, so the caller may reuse its buffers.
+     * copied, so the caller may reuse its buffers. [global] records whether the row holds at every
+     * integer solution of the original problem (see [LpModel.rowGlobal]); pass `false` for rows
+     * built from live, branch-tightened information.
      */
-    fun addRow(cols: IntArray, vals: LongArray, rel: Relation, rhs: Long) {
+    fun addRow(cols: IntArray, vals: LongArray, rel: Relation, rhs: Long, global: Boolean = true) {
         require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
-        rows.add(RawRow(cols.copyOf(), vals.copyOf(), rel, rhs))
+        rows.add(RawRow(cols.copyOf(), vals.copyOf(), rel, rhs, global))
     }
 
     /** Convenience overload for sparse maps (test call sites); unpacks into parallel arrays. */
@@ -123,7 +141,7 @@ internal class LpBuilder {
             vals[k] = c
             k++
         }
-        rows.add(RawRow(cols, vals, rel, rhs))
+        rows.add(RawRow(cols, vals, rel, rhs, global = true))
     }
 
     /**
@@ -177,6 +195,7 @@ internal class LpBuilder {
             n = n, m = m, a = a, rhs = rhs, cost = cost,
             upper = upper, hasUpper = hasUpper, loShift = loShift,
             objConstant = objConstant, sense = sense, tag = IntArray(n) { tags[it] },
+            rowGlobal = BooleanArray(m) { rows[it].global },
         )
     }
 }
