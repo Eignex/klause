@@ -22,7 +22,7 @@ import com.eignex.klause.solver.factor.Xor
  * from.
  *
  *  - [handwrittenCore] — small SAT/CSP instances built directly in Kotlin (`InCode`).
- *  - [dimacsCore]/[opbCore]/[schemaCore]/[flatzincCore] — vendored under `klause-bench/corpus/`.
+ *  - [dimacsCore]/[opbCore]/[schemaCore]/[flatzincCore] — vendored under `klause-bench/smoke-corpus/`.
  *  - [mznSmoke] — the in-tree `klause-mzn-lib/test-models/` smoke set (referenced, not copied).
  *  - external MiniZinc/SAT collections (fetched on demand) are declared in [ExternalCollections].
  */
@@ -351,12 +351,15 @@ internal object Suites {
         }
     }
 
-    // --- Vendored corpus suites (klause-bench/corpus/) ---
+    // --- Vendored smoke-corpus suites (klause-bench/smoke-corpus/) ---
 
     private val dimacsCore = suite("dimacs-core", "Curated small DIMACS CNF (SAT + UNSAT)") {
         format = Format.DIMACS
         license = "SATLIB-style (public benchmarks)"
         vendored("php4", Category.UNSAT, Expected.Unsat)
+        vendored("php3", Category.UNSAT, Expected.Unsat)
+        vendored("implication-chain", Category.SAT, Expected.Sat)
+        vendored("bipartite-2col", Category.SAT, Expected.Sat)
         vendored("random3sat-20-80", Category.SAT, Expected.Sat)
         vendored("random3sat-50-200", Category.SAT, Expected.Sat)
     }
@@ -365,12 +368,14 @@ internal object Suites {
         format = Format.OPB
         license = "internal"
         vendored("setcover-tiny", Category.PACKING, Expected.Sat)
+        vendored("pb-cardinality", Category.SAT, Expected.Sat)
     }
 
     private val schemaCore = suite("schema-core", "klause JSON schema instances") {
         format = Format.JSON_SCHEMA
         license = "internal"
         vendored("campaign", Category.ASSIGNMENT, Expected.Sat)
+        vendored("roster", Category.ASSIGNMENT, Expected.Sat)
     }
 
     private val flatzincCore = suite("flatzinc-core", "Curated small FlatZinc (satisfaction)") {
@@ -379,6 +384,9 @@ internal object Suites {
         vendored("cardinality", Category.CSP, Expected.Sat)
         vendored("permutation4", Category.CSP, Expected.Sat)
         vendored("small-linear", Category.CSP, Expected.Sat)
+        vendored("magic-square-3", Category.CSP, Expected.Sat)
+        vendored("graph-coloring-4cycle", Category.CSP, Expected.Sat)
+        vendored("element-channel", Category.CSP, Expected.Sat)
     }
 
     private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA instances") {
@@ -386,6 +394,8 @@ internal object Suites {
         license = "internal"
         vendored("lia-basic", Category.CSP, Expected.Sat)
         vendored("lia-opt", Category.OPTIMIZATION, Expected.Opt(7))
+        vendored("lia-unsat", Category.UNSAT, Expected.Unsat)
+        vendored("lia-disjunction", Category.CSP, Expected.Sat)
     }
 
     private val xcsp3Core = suite("xcsp3-core", "Curated XCSP3 integer CSP/COP instances") {
@@ -393,6 +403,8 @@ internal object Suites {
         license = "internal"
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
+        vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
+        vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
     }
 
     // --- External SAT collection (auto-fetched SATLIB tarball) ---
@@ -512,10 +524,12 @@ internal object ExternalCollections {
 
     val all = listOf(minizincBenchmarks, libminizincTests, hakank, satlibUf20, satlibUuf50)
 
-    // --- XCSP3 competition library (per-year instance archives, xcsp.org / CRIL) ---
+    // --- XCSP3 competition library (instance archives, xcsp.org / CRIL) ---
     // Instances ship as individually `.xml.lzma`-compressed files inside each zip; the
-    // coverage tool decompresses them on the fly. The per-year archives 2017–2025 (no
-    // competition in 2020–2021) constitute the complete competition instance set.
+    // coverage tool decompresses them on the fly. Per-year full archives cover 2017–2019 (no
+    // competition in 2020–2021); the 2022–2025 range is taken from the two curated main-track
+    // aggregates published at xcsp.org/instances (COP22to25, CSP22to25) rather than the
+    // overlapping per-year archives — same range, deduplicated to the CSP/COP tracks klause targets.
     private fun xcsp(year: Int, mb: Int) = ExternalCollection(
         id = "xcsp3-$year",
         url = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP${year % 100}.zip",
@@ -523,14 +537,22 @@ internal object ExternalCollections {
         reason = "${mb}MB competition archive; fetched rather than vendored",
         fetch = FetchMethod.Zip,
     )
+
+    /** A curated main-track aggregate spanning the 2022–2025 competitions, published at
+     *  xcsp.org/instances: `COP22to25` (1000 COP instances) and `CSP22to25` (800 CSP). */
+    private fun xcspAggregate(track: String, count: Int) = ExternalCollection(
+        id = "xcsp3-${track.lowercase()}-22to25",
+        url = "https://www.cril.univ-artois.fr/~lecoutre/compets/${track}22to25.zip",
+        license = "XCSP3 competition (academic benchmarks)",
+        reason = "$count main-track $track instances (2022–2025 aggregate); fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
     val xcsp3Competition = listOf(
         xcsp(2017, 102),
         xcsp(2018, 69),
         xcsp(2019, 136),
-        xcsp(2022, 103),
-        xcsp(2023, 86),
-        xcsp(2024, 63),
-        xcsp(2025, 31),
+        xcspAggregate("COP", 1000),
+        xcspAggregate("CSP", 800),
     )
 
     /** SMT-LIB QF_LIA non-incremental benchmark set (official CLC repository). */

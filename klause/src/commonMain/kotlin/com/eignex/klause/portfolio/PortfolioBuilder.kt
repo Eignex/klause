@@ -164,6 +164,13 @@ object PortfolioBuilder {
         //  - i % 4 == 3: the bare free engine on Luby restarts, for raw seed diversity (plateau rows).
         // SAT-optimized stays at index 0 so any pool with ≥1 backtrack worker keeps the #117 guard.
         val btObj = linearObjective ?: lsObjective
+        // The problem kind. `optimizing` = a COP (some objective present); otherwise a pure CSP
+        // (satisfaction). This is the seam for kind-aware composition: a CSP and a COP have
+        // different goals (any-feasible/UNSAT vs best-objective), success criteria, and best arms,
+        // so future work diverges the backtrack cycle, the LS ranking, and the mixed LS:BT ratio on
+        // it. For now it gates the one thing that's unambiguously meaningless on a CSP — the shared
+        // objective-bound supplier (there is no objective bound to prune on).
+        val optimizing = btObj != null
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
             val label = "backtrack#$i"
@@ -185,9 +192,9 @@ object PortfolioBuilder {
 
                 else -> BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = workerEvent)
             }
-            workers += PortfolioWorker.of(label, session, params, objective = btObj) { p, supplier ->
-                p.copy(objectiveBoundSupplier = supplier)
-            }
+            val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
+                if (optimizing) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
+            workers += PortfolioWorker.of(label, session, params, objective = btObj, withBound = withBound)
         }
         check(workers.isNotEmpty()) {
             "portfolio has no workers: no local-search or backtrack workers were requested"
