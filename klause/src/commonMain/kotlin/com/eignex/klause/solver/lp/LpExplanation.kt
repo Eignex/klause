@@ -9,9 +9,11 @@ import com.eignex.klause.util.IntArrayList
  * artifacts here share one shape: a set of *premises* — column bounds the certificate leans on —
  * whose negations form clause literals, with the constraint rows kept implicit. Keeping the rows
  * implicit is what makes the clauses small, and it is sound exactly when every row the certificate
- * leans on holds at every solution of the problem ([LpModel.rowGlobal]); a certificate that leans
- * on a node-local row (a live-big-M reified row, a locally separated or Gomory/MIR cut) is
- * withheld rather than under-cited.
+ * leans on holds at every solution of the problem ([LpModel.rowGlobal]). A non-global row with
+ * recorded validity premises ([LpModel.rowPremises] — the live-big-M reified rows) is kept implicit
+ * by citing those bounds as extra literals instead; a non-global row without premises (a locally
+ * separated or Gomory/MIR cut) makes the certificate inexpressible and it is withheld rather than
+ * under-cited.
  *
  * A premise is cited from the column's **live LP bound**:
  *  - an integer column contributes `¬(x ≥ lo)` (lower side) or `¬(x ≤ ub)` (upper side) — a
@@ -71,22 +73,25 @@ internal object LpExplanation {
 
     /**
      * Nogood literals for [solution]'s infeasibility certificate, or null when the solve was not
-     * infeasible, carried no certificate (an all-slack ray, or a ray through a non-global row —
-     * see [DualSimplex]'s certificate gate), or the certificate touches an auxiliary column. The
-     * certificate columns' seated bounds are jointly inconsistent with the (globally valid) rows,
-     * so the clause `⋁ ¬(seated bound)` is implied by the problem alone. The clause is fully
-     * falsified at the dead node; the engine registers it where a literal can become unassigned
-     * (a 1UIP backjump, or a restart flush), exactly like the assignment nogoods.
+     * infeasible, carried no certificate (an all-slack ray), leans on a non-global row with no
+     * recorded premises, or touches an auxiliary column. The certificate columns' seated bounds —
+     * plus the recorded validity premises of any non-global ray row ([LpModel.rowPremises]) — are
+     * jointly inconsistent with the remaining (globally valid) rows, so the clause `⋁ ¬(premise)`
+     * is implied by the problem alone. The clause is fully falsified at the dead node; the engine
+     * registers it where a literal can become unassigned (a 1UIP backjump, or a restart flush),
+     * exactly like the assignment nogoods.
      */
     fun infeasibilityClause(relaxation: LpRelaxation, solution: LpSolution, session: PropagationSession): IntArray? {
         if (solution.status != LpStatus.INFEASIBLE || solution.certCols.isEmpty()) return null
         val lits = IntArrayList(solution.certCols.size)
+        val seen = HashSet<Int>()
+        if (!addRowPremiseLits(lits, seen, relaxation, solution.certRows, session)) return null
         for (k in solution.certCols.indices) {
             val col = solution.certCols[k]
             when (val lit = premiseLit(relaxation, session, col, lowerSide = !solution.certBoundIsUpper[k])) {
                 PREMISE_AUX -> return null
                 PREMISE_NONE -> Unit
-                else -> lits.add(lit)
+                else -> if (seen.add(lit)) lits.add(lit)
             }
         }
         return lits.toIntArray()
@@ -99,16 +104,15 @@ internal object LpExplanation {
      * satisfying the rows, `objective ≥ L` follows from `x_j ≥ lo_j` on the columns with `d_j > 0`
      * and `x_j ≤ ub_j` on those with `d_j < 0` — exactly the premises cited here. Basic and
      * zero-reduced-cost columns do not move the bound and stay uncited; rows stay implicit, which
-     * is why every row with `y_i ≠ 0` must be globally valid.
+     * is why every row with `y_i ≠ 0` must be globally valid or carry recorded validity premises
+     * ([LpModel.rowPremises]) that are then cited alongside.
      */
     fun objectiveBoundReason(relaxation: LpRelaxation, solution: LpSolution, session: PropagationSession): IntArray? {
         if (solution.status != LpStatus.OPTIMAL) return null
-        val model = relaxation.model
-        for (i in 0 until model.m) {
-            if (solution.dualNumerator[i] != 0L && !model.rowGlobal[i]) return null
-        }
-        val status = solution.basis.status
         val lits = IntArrayList()
+        val seen = HashSet<Int>()
+        if (!addDualRowPremiseLits(lits, seen, relaxation, solution, session)) return null
+        val status = solution.basis.status
         for (col in relaxation.colVarId.indices) {
             if (status[col] == VarStatus.BASIC) continue
             val d = solution.reducedCostNumerator[col]
@@ -116,9 +120,62 @@ internal object LpExplanation {
             when (val lit = premiseLit(relaxation, session, col, lowerSide = d > 0L)) {
                 PREMISE_AUX -> return null
                 PREMISE_NONE -> Unit
-                else -> lits.add(lit)
+                else -> if (seen.add(lit)) lits.add(lit)
             }
         }
         return lits.toIntArray()
+    }
+
+    /**
+     * Append the negated validity premises of every non-global row in [rows]; false when some
+     * non-global row has none recorded (the certificate is then inexpressible). The premise
+     * thresholds were the live bounds at the relaxation's build, so each atom is true (and its
+     * negation false) at the node — tightenings since the build only strengthen the atom.
+     */
+    fun addRowPremiseLits(
+        lits: IntArrayList,
+        seen: MutableSet<Int>,
+        relaxation: LpRelaxation,
+        rows: IntArray,
+        session: PropagationSession,
+    ): Boolean {
+        val model = relaxation.model
+        for (r in rows) {
+            if (model.rowGlobal[r]) continue
+            val prem = model.rowPremises[r] ?: return false
+            for (k in prem.vars.indices) {
+                val lit = if (prem.isUpper[k]) {
+                    session.boundLeLit(prem.vars[k], prem.thresholds[k], positive = false)
+                } else {
+                    session.boundGeLit(prem.vars[k], prem.thresholds[k], positive = false)
+                }
+                if (seen.add(lit)) lits.add(lit)
+            }
+        }
+        return true
+    }
+
+    /** [addRowPremiseLits] over the rows carrying nonzero dual weight in an optimal [solution]. */
+    fun addDualRowPremiseLits(
+        lits: IntArrayList,
+        seen: MutableSet<Int>,
+        relaxation: LpRelaxation,
+        solution: LpSolution,
+        session: PropagationSession,
+    ): Boolean {
+        val model = relaxation.model
+        for (i in 0 until model.m) {
+            if (solution.dualNumerator[i] == 0L || model.rowGlobal[i]) continue
+            val prem = model.rowPremises[i] ?: return false
+            for (k in prem.vars.indices) {
+                val lit = if (prem.isUpper[k]) {
+                    session.boundLeLit(prem.vars[k], prem.thresholds[k], positive = false)
+                } else {
+                    session.boundGeLit(prem.vars[k], prem.thresholds[k], positive = false)
+                }
+                if (seen.add(lit)) lits.add(lit)
+            }
+        }
+        return true
     }
 }

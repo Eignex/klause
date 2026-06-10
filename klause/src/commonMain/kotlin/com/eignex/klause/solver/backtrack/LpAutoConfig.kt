@@ -12,6 +12,7 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -33,7 +34,11 @@ import com.eignex.klause.solver.factor.Table
  *  - **[BacktrackParams.lpElement]** — a constant-array [Element] is present (its convex hull).
  *  - **[BacktrackParams.lpTable]** — a [Table] is present (its convex hull).
  *  - **[BacktrackParams.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
- *  - **[BacktrackParams.energeticReasoning]** — a [Cumulative] is present.
+ *  - **[BacktrackParams.energeticReasoning]** — a [Cumulative] is present. When the auto path is
+ *    the one enabling it, [BacktrackParams.energeticEvery] is derived from the models' task counts
+ *    so the O(windows² · tasks) window scan stays a bounded fraction of a node's cost (a per-check
+ *    budget normalization, [ENERGETIC_OPS_PER_CHECK] — the same class of guard as the tableau
+ *    cap, not a tuning judgement); a caller who enabled the check explicitly keeps their cadence.
  *
  * The LP-relaxation flags are additionally gated by a **size guard**: the dual simplex keeps a
  * dense `m × (n + m + 1)` Long tableau per node, so the auto path declines models whose estimated
@@ -54,12 +59,21 @@ object LpAutoConfig {
      */
     const val MAX_AUTO_TABLEAU_CELLS: Long = 1L shl 20
 
+    /**
+     * Per-check operation budget the auto-derived [BacktrackParams.energeticEvery] normalises to:
+     * `cadence = ceil(Σ tasksᵢ³ / budget)` over the Cumulatives the scan actually visits (factors
+     * past the bound's own task cap are skipped there and cost nothing). A 48-task model stays at
+     * cadence 1; a 256-task model lands around 128.
+     */
+    const val ENERGETIC_OPS_PER_CHECK: Long = 1L shl 17
+
     /** `base` with each LP-family flag enabled where [problem]'s structure makes it applicable. */
     fun recommend(problem: Problem, base: BacktrackParams = BacktrackParams()): BacktrackParams {
         var lpEmittable = false
         var allDifferent = false
         var globalCardinality = false
         var cumulative = false
+        var energeticOps = 0L
         var pseudoBoolean = false
         var circuit = false
         var constArrayElement = false
@@ -85,7 +99,12 @@ object LpAutoConfig {
 
                 is GlobalCardinality -> globalCardinality = true
 
-                is Cumulative -> cumulative = true
+                is Cumulative -> {
+                    cumulative = true
+                    // The scan skips factors above its own task cap; they cost nothing.
+                    val t = f.starts.size.toLong()
+                    if (t <= CumulativeEnergeticBound.MAX_TASKS) energeticOps += t * t * t
+                }
 
                 is PseudoBoolean -> {
                     pseudoBoolean = true
@@ -120,6 +139,14 @@ object LpAutoConfig {
             lpTable = base.lpTable || (lpFits && table),
             lagrangian = base.lagrangian || allDifferent,
             energeticReasoning = base.energeticReasoning || cumulative,
+            // Derive the cadence only when the auto path is the one enabling the check — an
+            // explicit caller enablement keeps the caller's cadence untouched.
+            energeticEvery = if (cumulative && !base.energeticReasoning) {
+                maxOf(base.energeticEvery.toLong(), 1L + (energeticOps - 1L) / ENERGETIC_OPS_PER_CHECK)
+                    .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            } else {
+                base.energeticEvery
+            },
         )
     }
 }

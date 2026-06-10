@@ -163,6 +163,83 @@ class LpReasonSoundnessTest {
     }
 
     /**
+     * A Farkas ray that leans on a live-big-M reified row must cite the bounds behind the M instead
+     * of being withheld. Three pairwise covers force `x + y + w ≥ 9` in the LP, while the reified
+     * `¬(x + y + w ≥ 9)` face — built with the live big-M from the decision-tightened uppers — forces
+     * `≤ 8`. The live box alone only gives `≤ 12`, so no certificate over column seats exists: the
+     * ray *must* combine the non-global row, and the clause is expressible exactly because that row
+     * recorded its premises (`x ≤ 4`, `y ≤ 4`, `w ≤ 4`).
+     */
+    @Test
+    fun `farkas clause cites the live bounds behind a big-M row`() {
+        val p = Problem(
+            numBoolVars = 1,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 9),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 6),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 6),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 6),
+            ),
+        )
+        val session = PropagationSession(p)
+        assertTrue(session.pinIntAtMost(0, 4) !is PropagationResult.Unsat)
+        assertTrue(session.pinIntAtMost(1, 4) !is PropagationResult.Unsat)
+        assertTrue(session.pinIntAtMost(2, 4) !is PropagationResult.Unsat)
+        assertTrue(session.pinBool(0, false) !is PropagationResult.Unsat)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L))
+        val relaxation = CpToLpRelaxation(p, objective).build(session)
+        val solution = DualSimplex(relaxation.model).solve()
+        assertEquals(LpStatus.INFEASIBLE, solution.status)
+        // The ray genuinely leans on a non-global row (the big-M face is stronger than the box).
+        assertTrue(
+            solution.certRows.any { !relaxation.model.rowGlobal[it] },
+            "the certificate must combine the live-big-M row",
+        )
+
+        val clause = LpExplanation.infeasibilityClause(relaxation, solution, session)
+        assertNotNull(clause, "a big-M row with recorded premises keeps the certificate expressible")
+        for (lit in clause) {
+            assertEquals(false, session.litTruth(lit), "clause must be all-false (clause=${clause.toList()})")
+        }
+
+        // Brute validity: no factor-feasible point may satisfy every cited premise — the column
+        // seats plus each non-global ray row's recorded live bounds.
+        forEachSolution(p) { ints, bools ->
+            var inBox = true
+            for (k in solution.certCols.indices) {
+                val col = solution.certCols[k]
+                val varId = relaxation.colVarId[col]
+                val lo = relaxation.model.loShift[col]
+                val hi = lo + relaxation.model.upper[col]
+                val ok = if (relaxation.colIsBool[col]) {
+                    val seated = (lo + if (solution.certBoundIsUpper[k]) relaxation.model.upper[col] else 0L) == 1L
+                    bools[varId] == seated
+                } else if (solution.certBoundIsUpper[k]) {
+                    ints[varId] <= hi
+                } else {
+                    ints[varId] >= lo
+                }
+                if (!ok) inBox = false
+            }
+            for (r in solution.certRows) {
+                if (relaxation.model.rowGlobal[r]) continue
+                val prem = assertNotNull(relaxation.model.rowPremises[r])
+                for (k in prem.vars.indices) {
+                    val ok = if (prem.isUpper[k]) {
+                        ints[prem.vars[k]] <= prem.thresholds[k]
+                    } else {
+                        ints[prem.vars[k]] >= prem.thresholds[k]
+                    }
+                    if (!ok) inBox = false
+                }
+            }
+            assertTrue(!inBox, "feasible point ${ints.toList()}/${bools.toList()} inside the premise box")
+        }
+    }
+
+    /**
      * A locally separated cut is valid only under the node's tightened bounds. Here the Hall-sum cut
      * `x1 + x2 >= 9` (from live domains `[4, 10]`) is the binding row of the LP floor `z >= 1`, and
      * both `x1` and `x2` end up basic with zero reduced cost at *every* optimal basis — so the
