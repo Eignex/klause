@@ -67,7 +67,8 @@ class PresolveConfig(
     val passes: List<PresolvePass>,
 ) {
 
-    /** Drop [BREAK_SYMMETRIES] — for a pure local-search engine, where ordering constraints hurt. */
+    /** Drop [PresolvePass.BREAK_SYMMETRIES] — for a pure local-search engine, where ordering
+     *  constraints hurt. */
     fun withoutSymmetry(): PresolveConfig = PresolveConfig(passes.filter { it != PresolvePass.BREAK_SYMMETRIES })
 
     /** Predefined configs and the spec-string [parse]r. */
