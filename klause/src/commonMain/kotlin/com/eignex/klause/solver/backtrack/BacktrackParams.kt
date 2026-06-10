@@ -199,6 +199,15 @@ data class BacktrackParams(
      */
     val lpBranching: Boolean = false,
     /**
+     * LP-rounding primal heuristic (#287): before search, solve the root LP and try to round its
+     * fractional point into a feasible assignment by pinning each variable toward its LP value and
+     * propagating. A complete conflict-free pass is a feasible incumbent (propagation enforces every
+     * factor, so the result is sound by construction); it seeds the branch-and-bound bound so pruning
+     * and reduced-cost fixing bite from the first node. A conflict on the single pass abandons the
+     * probe (no backtracking). Requires a LinearObjective; off by default; never changes the optimum.
+     */
+    val lpProbe: Boolean = false,
+    /**
      * Cut generation (#22): at a scheduled node, after the LP solve, run separators that add valid
      * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
      * cuts), re-solving to tighten the bound. Requires [lpBounding]; off by default.

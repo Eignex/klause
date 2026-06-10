@@ -66,6 +66,21 @@ class LpBoundingTest {
     }
 
     @Test
+    fun `lp rounding probe seeds an incumbent and preserves the optimum`() {
+        // #287: the root LP of the triangle is integral at (1,1,1), so the probe rounds it into a
+        // feasible incumbent (objective 3) before search. The proven optimum must be unchanged.
+        val problem = triangle()
+        val off = BacktrackSolver(problem).minimize(sumObjective, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val on = BacktrackSolver(problem).minimize(
+            sumObjective,
+            BacktrackParams(randomSeed = 1L, lpBounding = true, lpProbe = true),
+        )
+        assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
+        assertEquals(3.0, off.objectiveValue)
+        assertEquals(3.0, on.objectiveValue)
+    }
+
+    @Test
     fun `frequency policy still preserves the optimum`() {
         // Solving the LP only every 3rd checked node must not change the proven optimum.
         val problem = triangle()
