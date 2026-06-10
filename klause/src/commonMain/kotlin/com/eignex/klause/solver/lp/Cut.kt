@@ -1,9 +1,12 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
+import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
@@ -352,5 +355,59 @@ internal class GccSeparator : CutSeparator {
     private companion object {
         const val MAX_VARS: Int = 4096
         const val MAX_VALUES: Int = 512
+    }
+}
+
+/**
+ * Knapsack cover cuts (#22/#286) for a `Σ w_i·x_i ≤ b` PseudoBoolean row with positive weights over
+ * 0/1 variables — the shape the dropped `Knapsack` factor decomposes to, so these recover its
+ * strength. A *cover* `C` is a set of items with `Σ_{C} w_i > b`: no feasible 0/1 point can set all of
+ * `C`, so `Σ_{i∈C} x_i ≤ |C| − 1` is a valid inequality. Separation finds a violated cover greedily by
+ * fractional value: take the highest-`x*` items until their weight exceeds `b`; if the resulting
+ * cover's `Σ x*` exceeds `|C| − 1` the cut is violated and emitted. Mixed-sign rows (negated literals
+ * or non-positive weights) are skipped — their cover form needs complementing, deferred.
+ */
+internal class KnapsackCoverSeparator : CutSeparator {
+    private val tol = 1e-6
+
+    override fun separate(ctx: CutContext): List<Cut> {
+        val cuts = ArrayList<Cut>()
+        for (factor in ctx.problem.factors) {
+            if (factor !is PseudoBoolean || factor.op != PbOp.LE) continue
+            if (factor.weights.any { it <= 0 } || factor.literals.any { !Lit.isPositive(it) }) continue
+            val k = factor.literals.size
+            if (k < 2) continue
+            val b = factor.bound.toLong()
+            val cols = IntArray(k)
+            val xstar = DoubleArray(k)
+            var ok = true
+            for (i in 0 until k) {
+                val col = ctx.relaxation.boolColOf[Lit.variable(factor.literals[i])]
+                if (col < 0) {
+                    ok = false
+                    break
+                }
+                cols[i] = col
+                xstar[i] = ctx.solution.primal(col)
+            }
+            if (!ok) continue
+            // Greedy cover: highest fractional value first, until the weight sum exceeds the bound.
+            val order = (0 until k).sortedByDescending { xstar[it] }
+            val cover = IntArrayList()
+            var wsum = 0L
+            for (i in order) {
+                cover.add(i)
+                wsum = addExact(wsum, factor.weights[i].toLong())
+                if (wsum > b) break
+            }
+            if (wsum <= b) continue // whole set fits under the bound — no cover, no cut
+            var lhs = 0.0
+            for (t in 0 until cover.size) lhs += xstar[cover[t]]
+            if (lhs > cover.size - 1 + tol) {
+                val cutCols = IntArray(cover.size) { cols[cover[it]] }
+                cuts.add(Cut(cutCols, LongArray(cover.size) { 1L }, Relation.LE, (cover.size - 1).toLong()))
+            }
+        }
+        return cuts
     }
 }
