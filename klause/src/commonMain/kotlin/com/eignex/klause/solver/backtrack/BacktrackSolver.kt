@@ -290,6 +290,11 @@ class BacktrackSolver(override val problem: Problem) :
             // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
             // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
             val lpBasisByDepth = ArrayList<Basis?>()
+            // The most recently solved pre-cut node tableau: the cheapest warm start of all — the
+            // child seeds from it by patching the few changed columns/rhs entries through the slack
+            // block instead of re-pivoting the basis (falls back to the per-depth basis when
+            // incompatible).
+            var lpHotTableau: DualSimplex? = null
             // LP-guided value ordering (#246): the node LP records its fractional primal here.
             val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
             // Immediate LP backjump (#280): when a node's LP is infeasible and its Farkas certificate
@@ -358,11 +363,13 @@ class BacktrackSolver(override val problem: Problem) :
                             objectiveVar = singleObj?.varId ?: -1,
                             objectiveAscending = singleObj?.ascending ?: true,
                             globalCuts = lpGlobalCuts,
+                            seedTableau = lpHotTableau,
                         )
                         if (outcome.basis != null) {
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                             lpBasisByDepth[depth] = outcome.basis
                         }
+                        if (outcome.tableau != null) lpHotTableau = outcome.tableau
                         val explanation = outcome.explanation
                         if (explanation != null) {
                             // Try to resolve the Farkas certificate to an asserting 1UIP clause and
@@ -523,8 +530,15 @@ class BacktrackSolver(override val problem: Problem) :
         Long.MIN_VALUE
     }
 
-    /** Outcome of one node LP pass: whether to prune, and the basis to warm-start children from. */
-    private class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
+    /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and
+     *  the solved pre-cut tableau for the cheaper seeded reload ([DualSimplex.solve]'s
+     *  `seedTableau`) — same caching condition as the basis. */
+    private class LpNodeOutcome(
+        val prune: Boolean,
+        val basis: Basis?,
+        val explanation: IntArray? = null,
+        val tableau: DualSimplex? = null,
+    )
 
     /**
      * Bounded, deduplicating buffer of LP-learned Farkas nogoods (#247) awaiting registration at the
@@ -662,10 +676,11 @@ class BacktrackSolver(override val problem: Problem) :
         objectiveVar: Int,
         objectiveAscending: Boolean,
         globalCuts: List<Cut>,
+        seedTableau: DualSimplex?,
     ): LpNodeOutcome = try {
         lpBoundAndFixUnsafe(
             relaxer, session, bound, sink, warmBasis, params, separators, hints,
-            objectiveVar, objectiveAscending, globalCuts,
+            objectiveVar, objectiveAscending, globalCuts, seedTableau,
         )
     } catch (_: LpOverflowException) {
         // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
@@ -707,6 +722,7 @@ class BacktrackSolver(override val problem: Problem) :
         return Basis(basicVars, status)
     }
 
+    @Suppress("LongParameterList")
     private fun lpBoundAndFixUnsafe(
         relaxer: CpToLpRelaxation,
         session: PropagationSession,
@@ -719,19 +735,26 @@ class BacktrackSolver(override val problem: Problem) :
         objectiveVar: Int,
         objectiveAscending: Boolean,
         globalCuts: List<Cut>,
+        seedTableau: DualSimplex?,
     ): LpNodeOutcome {
         var relaxation = relaxer.build(session, globalCuts)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
         var simplex = DualSimplex(relaxation.model)
         // Float fast-path (#18): with no parent basis to warm from, a quick double-precision solve
         // supplies a candidate basis for the exact solver to certify. Sound regardless — the exact
-        // solve re-optimizes to the true bound, and a bad/singular basis just cold-starts.
+        // solve re-optimizes to the true bound, and a bad/singular basis just cold-starts. The
+        // seeded tableau reload (when compatible) supersedes both.
         val startBasis = warmBasis ?: if (params.lpFloatWarmStart) FloatSimplex(relaxation.model).basis() else null
-        var solution = simplex.solve(startBasis)
+        var solution = simplex.solve(startBasis, seedTableau)
         sink.observeLpPivots(solution.pivots)
-        // Warm-start children from the initial (pre-cut) basis: cut rows vary per node, but the base
-        // model structure is identical across nodes, so only this basis transfers soundly.
+        // Warm-start children from the initial (pre-cut) basis and tableau: cut rows vary per node,
+        // but the base model structure is identical across nodes, so only this state transfers.
         val warmCache = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
+        val nodeTableau = if (solution.status == LpStatus.OPTIMAL) simplex else null
+        // The most recent same-shape optimal simplex inside this node, seeding the fixpoint
+        // re-solves (the cut rounds grow the row count, so they seed-fail fast and use the
+        // extended-basis path instead).
+        var lastSimplex = nodeTableau
 
         when (solution.status) {
             LpStatus.INFEASIBLE -> {
@@ -744,7 +767,7 @@ class BacktrackSolver(override val problem: Problem) :
             LpStatus.OPTIMAL ->
                 if (boundPrunes(solution, relaxation, bound)) {
                     sink.observeLpPrune()
-                    return LpNodeOutcome(true, warmCache)
+                    return LpNodeOutcome(true, warmCache, tableau = nodeTableau)
                 }
         }
 
@@ -785,18 +808,24 @@ class BacktrackSolver(override val problem: Problem) :
                 } else {
                     null
                 }
-                solution = simplex.solve(warmStart)
+                solution = simplex.solve(warmStart, lastSimplex)
                 sink.observeLpPivots(solution.pivots)
                 prevBasis = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
                 prevRows = relaxation.model.m
+                if (solution.status == LpStatus.OPTIMAL) lastSimplex = simplex
                 if (solution.status == LpStatus.INFEASIBLE) {
                     sink.observeLpPrune()
-                    return LpNodeOutcome(true, warmCache, lpExplanation(params, relaxation, solution, session))
+                    return LpNodeOutcome(
+                        true,
+                        warmCache,
+                        lpExplanation(params, relaxation, solution, session),
+                        tableau = nodeTableau,
+                    )
                 }
                 if (solution.status != LpStatus.OPTIMAL) break
                 if (boundPrunes(solution, relaxation, bound)) {
                     sink.observeLpPrune()
-                    return LpNodeOutcome(true, warmCache)
+                    return LpNodeOutcome(true, warmCache, tableau = nodeTableau)
                 }
             }
         }
@@ -831,7 +860,7 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                     if (res is PropagationResult.Unsat) {
                         sink.observeLpPrune()
-                        return LpNodeOutcome(true, warmCache)
+                        return LpNodeOutcome(true, warmCache, tableau = nodeTableau)
                     }
                 }
             }
@@ -847,39 +876,47 @@ class BacktrackSolver(override val problem: Problem) :
                     objectiveVar,
                     objectiveAscending,
                 )
-            if (prune) return LpNodeOutcome(true, warmCache)
+            if (prune) return LpNodeOutcome(true, warmCache, tableau = nodeTableau)
 
             // Stop unless the joint fixpoint is enabled, this round tightened a domain, and budget remains.
             if (!params.lpFixpoint || session.propagationCount == before || ++iter >= LP_FIXPOINT_ITERS) {
-                return LpNodeOutcome(false, warmCache)
+                return LpNodeOutcome(false, warmCache, tableau = nodeTableau)
             }
             // Re-solve on the tightened domains and loop. The pool cuts AND this node's local cuts
             // stay in the model — fixing/propagation only shrinks the node's box, inside which the
             // local cuts remain valid — and the re-solve warm-starts from the last optimal basis
             // (identical row layout), so the re-optimisation costs a few dual pivots, not a cold solve.
             relaxation = relaxer.build(session, globalCuts + cuts)
-            if (relaxation.model.n == 0) return LpNodeOutcome(false, warmCache)
+            if (relaxation.model.n == 0) return LpNodeOutcome(false, warmCache, tableau = nodeTableau)
             simplex = DualSimplex(relaxation.model)
             val fixWarm = if (params.lpWarmCuts && prevBasis != null) {
                 extendBasisWithSlacks(prevBasis, relaxation.model, prevRows)
             } else {
                 null
             }
-            solution = simplex.solve(fixWarm)
+            // Same row layout as the previous round, so the seeded reload applies directly; the
+            // extended basis stays as the fallback.
+            solution = simplex.solve(fixWarm, lastSimplex)
             prevBasis = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
             prevRows = relaxation.model.m
+            if (solution.status == LpStatus.OPTIMAL) lastSimplex = simplex
             sink.observeLpPivots(solution.pivots)
             when (solution.status) {
                 LpStatus.INFEASIBLE -> {
                     sink.observeLpPrune()
-                    return LpNodeOutcome(true, warmCache, lpExplanation(params, relaxation, solution, session))
+                    return LpNodeOutcome(
+                        true,
+                        warmCache,
+                        lpExplanation(params, relaxation, solution, session),
+                        tableau = nodeTableau,
+                    )
                 }
 
-                LpStatus.UNBOUNDED -> return LpNodeOutcome(false, warmCache)
+                LpStatus.UNBOUNDED -> return LpNodeOutcome(false, warmCache, tableau = nodeTableau)
 
                 LpStatus.OPTIMAL -> if (boundPrunes(solution, relaxation, bound)) {
                     sink.observeLpPrune()
-                    return LpNodeOutcome(true, warmCache)
+                    return LpNodeOutcome(true, warmCache, tableau = nodeTableau)
                 }
             }
         }
