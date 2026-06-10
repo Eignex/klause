@@ -52,6 +52,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 import kotlin.math.ceil
+import kotlin.math.round
 import kotlin.random.Random
 
 /**
@@ -370,6 +371,22 @@ class BacktrackSolver(override val problem: Problem) :
         // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
         // solved leaves.
         sink.start()
+        // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes
+        // and reduced-cost fixing bite from the first node. Sound — the probe returns only a fully
+        // propagated, feasible assignment.
+        if (params.lpProbe && objective is LinearObjective) {
+            val seed = lpRoundingProbe(objective)
+            if (seed != null) {
+                val o = objective.evaluate(seed)
+                if (o < bestObj) {
+                    bestObj = o
+                    best = seed
+                    if (singleObj != null) objVarBest = seed.ints[singleObj.varId]
+                    params.onEvent?.invoke(SearchEvent.Incumbent(o))
+                    yield(MinimizeResult.BestFound(seed, o, TerminationReason.BudgetExhausted))
+                }
+            }
+        }
         for (outcome in driveSearch(
             params.copy(minHammingDistance = 0, recentWindow = 0),
             pruneIf = pruneIf,
@@ -507,6 +524,39 @@ class BacktrackSolver(override val problem: Problem) :
             pending.clear()
             return out
         }
+    }
+
+    /**
+     * LP-rounding primal heuristic (#287): solve the root relaxation and round its fractional point
+     * into a feasible assignment by pinning each variable toward its LP value, propagating between
+     * pins. A complete conflict-free pass is a feasible incumbent — propagation enforces every factor,
+     * so the snapshot is sound by construction. Returns null when the LP is not optimal, a pin
+     * conflicts (single pass, no backtracking), or a rounded value is not in the live domain.
+     */
+    private fun lpRoundingProbe(objective: LinearObjective): Sample? {
+        val session = PropagationSession(problem)
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        if (relaxation.model.n == 0) return null
+        val solution = try {
+            DualSimplex(relaxation.model).solve()
+        } catch (_: LpOverflowException) {
+            return null
+        }
+        if (solution.status != LpStatus.OPTIMAL) return null
+        for (v in 0 until problem.numIntVars) {
+            val d = session.intDomain(v)
+            if (d.min == d.max) continue // already fixed by propagation
+            val col = relaxation.intColOf[v]
+            val target = if (col >= 0) round(solution.primal(col)).toInt().coerceIn(d.min, d.max) else d.min
+            if (session.pinInt(v, target) is PropagationResult.Unsat) return null
+        }
+        for (b in 0 until problem.numBoolVars) {
+            if (session.boolValue(b) != null) continue
+            val col = relaxation.boolColOf[b]
+            val target = col >= 0 && solution.primal(col) >= 0.5
+            if (session.pinBool(b, target) is PropagationResult.Unsat) return null
+        }
+        return snapshotAssignment(session)
     }
 
     /** True when the relaxation's rounded objective bound is at least the incumbent. */
