@@ -23,8 +23,8 @@ internal object VarStatus {
 
 /**
  * A basis: the set of basic variable columns plus the bound each nonbasic variable is pinned to.
- * Passed to [DualSimplex.solve] to warm-start re-optimization from a parent node's basis (#18,
- * #20). Because branch-and-bound only tightens bounds, the parent basis stays dual feasible, so
+ * Passed to [DualSimplex.solve] to warm-start re-optimization from a parent node's basis. Because
+ * branch-and-bound only tightens bounds, the parent basis stays dual feasible, so
  * the child re-optimizes with a few dual pivots instead of a cold solve.
  */
 internal class Basis(
@@ -58,7 +58,7 @@ internal class LpSolution(
     /** Dual-simplex pivots taken to reach this solution; lower with a good warm start. */
     val pivots: Int = 0,
     /**
-     * Farkas infeasibility certificate (#247), set only when [status] is [LpStatus.INFEASIBLE]. The
+     * Farkas infeasibility certificate, set only when [status] is [LpStatus.INFEASIBLE]. The
      * structural columns whose currently-seated bound participates in the dual ray that proves the LP
      * infeasible — together they are a sufficient reason. [certBoundIsUpper] is the parallel array of
      * the seated bound's side (true = the column's upper bound, false = its lower bound). Empty when
@@ -77,7 +77,7 @@ internal class LpSolution(
     /**
      * The largest integer that is a valid lower bound on the (minimization) objective: the exact
      * LP bound rounded **up**. Branch-and-bound prunes a node when this is at least the incumbent;
-     * because the bound is exact, the rounded comparison is exact too (#20). Only meaningful in
+     * because the bound is exact, the rounded comparison is exact too. Only meaningful in
      * minimization sense.
      */
     fun objectiveLowerBoundCeil(): Long = ceilDiv(objectiveNumerator, denominator)
@@ -95,7 +95,7 @@ private fun ceilDiv(a: Long, b: Long): Long {
 
 /**
  * Bounded-variable **dual** simplex with **fraction-free (Bareiss-style) integer** pivoting — the
- * native LP core of issue #18, purpose-built for branch-and-bound node bounding.
+ * native LP core of issue, purpose-built for branch-and-bound node bounding.
  *
  * ## Why dual simplex
  * Branch-and-bound branches tighten variable bounds, which leaves the parent's basis dual feasible
@@ -119,7 +119,7 @@ private fun ceilDiv(a: Long, b: Long): Long {
  *
  * ## First-implementation scope
  * Dense tableau, recomputed reduced costs and basic values each iteration, and **Bland's rule** for
- * guaranteed termination. Deliberately deferred to follow-ups under #18: revised simplex with
+ * guaranteed termination. Deliberately deferred to follow-ups under: revised simplex with
  * LU / Forrest–Tomlin basis updates, steepest-edge / Devex pricing, the float-fast-path with exact
  * dual certification, and determinant-growth control by periodic refactorization (today an overflow
  * throws [LpOverflowException] instead).
@@ -278,7 +278,7 @@ internal class DualSimplex(private val model: LpModel) {
     }
 
     /**
-     * Exact Gomory fractional cuts (#22) from the current optimal tableau, expressed over the
+     * Exact Gomory fractional cuts from the current optimal tableau, expressed over the
      * structural columns so they can be re-added by rebuilding the relaxation. Call only after a
      * [solve] that returned [LpStatus.OPTIMAL]; produces at most [maxCuts] cuts, one per fractional
      * basic structural variable.
@@ -468,7 +468,7 @@ internal class DualSimplex(private val model: LpModel) {
             }
             // No entering variable: the dual is unbounded, so the primal is infeasible. The leaving
             // row [r] (basic variable past bound [belowLower], no column able to repair it) is the
-            // Farkas dual ray — record its support as the infeasibility certificate (#247).
+            // Farkas dual ray — record its support as the infeasibility certificate.
             if (q == -1) return buildSolution(beta, LpStatus.INFEASIBLE, pivots, r, belowLower)
 
             // The leaving variable settles at the bound it was driven to.
@@ -552,7 +552,7 @@ internal class DualSimplex(private val model: LpModel) {
     }
 
     /**
-     * The structural columns in the support of the infeasibility dual ray (#247). The leaving row
+     * The structural columns in the support of the infeasibility dual ray. The leaving row
      * `x_lv = β/d − Σ_j (N[r][j]/d)·t_j` is an equality implied by the model's constraints; with the
      * leaving basic variable forced past its violated bound and every nonbasic seated at the bound the
      * row references, the bounds are jointly inconsistent. The reason is therefore the leaving

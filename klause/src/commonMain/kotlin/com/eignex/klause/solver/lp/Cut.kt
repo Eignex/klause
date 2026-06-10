@@ -42,7 +42,7 @@ internal fun allDifferentGroups(problem: Problem): List<IntArray> {
 
 /**
  * A linear inequality `Σ coeffs[k]·x_{cols[k]} rel rhs` over LP columns, added to the relaxation to
- * cut off a fractional LP point (#22). Columns index the relaxation's structural columns; the cut
+ * cut off a fractional LP point. Columns index the relaxation's structural columns; the cut
  * must be valid — satisfied by every integer-feasible point — so it never removes a real solution.
  */
 internal class Cut(val cols: IntArray, val coeffs: LongArray, val rel: Relation, val rhs: Long) {
@@ -62,7 +62,7 @@ internal class CutContext(
 )
 
 /**
- * Separates violated cuts from a fractional LP solution (#22). Implementations inspect the LP point
+ * Separates violated cuts from a fractional LP solution. Implementations inspect the LP point
  * and the problem structure and return cuts the point violates. Returning only violated cuts (rather
  * than all valid ones) keeps the LP from growing with constraints it does not need.
  */
@@ -71,7 +71,7 @@ internal interface CutSeparator {
 }
 
 /**
- * AllDifferent cuts (#22). AllDifferent is skipped by the base relaxation (#19); this re-introduces
+ * AllDifferent cuts. AllDifferent is skipped by the base relaxation; this re-introduces
  * its strength linearly. For a set S of all-different variables, any assignment uses |S| distinct
  * values, so `Σ_{i∈S} x_i` is bounded below by the sum of the |S| smallest distinct values available
  * across their domains, and above by the sum of the |S| largest — Hall-set bounds. Treating each
@@ -160,7 +160,7 @@ internal class AllDifferentSeparator : CutSeparator {
 }
 
 /**
- * Lagrangian-augmented LP cut (#23 ↔ #22): the objective-weighted AllDifferent bound. For an
+ * Lagrangian-augmented LP cut: the objective-weighted AllDifferent bound. For an
  * AllDifferent over variables `V`, the minimum of `Σ_{i∈V} c_i·x_i` subject to all-different is the
  * exact min-cost assignment of the objective coefficients to distinct values ([MinCostAssignment]) —
  * a stronger statement than the unweighted Hall sum cut whenever the `c_i` differ. Emitting
@@ -238,7 +238,7 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
 }
 
 /**
- * GlobalCardinality sum cuts (#22/#248) — the value-multiplicity generalization of the AllDifferent
+ * GlobalCardinality sum cuts — the value-multiplicity generalization of the AllDifferent
  * Hall cut. A *closed* GCC pins every `x_i` to a cover value `v_k`, each used within `[low_k, high_k]`
  * times, so `Σ_{i} x_i` is bounded by the cheapest (and dearest) value distribution honouring those
  * occurrence caps: fill the `low_k` forced occurrences, then spread the remaining slots over the
@@ -359,7 +359,7 @@ internal class GccSeparator : CutSeparator {
 }
 
 /**
- * Knapsack cover cuts (#22/#286) for a `Σ w_i·x_i ≤ b` PseudoBoolean row with positive weights over
+ * Knapsack cover cuts for a `Σ w_i·x_i ≤ b` PseudoBoolean row with positive weights over
  * 0/1 variables — the shape the dropped `Knapsack` factor decomposes to, so these recover its
  * strength. A *cover* `C` is a set of items with `Σ_{C} w_i > b`: no feasible 0/1 point can set all of
  * `C`, so `Σ_{i∈C} x_i ≤ |C| − 1` is a valid inequality. Separation finds a violated cover greedily by

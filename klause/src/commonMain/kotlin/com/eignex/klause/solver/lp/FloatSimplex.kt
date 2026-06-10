@@ -3,7 +3,7 @@ package com.eignex.klause.solver.lp
 import kotlin.math.abs
 
 /**
- * Double-precision bounded-variable dual simplex (#18 float fast-path). It solves the same LP as
+ * Double-precision bounded-variable dual simplex (the float fast-path). It solves the same LP as
  * [DualSimplex] but in floating point, and returns only the **basis** it lands on — never a bound.
  * The exact [DualSimplex] is then warm-started from that basis ([DualSimplex.solve]) and re-optimizes
  * to the true optimum, so the reported bound is always exact regardless of any float rounding here.
