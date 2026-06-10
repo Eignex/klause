@@ -35,7 +35,8 @@ enum class EngineMix {
  * [threads] is the available concurrency. `threads > 1` ⇒ a parallel [Portfolio] of that many
  * workers (one arm per core, repeating the strong arms on fresh seeds past the pool size).
  * `threads == 1` ⇒ a single core: a [SequentialPortfolio] bandit-schedules a small pool
- * ([SEQUENTIAL_POOL_SIZE]) of arms one slice at a time — pool size is decoupled from the one core.
+ * ([PortfolioComposition.SEQUENTIAL_POOL_SIZE]) of arms one slice at a time — pool size is
+ * decoupled from the one core.
  */
 data class PortfolioScenario(
     /** Available concurrency / pool width; `1` selects the single-core sequential executor (see

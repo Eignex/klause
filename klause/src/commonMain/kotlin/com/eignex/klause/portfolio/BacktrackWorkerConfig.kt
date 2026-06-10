@@ -27,7 +27,7 @@ import com.eignex.klause.solver.backtrack.SolutionGuided
  */
 internal data class BacktrackWorkerConfig(
     val label: String,
-    /** Fresh params for a worker on [seed], wired to emit [SearchEvent]s through [onEvent]. */
+    /** Fresh params for a worker on the given seed, wired to emit [SearchEvent]s through the sink. */
     val build: (seed: Long, onEvent: ((SearchEvent) -> Unit)?) -> BacktrackParams,
 ) {
     companion object {
