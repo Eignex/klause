@@ -25,6 +25,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.solver.presolve.PresolveConfig
 
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
@@ -35,8 +36,17 @@ import com.eignex.klause.solver.localsearch.strategy.TabuFilter
  */
 internal object SolveCore {
 
-    fun solve(solvable: Solvable, common: CommonOptions, output: OutputProtocol) {
+    private val pureLsEngines = setOf("ls", "localsearch", "local-search")
+
+    fun solve(rawSolvable: Solvable, common: CommonOptions, output: OutputProtocol) {
         val engine = (common.engine ?: cliProp("klause.fzn.engine") ?: "cp").lowercase()
+        // Presolve once, before any worker is built, so every engine and portfolio worker shares
+        // the one transformed problem. Symmetry breaking is dropped for a pure-LS engine (its
+        // ordering constraints hurt local search); solutions are reconstructed at render time.
+        val config = PresolveConfig.parse(common.presolve).let {
+            if (engine in pureLsEngines) it.withoutSymmetry() else it
+        }
+        val solvable = rawSolvable.presolved(config)
         output.begin(solvable.optimize, solvable.maximize)
 
         // MiniZinc-standard `-p N` (parallelism): N > 1 means a portfolio of N workers. An

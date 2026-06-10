@@ -21,6 +21,9 @@ import com.eignex.klause.solver.brute.BruteForceParams
 import com.eignex.klause.solver.brute.BruteForceSolver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.presolve.PresolveConfig
+import com.eignex.klause.solver.presolve.PresolveContext
+import com.eignex.klause.solver.presolve.Presolver
 import com.eignex.klause.yuck.YuckParams
 import com.eignex.klause.yuck.YuckSolver
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +85,28 @@ internal interface InProcessSolver {
     fun enumerated(n: Int): List<Sample>
     fun enumerateSequence(): Sequence<Sample>
     fun samplesSequence(): Sequence<Sample>
+}
+
+/**
+ * Wraps an [inner] solver built on a presolved problem so it presents the ORIGINAL [problem] and
+ * maps every emitted [Sample] back through [reconstruct] — the bench metrics check samples against
+ * the original problem, so they must be in original-variable space.
+ */
+private class ReconstructingInProcess(
+    override val problem: Problem,
+    private val inner: InProcessSolver,
+    private val reconstruct: (Sample) -> Sample,
+) : InProcessSolver {
+    override val name get() = inner.name
+    override fun solve(): SolveResult = when (val r = inner.solve()) {
+        is SolveResult.Sat -> r.copy(assignment = reconstruct(r.assignment))
+        else -> r
+    }
+
+    override fun samples(n: Int) = inner.samples(n).map(reconstruct)
+    override fun enumerated(n: Int) = inner.enumerated(n).map(reconstruct)
+    override fun enumerateSequence() = inner.enumerateSequence().map(reconstruct)
+    override fun samplesSequence() = inner.samplesSequence().map(reconstruct)
 }
 
 private class LocalSearchBench(
@@ -244,16 +269,28 @@ internal object Solvers {
     val YUCK = SolverConfig("yuck", Backend.YUCK)
     val KLAUSE_PORTFOLIO = SolverConfig("portfolio", Backend.KLAUSE_PORTFOLIO)
 
-    /** Build a bound solver for [problem]. */
-    fun build(config: SolverConfig, problem: Problem): InProcessSolver = when (config.backend) {
-        Backend.KLAUSE_LS -> LocalSearchBench(problem)
-        Backend.KLAUSE_COMPLETE -> BacktrackBench(problem)
-        Backend.LOGICNG -> LogicNGBench(problem)
-        Backend.BRUTE_FORCE -> BruteForceBench(problem)
-        Backend.CHOCO -> ChocoBench(problem)
-        Backend.ORTOOLS -> OrToolsBench(problem)
-        Backend.YUCK -> YuckBench(problem)
-        Backend.KLAUSE_PORTFOLIO -> PortfolioBench(problem)
+    /**
+     * Presolve config for the bench. Defaults to NONE so enumeration / parity / completeness
+     * metrics compare the same solution sets as the reference solvers; set `-Dklause.presolve`
+     * (none | default | all | comma-list) to measure the shipped presolve on e.g. the time metric.
+     */
+    private fun benchPresolve(): PresolveConfig =
+        System.getProperty("klause.presolve")?.let { PresolveConfig.parse(it) } ?: PresolveConfig.NONE
+
+    /** Build a bound solver for [problem], applying the bench presolve config (default NONE). */
+    fun build(config: SolverConfig, problem: Problem): InProcessSolver {
+        val pre = Presolver.run(problem, benchPresolve(), PresolveContext.EMPTY)
+        val inner = when (config.backend) {
+            Backend.KLAUSE_LS -> LocalSearchBench(pre.problem)
+            Backend.KLAUSE_COMPLETE -> BacktrackBench(pre.problem)
+            Backend.LOGICNG -> LogicNGBench(pre.problem)
+            Backend.BRUTE_FORCE -> BruteForceBench(pre.problem)
+            Backend.CHOCO -> ChocoBench(pre.problem)
+            Backend.ORTOOLS -> OrToolsBench(pre.problem)
+            Backend.YUCK -> YuckBench(pre.problem)
+            Backend.KLAUSE_PORTFOLIO -> PortfolioBench(pre.problem)
+        }
+        return if (pre.problem === problem) inner else ReconstructingInProcess(problem, inner, pre.reconstruct)
     }
 
     /** The default in-process portfolio: LS + backtrack + LogicNG, plus brute force only when
@@ -264,11 +301,18 @@ internal object Solvers {
      *  instance, which would dominate wall-clock on every metric if always on. With it on,
      *  `bench run time|completeness|parity|verify` benchmark the portfolio as a solver alongside
      *  the single engines. */
-    fun defaultPortfolio(problem: Problem): List<InProcessSolver> = buildList {
-        add(LocalSearchBench(problem))
-        add(BacktrackBench(problem))
-        add(LogicNGBench(problem))
-        if (BruteForceSolver.fits(problem)) add(BruteForceBench(problem))
-        if (System.getProperty("klause.bench.portfolio")?.toBoolean() == true) add(PortfolioBench(problem))
+    fun defaultPortfolio(problem: Problem): List<InProcessSolver> {
+        val pre = Presolver.run(problem, benchPresolve(), PresolveContext.EMPTY)
+        fun wrap(inner: InProcessSolver): InProcessSolver =
+            if (pre.problem === problem) inner else ReconstructingInProcess(problem, inner, pre.reconstruct)
+        return buildList {
+            add(wrap(LocalSearchBench(pre.problem)))
+            add(wrap(BacktrackBench(pre.problem)))
+            add(wrap(LogicNGBench(pre.problem)))
+            if (BruteForceSolver.fits(pre.problem)) add(wrap(BruteForceBench(pre.problem)))
+            if (System.getProperty("klause.bench.portfolio")?.toBoolean() == true) {
+                add(wrap(PortfolioBench(pre.problem)))
+            }
+        }
     }
 }

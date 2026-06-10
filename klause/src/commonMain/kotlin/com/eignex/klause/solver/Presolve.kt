@@ -69,8 +69,12 @@ object Presolve {
      * variable-remap seam that does not yet exist; this slice deliberately only touches variables
      * that no other factor references, so no factor is rewritten. Feasible-set-preserving over the
      * remaining variables.
+     *
+     * Variables in [objectiveIntVars] are never eliminated: an objective references their value
+     * directly, and the engine optimises over the presolved problem where an eliminated variable
+     * would be unconstrained, so removing one would make the bound meaningless.
      */
-    fun eliminateAffineSingletons(problem: Problem): AffineElimination {
+    fun eliminateAffineSingletons(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): AffineElimination {
         if (problem.numIntVars == 0) return AffineElimination(problem, emptyList())
         val occ = IntArray(problem.numIntVars)
         for (factor in problem.factors) for (v in factor.intVars) occ[v]++
@@ -78,7 +82,7 @@ object Presolve {
         val subs = ArrayList<AffineSub>()
         val kept = ArrayList<Factor>(problem.factors.size)
         for (factor in problem.factors) {
-            val xi = if (factor is Linear) eliminableIndex(factor, occ, eliminated) else -1
+            val xi = if (factor is Linear) eliminableIndex(factor, occ, eliminated, objectiveIntVars) else -1
             if (factor !is Linear || xi < 0) {
                 kept.add(factor)
                 continue
@@ -97,13 +101,20 @@ object Presolve {
 
     /** Index (0 or 1) of an eliminable variable in a 2-term `EQ` Linear, or -1. Eliminable: unit
      *  coefficient, occurs only in this factor, and neither it nor its partner already eliminated. */
-    private fun eliminableIndex(factor: Linear, occ: IntArray, eliminated: BooleanArray): Int {
+    private fun eliminableIndex(
+        factor: Linear,
+        occ: IntArray,
+        eliminated: BooleanArray,
+        objectiveIntVars: Set<Int>,
+    ): Int {
         if (factor.op != LinearOp.EQ || factor.vars.size != 2) return -1
         for (xi in 0..1) {
             val x = factor.vars[xi]
             val y = factor.vars[1 - xi]
             val unit = factor.coeffs[xi] == 1 || factor.coeffs[xi] == -1
-            if (unit && occ[x] == 1 && !eliminated[x] && !eliminated[y] && x != y) return xi
+            if (unit && occ[x] == 1 && !eliminated[x] && !eliminated[y] && x != y && x !in objectiveIntVars) {
+                return xi
+            }
         }
         return -1
     }

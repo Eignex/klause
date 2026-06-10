@@ -7,6 +7,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.presolve.PresolveConfig
+import com.eignex.klause.solver.presolve.PresolveContext
+import com.eignex.klause.solver.presolve.Presolver
 
 /*
  * Generic multi-mode CLI framework.
@@ -42,6 +45,9 @@ internal class CommonOptions {
     /** `--format NAME` / `--mode NAME`: force a specific mode regardless of file extension. */
     var formatOverride: String? = null
 
+    /** `--presolve SPEC`: presolve passes (none | default | all | comma-list of pass ids). */
+    var presolve: String? = null
+
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
     val engineParams = mutableListOf<String>()
 
@@ -73,7 +79,31 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     FlagSpec(listOf("--cp-seed"), false) { o.cpSeed = true },
     FlagSpec(listOf("--param"), true) { o.engineParams.add(requireNotNull(it)) },
     FlagSpec(listOf("--format", "--mode"), true) { o.formatOverride = it },
+    FlagSpec(listOf("--presolve"), true) { o.presolve = it },
 )
+
+/**
+ * Apply a presolve [config] to this Solvable, returning one whose [Solvable.problem] is the
+ * transformed problem and whose [Solvable.render] / [Solvable.objectiveValue] reconstruct the
+ * solution back to the original variables first. Every other field is valid unchanged because
+ * the same-space passes keep variable ids. Returns `this` when nothing changed.
+ */
+internal fun Solvable.presolved(config: PresolveConfig): Solvable {
+    val pre = Presolver.run(problem, config, PresolveContext.of(linearObjective))
+    if (pre.problem === problem) return this
+    return Solvable(
+        problem = pre.problem,
+        optimize = optimize,
+        maximize = maximize,
+        lsObjective = lsObjective,
+        linearObjective = linearObjective,
+        objVarId = objVarId,
+        definitionalSweep = definitionalSweep,
+        render = { sample -> render(pre.reconstruct(sample)) },
+        objectiveValue = objectiveValue?.let { ov -> { sample -> ov(pre.reconstruct(sample)) } },
+        annotatedBacktrackParams = annotatedBacktrackParams,
+    )
+}
 
 /**
  * Spec-driven argument parser. Walks [args], dispatching each recognised flag to its
