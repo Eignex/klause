@@ -4,6 +4,8 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -407,6 +409,83 @@ internal class KnapsackCoverSeparator : CutSeparator {
                 val cutCols = IntArray(cover.size) { cols[cover[it]] }
                 cuts.add(Cut(cutCols, LongArray(cover.size) { 1L }, Relation.LE, (cover.size - 1).toLong()))
             }
+        }
+        return cuts
+    }
+}
+
+/**
+ * Clique cuts for set-packing structure. Two Boolean variables are *mutually exclusive* when at most
+ * one can be true; a set of pairwise mutually exclusive variables is a clique, and `Σ_{clique} x ≤ 1`
+ * is a valid inequality. The conflict graph is read straight off the problem: a binary clause
+ * `¬a ∨ ¬b` is an edge, and an at-most-one constraint (a `Cardinality` with `max = 1`, or a unit-weight
+ * `Σ x ≤ 1` PseudoBoolean) over positive literals is a base clique whose members are all pairwise
+ * adjacent. Each base clique is greedily extended with the highest-fractional variables that are
+ * adjacent to every current member — keeping it a true clique — and the cut is emitted when the
+ * extended clique's LP value exceeds 1. The base constraint alone is already in the relaxation; the
+ * value is the extension across constraints.
+ */
+internal class CliqueCutSeparator : CutSeparator {
+    private val tol = 1e-6
+
+    override fun separate(ctx: CutContext): List<Cut> {
+        val adj = HashMap<Int, MutableSet<Int>>()
+        fun edge(a: Int, b: Int) {
+            if (a == b) return
+            adj.getOrPut(a) { HashSet() }.add(b)
+            adj.getOrPut(b) { HashSet() }.add(a)
+        }
+
+        val baseCliques = ArrayList<IntArray>()
+        fun atMostOne(literals: IntArray) {
+            if (literals.size < 2 || literals.any { !Lit.isPositive(it) }) return
+            val vars = IntArray(literals.size) { Lit.variable(literals[it]) }
+            for (i in vars.indices) for (j in i + 1 until vars.size) edge(vars[i], vars[j])
+            baseCliques.add(vars)
+        }
+        for (factor in ctx.problem.factors) {
+            when (factor) {
+                is Clause -> if (factor.literals.size == 2 && factor.literals.none { Lit.isPositive(it) }) {
+                    edge(Lit.variable(factor.literals[0]), Lit.variable(factor.literals[1]))
+                }
+
+                is Cardinality -> if (factor.max == 1) atMostOne(factor.literals)
+
+                is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1 && factor.weights.all { it == 1 }) {
+                    atMostOne(factor.literals)
+                }
+
+                else -> Unit
+            }
+        }
+        if (baseCliques.isEmpty()) return emptyList()
+
+        // Variables with a Boolean column, ordered by descending fractional value — the extension order.
+        val ranked = adj.keys
+            .filter { ctx.relaxation.boolColOf[it] >= 0 }
+            .sortedByDescending { ctx.solution.primal(ctx.relaxation.boolColOf[it]) }
+
+        val cuts = ArrayList<Cut>()
+        val emitted = HashSet<String>()
+        for (base in baseCliques) {
+            val clique = base.filter { ctx.relaxation.boolColOf[it] >= 0 }.toMutableList()
+            if (clique.size < 2) continue
+            val members = HashSet(clique)
+            for (cand in ranked) {
+                if (cand in members) continue
+                val neigh = adj[cand] ?: continue
+                if (clique.all { it in neigh }) {
+                    clique.add(cand)
+                    members.add(cand)
+                }
+            }
+            val cols = IntArray(clique.size) { ctx.relaxation.boolColOf[clique[it]] }
+            var lhs = 0.0
+            for (c in cols) lhs += ctx.solution.primal(c)
+            if (lhs <= 1.0 + tol) continue
+            val key = cols.sorted().joinToString(",")
+            if (!emitted.add(key)) continue
+            cuts.add(Cut(cols, LongArray(cols.size) { 1L }, Relation.LE, 1L))
         }
         return cuts
     }
