@@ -20,6 +20,13 @@ data class SmtLibProblem(
     val problem: Problem,
     /** The objective, or null for a pure satisfaction instance. */
     val objective: LinearObjective?,
+    /** Declared `Int` var name → int var id. Lets a CLI render a named model. */
+    val intVarNames: Map<String, Int> = emptyMap(),
+    /** Declared `Bool` var name → bool var id. */
+    val boolVarNames: Map<String, Int> = emptyMap(),
+    /** True when the original directive was `(maximize …)` (the [objective] negates so the
+     *  engine minimises). Lets a CLI report the true objective value. */
+    val maximize: Boolean = false,
 )
 
 /**
@@ -120,6 +127,9 @@ object SmtLibQfLia {
                     factors = factors.toTypedArray(),
                 ),
                 objective,
+                intVarNames = LinkedHashMap(intNames),
+                boolVarNames = LinkedHashMap(boolNames),
+                maximize = objectiveSpec?.second ?: false,
             )
         }
 

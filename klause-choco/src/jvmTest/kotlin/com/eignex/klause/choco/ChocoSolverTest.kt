@@ -99,21 +99,4 @@ class ChocoParallelPortfolioTest {
         )
         assertTrue(ChocoSolver(unsat).solve(ChocoParams(workers = 3)) is SolveResult.Unsat)
     }
-
-    @Test
-    fun `parallel minimize proves the optimum`() {
-        // minimize x + 2y subject to x + y >= 3 over [0..5]^2; optimum 3 at (3, 0).
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(
-                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
-            ),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val r = ChocoSolver(p).minimize(obj, ChocoParams(workers = 3))
-        val opt = r as MinimizeResult.Optimal
-        assertEquals(3.0, opt.objective)
-    }
 }

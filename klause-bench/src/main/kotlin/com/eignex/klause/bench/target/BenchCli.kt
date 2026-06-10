@@ -36,9 +36,10 @@ import com.eignex.klause.bench.tools.ProfileScope
  *    `bench <metric> [filters]` that carries a tuned budget / curated suite mix.
  *  - `preview <metric> [filters…]` — print the instances a run would cover, without running.
  *  - `list` — presets + suites; `list <suite>` — problems in a suite.
- *  - `diag:*` / `format-coverage:*` — diagnostics and whole-library format-coverage reports
- *    (parse/solve rates over the XCSP3 / SMT-LIB libraries; distinct from the `coverage`
- *    metric, which measures native-predicate coverage of a model).
+ *  - `diag:*` / `coverage:*` — diagnostics and whole-library format-coverage reports
+ *    (parse/solve rates over the XCSP3 / SMT-LIB libraries; the colon-suffixed `coverage:xcsp3`
+ *    / `coverage:smtlib` are distinct from the bare `coverage` metric, which measures
+ *    native-predicate coverage of a model).
  */
 object BenchCli {
     /** CLI entry point dispatching bench subcommands. */
@@ -59,9 +60,9 @@ object BenchCli {
 
             "diag:bandit" -> BanditProbe.main(args.drop(1).toTypedArray())
 
-            "format-coverage:xcsp3" -> FormatCoverage.xcsp3()
+            "coverage:xcsp3" -> FormatCoverage.xcsp3()
 
-            "format-coverage:smtlib" -> FormatCoverage.smtlib()
+            "coverage:smtlib" -> FormatCoverage.smtlib()
 
             // `bench <metric> [filters]` is the primary form; fall back to a preset id.
             else -> if (metricOrNull(cmd) != null) adHoc(args.toList(), preview = false) else runTarget(cmd)
@@ -207,7 +208,7 @@ object BenchCli {
             |  bench preview <metric> [filters…]     show what a run would cover
             |  bench list [<suite>]                  list presets+suites, or problems in a suite
             |  bench diag:backtrack | diag:cbls <x>  diagnostics
-            |  bench format-coverage:xcsp3|smtlib    parse/solve rates over a whole format library
+            |  bench coverage:xcsp3|smtlib          parse/solve rates over a whole format library
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>

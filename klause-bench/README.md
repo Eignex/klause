@@ -31,7 +31,7 @@ bench <preset-id>                    run a saved preset (see `list`)
 bench preview <metric> [filters…]    print what a run would cover, without running
 bench list [<suite>]                 list suites+presets, or the problems in one suite
 bench diag:backtrack | diag:cbls <x> diagnostics
-bench format-coverage:xcsp3|smtlib   parse/solve rates over a whole format library
+bench coverage:xcsp3|smtlib          parse/solve rates over a whole format library
 ```
 
 ## Filters
@@ -96,7 +96,7 @@ For a deeper whole-JVM native profile, the gradle hook is still available: `-Pas
 
 ### Whole-library format coverage
 
-Distinct from the `coverage` metric: `format-coverage:xcsp3|smtlib` fetches an entire external format library and reports how many instances parse, how many solve within a budget, and which unsupported constructs block the rest (the gap list for parser/factor work). Knobs: `-Dklause.coverage.{solve,timeMs,maxBytes,limit,progressEvery}`.
+Distinct from the bare `coverage` metric: the colon-suffixed `coverage:xcsp3|smtlib` fetches an entire external format library and reports how many instances parse, how many solve within a budget, and which unsupported constructs block the rest (the gap list for parser/factor work). Knobs: `-Dklause.coverage.{solve,timeMs,maxBytes,limit,progressEvery}`.
 
 ## Catalog, corpus, and selection
 
