@@ -6,9 +6,11 @@ import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
 import com.eignex.klause.ortools.OrToolsParams
 import com.eignex.klause.ortools.OrToolsSolver
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
-import com.eignex.klause.portfolio.PortfolioSpec
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -197,8 +199,15 @@ private class PortfolioBench(
     ls: Int = System.getProperty("klause.portfolio.ls")?.toIntOrNull() ?: 4,
     bt: Int = System.getProperty("klause.portfolio.bt")?.toIntOrNull() ?: 2,
 ) : InProcessSolver {
-    private val portfolio: Portfolio =
-        PortfolioBuilder.build(problem, PortfolioSpec.mixed(localSearchWorkers = ls, backtrackWorkers = bt))
+    // The portfolio-as-solver backend wires no objective, so it benchmarks the CSP-kind mixed
+    // composition (satisfaction + sampling). `-Dklause.portfolio.ls/bt` set the total width; the
+    // LS:backtrack split is now the scenario's (kind-derived) decision, not a per-knob count.
+    private val portfolio: Portfolio = Portfolio(
+        PortfolioBuilder.build(
+            problem,
+            PortfolioScenario.parallel(threads = ls + bt, kind = Kind.CSP, engine = EngineMix.MIXED),
+        ),
+    )
     override val name = "portfolio"
 
     @Suppress("InjectDispatcher")

@@ -8,8 +8,11 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
-import com.eignex.klause.portfolio.PortfolioSpec
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
@@ -306,12 +309,18 @@ internal object ParityMetric {
      * mixed both run the engine's own search.
      */
     private fun mixedPortfolio(entry: ResolvedProblem, lsObjective: Objective?, linearObjective: Objective?) =
-        PortfolioBuilder.build(
-            entry.problem,
-            PortfolioSpec.mixed(),
-            lsObjective = lsObjective,
-            linearObjective = linearObjective,
-            definitionalSweep = entry.definitionalSweep,
+        Portfolio(
+            PortfolioBuilder.build(
+                entry.problem,
+                PortfolioScenario.parallel(
+                    threads = 6,
+                    kind = if (lsObjective != null || linearObjective != null) Kind.COP else Kind.CSP,
+                    engine = EngineMix.MIXED,
+                ),
+                lsObjective = lsObjective,
+                linearObjective = linearObjective,
+                definitionalSweep = entry.definitionalSweep,
+            ),
         )
 
     // -Dklause.bench.parity.mode=fixed scores the single-threaded competition track: one
