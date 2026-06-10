@@ -66,6 +66,43 @@ class LpBoundingTest {
     }
 
     @Test
+    fun `lp rounding probe seeds an incumbent and preserves the optimum`() {
+        // #287: the root LP of the triangle is integral at (1,1,1), so the probe rounds it into a
+        // feasible incumbent (objective 3) before search. The proven optimum must be unchanged.
+        val problem = triangle()
+        val off = BacktrackSolver(problem).minimize(sumObjective, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val on = BacktrackSolver(problem).minimize(
+            sumObjective,
+            BacktrackParams(randomSeed = 1L, lpBounding = true, lpProbe = true),
+        )
+        assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
+        assertEquals(3.0, off.objectiveValue)
+        assertEquals(3.0, on.objectiveValue)
+    }
+
+    @Test
+    fun `root cut loop preserves the optimum and never explores more nodes`() {
+        // #285: closing the root relaxation harder (more separation rounds at level 0) must keep the
+        // proven optimum and never enlarge the tree versus a single root round.
+        val problem = triangle()
+        val deep = BacktrackSolver(problem).minimize(
+            sumObjective,
+            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true, lpRootCutRounds = 16),
+        )
+        val shallow = BacktrackSolver(problem).minimize(
+            sumObjective,
+            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true, lpRootCutRounds = 1, lpCutRounds = 1),
+        )
+        assertTrue(deep is MinimizeResult.Optimal && shallow is MinimizeResult.Optimal)
+        assertEquals(3.0, deep.objectiveValue)
+        assertEquals(3.0, shallow.objectiveValue)
+        assertTrue(
+            deep.stats.nodes.sum <= shallow.stats.nodes.sum,
+            "root cut loop explored more nodes: ${deep.stats.nodes.sum} vs ${shallow.stats.nodes.sum}",
+        )
+    }
+
+    @Test
     fun `frequency policy still preserves the optimum`() {
         // Solving the LP only every 3rd checked node must not change the proven optimum.
         val problem = triangle()

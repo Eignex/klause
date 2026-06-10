@@ -25,6 +25,9 @@ import com.eignex.klause.bench.tools.Profiler
  * When [profile] is set the run is recorded with the in-harness JFR [Profiler]. `scope=ALL`
  * wraps the whole run (resolve + solve); `scope=SOLVE` wraps only the measurement, so the
  * resolve step (corpus fetch + parse + MiniZinc compile) is excluded from the profile.
+ *
+ * The `kind=cop|csp` selection filter is applied earlier, during selection
+ * (`com.eignex.klause.bench.source.ProblemKind`), so it is not a concern here.
  */
 internal object MetricRunner {
     fun run(

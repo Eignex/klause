@@ -1,0 +1,12 @@
+c Pigeonhole PHP(3,2): 3 pigeons into 2 holes. UNSAT.
+c var(p,h) = (p-1)*2 + h ; p in 1..3, h in 1..2.
+p cnf 6 9
+1 2 0
+3 4 0
+5 6 0
+-1 -3 0
+-1 -5 0
+-3 -5 0
+-2 -4 0
+-2 -6 0
+-4 -6 0

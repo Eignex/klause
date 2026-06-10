@@ -99,7 +99,7 @@ internal data class ExternalCollection(
 /** Where a problem's bytes come from. Resolved to a concrete file by `source.CorpusFetcher`. */
 internal sealed interface ProblemSource {
     /** A file tracked in this repository, path relative to the workspace root. Use [corpus]
-     *  for the common case of a file under `klause-bench/corpus/`. */
+     *  for the common case of a file under `klause-bench/smoke-corpus/`. */
     data class Vendored(val workspaceRelPath: String) : ProblemSource
 
     /** Built directly in Kotlin — no file, no parsing. */
@@ -116,8 +116,10 @@ internal sealed interface ProblemSource {
     data class ExternalIndexed(val collection: ExternalCollection, val index: Int, val ext: String) : ProblemSource
 }
 
-/** Convenience: a vendored file under `klause-bench/corpus/<relPath>`. */
-internal fun corpus(relPath: String): ProblemSource.Vendored = ProblemSource.Vendored("klause-bench/corpus/$relPath")
+/** Convenience: a vendored file under `klause-bench/smoke-corpus/<relPath>`. */
+internal fun corpus(relPath: String): ProblemSource.Vendored = ProblemSource.Vendored(
+    "klause-bench/smoke-corpus/$relPath",
+)
 
 /**
  * One catalog entry: a named instance in a [Format], sourced from a [ProblemSource], tagged

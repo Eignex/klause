@@ -90,6 +90,104 @@ class LpLearnTest {
     }
 
     @Test
+    fun `immediate lp backjump fires without restarts and preserves the optimum`() {
+        // A genuinely LP-only infeasibility, so the LP path (not CP propagation) is what fails the
+        // node. var0 = s (the objective, minimised); var1..3 in [0,2]. Three pairwise covers force
+        // var1+var2+var3 >= 4.5 — a bound only a *combination* of constraints gives, which per-factor
+        // bound propagation cannot derive — while R4 (var1+var2+var3 - s <= 4) ties the surplus to s.
+        // Pinning s = 0 leaves the LP infeasible (4.5 > 4) yet bound-consistent (every var stays in
+        // [1,2]), so CP cannot fail the node — only the LP can, via a Farkas certificate that names
+        // s's seated upper bound. With lpLearn on and NO restarts, the only way that infeasibility
+        // shortens the search is the immediate Farkas backjump (#280); the restart-flush pool (#247)
+        // never drains without a restart. The optimum is s = 1.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1, 1, -1), intArrayOf(1, 2, 3, 0), LinearOp.LE, 4),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
+        val result = BacktrackSolver(problem).minimize(
+            obj,
+            // InputOrder + IndomainMin branch s first and try s = 0 first, hitting the LP-infeasible node.
+            BacktrackParams(
+                randomSeed = 1L,
+                lpBounding = true,
+                lpLearn = true,
+                variableHeuristic = InputOrder,
+                valueHeuristic = IndomainMin,
+            ),
+        )
+        assertTrue(result is MinimizeResult.Optimal, "immediate-backjump run must prove optimality")
+        assertEquals(1.0, result.objectiveValue)
+        assertTrue(
+            result.stats.lpBackjumps.sum > 0.0,
+            "the immediate LP backjump should fire (got ${result.stats.lpBackjumps.sum})",
+        )
+    }
+
+    @Test
+    fun `objective dual-bound propagation preserves the optimum`() {
+        // t = x0 + x1 + x2 with the triangle covers x0+x1>=2, x1+x2>=2, x0+x2>=2 over [0,5]; summing
+        // the covers gives 2*Σx >= 6 so the LP bound on t is 3 (optimum at (1,1,1)). #281 propagates
+        // t >= ceil(LP) = 3 with the reduced-cost reason. The optimum must be preserved.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4, // 0 = t, 1..3 = x0,x1,x2
+            intDomains = arrayOf(IntDomain(0, 15), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1, 1, -1), intArrayOf(1, 2, 3, 0), LinearOp.EQ, 0),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
+        val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val on = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 1L, lpBounding = true, lpObjectiveBound = true),
+        )
+        assertTrue(off is MinimizeResult.Optimal)
+        assertTrue(on is MinimizeResult.Optimal, "objective-bound propagation must preserve optimality")
+        assertEquals(3.0, off.objectiveValue)
+        assertEquals(3.0, on.objectiveValue)
+    }
+
+    @Test
+    fun `reduced-cost fixing reasons preserve the optimum`() {
+        // Single-variable objective t = x0+x1+x2 with triangle covers (optimum 3). With lpLearn the
+        // reduced-cost fixings carry their dual reason (#282); the optimum must be unchanged from the
+        // reasonless reduced-cost fixing (#21).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 15), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 2),
+                Linear(intArrayOf(1, 1, 1, -1), intArrayOf(1, 2, 3, 0), LinearOp.EQ, 0),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0))
+        val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 4L, lpBounding = true))
+        val on = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 4L, lpBounding = true, lpLearn = true),
+        )
+        assertTrue(off is MinimizeResult.Optimal)
+        assertTrue(on is MinimizeResult.Optimal, "reduced-cost reasons must preserve optimality")
+        assertEquals(3.0, off.objectiveValue)
+        assertEquals(3.0, on.objectiveValue)
+    }
+
+    @Test
     fun `energetic learning preserves the optimum`() {
         // 4 disjunctive tasks (length 3, capacity 1) over [0,11]; minimize Σ start. The only feasible
         // arrangement spaces them ≥3 apart → optimum 0+3+6+9 = 18. Branches that pack starts create

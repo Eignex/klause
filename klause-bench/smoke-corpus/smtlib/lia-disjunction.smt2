@@ -1,0 +1,12 @@
+; Self-authored QF_LIA smoke instance (satisfaction with a disjunction). License: internal.
+(set-logic QF_LIA)
+(declare-const a Int)
+(declare-const b Int)
+(declare-const c Int)
+(assert (>= a 0))
+(assert (>= b 0))
+(assert (>= c 0))
+(assert (<= (+ a b c) 5))
+(assert (>= a 1))
+(assert (or (= b c) (>= c 3)))
+(check-sat)

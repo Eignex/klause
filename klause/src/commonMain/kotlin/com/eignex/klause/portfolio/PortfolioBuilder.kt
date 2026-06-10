@@ -147,47 +147,58 @@ object PortfolioBuilder {
             }
         }
 
-        // Backtrack workers: a diverse palette of complete configs, cycled across workers so even
-        // a single backtrack worker gets the strong SAT-optimized config. Each bounds on the linear
-        // objective (falling back to the functional form if only that exists) and injects the
-        // shared objective bound so a tighter incumbent from any worker prunes the others' subtrees.
-        // The legs are single-config corpus winners; beyond the palette the cycle repeats on fresh
-        // seeds, which doubles as seed-twin diversity for luck-bound close calls.
-        //  - i % 4 == 0: the SAT-optimized CDCL stack ([BacktrackPresets.satOptimized]) —
-        //    adaptive restarts, phase + target phasing, three-tier learned DB (pigeonhole /
-        //    dense-random-3SAT, #117);
-        //  - i % 4 == 1: the conflict-driven composition ([BacktrackPresets.conflictDriven]) —
-        //    last-conflict over VSIDS, solution-guided values, phase saving (scheduling / reach tail);
-        //  - i % 4 == 2: conflict-driven but with the learned LinUCB variable heuristic
-        //    ([RegressionVariableHeuristic], #8) — wins routing (vrp/cvrp) where activity branching
-        //    stalls; the per-session contextual bandit needs ≥4 backtrack workers to be in the pool;
-        //  - i % 4 == 3: the bare free engine on Luby restarts, for raw seed diversity (plateau rows).
-        // SAT-optimized stays at index 0 so any pool with ≥1 backtrack worker keeps the #117 guard.
         val btObj = linearObjective ?: lsObjective
+        // The problem kind. `optimizing` = a COP (some objective present); otherwise a pure CSP
+        // (satisfaction). A CSP and a COP have different goals (any-feasible/UNSAT vs best-objective)
+        // and best arms, so the backtrack palette diverges on it (below), and the shared
+        // objective-bound supplier is only wired when optimizing (a CSP has no bound to prune on).
+        // Still kind-agnostic and left for follow-up: the LS ranking and the mixed LS:BT ratio.
+        val optimizing = btObj != null
+
+        // Backtrack palette, cycled across workers so even one backtrack worker gets the strong
+        // SAT-optimized config. SAT-optimized stays at index 0 for both kinds, so any pool with
+        // ≥1 backtrack worker keeps the #117 (pigeonhole / dense-random-3SAT) guard. Beyond the
+        // palette the cycle repeats on fresh seeds (seed-twin diversity for luck-bound close calls).
+        //  - COP (i % 4): 0 SAT-optimized · 1 conflict-driven · 2 conflict-driven + the learned
+        //    LinUCB variable heuristic ([RegressionVariableHeuristic], #8 — wins routing like
+        //    vrp/cvrp) · 3 the bare free engine (plateau diversity). Each prunes on the shared bound.
+        //  - CSP (i % 3): 0 SAT-optimized (the CDCL/UNSAT engine — only complete search proves
+        //    UNSAT) · 1 conflict-driven · 2 free. LinUCB is dropped: it's the COP routing arm and
+        //    its per-decision contextual scoring buys nothing on pure satisfaction (its features are
+        //    objective-independent and there is no bound to exploit).
         repeat(spec.backtrackWorkers) { i ->
             val session = BacktrackSolver(problem).session()
             val label = "backtrack#$i"
             val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(label, e) } }
             val seed = spec.seed + 1000L + i
-            val params = when (i % 4) {
-                0 -> BacktrackPresets.satOptimized(randomSeed = seed, onEvent = workerEvent)
-
-                1 -> BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = workerEvent)
-
-                2 -> BacktrackParams(
-                    randomSeed = seed,
-                    variableHeuristic = RegressionVariableHeuristic.linUcb(seed = seed),
-                    valueHeuristic = SolutionGuided(IndomainMin),
-                    phaseSaving = true,
-                    lubyRestartBase = 256L,
-                    onEvent = workerEvent,
-                )
-
-                else -> BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = workerEvent)
+            fun satOptimized() = BacktrackPresets.satOptimized(randomSeed = seed, onEvent = workerEvent)
+            fun conflictDriven() = BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = workerEvent)
+            fun linUcb() = BacktrackParams(
+                randomSeed = seed,
+                variableHeuristic = RegressionVariableHeuristic.linUcb(seed = seed),
+                valueHeuristic = SolutionGuided(IndomainMin),
+                phaseSaving = true,
+                lubyRestartBase = 256L,
+                onEvent = workerEvent,
+            )
+            fun free() = BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = workerEvent)
+            val params = if (optimizing) {
+                when (i % 4) {
+                    0 -> satOptimized()
+                    1 -> conflictDriven()
+                    2 -> linUcb()
+                    else -> free()
+                }
+            } else {
+                when (i % 3) {
+                    0 -> satOptimized()
+                    1 -> conflictDriven()
+                    else -> free()
+                }
             }
-            workers += PortfolioWorker.of(label, session, params, objective = btObj) { p, supplier ->
-                p.copy(objectiveBoundSupplier = supplier)
-            }
+            val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
+                if (optimizing) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
+            workers += PortfolioWorker.of(label, session, params, objective = btObj, withBound = withBound)
         }
         check(workers.isNotEmpty()) {
             "portfolio has no workers: no local-search or backtrack workers were requested"

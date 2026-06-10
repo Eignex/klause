@@ -1,0 +1,39 @@
+{
+    "entries": {
+        "size": {
+            "$type": "int",
+            "min": 1,
+            "max": 10
+        },
+        "shift": {
+            "$type": "nominal",
+            "labels": [
+                "day",
+                "night"
+            ]
+        },
+        "nightMinSize": {
+            "$type": "constraint",
+            "expr": {
+                "$type": "imp",
+                "left": {
+                    "$type": "nomeq",
+                    "name": "shift",
+                    "label": "night"
+                },
+                "right": {
+                    "$type": "intcmp",
+                    "left": {
+                        "$type": "intref",
+                        "name": "size"
+                    },
+                    "op": "GE",
+                    "right": {
+                        "$type": "intlit",
+                        "value": 3
+                    }
+                }
+            }
+        }
+    }
+}

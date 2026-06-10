@@ -199,6 +199,15 @@ data class BacktrackParams(
      */
     val lpBranching: Boolean = false,
     /**
+     * LP-rounding primal heuristic (#287): before search, solve the root LP and try to round its
+     * fractional point into a feasible assignment by pinning each variable toward its LP value and
+     * propagating. A complete conflict-free pass is a feasible incumbent (propagation enforces every
+     * factor, so the result is sound by construction); it seeds the branch-and-bound bound so pruning
+     * and reduced-cost fixing bite from the first node. A conflict on the single pass abandons the
+     * probe (no backtracking). Requires a LinearObjective; off by default; never changes the optimum.
+     */
+    val lpProbe: Boolean = false,
+    /**
      * Cut generation (#22): at a scheduled node, after the LP solve, run separators that add valid
      * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
      * cuts), re-solving to tighten the bound. Requires [lpBounding]; off by default.
@@ -206,6 +215,13 @@ data class BacktrackParams(
     val lpCuts: Boolean = false,
     /** Maximum separation rounds per node for [lpCuts]; each round adds cuts and re-solves. */
     val lpCutRounds: Int = 4,
+    /**
+     * Separation rounds at the root node (decision level 0) for [lpCuts] (#285). The root relaxation
+     * is solved once and bounds the whole tree, so spending more rounds there to drive a strong root
+     * cut closure pays off broadly; deeper nodes keep the cheaper [lpCutRounds]. Defaults to a deeper
+     * closure than per-node; capped to at least [lpCutRounds].
+     */
+    val lpRootCutRounds: Int = 16,
     /**
      * Include Gomory integrality cuts among the [lpCuts] separators. These come from the simplex
      * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
@@ -259,10 +275,19 @@ data class BacktrackParams(
      * constraints — and registered at the next restart (where its literals are no longer all-false),
      * so the dead region is pruned in sibling subtrees. Two sources: the node LP's Farkas
      * infeasibility certificate (requires [lpBounding]) and the energetic over-subscription window
-     * (requires [energeticReasoning]). Takes effect only when restarts are enabled (see
-     * [lubyRestartBase] / [adaptiveRestart]). Off by default.
+     * (requires [energeticReasoning]). When the certificate resolves to an asserting 1UIP clause the
+     * engine backjumps and learns immediately (#280), so this now helps even with restarts off;
+     * non-asserting certificates still fall back to restart-time registration. Off by default.
      */
     val lpLearn: Boolean = false,
+    /**
+     * Propagate the LP objective lower bound onto a single-variable objective (#281). When true and
+     * [lpBounding] holds, a feasible node LP tightens the objective variable's bound to the rounded LP
+     * optimum, with the reduced-cost dual certificate recorded as the reason so the bound is learnable
+     * and propagates through the objective-defining constraint to its component variables. Off by
+     * default; a no-op unless the objective is a single integer variable being minimised.
+     */
+    val lpObjectiveBound: Boolean = false,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

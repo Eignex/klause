@@ -42,7 +42,7 @@ internal class SuiteBuilder(val id: String, val description: String) {
     }
 
     /**
-     * A file vendored under `klause-bench/corpus/`. [relPath] defaults to
+     * A file vendored under `klause-bench/smoke-corpus/`. [relPath] defaults to
      * `<formatDir>/<name>.<ext>` (e.g. DIMACS → `dimacs/<name>.cnf`).
      */
     fun vendored(

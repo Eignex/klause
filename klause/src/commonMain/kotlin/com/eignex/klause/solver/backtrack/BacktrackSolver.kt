@@ -27,6 +27,7 @@ import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
 import com.eignex.klause.solver.lp.FloatSimplex
 import com.eignex.klause.solver.lp.GccSeparator
+import com.eignex.klause.solver.lp.KnapsackCoverSeparator
 import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.lp.LpExplanation
 import com.eignex.klause.solver.lp.LpOverflowException
@@ -51,6 +52,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 import kotlin.math.ceil
+import kotlin.math.round
 import kotlin.random.Random
 
 /**
@@ -237,6 +239,7 @@ class BacktrackSolver(override val problem: Problem) :
                 if (params.lpCuts) {
                     add(AllDifferentSeparator())
                     add(GccSeparator())
+                    add(KnapsackCoverSeparator())
                     // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
                     (objective as? LinearObjective)?.let { obj ->
                         val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
@@ -271,8 +274,13 @@ class BacktrackSolver(override val problem: Problem) :
         val lpBasisByDepth = ArrayList<Basis?>()
         // LP-guided value ordering (#246): the node LP records its fractional primal here.
         val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+        // Immediate LP backjump (#280): when a node's LP is infeasible and its Farkas certificate
+        // resolves to an asserting 1UIP clause, [pruneIf] stashes it here and [advance] turns the
+        // prune into a non-chronological backjump-and-learn instead of a one-level chronological pop.
+        var lpBackjump: Learned? = null
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
             is LinearObjective -> { session ->
+                lpBackjump = null
                 // Effective bound = min(local incumbent, external supplier). External bound
                 // sharing lets a parallel CP portfolio tighten every worker's pruning past
                 // their local incumbent as soon as any worker finds a better one.
@@ -327,12 +335,26 @@ class BacktrackSolver(override val problem: Problem) :
                             params,
                             lpSeparators,
                             lpHints,
+                            objectiveVar = singleObj?.varId ?: -1,
+                            objectiveAscending = singleObj?.ascending ?: true,
                         )
                         if (outcome.basis != null) {
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                             lpBasisByDepth[depth] = outcome.basis
                         }
-                        if (outcome.explanation != null) lpNogoods?.add(outcome.explanation)
+                        val explanation = outcome.explanation
+                        if (explanation != null) {
+                            // Try to resolve the Farkas certificate to an asserting 1UIP clause and
+                            // backjump immediately (#280). Only an asserting clause can be asserted as
+                            // a unit after the jump; otherwise fall back to the restart-flush pool
+                            // (#247), which needs the trail at root for the bound atoms to be free.
+                            val analyzed = session.analyzeConflictClause(explanation) as? Learned
+                            if (analyzed != null && analyzed.asserting) {
+                                lpBackjump = analyzed
+                            } else {
+                                lpNogoods?.add(explanation)
+                            }
+                        }
                         outcome.prune
                     }
 
@@ -349,9 +371,26 @@ class BacktrackSolver(override val problem: Problem) :
         // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
         // solved leaves.
         sink.start()
+        // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes
+        // and reduced-cost fixing bite from the first node. Sound — the probe returns only a fully
+        // propagated, feasible assignment.
+        if (params.lpProbe && objective is LinearObjective) {
+            val seed = lpRoundingProbe(objective)
+            if (seed != null) {
+                val o = objective.evaluate(seed)
+                if (o < bestObj) {
+                    bestObj = o
+                    best = seed
+                    if (singleObj != null) objVarBest = seed.ints[singleObj.varId]
+                    params.onEvent?.invoke(SearchEvent.Incumbent(o))
+                    yield(MinimizeResult.BestFound(seed, o, TerminationReason.BudgetExhausted))
+                }
+            }
+        }
         for (outcome in driveSearch(
             params.copy(minHammingDistance = 0, recentWindow = 0),
             pruneIf = pruneIf,
+            pruneLearned = { lpBackjump },
             sink = sink,
             objectiveVar = singleObj?.varId ?: -1,
             objectiveAscending = singleObj?.ascending ?: true,
@@ -487,6 +526,39 @@ class BacktrackSolver(override val problem: Problem) :
         }
     }
 
+    /**
+     * LP-rounding primal heuristic (#287): solve the root relaxation and round its fractional point
+     * into a feasible assignment by pinning each variable toward its LP value, propagating between
+     * pins. A complete conflict-free pass is a feasible incumbent — propagation enforces every factor,
+     * so the snapshot is sound by construction. Returns null when the LP is not optimal, a pin
+     * conflicts (single pass, no backtracking), or a rounded value is not in the live domain.
+     */
+    private fun lpRoundingProbe(objective: LinearObjective): Sample? {
+        val session = PropagationSession(problem)
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        if (relaxation.model.n == 0) return null
+        val solution = try {
+            DualSimplex(relaxation.model).solve()
+        } catch (_: LpOverflowException) {
+            return null
+        }
+        if (solution.status != LpStatus.OPTIMAL) return null
+        for (v in 0 until problem.numIntVars) {
+            val d = session.intDomain(v)
+            if (d.min == d.max) continue // already fixed by propagation
+            val col = relaxation.intColOf[v]
+            val target = if (col >= 0) round(solution.primal(col)).toInt().coerceIn(d.min, d.max) else d.min
+            if (session.pinInt(v, target) is PropagationResult.Unsat) return null
+        }
+        for (b in 0 until problem.numBoolVars) {
+            if (session.boolValue(b) != null) continue
+            val col = relaxation.boolColOf[b]
+            val target = col >= 0 && solution.primal(col) >= 0.5
+            if (session.pinBool(b, target) is PropagationResult.Unsat) return null
+        }
+        return snapshotAssignment(session)
+    }
+
     /** True when the relaxation's rounded objective bound is at least the incumbent. */
     private fun boundPrunes(solution: LpSolution, relaxation: LpRelaxation, bound: Double): Boolean {
         if (!bound.isFinite()) return false
@@ -511,8 +583,12 @@ class BacktrackSolver(override val problem: Problem) :
         params: BacktrackParams,
         separators: List<CutSeparator>,
         hints: LpHints?,
+        objectiveVar: Int,
+        objectiveAscending: Boolean,
     ): LpNodeOutcome = try {
-        lpBoundAndFixUnsafe(relaxer, session, bound, sink, warmBasis, params, separators, hints)
+        lpBoundAndFixUnsafe(
+            relaxer, session, bound, sink, warmBasis, params, separators, hints, objectiveVar, objectiveAscending,
+        )
     } catch (_: LpOverflowException) {
         // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
         // bound or reduction only loses pruning, never soundness — keep the node and move on.
@@ -538,6 +614,8 @@ class BacktrackSolver(override val problem: Problem) :
         params: BacktrackParams,
         separators: List<CutSeparator>,
         hints: LpHints?,
+        objectiveVar: Int,
+        objectiveAscending: Boolean,
     ): LpNodeOutcome {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
@@ -573,7 +651,13 @@ class BacktrackSolver(override val problem: Problem) :
             val pool = HashSet<String>()
             val cuts = ArrayList<Cut>()
             var round = 0
-            while (round++ < params.lpCutRounds) {
+            // The root relaxation bounds the whole tree, so close it harder there (#285).
+            val maxRounds = if (session.decisionLevel == 0) {
+                maxOf(params.lpRootCutRounds, params.lpCutRounds)
+            } else {
+                params.lpCutRounds
+            }
+            while (round++ < maxRounds) {
                 val ctx = CutContext(problem, relaxation, solution, session)
                 // Structure-based separators run on the LP point; Gomory cuts come from the tableau.
                 val separated = separators.flatMap { it.separate(ctx) }
@@ -602,9 +686,26 @@ class BacktrackSolver(override val problem: Problem) :
         // LP-guided value ordering (#246): record the final fractional primal for diving.
         if (solution.status == LpStatus.OPTIMAL) hints?.record(relaxation, solution)
 
+        // Objective dual-bound propagation (#281): push the LP lower bound onto a single-variable
+        // minimisation objective, with the reduced-cost certificate as the (learnable) reason, so it
+        // propagates through the objective-defining constraint. A resulting conflict prunes the node.
+        if (params.lpObjectiveBound && objectiveVar >= 0 && objectiveAscending &&
+            solution.status == LpStatus.OPTIMAL
+        ) {
+            val lpFloor = solution.objectiveLowerBoundCeil() + relaxation.objectiveConstant
+            val reason = LpExplanation.objectiveBoundReason(relaxation, solution, session)
+            if (reason != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+                val res = session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
+                if (res is PropagationResult.Unsat) {
+                    sink.observeLpPrune()
+                    return LpNodeOutcome(true, warmCache)
+                }
+            }
+        }
+
         // Reduced-cost fixing (#21) on the final, cut-strengthened solution; needs a finite gap.
         val prune = bound.isFinite() && solution.status == LpStatus.OPTIMAL &&
-            applyReducedCostFixing(relaxation, solution, session, bound, sink)
+            applyReducedCostFixing(relaxation, solution, session, bound, sink, params, objectiveVar, objectiveAscending)
         return LpNodeOutcome(prune, warmCache)
     }
 
@@ -626,6 +727,9 @@ class BacktrackSolver(override val problem: Problem) :
         session: PropagationSession,
         bound: Double,
         sink: SolveStatsSink,
+        params: BacktrackParams,
+        objectiveVar: Int,
+        objectiveAscending: Boolean,
     ): Boolean {
         val den = solution.denominator // > 0
         val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
@@ -639,6 +743,46 @@ class BacktrackSolver(override val problem: Problem) :
         }
         if (slack < 0L) return false
         val status = solution.basis.status
+        // Learnable reasons for each fixing (#282): a fixing of column `col` is justified by the LP's
+        // dual decomposition under the OTHER support columns' seated bounds, plus the incumbent bound
+        // `objVar ≤ improvingMax`. We can only express the incumbent half when there is a single-var
+        // minimisation objective whose live upper bound is already ≤ improvingMax (so the atom holds).
+        val learn = params.lpLearn && objectiveVar >= 0 && objectiveAscending &&
+            improvingMax in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
+            session.intDomain(objectiveVar).max.toLong() <= improvingMax
+        val supportCols = IntArrayList()
+        val supportLits = IntArrayList()
+        if (learn) {
+            for (c in relaxation.colVarId.indices) {
+                if (status[c] == VarStatus.BASIC || solution.reducedCostNumerator[c] == 0L) continue
+                val vid = relaxation.colVarId[c]
+                if (vid < 0 || vid == objectiveVar) continue
+                val atUpper = status[c] == VarStatus.AT_UPPER
+                val lit = when {
+                    relaxation.colIsBool[c] -> Lit.make(vid, !atUpper)
+
+                    atUpper -> session.boundLeLit(
+                        vid,
+                        (relaxation.model.loShift[c] + relaxation.model.upper[c]).toInt(),
+                        false,
+                    )
+
+                    else -> session.boundGeLit(vid, relaxation.model.loShift[c].toInt(), false)
+                }
+                supportCols.add(c)
+                supportLits.add(lit)
+            }
+        }
+        val incumbentLit = if (learn) session.boundLeLit(objectiveVar, improvingMax.toInt(), positive = false) else 0
+
+        // Reason for fixing `col`: every support column's seated-bound negation except col's own, plus
+        // the incumbent objective bound. (col's own bound is the variable moving, not a premise.)
+        fun reasonFor(col: Int): IntArray {
+            val out = IntArrayList(supportCols.size + 1)
+            for (k in 0 until supportCols.size) if (supportCols[k] != col) out.add(supportLits[k])
+            out.add(incumbentLit)
+            return out.toIntArray()
+        }
         for (col in relaxation.colVarId.indices) {
             val st = status[col]
             if (st == VarStatus.BASIC) continue
@@ -671,6 +815,8 @@ class BacktrackSolver(override val problem: Problem) :
                             varId,
                             false,
                         )
+                    } else if (learn) {
+                        session.implyIntAtMostWithReason(varId, (liveMin + dMax).toInt(), reasonFor(col))
                     } else {
                         session.implyIntAtMost(varId, (liveMin + dMax).toInt())
                     }
@@ -686,6 +832,8 @@ class BacktrackSolver(override val problem: Problem) :
                             varId,
                             true,
                         )
+                    } else if (learn) {
+                        session.implyIntAtLeastWithReason(varId, (liveMax - dMax).toInt(), reasonFor(col))
                     } else {
                         session.implyIntAtLeast(varId, (liveMax - dMax).toInt())
                     }
@@ -827,6 +975,10 @@ class BacktrackSolver(override val problem: Problem) :
     private fun driveSearch(
         params: BacktrackParams,
         pruneIf: ((PropagationSession) -> Boolean)? = null,
+        // Immediate LP backjump (#280): after [pruneIf] prunes a node, this returns the asserting
+        // 1UIP clause derived from the node's LP infeasibility (or null). When present, [advance]
+        // backjumps and learns instead of popping one level chronologically.
+        pruneLearned: (() -> Learned?)? = null,
         sink: SolveStatsSink? = null,
         // Objective-bound propagation (single-variable objectives only). When [objectiveVar]
         // is set, the engine pushes each incumbent's bound onto that variable at the root —
@@ -1085,6 +1237,7 @@ class BacktrackSolver(override val problem: Problem) :
                         sink,
                         relearnTripped,
                         onConflictTick,
+                        pruneLearned,
                     )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
@@ -1201,6 +1354,7 @@ class BacktrackSolver(override val problem: Problem) :
                         sink,
                         relearnTripped,
                         onConflictTick,
+                        pruneLearned,
                     )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
@@ -1420,6 +1574,7 @@ class BacktrackSolver(override val problem: Problem) :
         sink: SolveStatsSink? = null,
         relearnTripped: ((Learned) -> Boolean)? = null,
         onConflictTick: (() -> Unit)? = null,
+        pruneLearned: (() -> Learned?)? = null,
     ): AdvanceOutcome {
         while (true) {
             if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
@@ -1467,6 +1622,21 @@ class BacktrackSolver(override val problem: Problem) :
                 continue
             }
             if (pruneIf != null && pruneIf(session)) {
+                // Immediate LP backjump (#280): if the prune carried an asserting Farkas 1UIP clause,
+                // convert this node into a non-chronological backjump-and-learn. Revert the current
+                // pin first (the propagation-conflict path reaches the Backjump return with the failed
+                // pin already self-reverted, so trail.size == decisionLevel; match that here), then
+                // route through the same guards and handler as a propagation conflict.
+                val lpLearned = pruneLearned?.invoke()
+                if (lpLearned != null &&
+                    lpLearned.asserting &&
+                    lpLearned.literals.none { session.litTruth(it) == true } &&
+                    relearnTripped?.invoke(lpLearned) != true
+                ) {
+                    sink?.observeLpBackjump()
+                    session.popLast()
+                    return AdvanceOutcome.Backjump(lpLearned)
+                }
                 session.popLast()
                 continue
             }

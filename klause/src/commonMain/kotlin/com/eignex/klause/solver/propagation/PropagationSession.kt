@@ -276,6 +276,21 @@ class PropagationSession(
     /** Boolean reduced-cost fixing at the current level. See [implyIntAtMost]. */
     fun implyBool(v: Int, value: Boolean): PropagationResult = implyAtCurrentLevel { state.pinBool(v, value) }
 
+    /**
+     * Like [implyIntAtLeast]/[implyIntAtMost], but records [reason] as the antecedent of the new bound
+     * atom so conflict analysis can resolve *through* the tightening instead of treating it as a leaf
+     * (#281/#282). [reason] is a set of currently-false literals — the negated seated bounds whose
+     * conjunction (with the always-valid constraints) implies the bound — so the implicit reason clause
+     * `(new bound atom) ∨ reason` is globally valid. The antecedent is journaled and undone on
+     * backtrack like any other; the tightening itself still folds into the current level.
+     */
+    fun implyIntAtLeastWithReason(v: Int, lo: Int, reason: IntArray): PropagationResult =
+        implyAtCurrentLevel { state.tightenIntMin(v, lo, reason) }
+
+    /** Upper-bound counterpart of [implyIntAtLeastWithReason]. */
+    fun implyIntAtMostWithReason(v: Int, hi: Int, reason: IntArray): PropagationResult =
+        implyAtCurrentLevel { state.tightenIntMax(v, hi, reason) }
+
     private fun implyAtCurrentLevel(apply: () -> Boolean): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
@@ -296,6 +311,12 @@ class PropagationSession(
 
     /** Unified truth of a bool or atom literal — null when undetermined. */
     fun litTruth(lit: Int): Boolean? = state.litTruth(lit)
+
+    /** Run 1UIP conflict analysis from an externally supplied all-false conflict clause (e.g. an LP
+     *  Farkas certificate, #280) to obtain a learned clause and backjump level. See
+     *  [ConflictAnalyzer.analyzeConflictClause]. */
+    internal fun analyzeConflictClause(conflictClause: IntArray): ConflictAnalyzer.AnalysisResult =
+        state.conflictAnalyzer.analyzeConflictClause(conflictClause)
 
     /** Current learned-clause count. Used by the engine to decide whether to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */

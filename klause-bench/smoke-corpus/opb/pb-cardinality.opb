@@ -1,0 +1,2 @@
+* tiny pseudo-Boolean cardinality feasibility: at least 2 of 3 vars true.
++1 x1 +1 x2 +1 x3 >= 2 ;

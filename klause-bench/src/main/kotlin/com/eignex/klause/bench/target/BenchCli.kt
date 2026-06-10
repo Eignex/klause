@@ -6,6 +6,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.BanditProbe
 import com.eignex.klause.bench.tools.CblsDiag
 import com.eignex.klause.bench.tools.CpSeedProbe
@@ -25,9 +26,10 @@ import com.eignex.klause.bench.tools.ProfileScope
  *
  *   `bench <metric> [filters…]`   e.g. `bench parity suite=smtlib-core reference=ortools`
  *
- * Filters: `suite=a,b` (the token `core` expands to the in-process core) `category=SAT,OPT`
- * `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N` `reference=choco|ortools|yuck`
- * `timeout=<ms>` `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
+ * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
+ * `category=SAT,OPT` `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N`
+ * `reference=choco|ortools|yuck` `timeout=<ms>` `profile=cpu|wall|alloc` `profile-scope=solve|all`
+ * `profile-top=N`.
  *
  * Other commands:
  *  - `<preset-id>` — run a saved [Target] preset (see `list`); a preset is just a named
@@ -47,9 +49,6 @@ object BenchCli {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
 
             "preview" -> adHoc(args.drop(1), preview = true)
-
-            // `run` is kept as a back-compat alias for the primary `bench <metric>` form.
-            "run" -> adHoc(args.drop(1), preview = false)
 
             "diag:backtrack" -> MeasureBacktrack.run()
 
@@ -105,10 +104,16 @@ object BenchCli {
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
-     *  static-only unless named) → category/tag/name filter → family-aware caps/sampling. */
+     *  static-only unless named) → kind/category/tag/name filter → family-aware caps/sampling.
+     *  `kind=cop|csp` is applied *before* sampling (via [ProblemKind]) so a capped selection
+     *  fills its cap with the requested kind rather than under-filling. */
     private fun select(f: Map<String, String>): List<ProblemRef> {
         var refs: List<ProblemRef> = f["suite"]?.split(",")?.flatMap { expandSuite(it.trim()) }
             ?: Catalog.suites.flatMap { it.problems }
+        f["kind"]?.let { kind ->
+            val wantCop = parseKind(kind)
+            refs = refs.filter { ProblemKind.isCop(it) == wantCop }
+        }
         f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
             refs = refs.filter { it.category in cats }
         }
@@ -129,6 +134,13 @@ object BenchCli {
         val (idx, n) = shard.split("/").map { it.trim().toInt() }
         require(n > 0 && idx in 0 until n) { "klause.bench.shard must be i/n with 0 <= i < n, got $shard" }
         return selected.filterIndexed { i, _ -> i % n == idx }
+    }
+
+    /** `kind=cop` keeps optimization problems, `kind=csp` keeps satisfaction problems. */
+    private fun parseKind(kind: String): Boolean = when (kind.lowercase()) {
+        "cop", "opt", "optimization" -> true
+        "csp", "sat", "satisfaction" -> false
+        else -> error("kind must be cop|csp, got '$kind'")
     }
 
     /** Expand a suite token: `core` → every in-process core suite; otherwise the named suite. */
@@ -156,19 +168,16 @@ object BenchCli {
 
     private fun metricNames(): String = MetricKind.entries.joinToString(", ") { it.name.lowercase() }
 
-    private fun metricOrNull(name: String): MetricKind? = when (name.lowercase()) {
-        "time" -> MetricKind.TIME
-        "uniformness", "uniform" -> MetricKind.UNIFORMNESS
-        "completeness", "complete" -> MetricKind.COMPLETENESS
-        "verify" -> MetricKind.VERIFY
-        "parity" -> MetricKind.PARITY
-        "anytime" -> MetricKind.ANYTIME
-        "coverage" -> MetricKind.COVERAGE
-        "audit" -> MetricKind.AUDIT
-        "tuning", "tune" -> MetricKind.TUNING
-        "search" -> MetricKind.SEARCH
-        "credit" -> MetricKind.CREDIT
-        else -> null
+    /** Short aliases that don't match a [MetricKind] name verbatim. */
+    private val metricAliases = mapOf(
+        "uniform" to MetricKind.UNIFORMNESS,
+        "complete" to MetricKind.COMPLETENESS,
+        "tune" to MetricKind.TUNING,
+    )
+
+    /** Resolve a metric by its enum name (case-insensitive) or a short [metricAliases] alias. */
+    private fun metricOrNull(name: String): MetricKind? = name.lowercase().let { n ->
+        MetricKind.entries.firstOrNull { it.name.equals(n, ignoreCase = true) } ?: metricAliases[n]
     }
 
     private fun parseMetric(name: String): MetricKind =
@@ -198,13 +207,14 @@ object BenchCli {
             |  bench diag:backtrack | diag:cbls <x>  diagnostics
             |  bench coverage:xcsp3|smtlib          parse/solve rates over a whole format library
             |
-            |Filters: suite=a,b (suite=core = in-process core) category=SAT,OPTIMIZATION tag=… name=<glob>
-            |         per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>
+            |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
+            |         tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
+            |  bench verify suite=core
+            |  bench parity suite=mzn-bench kind=cop per-family=1
             |  bench parity suite=smtlib-core reference=ortools
-            |  bench coverage suite=mzn-bench
             |  bench search suite=slack-alldiff timeout=30000 profile=cpu
             """.trimMargin(),
         )
