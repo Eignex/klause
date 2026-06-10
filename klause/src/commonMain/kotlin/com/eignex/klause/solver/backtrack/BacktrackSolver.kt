@@ -271,8 +271,13 @@ class BacktrackSolver(override val problem: Problem) :
         val lpBasisByDepth = ArrayList<Basis?>()
         // LP-guided value ordering (#246): the node LP records its fractional primal here.
         val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+        // Immediate LP backjump (#280): when a node's LP is infeasible and its Farkas certificate
+        // resolves to an asserting 1UIP clause, [pruneIf] stashes it here and [advance] turns the
+        // prune into a non-chronological backjump-and-learn instead of a one-level chronological pop.
+        var lpBackjump: Learned? = null
         val pruneIf: ((PropagationSession) -> Boolean)? = when (objective) {
             is LinearObjective -> { session ->
+                lpBackjump = null
                 // Effective bound = min(local incumbent, external supplier). External bound
                 // sharing lets a parallel CP portfolio tighten every worker's pruning past
                 // their local incumbent as soon as any worker finds a better one.
@@ -332,7 +337,19 @@ class BacktrackSolver(override val problem: Problem) :
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                             lpBasisByDepth[depth] = outcome.basis
                         }
-                        if (outcome.explanation != null) lpNogoods?.add(outcome.explanation)
+                        val explanation = outcome.explanation
+                        if (explanation != null) {
+                            // Try to resolve the Farkas certificate to an asserting 1UIP clause and
+                            // backjump immediately (#280). Only an asserting clause can be asserted as
+                            // a unit after the jump; otherwise fall back to the restart-flush pool
+                            // (#247), which needs the trail at root for the bound atoms to be free.
+                            val analyzed = session.analyzeConflictClause(explanation) as? Learned
+                            if (analyzed != null && analyzed.asserting) {
+                                lpBackjump = analyzed
+                            } else {
+                                lpNogoods?.add(explanation)
+                            }
+                        }
                         outcome.prune
                     }
 
@@ -352,6 +369,7 @@ class BacktrackSolver(override val problem: Problem) :
         for (outcome in driveSearch(
             params.copy(minHammingDistance = 0, recentWindow = 0),
             pruneIf = pruneIf,
+            pruneLearned = { lpBackjump },
             sink = sink,
             objectiveVar = singleObj?.varId ?: -1,
             objectiveAscending = singleObj?.ascending ?: true,
@@ -827,6 +845,10 @@ class BacktrackSolver(override val problem: Problem) :
     private fun driveSearch(
         params: BacktrackParams,
         pruneIf: ((PropagationSession) -> Boolean)? = null,
+        // Immediate LP backjump (#280): after [pruneIf] prunes a node, this returns the asserting
+        // 1UIP clause derived from the node's LP infeasibility (or null). When present, [advance]
+        // backjumps and learns instead of popping one level chronologically.
+        pruneLearned: (() -> Learned?)? = null,
         sink: SolveStatsSink? = null,
         // Objective-bound propagation (single-variable objectives only). When [objectiveVar]
         // is set, the engine pushes each incumbent's bound onto that variable at the root —
@@ -1085,6 +1107,7 @@ class BacktrackSolver(override val problem: Problem) :
                         sink,
                         relearnTripped,
                         onConflictTick,
+                        pruneLearned,
                     )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
@@ -1201,6 +1224,7 @@ class BacktrackSolver(override val problem: Problem) :
                         sink,
                         relearnTripped,
                         onConflictTick,
+                        pruneLearned,
                     )
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
@@ -1420,6 +1444,7 @@ class BacktrackSolver(override val problem: Problem) :
         sink: SolveStatsSink? = null,
         relearnTripped: ((Learned) -> Boolean)? = null,
         onConflictTick: (() -> Unit)? = null,
+        pruneLearned: (() -> Learned?)? = null,
     ): AdvanceOutcome {
         while (true) {
             if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
@@ -1467,6 +1492,20 @@ class BacktrackSolver(override val problem: Problem) :
                 continue
             }
             if (pruneIf != null && pruneIf(session)) {
+                // Immediate LP backjump (#280): if the prune carried an asserting Farkas 1UIP clause,
+                // convert this node into a non-chronological backjump-and-learn. Revert the current
+                // pin first (the propagation-conflict path reaches the Backjump return with the failed
+                // pin already self-reverted, so trail.size == decisionLevel; match that here), then
+                // route through the same guards and handler as a propagation conflict.
+                val lpLearned = pruneLearned?.invoke()
+                if (lpLearned != null &&
+                    lpLearned.asserting &&
+                    lpLearned.literals.none { session.litTruth(it) == true } &&
+                    relearnTripped?.invoke(lpLearned) != true
+                ) {
+                    session.popLast()
+                    return AdvanceOutcome.Backjump(lpLearned)
+                }
                 session.popLast()
                 continue
             }

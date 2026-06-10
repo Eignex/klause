@@ -137,6 +137,18 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return analyzeFromSeed(seedReason, conflictLevelOf(seedReason))
     }
 
+    /**
+     * Run 1UIP from an externally supplied conflict clause whose literals are all currently false —
+     * e.g. an LP infeasibility (Farkas) certificate over absolute bound atoms (#247/#280). The clause
+     * is a valid seed reason: its disjunction is violated under the current assignment, exactly the
+     * contract [analyze] feeds the 1UIP loop. The conflict level is the deepest accurate decision
+     * level among its literals, as in [analyze], so the learned clause asserts at the right level and
+     * backjumps non-chronologically. Returns [AnalysisResult.NotApplicable] when the conflict sits at
+     * the root (nothing to learn) or 1UIP cannot collapse it to an asserting clause.
+     */
+    fun analyzeConflictClause(conflictClause: IntArray): AnalysisResult =
+        analyzeFromSeed(conflictClause, conflictLevelOf(conflictClause))
+
     /** Deepest accurate decision level among [reason]'s literals — the conflict level for a
      *  factor-seeded analysis (see [analyze]). */
     private fun conflictLevelOf(reason: IntArray): Int {
