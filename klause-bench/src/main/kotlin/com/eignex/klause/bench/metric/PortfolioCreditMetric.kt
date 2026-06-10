@@ -5,8 +5,11 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.report.markdown
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
-import com.eignex.klause.portfolio.PortfolioSpec
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Cancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -114,13 +117,33 @@ internal object PortfolioCreditMetric {
         seed: Long,
         budget: Budget,
     ): CreditRow {
-        val portfolio = PortfolioBuilder.build(
-            entry.problem,
-            PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = seed, lsConfigLabels = configs),
-            lsObjective = entry.lsObjective ?: entry.objective,
-            linearObjective = entry.objective,
-            definitionalSweep = entry.definitionalSweep,
-        )
+        val workers = if (configs != null) {
+            // The campaign measures an explicit config mix for per-worker attribution.
+            PortfolioBuilder.buildExplicit(
+                entry.problem,
+                lsLabels = configs,
+                backtrackWorkers = bt,
+                kind = Kind.COP,
+                seed = seed,
+                lsObjective = entry.lsObjective ?: entry.objective,
+                linearObjective = entry.objective,
+                definitionalSweep = entry.definitionalSweep,
+            )
+        } else {
+            PortfolioBuilder.build(
+                entry.problem,
+                PortfolioScenario.parallel(
+                    threads = ls + bt,
+                    kind = Kind.COP,
+                    engine = if (bt > 0) EngineMix.MIXED else EngineMix.LOCAL_SEARCH,
+                    seed = seed,
+                ),
+                lsObjective = entry.lsObjective ?: entry.objective,
+                linearObjective = entry.objective,
+                definitionalSweep = entry.definitionalSweep,
+            )
+        }
+        val portfolio = Portfolio(workers)
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }
         var first: String? = null

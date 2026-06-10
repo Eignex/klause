@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.propagation.ClauseExchange
 
 /**
  * Per-call params for [BacktrackSolver].
@@ -246,12 +247,14 @@ data class BacktrackParams(
      */
     val lpMir: Boolean = true,
     /**
-     * Warm-start the dual-simplex re-solve in each cut round from the previous round's optimal basis
-     * extended with the new cut rows' slacks (the textbook dual-simplex cut loop), instead of
-     * cold-starting from the all-slack basis. Adding valid cut rows with their slacks basic keeps the
-     * prior basis dual-feasible, so the re-solve resumes near the optimum and converges in a handful
-     * of pivots; a basis that fails to load (a rare singular extension) falls back to a cold start.
-     * The optimum is identical either way — this only changes the pivot path. On by default.
+     * Warm-start the dual-simplex re-solves within a node — each cut round resumes from the previous
+     * round's optimal basis extended with the new cut rows' slacks (the textbook dual-simplex cut
+     * loop), and each [lpFixpoint] re-solve resumes from the last optimal basis over the same rows —
+     * instead of cold-starting from the all-slack basis. Adding valid cut rows with their slacks
+     * basic keeps the prior basis dual-feasible, so the re-solve converges in a handful of pivots; a
+     * basis that fails to load (a singular extension, or determinant overflow during the reload)
+     * falls back to a cold start. The optimum is identical either way — this only changes the pivot
+     * path. On by default.
      */
     val lpWarmCuts: Boolean = true,
     /**
@@ -303,14 +306,19 @@ data class BacktrackParams(
      * infeasibility certificate (requires [lpBounding]) and the energetic over-subscription window
      * (requires [energeticReasoning]). When the certificate resolves to an asserting 1UIP clause the
      * engine backjumps and learns immediately (#280), so this now helps even with restarts off;
-     * non-asserting certificates still fall back to restart-time registration. Off by default.
+     * non-asserting certificates still fall back to restart-time registration. A certificate that
+     * leans on a node-local LP row (a live-big-M reified row, a local cut) is not expressible as a
+     * globally valid bound-atom clause and is withheld — the prune itself still happens. Off by
+     * default.
      */
     val lpLearn: Boolean = false,
     /**
      * Propagate the LP objective lower bound onto a single-variable objective (#281). When true and
      * [lpBounding] holds, a feasible node LP tightens the objective variable's bound to the rounded LP
      * optimum, with the reduced-cost dual certificate recorded as the reason so the bound is learnable
-     * and propagates through the objective-defining constraint to its component variables. Off by
+     * and propagates through the objective-defining constraint to its component variables. When no
+     * sound bound-atom reason exists (the certificate leans on a node-local row or an auxiliary
+     * column), the bound is still applied as a reason-less, level-local tightening. Off by
      * default; a no-op unless the objective is a single integer variable being minimised.
      */
     val lpObjectiveBound: Boolean = false,
@@ -331,6 +339,13 @@ data class BacktrackParams(
      * incumbents). `null` (default) disables observation entirely.
      */
     val onEvent: ((SearchEvent) -> Unit)? = null,
+    /**
+     * Optional cross-arm learned-clause exchange; see [ClauseExchange]. Invoked at each restart
+     * boundary (decision level 0) so a portfolio can import nogoods other arms learned and export
+     * this arm's new glue clauses. `null` (default) means no sharing — a standalone solve is
+     * unaffected. All arms must be built from the same problem for the shared clauses to be valid.
+     */
+    val clauseExchange: ClauseExchange? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

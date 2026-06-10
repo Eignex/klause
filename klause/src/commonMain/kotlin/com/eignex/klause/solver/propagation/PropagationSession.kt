@@ -121,6 +121,14 @@ class PropagationSession(
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
     val decisionLevel: Int get() = trail.size
 
+    /**
+     * True when bake-time propagation already proved the problem Unsat. The bake fixpoint stops at
+     * the first conflict, so the post-bake domains are then a *partial* propagation state — callers
+     * that read domains without pinning (e.g. the LP rounding probe snapshotting an assignment)
+     * must treat the session as conflicted rather than trust them.
+     */
+    val isUnsatAtRoot: Boolean get() = bakedUnsat != null
+
     /** Cumulative count of factor-forced assignments across this session — backs the
      *  `propagations` solve stat. Monotonic; the engine reads deltas around each pin. */
     val propagationCount: Long get() = state.propagations
@@ -343,6 +351,70 @@ class PropagationSession(
 
     /** Clear the reuse flag of learned clause [learnedIndex] (called for survivors after a reduction). */
     fun clearLearnedClauseUsed(learnedIndex: Int) = state.clearLearnedClauseUsed(learnedIndex)
+
+    /**
+     * Export this session's **glue** learned clauses — those with LBD ≤ [maxLbd] and length ≤
+     * [maxLen] — in session-portable [SharedClause] form, for cross-arm sharing. Int-bound atom
+     * literals are decoded to `(intVar, kind, threshold, sign)` via the atom registry; boolean
+     * literals travel as-is. Cheap: the glue set is small by construction. (See [ClauseExchange].)
+     */
+    fun exportGlueClauses(maxLbd: Int, maxLen: Int): List<SharedClause> {
+        val out = ArrayList<SharedClause>()
+        val numBool = problem.numBoolVars
+        for (i in 0 until learnedClauseCount) {
+            val lbd = learnedClauseLbd(i)
+            if (lbd > maxLbd) continue
+            val lits = learnedClauseAt(i).literals
+            if (lits.size > maxLen) continue
+            var boolCount = 0
+            for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
+            val bools = IntArray(boolCount)
+            val quads = IntArray((lits.size - boolCount) * SharedClause.QUAD)
+            var bi = 0
+            var qi = 0
+            for (lit in lits) {
+                val v = Lit.variable(lit)
+                if (v < numBool) {
+                    bools[bi++] = lit
+                } else {
+                    val atomId = v - numBool
+                    quads[qi++] = state.atomIntVar[atomId]
+                    quads[qi++] = state.atomKind[atomId]
+                    quads[qi++] = state.atomThreshold[atomId]
+                    quads[qi++] = if (Lit.isPositive(lit)) 0 else 1
+                }
+            }
+            out.add(SharedClause(bools, quads, lbd))
+        }
+        return out
+    }
+
+    /**
+     * Register an imported [shared] nogood (learned by another arm of the same problem) into this
+     * session's learned DB, translating its int-atom literals into this session's lazily-allocated
+     * atom space. Call only at decision level 0 (a restart): the literals are then unassigned, so the
+     * clause registers without an immediate unit/conflict and participates from the next fixpoint.
+     */
+    fun importClause(shared: SharedClause) {
+        val lits = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
+        var j = 0
+        for (l in shared.boolLits) lits[j++] = l
+        var i = 0
+        while (i < shared.atomQuads.size) {
+            val intVar = shared.atomQuads[i]
+            val kind = shared.atomQuads[i + 1]
+            val threshold = shared.atomQuads[i + 2]
+            val positive = shared.atomQuads[i + 3] == 0
+            val virtualVar = when (kind) {
+                0 -> state.atomVarGe(intVar, threshold)
+                1 -> state.atomVarLe(intVar, threshold)
+                else -> state.atomVarEq(intVar, threshold)
+            }
+            lits[j++] = Lit.make(virtualVar, positive)
+            i += SharedClause.QUAD
+        }
+        state.addLearnedClause(Clause(lits), shared.lbd, permanent = false)
+    }
 
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
         val want = if (value) 1 else 0

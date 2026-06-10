@@ -253,14 +253,16 @@ class PortfolioTest {
         // optimum (cancelled workers still yield their best — the anytime invariant). The
         // fallback only bounds a regression.
         val sawOptimum = AtomicBoolean(false)
-        PortfolioBuilder.build(
-            problem,
-            PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
-            lsObjective = obj,
-            linearObjective = obj,
-            onEvent = { _, e ->
-                if (e is SearchEvent.Incumbent && e.objective <= 3.0) sawOptimum.store(true)
-            },
+        Portfolio(
+            PortfolioBuilder.build(
+                problem,
+                PortfolioScenario.parallel(threads = 4, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
+                lsObjective = obj,
+                linearObjective = obj,
+                onEvent = { _, e ->
+                    if (e is SearchEvent.Incumbent && e.objective <= 3.0) sawOptimum.store(true)
+                },
+            ),
         ).use { p ->
             val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
             val r = p.minimize(cancellation = { sawOptimum.load() || fallback.hasPassedNow() })
@@ -286,17 +288,19 @@ class PortfolioTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val events = AtomicReference<List<Pair<String, SearchEvent>>>(emptyList())
-        PortfolioBuilder.build(
-            problem,
-            PortfolioSpec(localSearchWorkers = 1, backtrackWorkers = 1, seed = 1L),
-            lsObjective = obj,
-            linearObjective = obj,
-            onEvent = { worker, e ->
-                while (true) {
-                    val cur = events.load()
-                    if (events.compareAndSet(cur, cur + (worker to e))) break
-                }
-            },
+        Portfolio(
+            PortfolioBuilder.build(
+                problem,
+                PortfolioScenario.parallel(threads = 2, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
+                lsObjective = obj,
+                linearObjective = obj,
+                onEvent = { worker, e ->
+                    while (true) {
+                        val cur = events.load()
+                        if (events.compareAndSet(cur, cur + (worker to e))) break
+                    }
+                },
+            ),
         ).use { p ->
             // Stop once the first labeled incumbent is collected — all the assertions need.
             val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
@@ -325,9 +329,11 @@ class PortfolioTest {
     @Test
     fun `builder makes a mixed LS plus backtrack portfolio that solves`() = runTest {
         val problem = exactlyOneOver(4)
-        PortfolioBuilder.build(
-            problem,
-            PortfolioSpec(localSearchWorkers = 2, backtrackWorkers = 2, seed = 1L),
+        Portfolio(
+            PortfolioBuilder.build(
+                problem,
+                PortfolioScenario.parallel(threads = 4, kind = Kind.CSP, engine = EngineMix.MIXED, seed = 1L),
+            ),
         ).use { p ->
             val r = p.solve()
             assertTrue(r is SolveResult.Sat, "mixed LS+backtrack portfolio should solve exactly-one; got $r")
@@ -339,12 +345,16 @@ class PortfolioTest {
         // A single backtrack worker (i % 3 == 0) must be the SAT-optimized config; confirm the
         // built pool both surfaces that worker and solves a conflict-heavy UNSAT instance.
         val problem = pigeonhole(pigeons = 4, holes = 3)
-        PortfolioBuilder.build(problem, PortfolioSpec(backtrackWorkers = 1, seed = 0L)).use { p ->
+        Portfolio(
+            PortfolioBuilder.buildExplicit(problem, emptyList(), backtrackWorkers = 1, kind = Kind.CSP),
+        ).use { p ->
             assertTrue(p.workers.any { it.label == "backtrack#0" }, "expected a backtrack worker")
             assertIs<SolveResult.Unsat>(p.solve())
         }
         // With three backtrack workers the pool cycles through all three complete configs.
-        PortfolioBuilder.build(exactlyOneOver(5), PortfolioSpec(backtrackWorkers = 3, seed = 0L)).use { p ->
+        Portfolio(
+            PortfolioBuilder.buildExplicit(exactlyOneOver(5), emptyList(), backtrackWorkers = 3, kind = Kind.CSP),
+        ).use { p ->
             assertEquals(3, p.workers.count { it.label.startsWith("backtrack#") })
             assertIs<SolveResult.Sat>(p.solve())
         }

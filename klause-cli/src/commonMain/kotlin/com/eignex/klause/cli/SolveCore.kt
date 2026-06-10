@@ -1,5 +1,8 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
@@ -146,17 +149,25 @@ internal object SolveCore {
         defaultLs: Int = cliProp("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
         defaultBt: Int = cliProp("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
     ) {
-        val spec = buildPortfolioSpec(EngineParams(common.engineParams), common.randomSeed, defaultLs, defaultBt)
+        val scenario = buildPortfolioScenario(
+            EngineParams(common.engineParams),
+            common.randomSeed,
+            defaultLs,
+            defaultBt,
+            kind = if (solvable.optimize) Kind.COP else Kind.CSP,
+        )
         val (_, cancel) = deadlineCancellation(common)
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
-        val complete = spec.backtrackWorkers > 0
-        val portfolio = PortfolioBuilder.build(
-            solvable.problem,
-            spec,
-            lsObjective = solvable.lsObjective,
-            linearObjective = solvable.linearObjective,
-            definitionalSweep = solvable.definitionalSweep,
-            onEvent = portfolioVerboseListener(common.verbose),
+        val complete = scenario.engine != EngineMix.LOCAL_SEARCH
+        val portfolio = Portfolio(
+            PortfolioBuilder.build(
+                solvable.problem,
+                scenario,
+                lsObjective = solvable.lsObjective,
+                linearObjective = solvable.linearObjective,
+                definitionalSweep = solvable.definitionalSweep,
+                onEvent = portfolioVerboseListener(common.verbose),
+            ),
         )
         val t0 = nowMillis()
         try {

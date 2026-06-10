@@ -70,7 +70,8 @@ internal class CircuitSeparator : CutSeparator {
                 }
             }
             if (cols.isEmpty()) continue
-            cuts.add(Cut(cols.toIntArray(), LongArray(cols.size) { 1L }, Relation.GE, 1L))
+            // A cutset inequality of the Hamiltonian-circuit polytope holds for every circuit — global.
+            cuts.add(Cut(cols.toIntArray(), LongArray(cols.size) { 1L }, Relation.GE, 1L, global = true))
             if (cuts.size >= MAX_CUTS) return
         }
     }
