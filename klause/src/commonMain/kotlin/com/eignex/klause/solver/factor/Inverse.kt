@@ -78,7 +78,7 @@ class Inverse(
     /** Graded violation: the number of mismatched channel cells, compressed — a move that
      *  repairs some (but not all) cells scores a real improvement instead of 0. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation((state.refPayload[factorId] as State).violated.toLong())
+        compressViolation((state.refPayload[factorId] as State).violated.toLong(), state.violationSoftCap)
 
     /** Default brute-force: simulate, recount, return delta. Cost O(n) per query — fine
      *  for the structurally simple inverse but sub-optimal vs. an incremental Δ. */
@@ -87,14 +87,16 @@ class Inverse(
         val current = state.assignment.intValue(intVar)
         if (current == newValue) return 0
         val after = simulateViolations(state, intVar, newValue)
-        return compressViolation(after.toLong()) - compressViolation(s.violated.toLong())
+        return compressViolation(after.toLong(), state.violationSoftCap) -
+            compressViolation(s.violated.toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val before = s.violated
         s.violated = countViolations(state)
-        return compressViolation(s.violated.toLong()) - compressViolation(before.toLong())
+        return compressViolation(s.violated.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     private fun countViolations(state: LocalSearchState): Int {

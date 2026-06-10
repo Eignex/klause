@@ -45,12 +45,13 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     /** Graded violation: count of sorted-position mismatches, compressed. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation(mismatches(state, ov = -1, nv = 0).toLong())
+        compressViolation(mismatches(state, ov = -1, nv = 0).toLong(), state.violationSoftCap)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val before = mismatches(state, ov = -1, nv = 0)
         val after = mismatches(state, ov = intVar, nv = newValue)
-        return compressViolation(after.toLong()) - compressViolation(before.toLong())
+        return compressViolation(after.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

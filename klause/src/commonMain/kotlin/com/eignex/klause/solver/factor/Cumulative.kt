@@ -169,7 +169,7 @@ class Cumulative(
     /** Graded degree: total resource overage `Σ_t max(0, usage_t - cap)`, compressed so a
      *  deeply-overloaded profile can't dominate the global cost sum. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation(state.intPayload[factorId].toLong())
+        compressViolation(state.intPayload[factorId].toLong(), state.violationSoftCap)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val ls = state.refPayload[factorId] as LsState
@@ -227,7 +227,8 @@ class Cumulative(
                 }
             }
         }
-        return compressViolation((ls.overage + delta).toLong()) - compressViolation(ls.overage.toLong())
+        return compressViolation((ls.overage + delta).toLong(), state.violationSoftCap) -
+            compressViolation(ls.overage.toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -266,7 +267,8 @@ class Cumulative(
             }
         }
         state.intPayload[factorId] = ls.overage
-        return compressViolation(ls.overage.toLong()) - compressViolation(before.toLong())
+        return compressViolation(ls.overage.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -290,7 +292,8 @@ class Cumulative(
                 deltaOv += max(0, nu - cap) - max(0, u - cap)
             }
         }
-        return compressViolation((ls.overage + deltaOv).toLong()) - compressViolation(ls.overage.toLong())
+        return compressViolation((ls.overage + deltaOv).toLong(), state.violationSoftCap) -
+            compressViolation(ls.overage.toLong(), state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -318,7 +321,8 @@ class Cumulative(
         }
         ls.overage += deltaOv
         state.intPayload[factorId] = ls.overage
-        return compressViolation(ls.overage.toLong()) - compressViolation(before.toLong())
+        return compressViolation(ls.overage.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     /** Overage Δ of shifting task from [oldStart,+d) → [newStart,+d). Pure simulation. */

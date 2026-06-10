@@ -61,14 +61,15 @@ class PseudoBoolean(
 
     /** Graded violation: the weighted-sum residual `distance(sum)`, compressed — gives CBLS a
      *  gradient toward the bound instead of a flat boolean. */
-    private fun degreeOf(sum: Long): Int = compressViolation(distance(sum))
+    private fun degreeOf(sum: Long, softCap: Int): Int = compressViolation(distance(sum), softCap)
 
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = degreeOf(state.longPayload[factorId])
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        degreeOf(state.longPayload[factorId], state.violationSoftCap)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val change = changeOnFlip(state, boolVar, current = true)
         val sum = state.longPayload[factorId]
-        return degreeOf(sum + change) - degreeOf(sum)
+        return degreeOf(sum + change, state.violationSoftCap) - degreeOf(sum, state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -76,7 +77,7 @@ class PseudoBoolean(
         val oldSum = state.longPayload[factorId]
         val newSum = oldSum + change
         state.longPayload[factorId] = newSum
-        return degreeOf(newSum) - degreeOf(oldSum)
+        return degreeOf(newSum, state.violationSoftCap) - degreeOf(oldSum, state.violationSoftCap)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
@@ -214,8 +215,10 @@ class PseudoBoolean(
             val newChangeU = if (uPost) -signedU else signedU
             // Break/make track the sign of the graded Δ each var's flip would produce (the same
             // value deltaIfBoolFlipped returns), evaluated against the pre- and post-flip sums.
-            val preDelta = degreeOf(oldSum + oldChangeU) - degreeOf(oldSum)
-            val postDelta = degreeOf(newSum + newChangeU) - degreeOf(newSum)
+            val preDelta = degreeOf(oldSum + oldChangeU, state.violationSoftCap) -
+                degreeOf(oldSum, state.violationSoftCap)
+            val postDelta = degreeOf(newSum + newChangeU, state.violationSoftCap) -
+                degreeOf(newSum, state.violationSoftCap)
             val preBreak = preDelta > 0
             val preMake = preDelta < 0
             val postBreak = postDelta > 0

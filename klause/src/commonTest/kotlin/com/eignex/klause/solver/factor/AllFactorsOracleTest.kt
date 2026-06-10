@@ -425,6 +425,7 @@ class AllFactorsOracleTest {
         label: String? = null,
         exactProbe: Boolean = false,
         gac: Boolean = false,
+        softCap: Int? = null,
     ) {
         val name = label ?: factor::class.simpleName ?: "factor"
         val problem = Problem(
@@ -442,7 +443,55 @@ class AllFactorsOracleTest {
             FactorPropagationOracle.assertSound(problem, name)
         }
         MoveSetOracle.assertRepairsCoverImproving(problem, name, iters = 40, requireImprovement = false)
-        DegreeConsistencyOracle.assertConsistent(problem, name, exactProbe = exactProbe)
+        DegreeConsistencyOracle.assertConsistent(problem, name, exactProbe = exactProbe, softCap = softCap)
+    }
+
+    // ---- violationSoftCap tunability ---------------------------------------------
+
+    @Test fun `graded factors stay exact-probe consistent under a non-default violation soft cap`() {
+        // cap = 2 forces residuals above 2 into the log tail. The DegreeConsistencyOracle compares
+        // the deltaIf*-maintained cost against a fresh recompute at the same cap, so any
+        // compressViolation call site left on the default cap (rather than state.violationSoftCap)
+        // would desync and fail here — the guard that the knob is threaded through every factor.
+        val cap = 2
+        // Linear EQ with a wide domain: residuals reach ~16, deep into the log regime.
+        check(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 8),
+            intDomains = arrayOf(IntDomain(0, 8), IntDomain(0, 8)),
+            exactProbe = true,
+            softCap = cap,
+        )
+        // Cumulative: graded resource overage well above the cap.
+        check(
+            Cumulative(
+                starts = intArrayOf(0, 1, 2),
+                durations = intArrayOf(3, 3, 3),
+                resources = intArrayOf(2, 2, 2),
+                capacity = 2,
+            ),
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            exactProbe = true,
+            softCap = cap,
+        )
+        // AllDifferent: clash excess across a tight domain.
+        check(
+            AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 2),
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+            exactProbe = true,
+            softCap = cap,
+        )
+        // PseudoBoolean: weighted-sum residual (bool path) above the cap.
+        check(
+            PseudoBoolean(
+                weights = intArrayOf(5, 5, 5),
+                literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
+                op = PbOp.LE,
+                bound = 2,
+            ),
+            numBoolVars = 3,
+            exactProbe = true,
+            softCap = cap,
+        )
     }
 
     // ---- Holey-domain propagation guard ------------------------------------------

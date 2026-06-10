@@ -40,7 +40,7 @@ class Product(
         val av = state.assignment.intValue(a).toLong()
         val bv = state.assignment.intValue(b).toLong()
         val rv = state.assignment.intValue(result).toLong()
-        return compressViolation(abs(av * bv - rv))
+        return compressViolation(abs(av * bv - rv), state.violationSoftCap)
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
@@ -54,7 +54,8 @@ class Product(
             result -> abs(av * bv - nv)
             else -> return 0
         }
-        return compressViolation(after) - compressViolation(abs(av * bv - rv))
+        return compressViolation(after, state.violationSoftCap) -
+            compressViolation(abs(av * bv - rv), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -68,7 +69,8 @@ class Product(
             result -> abs(av * bv - ov)
             else -> return 0
         }
-        return compressViolation(abs(av * bv - rv)) - compressViolation(before)
+        return compressViolation(abs(av * bv - rv), state.violationSoftCap) -
+            compressViolation(before, state.violationSoftCap)
     }
 
     /** Bound-only conflict reason. */

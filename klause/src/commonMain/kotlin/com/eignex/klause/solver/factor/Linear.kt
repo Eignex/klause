@@ -74,14 +74,15 @@ class Linear private constructor(
      *  magnitude, so it stays binary (1 when `sum == bound`). This is the descent gradient
      *  CBLS needs on tight arithmetic: a move shrinking the residual scores a real improvement
      *  even when it doesn't flip the satisfied/violated status. */
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = degree(state.longPayload[factorId])
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        degree(state.longPayload[factorId], state.violationSoftCap)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val coeff = coeffOf(intVar)
         val old = state.assignment.intValue(intVar)
         val sum = state.longPayload[factorId]
         val newSum = sum + coeff.toLong() * (newValue - old)
-        return degree(newSum) - degree(sum)
+        return degree(newSum, state.violationSoftCap) - degree(sum, state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -90,7 +91,7 @@ class Linear private constructor(
         val oldSum = state.longPayload[factorId]
         val newSum = oldSum + coeff.toLong() * (cur - oldValue)
         state.longPayload[factorId] = newSum
-        return degree(newSum) - degree(oldSum)
+        return degree(newSum, state.violationSoftCap) - degree(oldSum, state.violationSoftCap)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
@@ -265,7 +266,7 @@ class Linear private constructor(
      *  `Long` running sum is interpreted in exactly one place. */
     private fun violates(sum: Long): Boolean = !linearHolds(sum, op, bound)
 
-    private fun degree(sum: Long): Int = linearDegree(sum, op, bound)
+    private fun degree(sum: Long, softCap: Int): Int = linearDegree(sum, op, bound, softCap)
 
     private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
 

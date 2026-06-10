@@ -65,40 +65,42 @@ class ReifiedPseudoBoolean(
      *  the indicator wants the relation to hold but it doesn't, the compressed weighted-sum
      *  residual (so body moves that shrink the gap score); when the indicator wants it false
      *  but it holds, `1` (a single aux flip repairs). Mirrors the [ReifiedLinear] gradient. */
-    private fun degreeFor(sum: Long, aux: Boolean): Int {
+    private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int {
         val h = predHolds(sum)
         return when {
             aux == h -> 0
-            aux -> compressViolation(distanceToInRange(sum))
+            aux -> compressViolation(distanceToInRange(sum), softCap)
             else -> 1
         }
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar))
+        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar), state.violationSoftCap)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.longPayload[factorId]
+        val cap = state.violationSoftCap
         return if (boolVar == auxBoolVar) {
-            degreeFor(sum, !aux) - degreeFor(sum, aux)
+            degreeFor(sum, !aux, cap) - degreeFor(sum, aux, cap)
         } else {
             val change = changeOnFlip(state, boolVar, current = true)
-            degreeFor(sum + change, aux) - degreeFor(sum, aux)
+            degreeFor(sum + change, aux, cap) - degreeFor(sum, aux, cap)
         }
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val oldSum = state.longPayload[factorId]
+        val cap = state.violationSoftCap
         if (boolVar == auxBoolVar) {
             val newAux = state.assignment.boolValue(auxBoolVar)
-            return degreeFor(oldSum, newAux) - degreeFor(oldSum, !newAux)
+            return degreeFor(oldSum, newAux, cap) - degreeFor(oldSum, !newAux, cap)
         }
         val change = changeOnFlip(state, boolVar, current = false)
         val newSum = oldSum + change
         state.longPayload[factorId] = newSum
         val aux = state.assignment.boolValue(auxBoolVar)
-        return degreeFor(newSum, aux) - degreeFor(oldSum, aux)
+        return degreeFor(newSum, aux, cap) - degreeFor(oldSum, aux, cap)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -279,16 +281,17 @@ class ReifiedPseudoBoolean(
             val changeV = if (flippedPost) signedFlipped else -signedFlipped
             oldSum = newSum - changeV
         }
-        val oldDeg = degreeFor(oldSum, oldAux)
-        val newDeg = degreeFor(newSum, newAux)
+        val cap = state.violationSoftCap
+        val oldDeg = degreeFor(oldSum, oldAux, cap)
+        val newDeg = degreeFor(newSum, newAux, cap)
         for (u in boolVars) {
             // Graded Δ each var's flip would produce (the value deltaIfBoolFlipped returns),
             // evaluated against the pre- and post-flip (sum, aux) — break/make track its sign.
             val preDelta: Int
             val postDelta: Int
             if (u == auxBoolVar) {
-                preDelta = degreeFor(oldSum, !oldAux) - oldDeg
-                postDelta = degreeFor(newSum, !newAux) - newDeg
+                preDelta = degreeFor(oldSum, !oldAux, cap) - oldDeg
+                postDelta = degreeFor(newSum, !newAux, cap) - newDeg
             } else {
                 val signedU = signedWeightByVar[u]
                 if (signedU == 0) {
@@ -299,8 +302,8 @@ class ReifiedPseudoBoolean(
                     val uPre = if (u == flippedVar) !uPost else uPost
                     val preChangeU = if (uPre) -signedU else signedU
                     val postChangeU = if (uPost) -signedU else signedU
-                    preDelta = degreeFor(oldSum + preChangeU, oldAux) - oldDeg
-                    postDelta = degreeFor(newSum + postChangeU, newAux) - newDeg
+                    preDelta = degreeFor(oldSum + preChangeU, oldAux, cap) - oldDeg
+                    postDelta = degreeFor(newSum + postChangeU, newAux, cap) - newDeg
                 }
             }
             val preBreak = preDelta > 0

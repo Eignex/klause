@@ -165,7 +165,7 @@ class Diffn(
     /** Graded violation: the number of overlapping rectangle pairs, compressed — a move that
      *  separates some (but not all) overlaps scores a real improvement instead of 0. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation((state.refPayload[factorId] as State).overlappingPairs.toLong())
+        compressViolation((state.refPayload[factorId] as State).overlappingPairs.toLong(), state.violationSoftCap)
 
     /** Affected-pair delta: a single-var move (position OR size) only changes the overlap
      *  status of pairs that include the moved rectangle, so the new total is
@@ -183,7 +183,8 @@ class Diffn(
             val newPairsR = pairsInvolvingRect(state, r, ov = intVar, nv = newValue)
             s.overlappingPairs - oldPairsR + newPairsR
         }
-        return compressViolation(after.toLong()) - compressViolation(s.overlappingPairs.toLong())
+        return compressViolation(after.toLong(), state.violationSoftCap) -
+            compressViolation(s.overlappingPairs.toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
@@ -191,7 +192,8 @@ class Diffn(
         if (state.assignment.intValue(intVar) == oldValue) return 0
         val before = s.overlappingPairs
         s.overlappingPairs = countOverlaps(state, ov = -1, nv = 0)
-        return compressViolation(s.overlappingPairs.toLong()) - compressViolation(before.toLong())
+        return compressViolation(s.overlappingPairs.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     /**

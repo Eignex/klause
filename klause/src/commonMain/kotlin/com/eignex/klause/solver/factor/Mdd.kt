@@ -63,7 +63,7 @@ class Mdd(
      *  layers — compressed. `0` iff a path currently exists; saturates at `seq.size + 1` when no
      *  symbol assignment admits an accepting path. Gives CBLS a gradient toward a feasible path. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation(acceptDistance { state.assignment.intValue(seq[it]) }.toLong())
+        compressViolation(acceptDistance { state.assignment.intValue(seq[it]) }.toLong(), state.violationSoftCap)
 
     /** Min symbol changes for a layer-by-layer path to an accepting state, where `getSym(i)` is
      *  layer `i`'s current symbol (a matching transition costs 0, any other costs 1). State ids
@@ -100,7 +100,8 @@ class Mdd(
             val v = seq[it]
             if (v == intVar) newValue else state.assignment.intValue(v)
         }
-        return compressViolation(after.toLong()) - compressViolation(before.toLong())
+        return compressViolation(after.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0

@@ -84,7 +84,8 @@ class NValue(
      *  gradient toward the target count instead of a flat boolean. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
         val s = state.refPayload[factorId] as State
-        return compressViolation(nvDegree(s.distinctCount, state.assignment.intValue(n)).toLong())
+        val raw = nvDegree(s.distinctCount, state.assignment.intValue(n)).toLong()
+        return compressViolation(raw, state.violationSoftCap)
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
@@ -92,7 +93,8 @@ class NValue(
         val before = nvDegree(s.distinctCount, state.assignment.intValue(n))
         val newDistinct = simulateDistinct(state, s, intVar, newValue)
         val newN = if (intVar == n) newValue else state.assignment.intValue(n)
-        return compressViolation(nvDegree(newDistinct, newN).toLong()) - compressViolation(before.toLong())
+        return compressViolation(nvDegree(newDistinct, newN).toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     /** Graded distance of a `distinct`-count against the target [n] value, per [mode]. */
@@ -141,7 +143,8 @@ class NValue(
             s.counts.put(cur, newCount + occurrences)
         }
         val afterDeg = nvDegree(s.distinctCount, state.assignment.intValue(n))
-        return compressViolation(afterDeg.toLong()) - compressViolation(beforeDeg.toLong())
+        return compressViolation(afterDeg.toLong(), state.violationSoftCap) -
+            compressViolation(beforeDeg.toLong(), state.violationSoftCap)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -164,7 +167,8 @@ class NValue(
             if (cntBefore == 0 && cntAfter > 0) distinct++
             if (cntBefore > 0 && cntAfter == 0) distinct--
         }
-        return compressViolation(nvDegree(distinct, nVal).toLong()) - compressViolation(before.toLong())
+        return compressViolation(nvDegree(distinct, nVal).toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -193,7 +197,8 @@ class NValue(
             }
         }
         val afterDeg = nvDegree(s.distinctCount, state.assignment.intValue(n))
-        return compressViolation(afterDeg.toLong()) - compressViolation(beforeDeg.toLong())
+        return compressViolation(afterDeg.toLong(), state.violationSoftCap) -
+            compressViolation(beforeDeg.toLong(), state.violationSoftCap)
     }
 
     /*
