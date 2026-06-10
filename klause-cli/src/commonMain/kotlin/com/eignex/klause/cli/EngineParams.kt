@@ -1,6 +1,8 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.portfolio.PortfolioSpec
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.Chb
 import com.eignex.klause.solver.backtrack.IndomainMax
@@ -138,16 +140,28 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
     return out to setup
 }
 
-/** Apply `--param` overrides for the portfolio engine on top of the worker-count defaults
- *  the caller derived (from `-p N` parallelism or its own fallbacks). [fallbackSeed] is the
- *  `-r` flag. */
-internal fun buildPortfolioSpec(p: EngineParams, fallbackSeed: Long?, defaultLs: Int, defaultBt: Int): PortfolioSpec {
-    val spec = PortfolioSpec(
-        localSearchWorkers = p.int("ls") ?: defaultLs,
-        backtrackWorkers = p.int("bt") ?: defaultBt,
-        seed = p.long("seed") ?: fallbackSeed ?: 1L,
-        lsLambda = p.double("lambda") ?: 1.0,
-    )
+/** Build the portfolio [PortfolioScenario] from `--param` overrides on top of the worker-count
+ *  defaults the caller derived (from `-p N` parallelism or its own fallbacks). [fallbackSeed] is
+ *  the `-r` flag, [kind] is whether the model optimizes. The `ls`/`bt` params set the total width
+ *  (`threads = ls + bt`) and select the engine mix (LS-only / backtrack-only / mixed); the exact
+ *  LS:backtrack split within a mixed pool is the scenario composition's (kind-derived) decision. */
+internal fun buildPortfolioScenario(
+    p: EngineParams,
+    fallbackSeed: Long?,
+    defaultLs: Int,
+    defaultBt: Int,
+    kind: Kind,
+): PortfolioScenario {
+    val ls = p.int("ls") ?: defaultLs
+    val bt = p.int("bt") ?: defaultBt
+    val seed = p.long("seed") ?: fallbackSeed ?: 1L
+    val lambda = p.double("lambda") ?: 1.0
     p.finish("portfolio", "ls, bt, seed, lambda")
-    return spec
+    require(ls >= 0 && bt >= 0 && ls + bt >= 1) { "portfolio needs ls + bt ≥ 1 (got ls=$ls, bt=$bt)" }
+    val engine = when {
+        ls == 0 -> EngineMix.BACKTRACK
+        bt == 0 -> EngineMix.LOCAL_SEARCH
+        else -> EngineMix.MIXED
+    }
+    return PortfolioScenario(threads = ls + bt, kind = kind, engine = engine, seed = seed, lsLambda = lambda)
 }
