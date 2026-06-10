@@ -2,10 +2,14 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.Table
 
 /**
  * Structural auto-configuration of the LP-relaxation family (#245). Each technique is enabled when —
@@ -14,9 +18,13 @@ import com.eignex.klause.solver.factor.ReifiedLinear
  * being a manual per-instance decision:
  *
  *  - **[BacktrackParams.lpBounding]** — there is genuine integer-linear structure ([Linear] /
- *    [ReifiedLinear]) the relaxation can exploit, or a cut-eligible global whose cuts need the LP.
- *  - **[BacktrackParams.lpCuts]** — an [AllDifferent] (Hall / assignment cuts) or [GlobalCardinality]
- *    (occurrence sum cuts) is present.
+ *    [ReifiedLinear]) the relaxation can exploit, or a global whose relaxation/cuts need the LP
+ *    ([AllDifferent], [GlobalCardinality], [Circuit], constant-array [Element], [Table]).
+ *  - **[BacktrackParams.lpCuts]** — an [AllDifferent] (Hall / assignment cuts), [GlobalCardinality]
+ *    (occurrence sum cuts), or [PseudoBoolean] (knapsack cover cuts) is present.
+ *  - **[BacktrackParams.lpCircuit]** — a [Circuit] is present (subtour-elimination cuts).
+ *  - **[BacktrackParams.lpElement]** — a constant-array [Element] is present (its convex hull).
+ *  - **[BacktrackParams.lpTable]** — a [Table] is present (its convex hull).
  *  - **[BacktrackParams.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
  *  - **[BacktrackParams.energeticReasoning]** — a [Cumulative] is present.
  *
@@ -33,19 +41,31 @@ object LpAutoConfig {
         var allDifferent = false
         var globalCardinality = false
         var cumulative = false
+        var pseudoBoolean = false
+        var circuit = false
+        var constArrayElement = false
+        var table = false
         for (f in problem.factors) {
             when (f) {
                 is Linear, is ReifiedLinear -> lpEmittable = true
                 is AllDifferent -> allDifferent = true
                 is GlobalCardinality -> globalCardinality = true
                 is Cumulative -> cumulative = true
+                is PseudoBoolean -> pseudoBoolean = true
+                is Circuit -> circuit = true
+                is Element -> if (!f.arrIsVars) constArrayElement = true
+                is Table -> table = true
                 else -> Unit
             }
         }
         val cutEligible = allDifferent || globalCardinality
         return base.copy(
-            lpBounding = base.lpBounding || lpEmittable || cutEligible,
-            lpCuts = base.lpCuts || cutEligible,
+            lpBounding = base.lpBounding || lpEmittable || cutEligible ||
+                pseudoBoolean || circuit || constArrayElement || table,
+            lpCuts = base.lpCuts || cutEligible || pseudoBoolean,
+            lpCircuit = base.lpCircuit || circuit,
+            lpElement = base.lpElement || constArrayElement,
+            lpTable = base.lpTable || table,
             lagrangian = base.lagrangian || allDifferent,
             energeticReasoning = base.energeticReasoning || cumulative,
         )

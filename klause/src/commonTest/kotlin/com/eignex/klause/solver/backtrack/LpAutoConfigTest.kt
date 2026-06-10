@@ -5,11 +5,17 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.Table
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -63,6 +69,42 @@ class LpAutoConfigTest {
         assertTrue(r.energeticReasoning)
         assertFalse(r.lpBounding)
         assertFalse(r.lpCuts)
+    }
+
+    @Test
+    fun `circuit enables circuit cuts and bounding`() {
+        val r = LpAutoConfig.recommend(problem(Circuit(intArrayOf(0, 1, 2))))
+        assertTrue(r.lpBounding)
+        assertTrue(r.lpCircuit)
+    }
+
+    @Test
+    fun `constant-array element enables element hull but a variable array does not`() {
+        val constArr = LpAutoConfig.recommend(
+            problem(Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 0)),
+        )
+        assertTrue(constArr.lpBounding)
+        assertTrue(constArr.lpElement)
+
+        val varArr = LpAutoConfig.recommend(
+            problem(Element(idx = 0, result = 1, arr = intArrayOf(2), arrIsVars = true, indexOffset = 0)),
+        )
+        assertFalse(varArr.lpElement)
+    }
+
+    @Test
+    fun `table enables table hull and bounding`() {
+        val r = LpAutoConfig.recommend(problem(Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 1))))
+        assertTrue(r.lpBounding)
+        assertTrue(r.lpTable)
+    }
+
+    @Test
+    fun `pseudo-boolean enables cover cuts`() {
+        val pb = PseudoBoolean(intArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4)
+        val r = LpAutoConfig.recommend(Problem(2, 0, emptyArray(), arrayOf<Factor>(pb)))
+        assertTrue(r.lpCuts)
+        assertTrue(r.lpBounding)
     }
 
     @Test
