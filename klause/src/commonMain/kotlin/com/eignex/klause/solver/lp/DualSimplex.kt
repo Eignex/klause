@@ -295,7 +295,37 @@ internal class DualSimplex(private val model: LpModel) {
      * determinant `D = |d|`; an overflow on the scale-up drops that one cut (sound — a missed cut
      * never removes a feasible point).
      */
-    fun gomoryCuts(maxCuts: Int): List<Cut> {
+    fun gomoryCuts(maxCuts: Int): List<Cut> = tableauCuts(maxCuts) { _, rj -> rj }
+
+    /**
+     * Gomory mixed-integer (MIR) cuts from the optimal tableau — the same single-row derivation as
+     * [gomoryCuts] but with the stronger mixed-integer rounding multiplier on each nonbasic term.
+     *
+     * For a basic row `x_v + Σ_j a_j·t_j = b̄` (fractional `b̄`, all `t_j ≥ 0` integer), the MIR
+     * inequality is `Σ_j φ(a_j)·t_j ≥ f0` with `f_j = frac(a_j)`, `f0 = frac(b̄)`, and
+     * `φ(a_j) = f_j` when `f_j ≤ f0`, else `f0·(1 − f_j)/(1 − f0)`. This dominates the pure-integer
+     * Gomory cut `Σ f_j·t_j ≥ f0` (the second branch is smaller whenever `f_j > f0`). Every nonbasic
+     * `t_j` here is integer-valued — structural variables are integer and a `≤`-row slack of an
+     * integer row at an integer point is integer — so the all-integer MIR function applies to every
+     * column. Clearing denominators by `D·(D − r0)` (with `r_j = D·f_j`, `r0 = D·f0`, `D = |d|`)
+     * keeps the multiplier `r_j·(D − r0)` / `r0·(D − r_j)` and right-hand side `r0·(D − r0)` exact in
+     * Long arithmetic; an overflow on the scale-up drops that one cut (sound — a missed cut never
+     * removes a feasible point). The `t_j` are then back-substituted to the structural columns and
+     * the result Chvátal-rounded exactly as in [gomoryCuts].
+     */
+    fun mirCuts(maxCuts: Int): List<Cut> = tableauCuts(maxCuts) { f0, rj ->
+        // bigD is captured below via the row builder; r0 == f0, both already D-scaled in [0, D).
+        val bigD = if (d < 0L) -d else d
+        if (rj <= f0) mulExact(rj, bigD - f0) else mulExact(f0, bigD - rj)
+    }
+
+    /**
+     * Shared single-row cut generator over fractional basic structural variables. [coefOf] maps the
+     * row's `f0` and a nonbasic term's `r_j = D·frac(a_j)` to that term's integer multiplier (plain
+     * `r_j` for Gomory, the MIR rounding for [mirCuts]); the base right-hand side scales `f0` by the
+     * same factor `coefOf` applies to `r_j == r0`.
+     */
+    private inline fun tableauCuts(maxCuts: Int, coefOf: (f0: Long, rj: Long) -> Long): List<Cut> {
         val beta = computeBeta()
         val bigD = if (d < 0L) -d else d
         val sign = if (d < 0L) -1L else 1L
@@ -308,7 +338,8 @@ internal class DualSimplex(private val model: LpModel) {
                 val bNum = mulExact(sign, beta[i])
                 val f0 = floorMod(bNum, bigD)
                 if (f0 == 0L) continue // integral value: no cut from this row
-                val cut = gomoryRow(i, bigD, sign, f0) ?: continue
+                val baseRhs = coefOf(f0, f0) // scale f0 by the same factor used on r_j == r0
+                val cut = tableauRow(i, bigD, sign, f0, baseRhs, coefOf) ?: continue
                 cuts.add(cut)
             } catch (_: LpOverflowException) {
                 continue // scale-up overflowed: skip this cut, stay sound
@@ -317,8 +348,15 @@ internal class DualSimplex(private val model: LpModel) {
         return cuts
     }
 
-    /** Build the structural-space Gomory cut for basic row [i]; null if it has no nonzero term. */
-    private fun gomoryRow(i: Int, bigD: Long, sign: Long, f0: Long): Cut? {
+    /** Build the structural-space single-row cut for basic row [i]; null if it has no nonzero term. */
+    private inline fun tableauRow(
+        i: Int,
+        bigD: Long,
+        sign: Long,
+        f0: Long,
+        baseRhs: Long,
+        coefOf: (f0: Long, rj: Long) -> Long,
+    ): Cut? {
         val coef = LongArray(model.n) // accumulated coefficient on each structural x'_k
         var c = 0L // accumulated constant on the left side
         for (j in 0 until numVars) {
@@ -328,12 +366,14 @@ internal class DualSimplex(private val model: LpModel) {
             val aNum = if (atLower) mulExact(sign, nMat[i][j]) else -mulExact(sign, nMat[i][j])
             val rj = floorMod(aNum, bigD) // D·frac(a_j), in [0, D)
             if (rj == 0L) continue
+            val mj = coefOf(f0, rj) // term multiplier (r_j for Gomory, MIR rounding otherwise)
+            if (mj == 0L) continue
             if (j < model.n) {
                 if (atLower) {
-                    coef[j] = addExact(coef[j], rj) // t_j = x'_j
+                    coef[j] = addExact(coef[j], mj) // t_j = x'_j
                 } else {
-                    coef[j] = subExact(coef[j], rj) // t_j = ub_j − x'_j
-                    c = addExact(c, mulExact(rj, model.upper[j]))
+                    coef[j] = subExact(coef[j], mj) // t_j = ub_j − x'_j
+                    c = addExact(c, mulExact(mj, model.upper[j]))
                 }
             } else {
                 val r = j - model.n
@@ -341,13 +381,13 @@ internal class DualSimplex(private val model: LpModel) {
                 // ≤-row slack: t_j = rhs_r − Σ_k a_rk·x'_k.
                 for (k in 0 until model.n) {
                     val ark = model.a[r][k]
-                    if (ark != 0L) coef[k] = subExact(coef[k], mulExact(rj, ark))
+                    if (ark != 0L) coef[k] = subExact(coef[k], mulExact(mj, ark))
                 }
-                c = addExact(c, mulExact(rj, model.rhs[r]))
+                c = addExact(c, mulExact(mj, model.rhs[r]))
             }
         }
-        // Cut Σ coef_k·x'_k ≥ f0 − c, then unshift x'_k = x_k − loShift_k for the builder's space.
-        var rhs = subExact(f0, c)
+        // Cut Σ coef_k·x'_k ≥ baseRhs − c, then unshift x'_k = x_k − loShift_k for the builder's space.
+        var rhs = subExact(baseRhs, c)
         for (k in 0 until model.n) {
             if (coef[k] != 0L) rhs = addExact(rhs, mulExact(coef[k], model.loShift[k]))
         }

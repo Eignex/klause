@@ -663,7 +663,9 @@ class BacktrackSolver(override val problem: Problem) :
                 val separated = separators.flatMap { it.separate(ctx) }
                 val gomory =
                     if (params.lpCuts && params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-                val fresh = (separated + gomory).filter { pool.add(it.key()) }
+                val mir =
+                    if (params.lpCuts && params.lpMir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+                val fresh = (separated + gomory + mir).filter { pool.add(it.key()) }
                 if (fresh.isEmpty()) break
                 cuts.addAll(fresh)
                 sink.observeLpCuts(fresh.size)
