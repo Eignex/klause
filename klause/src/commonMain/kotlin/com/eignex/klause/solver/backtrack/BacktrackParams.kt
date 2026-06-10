@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.propagation.ClauseExchange
 
 /**
  * Per-call params for [BacktrackSolver].
@@ -338,6 +339,13 @@ data class BacktrackParams(
      * incumbents). `null` (default) disables observation entirely.
      */
     val onEvent: ((SearchEvent) -> Unit)? = null,
+    /**
+     * Optional cross-arm learned-clause exchange; see [ClauseExchange]. Invoked at each restart
+     * boundary (decision level 0) so a portfolio can import nogoods other arms learned and export
+     * this arm's new glue clauses. `null` (default) means no sharing — a standalone solve is
+     * unaffected. All arms must be built from the same problem for the shared clauses to be valid.
+     */
+    val clauseExchange: ClauseExchange? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

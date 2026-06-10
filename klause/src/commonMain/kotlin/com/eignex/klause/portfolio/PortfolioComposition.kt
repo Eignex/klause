@@ -86,7 +86,8 @@ internal sealed interface WorkerConfig {
      * for backtrack, numbers the label). [lsObjective]/[linearObjective] are the two objective
      * representations (#63) — each engine picks its preferred form and falls back to the other.
      * [lsLambda]/[definitionalSweep] are LS-only (backtrack ignores them). [onEvent] is the shared
-     * [SearchEvent] sink, tagged here with the worker's label.
+     * [SearchEvent] sink, tagged here with the worker's label. [clausePool], when non-null, wires a
+     * cross-arm clause exchange (backtrack arms only; LS ignores it).
      */
     fun materialize(
         problem: Problem,
@@ -97,6 +98,7 @@ internal sealed interface WorkerConfig {
         linearObjective: Objective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        clausePool: SharedClausePool?,
     ): PortfolioWorker
 }
 

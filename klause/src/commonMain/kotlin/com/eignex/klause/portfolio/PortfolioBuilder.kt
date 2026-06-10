@@ -4,6 +4,8 @@ import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SearchEvent
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.stream.lock
 
 /**
  * Materialises the arms a [PortfolioScenario] composes to into runnable [PortfolioWorker]s — the
@@ -47,6 +49,7 @@ object PortfolioBuilder {
         linearObjective,
         definitionalSweep,
         onEvent,
+        clausePool = clausePoolFor(scenario),
     )
 
     /**
@@ -77,11 +80,17 @@ object PortfolioBuilder {
             addAll(lsConfigs)
             if (backtrackWorkers > 0) addAll(BacktrackWorkerConfig.diverse(kind, backtrackWorkers))
         }
-        return materialize(problem, arms, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent)
+        // The credit campaign measures per-worker attribution, which cross-arm clause sharing would
+        // confound, so the explicit path never shares.
+        return materialize(
+            problem, arms, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent,
+            clausePool = null,
+        )
     }
 
     /** Materialise each composed arm via its own [WorkerConfig.materialize] — the shared body of
-     *  [build] and [buildExplicit]. The arm index offsets the seed (and numbers backtrack labels). */
+     *  [build] and [buildExplicit]. The arm index offsets the seed (and numbers backtrack labels);
+     *  [clausePool], when non-null, is shared by every backtrack arm for learned-clause exchange. */
     private fun materialize(
         problem: Problem,
         arms: List<WorkerConfig>,
@@ -91,11 +100,27 @@ object PortfolioBuilder {
         linearObjective: Objective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        clausePool: SharedClausePool?,
     ): List<PortfolioWorker> {
         val workers = arms.mapIndexed { i, config ->
-            config.materialize(problem, i, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent)
+            config.materialize(
+                problem, i, seed, lsLambda, lsObjective, linearObjective, definitionalSweep, onEvent, clausePool,
+            )
         }
         check(workers.isNotEmpty()) { "portfolio produced no workers" }
         return workers
+    }
+
+    /**
+     * The shared clause pool for [scenario], or null when sharing doesn't apply (an LS-only pool is
+     * pointless — LS ignores clauses). Created once per build and handed to every backtrack arm.
+     * The lock is derived from the executor's concurrency: a no-op under the single-threaded
+     * [SequentialPortfolio] (`Concurrency.None`, zero overhead — the pool is just cross-segment
+     * memory there) and a platform mutex under the parallel [Portfolio]'s concurrent writers.
+     */
+    private fun clausePoolFor(scenario: PortfolioScenario): SharedClausePool? {
+        if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
+        val concurrency = if (scenario.threads == 1) Concurrency.None else Concurrency.Strict
+        return SharedClausePool(concurrency.lock())
     }
 }
