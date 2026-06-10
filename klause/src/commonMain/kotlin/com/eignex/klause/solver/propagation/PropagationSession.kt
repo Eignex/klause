@@ -297,6 +297,12 @@ class PropagationSession(
     /** Unified truth of a bool or atom literal — null when undetermined. */
     fun litTruth(lit: Int): Boolean? = state.litTruth(lit)
 
+    /** Run 1UIP conflict analysis from an externally supplied all-false conflict clause (e.g. an LP
+     *  Farkas certificate, #280) to obtain a learned clause and backjump level. See
+     *  [ConflictAnalyzer.analyzeConflictClause]. */
+    internal fun analyzeConflictClause(conflictClause: IntArray): ConflictAnalyzer.AnalysisResult =
+        state.conflictAnalyzer.analyzeConflictClause(conflictClause)
+
     /** Current learned-clause count. Used by the engine to decide whether to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
     val learnedClauseCount: Int get() = state.learnedClauses.size
