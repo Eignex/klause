@@ -19,6 +19,7 @@ import com.eignex.klause.solver.lp.AllDifferentSeparator
 import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CircuitSeparator
+import com.eignex.klause.solver.lp.CliqueCutSeparator
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.Cut
@@ -241,6 +242,7 @@ class BacktrackSolver(override val problem: Problem) :
                     add(AllDifferentSeparator())
                     add(GccSeparator())
                     add(KnapsackCoverSeparator())
+                    add(CliqueCutSeparator())
                     // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
                     (objective as? LinearObjective)?.let { obj ->
                         val coef = LongArray(problem.numIntVars) { obj.intCoefficients.getOrElse(it) { 0L } }
@@ -250,6 +252,13 @@ class BacktrackSolver(override val problem: Problem) :
                 // Genuine subtour-elimination cuts over the circuit arc relaxation.
                 if (params.lpCircuit) add(CircuitSeparator())
             }
+        } else {
+            emptyList()
+        }
+        // Persistent global cut pool: harvest the structural separators' cuts at the root once;
+        // they are globally valid, so they are re-added to every node's relaxation below.
+        val lpGlobalCuts: List<Cut> = if (params.lpCutPool && lpRelaxer != null && lpSeparators.isNotEmpty()) {
+            harvestRootCuts(lpRelaxer, PropagationSession(problem), lpSeparators)
         } else {
             emptyList()
         }
@@ -338,6 +347,7 @@ class BacktrackSolver(override val problem: Problem) :
                             lpHints,
                             objectiveVar = singleObj?.varId ?: -1,
                             objectiveAscending = singleObj?.ascending ?: true,
+                            globalCuts = lpGlobalCuts,
                         )
                         if (outcome.basis != null) {
                             while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
@@ -568,6 +578,40 @@ class BacktrackSolver(override val problem: Problem) :
     }
 
     /**
+     * Persistent global cut pool: separate the structural separators at the root once and
+     * return their cuts. Root domains equal the declared domains, so these cuts are globally valid —
+     * a root Hall / cover / assignment / subtour cut stays a valid (if weaker) bound at every tighter
+     * descendant — and re-adding them at every node avoids re-separating them. Gomory cuts are excluded
+     * (they come from the live tableau in the per-node loop and are only locally valid).
+     */
+    private fun harvestRootCuts(
+        relaxer: CpToLpRelaxation,
+        session: PropagationSession,
+        separators: List<CutSeparator>,
+    ): List<Cut> {
+        if (separators.isEmpty()) return emptyList()
+        val pool = HashSet<String>()
+        val cuts = ArrayList<Cut>()
+        try {
+            var relaxation = relaxer.build(session)
+            if (relaxation.model.n == 0) return emptyList()
+            var solution = DualSimplex(relaxation.model).solve()
+            var round = 0
+            while (round++ < CUT_POOL_ROUNDS && solution.status == LpStatus.OPTIMAL) {
+                val ctx = CutContext(problem, relaxation, solution, session)
+                val fresh = separators.flatMap { it.separate(ctx) }.filter { pool.add(it.key()) }
+                if (fresh.isEmpty()) break
+                cuts.addAll(fresh)
+                relaxation = relaxer.build(session, cuts)
+                solution = DualSimplex(relaxation.model).solve()
+            }
+        } catch (_: LpOverflowException) {
+            return cuts // keep whatever stayed within 64-bit determinants — still globally valid
+        }
+        return cuts
+    }
+
+    /**
      * LP-relaxation bounding (#20), cut generation (#22) and reduced-cost fixing (#21): build and
      * solve one exact integer LP relaxation of the live problem, optionally strengthen it with cuts,
      * then either prune this node or tighten its domains. Prunes when the relaxation is infeasible or
@@ -586,9 +630,11 @@ class BacktrackSolver(override val problem: Problem) :
         hints: LpHints?,
         objectiveVar: Int,
         objectiveAscending: Boolean,
+        globalCuts: List<Cut>,
     ): LpNodeOutcome = try {
         lpBoundAndFixUnsafe(
-            relaxer, session, bound, sink, warmBasis, params, separators, hints, objectiveVar, objectiveAscending,
+            relaxer, session, bound, sink, warmBasis, params, separators, hints,
+            objectiveVar, objectiveAscending, globalCuts,
         )
     } catch (_: LpOverflowException) {
         // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
@@ -641,8 +687,9 @@ class BacktrackSolver(override val problem: Problem) :
         hints: LpHints?,
         objectiveVar: Int,
         objectiveAscending: Boolean,
+        globalCuts: List<Cut>,
     ): LpNodeOutcome {
-        var relaxation = relaxer.build(session)
+        var relaxation = relaxer.build(session, globalCuts)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
         var simplex = DualSimplex(relaxation.model)
         // Float fast-path (#18): with no parent basis to warm from, a quick double-precision solve
@@ -692,11 +739,13 @@ class BacktrackSolver(override val problem: Problem) :
                 val separated = separators.flatMap { it.separate(ctx) }
                 val gomory =
                     if (params.lpCuts && params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-                val fresh = (separated + gomory).filter { pool.add(it.key()) }
+                val mir =
+                    if (params.lpCuts && params.lpMir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+                val fresh = (separated + gomory + mir).filter { pool.add(it.key()) }
                 if (fresh.isEmpty()) break
                 cuts.addAll(fresh)
                 sink.observeLpCuts(fresh.size)
-                relaxation = relaxer.build(session, cuts)
+                relaxation = relaxer.build(session, globalCuts + cuts)
                 simplex = DualSimplex(relaxation.model)
                 val warmStart = if (params.lpWarmCuts && prevBasis != null) {
                     extendBasisWithSlacks(prevBasis, relaxation.model, prevRows)
@@ -764,8 +813,8 @@ class BacktrackSolver(override val problem: Problem) :
             if (!params.lpFixpoint || session.propagationCount == before || ++iter >= LP_FIXPOINT_ITERS) {
                 return LpNodeOutcome(false, warmCache)
             }
-            // Re-solve on the tightened domains and loop.
-            relaxation = relaxer.build(session)
+            // Re-solve on the tightened domains and loop, keeping the global cut pool in the model.
+            relaxation = relaxer.build(session, globalCuts)
             if (relaxation.model.n == 0) return LpNodeOutcome(false, warmCache)
             simplex = DualSimplex(relaxation.model)
             solution = simplex.solve()
@@ -2017,6 +2066,9 @@ class BacktrackSolver(override val problem: Problem) :
 
         /** Most Gomory cuts to draw from one tableau per separation round (#22). */
         const val GOMORY_CUTS_PER_ROUND: Int = 8
+
+        /** Separation rounds when harvesting the persistent root cut pool. */
+        const val CUT_POOL_ROUNDS: Int = 8
 
         /** Maximum LP↔propagation re-solve rounds per node under `lpFixpoint` (#283). */
         const val LP_FIXPOINT_ITERS: Int = 4

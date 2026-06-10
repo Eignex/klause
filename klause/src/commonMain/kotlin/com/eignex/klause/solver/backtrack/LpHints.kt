@@ -7,7 +7,7 @@ import kotlin.math.roundToLong
 
 /**
  * Per-call cache of the most recent fractional LP value of each variable, for LP-guided value
- * ordering (#246). Filled by the node LP solve and read by the descent to order branch values toward
+ * ordering. Filled by the node LP solve and read by the descent to order branch values toward
  * the LP value (round-toward-LP diving). Purely advisory — it reorders candidate values the value
  * heuristic already produced, so it can change search order but never the optimum or feasibility.
  *

@@ -8,7 +8,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 /**
- * Energetic-reasoning infeasibility check for Cumulative globals (#22/#23). For a time window
+ * Energetic-reasoning infeasibility check for Cumulative globals. For a time window
  * `[t1, t2)`, every task must spend at least its *mandatory* energy inside the window no matter where
  * it is placed; if the summed mandatory energy of the tasks exceeds `capacity·(t2 − t1)`, no schedule
  * fits and the node is infeasible (Baptiste–Le Pape–Nuijten / Lopez energetic reasoning).
@@ -18,7 +18,7 @@ import com.eignex.klause.util.LongArrayList
  * duration and only **definitely-present** tasks (a lower bound on what must fit), while capacity uses
  * its **maximum** (an upper bound on what is available) — so a reported overflow is always real.
  *
- * Out of scope (deferred, documented on #22/#23): energetic *cuts* added to the LP (they need a
+ * Out of scope (deferred): energetic *cuts* added to the LP (they need a
  * time-indexed reformulation klause's start-variable LP does not have) and a Cumulative Lagrangian
  * subproblem via min-cost flow. Those overlap heavily with klause's existing theta-tree / edge-finding
  * propagation; this check is the sound, self-contained slice.
@@ -32,7 +32,7 @@ internal class CumulativeEnergeticBound(problem: Problem) {
     fun isInfeasible(session: PropagationSession): Boolean = factors.any { overSubscribed(it, session) }
 
     /**
-     * A nogood explaining the first energetically over-subscribed window (#247), or null when no
+     * A nogood explaining the first energetically over-subscribed window, or null when no
      * Cumulative is over-subscribed (or the arithmetic overflows). The window's over-subscription
      * `Σ dem_i·overlap_i > capacity·width` follows from each contributing task's start bounds
      * (`start ≥ est`, `start ≤ lst` pin the mandatory overlap), its min duration/demand and the max
