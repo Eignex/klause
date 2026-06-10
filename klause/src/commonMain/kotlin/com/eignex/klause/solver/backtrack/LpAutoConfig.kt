@@ -12,7 +12,7 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
 
 /**
- * Structural auto-configuration of the LP-relaxation family (#245). Each technique is enabled when —
+ * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
  * and only when — the problem actually contains the structure it targets. Applicability is a
  * structural fact, so this never *speculates* about performance; it just stops the LP machinery from
  * being a manual per-instance decision:
@@ -31,7 +31,7 @@ import com.eignex.klause.solver.factor.Table
  * Every flag is OR-ed onto `base`, so an explicit caller setting is never turned *off*, and the
  * default ([recommend] is opt-in — nothing calls it implicitly) leaves the existing behaviour intact.
  * Picking *which* techniques pay off on a given corpus, and whether any should flip on by default,
- * is the empirical half of #245 and stays with the benchmark.
+ * is the empirical half of and stays with the benchmark.
  */
 object LpAutoConfig {
 

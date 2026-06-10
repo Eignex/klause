@@ -15,7 +15,7 @@ internal class CircuitArcModel(
 )
 
 /**
- * Genuine subtour-elimination cuts (#22) for [com.eignex.klause.solver.factor.Circuit]. The base
+ * Genuine subtour-elimination cuts for [com.eignex.klause.solver.factor.Circuit]. The base
  * relaxation's degree rows (each node has exactly one out- and one in-arc) make every *integer*
  * arc solution a permutation — a disjoint union of cycles. A Hamiltonian circuit is the single-cycle
  * case, so the gap to feasibility is exactly the subtours, removed by the directed cutset inequality

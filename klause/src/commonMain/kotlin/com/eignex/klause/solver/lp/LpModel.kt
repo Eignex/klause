@@ -10,7 +10,7 @@ internal enum class Relation { LE, GE, EQ }
 internal enum class Sense { MINIMIZE, MAXIMIZE }
 
 /**
- * A bounded-variable LP in the normalized form the integer-preserving dual simplex (#18)
+ * A bounded-variable LP in the normalized form the integer-preserving dual simplex
  * consumes. All input coefficients, bounds and right-hand sides are integers — this is the
  * "integer based" core: it exploits that every klause datum is integral rather than carrying
  * a general-purpose floating LP.
@@ -56,7 +56,7 @@ internal class LpModel(
     val objConstant: Long,
     /** Original optimization sense; the stored [cost] is always minimization. */
     val sense: Sense,
-    /** Caller tag per structural column, for mapping LP columns back to `(varId, value)` (#21). */
+    /** Caller tag per structural column, for mapping LP columns back to `(varId, value)`. */
     val tag: IntArray,
 ) {
     /** Total variable count: structural plus slack. */

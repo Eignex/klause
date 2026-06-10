@@ -5,7 +5,7 @@ import com.eignex.klause.util.LongArrayList
 
 /**
  * Exact minimum-cost bipartite assignment over [Long] costs — the AllDifferent Lagrangian subproblem
- * (#23). Assigns each of [numVars] variables a distinct value from `0 until numValues`, minimizing
+ *. Assigns each of [numVars] variables a distinct value from `0 until numValues`, minimizing
  * the total cost of the chosen `(variable, value)` options, where an option's cost is supplied by
  * [addOption] and absent options are forbidden.
  *

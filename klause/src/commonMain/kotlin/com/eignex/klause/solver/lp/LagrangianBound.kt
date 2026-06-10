@@ -11,7 +11,7 @@ import com.eignex.klause.util.LongArrayList
 import kotlin.math.ceil
 
 /**
- * Subgradient Lagrangian bound for a structured AllDifferent global (#23). For
+ * Subgradient Lagrangian bound for a structured AllDifferent global. For
  * `minimize Σ cᵢ·xᵢ s.t. AllDifferent(V) ∧ (linear linking constraints over V)`, dualize the linking
  * constraints with multipliers λ and keep AllDifferent as the subproblem — which is an exact
  * min-cost assignment ([MinCostAssignment]). For any valid-sign λ,

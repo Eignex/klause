@@ -20,7 +20,7 @@ import com.eignex.klause.util.IntArrayList
 
 /**
  * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
- * back to the CP variable it stands for. The mapping is what lets reduced-cost fixing (#21) turn
+ * back to the CP variable it stands for. The mapping is what lets reduced-cost fixing turn
  * an LP column reduction into a domain reduction on the right `(kind, varId)`.
  *
  * The LP objective is over the column costs only; the true objective is
@@ -35,7 +35,7 @@ internal class LpRelaxation(
     val colIsBool: BooleanArray,
     /** Constant term of the objective, omitted from the LP and re-added to its bound. */
     val objectiveConstant: Long,
-    /** Integer variable id → its LP column, or -1 if none. For separators to write cuts (#22). */
+    /** Integer variable id → its LP column, or -1 if none. For separators to write cuts. */
     val intColOf: IntArray,
     /** Boolean variable id → its LP column, or -1 if none. */
     val boolColOf: IntArray,
@@ -45,7 +45,7 @@ internal class LpRelaxation(
 
 /**
  * Walks [Problem.factors] and emits an [LpModel] relaxation for the LP-emittable factor types,
- * pulling variable bounds live from the current search node (#19).
+ * pulling variable bounds live from the current search node.
  *
  * ## What is encoded
  *  - [Linear]: one row, `LE`/`GE`/`EQ` mapped directly; `NE` is not LP-relaxable and is skipped.
@@ -62,7 +62,7 @@ internal class LpRelaxation(
  *
  * ## What is skipped
  *  Hard globals (AllDifferent, Cumulative, Element, Circuit, …) are not encoded here; they are
- *  handled by cut generation (#22) or Lagrangian relaxation (#23). Unrecognized factors are
+ *  handled by cut generation or Lagrangian relaxation. Unrecognized factors are
  *  silently skipped — a missing constraint only loosens the relaxation, it never makes the bound
  *  unsound.
  *

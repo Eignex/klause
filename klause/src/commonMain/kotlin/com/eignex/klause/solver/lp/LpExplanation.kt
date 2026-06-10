@@ -5,7 +5,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Turns an infeasible LP's Farkas certificate (#247) into a learned-clause nogood over absolute
+ * Turns an infeasible LP's Farkas certificate into a learned-clause nogood over absolute
  * variable-bound atoms. The certificate ([LpSolution.certCols] / [LpSolution.certBoundIsUpper]) names
  * the structural columns whose currently-seated bound is part of the dual ray proving the node LP
  * infeasible. Those bounds, together with the original constraints, admit no point — so the clause
@@ -50,7 +50,7 @@ internal object LpExplanation {
     }
 
     /**
-     * Reason atoms certifying the LP's objective lower bound (#281), for an OPTIMAL solve, or null
+     * Reason atoms certifying the LP's objective lower bound, for an OPTIMAL solve, or null
      * when the solve was not optimal or the certificate touches an auxiliary column. By LP duality the
      * optimum `L = c·x*` is held in place by the nonbasic structural variables seated at a bound with a
      * nonzero reduced cost: relaxing any of those bounds is the only way the objective could fall below
