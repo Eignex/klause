@@ -246,6 +246,15 @@ data class BacktrackParams(
      */
     val lpMir: Boolean = true,
     /**
+     * Warm-start the dual-simplex re-solve in each cut round from the previous round's optimal basis
+     * extended with the new cut rows' slacks (the textbook dual-simplex cut loop), instead of
+     * cold-starting from the all-slack basis. Adding valid cut rows with their slacks basic keeps the
+     * prior basis dual-feasible, so the re-solve resumes near the optimum and converges in a handful
+     * of pivots; a basis that fails to load (a rare singular extension) falls back to a cold start.
+     * The optimum is identical either way — this only changes the pivot path. On by default.
+     */
+    val lpWarmCuts: Boolean = true,
+    /**
      * Genuine subtour-elimination cuts for Circuit globals (#22). When true and [lpBounding] holds,
      * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
      * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
