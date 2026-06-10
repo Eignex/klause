@@ -4,9 +4,9 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
-import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.BanditProbe
 import com.eignex.klause.bench.tools.CblsDiag
 import com.eignex.klause.bench.tools.CpSeedProbe
@@ -85,34 +85,34 @@ object BenchCli {
         val metric = parseMetric(metricName)
         val f = args.drop(1).filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
-        val wantCop = f["kind"]?.let { parseKind(it) }
         if (refs.isEmpty()) {
             println("(no problems matched the selection)")
             return
         }
 
         if (preview) {
-            // `kind` is judged from the resolved objective, so previewing it must resolve the
-            // (already-sampled) selection — exact, at the cost of a resolve.
-            val shown = if (wantCop == null) refs else refs.filter { resolvedIsCop(it) == wantCop }
-            println("=== preview: $metricName over ${shown.size} instance(s) ===")
-            shown.forEach { println("  ${it.name}  [${it.format}/${it.category}]") }
+            println("=== preview: $metricName over ${refs.size} instance(s) ===")
+            refs.forEach { println("  ${it.name}  [${it.format}/${it.category}]") }
             return
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         val reference = f["reference"]?.let { Backend.valueOf(it.uppercase().replace("-", "")) }
         val profile = parseProfile(f)
         println("=== run: $metricName over ${refs.size} instance(s) ===")
-        MetricRunner.run(metric, refs, budget, reference, profile, wantCop)
+        MetricRunner.run(metric, refs, budget, reference, profile)
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
-     *  static-only unless named) → category/tag/name filter → family-aware caps/sampling. The
-     *  `kind=cop|csp` filter is *not* applied here — it needs the resolved objective and runs
-     *  post-resolution (see [adHoc] / [MetricRunner]). */
+     *  static-only unless named) → kind/category/tag/name filter → family-aware caps/sampling.
+     *  `kind=cop|csp` is applied *before* sampling (via [ProblemKind]) so a capped selection
+     *  fills its cap with the requested kind rather than under-filling. */
     private fun select(f: Map<String, String>): List<ProblemRef> {
         var refs: List<ProblemRef> = f["suite"]?.split(",")?.flatMap { expandSuite(it.trim()) }
             ?: Catalog.suites.flatMap { it.problems }
+        f["kind"]?.let { kind ->
+            val wantCop = parseKind(kind)
+            refs = refs.filter { ProblemKind.isCop(it) == wantCop }
+        }
         f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
             refs = refs.filter { it.category in cats }
         }
@@ -141,10 +141,6 @@ object BenchCli {
         "csp", "sat", "satisfaction" -> false
         else -> error("kind must be cop|csp, got '$kind'")
     }
-
-    /** Whether [ref] resolves to a constraint *optimization* problem (objective present) — the
-     *  exact COP/CSP test, used to preview the `kind` filter. */
-    private fun resolvedIsCop(ref: ProblemRef): Boolean = Runners.resolve(ref).objective != null
 
     /** Expand a suite token: `core` → every in-process core suite; otherwise the named suite. */
     private fun expandSuite(token: String): List<ProblemRef> = when (token) {
