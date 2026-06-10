@@ -1,5 +1,9 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.DefinitionalSweep
+import com.eignex.klause.solver.Objective
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SearchEvent
 import kotlin.math.roundToInt
 
 /** Whether the problem is a constraint *optimization* (an objective to minimise) or a pure
@@ -67,12 +71,33 @@ data class PortfolioScenario(
     }
 }
 
-/** A composed-but-not-yet-materialised arm: a reference into one of the two catalogs
- *  ([LocalSearchWorkerConfig] / [BacktrackWorkerConfig]). [PortfolioBuilder] turns each into a
- *  [PortfolioWorker]. */
-internal sealed interface ArmRef {
-    data class Ls(val config: LocalSearchWorkerConfig) : ArmRef
-    data class Bt(val config: BacktrackWorkerConfig) : ArmRef
+/**
+ * A composed-but-not-yet-materialised portfolio arm — one entry of either catalog
+ * ([LocalSearchWorkerConfig] / [BacktrackWorkerConfig]). Each arm knows how to build its own
+ * [PortfolioWorker] over a problem, so [PortfolioBuilder] is a thin `map` and there is no
+ * engine-specific switch: the two engines stay symmetric ("arms in one spot").
+ */
+internal sealed interface WorkerConfig {
+    /** Telemetry id (the catalog label, before the engine prefix is added in [materialize]). */
+    val label: String
+
+    /**
+     * Build the runnable worker. [index] is the arm's position in the pool (offsets the seed and,
+     * for backtrack, numbers the label). [lsObjective]/[linearObjective] are the two objective
+     * representations (#63) — each engine picks its preferred form and falls back to the other.
+     * [lsLambda]/[definitionalSweep] are LS-only (backtrack ignores them). [onEvent] is the shared
+     * [SearchEvent] sink, tagged here with the worker's label.
+     */
+    fun materialize(
+        problem: Problem,
+        index: Int,
+        seed: Long,
+        lsLambda: Double,
+        lsObjective: Objective?,
+        linearObjective: Objective?,
+        definitionalSweep: DefinitionalSweep?,
+        onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    ): PortfolioWorker
 }
 
 /**
@@ -99,7 +124,7 @@ internal object PortfolioComposition {
     }
 
     /** The ordered arm list for [scenario]. */
-    fun compose(scenario: PortfolioScenario): List<ArmRef> {
+    fun compose(scenario: PortfolioScenario): List<WorkerConfig> {
         val count = if (scenario.threads == 1) SEQUENTIAL_POOL_SIZE else scenario.threads
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(count)
@@ -108,17 +133,16 @@ internal object PortfolioComposition {
         }
     }
 
-    private fun lsArms(count: Int): List<ArmRef> = LocalSearchWorkerConfig.diverse(count).map { ArmRef.Ls(it) }
+    private fun lsArms(count: Int): List<WorkerConfig> = LocalSearchWorkerConfig.diverse(count)
 
-    private fun btArms(kind: Kind, count: Int): List<ArmRef> =
-        BacktrackWorkerConfig.diverse(kind, count).map { ArmRef.Bt(it) }
+    private fun btArms(kind: Kind, count: Int): List<WorkerConfig> = BacktrackWorkerConfig.diverse(kind, count)
 
-    private fun mixedArms(kind: Kind, count: Int): List<ArmRef> {
+    private fun mixedArms(kind: Kind, count: Int): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
         // fast first-incumbent engine).
         val lsCount = (count * lsShare(kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
-        val arms = ArrayList<ArmRef>(count)
+        val arms = ArrayList<WorkerConfig>(count)
         arms += lsArms(lsCount)
         if (btCount > 0) arms += btArms(kind, btCount)
         return arms
