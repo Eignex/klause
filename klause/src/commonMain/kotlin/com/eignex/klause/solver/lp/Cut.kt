@@ -46,8 +46,21 @@ internal fun allDifferentGroups(problem: Problem): List<IntArray> {
  * A linear inequality `Σ coeffs[k]·x_{cols[k]} rel rhs` over LP columns, added to the relaxation to
  * cut off a fractional LP point. Columns index the relaxation's structural columns; the cut
  * must be valid — satisfied by every integer-feasible point — so it never removes a real solution.
+ *
+ * [global] says the cut is satisfied by every integer **solution of the problem**, not merely by
+ * the points inside the separating node's box: a cut whose derivation read only factor structure
+ * (knapsack cover, clique, circuit cutset) or unbranched root domains is global; one derived from
+ * live tightened domains (Hall/GCC/assignment sums deeper in the tree, Gomory/MIR tableau cuts) is
+ * not. The flag flows into [LpModel.rowGlobal], which gates whether LP certificates over the
+ * cut-augmented model may be learned. Defaults to `false` — the sound direction.
  */
-internal class Cut(val cols: IntArray, val coeffs: LongArray, val rel: Relation, val rhs: Long) {
+internal class Cut(
+    val cols: IntArray,
+    val coeffs: LongArray,
+    val rel: Relation,
+    val rhs: Long,
+    val global: Boolean = false,
+) {
     /** A stable key for deduplicating cuts across separation rounds (ignores column order). */
     fun key(): String {
         val terms = cols.indices.sortedBy { cols[it] }.joinToString(",") { "${cols[it]}:${coeffs[it]}" }
@@ -70,6 +83,26 @@ internal class CutContext(
  */
 internal interface CutSeparator {
     fun separate(ctx: CutContext): List<Cut>
+}
+
+/** True when every [vars] member's live `[min, max]` equals its declared interval — a bound derived
+ *  from the live intervals is then valid at every solution, not only inside the node's box. */
+private fun liveIntervalsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
+    for (v in vars) {
+        val live = ctx.session.intDomain(v)
+        val declared = ctx.problem.intDomains[v]
+        if (live.min != declared.min || live.max != declared.max) return false
+    }
+    return true
+}
+
+/** Hole-aware version of [liveIntervalsAreDeclared]: the live domain is always a subset of the
+ *  declared one, so equal sizes mean equal value sets. */
+private fun liveDomainsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
+    for (v in vars) {
+        if (ctx.session.intDomain(v).size != ctx.problem.intDomains[v].size) return false
+    }
+    return true
 }
 
 /**
@@ -104,11 +137,16 @@ internal class AllDifferentSeparator : CutSeparator {
             if (!ok) continue
 
             val (minSum, maxSum) = distinctSumBounds(vars, ctx.session)
+            // The Hall bounds read only the live [min, max] intervals, so the cut is global exactly
+            // when those are still the declared intervals (always at the root).
+            val global = liveIntervalsAreDeclared(ctx, vars)
             var lpSum = 0.0
             for (c in cols) lpSum += ctx.solution.primal(c)
             val ones = LongArray(cols.size) { 1L }
-            if (lpSum < minSum - tol) cuts.add(Cut(cols.copyOf(), ones, Relation.GE, minSum))
-            if (lpSum > maxSum + tol) cuts.add(Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, maxSum))
+            if (lpSum < minSum - tol) cuts.add(Cut(cols.copyOf(), ones, Relation.GE, minSum, global))
+            if (lpSum > maxSum + tol) {
+                cuts.add(Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, maxSum, global))
+            }
         }
         return cuts
     }
@@ -196,7 +234,10 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
                 lpLhs += c.toDouble() * ctx.solution.primal(col)
             }
             if (lpLhs < assignmentMin - tol) {
-                cuts.add(Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.GE, assignmentMin))
+                // The assignment enumerated the live value sets hole-aware, so globality needs full
+                // domain equality with the declared sets, not just matching intervals.
+                val global = liveDomainsAreDeclared(ctx, vars)
+                cuts.add(Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.GE, assignmentMin, global))
             }
         }
         return cuts
@@ -275,16 +316,25 @@ internal class GccSeparator : CutSeparator {
             if (!ok) continue
 
             val bounds = sumBounds(factor, xs.size, ctx.session) ?: continue
+            // The greedy distribution reads only the occurrence windows: factor constants make the
+            // cut global outright; count variables make it global while their live intervals are
+            // still the declared ones.
+            val countVars = factor.countVars
+            val global = if (factor.countLow != null && factor.countHigh != null) {
+                true
+            } else {
+                countVars != null && liveIntervalsAreDeclared(ctx, countVars)
+            }
             var lpSum = 0.0
             for (c in cols) lpSum += ctx.solution.primal(c)
             if (lpSum < bounds[0] - tol) {
                 cuts.add(
-                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.GE, bounds[0]),
+                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.GE, bounds[0], global),
                 )
             }
             if (lpSum > bounds[1] + tol) {
                 cuts.add(
-                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, bounds[1]),
+                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, bounds[1], global),
                 )
             }
         }
@@ -407,7 +457,10 @@ internal class KnapsackCoverSeparator : CutSeparator {
             for (t in 0 until cover.size) lhs += xstar[cover[t]]
             if (lhs > cover.size - 1 + tol) {
                 val cutCols = IntArray(cover.size) { cols[cover[it]] }
-                cuts.add(Cut(cutCols, LongArray(cover.size) { 1L }, Relation.LE, (cover.size - 1).toLong()))
+                // A cover is read off the factor's weights and bound alone — global by construction.
+                cuts.add(
+                    Cut(cutCols, LongArray(cover.size) { 1L }, Relation.LE, (cover.size - 1).toLong(), global = true),
+                )
             }
         }
         return cuts
@@ -485,7 +538,8 @@ internal class CliqueCutSeparator : CutSeparator {
             if (lhs <= 1.0 + tol) continue
             val key = cols.sorted().joinToString(",")
             if (!emitted.add(key)) continue
-            cuts.add(Cut(cols, LongArray(cols.size) { 1L }, Relation.LE, 1L))
+            // The conflict graph is read off binary clauses and at-most-one factors — global.
+            cuts.add(Cut(cols, LongArray(cols.size) { 1L }, Relation.LE, 1L, global = true))
         }
         return cuts
     }

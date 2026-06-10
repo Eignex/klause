@@ -121,6 +121,14 @@ class PropagationSession(
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
     val decisionLevel: Int get() = trail.size
 
+    /**
+     * True when bake-time propagation already proved the problem Unsat. The bake fixpoint stops at
+     * the first conflict, so the post-bake domains are then a *partial* propagation state — callers
+     * that read domains without pinning (e.g. the LP rounding probe snapshotting an assignment)
+     * must treat the session as conflicted rather than trust them.
+     */
+    val isUnsatAtRoot: Boolean get() = bakedUnsat != null
+
     /** Cumulative count of factor-forced assignments across this session — backs the
      *  `propagations` solve stat. Monotonic; the engine reads deltas around each pin. */
     val propagationCount: Long get() = state.propagations

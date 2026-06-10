@@ -271,9 +271,20 @@ internal class DualSimplex(private val model: LpModel) {
         return if (d < 0L) -s else s
     }
 
-    /** Solve, optionally warm-starting from [warmBasis]. */
+    /**
+     * Solve, optionally warm-starting from [warmBasis]. A warm basis is a pure speedup, so any
+     * failure to load it — a singular basis, or determinant overflow during the fraction-free
+     * reload (whose pivot order is arbitrary, unlike the ratio-test-guided cold solve) — falls
+     * back to the cold start instead of giving up on the solve.
+     */
     fun solve(warmBasis: Basis? = null): LpSolution {
-        if (warmBasis == null || !loadBasis(warmBasis)) coldStart()
+        val warmed = warmBasis != null &&
+            try {
+                loadBasis(warmBasis)
+            } catch (_: LpOverflowException) {
+                false
+            }
+        if (!warmed) coldStart()
         return runDualSimplex()
     }
 
@@ -600,6 +611,13 @@ internal class DualSimplex(private val model: LpModel) {
      * nonzero row coefficient. Slack columns map to model rows (always present, not branch bounds), so
      * they are not part of the bound reason. Sign of the determinant does not affect which side a
      * column is seated at, so this needs no normalization.
+     *
+     * Keeping the rows implicit is only sound when every row the leaving row combines is globally
+     * valid. Row `i`'s weight in the combination is `(B⁻¹)_{r,i}`, which sits in the tableau as the
+     * leaving row's slack-column entry `N[r][slackCol(i)]/d`; if any row with a nonzero weight is
+     * not [LpModel.rowGlobal] — a live-big-M reified row or a node-local cut — the bound-only
+     * premise set is incomplete outside this node's box, so no certificate is reported (the prune
+     * itself stands; only the learned artifact is withheld).
      */
     private fun infeasibilityCertificate(
         st: LpStatus,
@@ -607,6 +625,11 @@ internal class DualSimplex(private val model: LpModel) {
         belowLower: Boolean,
     ): Pair<IntArray, BooleanArray> {
         if (st != LpStatus.INFEASIBLE || infeasibleRow < 0) return IntArray(0) to BooleanArray(0)
+        for (i in 0 until m) {
+            if (nMat[infeasibleRow][model.slackCol(i)] != 0L && !model.rowGlobal[i]) {
+                return IntArray(0) to BooleanArray(0)
+            }
+        }
         val cols = IntArrayList()
         val upper = ArrayList<Boolean>()
         val lv = basicVar[infeasibleRow]
