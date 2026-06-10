@@ -238,6 +238,14 @@ data class BacktrackParams(
      */
     val lpGomory: Boolean = true,
     /**
+     * Include Gomory mixed-integer (MIR) cuts among the [lpCuts] separators. Derived from the same
+     * tableau rows as [lpGomory] but with the stronger mixed-integer rounding multiplier, so they
+     * dominate the pure-integer cut on rows with fractional nonbasic coefficients. Like [lpGomory]
+     * they need no problem structure and stay exact in the integer tableau. On by default when
+     * [lpCuts] is set.
+     */
+    val lpMir: Boolean = true,
+    /**
      * Genuine subtour-elimination cuts for Circuit globals (#22). When true and [lpBounding] holds,
      * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
      * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
