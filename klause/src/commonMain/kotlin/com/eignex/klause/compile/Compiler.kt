@@ -40,7 +40,6 @@ import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.PseudoBooleanExpr
 import com.eignex.klause.ast.RegularExpr
 import com.eignex.klause.ast.SchemaEntry
-import com.eignex.klause.ast.SearchAnnotation
 import com.eignex.klause.ast.SetDisjoint
 import com.eignex.klause.ast.SetEq
 import com.eignex.klause.ast.SetIn
@@ -171,9 +170,6 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
                     }
 
                     is NamedConstraint -> {}
-
-                    // handled in a second pass once all vars are registered
-                    is SearchAnnotation -> {} // picked up at the end of compile()
                 }
             }
 
@@ -198,10 +194,6 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
                     )
                 }
 
-            // Pick up the last `__search*` annotation in declaration order — schemas may
-            // re-declare to refine an inherited choice.
-            val searchAnnotation = def.entries.entries
-                .lastOrNull { it.value is SearchAnnotation }?.value as? SearchAnnotation
             return CompiledProblem(
                 problem = Problem(
                     numBoolVars = numBoolVars,
@@ -216,7 +208,6 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
                 floatDecoders = floatDecoders.toMap(),
                 setLayouts = setLayouts.toMap(),
                 setNominalLabels = setLabelOrder.toMap(),
-                defaultBacktrackParams = searchAnnotation?.let { searchAnnotationToParams(it) },
             )
         }
 
