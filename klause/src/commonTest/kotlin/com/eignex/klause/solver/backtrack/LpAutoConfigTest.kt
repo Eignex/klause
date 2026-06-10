@@ -81,6 +81,27 @@ class LpAutoConfigTest {
     }
 
     @Test
+    fun `auto-enabled energetic reasoning derives a size-aware cadence`() {
+        fun cumulative(tasks: Int) = Problem(
+            0,
+            tasks,
+            Array(tasks) { IntDomain(0, 5) },
+            arrayOf<Factor>(
+                Cumulative(IntArray(tasks) { it }, IntArray(tasks) { 3 }, IntArray(tasks) { 1 }, capacity = 1),
+            ),
+        )
+        // 27 tasks: ~20k scan ops per check, under the per-check budget — full cadence.
+        assertEquals(1, LpAutoConfig.recommend(cumulative(27)).energeticEvery)
+        // 256 tasks: ~16.7M ops — the cadence normalises it back to the budget.
+        val big = LpAutoConfig.recommend(cumulative(256))
+        assertTrue(big.energeticReasoning)
+        assertEquals(128, big.energeticEvery)
+        // A caller who enabled the check explicitly keeps their cadence untouched.
+        val explicit = LpAutoConfig.recommend(cumulative(256), BacktrackParams(energeticReasoning = true))
+        assertEquals(1, explicit.energeticEvery)
+    }
+
+    @Test
     fun `oversized model declines the lp family but keeps the structure-capped bounds`() {
         // 2000 unit rows over 2000 vars estimate a dense tableau of ~8M cells — past the auto
         // guard — so the LP-relaxation flags stay off; the Lagrangian/energetic bounds (own

@@ -201,7 +201,9 @@ internal class CumulativeEnergeticBound(problem: Problem) {
         return if (m > 0L) m else 0L
     }
 
-    private companion object {
-        const val MAX_TASKS: Int = 256
+    internal companion object {
+        /** Per-factor task cap: factors above it are skipped entirely (and cost nothing — the
+         *  auto-config cadence estimate relies on this). */
+        internal const val MAX_TASKS: Int = 256
     }
 }

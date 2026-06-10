@@ -283,6 +283,7 @@ class BacktrackSolver(override val problem: Problem) :
                 null
             }
             var lpCheckCounter = 0
+            var energeticCheckCounter = 0
             // LP-learned nogoods (#247): infeasible-node Farkas clauses, collected here by the prune
             // closure and flushed into the clause DB at each restart (where they are no longer all-false).
             val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
@@ -307,7 +308,10 @@ class BacktrackSolver(override val problem: Problem) :
                     linearLowerBound(objective, session) >= effectiveBound -> true
 
                     // Energetic-reasoning feasibility: prune if a Cumulative is over-subscribed.
-                    energeticBound != null && energeticBound.isInfeasible(session) -> {
+                    // Gated by the frequency policy — the window scan is O(windows² · tasks) with
+                    // no incremental state, so task-heavy models run it on a cadence.
+                    energeticBound != null && ++energeticCheckCounter % params.energeticEvery == 0 &&
+                        energeticBound.isInfeasible(session) -> {
                         sink.observeEnergeticPrune()
                         if (lpNogoods != null) energeticBound.explain(session)?.let { lpNogoods.add(it) }
                         true
@@ -918,34 +922,44 @@ class BacktrackSolver(override val problem: Problem) :
         // Learnable reasons for each fixing (#282): a fixing of column `col` is justified by the LP's
         // dual decomposition under the OTHER support columns' seated bounds — including the objective
         // variable's own seated bound when it carries a reduced cost — plus the incumbent bound
-        // `objVar ≤ improvingMax`. Expressible only when: there is a single-var minimisation
-        // objective whose live upper bound is already ≤ improvingMax (so the incumbent atom holds);
-        // every row with dual weight is globally valid (the rows stay implicit, see
-        // [LpExplanation]); and no support premise sits on an auxiliary column. Otherwise the
-        // fixings stay reason-less level-local tightenings, which conflict analysis treats as leaves.
+        // `objVar ≤ improvingMax`, plus the recorded validity premises of any non-global row carrying
+        // dual weight (those justify the decomposition itself, so they are never excluded per-column).
+        // Expressible only when: there is a single-var minimisation objective whose live upper bound
+        // is already ≤ improvingMax (so the incumbent atom holds); every dual-weighted non-global row
+        // has recorded premises (see [LpExplanation]); and no support premise sits on an auxiliary
+        // column. Otherwise the fixings stay reason-less level-local tightenings, which conflict
+        // analysis treats as leaves.
         var learn = params.lpLearn && objectiveVar >= 0 && objectiveAscending &&
             improvingMax in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
-            session.intDomain(objectiveVar).max.toLong() <= improvingMax &&
-            (0 until relaxation.model.m).all {
-                solution.dualNumerator[it] == 0L || relaxation.model.rowGlobal[it]
-            }
+            session.intDomain(objectiveVar).max.toLong() <= improvingMax
         val supportCols = IntArrayList()
         val supportLits = IntArrayList()
         if (learn) {
-            for (c in relaxation.colVarId.indices) {
-                if (status[c] == VarStatus.BASIC) continue
-                val dNum = solution.reducedCostNumerator[c]
-                if (dNum == 0L) continue
-                // The premise side follows the reduced cost's sign, not the seat name — a collapsed
-                // (pinned) column's recorded seat is arbitrary. See [LpExplanation.premiseLit].
-                val lit = LpExplanation.premiseLit(relaxation, session, c, lowerSide = dNum > 0L)
-                if (lit == LpExplanation.PREMISE_AUX) {
-                    learn = false
-                    break
+            val seen = HashSet<Int>()
+            val premLits = IntArrayList()
+            if (LpExplanation.addDualRowPremiseLits(premLits, seen, relaxation, solution, session)) {
+                for (k in 0 until premLits.size) {
+                    supportCols.add(-1) // row premise: part of every fixing's reason, never excluded
+                    supportLits.add(premLits[k])
                 }
-                if (lit == LpExplanation.PREMISE_NONE) continue
-                supportCols.add(c)
-                supportLits.add(lit)
+                for (c in relaxation.colVarId.indices) {
+                    if (status[c] == VarStatus.BASIC) continue
+                    val dNum = solution.reducedCostNumerator[c]
+                    if (dNum == 0L) continue
+                    // The premise side follows the reduced cost's sign, not the seat name — a
+                    // collapsed (pinned) column's recorded seat is arbitrary. See
+                    // [LpExplanation.premiseLit].
+                    val lit = LpExplanation.premiseLit(relaxation, session, c, lowerSide = dNum > 0L)
+                    if (lit == LpExplanation.PREMISE_AUX) {
+                        learn = false
+                        break
+                    }
+                    if (lit == LpExplanation.PREMISE_NONE || !seen.add(lit)) continue
+                    supportCols.add(c)
+                    supportLits.add(lit)
+                }
+            } else {
+                learn = false
             }
         }
         val incumbentLit = if (learn) session.boundLeLit(objectiveVar, improvingMax.toInt(), positive = false) else 0

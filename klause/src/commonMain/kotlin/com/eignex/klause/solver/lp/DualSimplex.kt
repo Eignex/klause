@@ -66,6 +66,13 @@ internal class LpSolution(
      */
     val certCols: IntArray = IntArray(0),
     val certBoundIsUpper: BooleanArray = BooleanArray(0),
+    /**
+     * The original-model rows the infeasibility ray combines (nonzero `(B⁻¹)_{r,i}` weight), set
+     * with [certCols]. The certificate keeps these rows implicit, so a consumer turning it into a
+     * learned clause must check each is globally valid — or cite its recorded premises
+     * ([LpModel.rowPremises]) — before keeping the rows silent (see `LpExplanation`).
+     */
+    val certRows: IntArray = IntArray(0),
 ) {
     /** The objective in the model's original sense as a floating value (convenience only). */
     val objectiveValue: Double
@@ -585,7 +592,7 @@ internal class DualSimplex(private val model: LpModel) {
             for (j in redNum.indices) redNum[j] = -redNum[j]
         }
 
-        val (certCols, certUpper) = infeasibilityCertificate(st, infeasibleRow, infeasibleBelowLower)
+        val cert = infeasibilityCertificate(st, infeasibleRow, infeasibleBelowLower)
 
         return LpSolution(
             status = st,
@@ -597,8 +604,9 @@ internal class DualSimplex(private val model: LpModel) {
             basis = Basis(basicVars = basicVar.copyOf(), status = status.copyOf()),
             sense = model.sense,
             pivots = pivots,
-            certCols = certCols,
-            certBoundIsUpper = certUpper,
+            certCols = cert.cols,
+            certBoundIsUpper = cert.boundIsUpper,
+            certRows = cert.rows,
         )
     }
 
@@ -612,23 +620,19 @@ internal class DualSimplex(private val model: LpModel) {
      * they are not part of the bound reason. Sign of the determinant does not affect which side a
      * column is seated at, so this needs no normalization.
      *
-     * Keeping the rows implicit is only sound when every row the leaving row combines is globally
-     * valid. Row `i`'s weight in the combination is `(B⁻¹)_{r,i}`, which sits in the tableau as the
-     * leaving row's slack-column entry `N[r][slackCol(i)]/d`; if any row with a nonzero weight is
-     * not [LpModel.rowGlobal] — a live-big-M reified row or a node-local cut — the bound-only
-     * premise set is incomplete outside this node's box, so no certificate is reported (the prune
-     * itself stands; only the learned artifact is withheld).
+     * Keeping the rows implicit is only sound when every combined row is globally valid (or its
+     * recorded premises are cited alongside). Row `i`'s weight in the combination is `(B⁻¹)_{r,i}`,
+     * which sits in the tableau as the leaving row's slack-column entry `N[r][slackCol(i)]/d`; the
+     * rows with nonzero weight are reported as [LpSolution.certRows] and the expressibility
+     * decision lives with the consumer (`LpExplanation`), which has the premise data.
      */
-    private fun infeasibilityCertificate(
-        st: LpStatus,
-        infeasibleRow: Int,
-        belowLower: Boolean,
-    ): Pair<IntArray, BooleanArray> {
-        if (st != LpStatus.INFEASIBLE || infeasibleRow < 0) return IntArray(0) to BooleanArray(0)
+    private fun infeasibilityCertificate(st: LpStatus, infeasibleRow: Int, belowLower: Boolean): Certificate {
+        if (st != LpStatus.INFEASIBLE || infeasibleRow < 0) {
+            return Certificate(IntArray(0), BooleanArray(0), IntArray(0))
+        }
+        val rows = IntArrayList()
         for (i in 0 until m) {
-            if (nMat[infeasibleRow][model.slackCol(i)] != 0L && !model.rowGlobal[i]) {
-                return IntArray(0) to BooleanArray(0)
-            }
+            if (nMat[infeasibleRow][model.slackCol(i)] != 0L) rows.add(i)
         }
         val cols = IntArrayList()
         val upper = ArrayList<Boolean>()
@@ -644,6 +648,9 @@ internal class DualSimplex(private val model: LpModel) {
             cols.add(j)
             upper.add(status[j] == VarStatus.AT_UPPER)
         }
-        return cols.toIntArray() to BooleanArray(upper.size) { upper[it] }
+        return Certificate(cols.toIntArray(), BooleanArray(upper.size) { upper[it] }, rows.toIntArray())
     }
+
+    /** The Farkas certificate triple; see [infeasibilityCertificate]. */
+    private class Certificate(val cols: IntArray, val boundIsUpper: BooleanArray, val rows: IntArray)
 }

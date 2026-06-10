@@ -308,6 +308,15 @@ data class BacktrackParams(
      */
     val energeticReasoning: Boolean = false,
     /**
+     * Frequency policy for [energeticReasoning]: run the window scan at one in every
+     * [energeticEvery] pruning checks, mirroring [lpBoundEvery]. The scan is O(windows² · tasks)
+     * per Cumulative with no incremental state, so on task-heavy models it dominates a node's
+     * cost; a cadence trades missed prunes for throughput. `1` (default) checks at every pruned
+     * node. [LpAutoConfig] derives a size-aware cadence from the task counts when *it* enables
+     * the check. Must be positive.
+     */
+    val energeticEvery: Int = 1,
+    /**
      * Learn a clause from an infeasible node (#247). When true, an infeasibility proof is turned into
      * a nogood over absolute variable-bound atoms — a globally valid clause implied by the original
      * constraints — and registered at the next restart (where its literals are no longer all-false),
@@ -315,10 +324,10 @@ data class BacktrackParams(
      * infeasibility certificate (requires [lpBounding]) and the energetic over-subscription window
      * (requires [energeticReasoning]). When the certificate resolves to an asserting 1UIP clause the
      * engine backjumps and learns immediately (#280), so this now helps even with restarts off;
-     * non-asserting certificates still fall back to restart-time registration. A certificate that
-     * leans on a node-local LP row (a live-big-M reified row, a local cut) is not expressible as a
-     * globally valid bound-atom clause and is withheld — the prune itself still happens. Off by
-     * default.
+     * non-asserting certificates still fall back to restart-time registration. A certificate
+     * leaning on a live-big-M reified row cites the bounds that justify the M alongside its column
+     * seats; one leaning on a node-local cut is not expressible as a globally valid bound-atom
+     * clause and is withheld — the prune itself still happens. Off by default.
      */
     val lpLearn: Boolean = false,
     /**

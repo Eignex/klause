@@ -6,6 +6,17 @@ import com.eignex.klause.util.LongArrayList
 /** Constraint relation for a row added to the builder, before normalization to `<=` form. */
 internal enum class Relation { LE, GE, EQ }
 
+/**
+ * The live variable bounds a non-global row's validity rests on — the premises an LP certificate
+ * must cite alongside its column seats when the row carries dual weight (see [LpModel.rowGlobal]).
+ * The canonical producer is a live-big-M `ReifiedLinear` row: its relaxed face spans the *live*
+ * range of the linear form, so the row holds wherever each variable respects the live bound that
+ * entered the M — exactly the `(variable, side, threshold)` triples recorded here. Only bounds
+ * tighter than the declared ones are recorded (a declared bound holds everywhere). Parallel
+ * arrays: premise `k` is `x_{vars[k]} ≤ thresholds[k]` when `isUpper[k]`, else `≥`.
+ */
+internal class LpRowPremises(val vars: IntArray, val isUpper: BooleanArray, val thresholds: IntArray)
+
 /** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
 internal enum class Sense { MINIMIZE, MAXIMIZE }
 
@@ -68,6 +79,13 @@ internal class LpModel(
      * row their dual certificate leans on is globally valid; this array is what they check.
      */
     val rowGlobal: BooleanArray = BooleanArray(m) { true },
+    /**
+     * Per-row citation fallback for non-global rows: the live bounds whose atoms make row `i`
+     * valid ([LpRowPremises]), or null when the row's validity is not expressible as bound atoms
+     * (locally separated and Gomory/MIR cuts) — a certificate leaning on such a row is withheld.
+     * Always null where [rowGlobal] is true.
+     */
+    val rowPremises: Array<LpRowPremises?> = arrayOfNulls(m),
 ) {
     /** Total variable count: structural plus slack. */
     val numVars: Int get() = n + m
@@ -98,6 +116,7 @@ internal class LpBuilder {
         val rel: Relation,
         val rhs: Long,
         val global: Boolean,
+        val premises: LpRowPremises?,
     )
 
     private val rows = ArrayList<RawRow>()
@@ -124,11 +143,19 @@ internal class LpBuilder {
      * returned by [addVar]; absent columns are zero, repeated columns are summed. The arrays are
      * copied, so the caller may reuse its buffers. [global] records whether the row holds at every
      * integer solution of the original problem (see [LpModel.rowGlobal]); pass `false` for rows
-     * built from live, branch-tightened information.
+     * built from live, branch-tightened information — with [premises] naming the live bounds that
+     * justify the row when they are expressible (see [LpRowPremises]).
      */
-    fun addRow(cols: IntArray, vals: LongArray, rel: Relation, rhs: Long, global: Boolean = true) {
+    fun addRow(
+        cols: IntArray,
+        vals: LongArray,
+        rel: Relation,
+        rhs: Long,
+        global: Boolean = true,
+        premises: LpRowPremises? = null,
+    ) {
         require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
-        rows.add(RawRow(cols.copyOf(), vals.copyOf(), rel, rhs, global))
+        rows.add(RawRow(cols.copyOf(), vals.copyOf(), rel, rhs, global, premises))
     }
 
     /** Convenience overload for sparse maps (test call sites); unpacks into parallel arrays. */
@@ -141,7 +168,7 @@ internal class LpBuilder {
             vals[k] = c
             k++
         }
-        rows.add(RawRow(cols, vals, rel, rhs, global = true))
+        rows.add(RawRow(cols, vals, rel, rhs, global = true, premises = null))
     }
 
     /**
@@ -196,6 +223,7 @@ internal class LpBuilder {
             upper = upper, hasUpper = hasUpper, loShift = loShift,
             objConstant = objConstant, sense = sense, tag = IntArray(n) { tags[it] },
             rowGlobal = BooleanArray(m) { rows[it].global },
+            rowPremises = Array(m) { rows[it].premises },
         )
     }
 }

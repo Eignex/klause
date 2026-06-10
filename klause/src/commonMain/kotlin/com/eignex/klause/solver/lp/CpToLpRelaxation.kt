@@ -163,6 +163,7 @@ internal class CpToLpRelaxation(
             rel: Relation,
             rhs: Long,
             global: Boolean = true,
+            premises: LpRowPremises? = null,
         ) {
             val extra = if (auxCol >= 0) 1 else 0
             val cols = IntArray(vars.size + extra)
@@ -175,7 +176,7 @@ internal class CpToLpRelaxation(
                 cols[vars.size] = auxCol
                 vals[vars.size] = auxCoeff
             }
-            builder.addRow(cols, vals, rel, rhs, global)
+            builder.addRow(cols, vals, rel, rhs, global, premises)
         }
 
         /**
@@ -214,7 +215,11 @@ internal class CpToLpRelaxation(
          * A live big-M bakes branch-tightened bounds into the row's constants, so the row only holds
          * inside the node's box. Each row is therefore marked global exactly when its M equals the
          * M the *declared* range `[lMinD, lMaxD]` would give — then the relaxed face spans the whole
-         * declared box and the row holds at every solution (see [LpModel.rowGlobal]).
+         * declared box and the row holds at every solution (see [LpModel.rowGlobal]). A non-global
+         * row records the live bounds its M rests on as [LpRowPremises] — the lMax-side rows cite
+         * each variable's M-relevant live bound (`≤ max` for positive coefficients, `≥ min` for
+         * negative; mirrored for lMin-side rows) — so a certificate that leans on the row can cite
+         * those atoms instead of being withheld (see [LpExplanation]).
          */
         private fun reifiedRows(rl: ReifiedLinear) {
             var lMin = 0L
@@ -242,36 +247,95 @@ internal class CpToLpRelaxation(
             val boundUp = addExact(bound, 1L) // L ≥ bound + 1 is the integer negation of L ≤ bound
             val boundDown = subExact(bound, 1L)
 
-            fun row(auxCoeff: Long, rel: Relation, rhs: Long, global: Boolean) =
-                addIntRow(rl.vars, rl.coeffs, a, auxCoeff, rel, rhs, global)
+            // The live bounds the lMax side (maxSide = true) or lMin side of the M rests on; only
+            // bounds tighter than declared are cited (the rest hold everywhere).
+            fun sidePremises(maxSide: Boolean): LpRowPremises {
+                val pv = IntArrayList()
+                val pt = IntArrayList()
+                val pu = ArrayList<Boolean>()
+                for (k in rl.vars.indices) {
+                    val c = rl.coeffs[k]
+                    if (c == 0) continue
+                    val v = rl.vars[k]
+                    val dom = session.intDomain(v)
+                    val dec = problem.intDomains[v]
+                    if ((c >= 0) == maxSide) {
+                        if (dom.max != dec.max) {
+                            pv.add(v)
+                            pu.add(true)
+                            pt.add(dom.max)
+                        }
+                    } else if (dom.min != dec.min) {
+                        pv.add(v)
+                        pu.add(false)
+                        pt.add(dom.min)
+                    }
+                }
+                return LpRowPremises(pv.toIntArray(), BooleanArray(pu.size) { pu[it] }, pt.toIntArray())
+            }
+
+            fun row(auxCoeff: Long, rel: Relation, rhs: Long, global: Boolean, maxSide: Boolean) = addIntRow(
+                rl.vars,
+                rl.coeffs,
+                a,
+                auxCoeff,
+                rel,
+                rhs,
+                global,
+                premises = if (global) null else sidePremises(maxSide),
+            )
 
             when (rl.op) {
                 LinearOp.LE -> {
                     val m1 = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    row(m1, Relation.LE, addExact(bound, m1), m1 == maxOf(0L, subExact(lMaxD, bound)))
+                    row(m1, Relation.LE, addExact(bound, m1), m1 == maxOf(0L, subExact(lMaxD, bound)), maxSide = true)
                     val m2 = maxOf(0L, subExact(boundUp, lMin)) // aux=0 ⇒ L ≥ bound+1
-                    row(m2, Relation.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)))
+                    row(m2, Relation.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)), maxSide = false)
                 }
 
                 LinearOp.GE -> {
                     val m1 = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
-                    row(-m1, Relation.GE, subExact(bound, m1), m1 == maxOf(0L, subExact(bound, lMinD)))
+                    row(
+                        -m1,
+                        Relation.GE,
+                        subExact(bound, m1),
+                        m1 == maxOf(0L, subExact(bound, lMinD)),
+                        maxSide = false,
+                    )
                     val m2 = maxOf(0L, subExact(lMax, boundDown)) // aux=0 ⇒ L ≤ bound-1
-                    row(-m2, Relation.LE, boundDown, m2 == maxOf(0L, subExact(lMaxD, boundDown)))
+                    row(
+                        -m2,
+                        Relation.LE,
+                        boundDown,
+                        m2 == maxOf(0L, subExact(lMaxD, boundDown)),
+                        maxSide = true,
+                    )
                 }
 
                 LinearOp.EQ -> {
                     val mHi = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    row(mHi, Relation.LE, addExact(bound, mHi), mHi == maxOf(0L, subExact(lMaxD, bound)))
+                    row(
+                        mHi,
+                        Relation.LE,
+                        addExact(bound, mHi),
+                        mHi == maxOf(0L, subExact(lMaxD, bound)),
+                        maxSide = true,
+                    )
                     val mLo = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
-                    row(-mLo, Relation.GE, subExact(bound, mLo), mLo == maxOf(0L, subExact(bound, lMinD)))
+                    row(
+                        -mLo,
+                        Relation.GE,
+                        subExact(bound, mLo),
+                        mLo == maxOf(0L, subExact(bound, lMinD)),
+                        maxSide = false,
+                    )
                 }
 
                 LinearOp.NE -> {
                     val mHi = maxOf(0L, subExact(lMax, bound)) // aux=0 ⇒ L ≤ bound
-                    row(-mHi, Relation.LE, bound, mHi == maxOf(0L, subExact(lMaxD, bound)))
+                    row(-mHi, Relation.LE, bound, mHi == maxOf(0L, subExact(lMaxD, bound)), maxSide = true)
                     val mLo = maxOf(0L, subExact(bound, lMin)) // aux=0 ⇒ L ≥ bound
-                    row(mLo, Relation.GE, bound, mLo == maxOf(0L, subExact(bound, lMinD)))
+                    row(mLo, Relation.GE, bound, mLo == maxOf(0L, subExact(bound, lMinD)), maxSide = false)
                 }
             }
         }
