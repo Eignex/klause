@@ -6,8 +6,11 @@ import com.eignex.klause.bench.report.markdown
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.Backend
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
-import com.eignex.klause.portfolio.PortfolioSpec
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Objective
@@ -288,14 +291,36 @@ internal object AnytimeMetric {
         // Per-worker objectives (#63): the LS workers descend the functional/gradient objective
         // (klauseObj), the backtrack workers bound the linear one (linearObj). A mixed pool no
         // longer collapses the LS workers onto the linear objective and loses the gradient.
-        val portfolio = PortfolioBuilder.build(
-            entry.problem,
-            PortfolioSpec(localSearchWorkers = ls, backtrackWorkers = bt, seed = 1L, lsConfigLabels = configsProp),
-            lsObjective = klauseObj,
-            linearObjective = linearObj,
-            definitionalSweep = entry.definitionalSweep,
-            onEvent = onEvent?.let { sink -> { _, e -> sink(e) } },
-        )
+        val portfolioEvent: (worker: String, event: SearchEvent) -> Unit = { _, e -> onEvent?.invoke(e) }
+        val workers = if (configsProp != null) {
+            // Explicit config mix (the campaign override).
+            PortfolioBuilder.buildExplicit(
+                entry.problem,
+                lsLabels = configsProp,
+                backtrackWorkers = bt,
+                kind = Kind.COP,
+                seed = 1L,
+                lsObjective = klauseObj,
+                linearObjective = linearObj,
+                definitionalSweep = entry.definitionalSweep,
+                onEvent = if (onEvent != null) portfolioEvent else null,
+            )
+        } else {
+            PortfolioBuilder.build(
+                entry.problem,
+                PortfolioScenario.parallel(
+                    threads = ls + bt,
+                    kind = Kind.COP,
+                    engine = if (bt > 0) EngineMix.MIXED else EngineMix.LOCAL_SEARCH,
+                    seed = 1L,
+                ),
+                lsObjective = klauseObj,
+                linearObjective = linearObj,
+                definitionalSweep = entry.definitionalSweep,
+                onEvent = if (onEvent != null) portfolioEvent else null,
+            )
+        }
+        val portfolio = Portfolio(workers)
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         val cancel = Cancellation { System.currentTimeMillis() > deadline }
         val queue = LinkedBlockingQueue<Any>()

@@ -3,8 +3,10 @@ package com.eignex.klause.bench.tools
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
-import com.eignex.klause.portfolio.PortfolioSpec
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
@@ -68,8 +70,14 @@ internal object BanditProbe {
                     )
                 },
             )
-            report("  seq-mixed     ", runSequential(program, obj, budget, PortfolioSpec.mixed()))
-            report("  seq-backtrack ", runSequential(program, obj, budget, PortfolioSpec.backtrackOnly()))
+            report(
+                "  seq-mixed     ",
+                runSequential(program, obj, budget, PortfolioScenario.sequential(Kind.COP, EngineMix.MIXED)),
+            )
+            report(
+                "  seq-backtrack ",
+                runSequential(program, obj, budget, PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK)),
+            )
         }
     }
 
@@ -106,19 +114,24 @@ internal object BanditProbe {
         return Run(firstMs, valueOf(r), bestMs, r.stats.nodes.sum.toLong())
     }
 
-    private fun runSequential(program: FlatZincProgram, obj: Objective, budget: Long, spec: PortfolioSpec): Run {
+    private fun runSequential(
+        program: FlatZincProgram,
+        obj: Objective,
+        budget: Long,
+        scenario: PortfolioScenario,
+    ): Run {
         val t0 = System.currentTimeMillis()
         val deadline = t0 + budget
         var firstMs: Long? = null
         var bestMs: Long? = null
-        val portfolio = PortfolioBuilder.build(
+        val workers = PortfolioBuilder.build(
             program.problem,
-            spec,
+            scenario,
             lsObjective = program.lsObjective ?: obj,
             linearObjective = obj,
             definitionalSweep = program.definitionalSweep,
         )
-        val seq = SequentialPortfolio.exp3(portfolio.workers)
+        val seq = SequentialPortfolio.exp3(workers)
         val r = seq.use {
             it.minimize(Cancellation { System.currentTimeMillis() > deadline }) {
                 val now = System.currentTimeMillis() - t0
