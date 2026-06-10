@@ -39,7 +39,9 @@ internal data class BacktrackWorkerConfig(
 ) : WorkerConfig {
 
     /** Build a backtrack worker: fresh [BacktrackSolver] session + params from [build], bound-pruning
-     *  on the shared incumbent when an objective is present. LS-only knobs ([lsLambda],
+     *  on the shared incumbent when an objective is present, and a per-arm [PoolClauseExchange] when
+     *  [clausePool] is supplied (cross-arm learned-clause sharing — the lp arm's globally valid
+     *  Farkas nogoods travel through it like any other glue clause). LS-only knobs ([lsLambda],
      *  [lsObjective], [definitionalSweep]) are ignored. The label is `backtrack#<index>`. */
     override fun materialize(
         problem: Problem,
@@ -50,10 +52,12 @@ internal data class BacktrackWorkerConfig(
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        clausePool: SharedClausePool?,
     ): PortfolioWorker {
         val workerLabel = "backtrack#$index"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
-        val params = build(seed + 1000L + index, workerEvent)
+        var params = build(seed + 1000L + index, workerEvent)
+        if (clausePool != null) params = params.copy(clauseExchange = PoolClauseExchange(clausePool))
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
             if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null

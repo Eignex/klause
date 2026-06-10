@@ -83,6 +83,7 @@ internal data class LocalSearchWorkerConfig(
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        clausePool: SharedClausePool?, // ignored: local search neither learns nor consumes clauses
     ): PortfolioWorker {
         val session = LocalSearchSolver(
             problem,

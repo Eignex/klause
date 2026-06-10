@@ -88,7 +88,8 @@ internal sealed interface WorkerConfig {
      * optimising worker minimises; [lsObjective] is the optional LS gradient view of the same
      * objective (backtrack ignores it). [lsLambda]/[definitionalSweep] are LS-only (backtrack
      * ignores them). [onEvent] is the shared [SearchEvent] sink, tagged here with the worker's
-     * label.
+     * label. [clausePool], when non-null, wires a cross-arm clause exchange (backtrack arms only;
+     * LS ignores it).
      */
     fun materialize(
         problem: Problem,
@@ -99,6 +100,7 @@ internal sealed interface WorkerConfig {
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        clausePool: SharedClausePool?,
     ): PortfolioWorker
 }
 
