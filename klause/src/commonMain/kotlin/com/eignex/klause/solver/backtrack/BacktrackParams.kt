@@ -223,6 +223,15 @@ data class BacktrackParams(
      */
     val lpRootCutRounds: Int = 16,
     /**
+     * Persistent global cut pool (#285). When true (and [lpCuts]), the structural separators are run
+     * once at the root and the cuts they find are cached and re-added to every node's relaxation,
+     * instead of being re-separated per node. These cuts are computed from the root (= declared)
+     * domains and problem structure, so they are globally valid — a root Hall/cover/assignment/subtour
+     * cut stays a valid (if weaker) bound at every tighter descendant. Gives a cheap baseline
+     * strengthening at every node on top of per-node separation. Off by default.
+     */
+    val lpCutPool: Boolean = false,
+    /**
      * Include Gomory integrality cuts among the [lpCuts] separators. These come from the simplex
      * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
      * tableau makes them numerically clean. On by default when [lpCuts] is set.
