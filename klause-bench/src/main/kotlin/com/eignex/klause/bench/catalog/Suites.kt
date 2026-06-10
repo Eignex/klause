@@ -524,10 +524,12 @@ internal object ExternalCollections {
 
     val all = listOf(minizincBenchmarks, libminizincTests, hakank, satlibUf20, satlibUuf50)
 
-    // --- XCSP3 competition library (per-year instance archives, xcsp.org / CRIL) ---
+    // --- XCSP3 competition library (instance archives, xcsp.org / CRIL) ---
     // Instances ship as individually `.xml.lzma`-compressed files inside each zip; the
-    // coverage tool decompresses them on the fly. The per-year archives 2017–2025 (no
-    // competition in 2020–2021) constitute the complete competition instance set.
+    // coverage tool decompresses them on the fly. Per-year full archives cover 2017–2019 (no
+    // competition in 2020–2021); the 2022–2025 range is taken from the two curated main-track
+    // aggregates published at xcsp.org/instances (COP22to25, CSP22to25) rather than the
+    // overlapping per-year archives — same range, deduplicated to the CSP/COP tracks klause targets.
     private fun xcsp(year: Int, mb: Int) = ExternalCollection(
         id = "xcsp3-$year",
         url = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP${year % 100}.zip",
@@ -535,14 +537,22 @@ internal object ExternalCollections {
         reason = "${mb}MB competition archive; fetched rather than vendored",
         fetch = FetchMethod.Zip,
     )
+
+    /** A curated main-track aggregate spanning the 2022–2025 competitions, published at
+     *  xcsp.org/instances: `COP22to25` (1000 COP instances) and `CSP22to25` (800 CSP). */
+    private fun xcspAggregate(track: String, count: Int) = ExternalCollection(
+        id = "xcsp3-${track.lowercase()}-22to25",
+        url = "https://www.cril.univ-artois.fr/~lecoutre/compets/${track}22to25.zip",
+        license = "XCSP3 competition (academic benchmarks)",
+        reason = "$count main-track $track instances (2022–2025 aggregate); fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
     val xcsp3Competition = listOf(
         xcsp(2017, 102),
         xcsp(2018, 69),
         xcsp(2019, 136),
-        xcsp(2022, 103),
-        xcsp(2023, 86),
-        xcsp(2024, 63),
-        xcsp(2025, 31),
+        xcspAggregate("COP", 1000),
+        xcspAggregate("CSP", 800),
     )
 
     /** SMT-LIB QF_LIA non-incremental benchmark set (official CLC repository). */
