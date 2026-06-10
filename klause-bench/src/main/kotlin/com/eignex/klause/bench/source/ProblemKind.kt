@@ -34,9 +34,14 @@ internal object ProblemKind {
         }
     }
 
-    /** A `solve minimize|maximize …;` item, ignoring `%` line comments (MiniZinc/FlatZinc). */
-    private fun hasSolveObjective(text: String): Boolean =
-        text.lineSequence().map { it.substringBefore('%') }.any { SOLVE_OBJECTIVE.containsMatchIn(it) }
+    /** A `solve minimize|maximize …;` item, ignoring `%` line comments (MiniZinc/FlatZinc). The
+     *  solve item routinely spans multiple lines — `solve :: int_search(…) \n minimize obj;` — so
+     *  the match runs over the comment-stripped text *joined back together*, not line by line
+     *  (the regex's `[^;]*` already spans newlines and stops at the item's terminating `;`). */
+    internal fun hasSolveObjective(text: String): Boolean {
+        val stripped = text.lineSequence().joinToString("\n") { it.substringBefore('%') }
+        return SOLVE_OBJECTIVE.containsMatchIn(stripped)
+    }
 
     private val SOLVE_OBJECTIVE = Regex("""\bsolve\b[^;]*\b(?:minimize|maximize)\b""")
     private val OPB_OBJECTIVE = Regex("""(?m)^\s*(?:min|max):""")
