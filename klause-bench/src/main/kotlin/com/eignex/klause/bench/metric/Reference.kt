@@ -24,13 +24,17 @@ internal interface Reference {
     val name: String
 
     /** [search]: annotation-derived klause search params for fixed-track comparisons —
-     *  references that can mirror the prescribed search (Choco) apply it; others ignore it. */
-    fun solve(problem: Problem, budget: Budget, search: BacktrackParams? = null): SolveResult
+     *  references that can mirror the prescribed search (Choco) apply it; others ignore it.
+     *  [processors]: parallel-search width — the same `processors=` that drives klause, so a
+     *  track is faithful end-to-end (Choco races that many diversified copies; Yuck/OR-Tools,
+     *  single-process, ignore it). */
+    fun solve(problem: Problem, budget: Budget, search: BacktrackParams? = null, processors: Int = 1): SolveResult
     fun minimize(
         problem: Problem,
         objective: LinearObjective,
         budget: Budget,
         search: BacktrackParams? = null,
+        processors: Int = 1,
     ): MinimizeResult
 
     /** Anytime incumbent stream for the anytime metric. OR-Tools yields each new incumbent
@@ -61,21 +65,20 @@ internal interface Reference {
 private object ChocoReference : Reference {
     override val name = "choco"
 
-    // -Dklause.bench.choco.workers=n races n diversified model copies via Choco's
-    // ParallelPortfolio — the track-honest reference when klause runs a multi-worker
-    // portfolio on the same core budget. Default 1 = the classic sequential reference.
-    private val workers = System.getProperty("klause.bench.choco.workers")?.toIntOrNull() ?: 1
-
-    // -Dklause.bench.choco.lcg=true builds the reference with Choco's lazy-clause-generation
-    // engine — the Choco CP-SAT competition entry's architecture, the architecture-matched
-    // rival for klause on the fixed track.
-    private val lcg = System.getProperty("klause.bench.choco.lcg")?.toBoolean() ?: false
-    private fun params(b: Budget, search: BacktrackParams? = null) =
-        ChocoParams(b.timeoutMillis, workers = workers, fixedSearch = search, lcg = lcg)
-    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
-        ChocoSolver(problem).solve(params(budget, search))
-    override fun minimize(problem: Problem, objective: LinearObjective, budget: Budget, search: BacktrackParams?) =
-        ChocoSolver(problem).minimize(objective, params(budget, search))
+    // Choco is always the CP-SAT (lazy-clause-generation) engine — see ChocoModel.build, no toggle —
+    // and its parallel width is the track's `processors` (Choco races that many diversified copies via
+    // ParallelPortfolio), so the reference matches klause's compute budget without a separate knob.
+    private fun params(b: Budget, search: BacktrackParams? = null, processors: Int = 1) =
+        ChocoParams(b.timeoutMillis, workers = processors, fixedSearch = search)
+    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?, processors: Int) =
+        ChocoSolver(problem).solve(params(budget, search, processors))
+    override fun minimize(
+        problem: Problem,
+        objective: LinearObjective,
+        budget: Budget,
+        search: BacktrackParams?,
+        processors: Int,
+    ) = ChocoSolver(problem).minimize(objective, params(budget, search, processors))
     override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
         ChocoSolver(problem).improvements(objective, params(budget))
 }
@@ -86,10 +89,15 @@ private object ChocoReference : Reference {
 private object YuckReference : Reference {
     override val name = "yuck"
     private fun params(b: Budget) = YuckParams(timeoutMillis = b.timeoutMillis)
-    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
+    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?, processors: Int) =
         YuckSolver(problem).solve(params(budget))
-    override fun minimize(problem: Problem, objective: LinearObjective, budget: Budget, search: BacktrackParams?) =
-        YuckSolver(problem).minimize(objective, params(budget))
+    override fun minimize(
+        problem: Problem,
+        objective: LinearObjective,
+        budget: Budget,
+        search: BacktrackParams?,
+        processors: Int,
+    ) = YuckSolver(problem).minimize(objective, params(budget))
     override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
         YuckSolver(problem).improvements(objective, params(budget))
 }
@@ -97,10 +105,15 @@ private object YuckReference : Reference {
 private object OrToolsReference : Reference {
     override val name = "ortools"
     private fun params(b: Budget) = OrToolsParams(timeoutMillis = b.timeoutMillis)
-    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?) =
+    override fun solve(problem: Problem, budget: Budget, search: BacktrackParams?, processors: Int) =
         OrToolsSolver(problem).solve(params(budget))
-    override fun minimize(problem: Problem, objective: LinearObjective, budget: Budget, search: BacktrackParams?) =
-        OrToolsSolver(problem).minimize(objective, params(budget))
+    override fun minimize(
+        problem: Problem,
+        objective: LinearObjective,
+        budget: Budget,
+        search: BacktrackParams?,
+        processors: Int,
+    ) = OrToolsSolver(problem).minimize(objective, params(budget))
     override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
         OrToolsSolver(problem).improvements(objective, params(budget))
 }
