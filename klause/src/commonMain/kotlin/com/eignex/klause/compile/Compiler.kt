@@ -508,7 +508,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
 
     // Construction-time SAC probes are resolved from the presolve config (solution-preserving, so
     // intent-independent — resolved under EMPTY). Holes imply bounds.
-    val presolve = config.presolve
+    val presolve = config.presolveConfig()
     val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
     return CompiledProblem(
         problem = Problem(
