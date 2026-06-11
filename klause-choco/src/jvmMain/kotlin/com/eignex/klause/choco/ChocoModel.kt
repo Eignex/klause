@@ -35,6 +35,7 @@ import org.chocosolver.solver.Model
 import org.chocosolver.solver.SettingsBuilder
 import org.chocosolver.solver.constraints.extension.Tuples
 import org.chocosolver.solver.constraints.nary.automata.FA.FiniteAutomaton
+import org.chocosolver.solver.exception.SolverException
 import org.chocosolver.solver.variables.BoolVar
 import org.chocosolver.solver.variables.IntVar
 import org.chocosolver.solver.variables.Task
@@ -373,11 +374,40 @@ class ChocoModel private constructor(
          *  rather than enumerated bitsets, which Choco rejects past a few tens of thousands. */
         private const val MAX_ENUMERATED_SPAN = 1 shl 16
 
-        /** Translate [problem] into a [ChocoModel] by posting every factor as a Choco constraint. */
-        fun build(problem: Problem, lcg: Boolean = false): ChocoModel {
-            // lcg = Choco's lazy-clause-generation engine (the "Choco CP-SAT" competition
-            // entry's architecture): bound/value literals + clause learning instead of the
-            // classic CP kernel. The architecture-matched reference for klause.
+        /**
+         * Translate [problem] into a [ChocoModel] by posting every factor as a Choco constraint.
+         *
+         * Always prefers Choco's lazy-clause-generation engine (the "Choco CP-SAT" competition
+         * entry's architecture: bound/value literals + clause learning) — the architecture-matched,
+         * strong reference for klause; there is no manual switch to the weak classic kernel (running
+         * it by accident silently degrades every comparison). LCG can't post a few global constraints
+         * (`keySort`/`regular`/`inverse`/…), so when Choco rejects one this **auto-falls back to the
+         * classic kernel for that one model, logged to stderr** — LCG everywhere it works, classic only
+         * where Choco forces it, never silent.
+         */
+        fun build(problem: Problem): ChocoModel {
+            // Some globals can't run under LCG — either Choco rejects them at post time
+            // ("not supported in LCG mode") or LCG's propagator yields an invalid solution at
+            // solve time (inverseChanneling). The latter can't be caught at build time, so screen
+            // for the known-incompatible factors up front and use the classic kernel for those models.
+            if (problem.factors.any { it is Inverse || it is Sort || it is Regular }) {
+                logClassicFallback("a global with no sound LCG propagator (inverse/sort/regular)")
+                return buildWith(problem, lcg = false)
+            }
+            return try {
+                buildWith(problem, lcg = true)
+            } catch (e: SolverException) {
+                if (e.message?.contains("not supported in LCG mode") != true) throw e
+                logClassicFallback(e.message?.substringBefore(" constraint") ?: "an unsupported constraint")
+                buildWith(problem, lcg = false)
+            }
+        }
+
+        private fun logClassicFallback(reason: String) {
+            System.err.println("% choco: $reason not in LCG — using the classic kernel for this model")
+        }
+
+        private fun buildWith(problem: Problem, lcg: Boolean): ChocoModel {
             val model = if (lcg) {
                 Model("klause-choco", SettingsBuilder().setLCG(true).build())
             } else {

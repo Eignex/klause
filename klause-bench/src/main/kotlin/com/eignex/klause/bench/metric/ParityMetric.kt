@@ -173,6 +173,10 @@ internal object ParityMetric {
      *  uses its own default search. */
     private fun referenceSearch(entry: ResolvedProblem, fixed: Boolean) = if (fixed) entry.searchParams else null
 
+    /** Reference parallel width per track: the fixed track is single-thread (follow the annotation),
+     *  so Choco runs 1 worker; every other track matches klause's `processors`. Open ≡ parallel here. */
+    private fun refProcessors(fixed: Boolean, processors: Int) = if (fixed) 1 else processors
+
     private fun satisfyRow(
         entry: ResolvedProblem,
         budget: Budget,
@@ -187,7 +191,8 @@ internal object ParityMetric {
         val refFeas = if (cached != null) {
             cached.feasible
         } else {
-            runCatching { feasibility(ref.solve(entry.problem, budget, referenceSearch(entry, fixed))) }
+            val rp = refProcessors(fixed, processors)
+            runCatching { feasibility(ref.solve(entry.problem, budget, referenceSearch(entry, fixed), rp)) }
                 .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
         }
         val exp = expectedFeasible(entry.ref.expected)
@@ -220,7 +225,13 @@ internal object ParityMetric {
             refDisplay = cached.display
         } else {
             val refRes = runCatching {
-                ref.minimize(entry.problem, obj, budget, referenceSearch(entry, fixed))
+                ref.minimize(
+                    entry.problem,
+                    obj,
+                    budget,
+                    referenceSearch(entry, fixed),
+                    refProcessors(fixed, processors),
+                )
             }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
             cv = refRes.objectiveValue
             refDisplay = optStr(refRes)
@@ -279,7 +290,7 @@ internal object ParityMetric {
         val c = runCatching {
             ChocoSolver(entry.problem).minimizeTimed(
                 obj as LinearObjective,
-                ChocoParams(budget.timeoutMillis, lcg = true), // default search; see note above
+                ChocoParams(budget.timeoutMillis), // default search; see note above
             )
         }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", Reference.of(Backend.CHOCO), it) }
         val cv = c.value
@@ -337,7 +348,7 @@ internal object ParityMetric {
         runCatching {
             ChocoSolver(entry.problem).minimizeTimed(
                 obj,
-                ChocoParams(warmMs, lcg = true),
+                ChocoParams(warmMs),
             )
         }
     }
