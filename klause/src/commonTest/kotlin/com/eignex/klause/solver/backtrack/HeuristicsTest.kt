@@ -45,7 +45,7 @@ class HeuristicsTest {
     }
 
     @Test
-    fun `indomain_median is the middle by position - distinct from indomain_middle (mean of bounds)`() {
+    fun `indomain_median is the middle by position - distinct from indomain_middle mean of bounds`() {
         // Domain {0,1,2,3,10}: median by position is valueAt(2) = 2; the mean of bounds is 5,
         // whose nearest present value is 3. So the two heuristics start on different values.
         var d = IntDomain(0, 10)
