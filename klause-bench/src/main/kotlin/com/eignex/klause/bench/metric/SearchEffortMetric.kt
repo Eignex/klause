@@ -4,8 +4,6 @@ import com.eignex.klause.bench.report.EnvInfo
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
-import com.eignex.klause.logicng.LogicNGParams
-import com.eignex.klause.logicng.LogicNGSolver
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.SolveResult
@@ -20,28 +18,25 @@ import com.eignex.klause.solver.backtrack.Vsids
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.Locale
-import kotlin.concurrent.thread
 
 /**
  * Complete-search effort per problem, run as an A/B between two [BacktrackSolver] configurations
- * under a fixed seed and per-instance timeout, alongside the **LogicNG** (bit-blasted MiniSAT)
- * reference as a pure-SAT yardstick (the #117 comparison). The two legs (`legA`/`legB`) are chosen
- * from a named palette — `vsids` (the historical baseline: VSIDS + phase + Luby + LBD), `satopt`
+ * under a fixed seed and per-instance timeout. The two legs (`legA`/`legB`) are chosen from a named
+ * palette — `vsids` (the historical baseline: VSIDS + phase + Luby + LBD), `satopt`
  * ([BacktrackPresets.satOptimized]), `conflict` ([BacktrackPresets.conflictDriven]), and `linucb`
  * (the learned [RegressionVariableHeuristic]) — so any heuristic/explanation change can be A/B'd by
  * holding the suite fixed; the default pair `vsids` vs `satopt` preserves the original comparison.
  *
  * Each leg reports the engine's own [SolveStats] — nodes, conflicts (fails), learned clauses,
- * restarts — plus verdict and wall time (LogicNG exposes no conflict counter, so only verdict +
- * wall time). A **CSP** runs through [BacktrackSolver.solve] (satisfaction); a **COP** (the problem
- * carries an objective) runs through branch-and-bound [BacktrackSolver.minimize] and additionally
- * reports the best objective reached.
+ * restarts — plus verdict and wall time. A **CSP** runs through [BacktrackSolver.solve]
+ * (satisfaction); a **COP** (the problem carries an objective) runs through branch-and-bound
+ * [BacktrackSolver.minimize] and additionally reports the best objective reached.
  *
  * Two summaries: for CSP/UNSAT the conflict count is the search-size signal (fewer fails over the
  * both-solved set = the stronger config); for COP the objective head-to-head (who reached the
  * better bound over the both-feasible set) is the quality signal the fails count can't capture.
  *
- * Knobs: `-Dklause.bench.search.{seed,legA,legB,logicng}`.
+ * Knobs: `-Dklause.bench.search.{seed,legA,legB}`.
  */
 @Serializable
 data class SearchEffortReport(
@@ -65,7 +60,6 @@ internal data class SearchEffortPair(
     val name: String,
     val baseline: SearchEffortReport,
     val satOpt: SearchEffortReport,
-    val logicNg: SearchEffortReport,
 )
 
 @Serializable
@@ -80,7 +74,6 @@ internal data class SearchEffortResults(
     val legB: String = "satopt",
     val baselineSolved: Int,
     val satOptSolved: Int,
-    val logicNgSolved: Int,
     val total: Int,
     val bothSolved: Int,
     val baselineFailsSumBothSolved: Long,
@@ -91,7 +84,6 @@ internal data class SearchEffortResults(
 internal object SearchEffortMetric {
     fun run(entries: List<ResolvedProblem>, budget: Budget) {
         val seed = System.getProperty("klause.bench.search.seed")?.toLongOrNull() ?: 1L
-        val runLogicNg = System.getProperty("klause.bench.search.logicng")?.toBooleanStrictOrNull() ?: true
         // The two backtrack configs to A/B (#8 follow-up). Default is the historical baseline pair
         // (vsids vs satopt); set `-Dklause.bench.search.legA/legB` to compare any of vsids / satopt /
         // conflict / linucb — e.g. legA=conflict legB=linucb to ask whether the learned LinUCB arm
@@ -100,8 +92,7 @@ internal object SearchEffortMetric {
         val legB = System.getProperty("klause.bench.search.legB") ?: "satopt"
         println()
         println(
-            "=== search-effort A/B (legA=$legA vs legB=$legB vs LogicNG, " +
-                "seed=$seed, ${budget.timeoutMillis}ms/instance) ===",
+            "=== search-effort A/B (legA=$legA vs legB=$legB, seed=$seed, ${budget.timeoutMillis}ms/instance) ===",
         )
         println(
             "%-20s %16s %12s %16s %12s %7s %7s".format(
@@ -119,15 +110,7 @@ internal object SearchEffortMetric {
         for (e in entries) {
             val baseline = solveWith(e, budget) { deadline -> legParams(legA, seed, deadline) }
             val satOpt = solveWith(e, budget) { deadline -> legParams(legB, seed, deadline) }
-            // The LogicNG reference leg translates CP problems to CNF, which on large
-            // instances dominates allocation/GC and pollutes a klause CPU profile. Set
-            // -Dklause.bench.search.logicng=false to skip it for clean engine profiling.
-            val logicNg = if (runLogicNg) {
-                solveLogicNg(e, budget.timeoutMillis)
-            } else {
-                SearchEffortReport(e.name, "off", solved = false, 0, 0, 0, 0, wallMs = 0, timedOut = false)
-            }
-            pairs += SearchEffortPair(e.name, baseline, satOpt, logicNg)
+            pairs += SearchEffortPair(e.name, baseline, satOpt)
             println(
                 "%-20s %8s/%-7d %12s %8s/%-7d %12s %7d %7d".format(
                     Locale.ROOT,
@@ -148,11 +131,9 @@ internal object SearchEffortMetric {
         val satSum = both.sumOf { it.satOpt.fails }
         val baseSolved = pairs.count { it.baseline.solved }
         val satSolved = pairs.count { it.satOpt.solved }
-        val lngSolved = pairs.count { it.logicNg.solved }
         println(
-            "--- solved: $legA $baseSolved/${pairs.size}, $legB $satSolved/${pairs.size}, " +
-                "logicng $lngSolved/${pairs.size}  |  fails over both-solved (${both.size}): " +
-                "$legA=$baseSum $legB=$satSum" +
+            "--- solved: $legA $baseSolved/${pairs.size}, $legB $satSolved/${pairs.size}" +
+                "  |  fails over both-solved (${both.size}): $legA=$baseSum $legB=$satSum" +
                 (if (baseSum > 0) " (%.2fx)".format(Locale.ROOT, satSum.toDouble() / baseSum) else "") + " ---",
         )
         // COP head-to-head: among instances where both legs found a feasible objective, who reached
@@ -187,7 +168,6 @@ internal object SearchEffortMetric {
                 legB = legB,
                 baselineSolved = baseSolved,
                 satOptSolved = satSolved,
-                logicNgSolved = lngSolved,
                 total = pairs.size,
                 bothSolved = both.size,
                 baselineFailsSumBothSolved = baseSum,
@@ -275,40 +255,4 @@ internal object SearchEffortMetric {
             objective = obj,
         )
     }
-
-    /**
-     * Reference comparison: solve [e] with the LogicNG (bit-blasted MiniSAT) backend, the
-     * pure-SAT yardstick for #117. LogicNG's single `sat()` call can't be interrupted
-     * mid-solve, so run it on a worker thread and join with [timeoutMillis]; a thread still
-     * running past the deadline is left to finish in the background and reported as a timeout.
-     * LogicNG reports no CDCL conflict counter, so only the verdict and wall time are captured.
-     */
-    private fun solveLogicNg(e: ResolvedProblem, timeoutMillis: Long): SearchEffortReport {
-        // Single-element holder written by the worker; safe to read after a completed join
-        // (thread termination establishes a happens-before edge). When the worker is still
-        // alive past the deadline we ignore the holder and report a timeout.
-        val holder = arrayOfNulls<SolveResult>(1)
-        val start = System.currentTimeMillis()
-        val worker = thread(start = true, isDaemon = true, name = "logicng-${e.name}") {
-            holder[0] = runCatching {
-                LogicNGSolver(e.problem).solve(LogicNGParams(randomSeed = 0L, timeoutMillis = timeoutMillis))
-            }.getOrNull()
-        }
-        worker.join(timeoutMillis + JOIN_GRACE_MS)
-        val ms = System.currentTimeMillis() - start
-        val r = if (worker.isAlive) null else holder[0]
-        return SearchEffortReport(
-            name = e.name,
-            verdict = if (worker.isAlive) "Timeout" else (r?.let { it::class.simpleName ?: "?" } ?: "ERROR"),
-            solved = r is SolveResult.Sat || r is SolveResult.Unsat,
-            nodes = 0,
-            fails = 0,
-            learned = 0,
-            restarts = 0,
-            wallMs = ms,
-            timedOut = worker.isAlive,
-        )
-    }
-
-    private const val JOIN_GRACE_MS = 2_000L
 }
