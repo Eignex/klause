@@ -1,9 +1,12 @@
 package com.eignex.klause.portfolio
 
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicInteger
+
 internal actual fun <T> parallelStream(tasks: List<(emit: (T) -> Unit) -> Unit>): Sequence<T> = sequence {
     val done = Any()
-    val queue = java.util.concurrent.LinkedBlockingQueue<Any>()
-    val remaining = java.util.concurrent.atomic.AtomicInteger(tasks.size)
+    val queue = LinkedBlockingQueue<Any>()
+    val remaining = AtomicInteger(tasks.size)
     val threads = tasks.map { task ->
         Thread {
             try {
