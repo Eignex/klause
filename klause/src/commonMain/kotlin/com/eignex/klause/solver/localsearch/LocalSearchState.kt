@@ -2,9 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.InvariantNetwork
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP

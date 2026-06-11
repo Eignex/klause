@@ -5,9 +5,9 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.format.Formats
 import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
@@ -19,7 +19,7 @@ internal data class ResolvedProblem(
     /** Local-search-only gradient view of [objective] for decomposed objectives, when the model
      *  provides one (see `LocalSearchParams.lsObjective`). Null ⇒ LS descends [objective]. */
     val lsObjective: IncrementalObjective? = null,
-    /** Definitional sweep for the LS engine (see [com.eignex.klause.solver.DefinitionalSweep]);
+    /** Definitional sweep for the LS engine (see [com.eignex.klause.solver.localsearch.DefinitionalSweep]);
      *  carried from `FlatZincProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
     val definitionalSweep: DefinitionalSweep? = null,
     /** Search heuristics from the model's `solve :: int_search(...)` annotation (see

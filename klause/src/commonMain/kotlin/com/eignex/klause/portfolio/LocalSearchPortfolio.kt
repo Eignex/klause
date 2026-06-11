@@ -2,12 +2,12 @@
 
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.CostShaping
+import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
