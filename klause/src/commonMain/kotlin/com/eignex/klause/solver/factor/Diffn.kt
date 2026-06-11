@@ -43,6 +43,16 @@ class Diffn(
         require(heightVars == null || heightVars.size == n) { "diffn: heightVars size mismatch" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Diffn(
+        xs.remapVars(intMap),
+        ys.remapVars(intMap),
+        widths,
+        heights,
+        widthVars?.remapVars(intMap),
+        heightVars?.remapVars(intMap),
+        nonStrict,
+    )
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray)

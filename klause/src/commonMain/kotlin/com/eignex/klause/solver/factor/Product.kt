@@ -24,6 +24,8 @@ class Product(
     val result: Int,
 ) : Factor {
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Product(intMap[a], intMap[b], intMap[result])
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = intArrayOf(a, b, result)
 

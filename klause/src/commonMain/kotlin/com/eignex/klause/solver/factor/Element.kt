@@ -41,6 +41,9 @@ class Element(
         require(arr.isNotEmpty()) { "element: empty array" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        Element(intMap[idx], intMap[result], if (arrIsVars) arr.remapVars(intMap) else arr, arrIsVars, indexOffset)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)

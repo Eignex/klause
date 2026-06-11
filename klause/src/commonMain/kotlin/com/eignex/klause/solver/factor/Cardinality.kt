@@ -27,6 +27,8 @@ class Cardinality(
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cardinality(literals.remapLits(boolMap), min, max)
+
     override val boolVars: IntArray = run {
         val seen = LinkedHashSet<Int>()
         for (lit in literals) seen.add(Lit.variable(lit))

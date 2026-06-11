@@ -30,6 +30,18 @@ interface Factor {
     val intVars: IntArray
 
     /**
+     * A copy of this factor with every Boolean variable id rewritten through [boolMap] and every
+     * integer variable id through [intMap] (`newId = map[oldId]`). Non-variable data — coefficients,
+     * bounds, constant arrays, domain offsets, DFA tables — is carried over unchanged. Used by
+     * presolve passes that renumber or substitute variables (#332).
+     *
+     * Every factor must implement this (no default): a variable being renumbered or substituted can
+     * appear in any factor, so a silent miss would leave stale ids in the rewritten problem. A
+     * factor that genuinely touches no variables returns `this`.
+     */
+    fun remap(boolMap: IntArray, intMap: IntArray): Factor
+
+    /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
      * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
      * — sound but trivial. Factors override to participate in [Problem.propagate].

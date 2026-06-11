@@ -51,6 +51,9 @@ class NValue(
         }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        NValue(intMap[n], xs.remapVars(intMap), mode, presents.remapLits(boolMap))
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = xs + intArrayOf(n)
 

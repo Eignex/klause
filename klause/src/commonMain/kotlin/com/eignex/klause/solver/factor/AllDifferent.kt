@@ -49,6 +49,9 @@ class AllDifferent(
     // positions are skipped entirely; unpinned-presence positions are skipped too, so any
     // filtering remains sound under "this position might still go absent".
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        AllDifferent(vars.remapVars(intMap), domainMin, domainSize, presents.remapLits(boolMap))
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars
 

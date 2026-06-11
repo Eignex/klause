@@ -33,6 +33,9 @@ class Inverse(
         require(f.isNotEmpty()) { "inverse: empty arrays" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        Inverse(f.remapVars(intMap), g.remapVars(intMap), fOffset, gOffset)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = f + g
 

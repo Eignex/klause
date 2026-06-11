@@ -42,6 +42,9 @@ class ReifiedLinear private constructor(
         require(coeffs.isNotEmpty()) { "ReifiedLinear must have at least one term" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        ReifiedLinear(boolMap[auxBoolVar], coeffs, vars.remapVars(intMap), op, bound)
+
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
     override val intVars: IntArray = vars
 

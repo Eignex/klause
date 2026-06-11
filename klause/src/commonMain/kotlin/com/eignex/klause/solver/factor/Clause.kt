@@ -26,6 +26,8 @@ class Clause(val literals: IntArray) : Factor {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
+
     override val boolVars: IntArray = run {
         val seen = LinkedHashSet<Int>()
         for (lit in literals) seen.add(Lit.variable(lit))
