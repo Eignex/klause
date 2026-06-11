@@ -98,6 +98,22 @@ class AffineEliminationTest {
     }
 
     @Test
+    fun `aliases x = y out of a non-linear factor`() {
+        // x0 = x1 and x0 also in AllDifferent(x0, x2): the alias case substitutes x0 -> x1 into the
+        // global via remap, eliminating x0 even though it's not a linear factor.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0), // x0 = x1
+                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 4), // x0 in a global
+            ),
+        )
+        checkRoundTrip("alias-into-global", problem, expectEliminated = true, expectSat = true)
+    }
+
+    @Test
     fun `chained eliminations reconstruct correctly`() {
         // x = 2y+1 and y = z+1: eliminate x, then y (its defining EQ's partner folds), then z stays.
         val problem = Problem(
