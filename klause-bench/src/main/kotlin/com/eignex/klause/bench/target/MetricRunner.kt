@@ -16,7 +16,17 @@ import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileScope
 import com.eignex.klause.bench.tools.Profiler
-import com.eignex.klause.portfolio.CompetitionMode
+import com.eignex.klause.portfolio.EngineMix
+
+/**
+ * The klause-side search config for a parity run, set from the `engine=` / `processors=` / `fixed=`
+ * filters (only the parity metric reads it). [fixed] follows the model's search annotation on a
+ * single thread (engine/processors ignored); otherwise [engine] over [processors] workers — a
+ * [com.eignex.klause.portfolio.PortfolioScenario] (`processors == 1` ⇒ the single-core sequential
+ * portfolio). These map directly onto the portfolio's engine × threads axes, so the competition
+ * tracks are just filter combinations (see the bench README recipes) rather than a baked-in enum.
+ */
+internal data class ParitySearch(val engine: EngineMix, val processors: Int, val fixed: Boolean)
 
 /**
  * Runs a [MetricKind] over a concrete set of [ProblemRef]s. The single dispatch point shared
@@ -37,12 +47,12 @@ internal object MetricRunner {
         budget: Budget,
         reference: Backend?,
         profile: ProfileConfig? = null,
-        competition: CompetitionConfig? = null,
+        parity: ParitySearch? = null,
     ) {
         if (profile != null && profile.scope == ProfileScope.ALL) {
-            Profiler.record(profile) { dispatch(metric, refs, budget, reference, competition, solveProfile = null) }
+            Profiler.record(profile) { dispatch(metric, refs, budget, reference, parity, solveProfile = null) }
         } else {
-            dispatch(metric, refs, budget, reference, competition, solveProfile = profile)
+            dispatch(metric, refs, budget, reference, parity, solveProfile = profile)
         }
     }
 
@@ -53,20 +63,23 @@ internal object MetricRunner {
         refs: List<ProblemRef>,
         budget: Budget,
         reference: Backend?,
-        competition: CompetitionConfig?,
+        parity: ParitySearch?,
         solveProfile: ProfileConfig?,
     ) {
         fun <T> solve(block: () -> T): T = if (solveProfile != null) Profiler.record(solveProfile, block) else block()
         when (metric) {
             MetricKind.PARITY -> {
                 val resolved = BenchLoad.resolveRefs(refs)
+                val ps = parity
+                    ?: ParitySearch(EngineMix.MIXED, Runtime.getRuntime().availableProcessors(), fixed = false)
                 solve {
                     ParityMetric.run(
                         resolved,
                         budget,
                         reference ?: Backend.CHOCO,
-                        competition?.mode ?: CompetitionMode.OPEN,
-                        competition?.threads ?: Runtime.getRuntime().availableProcessors(),
+                        ps.engine,
+                        ps.processors,
+                        ps.fixed,
                     )
                 }
             }
