@@ -403,10 +403,15 @@ internal class DualSimplex(private val model: LpModel) {
      * reduced-cost sign to keep the start dual feasible (changed columns are bounded — they are
      * structural — so both seats exist). Returns false when the shapes, costs, row relations or a
      * basic column differ: the caller then falls back to the basis reload.
+     *
+     * A child with **more** rows than [prev] and a bit-identical prefix — the cut loop's shape —
+     * takes the append path instead: see [seedAppended].
      */
     private fun seedFrom(prev: DualSimplex): Boolean {
         val pm = prev.model
-        if (pm.m != m || pm.n != model.n) return false
+        if (pm.n != model.n) return false
+        if (pm.m < m) return seedAppended(prev)
+        if (pm.m != m) return false
         if (!pm.cost.contentEquals(model.cost) || !pm.hasUpper.contentEquals(model.hasUpper)) return false
 
         // Diff the constraint coefficients; reject a change in any column basic in prev (it would
@@ -480,6 +485,85 @@ internal class DualSimplex(private val model: LpModel) {
             val sign = fracSign(red)
             if (sign < 0) status[q] = VarStatus.AT_UPPER
             if (sign > 0) status[q] = VarStatus.AT_LOWER
+        }
+        return true
+    }
+
+    /**
+     * Seed from a [prev] tableau with **fewer** rows whose row prefix is bit-identical — the cut
+     * loop's shape, where rows are only ever appended under unchanged variable bounds. With each
+     * appended row's slack basic, the grown basis is block-triangular
+     * (`B' = [[B, 0], [C, I]]`, `C` = the new rows' entries at the old basic columns), so the
+     * carried determinant is unchanged and:
+     *
+     *  - old tableau rows carry over verbatim, gaining zero entries under the new slack columns
+     *    (`B'⁻¹`'s upper-right block is zero);
+     *  - appended row `t` materializes as `det·M'_t − Σ_j a_t[j]·N[rowOf(j)][·]` over the basic
+     *    *structural* columns `j` in its support (old-slack basics contribute nothing — a cut row
+     *    has no slack coefficients) — O(numVars · |basic support|) instead of a pivot reload.
+     *
+     * No reseat is needed: the appended basic slacks carry zero cost, so every old column's
+     * reduced cost — and with it dual feasibility — is untouched.
+     */
+    private fun seedAppended(prev: DualSimplex): Boolean {
+        val pm = prev.model
+        val m0 = pm.m
+        // The structural costs and the old rows (coefficients, rhs, relation) must be identical;
+        // bounds are free to differ (they never enter the tableau).
+        for (j in 0 until model.n) {
+            if (pm.cost[j] != model.cost[j]) return false
+        }
+        for (i in 0 until m0) {
+            if (!pm.a[i].contentEquals(model.a[i])) return false
+            if (pm.rhs[i] != model.rhs[i]) return false
+            if (pm.hasUpper[pm.n + i] != model.hasUpper[model.n + i]) return false
+        }
+
+        // Old rows carry over into the wider column layout; new slack columns are zero there.
+        val oldVars = model.n + m0
+        for (i in 0 until m0) {
+            val src = prev.nMat[i]
+            val dst = nMat[i]
+            src.copyInto(dst, destinationOffset = 0, startIndex = 0, endIndex = oldVars)
+            for (j in oldVars until numVars) dst[j] = 0L
+            dst[rhsCol] = src[oldVars] // the parent's rhs column index
+            rowMaxAbs[i] = prev.rowMaxAbs[i]
+            basicVar[i] = prev.basicVar[i]
+        }
+        for (j in 0 until oldVars) status[j] = prev.status[j]
+        d = prev.d
+
+        // Row index of each basic structural column, for the C·B⁻¹ subtraction.
+        val varRow = IntArray(model.n) { -1 }
+        for (k in 0 until m0) {
+            val v = prev.basicVar[k]
+            if (v < model.n) varRow[v] = k
+        }
+        for (t in m0 until m) {
+            val dst = nMat[t]
+            for (j in 0 until model.n) dst[j] = mulExact(d, model.a[t][j])
+            for (j in model.n until numVars) dst[j] = 0L
+            dst[model.n + t] = d
+            dst[rhsCol] = mulExact(d, model.rhs[t])
+            for (j in 0 until model.n) {
+                val c = model.a[t][j]
+                if (c == 0L) continue
+                val k = varRow[j]
+                if (k < 0) continue
+                val par = nMat[k] // already in the new layout; its new-slack entries are zero
+                for (col in 0..numVars) {
+                    val sub = mulExact(c, par[col])
+                    if (sub != 0L) dst[col] = subExact(dst[col], sub)
+                }
+            }
+            var mx = 0L
+            for (col in 0..numVars) {
+                val a = absClamped(dst[col])
+                if (a > mx) mx = a
+            }
+            rowMaxAbs[t] = mx
+            basicVar[t] = model.n + t
+            status[model.n + t] = VarStatus.BASIC
         }
         return true
     }
@@ -671,10 +755,15 @@ internal class DualSimplex(private val model: LpModel) {
                         belowLower = low
                     }
                 } else {
-                    // |violation|·|d|: distance past the violated bound (lower 0, or upper).
+                    // |violation|·|d|: distance past the violated bound (lower 0, or upper). Ties
+                    // break on the smallest basic-variable index — NOT scan order — so the pivot
+                    // trajectory is canonical in the basis, independent of how the tableau's rows
+                    // happen to be permuted (a seeded reload preserves the parent's row order, a
+                    // basis reload assigns its own; without a canonical tie-break the two walk
+                    // different pivot paths from identical starts).
                     val raw = if (low) beta[i] else subExact(beta[i], mulExact(model.upper[v], d))
                     val viol = if (raw < 0L) -raw else raw
-                    if (viol > bestViol || r == -1) {
+                    if (viol > bestViol || (viol == bestViol && v < leavingVar) || r == -1) {
                         bestViol = viol
                         r = i
                         leavingVar = v

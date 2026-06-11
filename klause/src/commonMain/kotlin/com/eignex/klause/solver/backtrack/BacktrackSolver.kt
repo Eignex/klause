@@ -634,11 +634,13 @@ class BacktrackSolver(override val problem: Problem) :
         try {
             var relaxation = relaxer.build(session)
             if (relaxation.model.n == 0) return emptyList()
-            var solution = DualSimplex(relaxation.model).solve()
+            var simplex = DualSimplex(relaxation.model)
+            var solution = simplex.solve()
             var prevRows = relaxation.model.m
             var round = 0
             while (round++ < CUT_POOL_ROUNDS && solution.status == LpStatus.OPTIMAL) {
                 val prevBasis = solution.basis
+                val prevSimplex = simplex
                 val ctx = CutContext(problem, relaxation, solution, session)
                 val fresh = separators.flatMap { it.separate(ctx) }
                     .filter { pool.add(it.key()) }
@@ -646,8 +648,9 @@ class BacktrackSolver(override val problem: Problem) :
                 if (fresh.isEmpty()) break
                 cuts.addAll(fresh)
                 relaxation = relaxer.build(session, cuts)
-                solution = DualSimplex(relaxation.model)
-                    .solve(extendBasisWithSlacks(prevBasis, relaxation.model, prevRows))
+                simplex = DualSimplex(relaxation.model)
+                solution = simplex
+                    .solve(extendBasisWithSlacks(prevBasis, relaxation.model, prevRows), prevSimplex)
                 prevRows = relaxation.model.m
             }
         } catch (_: LpOverflowException) {
@@ -746,6 +749,7 @@ class BacktrackSolver(override val problem: Problem) :
         // seeded tableau reload (when compatible) supersedes both.
         val startBasis = warmBasis ?: if (params.lpFloatWarmStart) FloatSimplex(relaxation.model).basis() else null
         var solution = simplex.solve(startBasis, seedTableau)
+        if (simplex.lastSolveSeeded) sink.observeLpSeeded()
         sink.observeLpPivots(solution.pivots)
         // Warm-start children from the initial (pre-cut) basis and tableau: cut rows vary per node,
         // but the base model structure is identical across nodes, so only this state transfers.
@@ -809,6 +813,7 @@ class BacktrackSolver(override val problem: Problem) :
                     null
                 }
                 solution = simplex.solve(warmStart, lastSimplex)
+                if (simplex.lastSolveSeeded) sink.observeLpSeeded()
                 sink.observeLpPivots(solution.pivots)
                 prevBasis = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
                 prevRows = relaxation.model.m
@@ -897,6 +902,7 @@ class BacktrackSolver(override val problem: Problem) :
             // Same row layout as the previous round, so the seeded reload applies directly; the
             // extended basis stays as the fallback.
             solution = simplex.solve(fixWarm, lastSimplex)
+            if (simplex.lastSolveSeeded) sink.observeLpSeeded()
             prevBasis = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
             prevRows = relaxation.model.m
             if (solution.status == LpStatus.OPTIMAL) lastSimplex = simplex

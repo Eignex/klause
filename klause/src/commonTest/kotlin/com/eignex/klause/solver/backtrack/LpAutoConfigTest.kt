@@ -132,6 +132,7 @@ class LpAutoConfigTest {
         assertTrue(auto is MinimizeResult.Optimal)
         assertEquals(3.0, auto.objectiveValue)
         assertTrue(auto.stats.lpPivots.sum > 0.0, "lpAuto must engage the node LP")
+        assertTrue(auto.stats.lpSeeded.sum > 0.0, "descendant node LPs must reuse the hot tableau")
 
         val plain = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
         assertTrue(plain is MinimizeResult.Optimal)
