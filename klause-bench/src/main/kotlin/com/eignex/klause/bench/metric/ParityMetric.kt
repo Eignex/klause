@@ -124,8 +124,15 @@ internal object ParityMetric {
         return i to n
     }
 
-    /** Cached reference outcome parsed back from a previous sweep log line. */
-    private data class CachedRef(val feasible: Boolean?, val objective: Double?, val display: String)
+    /** Cached reference outcome parsed back from a previous sweep log line — value, time-to-best,
+     *  and whether the reference proved it, so a frozen reference can be reused for tie-on-speed. */
+    private data class CachedRef(
+        val feasible: Boolean?,
+        val objective: Double?,
+        val timeMs: Long?,
+        val proven: Boolean,
+        val display: String,
+    )
 
     /** Parse `ok|!! [name] kind klause=… <ref>=<value> expected=…` sweep lines into
      *  name → cached reference outcome. Unparseable lines are skipped. */
@@ -143,7 +150,10 @@ internal object ParityMetric {
                         value.startsWith("opt=") || value.startsWith("best=") -> true
                         else -> null
                     },
-                    objective = value.substringAfter("=", "").toDoubleOrNull(),
+                    // optimize columns are `opt|best=<value>@<ms>ms`; split off the time suffix.
+                    objective = value.substringAfter("=", "").substringBefore("@").toDoubleOrNull(),
+                    timeMs = if ("@" in value) value.substringAfter("@").removeSuffix("ms").toLongOrNull() else null,
+                    proven = value.startsWith("opt="),
                     display = value,
                 )
             }
@@ -214,18 +224,27 @@ internal object ParityMetric {
         processors: Int,
         fixed: Boolean,
     ): ParityRow {
-        if (timedMode) return timedOptimizeRow(entry, obj, budget)
-        val klause = runCatching { klauseMinimize(entry, obj, budget, engine, processors, fixed) }
+        // Always timed: the goal scores COP as "better value OR same value reached sooner", so every
+        // optimize row records klause's and the reference's time-to-best, not just the objective.
+        // Warm the JVM first — a cold first solve spends seconds in JIT compilation, which would
+        // dominate time-to-best on fast rows (the competition runs a warmed native binary).
+        warmup(entry, obj)
+        val k = runCatching { klauseMinimizeTimed(entry, obj, budget, engine, processors, fixed) }
             .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", ref, it) }
-        val kv = klause.objectiveValue
+        val kv = k.first.objectiveValue
+        val kMs = k.second
         val cv: Double?
+        val cMs: Long?
+        val cProven: Boolean
         val refDisplay: String
         if (cached != null) {
             cv = cached.objective
+            cMs = cached.timeMs
+            cProven = cached.proven
             refDisplay = cached.display
         } else {
-            val refRes = runCatching {
-                ref.minimize(
+            val rt = runCatching {
+                ref.minimizeTimed(
                     entry.problem,
                     obj,
                     budget,
@@ -233,97 +252,60 @@ internal object ParityMetric {
                     refProcessors(fixed, processors),
                 )
             }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
-            cv = refRes.objectiveValue
-            refDisplay = optStr(refRes)
+            cv = rt.value
+            cMs = rt.timeToBestMs
+            cProven = rt.proven
+            refDisplay = refTimedStr(cv, cMs, cProven)
         }
         val exp = (entry.ref.expected as? Expected.Opt)?.value?.toDouble()
-        val verdict = when {
-            kv == null || cv == null -> if (kv == cv) "OK" else "MISMATCH"
-            kv != cv -> "MISMATCH"
-            exp != null && cv != exp -> "MISMATCH"
-            else -> "OK"
-        }
         return ParityRow(
             entry.name,
             "optimize",
-            verdict,
-            optStr(klause),
+            timedVerdict(kv, kMs, cv, cMs, cProven),
+            timedResultStr(k.first, kMs),
             refDisplay,
             ref.name,
             exp?.toString() ?: "?",
+            "k=${fmt(kv)}@${kMs ?: "-"}ms ${ref.name}=${fmt(cv)}@${cMs ?: "-"}ms" + (if (cProven) " refProven" else ""),
         )
     }
 
-    // -Dklause.bench.parity.timed scores the COP goal as a free-search race: a single
-    // klause worker on its own free conflict-driven search vs Choco-CP-SAT (LCG) on its
-    // default search, where "beat" means a strictly better objective OR the same objective
-    // reached sooner. Both run single-threaded (no portfolio, no parallelism). A fixed-track
-    // variant (both following the model annotation) is not viable: choco-LCG is unsound under
-    // a mirrored fixed search (see rasros/choco-lcg-false-unsat), so each solver uses its own
-    // search — the comparison every solver actually runs in competition.
-    private val timedMode = System.getProperty("klause.bench.parity.timed")?.toBoolean() ?: false
+    /** COP goal scoring: klause "beats" the reference with a strictly better objective, or the same
+     *  objective reached no later. A strictly-better klause value against a reference that *proved*
+     *  its optimum is unsound (klause can't beat a proven optimum) — flagged, not counted a win. */
+    private fun timedVerdict(kv: Double?, kMs: Long?, cv: Double?, cMs: Long?, cProven: Boolean): String = when {
+        kv == null -> "MISMATCH"
 
-    private fun timedOptimizeRow(entry: ResolvedProblem, obj: LinearObjective, budget: Budget): ParityRow {
-        // Warm the JVM before timing. The competition runs a native binary with no JIT
-        // warmup cost; on the JVM a cold first solve spends seconds in compilation, which
-        // dominates time-to-best on fast rows and would make every quick COP look slow.
-        // A short throwaway solve per engine moves the hot paths to compiled code so the
-        // timed solve reflects steady-state speed. Budget-capped small so warmup is cheap.
-        warmup(entry, obj)
+        // klause found nothing in budget — not a win
+        cv == null -> "OK"
 
-        val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        // klause: single free conflict-driven worker, time-stamped at each incumbent. (Not
-        // the model annotation — forcing it cripples klause on rows whose prescribed search
-        // suits a different engine, e.g. stochastic-fjsp where free search proves the optimum
-        // in tens of ms while the annotation stalls. Choco likewise runs its own default.)
-        var kBestMillis: Long? = null
-        val t0 = System.currentTimeMillis()
-        val kParams = BacktrackPresets.conflictDriven(
-            randomSeed = 3L,
-            cancellation = Cancellation { System.currentTimeMillis() > deadline },
-            onEvent = { e -> if (e is SearchEvent.Incumbent) kBestMillis = System.currentTimeMillis() - t0 },
-        )
-        val k = runCatching { BacktrackSolver(entry.problem).minimize(obj, kParams) }
-            .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", Reference.of(Backend.CHOCO), it) }
-        val kv = k.objectiveValue
-        // Choco-CP-SAT (LCG) reference under the same prescribed search.
-        val c = runCatching {
-            ChocoSolver(entry.problem).minimizeTimed(
-                obj as LinearObjective,
-                ChocoParams(budget.timeoutMillis), // default search; see note above
-            )
-        }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", Reference.of(Backend.CHOCO), it) }
-        val cv = c.value
-        val beat = when {
-            kv == null -> false
+        // klause found an incumbent, the reference did not
+        kv < cv -> if (cProven) "MISMATCH" else "OK"
 
-            cv == null -> true
+        // better; below a *proven* optimum ⇒ unsound, flag it
+        kv > cv -> "MISMATCH"
 
-            // klause found something, reference did not
-            kv < cv -> true
-
-            kv == cv -> (kBestMillis ?: Long.MAX_VALUE) < (c.timeToBestMillis ?: Long.MAX_VALUE)
-
-            else -> false
-        }
-        val detail = "k=${fmt(kv)}@${kBestMillis ?: "-"}ms cpsat=${fmt(cv)}@${c.timeToBestMillis ?: "-"}ms"
-        return ParityRow(
-            entry.name,
-            "optimize",
-            if (beat) "OK" else "MISMATCH",
-            fmt(kv),
-            fmt(cv),
-            "choco-cpsat",
-            "?",
-            detail,
-        )
+        // reference better
+        else -> if ((kMs ?: Long.MAX_VALUE) <= (cMs ?: Long.MAX_VALUE)) "OK" else "MISMATCH" // tie ⇒ faster wins
     }
+
+    /** `opt|best=<value>@<ms>ms` (or `UNSAT`/`?`) — carries value AND time-to-best so a frozen
+     *  reference column is re-parseable by [parseReferenceCache] for tie-on-speed iteration. */
+    private fun timedResultStr(r: MinimizeResult, ms: Long?): String = when (r) {
+        is MinimizeResult.Optimal -> "opt=${r.objective}@${ms ?: "-"}ms"
+        is MinimizeResult.BestFound -> "best=${r.objective}@${ms ?: "-"}ms"
+        is MinimizeResult.Infeasible -> "UNSAT"
+        is MinimizeResult.Unknown -> "?"
+    }
+
+    private fun refTimedStr(value: Double?, ms: Long?, proven: Boolean): String =
+        if (value == null) "?" else "${if (proven) "opt" else "best"}=$value@${ms ?: "-"}ms"
 
     private fun fmt(v: Double?): String = v?.toString() ?: "?"
 
-    /** Throwaway short solve per engine to JIT-warm the hot paths before timing (see
-     *  [timedOptimizeRow]). The warmup budget is fixed and small; cancellation cuts it off
-     *  so warming a hard row costs at most this slice. Results are discarded.
+    /** Throwaway short solve per engine to JIT-warm the hot paths before the timed optimize measure.
+     *  The warmup budget is fixed and small; cancellation cuts it off so warming a hard row costs at
+     *  most this slice. Results are discarded.
      *
      *  The klause warmup must NOT share search-heuristic instances with the timed solve: a
      *  solution-guided value heuristic remembers the best assignment it has seen, so reusing
@@ -364,6 +346,7 @@ internal object ParityMetric {
         entry: ResolvedProblem,
         scenario: PortfolioScenario,
         objective: LinearObjective?,
+        onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): PortfolioExecutor {
         val workers = PortfolioBuilder.build(
             entry.problem,
@@ -371,6 +354,7 @@ internal object ParityMetric {
             objective = objective,
             lsObjective = entry.lsObjective,
             definitionalSweep = entry.definitionalSweep,
+            onEvent = onEvent,
         )
         return if (scenario.threads == 1) SequentialPortfolio.exp3(workers, scenario.seed) else Portfolio(workers)
     }
@@ -405,19 +389,28 @@ internal object ParityMetric {
         }
     }
 
-    private fun klauseMinimize(
+    /** Minimise with the config's klause search AND the time-to-best (timestamp of the last incumbent
+     *  via [SearchEvent.Incumbent]) so parity can break value-ties on speed. */
+    private fun klauseMinimizeTimed(
         entry: ResolvedProblem,
         obj: LinearObjective,
         budget: Budget,
         engine: EngineMix,
         processors: Int,
         fixed: Boolean,
-    ): MinimizeResult {
-        val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        if (fixed) return BacktrackSolver(entry.problem).minimize(obj, fixedParams(entry, deadline))
-        return executorFor(entry, scenarioFor(engine, processors, Kind.COP), objective = obj).use {
-            it.minimize(Cancellation { System.currentTimeMillis() > deadline })
+    ): Pair<MinimizeResult, Long?> {
+        val t0 = System.currentTimeMillis()
+        val deadline = t0 + budget.timeoutMillis
+        var bestMs: Long? = null
+        if (fixed) {
+            val params = fixedParams(entry, deadline)
+                .copy(onEvent = { e -> if (e is SearchEvent.Incumbent) bestMs = System.currentTimeMillis() - t0 })
+            return BacktrackSolver(entry.problem).minimize(obj, params) to bestMs
         }
+        val exec = executorFor(entry, scenarioFor(engine, processors, Kind.COP), objective = obj) { _, e ->
+            if (e is SearchEvent.Incumbent) bestMs = System.currentTimeMillis() - t0
+        }
+        return exec.use { it.minimize(Cancellation { System.currentTimeMillis() > deadline }) } to bestMs
     }
 
     /** true = feasible, false = infeasible, null = unknown/timeout. */
@@ -441,13 +434,6 @@ internal object ParityMetric {
         true -> "SAT"
         false -> "UNSAT"
         null -> "?"
-    }
-
-    private fun optStr(r: MinimizeResult): String = when (r) {
-        is MinimizeResult.Optimal -> "opt=${r.objective}"
-        is MinimizeResult.BestFound -> "best=${r.objective}"
-        is MinimizeResult.Infeasible -> "UNSAT"
-        is MinimizeResult.Unknown -> "?"
     }
 
     private fun errorRow(
