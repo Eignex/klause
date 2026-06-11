@@ -128,6 +128,97 @@ class TableauSeedTest {
     }
 
     @Test
+    fun `appended-row child seeds and matches the cold solve exactly`() {
+        // The cut loop's shape: same bounds, identical row prefix, new rows appended. The seed
+        // must take the block-triangular append path (no basis reload) and land on the cold
+        // verdict and optimum exactly. A mutated prefix must be refused.
+        val rng = Random(20260612)
+        var seeded = 0
+        var compared = 0
+        var refusals = 0
+        repeat(300) {
+            val n = 8 + rng.nextInt(8)
+            val m = 8 + rng.nextInt(10)
+            val hi = IntArray(n) { 4 + rng.nextInt(6) }
+            val rowCols = ArrayList<IntArray>()
+            val rowVals = ArrayList<LongArray>()
+            val rowRel = ArrayList<Relation>()
+            val rowRhs = ArrayList<Long>()
+            fun addRandomRow() {
+                val len = 2 + rng.nextInt(minOf(n - 1, 4))
+                val start = rng.nextInt(n - len + 1)
+                val cols = IntArray(len) { k -> start + k }
+                val vals = LongArray(len) { if (rng.nextInt(4) == 0) -1L else 1L }
+                val rel = if (rng.nextBoolean()) Relation.LE else Relation.GE
+                var lhsAtMid = 0L
+                for (k in cols.indices) lhsAtMid += vals[k] * (hi[cols[k]] / 2)
+                val rhs = if (rel == Relation.GE) lhsAtMid - rng.nextInt(0, 3) else lhsAtMid + rng.nextInt(0, 3)
+                rowCols.add(cols)
+                rowVals.add(vals)
+                rowRel.add(rel)
+                rowRhs.add(rhs)
+            }
+            repeat(m) { addRandomRow() }
+            fun assemble(rows: Int): LpModel {
+                val b = LpBuilder()
+                repeat(n) { j -> b.addVar(0L, hi[j].toLong(), cost = ((j * 5 + 2) % 5 - 2).toLong()) }
+                repeat(rows) { r -> b.addRow(rowCols[r], rowVals[r], rowRel[r], rowRhs[r]) }
+                return b.build(Sense.MINIMIZE)
+            }
+            val parentModel = assemble(m)
+            val parentSimplex = DualSimplex(parentModel)
+            val parent = try {
+                parentSimplex.solve()
+            } catch (_: LpOverflowException) {
+                return@repeat
+            }
+            if (parent.status != LpStatus.OPTIMAL) return@repeat
+
+            // Child: the same rows plus 1-3 appended cut-shaped rows.
+            repeat(1 + rng.nextInt(3)) { addRandomRow() }
+            val childModel = assemble(rowCols.size)
+            val cold = try {
+                DualSimplex(childModel).solve()
+            } catch (_: LpOverflowException) {
+                return@repeat
+            }
+            val seededSimplex = DualSimplex(childModel)
+            val warm = try {
+                seededSimplex.solve(seedTableau = parentSimplex)
+            } catch (_: LpOverflowException) {
+                return@repeat
+            }
+            compared++
+            if (seededSimplex.lastSolveSeeded) seeded++
+            assertEquals(cold.status, warm.status, "appended-seed verdict diverged")
+            if (cold.status == LpStatus.OPTIMAL) {
+                assertEquals(cold.objectiveValue, warm.objectiveValue, 1e-9, "appended-seed optimum diverged")
+            }
+
+            // A mutated prefix row must refuse the append seed (and still solve correctly).
+            val k = rng.nextInt(m)
+            rowRhs[k] = rowRhs[k] + 1L
+            val mutated = assemble(rowCols.size)
+            val refusedSimplex = DualSimplex(mutated)
+            val refusedSolve = try {
+                refusedSimplex.solve(seedTableau = parentSimplex)
+            } catch (_: LpOverflowException) {
+                return@repeat
+            }
+            if (!refusedSimplex.lastSolveSeeded) refusals++
+            val mutatedCold = try {
+                DualSimplex(mutated).solve()
+            } catch (_: LpOverflowException) {
+                return@repeat
+            }
+            assertEquals(mutatedCold.status, refusedSolve.status, "refused-seed verdict diverged")
+        }
+        assertTrue(compared > 150, "covered only $compared appended instances")
+        assertEquals(compared, seeded, "an identical-prefix append must always accept the seed")
+        assertTrue(refusals > 150, "prefix mutations must refuse the append seed (got $refusals)")
+    }
+
+    @Test
     fun `bounds-only child always seeds`() {
         // No coefficient changes at all: the rhs-patch path must apply (the pure parent→child
         // branch-and-bound shape).

@@ -53,6 +53,9 @@ data class SolveStats(
     val lpCuts: SumResult = ZERO_COUNT,
     /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate (#280). */
     val lpBackjumps: SumResult = ZERO_COUNT,
+    /** Node LP solves that started from a seeded tableau (the cheapest warm start) instead of a
+     *  basis reload or cold start — the hot-tableau hit rate. */
+    val lpSeeded: SumResult = ZERO_COUNT,
     /** Nodes pruned by the Lagrangian bound (#23). */
     val lagrangianPruned: SumResult = ZERO_COUNT,
     /** Nodes pruned by the Cumulative energetic-reasoning check (#22/#23). */
@@ -93,6 +96,7 @@ data class SolveStats(
             lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
             lpCuts = SumResult(lpCuts.sum + other.lpCuts.sum),
             lpBackjumps = SumResult(lpBackjumps.sum + other.lpBackjumps.sum),
+            lpSeeded = SumResult(lpSeeded.sum + other.lpSeeded.sum),
             lagrangianPruned = SumResult(lagrangianPruned.sum + other.lagrangianPruned.sum),
             energeticPruned = SumResult(energeticPruned.sum + other.energeticPruned.sum),
             peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
@@ -132,6 +136,7 @@ internal class SolveStatsSink(val backend: String) {
     val lpPivots: CountStat = CountStat()
     val lpCuts: CountStat = CountStat()
     val lpBackjumps: CountStat = CountStat()
+    val lpSeeded: CountStat = CountStat()
     val lagrangianPruned: CountStat = CountStat()
     val energeticPruned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
@@ -211,6 +216,11 @@ internal class SolveStatsSink(val backend: String) {
         lpBackjumps.update(1.0)
     }
 
+    /** A node LP solve that started from a seeded tableau instead of a basis/cold reload. */
+    fun observeLpSeeded() {
+        lpSeeded.update(1.0)
+    }
+
     /** A node whose subtree was cut by the Lagrangian bound (#23). */
     fun observeLagrangianPrune() {
         lagrangianPruned.update(1.0)
@@ -241,6 +251,7 @@ internal class SolveStatsSink(val backend: String) {
             lpPivots = lpPivots.read(),
             lpCuts = lpCuts.read(),
             lpBackjumps = lpBackjumps.read(),
+            lpSeeded = lpSeeded.read(),
             lagrangianPruned = lagrangianPruned.read(),
             energeticPruned = energeticPruned.read(),
             peakDepth = peakDepth.read(),
