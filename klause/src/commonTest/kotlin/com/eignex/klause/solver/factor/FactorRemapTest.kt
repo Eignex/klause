@@ -121,7 +121,7 @@ class FactorRemapTest {
     }
 
     @Test
-    fun `cumulative capacityVar sentinel survives, real one remaps`() {
+    fun `cumulative capacityVar sentinel survives and a real one remaps`() {
         val constCap = Cumulative(intArrayOf(0), intArrayOf(2), intArrayOf(1), 3).remap(boolMap, intMap) as Cumulative
         assertEquals(-1, constCap.capacityVar)
         val varCap = Cumulative(intArrayOf(0), intArrayOf(2), intArrayOf(1), 3, capacityVar = 6)
