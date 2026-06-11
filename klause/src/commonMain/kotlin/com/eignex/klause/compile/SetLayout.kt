@@ -5,13 +5,13 @@ package com.eignex.klause.compile
  * per universe element, indexed in parallel arrays.
  *
  *  - `universe[i]` is the integer value of the i'th universe element. For nominal-set
- *    vars the value is the label's index in [Compiler.Build.setLabelOrder] — the actual
+ *    vars the value is the label's index in [Lowering.setLabelOrder] — the actual
  *    label string lives there.
  *  - `indicatorBoolIds[i]` is the klause-side Bool var id that's true iff `universe[i]`
  *    is currently a member of the set.
  *
  * Anything that walks a [com.eignex.klause.ast.SetExpr] eventually produces one of these,
- * either by looking up an existing set var via [Compiler.Build.materializeSet] or by
+ * either by looking up an existing set var via [Lowering.materializeSet] or by
  * synthesising aux indicators for `union` / `intersect` / `diff` / set literals.
  */
 internal class SetLayout(val universe: IntArray, val indicatorBoolIds: IntArray) {

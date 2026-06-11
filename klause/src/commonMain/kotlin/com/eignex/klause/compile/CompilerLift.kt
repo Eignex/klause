@@ -24,7 +24,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.factor.Product
 
 /**
- * Affine-fragment lift for [Compiler.Build]. Rewrites a tree of [IntExpr] so the
+ * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the
  * residual is affine (sums of [IntScale] over [IntRef] plus [IntLit] constants) — every
  * non-affine subexpression ([IntMul], [IntDiv], [IntMod], [IntElement], [IntIfThenElse],
  * [IntMax] / [IntMin], [IntAbs]) is replaced with a fresh aux [IntRef], and auxiliary
@@ -32,7 +32,7 @@ import com.eignex.klause.solver.factor.Product
  * top-level assertion path (`CompilerAssertions`) and the reification path
  * (`CompilerLowering`) deal only with linear forms.
  */
-internal fun Compiler.Build.lift(expr: IntExpr): IntExpr = when (expr) {
+internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
     is IntRef, is IntLit -> expr
     is IntScale -> IntScale(expr.coeff, lift(expr.child))
     is IntSum -> IntSum(expr.children.map { lift(it) })
@@ -59,7 +59,7 @@ internal fun Compiler.Build.lift(expr: IntExpr): IntExpr = when (expr) {
  * keep the sign of the dividend; callers porting from Java-style semantics need
  * to adjust.
  */
-internal fun Compiler.Build.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
+internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
     val nLifted = lift(num)
     val dLifted = lift(den)
     val nDom = domainOf(nLifted)
@@ -97,7 +97,7 @@ internal fun Compiler.Build.liftDivMod(num: IntExpr, den: IntExpr, returnRemaind
     return if (returnRemainder) IntRef(rName) else IntRef(qName)
 }
 
-internal fun Compiler.Build.liftMul(left: IntExpr, right: IntExpr): IntExpr {
+internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {
     val l = lift(left)
     val r = lift(right)
     // Constant folding: const * x or x * const → IntScale.
@@ -126,7 +126,7 @@ internal fun Compiler.Build.liftMul(left: IntExpr, right: IntExpr): IntExpr {
 
 /** Force [expr] into a single [IntRef] so a factor that takes raw int var ids (like
  *  [Product]) can reference it. Affine `IntScale`/`IntSum` get pinned to a fresh aux. */
-internal fun Compiler.Build.materializeIntVar(expr: IntExpr): IntRef = when (expr) {
+internal fun Lowering.materializeIntVar(expr: IntExpr): IntRef = when (expr) {
     is IntRef -> expr
 
     else -> {
@@ -138,7 +138,7 @@ internal fun Compiler.Build.materializeIntVar(expr: IntExpr): IntRef = when (exp
     }
 }
 
-internal fun Compiler.Build.liftElement(index: IntExpr, items: List<IntExpr>): IntExpr {
+internal fun Lowering.liftElement(index: IntExpr, items: List<IntExpr>): IntExpr {
     val idxLifted = lift(index)
     val itemsLifted = items.map { lift(it) }
     val itemDoms = itemsLifted.map { domainOf(it) }
@@ -163,7 +163,7 @@ internal fun Compiler.Build.liftElement(index: IntExpr, items: List<IntExpr>): I
     return auxRef
 }
 
-internal fun Compiler.Build.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntExpr): IntExpr {
+internal fun Lowering.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntExpr): IntExpr {
     val tLifted = lift(thenE)
     val eLifted = lift(elseE)
     val tDom = domainOf(tLifted)
@@ -176,7 +176,7 @@ internal fun Compiler.Build.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE
     return auxRef
 }
 
-internal fun Compiler.Build.liftMinMax(children: List<IntExpr>, isMin: Boolean): IntExpr {
+internal fun Lowering.liftMinMax(children: List<IntExpr>, isMin: Boolean): IntExpr {
     val lifted = children.map { lift(it) }
     val doms = lifted.map { domainOf(it) }
     val auxDomain = if (isMin) {
@@ -193,7 +193,7 @@ internal fun Compiler.Build.liftMinMax(children: List<IntExpr>, isMin: Boolean):
     return auxRef
 }
 
-internal fun Compiler.Build.liftAbs(child: IntExpr): IntExpr {
+internal fun Lowering.liftAbs(child: IntExpr): IntExpr {
     val lifted = lift(child)
     val d = domainOf(lifted)
     val absMax = maxOf(if (d.min < 0) -d.min else d.min, if (d.max < 0) -d.max else d.max)
@@ -214,7 +214,7 @@ internal fun Compiler.Build.liftAbs(child: IntExpr): IntExpr {
     return auxRef
 }
 
-internal fun Compiler.Build.newAuxIntVar(domain: IntDomain): String {
+internal fun Lowering.newAuxIntVar(domain: IntDomain): String {
     val name = "__aux_int_${auxIntCounter++}"
     bindIntName(name, newIntVar(domain))
     return name
@@ -222,7 +222,7 @@ internal fun Compiler.Build.newAuxIntVar(domain: IntDomain): String {
 
 /** Domain of any [IntExpr] post-lift. The expression must reside in the affine
  *  fragment (caller is responsible for lifting non-affine subexpressions first). */
-internal fun Compiler.Build.domainOf(expr: IntExpr): IntDomain = when (expr) {
+internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
     is IntRef -> intDomains[intVarOf(expr.name)]
 
     is IntLit -> IntDomain(expr.value, expr.value)
@@ -274,7 +274,7 @@ internal fun checkedInt(value: Long, what: () -> String): Int {
 // Affine canonical form: Σ coeffs[name] * name + constant.
 internal data class Affine(val coeffs: Map<String, Int>, val constant: Int)
 
-internal fun Compiler.Build.affine(expr: IntExpr): Affine = when (expr) {
+internal fun Lowering.affine(expr: IntExpr): Affine = when (expr) {
     is IntRef -> Affine(mapOf(expr.name to 1), 0)
 
     is IntLit -> Affine(emptyMap(), expr.value)
@@ -313,7 +313,7 @@ private fun narrowCoeffs(coeffs: Map<String, Long>): Map<String, Int> {
     return out
 }
 
-internal fun Compiler.Build.subtract(left: Affine, right: Affine): Affine {
+internal fun Lowering.subtract(left: Affine, right: Affine): Affine {
     val coeffs = HashMap<String, Long>(left.coeffs.size)
     for ((k, v) in left.coeffs) coeffs[k] = v.toLong()
     for ((k, v) in right.coeffs) coeffs[k] = (coeffs[k] ?: 0L) - v
@@ -323,7 +323,7 @@ internal fun Compiler.Build.subtract(left: Affine, right: Affine): Affine {
     )
 }
 
-internal fun Compiler.Build.coeffsToArrays(coeffs: Map<String, Int>): Pair<IntArray, IntArray> {
+internal fun Lowering.coeffsToArrays(coeffs: Map<String, Int>): Pair<IntArray, IntArray> {
     val varIds = IntArray(coeffs.size)
     val coeffArr = IntArray(coeffs.size)
     var i = 0

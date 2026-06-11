@@ -34,7 +34,7 @@ import com.eignex.klause.solver.factor.Mdd
 
 /** Helper: build the [Mdd] factor and emit it when
  *  `seq` is all bare IntRefs. Falls back to the table-based decomposition. */
-internal fun Compiler.Build.assertMddNative(
+internal fun Lowering.assertMddNative(
     seqExpr: List<IntExpr>,
     numStatesPerLayer: List<Int>,
     layerStarts: List<Int>,
@@ -63,7 +63,7 @@ internal fun Compiler.Build.assertMddNative(
     return false
 }
 
-internal fun Compiler.Build.assertMdd(expr: MddExpr) {
+internal fun Lowering.assertMdd(expr: MddExpr) {
     if (assertMddNative(
             expr.seq,
             expr.numStatesPerLayer,
@@ -80,7 +80,7 @@ internal fun Compiler.Build.assertMdd(expr: MddExpr) {
     assertMddDecomposed(expr)
 }
 
-internal fun Compiler.Build.assertMddDecomposed(expr: MddExpr) {
+internal fun Lowering.assertMddDecomposed(expr: MddExpr) {
     val n = expr.seq.size
     // Allocate per-layer state vars: state[0..n]. state[0] = initial; state[n] ∈ accepting.
     val stateRefs = Array(n + 1) { i ->
@@ -121,7 +121,7 @@ internal fun Compiler.Build.assertMddDecomposed(expr: MddExpr) {
     }
 }
 
-internal fun Compiler.Build.assertCostMdd(expr: CostMddExpr) {
+internal fun Lowering.assertCostMdd(expr: CostMddExpr) {
     val liftedCost = lift(expr.cost)
     if (liftedCost is IntRef && assertMddNative(
             expr.seq,
@@ -140,7 +140,7 @@ internal fun Compiler.Build.assertCostMdd(expr: CostMddExpr) {
     assertCostMddDecomposed(expr)
 }
 
-internal fun Compiler.Build.assertCostMddDecomposed(expr: CostMddExpr) {
+internal fun Lowering.assertCostMddDecomposed(expr: CostMddExpr) {
     val n = expr.seq.size
     val stateRefs = Array(n + 1) { i ->
         val ns = expr.numStatesPerLayer[i]
@@ -197,7 +197,7 @@ internal fun Compiler.Build.assertCostMddDecomposed(expr: CostMddExpr) {
     assertExpr(IntCompare(IntSum(sumTerms), IntCmpOp.EQ, IntLit(0)))
 }
 
-internal fun Compiler.Build.assertCostRegular(expr: CostRegularExpr) {
+internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
     val n = expr.seq.size
     val numStates = expr.numStates
     val numSymbols = expr.numSymbols

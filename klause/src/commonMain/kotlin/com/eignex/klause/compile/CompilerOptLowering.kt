@@ -53,7 +53,7 @@ import com.eignex.klause.solver.IntDomain
 private fun indicatorInt(cond: BoolExpr): IntExpr = IntIfThenElse(cond, IntLit(1), IntLit(0))
 
 /** `b ↔ AllDifferent(terms)` (non-opt). Pairwise NE conjuncted via Tseitin. */
-internal fun Compiler.Build.reifyAllDifferent(terms: List<IntExpr>): Int {
+internal fun Lowering.reifyAllDifferent(terms: List<IntExpr>): Int {
     val pairs = mutableListOf<BoolExpr>()
     for (i in terms.indices) {
         for (j in i + 1 until terms.size) {
@@ -64,7 +64,7 @@ internal fun Compiler.Build.reifyAllDifferent(terms: List<IntExpr>): Int {
 }
 
 /** `b ↔ AllDifferentOpt`. Each pair guarded by both presence bits. */
-internal fun Compiler.Build.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
+internal fun Lowering.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
     val pairs = mutableListOf<BoolExpr>()
     for (i in expr.terms.indices) {
         for (j in i + 1 until expr.terms.size) {
@@ -84,7 +84,7 @@ internal fun Compiler.Build.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
 /** `b ↔ nvalue(n, xs, mode)` over a presence-gated subset. Enumerate the union domain;
  *  for each candidate value `v`, build the indicator `∃i (p_i ∧ x_i = v)`. Sum the
  *  indicators and compare against `n` per `mode`. */
-internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
+internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
     // Compute the union of static domains for each x_i. Each xs entry must lift to a
     // bare IntRef so we can look up its domain — non-bare arithmetic on opt vars at this
     // position isn't supported (matches the non-opt convention).
@@ -115,7 +115,7 @@ internal fun Compiler.Build.reifyNValueOpt(expr: NValueExprOpt): Int {
 
 /** `b ↔ gcc(...)` over a presence-gated subset, with optional closed-set check.
  *  Per cover: `low[k] ≤ Σ_i 1{p_i ∧ x_i=cover[k]} ≤ high[k]`. */
-internal fun Compiler.Build.reifyGccOpt(expr: GccExprOpt): Int {
+internal fun Lowering.reifyGccOpt(expr: GccExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (k in expr.cover.indices) {
         val coverVal = expr.cover[k]
@@ -142,7 +142,7 @@ internal fun Compiler.Build.reifyGccOpt(expr: GccExprOpt): Int {
 }
 
 /** `b ↔ disjunctive(starts, durations)` (non-opt). Pairwise non-overlap via reified Or. */
-internal fun Compiler.Build.reifyDisjunctive(expr: DisjunctiveExpr): Int {
+internal fun Lowering.reifyDisjunctive(expr: DisjunctiveExpr): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (i in expr.starts.indices) {
         for (j in i + 1 until expr.starts.size) {
@@ -156,7 +156,7 @@ internal fun Compiler.Build.reifyDisjunctive(expr: DisjunctiveExpr): Int {
 }
 
 /** `b ↔ disjunctiveOpt(...)`. Each pair gated by both presence bits. */
-internal fun Compiler.Build.reifyDisjunctiveOpt(expr: DisjunctiveExprOpt): Int {
+internal fun Lowering.reifyDisjunctiveOpt(expr: DisjunctiveExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (i in expr.starts.indices) {
         for (j in i + 1 until expr.starts.size) {
@@ -183,12 +183,12 @@ private fun pairwiseNoOverlap(si: IntExpr, di: Int, sj: IntExpr, dj: Int): BoolE
  *  runs_i(t)` must stay under capacity. The horizon spans `[minEst, maxLct)` derived from
  *  the static start-var domains; absent that information the lowering can't bound the
  *  number of time-point constraints, so each start must lift to a bare [com.eignex.klause.ast.IntRef]. */
-internal fun Compiler.Build.reifyCumulative(expr: CumulativeExpr): Int =
+internal fun Lowering.reifyCumulative(expr: CumulativeExpr): Int =
     cumulativeTimeTabling(expr.starts, expr.durations, expr.resources, expr.capacity, presents = null)
 
 /** Same as [reifyCumulative] but with per-task presence gates folded into each
  *  runs-at-t indicator. */
-internal fun Compiler.Build.reifyCumulativeOpt(expr: CumulativeExprOpt): Int =
+internal fun Lowering.reifyCumulativeOpt(expr: CumulativeExprOpt): Int =
     cumulativeTimeTabling(expr.starts, expr.durations, expr.resources, expr.capacity, presents = expr.presents)
 
 /**
@@ -199,7 +199,7 @@ internal fun Compiler.Build.reifyCumulativeOpt(expr: CumulativeExprOpt): Int =
  * over `succ` and over positions. All produced factors are BitBlaster-supported (Linear,
  * Reified*, AllDifferent, Clause).
  */
-internal fun Compiler.Build.reifyCircuit(expr: CircuitExpr): Int {
+internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
     val n = expr.succ.size
     val offset = expr.valueOffset
     val pieces = mutableListOf<BoolExpr>()
@@ -248,7 +248,7 @@ internal fun Compiler.Build.reifyCircuit(expr: CircuitExpr): Int {
  * contradiction. Closing the included sub-cycle is handled by allowing
  * `pos[succ[i]] = 0` when the edge closes the loop.
  */
-internal fun Compiler.Build.reifySubcircuit(expr: SubcircuitExpr): Int {
+internal fun Lowering.reifySubcircuit(expr: SubcircuitExpr): Int {
     val n = expr.succ.size
     val offset = expr.valueOffset
     val pieces = mutableListOf<BoolExpr>()
@@ -283,7 +283,7 @@ private fun allDiffAsAnd(terms: List<IntExpr>): BoolExpr {
     return if (pairs.size == 1) pairs[0] else And(pairs)
 }
 
-private fun Compiler.Build.cumulativeTimeTabling(
+private fun Lowering.cumulativeTimeTabling(
     starts: List<IntExpr>,
     durations: List<Int>,
     resources: List<Int>,
