@@ -4,8 +4,6 @@ import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.solver.presolve.PresolveContext
-import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FloatInterval
 import com.eignex.klause.solver.FloatMetadata
@@ -38,6 +36,8 @@ import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.GaussianXor
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.presolve.PresolveContext
+import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.util.binarySearchInt
 
 /**

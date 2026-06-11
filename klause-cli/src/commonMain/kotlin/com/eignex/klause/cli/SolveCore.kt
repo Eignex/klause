@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
@@ -25,7 +26,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.presolve.PresolveConfig
 
 /**
