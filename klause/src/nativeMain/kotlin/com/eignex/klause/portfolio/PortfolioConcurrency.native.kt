@@ -1,4 +1,7 @@
 @file:OptIn(ExperimentalForeignApi::class)
+// TODO: drop this suppression and migrate off kotlin.native.concurrent.Worker once Kotlin/Native
+// ships a stable threads replacement (the API is flagged obsolete but has no drop-in successor yet).
+@file:Suppress("DEPRECATION")
 
 package com.eignex.klause.portfolio
 
