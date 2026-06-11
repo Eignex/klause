@@ -7,8 +7,8 @@ import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.formats.xcsp3.Xcsp3
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.objective.LinearObjective
 import java.io.File
 
 /** A parsed instance lifted into klause's solver representation, plus an optional objective. */

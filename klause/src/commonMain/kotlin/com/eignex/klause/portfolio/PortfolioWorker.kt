@@ -1,12 +1,12 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 
 /**
  * One configured engine instance in a `Portfolio`: a [Session] together with the base

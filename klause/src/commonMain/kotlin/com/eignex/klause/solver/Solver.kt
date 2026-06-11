@@ -10,6 +10,12 @@ import com.eignex.klause.solver.count.ExactCountConfig
 import com.eignex.klause.solver.count.SampleQuality
 import com.eignex.klause.solver.count.SamplingConfig
 import com.eignex.klause.solver.count.UniGen
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SampleResult
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.UnsatCore
 
 /**
  * Marker for backend-specific solver params. Each solver backend ships its own data class
@@ -68,8 +74,8 @@ sealed interface SolveResult {
          * any conflict's 1UIP analysis during the search. Sound (jointly infeasible
          * with the hard constraints) but not guaranteed minimal — populated by
          * [com.eignex.klause.solver.backtrack.BacktrackSolver]; other backends leave
-         * this `null`. Used by [satisfyUnderAssumptions] to surface a tight
-         * [SatisfyResult.UnsatUnderAssumptions.core] without the
+         * this `null`. Used by [com.eignex.klause.solver.result.satisfyUnderAssumptions] to surface a tight
+         * [com.eignex.klause.solver.result.SatisfyResult.UnsatUnderAssumptions.core] without the
          * `minimizeCore = true` deletion-MUS fallback.
          */
         val assumptionCore: Assumptions? = null,
@@ -193,7 +199,7 @@ interface Solver<P : SolverParams> {
  * bounds, native `mkAdd` translation in Z3) from params alone, with no runtime objective-type
  * dispatch. The local-search engines additionally accept a per-move gradient view of the same
  * objective via `LocalSearchParams.lsObjective` (see
- * [com.eignex.klause.solver.IncrementalObjective]).
+ * [com.eignex.klause.solver.objective.IncrementalObjective]).
  */
 interface Optimizer<P : SolverParams> : Solver<P> {
     /**

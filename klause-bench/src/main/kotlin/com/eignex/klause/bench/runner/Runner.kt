@@ -6,10 +6,10 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.format.Formats
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.IncrementalObjective
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
 
 /** A catalog [ProblemRef] resolved into a concrete, solvable klause [Problem]. */
 internal data class ResolvedProblem(

@@ -2,8 +2,6 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Linear
@@ -12,7 +10,9 @@ import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.DualSimplex
 import com.eignex.klause.solver.lp.LpExplanation
 import com.eignex.klause.solver.lp.LpStatus
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

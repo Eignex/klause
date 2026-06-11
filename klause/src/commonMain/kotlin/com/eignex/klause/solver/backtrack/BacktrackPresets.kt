@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.SearchEvent
+import com.eignex.klause.solver.result.SearchEvent
 
 /**
  * Curated [BacktrackParams] presets — named, ready-to-use configurations that bundle the

@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.objective.FunctionalObjective
 
 /**
  * The topologically-ordered functional definitions of a FlatZinc model — every

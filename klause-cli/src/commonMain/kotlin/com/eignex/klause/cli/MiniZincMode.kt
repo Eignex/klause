@@ -5,9 +5,9 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.formats.minizinc.OznApplier
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveStats
-import com.eignex.klause.solver.maximizeInt
-import com.eignex.klause.solver.minimizeInt
+import com.eignex.klause.solver.objective.maximizeInt
+import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.result.SolveStats
 
 /**
  * MiniZinc / FlatZinc front-end. The default mode: MiniZinc invokes this binary via the

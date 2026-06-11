@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.presolve
 
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.Presolve
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.presolve.Presolve
 
 /**
  * Result of running a presolve pipeline: the transformed [problem] plus the [reconstruct]

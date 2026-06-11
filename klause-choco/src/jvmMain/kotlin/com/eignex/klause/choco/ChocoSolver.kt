@@ -1,12 +1,12 @@
 package com.eignex.klause.choco
 
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.TerminationReason
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import org.chocosolver.solver.Model
 import org.chocosolver.solver.ParallelPortfolio
 import org.chocosolver.solver.Solution

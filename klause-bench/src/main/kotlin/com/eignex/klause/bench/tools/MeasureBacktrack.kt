@@ -12,7 +12,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Diagnostic: run [BacktrackSolver] over a generated scaling series and dump the engine's
- * [com.eignex.klause.solver.SolveStats] per instance — to see *where* the complete search
+ * [com.eignex.klause.solver.result.SolveStats] per instance — to see *where* the complete search
  * spends effort and whether clause learning is engaging, without needing a downloaded
  * corpus.
  *

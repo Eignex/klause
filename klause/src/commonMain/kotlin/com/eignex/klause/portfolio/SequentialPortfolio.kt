@@ -1,11 +1,11 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolveStats
-import com.eignex.klause.solver.TerminationReason
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.Exp3Bandit
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit

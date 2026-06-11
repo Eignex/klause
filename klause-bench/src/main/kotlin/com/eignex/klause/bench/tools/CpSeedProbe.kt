@@ -3,7 +3,6 @@ package com.eignex.klause.bench.tools
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -14,8 +13,9 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import com.eignex.klause.solver.maximizeInt
-import com.eignex.klause.solver.minimizeInt
+import com.eignex.klause.solver.objective.maximizeInt
+import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.result.MinimizeResult
 import java.io.File
 import java.util.Locale
 

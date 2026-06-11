@@ -2,7 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveStats
+import com.eignex.klause.solver.result.SolveStats
 
 /**
  * XCSP3 front-end (`.xml` / `.xcsp` / `.xcsp3`). Emits the XCSP3 competition output protocol:

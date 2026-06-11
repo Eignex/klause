@@ -1,18 +1,12 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolveStatsSink
 import com.eignex.klause.solver.Solver
-import com.eignex.klause.solver.TerminationReason
-import com.eignex.klause.solver.UnsatCore
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.lp.AllDifferentSeparator
 import com.eignex.klause.solver.lp.AssignmentObjectiveCut
@@ -39,7 +33,7 @@ import com.eignex.klause.solver.lp.VarStatus
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.mulExact
 import com.eignex.klause.solver.lp.subExact
-import com.eignex.klause.solver.projectSeedConflictToAssumptions
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -48,6 +42,12 @@ import com.eignex.klause.solver.propagation.TIER_CORE
 import com.eignex.klause.solver.propagation.TIER_LOCAL
 import com.eignex.klause.solver.propagation.TIER_MID
 import com.eignex.klause.solver.propagation.TIER_UNSET
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.UnsatCore
+import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
@@ -1124,7 +1124,7 @@ class BacktrackSolver(override val problem: Problem) :
          *  [touchedAssumptionLevels] is the union of seed-level decision levels that
          *  appeared in any conflict's learned-clause decision-level set during the
          *  search — feeds the assumption-core projection in
-         *  [com.eignex.klause.solver.satisfyUnderAssumptions]. Empty when no seed was
+         *  [com.eignex.klause.solver.result.satisfyUnderAssumptions]. Empty when no seed was
          *  in play or no conflict referenced a seed level. */
         data class Exhausted(val core: UnsatCore? = null, val touchedAssumptionLevels: IntArray = IntArray(0)) :
             SearchOutcome

@@ -1,9 +1,12 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.objective
+import com.eignex.klause.solver.Assignment
+import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.Sample
 
 /**
  * Anything the local-search internals can score an assignment by; "lower is better".
  *
- * This is **not** the optimizer API type: [Optimizer.minimize] is statically typed
+ * This is **not** the optimizer API type: [com.eignex.klause.solver.Optimizer.minimize] is statically typed
  * [LinearObjective] — the one canonical objective every front-end produces — so backends enable
  * their objective machinery (LP bounding, branch-and-bound bounds, native translations) from
  * params alone, with no objective-shape dispatch. This interface remains as the local-search

@@ -2,7 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveStats
+import com.eignex.klause.solver.result.SolveStats
 
 /**
  * SMT-LIB 2 **QF_LIA** front-end (`.smt2` / `.smt`). Emits the SMT-LIB convention: a

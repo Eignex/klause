@@ -1,15 +1,15 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.solver.IncrementalObjective
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Move.BoolFlip
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.Objective
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test

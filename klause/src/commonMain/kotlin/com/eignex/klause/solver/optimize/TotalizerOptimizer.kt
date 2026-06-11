@@ -6,13 +6,13 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SatisfyResult
-import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
-import com.eignex.klause.solver.satisfyUnderAssumptions
+import com.eignex.klause.solver.result.SatisfyResult
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.satisfyUnderAssumptions
 
 /**
  * Totalizer-encoded core-guided MaxSAT optimiser for **unweighted** problems. Builds

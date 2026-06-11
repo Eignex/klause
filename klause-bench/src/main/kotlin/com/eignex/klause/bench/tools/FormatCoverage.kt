@@ -8,12 +8,12 @@ import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream

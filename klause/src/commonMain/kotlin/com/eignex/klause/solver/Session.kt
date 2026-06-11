@@ -5,6 +5,10 @@ import com.eignex.klause.solver.count.Count
 import com.eignex.klause.solver.count.CountConfig
 import com.eignex.klause.solver.count.ExactCountConfig
 import com.eignex.klause.solver.count.SamplingConfig
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SampleResult
+import com.eignex.klause.solver.result.TerminationReason
 
 /**
  * Stateful per-instance handle for a [Solver]. A Session holds the per-instance state

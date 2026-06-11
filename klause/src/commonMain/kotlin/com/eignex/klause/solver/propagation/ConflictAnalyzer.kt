@@ -93,7 +93,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             /** Distinct decision levels appearing in [literals]. Sorted ascending. Used
              *  by the engine to project a conflict back to the subset of assumption-
              *  level pins (decision levels 1..|seed|) that participated — feeds the
-             *  assumption-core extraction path in [com.eignex.klause.solver.satisfyUnderAssumptions]. */
+             *  assumption-core extraction path in [com.eignex.klause.solver.result.satisfyUnderAssumptions]. */
             val decisionLevels: IntArray,
             /** True iff the clause is a proper 1UIP clause — exactly one literal at the
              *  conflict level — so that after popping to [backjumpLevel] it becomes unit

@@ -1,16 +1,16 @@
 package com.eignex.klause.solver.localsearch.meta
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSession
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
 import kotlin.random.Random

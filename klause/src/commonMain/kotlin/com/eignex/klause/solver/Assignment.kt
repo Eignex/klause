@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.Bits
 import kotlin.random.Random
 
 /**

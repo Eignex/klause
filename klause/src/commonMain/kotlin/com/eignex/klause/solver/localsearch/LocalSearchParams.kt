@@ -2,12 +2,12 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.IncrementalObjective
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
+import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SearchEvent
 
 /**
  * Per-call params for the local-search [LocalSearchSolver]. Engine setup
@@ -53,12 +53,12 @@ data class LocalSearchParams(
     /**
      * Optional per-move *gradient view* of the objective for [LocalSearchSolver.minimize] /
      * `improvements`: when non-null, the descent scores and evaluates against this
-     * [com.eignex.klause.solver.IncrementalObjective] instead of the [LinearObjective] passed to
+     * [com.eignex.klause.solver.objective.IncrementalObjective] instead of the [LinearObjective] passed to
      * `minimize`. The canonical use is a functionally-defined MiniZinc objective (the
      * `defines_var` cone behind `minimizeInt(V)`): the linear form has zero gradient on decision
      * moves — moving a decision variable merely violates `V`'s defining constraint — while this
      * view recomputes `V` from the leaves, giving CBLS the gradient that matters (see
-     * [com.eignex.klause.solver.FunctionalObjective]). Must agree with the linear objective on
+     * [com.eignex.klause.solver.objective.FunctionalObjective]). Must agree with the linear objective on
      * every *feasible* assignment, so incumbent objectives stay comparable across engines.
      * `null` (default) descends the linear objective directly. Ignored by `solve` / `samples` /
      * `enumerate`.

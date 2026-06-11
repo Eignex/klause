@@ -6,11 +6,11 @@ import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
 import com.eignex.klause.ortools.OrToolsParams
 import com.eignex.klause.ortools.OrToolsSolver
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.yuck.YuckParams
 import com.eignex.klause.yuck.YuckSolver
 

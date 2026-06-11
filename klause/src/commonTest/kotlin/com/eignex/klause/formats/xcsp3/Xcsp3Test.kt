@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.xcsp3
 
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -13,6 +12,7 @@ import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

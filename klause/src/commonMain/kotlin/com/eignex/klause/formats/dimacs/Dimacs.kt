@@ -2,10 +2,10 @@ package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.cnf.CnfProblem
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.math.abs
 
 /**

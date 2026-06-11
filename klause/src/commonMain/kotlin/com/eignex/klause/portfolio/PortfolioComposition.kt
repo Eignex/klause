@@ -1,10 +1,10 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.IncrementalObjective
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.SearchEvent
+import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SearchEvent
 import kotlin.math.roundToInt
 
 /** Whether the problem is a constraint *optimization* (an objective to minimise) or a pure

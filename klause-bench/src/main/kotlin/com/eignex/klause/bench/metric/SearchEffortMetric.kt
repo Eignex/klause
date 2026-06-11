@@ -7,9 +7,7 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.logicng.LogicNGParams
 import com.eignex.klause.logicng.LogicNGSolver
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -17,6 +15,8 @@ import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.RegressionVariableHeuristic
 import com.eignex.klause.solver.backtrack.SolutionGuided
 import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.Locale

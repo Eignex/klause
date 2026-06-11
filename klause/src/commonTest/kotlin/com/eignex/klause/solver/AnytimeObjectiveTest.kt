@@ -3,6 +3,7 @@ package com.eignex.klause.solver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
