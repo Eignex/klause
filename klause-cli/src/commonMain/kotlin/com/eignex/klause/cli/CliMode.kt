@@ -88,8 +88,8 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
  * solution back to the original variables first. Every other field is valid unchanged because
  * the same-space passes keep variable ids. Returns `this` when nothing changed.
  */
-internal fun Solvable.presolved(config: PresolveConfig): Solvable {
-    val pre = Presolver.run(problem, config, PresolveContext.of(linearObjective))
+internal fun Solvable.presolved(config: PresolveConfig, solutionSetSensitive: Boolean): Solvable {
+    val pre = Presolver.run(problem, config, PresolveContext.of(linearObjective, solutionSetSensitive))
     if (pre.problem === problem) return this
     return Solvable(
         problem = pre.problem,

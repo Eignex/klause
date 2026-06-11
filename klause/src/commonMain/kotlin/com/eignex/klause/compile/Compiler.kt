@@ -60,6 +60,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RealLinearConstraint
+import com.eignex.klause.solver.presolve.PresolveContext
+import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.LinearOp
@@ -504,6 +506,10 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             )
         }
 
+    // Construction-time SAC probes are resolved from the presolve config (solution-preserving, so
+    // intent-independent — resolved under EMPTY). Holes imply bounds.
+    val presolve = config.presolve
+    val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
     return CompiledProblem(
         problem = Problem(
             numBoolVars = numBoolVars,
@@ -511,6 +517,9 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
             floatMetadata = metadata,
+            probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
+            probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
+            probeIntHoles = holes,
         ),
         boolVarIdByName = boolVarIdByName.toMap(),
         intVarIdByName = intVarIdByName.toMap(),

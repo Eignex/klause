@@ -1,5 +1,7 @@
 package com.eignex.klause.config
 
+import com.eignex.klause.solver.presolve.PresolveConfig
+
 /** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries
  *  with no explicit range). Wide enough to absorb typical CP arithmetic without overflow in
  *  factor coefficient × value products; matches the convention used by Gecode / Chuffed. */
@@ -68,6 +70,12 @@ data class KlauseConfig(
     /** Fixed-point scale used by the FlatZinc float-linear lowering (real coefficients and
      *  bounds are multiplied by this and rounded to integers). Env: `KLAUSE_FLOAT_SCALE`. */
     val floatScale: Long = DEFAULT_FLOAT_SCALE,
+
+    /** Which presolve passes run, as a tri-state per-pass config (each pass on / off / auto).
+     *  Covers the problem-level passes and the construction-time SAC probes; defaults to
+     *  [PresolveConfig.AUTO] (every pass auto-resolved). The CLI `--presolve` flag and the
+     *  `klause.presolve` property override it. */
+    val presolve: PresolveConfig = PresolveConfig.AUTO,
 ) {
     /** Default configuration values. */
     companion object {
