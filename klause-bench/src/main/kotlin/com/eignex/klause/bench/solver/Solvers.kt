@@ -204,13 +204,10 @@ private class YuckBench(override val problem: Problem, private val params: YuckP
  * backtrack engine the anytime metric drives, now selectable for the time / completeness /
  * parity / verify metrics so the portfolio can be benchmarked *as a solver* across the catalog.
  *
- * Worker counts come from `-Dklause.portfolio.ls` (default 4) and `-Dklause.portfolio.bt`
- * (default 2). The portfolio + sessions are built once and reused across calls (matching the
+ * The pool width comes from `-Dklause.portfolio.processors` (default: host core count) — the same
+ * one-knob model parity uses; the LS:backtrack split is the scenario's (kind-derived) decision, not a
+ * per-engine count. The portfolio + sessions are built once and reused across calls (matching the
  * single-engine benches).
- *
- * **Bridge (load-bearing):** the coroutine [Portfolio] → blocking bridge MUST use
- * `runBlocking(Dispatchers.Default)`. Plain `runBlocking` is single-threaded and the CPU-bound,
- * never-suspending worker loops starve each other (symptom: a parallel pool behaves serially).
  *
  * **Scope:** [solve] and the bounded [samples] / [enumerated] are the intended use. The lazy
  * sequence views are materialised to a bounded cap (`SEQUENCE_CAP`) because LS workers stream
@@ -219,16 +216,16 @@ private class YuckBench(override val problem: Problem, private val params: YuckP
  */
 private class PortfolioBench(
     override val problem: Problem,
-    ls: Int = System.getProperty("klause.portfolio.ls")?.toIntOrNull() ?: 4,
-    bt: Int = System.getProperty("klause.portfolio.bt")?.toIntOrNull() ?: 2,
+    processors: Int = System.getProperty("klause.portfolio.processors")?.toIntOrNull()
+        ?: Runtime.getRuntime().availableProcessors(),
 ) : InProcessSolver {
     // The portfolio-as-solver backend wires no objective, so it benchmarks the CSP-kind mixed
-    // composition (satisfaction + sampling). `-Dklause.portfolio.ls/bt` set the total width; the
-    // LS:backtrack split is now the scenario's (kind-derived) decision, not a per-knob count.
+    // composition (satisfaction + sampling) over `processors` workers; the LS:backtrack split is the
+    // scenario's (kind-derived) decision, not a per-knob count.
     private val portfolio: Portfolio = Portfolio(
         PortfolioBuilder.build(
             problem,
-            PortfolioScenario.parallel(threads = ls + bt, kind = Kind.CSP, engine = EngineMix.MIXED),
+            PortfolioScenario.parallel(threads = processors, kind = Kind.CSP, engine = EngineMix.MIXED),
         ),
     )
     override val name = "portfolio"
