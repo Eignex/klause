@@ -42,6 +42,8 @@ class Subcircuit(
         require(succ.isNotEmpty()) { "Subcircuit needs at least one var, got ${succ.size}" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Subcircuit(succ.remapVars(intMap))
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = succ
 

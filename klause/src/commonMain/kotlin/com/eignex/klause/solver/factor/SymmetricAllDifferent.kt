@@ -29,6 +29,9 @@ class SymmetricAllDifferent(
         require(xs.isNotEmpty()) { "symmetric_all_different: empty xs" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        SymmetricAllDifferent(xs.remapVars(intMap), indexOffset)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 

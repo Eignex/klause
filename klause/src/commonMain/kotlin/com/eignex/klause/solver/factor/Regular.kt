@@ -51,6 +51,9 @@ class Regular(
         require(q0 in 1..numStates) { "regular: q0 ($q0) out of [1, $numStates]" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        Regular(seq.remapVars(intMap), numStates, alphabetSize, transitions, q0, accepting)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = seq
 

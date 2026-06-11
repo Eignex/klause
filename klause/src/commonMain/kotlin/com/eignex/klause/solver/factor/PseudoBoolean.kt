@@ -32,6 +32,9 @@ class PseudoBoolean(
         require(weights.isNotEmpty()) { "PseudoBoolean must have at least one term" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        PseudoBoolean(weights, literals.remapLits(boolMap), op, bound)
+
     override val boolVars: IntArray = run {
         val seen = LinkedHashSet<Int>()
         for (lit in literals) seen.add(Lit.variable(lit))

@@ -35,6 +35,8 @@ class Table(
         require(numTuples > 0) { "table: at least one tuple required" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(xs.remapVars(intMap), tuples)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 

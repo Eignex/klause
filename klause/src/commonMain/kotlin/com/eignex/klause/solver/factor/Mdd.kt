@@ -53,6 +53,17 @@ class Mdd(
         if (recordStride == 4) require(cost >= 0) { "Mdd: cost-MDD requires cost var" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Mdd(
+        seq.remapVars(intMap),
+        numStatesPerLayer,
+        layerStarts,
+        transitions,
+        initial,
+        accepting,
+        recordStride,
+        if (cost >= 0) intMap[cost] else cost,
+    )
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
 

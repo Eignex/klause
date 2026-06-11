@@ -31,6 +31,9 @@ class ReifiedCardinality(
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)
+
     override val boolVars: IntArray = run {
         val unique = LinkedHashSet<Int>()
         unique.add(auxBoolVar)

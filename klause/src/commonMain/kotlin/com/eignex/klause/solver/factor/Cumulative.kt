@@ -98,6 +98,17 @@ class Cumulative(
         }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cumulative(
+        starts.remapVars(intMap),
+        durations,
+        resources,
+        capacity,
+        presents.remapLits(boolMap),
+        durationVars.remapVars(intMap),
+        resourceVars.remapVars(intMap),
+        if (capacityVar >= 0) intMap[capacityVar] else capacityVar,
+    )
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = run {
         val extra = (if (durationVars.isNotEmpty()) durationVars.size else 0) +

@@ -32,6 +32,9 @@ class ReifiedPseudoBoolean(
         require(weights.isNotEmpty()) { "ReifiedPseudoBoolean must have at least one term" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
+
     override val boolVars: IntArray = run {
         val unique = LinkedHashSet<Int>()
         unique.add(auxBoolVar)

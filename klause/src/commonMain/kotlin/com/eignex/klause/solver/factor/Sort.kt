@@ -23,6 +23,8 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
         require(xs.isNotEmpty()) { "sort: empty arrays" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Sort(xs.remapVars(intMap), ys.remapVars(intMap))
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
 

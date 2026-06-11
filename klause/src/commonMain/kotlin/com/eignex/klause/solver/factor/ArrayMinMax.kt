@@ -21,6 +21,9 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
         require(xs.isNotEmpty()) { "ArrayMinMax needs at least one operand" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        ArrayMinMax(intMap[result], xs.remapVars(intMap), max)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + intArrayOf(result)
 

@@ -26,6 +26,8 @@ class Xor(
         require(targetParity == 0 || targetParity == 1) { "targetParity must be 0 or 1" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Xor(literals.remapLits(boolMap), targetParity)
+
     override val boolVars: IntArray = run {
         val unique = LinkedHashSet<Int>()
         for (lit in literals) unique.add(Lit.variable(lit))

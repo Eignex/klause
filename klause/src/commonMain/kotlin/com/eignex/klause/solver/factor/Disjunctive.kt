@@ -69,6 +69,9 @@ class Disjunctive(
         }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        Disjunctive(starts.remapVars(intMap), durations, presents.remapLits(boolMap), durationVars.remapVars(intMap))
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = if (durationVars.isEmpty()) starts else starts + durationVars
 

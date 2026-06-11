@@ -57,6 +57,16 @@ class GlobalCardinality(
         }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = GlobalCardinality(
+        xs.remapVars(intMap),
+        cover,
+        countVars?.remapVars(intMap),
+        countLow,
+        countHigh,
+        closed,
+        presents.remapLits(boolMap),
+    )
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
 
     private fun present(state: LocalSearchState, idx: Int): Boolean =

@@ -56,6 +56,8 @@ class Linear private constructor(
         require(coeffs.isNotEmpty()) { "Linear must have at least one term" }
     }
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = vars
 

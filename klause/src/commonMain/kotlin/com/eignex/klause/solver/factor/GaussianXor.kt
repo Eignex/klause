@@ -29,7 +29,10 @@ import com.eignex.klause.solver.propagation.PropagationState
  * factors posted alongside it, which carry the same parity semantics *with* real LS support,
  * so LS enforces each parity row via those siblings.
  */
-class GaussianXor(constraints: List<Xor>) : Factor {
+class GaussianXor(private val constraints: List<Xor>) : Factor {
+
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        GaussianXor(constraints.map { it.remap(boolMap, intMap) as Xor })
 
     /** Union of all variables across the constraints, in stable order; column index = position. */
     override val boolVars: IntArray

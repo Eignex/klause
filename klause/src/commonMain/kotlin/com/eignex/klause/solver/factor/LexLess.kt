@@ -29,6 +29,9 @@ class LexLess(
     val strict: Boolean,
 ) : Factor {
 
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        LexLess(xs.remapVars(intMap), ys.remapVars(intMap), strict)
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
 
