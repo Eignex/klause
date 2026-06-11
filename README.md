@@ -117,9 +117,9 @@ class CampaignSchema : VariableSchema() {
   filter to the present subset, so most user code does not need to mention
   presence explicitly.
 - Integer arithmetic: +, -, *, /, % over integer expressions and constants.
-  Division and modulo are Euclidean (matching SMT-LIB QF_LIA) so the
-  remainder is always non-negative. Multiplication works variable-by-variable,
-  not only by constants.
+  Division and modulo are truncated toward zero (matching MiniZinc and Java/Kotlin
+  `%`), so the remainder takes the sign of the dividend. Multiplication works
+  variable-by-variable, not only by constants.
 - Comparisons: le, lt, ge, gt, eq, ne between arbitrary integer expressions,
   returning a Boolean expression usable in any reified context.
 - Counting: atMost and atLeast bound the number of true bools; cardinality

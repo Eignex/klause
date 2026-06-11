@@ -74,9 +74,9 @@ class IntDivModDslTest {
         assertTrue(cnf.clauses.isNotEmpty())
     }
 
-    /** Euclidean: -7 = 3*(-3) + 2, so (-7) div 3 = -3 (not -2 like Java truncation). */
+    /** Truncated toward zero: -7 div 2 = -3 (remainder -1), matching Kotlin's `/`. */
     @Test
-    fun `negative numerator Euclidean division`() {
+    fun `negative numerator truncated division`() {
         class S : VariableSchema() {
             val n by intVar(min = -7, max = -7)
             val d by intVar(min = 1, max = 3)
@@ -93,16 +93,16 @@ class IntDivModDslTest {
         for (s in samples) {
             val nv = compiled.decode(schema.n, s)
             val dv = compiled.decode(schema.d, s)
-            // Euclidean: pick q s.t. n - q*d ∈ [0, |d|). For n=-7, d=3: q=-3, r=2.
             assertEquals(-7, nv)
-            assertEquals(3, dv)
+            // Kotlin's `/` is truncated-toward-zero — the convention klause now uses.
+            assertEquals(-3, nv / dv, "n=$nv d=$dv")
         }
     }
 
-    /** Negative denominator Euclidean: for positive n, q is computed from `q*d + r = n`
-     *  with `0 ≤ r < |d|`. e.g. 4 div -2 = -2 (r=0), 5 div -2 = -2 (r=1). */
+    /** Negative denominator, positive numerator: truncated and Euclidean agree here (the
+     *  remainder is non-negative either way). e.g. 4 div -2 = -2 (r=0), 5 div -2 = -2 (r=1). */
     @Test
-    fun `negative denominator Euclidean division`() {
+    fun `negative denominator division`() {
         class S : VariableSchema() {
             val n by intVar(min = 0, max = 6)
             val d by intVar(min = -3, max = -1)
@@ -122,19 +122,19 @@ class IntDivModDslTest {
             val dv = compiled.decode(schema.d, s)
             assertTrue(
                 (nv to dv) in expectedPairs,
-                "n=$nv d=$dv not in expected Euclidean q=-2 pairs $expectedPairs",
+                "n=$nv d=$dv not in expected q=-2 pairs $expectedPairs",
             )
         }
     }
 
-    /** Euclidean mod is always non-negative. -10 = 3*(-4) + 2, so (-10) mod 3 = 2
-     *  (not -1 like Java's `%`). */
+    /** Truncated mod takes the sign of the dividend: -10 mod 3 = -1 (matching Kotlin's `%`),
+     *  not the Euclidean +2. */
     @Test
-    fun `negative numerator Euclidean mod is non-negative`() {
+    fun `negative numerator truncated mod takes dividend sign`() {
         class S : VariableSchema() {
             val n by intVar(min = -10, max = -10)
             val d by intVar(min = 3, max = 3)
-            val pinR by constraint { (n % d) eq 2 }
+            val pinR by constraint { (n % d) eq -1 }
         }
         val schema = S()
         val compiled = schema.compile()
@@ -149,6 +149,7 @@ class IntDivModDslTest {
             val dv = compiled.decode(schema.d, s)
             assertEquals(-10, nv)
             assertEquals(3, dv)
+            assertEquals(-1, nv % dv, "n=$nv d=$dv")
         }
     }
 }
