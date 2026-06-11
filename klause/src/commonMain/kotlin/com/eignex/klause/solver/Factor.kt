@@ -52,6 +52,16 @@ interface Factor {
     fun structuralKey(): String? = null
 
     /**
+     * Whether this factor's meaning is invariant under *any* relabeling of domain values — i.e. it
+     * treats values as interchangeable symbols (AllDifferent: distinctness ignores which values).
+     * Used by value-symmetry detection (#366): a value permutation is a symmetry only if every
+     * factor is value-anonymous (and every variable's domain is invariant under it). Arithmetic and
+     * value-meaningful constraints return `false` (the default), conservatively blocking value
+     * symmetry for the whole problem.
+     */
+    fun isValueAnonymous(): Boolean = false
+
+    /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
      * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
      * — sound but trivial. Factors override to participate in [Problem.propagate].
