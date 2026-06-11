@@ -1,4 +1,8 @@
 package com.eignex.klause.formats.flatzinc
+import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
+import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FloatInterval
 import com.eignex.klause.solver.FloatMetadata
@@ -44,8 +48,8 @@ import com.eignex.klause.util.binarySearchInt
  */
 internal class FlatZincCompiler(
     internal val model: FznModel,
-    internal val floatBuckets: Int = 1024,
-    internal val floatScale: Long = 1_000_000L,
+    internal val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+    internal val floatScale: Long = DEFAULT_FLOAT_SCALE,
     /**
      * Per the MiniZinc Challenge LS-track rules, `symmetry_breaking_constraint(...)` and
      * `redundant_constraint(...)` may be dropped by local-search solvers. Set this to
@@ -1066,21 +1070,11 @@ internal class FlatZincCompiler(
     internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, 0, 0)
 }
 
-/** Default lower bound for unbounded `var int` declarations. Wide enough to absorb
- *  typical CP arithmetic without overflow in factor coefficient × value products; matches
- *  the convention used by Gecode / Chuffed. Override at the CLI boundary via the
- *  `unboundedIntLo` parameter of [parseFlatZinc] — `klause-cli` wires the
- *  `KLAUSE_FZN_UNBOUNDED_INT_LO` env var / `--unbounded-int-lo` flag through. */
-const val DEFAULT_UNBOUNDED_INT_LO: Int = -10_000_000
-
-/** Default upper bound for unbounded `var int`; counterpart to [DEFAULT_UNBOUNDED_INT_LO]. */
-const val DEFAULT_UNBOUNDED_INT_HI: Int = 10_000_000
-
 /** Top-level entry point: parse + compile. */
 fun parseFlatZinc(
     source: String,
-    floatBuckets: Int = 1024,
-    floatScale: Long = 1_000_000L,
+    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+    floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
     unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,

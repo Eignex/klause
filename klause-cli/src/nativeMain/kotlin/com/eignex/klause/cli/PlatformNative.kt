@@ -34,6 +34,10 @@ internal actual fun installCliConfig(): KlauseConfig {
             ?: base.unboundedIntLo,
         unboundedIntHi = cliProp("klause.fzn.unboundedIntHi")?.trim()?.toIntOrNull()
             ?: base.unboundedIntHi,
+        floatBuckets = cliProp("klause.floatBuckets")?.trim()?.toIntOrNull()
+            ?: base.floatBuckets,
+        floatScale = cliProp("klause.floatScale")?.trim()?.toLongOrNull()
+            ?: base.floatScale,
     )
     KlauseConfig.current = config
     return config

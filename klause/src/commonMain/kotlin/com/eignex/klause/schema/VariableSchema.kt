@@ -10,6 +10,7 @@ import com.eignex.klause.ast.NominalSpec
 import com.eignex.klause.ast.PresenceSpec
 import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.ast.SetSpec
+import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.skema.Schema
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
@@ -19,11 +20,6 @@ internal const val PRESENCE_SUFFIX: String = "__present"
 
 /** Builds the canonical presence-variable name for an opt var named [varName]. */
 internal fun presenceName(varName: String): String = "$varName$PRESENCE_SUFFIX"
-
-/** Default bucket count for [VariableSchema.floatVar] when the caller doesn't specify one.
- *  10-bit precision is enough for typical config-style fractions; bump it explicitly when
- *  the constraint set needs finer granularity. */
-const val DEFAULT_FLOAT_BUCKETS: Int = 1024
 
 /**
  * Property-delegate base class for declaring a typed klause schema. Backed by
