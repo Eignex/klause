@@ -64,6 +64,23 @@ class SymmetryBreakingTest {
     private fun pos(v: Int) = Lit.make(v, true)
 
     @Test
+    fun `interchangeable matrix rows are lex-ordered`() {
+        // Two rows: x0 + 2·x1 ≤ 3 and x2 + 2·x3 ≤ 3. The rows are interchangeable as blocks, but the
+        // cells within a row are NOT (different coefficients) — so this is block/row symmetry, broken
+        // by a lex-leader between the rows rather than per-variable ordering.
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            listOf(
+                Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 2), intArrayOf(2, 3), LinearOp.LE, 3),
+            ),
+        )
+        checkSound("matrix-rows", problem, expectReduced = true)
+    }
+
+    @Test
     fun `verified detection orders interchangeable vars in separate isomorphic factors`() {
         // x0 in (x0 <= 3) and x1 in (x1 <= 3): different factors, but swapping x0/x1 preserves the
         // factor set, so they ARE interchangeable. The same-factor-set heuristic misses this;

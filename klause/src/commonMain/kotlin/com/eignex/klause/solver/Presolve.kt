@@ -4,6 +4,7 @@ import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -14,6 +15,9 @@ import com.eignex.klause.solver.factor.Xor
  * a smaller / tighter formulation. Pure (no solving); the caller decides when to apply them.
  */
 object Presolve {
+
+    /** Cap on a verified-symmetry candidate group; larger groups are skipped (#367 size guard). */
+    private const val MAX_VERIFIED_GROUP = 40
 
     /**
      * GCD coefficient strengthening (#319) for [Linear] and [PseudoBoolean] constraints. If the
@@ -405,7 +409,11 @@ object Presolve {
         val verified = verifiedSymmetryOrbits(problem, objectiveIntVars, objectiveBoolVars)
         val intGroups = verified?.first ?: interchangeableIntGroups(problem, objectiveIntVars)
         val boolGroups = verified?.second ?: interchangeableBoolGroups(problem, objectiveBoolVars)
-        if (intGroups.isEmpty() && boolGroups.isEmpty()) return problem
+        // Block/row symmetry (#367): interchangeable blocks of int vars (e.g. matrix rows defined by
+        // isomorphic factors), ordered by lex-leader. Only when verified detection is available.
+        val brokenInts = intGroups.flatMap { it.toList() }.toHashSet()
+        val blockLex = if (verified == null) emptyList() else verifiedBlockLex(problem, objectiveIntVars, brokenInts)
+        if (intGroups.isEmpty() && boolGroups.isEmpty() && blockLex.isEmpty()) return problem
         val extra = ArrayList<Factor>()
         for (group in intGroups) {
             for (j in 0 until group.size - 1) {
@@ -417,6 +425,7 @@ object Presolve {
                 extra.add(Clause(intArrayOf(Lit.make(group[j], false), Lit.make(group[j + 1], true))))
             }
         }
+        extra.addAll(blockLex)
         return rebuildProblem(problem, problem.factors.toList() + extra)
     }
 
@@ -479,6 +488,90 @@ object Presolve {
         return counts == base
     }
 
+    /**
+     * Verified block / row symmetry (#367): groups of int variables defined by *isomorphic* factors
+     * (e.g. matrix rows, each an AllDifferent over a distinct row) are interchangeable as blocks.
+     * Candidate blocks are the sorted-variable sets of factors sharing a canonical shape; a block
+     * pair is verified an automorphism via [isAutomorphism] (with position-wise equal domains), and
+     * verified-equal blocks are ordered by a lex-leader [LexLess] chain. Skips bool-touching factors,
+     * objective variables, and variables already broken as single-var orbits ([alreadyBroken]) so
+     * row and cell breaking don't interact unsoundly.
+     */
+    private fun verifiedBlockLex(problem: Problem, objectiveIntVars: Set<Int>, alreadyBroken: Set<Int>): List<Factor> {
+        val base = HashMap<String, Int>()
+        for (f in problem.factors) {
+            val k = f.structuralKey() ?: return emptyList()
+            base[k] = (base[k] ?: 0) + 1
+        }
+        val byShape = HashMap<String, MutableList<IntArray>>()
+        for (f in problem.factors) {
+            if (f.boolVars.isNotEmpty() || f.intVars.isEmpty()) continue
+            val block = f.intVars.toSortedSet().toIntArray()
+            if (block.any { it in objectiveIntVars || it in alreadyBroken }) continue
+            val shape = canonicalShape(problem, f, block) ?: continue
+            byShape.getOrPut(shape) { ArrayList() }.add(block)
+        }
+        val intMap = IntArray(problem.numIntVars) { it }
+        val extra = ArrayList<Factor>()
+        for ((_, blocks) in byShape) {
+            if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
+            val parent = IntArray(blocks.size) { it }
+            fun find(x: Int): Int {
+                var r = x
+                while (parent[r] != r) r = parent[r]
+                return r
+            }
+            for (i in blocks.indices) {
+                for (j in i + 1 until blocks.size) {
+                    if (find(i) != find(j) && blocksSwapVerified(problem, base, intMap, blocks[i], blocks[j])) {
+                        parent[find(i)] = find(j)
+                    }
+                }
+            }
+            val byRoot = HashMap<Int, MutableList<IntArray>>()
+            for (i in blocks.indices) byRoot.getOrPut(find(i)) { ArrayList() }.add(blocks[i])
+            for (cls in byRoot.values) {
+                val ordered = cls.sortedBy { it[0] }
+                for (k in 0 until ordered.size - 1) extra.add(LexLess(ordered[k], ordered[k + 1], strict = false))
+            }
+        }
+        return extra
+    }
+
+    /** Canonical structure key for a block: remap its (sorted) variables to `0..k-1`, so two
+     *  isomorphic factors over disjoint variables share a key. `null` if the factor isn't keyed. */
+    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray): String? {
+        val intMap = IntArray(problem.numIntVars) { it }
+        for (k in block.indices) intMap[block[k]] = k
+        return f.remap(IntArray(problem.numBoolVars) { it }, intMap).structuralKey()
+    }
+
+    /** Whether swapping disjoint blocks [a] and [b] position-wise (`a[k] ↔ b[k]`) is an automorphism
+     *  and each position has equal domains (domains aren't encoded in factors, so checked here). */
+    private fun blocksSwapVerified(
+        problem: Problem,
+        base: Map<String, Int>,
+        intMap: IntArray,
+        a: IntArray,
+        b: IntArray,
+    ): Boolean {
+        if (a.size != b.size) return false
+        for (k in a.indices) {
+            if (a[k] in b) return false // overlapping blocks: swap would tangle
+            if (domainKey(problem.intDomains[a[k]]) != domainKey(problem.intDomains[b[k]])) return false
+        }
+        for (k in a.indices) {
+            intMap[a[k]] = b[k]
+            intMap[b[k]] = a[k]
+        }
+        val ok = isAutomorphism(problem, base, IntArray(problem.numBoolVars) { it }, intMap)
+        for (k in a.indices) {
+            intMap[a[k]] = a[k]
+            intMap[b[k]] = b[k]
+        }
+        return ok
+    }
+
     /** Union the candidate variables whose pairwise transposition [verify]s as a symmetry, then
      *  return the resulting orbits of size ≥ 2 (each sorted). Transpositions generate the full
      *  symmetric group on an orbit, so a total order over it is a sound symmetry break. */
@@ -500,6 +593,9 @@ object Presolve {
             return root
         }
         for (group in candidateGroups) {
+            // Size guard (#367): each group costs O(size² × factors) verifications. Skip groups
+            // beyond the cap — fewer symmetries broken, never unsound.
+            if (group.size > MAX_VERIFIED_GROUP) continue
             for (i in group.indices) {
                 for (j in i + 1 until group.size) {
                     val u = group[i]
