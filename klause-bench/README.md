@@ -45,7 +45,7 @@ bench coverage:xcsp3|smtlib          parse/solve rates over a whole format libra
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
 | `reference=choco\|ortools\|yuck` | reference solver for parity/anytime |
 | `timeout=<ms>` | per-instance budget for metrics that honor it |
-| `mode=fixed\|free\|parallel\|open\|local-search` `threads=N` | parity competition track (below); `threads` overrides the host core count for the parallel tracks |
+| `engine=backtrack\|ls\|mixed` `processors=N` `fixed=true` | klause's search for a parity run (below); `engine`/`processors` mirror the CLI's `--engine` / `-p`, `fixed` follows the model annotation |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
 ## Metrics
@@ -82,28 +82,35 @@ bench search suite=core category=UNSAT timeout=30000
 bench audit suite=mzn-smoke
 ```
 
-### Competition modes
+### Parity search: competition tracks as filter combinations
 
-`mode=` runs parity with the klause configuration of a MiniZinc / XCSP competition track, so a run
-measures klause exactly as the competition scores it. `kind=cop|csp` and `timeout=<ms>` compose with
-any mode; `threads=N` overrides the host core count for the parallel tracks.
-
-| mode | klause configuration |
-|---|---|
-| `fixed` | 1 thread, follow the model's `int_search` annotation (the reference mirrors it too — sound now that the LCG fixed-search bug is worked around); models with no annotation fall back to free search |
-| `free` | 1 thread, klause's own search (the single-core bandit-scheduled portfolio) |
-| `parallel` | multi-thread, a single engine (complete backtrack) |
-| `open` | multi-thread, mixed engines (the default) |
-| `local-search` | local search only |
+Parity solves the klause side with `engine` (`backtrack`/`ls`/`mixed`) over `processors` workers — the
+portfolio's two axes, mirroring the CLI's `--engine` / `-p`. `processors=1` is the single-core
+sequential portfolio. The MiniZinc / XCSP competition tracks are just combinations of these, so there
+are no baked-in track names — spell each as a recipe (all compose with `kind=cop|csp` and `timeout=`):
 
 ```
-bench parity suite=mzn-bench mode=free kind=cop timeout=300000   # 1-thread free COP track
-bench parity suite=mzn-bench mode=fixed                          # both solvers follow the annotation
-bench mzn-open                                                    # preset: open track, 300 s
+# open (default): multi-thread, mixed engines
+bench parity suite=mzn-bench timeout=300000
+
+# free: 1 thread, klause's own search (the single-core sequential portfolio)
+bench parity suite=mzn-bench processors=1 timeout=300000
+
+# parallel: multi-thread, a single engine
+bench parity suite=mzn-bench engine=backtrack timeout=300000
+
+# local search only
+bench parity suite=mzn-bench engine=ls timeout=300000
 ```
 
-The presets `mzn-fixed` / `mzn-free` / `mzn-parallel` / `mzn-open` / `mzn-ls` are these tracks over the
-MiniZinc Challenge corpus at the 300 s budget.
+The one exception is the **fixed** track — follow the model's `int_search` annotation — which has no
+filter combination, so it's a flag of its own. The reference mirrors the annotation too (a true
+two-sided fixed comparison, sound now that the Choco LCG fixed-search bug is worked around); models
+without an annotation fall back to free search, and the run reports how many followed vs fell back.
+
+```
+bench parity suite=mzn-bench fixed=true timeout=300000
+```
 
 (drop the `./gradlew :klause-bench:bench --args="…"` wrapper for brevity above.)
 

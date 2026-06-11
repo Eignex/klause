@@ -8,7 +8,7 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.choco.ChocoParams
 import com.eignex.klause.choco.ChocoSolver
-import com.eignex.klause.portfolio.CompetitionMode
+import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
@@ -68,8 +68,9 @@ internal object ParityMetric {
         entries: List<ResolvedProblem>,
         budget: Budget = Budget(),
         reference: Backend = Backend.CHOCO,
-        mode: CompetitionMode = CompetitionMode.OPEN,
-        threads: Int = Runtime.getRuntime().availableProcessors(),
+        engine: EngineMix = EngineMix.MIXED,
+        processors: Int = Runtime.getRuntime().availableProcessors(),
+        fixed: Boolean = false,
     ) {
         val ref = System.getProperty(
             "klause.bench.parity.reference",
@@ -82,14 +83,13 @@ internal object ParityMetric {
         // reuses the reference solver's printed results row-by-row instead of re-running it,
         // halving sweep wall time. Rows absent from the cache run the reference live.
         val cache = System.getProperty("klause.bench.parity.referenceCache")?.let(::parseReferenceCache).orEmpty()
-        val effectiveThreads = if (mode == CompetitionMode.FREE || mode == CompetitionMode.FIXED) 1 else threads
+        // `fixed` follows the model annotation on a single thread (engine/processors don't apply);
+        // otherwise the search is `engine` over `processors` workers.
+        val label = if (fixed) "fixed" else "${engine.name.lowercase()} ×$processors"
         println()
-        println(
-            "=== parity (klause $mode" + (if (effectiveThreads > 1) " ×$effectiveThreads" else "") +
-                " vs ${ref.name} reference; checked against recorded expected) ===",
-        )
+        println("=== parity (klause $label vs ${ref.name} reference; checked against recorded expected) ===")
         val rows = entries.map { entry ->
-            val r = row(entry, budget, ref, cache[entry.name], mode, effectiveThreads)
+            val r = row(entry, budget, ref, cache[entry.name], engine, processors, fixed)
             val mark = if (r.verdict == "OK") "ok " else "!! "
             println(
                 "$mark[${r.name}] ${r.kind} klause=${r.klause} " +
@@ -105,7 +105,7 @@ internal object ParityMetric {
             "build/parity-report-shard-${shard.first}-of-${shard.second}.json"
         }
         Reports.writeJson(reportPath, results)
-        if (mode == CompetitionMode.FIXED) {
+        if (fixed) {
             val followed = entries.count { it.searchParams != null }
             println(
                 "--- fixed track: $followed/${entries.size} followed the model annotation, " +
@@ -156,37 +156,38 @@ internal object ParityMetric {
         budget: Budget,
         ref: Reference,
         cached: CachedRef?,
-        mode: CompetitionMode,
-        threads: Int,
+        engine: EngineMix,
+        processors: Int,
+        fixed: Boolean,
     ): ParityRow {
         val obj = entry.objective
         return if (obj == null) {
-            satisfyRow(entry, budget, ref, cached, mode, threads)
+            satisfyRow(entry, budget, ref, cached, engine, processors, fixed)
         } else {
-            optimizeRow(entry, obj, budget, ref, cached, mode, threads)
+            optimizeRow(entry, obj, budget, ref, cached, engine, processors, fixed)
         }
     }
 
     /** The reference mirrors the model's search annotation only in the fixed track (a true two-sided
-     *  fixed comparison, sound now that `applyFixedSearch` works around the LCG bug); every other mode
-     *  lets the reference use its own default search. */
-    private fun referenceSearch(entry: ResolvedProblem, mode: CompetitionMode) =
-        if (mode == CompetitionMode.FIXED) entry.searchParams else null
+     *  fixed comparison, sound now that `applyFixedSearch` works around the LCG bug); otherwise it
+     *  uses its own default search. */
+    private fun referenceSearch(entry: ResolvedProblem, fixed: Boolean) = if (fixed) entry.searchParams else null
 
     private fun satisfyRow(
         entry: ResolvedProblem,
         budget: Budget,
         ref: Reference,
         cached: CachedRef?,
-        mode: CompetitionMode,
-        threads: Int,
+        engine: EngineMix,
+        processors: Int,
+        fixed: Boolean,
     ): ParityRow {
-        val klause = runCatching { feasibility(klauseSolve(entry, budget, mode, threads)) }
+        val klause = runCatching { feasibility(klauseSolve(entry, budget, engine, processors, fixed)) }
             .getOrElse { return errorRow(entry, "satisfy", "KLAUSE_ERROR", ref, it) }
         val refFeas = if (cached != null) {
             cached.feasible
         } else {
-            runCatching { feasibility(ref.solve(entry.problem, budget, referenceSearch(entry, mode))) }
+            runCatching { feasibility(ref.solve(entry.problem, budget, referenceSearch(entry, fixed))) }
                 .getOrElse { return errorRow(entry, "satisfy", "REFERENCE_ERROR", ref, it) }
         }
         val exp = expectedFeasible(entry.ref.expected)
@@ -204,11 +205,12 @@ internal object ParityMetric {
         budget: Budget,
         ref: Reference,
         cached: CachedRef?,
-        mode: CompetitionMode,
-        threads: Int,
+        engine: EngineMix,
+        processors: Int,
+        fixed: Boolean,
     ): ParityRow {
         if (timedMode) return timedOptimizeRow(entry, obj, budget)
-        val klause = runCatching { klauseMinimize(entry, obj, budget, mode, threads) }
+        val klause = runCatching { klauseMinimize(entry, obj, budget, engine, processors, fixed) }
             .getOrElse { return errorRow(entry, "optimize", "KLAUSE_ERROR", ref, it) }
         val kv = klause.objectiveValue
         val cv: Double?
@@ -218,7 +220,7 @@ internal object ParityMetric {
             refDisplay = cached.display
         } else {
             val refRes = runCatching {
-                ref.minimize(entry.problem, obj, budget, referenceSearch(entry, mode))
+                ref.minimize(entry.problem, obj, budget, referenceSearch(entry, fixed))
             }.getOrElse { return errorRow(entry, "optimize", "REFERENCE_ERROR", ref, it) }
             cv = refRes.objectiveValue
             refDisplay = optStr(refRes)
@@ -362,13 +364,15 @@ internal object ParityMetric {
         return if (scenario.threads == 1) SequentialPortfolio.exp3(workers, scenario.seed) else Portfolio(workers)
     }
 
-    /** The scenario for a non-FIXED [mode]; [PortfolioScenario.forMode] only returns null for FIXED,
-     *  which the callers handle before reaching here. */
-    private fun scenarioFor(mode: CompetitionMode, kind: Kind, threads: Int): PortfolioScenario =
-        PortfolioScenario.forMode(mode, kind, threads, seed = PARITY_SEED)
-            ?: error("forMode($mode) has no scenario — FIXED must be handled by the annotation path")
+    /** A scenario over the portfolio's engine × threads axes: a single-core sequential portfolio when
+     *  `processors == 1`, a parallel pool otherwise. (The `fixed` annotation track has no scenario.) */
+    private fun scenarioFor(engine: EngineMix, processors: Int, kind: Kind): PortfolioScenario = if (processors == 1) {
+        PortfolioScenario.sequential(kind, engine, seed = PARITY_SEED)
+    } else {
+        PortfolioScenario.parallel(processors, kind, engine, seed = PARITY_SEED)
+    }
 
-    /** The FIXED-track params: the model's compiled annotation if present (a true fixed search),
+    /** The fixed-track params: the model's compiled annotation if present (a true fixed search),
      *  else a single conflict-driven free search as the fallback. Both carry the run deadline. */
     private fun fixedParams(entry: ResolvedProblem, deadline: Long): BacktrackParams {
         val cancel = Cancellation { System.currentTimeMillis() > deadline }
@@ -376,11 +380,16 @@ internal object ParityMetric {
             ?: BacktrackPresets.conflictDriven(randomSeed = PARITY_SEED, cancellation = cancel)
     }
 
-    private fun klauseSolve(entry: ResolvedProblem, budget: Budget, mode: CompetitionMode, threads: Int): SolveResult {
+    private fun klauseSolve(
+        entry: ResolvedProblem,
+        budget: Budget,
+        engine: EngineMix,
+        processors: Int,
+        fixed: Boolean,
+    ): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        if (mode == CompetitionMode.FIXED) return BacktrackSolver(entry.problem).solve(fixedParams(entry, deadline))
-        val scenario = scenarioFor(mode, Kind.CSP, threads)
-        return executorFor(entry, scenario, objective = null).use {
+        if (fixed) return BacktrackSolver(entry.problem).solve(fixedParams(entry, deadline))
+        return executorFor(entry, scenarioFor(engine, processors, Kind.CSP), objective = null).use {
             it.solve(Cancellation { System.currentTimeMillis() > deadline })
         }
     }
@@ -389,15 +398,13 @@ internal object ParityMetric {
         entry: ResolvedProblem,
         obj: LinearObjective,
         budget: Budget,
-        mode: CompetitionMode,
-        threads: Int,
+        engine: EngineMix,
+        processors: Int,
+        fixed: Boolean,
     ): MinimizeResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
-        if (mode == CompetitionMode.FIXED) {
-            return BacktrackSolver(entry.problem).minimize(obj, fixedParams(entry, deadline))
-        }
-        val scenario = scenarioFor(mode, Kind.COP, threads)
-        return executorFor(entry, scenario, objective = obj).use {
+        if (fixed) return BacktrackSolver(entry.problem).minimize(obj, fixedParams(entry, deadline))
+        return executorFor(entry, scenarioFor(engine, processors, Kind.COP), objective = obj).use {
             it.minimize(Cancellation { System.currentTimeMillis() > deadline })
         }
     }

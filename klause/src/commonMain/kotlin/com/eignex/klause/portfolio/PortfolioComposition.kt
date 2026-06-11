@@ -69,50 +69,7 @@ data class PortfolioScenario(
         /** A single-core, bandit-scheduled portfolio (the competition free/fixed track). */
         fun sequential(kind: Kind, engine: EngineMix = EngineMix.MIXED, seed: Long = 0L) =
             PortfolioScenario(threads = 1, kind = kind, engine = engine, seed = seed)
-
-        /**
-         * The scenario for a [CompetitionMode] track, or `null` for [CompetitionMode.FIXED] — fixed
-         * search follows the model's own annotation through a single annotated solver, not a composed
-         * portfolio, so it has no scenario. [threads] is the available concurrency for the parallel
-         * tracks (`FREE` ignores it — it is always single-core sequential). One place mapping the
-         * competition tracks onto the three portfolio axes.
-         */
-        fun forMode(mode: CompetitionMode, kind: Kind, threads: Int, seed: Long = 0L): PortfolioScenario? =
-            when (mode) {
-                CompetitionMode.FIXED -> null
-                CompetitionMode.FREE -> sequential(kind, EngineMix.MIXED, seed)
-                CompetitionMode.PARALLEL -> parallel(threads, kind, EngineMix.BACKTRACK, seed)
-                CompetitionMode.OPEN -> parallel(threads, kind, EngineMix.MIXED, seed)
-                CompetitionMode.LOCAL_SEARCH -> parallel(threads, kind, EngineMix.LOCAL_SEARCH, seed)
-            }
     }
-}
-
-/**
- * The competition tracks a portfolio is measured under, mirroring the MiniZinc / XCSP setups:
- *  - [FIXED] — single thread, following the model's prescribed search annotation;
- *  - [FREE] — single thread, any strategy (klause's single-core sequential bandit portfolio);
- *  - [PARALLEL] — multi-thread, a single engine family (complete backtrack);
- *  - [OPEN] — multi-thread, mixed engines;
- *  - [LOCAL_SEARCH] — local search only.
- *
- * [PortfolioScenario.forMode] maps each (except [FIXED], which is the annotation path) onto a scenario.
- */
-enum class CompetitionMode {
-    /** 1 thread, follow the model's search annotation. */
-    FIXED,
-
-    /** 1 thread, any strategy. */
-    FREE,
-
-    /** Multi-thread, a single engine family. */
-    PARALLEL,
-
-    /** Multi-thread, mixed engines. */
-    OPEN,
-
-    /** Local search only. */
-    LOCAL_SEARCH,
 }
 
 /**
