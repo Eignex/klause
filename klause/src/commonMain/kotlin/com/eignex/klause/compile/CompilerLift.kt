@@ -18,9 +18,9 @@ import com.eignex.klause.ast.IntRef
 import com.eignex.klause.ast.IntScale
 import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.Not
-import com.eignex.klause.ast.Or
 import com.eignex.klause.ast.SetCard
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.IntFunctionLowering
 import com.eignex.klause.solver.factor.Product
 
 /**
@@ -48,53 +48,24 @@ internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
 }
 
 /**
- * Lower `n div d` and `n mod d` together with Euclidean semantics (matching
- * SMT-LIB QF_LIA):
- *
- *   q * d + r = n,    0 ≤ r < |d|,    d ≠ 0.
- *
- * The remainder is always non-negative regardless of the signs of `n` and `d`.
- * For example `(-7) mod 3 = 2` (with `q = -3`) and `(-7) mod (-3) = 2` (with
- * `q = 3`). This disagrees with `kotlin.Int.rem` and Java's `%` operator, which
- * keep the sign of the dividend; callers porting from Java-style semantics need
- * to adjust.
+ * Lower `n div d` and `n mod d` with truncated-toward-zero semantics (matching MiniZinc's
+ * `int_div`/`int_mod`, the same convention as `kotlin.Int.rem` / Java's `%`): `|r| < |d|`
+ * and `r` takes the sign of the dividend `n`, e.g. `(-7) mod 3 = -1` with `q = -2`. The
+ * encoding is shared with the FlatZinc front-end via [IntFunctionLowering.truncatedDivMod];
+ * `d ≠ 0` is required up front rather than left to propagation.
  */
 internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
-    val nLifted = lift(num)
-    val dLifted = lift(den)
-    val nDom = domainOf(nLifted)
-    val dDom = domainOf(dLifted)
-    require(0 !in dDom) { "div/mod requires denominator domain to exclude 0; got $dDom" }
-    val nRef = materializeIntVar(nLifted)
-    val dRef = materializeIntVar(dLifted)
-
-    val nAbsMax = maxOf(if (nDom.min < 0) -nDom.min else nDom.min, nDom.max)
-    val dAbsMax = maxOf(if (dDom.min < 0) -dDom.min else dDom.min, dDom.max)
-    val qDomain = IntDomain(-nAbsMax, nAbsMax)
-    val rDomain = IntDomain(0, dAbsMax - 1)
-    val qName = newAuxIntVar(qDomain)
-    val rName = newAuxIntVar(rDomain)
-    val dqAbsMaxLong = nAbsMax.toLong() * dAbsMax + dAbsMax
-    require(dqAbsMaxLong <= Int.MAX_VALUE) {
-        "div/mod intermediate domain overflows Int: |q*d| up to $dqAbsMaxLong " +
-            "(numerator domain $nDom, denominator domain $dDom)"
-    }
-    val dqAbsMax = dqAbsMaxLong.toInt()
-    val dqDomain = IntDomain(-dqAbsMax, dqAbsMax)
-    val dqName = newAuxIntVar(dqDomain)
-    factors += Product(intVarOf(dRef.name), intVarOf(qName), intVarOf(dqName))
-
-    // dq + r = n.
-    assertExpr(
-        IntCompare(IntSum(listOf(IntRef(dqName), IntRef(rName))), IntCmpOp.EQ, nRef),
+    val a = intVarOf(materializeIntVar(lift(num)).name)
+    val b = intVarOf(materializeIntVar(lift(den)).name)
+    require(0 !in intDomains[b]) { "div/mod requires denominator domain to exclude 0; got ${intDomains[b]}" }
+    val res = IntFunctionLowering.truncatedDivMod(
+        a, b, intDomains[a], intDomains[b], quotient = null, remainder = null,
+        freshInt = { d -> intVarOf(newAuxIntVar(d)) },
+        freshBool = { newBoolVar() },
     )
-    // r < |d|. The rDomain pin already enforces r ≥ 0.
-    assertExpr(
-        IntCompare(IntRef(rName), IntCmpOp.LT, IntAbs(dRef)),
-    )
-    // d ≠ 0 is required regardless of domain; handled by the require above (0 ∉ dDom).
-
-    return if (returnRemainder) IntRef(rName) else IntRef(qName)
+    factors += res.factors
+    val resultId = if (returnRemainder) res.remainder else res.quotient
+    return IntRef(idToIntName.getValue(resultId))
 }
 
 internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {
@@ -185,12 +156,9 @@ internal fun Lowering.liftMinMax(children: List<IntExpr>, isMin: Boolean): IntEx
         IntDomain(doms.maxOf { it.min }, doms.maxOf { it.max })
     }
     val auxName = newAuxIntVar(auxDomain)
-    val auxRef = IntRef(auxName)
-    val op = if (isMin) IntCmpOp.LE else IntCmpOp.GE
-    for (c in lifted) assertExpr(IntCompare(auxRef, op, c))
-    val orChildren = lifted.map { IntCompare(auxRef, IntCmpOp.EQ, it) as BoolExpr }
-    assertExpr(if (orChildren.size == 1) orChildren[0] else Or(orChildren))
-    return auxRef
+    val argIds = lifted.map { intVarOf(materializeIntVar(it).name) }.toIntArray()
+    factors += IntFunctionLowering.minMaxFactors(intVarOf(auxName), argIds, isMax = !isMin) { newBoolVar() }
+    return IntRef(auxName)
 }
 
 internal fun Lowering.liftAbs(child: IntExpr): IntExpr {
@@ -198,20 +166,9 @@ internal fun Lowering.liftAbs(child: IntExpr): IntExpr {
     val d = domainOf(lifted)
     val absMax = maxOf(if (d.min < 0) -d.min else d.min, if (d.max < 0) -d.max else d.max)
     val auxName = newAuxIntVar(IntDomain(0, absMax))
-    val auxRef = IntRef(auxName)
-    // z >= 0; z >= x; z >= -x; (z = x) ∨ (z = -x).
-    assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntLit(0)))
-    assertExpr(IntCompare(auxRef, IntCmpOp.GE, lifted))
-    assertExpr(IntCompare(auxRef, IntCmpOp.GE, IntScale(-1, lifted)))
-    assertExpr(
-        Or(
-            listOf(
-                IntCompare(auxRef, IntCmpOp.EQ, lifted),
-                IntCompare(auxRef, IntCmpOp.EQ, IntScale(-1, lifted)),
-            ),
-        ),
-    )
-    return auxRef
+    val operandId = intVarOf(materializeIntVar(lifted).name)
+    factors += IntFunctionLowering.absFactors(operandId, intVarOf(auxName)) { newBoolVar() }
+    return IntRef(auxName)
 }
 
 internal fun Lowering.newAuxIntVar(domain: IntDomain): String {

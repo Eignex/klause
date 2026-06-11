@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.IntFunctionLowering
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.AllDifferent
@@ -1356,41 +1357,24 @@ internal fun FlatZincCompiler.emitIntMinus(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitIntAbs(c: FznConstraint) {
-    // int_abs(a, r): r = |a|. Encode as:
-    //   r ≥ a, r ≥ -a (always)
-    //   pa ↔ (r = a), pb ↔ (r = -a), (pa ∨ pb).
+    // int_abs(a, r): r = |a|. Shared encoding — see [IntFunctionLowering.absFactors].
     require(c.args.size == 2)
     val a = resolveIntVar(c.args[0])
     val r = resolveIntVar(c.args[1])
-    factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, r), LinearOp.LE, 0)) // a ≤ r
-    factors.add(Linear(intArrayOf(-1, -1), intArrayOf(a, r), LinearOp.LE, 0)) // -a ≤ r
-    val pa = allocBool("__abs_${a}_${r}_pa")
-    val pb = allocBool("__abs_${a}_${r}_pb")
-    factors.add(ReifiedLinear(pa, intArrayOf(1, -1), intArrayOf(r, a), LinearOp.EQ, 0))
-    factors.add(ReifiedLinear(pb, intArrayOf(1, 1), intArrayOf(r, a), LinearOp.EQ, 0))
-    factors.add(Clause(intArrayOf(Lit.make(pa, true), Lit.make(pb, true))))
+    var i = 0
+    factors.addAll(IntFunctionLowering.absFactors(a, r) { allocBool("__abs_${a}_${r}_${i++}") })
 }
 
 internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
-    // int_max(a, b, r): r = max(a, b). int_min: r = min(a, b).
-    //   max → r ≥ a, r ≥ b, (r = a ∨ r = b)
-    //   min → r ≤ a, r ≤ b, (r = a ∨ r = b)
+    // int_max(a, b, r) / int_min(a, b, r). Shared encoding — see [IntFunctionLowering.minMaxFactors].
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val r = resolveIntVar(c.args[2])
-    if (max) {
-        factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, r), LinearOp.LE, 0)) // a ≤ r
-        factors.add(Linear(intArrayOf(1, -1), intArrayOf(b, r), LinearOp.LE, 0)) // b ≤ r
-    } else {
-        factors.add(Linear(intArrayOf(-1, 1), intArrayOf(a, r), LinearOp.LE, 0)) // r ≤ a
-        factors.add(Linear(intArrayOf(-1, 1), intArrayOf(b, r), LinearOp.LE, 0)) // r ≤ b
-    }
-    val pa = allocBool("__mm_${a}_${b}_${r}_pa")
-    val pb = allocBool("__mm_${a}_${b}_${r}_pb")
-    factors.add(ReifiedLinear(pa, intArrayOf(1, -1), intArrayOf(r, a), LinearOp.EQ, 0))
-    factors.add(ReifiedLinear(pb, intArrayOf(1, -1), intArrayOf(r, b), LinearOp.EQ, 0))
-    factors.add(Clause(intArrayOf(Lit.make(pa, true), Lit.make(pb, true))))
+    var i = 0
+    factors.addAll(
+        IntFunctionLowering.minMaxFactors(r, intArrayOf(a, b), isMax = max) { allocBool("__mm_${a}_${b}_${r}_${i++}") },
+    )
 }
 
 /**
@@ -1408,7 +1392,7 @@ internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val q = resolveIntVar(c.args[2])
-    encodeTruncDivMod(a, b, q, remVar = null)
+    emitTruncDivMod(a, b, qVar = q, remVar = null)
 }
 
 /** `int_mod(a, b, rem)` — same constraint shape as [emitIntDiv], but with `rem` exposed
@@ -1418,191 +1402,20 @@ internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val rem = resolveIntVar(c.args[2])
-    encodeTruncDivMod(a, b, qVar = null, remVar = rem)
+    emitTruncDivMod(a, b, qVar = null, remVar = rem)
 }
 
-/**
- * Encodes a truncated `a = q*b + r` with `|r| < |b|` and `sign(r) = sign(a)` when `r != 0`.
- * Allocates whichever of `q` / `r` wasn't supplied. The aux quotient/remainder gets a
- * domain wide enough to span the algebraically possible range.
- */
-internal fun FlatZincCompiler.encodeTruncDivMod(a: Int, b: Int, qVar: Int?, remVar: Int?) {
-    val dA = intDomains[a]
-    val dB = intDomains[b]
-    // Constant positive divisor over a non-negative dividend: truncated division equals
-    // floor division, so the whole relation is one linear `a = B·q + r` with tight aux
-    // domains q ∈ [aMin/B, aMax/B] and r ∈ [0, B-1]. The general encoding below instead
-    // posts a var·var product plus an |b| reification chain and gives q a ±|a| span —
-    // on divisibility-grid models (evilshop schedules on a 97 grid, fifty mods over
-    // 0..273346 dividends) that difference is half a million spurious q values per
-    // constraint and the row never finds a solution.
-    if (dB.min == dB.max && dB.min > 0 && dA.min >= 0) {
-        val bConst = dB.min
-        val q = qVar ?: allocInt("__div_q_${a}_$b", dA.min / bConst, dA.max / bConst)
-        val rem = remVar ?: allocInt("__div_r_${a}_$b", 0, bConst - 1)
-        // a − B·q − r = 0; a supplied q/rem (FZN-declared) may carry wider or signed
-        // domains, so bound r into [0, B−1] explicitly when it was supplied.
-        factors.add(
-            Linear(
-                coeffs = intArrayOf(1, -bConst, -1),
-                vars = intArrayOf(a, q, rem),
-                op = LinearOp.EQ,
-                bound = 0,
-            ),
-        )
-        if (remVar != null) {
-            factors.add(Linear(intArrayOf(1), intArrayOf(rem), LinearOp.GE, 0))
-            factors.add(Linear(intArrayOf(1), intArrayOf(rem), LinearOp.LE, bConst - 1))
-        }
-        return
-    }
-    val bMag = maxOf(abs(dB.min), abs(dB.max))
-    val aMag = maxOf(abs(dA.min), abs(dA.max))
-    val qDomain = if (bMag == 0) {
-        intArrayOf(-aMag, aMag) // b's domain is {0} — degenerate
-    } else {
-        intArrayOf(-aMag - 1, aMag + 1)
-    }
-    val rDomain = intArrayOf(-bMag + 1, bMag - 1)
-    val q = qVar ?: allocInt("__div_q_${a}_$b", qDomain[0], qDomain[1])
-    val rem = remVar ?: allocInt("__div_r_${a}_$b", rDomain[0], rDomain[1])
-    // Otherwise tighten the provided var to the algebraic span (sound bound).
-    if (qVar != null) {
-        // Best-effort tighten via factor of equality on the aux range — we don't have direct
-        // domain mutation here, so rely on propagation to discover this.
-    }
-    // q · b = prod (aux), then prod + rem = a.
-    val prod = allocInt("__div_prod_${a}_$b", -aMag - bMag - 1, aMag + bMag + 1)
-    factors.add(Product(a = q, b = b, result = prod))
-    factors.add(
-        Linear(
-            coeffs = intArrayOf(1, 1, -1),
-            vars = intArrayOf(prod, rem, a),
-            op = LinearOp.EQ,
-            bound = 0,
-        ),
+/** Bridge the FlatZinc allocator onto the shared [IntFunctionLowering.truncatedDivMod]. */
+private fun FlatZincCompiler.emitTruncDivMod(a: Int, b: Int, qVar: Int?, remVar: Int?) {
+    var n = 0
+    val res = IntFunctionLowering.truncatedDivMod(
+        a, b, intDomains[a], intDomains[b], quotient = qVar, remainder = remVar,
+        freshInt = { d -> allocInt("__divmod_${a}_${b}_i${n++}", d.min, d.max) },
+        freshBool = { allocBool("__divmod_${a}_${b}_b${n++}") },
     )
-    // |rem| < |b|: encode as rem < |b| AND -rem < |b|, where |b| via aux.
-    // Simpler equivalent: rem ≤ |b| - 1 and rem ≥ -|b| + 1. We channel |b| via int_abs.
-    val absB = allocInt("__div_absb_${a}_$b", 0, bMag)
-    // Replicate int_abs(b, absB): absB ≥ b, absB ≥ -b, (absB = b ∨ absB = -b).
-    factors.add(
-        Linear(
-            intArrayOf(1, -1),
-            intArrayOf(b, absB),
-            LinearOp.LE,
-            0,
-        ),
-    )
-    factors.add(
-        Linear(
-            intArrayOf(-1, -1),
-            intArrayOf(b, absB),
-            LinearOp.LE,
-            0,
-        ),
-    )
-    val absBpa = allocBool("__div_absb_pa_${a}_$b")
-    val absBpb = allocBool("__div_absb_pb_${a}_$b")
-    factors.add(
-        ReifiedLinear(
-            absBpa,
-            intArrayOf(1, -1),
-            intArrayOf(absB, b),
-            LinearOp.EQ,
-            0,
-        ),
-    )
-    factors.add(
-        ReifiedLinear(
-            absBpb,
-            intArrayOf(1, 1),
-            intArrayOf(absB, b),
-            LinearOp.EQ,
-            0,
-        ),
-    )
-    factors.add(
-        Clause(
-            intArrayOf(Lit.make(absBpa, true), Lit.make(absBpb, true)),
-        ),
-    )
-    // rem ≤ absB - 1: rem - absB ≤ -1.
-    factors.add(
-        Linear(
-            intArrayOf(1, -1),
-            intArrayOf(rem, absB),
-            LinearOp.LE,
-            -1,
-        ),
-    )
-    // rem ≥ -absB + 1: -rem - absB ≤ -1.
-    factors.add(
-        Linear(
-            intArrayOf(-1, -1),
-            intArrayOf(rem, absB),
-            LinearOp.LE,
-            -1,
-        ),
-    )
-    // Truncated semantics: sign(rem) = sign(a) when rem != 0.
-    //   rem > 0 → a ≥ 0;  rem < 0 → a ≤ 0;  rem = 0 → no constraint.
-    // Encode as: rem > 0 → a ≥ 1   (sign-aligned for non-zero rem) AND
-    //            rem < 0 → a ≤ -1
-    // Both via reified linears.
-    val remPos = allocBool("__div_rempos_${a}_$b")
-    val remNeg = allocBool("__div_remneg_${a}_$b")
-    factors.add(
-        ReifiedLinear(
-            remPos,
-            intArrayOf(1),
-            intArrayOf(rem),
-            LinearOp.GE,
-            1,
-        ),
-    )
-    factors.add(
-        ReifiedLinear(
-            remNeg,
-            intArrayOf(1),
-            intArrayOf(rem),
-            LinearOp.LE,
-            -1,
-        ),
-    )
-    val aNonNeg = allocBool("__div_apos_${a}_$b")
-    val aNonPos = allocBool("__div_aneg_${a}_$b")
-    factors.add(
-        ReifiedLinear(
-            aNonNeg,
-            intArrayOf(1),
-            intArrayOf(a),
-            LinearOp.GE,
-            0,
-        ),
-    )
-    factors.add(
-        ReifiedLinear(
-            aNonPos,
-            intArrayOf(1),
-            intArrayOf(a),
-            LinearOp.LE,
-            0,
-        ),
-    )
-    // remPos → aNonNeg:  ¬remPos ∨ aNonNeg
-    factors.add(
-        Clause(
-            intArrayOf(Lit.make(remPos, false), Lit.make(aNonNeg, true)),
-        ),
-    )
-    // remNeg → aNonPos:  ¬remNeg ∨ aNonPos
-    factors.add(
-        Clause(
-            intArrayOf(Lit.make(remNeg, false), Lit.make(aNonPos, true)),
-        ),
-    )
+    factors.addAll(res.factors)
 }
+
 
 /**
  * `array_int_element(idx, arr, result)` / `array_var_int_element(idx, arr, result)`:
