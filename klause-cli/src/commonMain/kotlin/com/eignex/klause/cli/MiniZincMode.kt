@@ -39,6 +39,8 @@ internal object MiniZincMode : CliMode {
             val source = readTextFile(path)
             val program = parseFlatZinc(
                 source = source,
+                floatBuckets = config.floatBuckets,
+                floatScale = config.floatScale,
                 unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo,
                 unboundedIntHi = unboundedIntHi ?: config.unboundedIntHi,
             )

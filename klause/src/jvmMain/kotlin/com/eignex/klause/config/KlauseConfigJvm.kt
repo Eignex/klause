@@ -10,6 +10,8 @@ package com.eignex.klause.config
  *  - `klause.pinAbsentOpt` | `KLAUSE_PIN_ABSENT_OPT` — Boolean (`0`/`false`/`off`/`no` ⇒ false)
  *  - `klause.fzn.unboundedIntLo` | `KLAUSE_FZN_UNBOUNDED_INT_LO` — Int
  *  - `klause.fzn.unboundedIntHi` | `KLAUSE_FZN_UNBOUNDED_INT_HI` — Int
+ *  - `klause.floatBuckets` | `KLAUSE_FLOAT_BUCKETS` — Int
+ *  - `klause.floatScale` | `KLAUSE_FLOAT_SCALE` — Long
  *
  * This is the single place env/property names for core config are spelled out; entry points
  * should call it instead of reading `System.getenv` directly.
@@ -19,10 +21,13 @@ fun klauseConfigFromEnv(base: KlauseConfig = KlauseConfig.current): KlauseConfig
     fun bool(prop: String, env: String, default: Boolean): Boolean =
         raw(prop, env)?.let { it.trim().lowercase() !in FALSEY } ?: default
     fun int(prop: String, env: String, default: Int): Int = raw(prop, env)?.trim()?.toIntOrNull() ?: default
+    fun long(prop: String, env: String, default: Long): Long = raw(prop, env)?.trim()?.toLongOrNull() ?: default
     return base.copy(
         pinAbsentOptVars = bool("klause.pinAbsentOpt", "KLAUSE_PIN_ABSENT_OPT", base.pinAbsentOptVars),
         unboundedIntLo = int("klause.fzn.unboundedIntLo", "KLAUSE_FZN_UNBOUNDED_INT_LO", base.unboundedIntLo),
         unboundedIntHi = int("klause.fzn.unboundedIntHi", "KLAUSE_FZN_UNBOUNDED_INT_HI", base.unboundedIntHi),
+        floatBuckets = int("klause.floatBuckets", "KLAUSE_FLOAT_BUCKETS", base.floatBuckets),
+        floatScale = long("klause.floatScale", "KLAUSE_FLOAT_SCALE", base.floatScale),
     )
 }
 

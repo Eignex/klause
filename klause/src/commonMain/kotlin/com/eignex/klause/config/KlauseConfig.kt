@@ -1,7 +1,20 @@
 package com.eignex.klause.config
 
-import com.eignex.klause.formats.flatzinc.DEFAULT_UNBOUNDED_INT_HI
-import com.eignex.klause.formats.flatzinc.DEFAULT_UNBOUNDED_INT_LO
+/** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries
+ *  with no explicit range). Wide enough to absorb typical CP arithmetic without overflow in
+ *  factor coefficient × value products; matches the convention used by Gecode / Chuffed. */
+const val DEFAULT_UNBOUNDED_INT_LO: Int = -10_000_000
+
+/** Default upper bound for unbounded `var int`; counterpart to [DEFAULT_UNBOUNDED_INT_LO]. */
+const val DEFAULT_UNBOUNDED_INT_HI: Int = 10_000_000
+
+/** Default number of uniformly-spaced buckets a `floatVar` is discretised into. 10-bit
+ *  precision is enough for typical config-style fractions; raise it for finer granularity. */
+const val DEFAULT_FLOAT_BUCKETS: Int = 1024
+
+/** Default fixed-point scale for the FlatZinc float-linear lowering: real coefficients and
+ *  bounds are multiplied by this and rounded to integers. */
+const val DEFAULT_FLOAT_SCALE: Long = 1_000_000L
 
 /**
  * Central, process-wide configuration for klause's core (compiler + frontends).
@@ -46,6 +59,15 @@ data class KlauseConfig(
 
     /** Upper bound counterpart to [unboundedIntLo]. Env: `KLAUSE_FZN_UNBOUNDED_INT_HI`. */
     val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+
+    /** Number of uniformly-spaced buckets a `floatVar` is discretised into when no explicit
+     *  count is given. Higher = finer precision, more bits per float var. Env:
+     *  `KLAUSE_FLOAT_BUCKETS`. */
+    val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+
+    /** Fixed-point scale used by the FlatZinc float-linear lowering (real coefficients and
+     *  bounds are multiplied by this and rounded to integers). Env: `KLAUSE_FLOAT_SCALE`. */
+    val floatScale: Long = DEFAULT_FLOAT_SCALE,
 ) {
     /** Default configuration values. */
     companion object {
