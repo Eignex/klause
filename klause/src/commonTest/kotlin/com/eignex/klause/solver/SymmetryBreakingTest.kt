@@ -64,6 +64,38 @@ class SymmetryBreakingTest {
     private fun pos(v: Int) = Lit.make(v, true)
 
     @Test
+    fun `verified detection orders interchangeable vars in separate isomorphic factors`() {
+        // x0 in (x0 <= 3) and x1 in (x1 <= 3): different factors, but swapping x0/x1 preserves the
+        // factor set, so they ARE interchangeable. The same-factor-set heuristic misses this;
+        // verified detection (remap + structural key) catches it and orders them.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            listOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 3),
+            ),
+        )
+        checkSound("cross-factor", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `asymmetric separate factors are not grouped`() {
+        // x0 <= 3, x1 <= 4: NOT interchangeable (swapping changes the bounds). Must not reduce.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            listOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 4),
+            ),
+        )
+        checkSound("asymmetric", problem, expectReduced = false)
+    }
+
+    @Test
     fun `interchangeable alldifferent variables are ordered`() {
         val problem = Problem(
             0,

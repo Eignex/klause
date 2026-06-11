@@ -42,6 +42,16 @@ interface Factor {
     fun remap(boolMap: IntArray, intMap: IntArray): Factor
 
     /**
+     * A canonical string identifying this constraint up to variable identity: same factor type,
+     * same constants (coefficients, bounds, polarities), and the same multiset of variables — in a
+     * representation that does not depend on internal ordering — produce the same key. Used by
+     * symmetry detection (#334) to check whether permuting variables maps the factor set to itself
+     * (an automorphism). `null` (the default) means "not keyed"; verification falls back to the
+     * conservative same-factor-set heuristic when any factor in the problem is unkeyed.
+     */
+    fun structuralKey(): String? = null
+
+    /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
      * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
      * — sound but trivial. Factors override to participate in [Problem.propagate].

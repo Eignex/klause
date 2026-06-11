@@ -56,6 +56,9 @@ class Linear private constructor(
         require(coeffs.isNotEmpty()) { "Linear must have at least one term" }
     }
 
+    override fun structuralKey(): String =
+        "lin:$op:$bound:" + vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${coeffs[it]}" }
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
 
     override val boolVars: IntArray = EmptyIntArray

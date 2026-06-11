@@ -332,8 +332,11 @@ object Presolve {
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
     ): Problem {
-        val intGroups = interchangeableIntGroups(problem, objectiveIntVars)
-        val boolGroups = interchangeableBoolGroups(problem, objectiveBoolVars)
+        // Prefer verified detection (any factor swap proven an automorphism); fall back to the
+        // sufficient same-factor-set heuristic when a factor type isn't structurally keyed.
+        val verified = verifiedSymmetryOrbits(problem, objectiveIntVars, objectiveBoolVars)
+        val intGroups = verified?.first ?: interchangeableIntGroups(problem, objectiveIntVars)
+        val boolGroups = verified?.second ?: interchangeableBoolGroups(problem, objectiveBoolVars)
         if (intGroups.isEmpty() && boolGroups.isEmpty()) return problem
         val extra = ArrayList<Factor>()
         for (group in intGroups) {
@@ -347,6 +350,99 @@ object Presolve {
             }
         }
         return rebuildProblem(problem, problem.factors.toList() + extra)
+    }
+
+    /**
+     * Verified interchangeable-variable detection (#334): a variable transposition is a genuine
+     * symmetry iff swapping the two variables maps the factor multiset onto itself. Each candidate
+     * swap is *checked* by remapping every factor and comparing structural keys — so it catches
+     * symmetries the same-factor-set heuristic misses (variables in different but isomorphic
+     * factors, matrix rows), and is sound by construction. Returns `null` when any factor lacks a
+     * [Factor.structuralKey] (then the caller uses the conservative heuristic). Returns the int and
+     * bool orbits (size ≥ 2) otherwise; objective variables are excluded.
+     */
+    private fun verifiedSymmetryOrbits(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        objectiveBoolVars: Set<Int>,
+    ): Pair<List<IntArray>, List<IntArray>>? {
+        val base = HashMap<String, Int>()
+        for (f in problem.factors) {
+            val key = f.structuralKey() ?: return null
+            base[key] = (base[key] ?: 0) + 1
+        }
+        val intMap = IntArray(problem.numIntVars) { it }
+        val boolMap = IntArray(problem.numBoolVars) { it }
+
+        val intCandidates = HashMap<String, MutableList<Int>>()
+        for (v in 0 until problem.numIntVars) {
+            if (v !in objectiveIntVars) intCandidates.getOrPut(domainKey(problem.intDomains[v])) { ArrayList() }.add(v)
+        }
+        val intOrbits = buildVerifiedOrbits(problem.numIntVars, intCandidates.values.toList()) { u, v ->
+            intMap[u] = v
+            intMap[v] = u
+            val ok = isAutomorphism(problem, base, boolMap, intMap)
+            intMap[u] = u
+            intMap[v] = v
+            ok
+        }
+        val boolVarsCand = (0 until problem.numBoolVars).filter { it !in objectiveBoolVars }
+        val boolOrbits = buildVerifiedOrbits(problem.numBoolVars, listOf(boolVarsCand)) { u, v ->
+            boolMap[u] = v
+            boolMap[v] = u
+            val ok = isAutomorphism(problem, base, boolMap, intMap)
+            boolMap[u] = u
+            boolMap[v] = v
+            ok
+        }
+        return intOrbits to boolOrbits
+    }
+
+    /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
+     *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
+    private fun isAutomorphism(problem: Problem, base: Map<String, Int>, boolMap: IntArray, intMap: IntArray): Boolean {
+        val counts = HashMap<String, Int>(base.size)
+        for (f in problem.factors) {
+            val key = f.remap(boolMap, intMap).structuralKey() ?: return false
+            val next = (counts[key] ?: 0) + 1
+            if (next > (base[key] ?: 0)) return false // already can't match the multiset
+            counts[key] = next
+        }
+        return counts == base
+    }
+
+    /** Union the candidate variables whose pairwise transposition [verify]s as a symmetry, then
+     *  return the resulting orbits of size ≥ 2 (each sorted). Transpositions generate the full
+     *  symmetric group on an orbit, so a total order over it is a sound symmetry break. */
+    private fun buildVerifiedOrbits(
+        numVars: Int,
+        candidateGroups: List<List<Int>>,
+        verify: (Int, Int) -> Boolean,
+    ): List<IntArray> {
+        val parent = IntArray(numVars) { it }
+        fun find(x: Int): Int {
+            var root = x
+            while (parent[root] != root) root = parent[root]
+            var cur = x
+            while (parent[cur] != cur) {
+                val next = parent[cur]
+                parent[cur] = root
+                cur = next
+            }
+            return root
+        }
+        for (group in candidateGroups) {
+            for (i in group.indices) {
+                for (j in i + 1 until group.size) {
+                    val u = group[i]
+                    val v = group[j]
+                    if (find(u) != find(v) && verify(u, v)) parent[find(u)] = find(v)
+                }
+            }
+        }
+        val byRoot = HashMap<Int, MutableList<Int>>()
+        for (group in candidateGroups) for (v in group) byRoot.getOrPut(find(v)) { ArrayList() }.add(v)
+        return byRoot.values.filter { it.size >= 2 }.map { it.sorted().toIntArray() }
     }
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */

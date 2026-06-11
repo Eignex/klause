@@ -49,6 +49,9 @@ class AllDifferent(
     // positions are skipped entirely; unpinned-presence positions are skipped too, so any
     // filtering remains sound under "this position might still go absent".
 
+    override fun structuralKey(): String =
+        "alldiff:$domainMin:$domainSize:" + vars.sorted().joinToString(",") + ":" + presents.sorted().joinToString(",")
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         AllDifferent(vars.remapVars(intMap), domainMin, domainSize, presents.remapLits(boolMap))
 

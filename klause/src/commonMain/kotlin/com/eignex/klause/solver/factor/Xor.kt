@@ -26,6 +26,8 @@ class Xor(
         require(targetParity == 0 || targetParity == 1) { "targetParity must be 0 or 1" }
     }
 
+    override fun structuralKey(): String = "xor:$targetParity:" + literals.sorted().joinToString(",")
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Xor(literals.remapLits(boolMap), targetParity)
 
     override val boolVars: IntArray = run {
