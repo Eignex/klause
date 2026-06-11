@@ -506,7 +506,7 @@ object Presolve {
         val byShape = HashMap<String, MutableList<IntArray>>()
         for (f in problem.factors) {
             if (f.boolVars.isNotEmpty() || f.intVars.isEmpty()) continue
-            val block = f.intVars.toSortedSet().toIntArray()
+            val block = f.intVars.distinct().sorted().toIntArray()
             if (block.any { it in objectiveIntVars || it in alreadyBroken }) continue
             val shape = canonicalShape(problem, f, block) ?: continue
             byShape.getOrPut(shape) { ArrayList() }.add(block)
