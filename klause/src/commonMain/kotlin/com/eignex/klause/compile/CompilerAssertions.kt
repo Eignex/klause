@@ -70,14 +70,14 @@ import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
 import com.eignex.klause.solver.factor.SymmetricAllDifferent as SymmetricAllDifferentFactor
 
 /**
- * Top-level constraint assertion handlers for [Compiler.Build]. The DSL drops a tree of
+ * Top-level constraint assertion handlers for [Lowering]. The DSL drops a tree of
  * [BoolExpr] into [assertExpr]; this file owns the dispatch into per-shape emitters
  * ([assertAllDifferent], [assertCircuit], [assertCumulative], ...) and the integer-
  * comparison normalisation ([assertIntCompare] / [emitTopLevelCmp] / [emitSingleVar]).
  * Sub-expression-level lowering (`lowerToLit`, `reify*`, `tseitin*`) lives in
  * `CompilerLowering`; affine-fragment lift lives in `CompilerLift`.
  */
-internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
+internal fun Lowering.assertExpr(expr: BoolExpr) {
     when (expr) {
         is And -> for (c in expr.children) assertExpr(c)
 
@@ -182,7 +182,7 @@ internal fun Compiler.Build.assertExpr(expr: BoolExpr) {
     }
 }
 
-internal fun Compiler.Build.expandTable(t: TableConstraint): BoolExpr {
+internal fun Lowering.expandTable(t: TableConstraint): BoolExpr {
     val lifted = t.terms.map { lift(it) }
     val tuples = t.tuples.map { tup ->
         And(
@@ -213,7 +213,7 @@ internal fun Compiler.Build.expandTable(t: TableConstraint): BoolExpr {
  * `Σ (c_v · step_v) · b_v ⟨op⟩ bound − Σ c_v · lo_v`, then multiply by `SCALE` and
  * round to integer coefficients. Discretisation error is ~1/SCALE per term.
  */
-internal fun Compiler.Build.assertFloatLinear(c: FloatLinearConstraint) {
+internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
     val n = c.varNames.size
     val realIds = IntArray(n) { i ->
         floatVarIdByName[c.varNames[i]]
@@ -271,7 +271,7 @@ internal fun Compiler.Build.assertFloatLinear(c: FloatLinearConstraint) {
     factors += Linear(scaledCoeffs, intVarIds, realOp, scaledBoundInt)
 }
 
-internal fun Compiler.Build.assertAllDifferent(terms: List<IntExpr>) {
+internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
     val lifted = terms.map { lift(it) }
     // Specialisation: when every operand is a bare IntRef (no arithmetic residual), emit
     // the global factor. Otherwise fall back to pairwise NE through the existing
@@ -300,7 +300,7 @@ internal fun Compiler.Build.assertAllDifferent(terms: List<IntExpr>) {
 /** Lift `e` to a solver int-var id, materialising an aux var pinned equal when the lifted
  *  form carries an arithmetic residual rather than being a bare variable reference. The
  *  channeling globals below need concrete var ids to post their native factor. */
-internal fun Compiler.Build.varIdOfLifted(e: IntExpr): Int {
+internal fun Lowering.varIdOfLifted(e: IntExpr): Int {
     val lifted = lift(e)
     if (lifted is IntRef) return intVarOf(lifted.name)
     val aux = newAuxIntVar(domainOf(lifted))
@@ -308,12 +308,12 @@ internal fun Compiler.Build.varIdOfLifted(e: IntExpr): Int {
     return intVarOf(aux)
 }
 
-internal fun Compiler.Build.assertSymmetricAllDifferent(expr: SymmetricAllDifferent) {
+internal fun Lowering.assertSymmetricAllDifferent(expr: SymmetricAllDifferent) {
     val ids = IntArray(expr.terms.size) { varIdOfLifted(expr.terms[it]) }
     factors += SymmetricAllDifferentFactor(ids, indexOffset = expr.indexOffset)
 }
 
-internal fun Compiler.Build.assertInverse(expr: InverseChannel) {
+internal fun Lowering.assertInverse(expr: InverseChannel) {
     val f = IntArray(expr.f.size) { varIdOfLifted(expr.f[it]) }
     val g = IntArray(expr.g.size) { varIdOfLifted(expr.g[it]) }
     factors += InverseFactor(f, g, fOffset = expr.fOffset, gOffset = expr.gOffset)
@@ -325,7 +325,7 @@ internal fun Compiler.Build.assertInverse(expr: InverseChannel) {
  * 1-indexed inputs), aux 0-indexed int vars are allocated and channeled to the original
  * vars via a Linear factor — the factor itself stays 0-indexed.
  */
-internal fun Compiler.Build.assertCircuit(succ: List<IntExpr>, valueOffset: Int, sub: Boolean) {
+internal fun Lowering.assertCircuit(succ: List<IntExpr>, valueOffset: Int, sub: Boolean) {
     val n = succ.size
     val lifted = succ.map { lift(it) }
     require(lifted.all { it is IntRef }) {
@@ -351,7 +351,7 @@ internal fun Compiler.Build.assertCircuit(succ: List<IntExpr>, valueOffset: Int,
     factors += if (sub) SubcircuitFactor(succ = ids) else CircuitFactor(succ = ids)
 }
 
-internal fun Compiler.Build.assertCumulative(expr: CumulativeExpr) {
+internal fun Lowering.assertCumulative(expr: CumulativeExpr) {
     val lifted = expr.starts.map { lift(it) }
     require(lifted.all { it is IntRef }) {
         "cumulative: every start term must be a bare variable reference (no arithmetic)."
@@ -369,7 +369,7 @@ internal fun Compiler.Build.assertCumulative(expr: CumulativeExpr) {
  * Lower each presence [BoolExpr] in [presents] to a solver literal. Used by every opt-aware
  * global to thread presence into its factor's `presents: IntArray`.
  */
-private fun Compiler.Build.lowerPresences(presents: List<BoolExpr>): IntArray {
+private fun Lowering.lowerPresences(presents: List<BoolExpr>): IntArray {
     val out = IntArray(presents.size)
     for (i in presents.indices) out[i] = lowerToLit(presents[i])
     return out
@@ -377,7 +377,7 @@ private fun Compiler.Build.lowerPresences(presents: List<BoolExpr>): IntArray {
 
 /** AllDifferent over an opt-presence-gated subset. Bare-IntRef operands map directly to the
  *  global factor; non-bare operands fall back to presence-guarded pairwise NE. */
-internal fun Compiler.Build.assertAllDifferentOpt(expr: AllDifferentOpt) {
+internal fun Lowering.assertAllDifferentOpt(expr: AllDifferentOpt) {
     val lifted = expr.terms.map { lift(it) }
     val presentLits = lowerPresences(expr.presents)
     if (lifted.all { it is IntRef }) {
@@ -409,14 +409,14 @@ internal fun Compiler.Build.assertAllDifferentOpt(expr: AllDifferentOpt) {
 
 /** Reconstruct a [BoolExpr] from a solver literal — used to thread already-lowered
  *  presence literals back through the AST-level guards in the pairwise fallback path. */
-private fun Compiler.Build.boolFromLit(lit: Int): BoolExpr {
+private fun Lowering.boolFromLit(lit: Int): BoolExpr {
     val v = Lit.variable(lit)
     val name = idToBoolName[v]
         ?: error("opt: unknown bool var id $v in presence lowering")
     return BoolRef(name, negated = !Lit.isPositive(lit))
 }
 
-internal fun Compiler.Build.assertCumulativeOpt(expr: CumulativeExprOpt) {
+internal fun Lowering.assertCumulativeOpt(expr: CumulativeExprOpt) {
     val lifted = expr.starts.map { lift(it) }
     require(lifted.all { it is IntRef }) {
         "cumulativeOpt: every start term must be a bare variable reference (no arithmetic)."
@@ -431,7 +431,7 @@ internal fun Compiler.Build.assertCumulativeOpt(expr: CumulativeExprOpt) {
     )
 }
 
-internal fun Compiler.Build.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
+internal fun Lowering.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
     val lifted = expr.starts.map { lift(it) }
     require(lifted.all { it is IntRef }) {
         "disjunctiveOpt: every start term must be a bare variable reference (no arithmetic)."
@@ -444,7 +444,7 @@ internal fun Compiler.Build.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
     )
 }
 
-internal fun Compiler.Build.assertNValueOpt(expr: NValueExprOpt) {
+internal fun Lowering.assertNValueOpt(expr: NValueExprOpt) {
     val xsLifted = expr.xs.map { lift(it) }
     require(xsLifted.all { it is IntRef }) {
         "nvalueOpt: every xs term must be a bare variable reference (no arithmetic)."
@@ -466,7 +466,7 @@ internal fun Compiler.Build.assertNValueOpt(expr: NValueExprOpt) {
     )
 }
 
-internal fun Compiler.Build.assertGccOpt(expr: GccExprOpt) {
+internal fun Lowering.assertGccOpt(expr: GccExprOpt) {
     val xsLifted = expr.xs.map { lift(it) }
     require(xsLifted.all { it is IntRef }) {
         "gccOpt: every xs term must be a bare variable reference (no arithmetic)."
@@ -482,7 +482,7 @@ internal fun Compiler.Build.assertGccOpt(expr: GccExprOpt) {
     )
 }
 
-internal fun Compiler.Build.assertDisjunctive(expr: DisjunctiveExpr) {
+internal fun Lowering.assertDisjunctive(expr: DisjunctiveExpr) {
     val lifted = expr.starts.map { lift(it) }
     require(lifted.all { it is IntRef }) {
         "disjunctive: every start term must be a bare variable reference (no arithmetic)."
@@ -494,7 +494,7 @@ internal fun Compiler.Build.assertDisjunctive(expr: DisjunctiveExpr) {
     )
 }
 
-internal fun Compiler.Build.assertSort(expr: SortExpr) {
+internal fun Lowering.assertSort(expr: SortExpr) {
     val liftedXs = expr.xs.map { lift(it) }
     val liftedYs = expr.ys.map { lift(it) }
     require(liftedXs.all { it is IntRef } && liftedYs.all { it is IntRef }) {
@@ -505,7 +505,7 @@ internal fun Compiler.Build.assertSort(expr: SortExpr) {
     factors += SortFactor(xs = xsIds, ys = ysIds)
 }
 
-internal fun Compiler.Build.assertDiffn(expr: DiffnExpr) {
+internal fun Lowering.assertDiffn(expr: DiffnExpr) {
     val liftedX = expr.xs.map { lift(it) }
     val liftedY = expr.ys.map { lift(it) }
     require(liftedX.all { it is IntRef } && liftedY.all { it is IntRef }) {
@@ -521,7 +521,7 @@ internal fun Compiler.Build.assertDiffn(expr: DiffnExpr) {
     )
 }
 
-internal fun Compiler.Build.assertRegular(expr: RegularExpr) {
+internal fun Lowering.assertRegular(expr: RegularExpr) {
     val lifted = expr.seq.map { lift(it) }
     require(lifted.all { it is IntRef }) {
         "regular: every sequence term must be a bare variable reference (no arithmetic)."
@@ -537,7 +537,7 @@ internal fun Compiler.Build.assertRegular(expr: RegularExpr) {
     )
 }
 
-internal fun Compiler.Build.assertIntCompare(expr: IntCompare) {
+internal fun Lowering.assertIntCompare(expr: IntCompare) {
     val (op, normBound) = normalize(expr.op, 0)
     val combined = subtract(affine(lift(expr.left)), affine(lift(expr.right)))
     val coeffs = combined.coeffs
@@ -545,7 +545,7 @@ internal fun Compiler.Build.assertIntCompare(expr: IntCompare) {
     emitTopLevelCmp(coeffs, op, bound)
 }
 
-internal fun Compiler.Build.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmpOp, bound: Int) {
+internal fun Lowering.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmpOp, bound: Int) {
     if (coeffs.isEmpty()) {
         // 0 op bound: trivially true or false at compile time.
         val holds = when (op) {
@@ -587,7 +587,7 @@ internal fun Compiler.Build.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmp
     }
 }
 
-internal fun Compiler.Build.emitSingleVar(name: String, coeff: Int, op: IntCmpOp, bound: Int) {
+internal fun Lowering.emitSingleVar(name: String, coeff: Int, op: IntCmpOp, bound: Int) {
     // Σ c x ⟨op⟩ b reduces to x ⟨op'⟩ b/c (assuming exact division). Avoid the division
     // by lowering through the Linear factor when c isn't ±1.
     if (coeff == 1) {
@@ -611,7 +611,7 @@ internal fun Compiler.Build.emitSingleVar(name: String, coeff: Int, op: IntCmpOp
     factors += Linear(intArrayOf(coeff), intArrayOf(varId), op.toLinearOp(), bound)
 }
 
-internal fun Compiler.Build.emitSingleVarCanonical(name: String, op: IntCmpOp, bound: Int) {
+internal fun Lowering.emitSingleVarCanonical(name: String, op: IntCmpOp, bound: Int) {
     val v = intVarOf(name)
     factors += Linear(intArrayOf(1), intArrayOf(v), op.toLinearOp(), bound)
 }

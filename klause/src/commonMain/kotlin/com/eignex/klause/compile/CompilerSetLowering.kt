@@ -39,7 +39,7 @@ import com.eignex.klause.solver.factor.ReifiedLinear
  * the literal's own element list (for [SetLiteral] / [SetNominalLiteral]). This keeps
  * the lowering uniform — every downstream consumer iterates the universe once.
  */
-internal fun Compiler.Build.materializeSet(expr: SetExpr): SetLayout = when (expr) {
+internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
     is SetRef -> setLayouts[expr.name]
         ?: error("Unknown set variable '${expr.name}'")
 
@@ -171,7 +171,7 @@ private fun unionUniverse(a: IntArray, b: IntArray): IntArray {
 // constraints; `lowerToLit` calls the [reify*] variants below when the same expression
 // shows up inside a sub-expression position.
 
-internal fun Compiler.Build.assertSetIn(expr: SetIn) {
+internal fun Lowering.assertSetIn(expr: SetIn) {
     val set = materializeSet(expr.set)
     // x ∈ S  ≡  ∨_{e ∈ universe(S)} (x = e ∧ S[e])
     // Top-level form: emit `∨_{e} (x = e ∧ S[e])` via Tseitin disjunction, then assert it.
@@ -190,7 +190,7 @@ internal fun Compiler.Build.assertSetIn(expr: SetIn) {
     assertExpr(expanded)
 }
 
-internal fun Compiler.Build.assertSetNominalIn(expr: SetNominalIn) {
+internal fun Lowering.assertSetNominalIn(expr: SetNominalIn) {
     val set = materializeSet(expr.set)
     val setName = setRefName(expr.set)
         ?: error(
@@ -205,7 +205,7 @@ internal fun Compiler.Build.assertSetNominalIn(expr: SetNominalIn) {
     factors += Clause(intArrayOf(Lit.make(set.indicatorBoolIds[idx], positive = true)))
 }
 
-internal fun Compiler.Build.assertSetSubsetOf(expr: SetSubsetOf) {
+internal fun Lowering.assertSetSubsetOf(expr: SetSubsetOf) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     // ∀ e ∈ universe(L): if e ∈ universe(R) then L[e] → R[e], else L[e] = false.
@@ -224,7 +224,7 @@ internal fun Compiler.Build.assertSetSubsetOf(expr: SetSubsetOf) {
     }
 }
 
-internal fun Compiler.Build.assertSetDisjoint(expr: SetDisjoint) {
+internal fun Lowering.assertSetDisjoint(expr: SetDisjoint) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     // ∀ e ∈ universe(L) ∩ universe(R): ¬(L[e] ∧ R[e]). (SetBitsetDisjoint bulk factor dropped, #209.)
@@ -238,7 +238,7 @@ internal fun Compiler.Build.assertSetDisjoint(expr: SetDisjoint) {
     }
 }
 
-internal fun Compiler.Build.assertSetEq(expr: SetEq) {
+internal fun Lowering.assertSetEq(expr: SetEq) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     val union = unionUniverse(l.universe, r.universe)
@@ -269,7 +269,7 @@ internal fun Compiler.Build.assertSetEq(expr: SetEq) {
 //  Reified set-expression lowering
 // -----------------------------------------------------------------------------------
 
-internal fun Compiler.Build.reifySetIn(expr: SetIn): Int {
+internal fun Lowering.reifySetIn(expr: SetIn): Int {
     val set = materializeSet(expr.set)
     val pieces = mutableListOf<BoolExpr>()
     for (i in set.universe.indices) {
@@ -283,7 +283,7 @@ internal fun Compiler.Build.reifySetIn(expr: SetIn): Int {
     return lowerToLit(if (pieces.size == 1) pieces[0] else Or(pieces))
 }
 
-internal fun Compiler.Build.reifySetNominalIn(expr: SetNominalIn): Int {
+internal fun Lowering.reifySetNominalIn(expr: SetNominalIn): Int {
     val setName = setRefName(expr.set)
         ?: error("reified nominal-set membership needs a nominal-set var on the right")
     val layout = setLayouts[setName] ?: error("unknown set '$setName'")
@@ -294,7 +294,7 @@ internal fun Compiler.Build.reifySetNominalIn(expr: SetNominalIn): Int {
     return Lit.make(layout.indicatorBoolIds[idx], positive = true)
 }
 
-internal fun Compiler.Build.reifySetSubsetOf(expr: SetSubsetOf): Int {
+internal fun Lowering.reifySetSubsetOf(expr: SetSubsetOf): Int {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     val pieces = mutableListOf<BoolExpr>()
@@ -311,7 +311,7 @@ internal fun Compiler.Build.reifySetSubsetOf(expr: SetSubsetOf): Int {
     return lowerToLit(if (pieces.size == 1) pieces[0] else And(pieces))
 }
 
-internal fun Compiler.Build.reifySetDisjoint(expr: SetDisjoint): Int {
+internal fun Lowering.reifySetDisjoint(expr: SetDisjoint): Int {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     val pieces = mutableListOf<BoolExpr>()
@@ -330,7 +330,7 @@ internal fun Compiler.Build.reifySetDisjoint(expr: SetDisjoint): Int {
     }
 }
 
-internal fun Compiler.Build.reifySetEq(expr: SetEq): Int {
+internal fun Lowering.reifySetEq(expr: SetEq): Int {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     val union = unionUniverse(l.universe, r.universe)
@@ -359,7 +359,7 @@ internal fun Compiler.Build.reifySetEq(expr: SetEq): Int {
 // -----------------------------------------------------------------------------------
 
 /** Lift `card(S)` to a fresh int var whose value equals `Σ indicator_i`. */
-internal fun Compiler.Build.liftSetCard(expr: SetCard): IntRef {
+internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
     val layout = materializeSet(expr.set)
     val n = layout.size
     val aux = newAuxIntVar(IntDomain(0, n))
@@ -402,7 +402,7 @@ internal fun Compiler.Build.liftSetCard(expr: SetCard): IntRef {
 /** Wrap a bool var id (allocated for a set indicator) as a [BoolExpr] reusable in the
  *  AST-level Tseitin pipeline. Each indicator gets a synthetic name so the existing
  *  `BoolRef` machinery can route it through the standard bool-lookup path. */
-private fun Compiler.Build.indicatorBoolExpr(boolId: Int): BoolExpr {
+private fun Lowering.indicatorBoolExpr(boolId: Int): BoolExpr {
     // The bool var already exists in [boolVarIdByName] indirectly via the set layout —
     // but the table is keyed by name, not id. Synthesise a name and register the
     // back-link on demand so [lowerToLit]/[BoolRef] work uniformly.
