@@ -32,6 +32,10 @@ class PseudoBoolean(
         require(weights.isNotEmpty()) { "PseudoBoolean must have at least one term" }
     }
 
+    override fun structuralKey(): String = "pb:$op:$bound:" + literals.indices.sortedBy { literals[it] }.joinToString(
+        ",",
+    ) { "${literals[it]}=${weights[it]}" }
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         PseudoBoolean(weights, literals.remapLits(boolMap), op, bound)
 

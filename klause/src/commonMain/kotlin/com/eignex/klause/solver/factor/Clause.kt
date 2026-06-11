@@ -26,6 +26,8 @@ class Clause(val literals: IntArray) : Factor {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
     }
 
+    override fun structuralKey(): String = "clause:" + literals.sorted().joinToString(",")
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
 
     override val boolVars: IntArray = run {

@@ -27,6 +27,8 @@ class Cardinality(
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
     }
 
+    override fun structuralKey(): String = "card:$min:$max:" + literals.sorted().joinToString(",")
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cardinality(literals.remapLits(boolMap), min, max)
 
     override val boolVars: IntArray = run {
