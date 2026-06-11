@@ -210,19 +210,69 @@ object Presolve {
 
     private fun strengthenPb(factor: PseudoBoolean): Factor? {
         val g = gcdOf(factor.weights)
-        if (g <= 1) return factor
-        return when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
-            is Reduced.Bound -> PseudoBoolean(
-                divAll(factor.weights, g),
-                factor.literals.copyOf(),
-                factor.op,
-                reduced.bound,
-            )
+        val gcdReduced: PseudoBoolean = if (g <= 1) {
+            factor
+        } else {
+            when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
+                is Reduced.Bound -> PseudoBoolean(
+                    divAll(factor.weights, g),
+                    factor.literals.copyOf(),
+                    factor.op,
+                    reduced.bound,
+                )
 
-            Reduced.Drop -> null
+                Reduced.Drop -> return null
 
-            Reduced.Unchanged -> factor
+                Reduced.Unchanged -> factor
+            }
         }
+        return liftKnapsack(gcdReduced)
+    }
+
+    /**
+     * Knapsack coefficient lifting (#333) for a `≤` pseudo-Boolean `Σ wⱼ lⱼ ≤ b`. After normalising
+     * to positive weights (a negative `wⱼ` becomes `|wⱼ|·¬lⱼ` with the bound raised by `|wⱼ|`), the
+     * dual `Σ wⱼ(1−lⱼ) ≥ d` with `d = Σwⱼ − b` is a cover: any weight exceeding `d` contributes no
+     * more than `d` to covering it, so each `wⱼ` clamps to `min(wⱼ, d)` and the bound becomes
+     * `Σ min(wⱼ,d) − d`. Exact (feasible-set-preserving), and it both shrinks coefficients and
+     * tightens the relaxation beyond what GCD reduction reaches. `d ≤ 0` ⟹ the constraint is always
+     * satisfied (dropped). Non-`≤` ops and out-of-Int-range slacks are left untouched.
+     */
+    private fun liftKnapsack(pb: PseudoBoolean): Factor? {
+        if (pb.op != PbOp.LE) return pb
+        val n = pb.literals.size
+        val weights = IntArray(n)
+        val lits = IntArray(n)
+        var bound = pb.bound.toLong()
+        for (i in 0 until n) {
+            if (pb.weights[i] < 0) {
+                weights[i] = -pb.weights[i]
+                lits[i] = Lit.negate(pb.literals[i])
+                bound += weights[i]
+            } else {
+                weights[i] = pb.weights[i]
+                lits[i] = pb.literals[i]
+            }
+        }
+        var sum = 0L
+        for (w in weights) sum += w
+        val d = sum - bound
+        if (d <= 0L) return null // always satisfied
+        if (d >= sum || d > Int.MAX_VALUE) return pb // no weight exceeds d, or slack out of range
+        var changed = false
+        var newSum = 0L
+        val lifted = IntArray(n) { i ->
+            if (weights[i] > d) {
+                changed = true
+                d.toInt()
+            } else {
+                weights[i]
+            }.also { newSum += it }
+        }
+        if (!changed) return pb
+        val newBound = newSum - d
+        if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return pb
+        return PseudoBoolean(lifted, lits, PbOp.LE, newBound.toInt())
     }
 
     private fun toRel(op: LinearOp): Rel = when (op) {

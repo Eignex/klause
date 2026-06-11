@@ -103,6 +103,28 @@ class PresolveTest {
     }
 
     @Test
+    fun `knapsack lifting preserves the feasible set`() {
+        val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, 1, 1), lits, PbOp.LE, 3)) // d=4, w0=5 clamps to 4
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(10, 2, 3), lits, PbOp.LE, 4))
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(3, 3, 3), lits, PbOp.LE, 9)) // redundant: drops
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, -2, 1), lits, PbOp.LE, 2)) // negative weight normalized
+        val mixed = intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true))
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(6, 2, 1), mixed, PbOp.LE, 4))
+    }
+
+    @Test
+    fun `random knapsack constraints preserve the feasible set`() {
+        val rng = Random(0x5A7)
+        repeat(500) {
+            val n = 2 + rng.nextInt(3) // 2..4
+            val lits = IntArray(n) { Lit.make(it, rng.nextBoolean()) }
+            val weights = IntArray(n) { rng.nextInt(9) - 3 } // -3..5
+            assertPbEquivalent(n, PseudoBoolean(weights, lits, PbOp.LE, rng.nextInt(15) - 3))
+        }
+    }
+
+    @Test
     fun `coprime coefficients are left untouched`() {
         val original = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 5)
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 4) }, listOf(original))
