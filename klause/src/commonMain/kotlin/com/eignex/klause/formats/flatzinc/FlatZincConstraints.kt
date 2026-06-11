@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.EmptyIntArray
-import com.eignex.klause.solver.IntFunctionLowering
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.AllDifferent
@@ -14,6 +13,7 @@ import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
+import com.eignex.klause.solver.factor.IntFunctionLowering
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear

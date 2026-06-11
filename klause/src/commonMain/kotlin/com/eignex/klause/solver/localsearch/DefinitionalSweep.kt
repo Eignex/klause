@@ -1,13 +1,21 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.localsearch
 
+import com.eignex.klause.solver.Assignment
+import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.objective.FunctionalObjective
 
 /**
- * The topologically-ordered functional definitions of a FlatZinc model — every
- * `:: defines_var(V)`-annotated constraint whose shape a [SweepNode] can mirror exactly, over
- * the *whole* model rather than just the objective cone. Definitions cover both value spaces:
+ * A local-search acceleration structure (consumed by [LocalSearchSolver]): the topologically-
+ * ordered functional definitions of a model — every functionally-defined variable whose shape a
+ * [SweepNode] can mirror exactly, over the *whole* model rather than just the objective cone. The
+ * class is engine-side and format-agnostic (it depends only on the factor / objective IR); the
+ * front-end supplies the definitions — FlatZinc, via `:: defines_var(V)` annotations, is the only
+ * builder today. Definitions cover both value spaces:
  * int DAGs (abs / min / linear aux chains) via [SweepNode.IntDef], and the bool-shaped
  * definitions decompositions lean on — comparison reifications, `bool2int` channels, literal
  * set membership, bool conjunction/disjunction — plus variable-index element access.

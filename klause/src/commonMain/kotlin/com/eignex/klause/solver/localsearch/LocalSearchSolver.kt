@@ -2,7 +2,6 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -71,7 +70,7 @@ class LocalSearchSolver(
      *  violation contribution. Idempotent and bounded by [Problem.numBoolVars +
      *  numIntVars]. */
     val greedyRepairOnRestart: Boolean = true,
-    /** Optional definitional sweep (see [com.eignex.klause.solver.DefinitionalSweep]): after
+    /** Optional definitional sweep (see [com.eignex.klause.solver.localsearch.DefinitionalSweep]): after
      *  every restart's randomization, defined (aux) vars are *evaluated* bottom-up from the
      *  free decision vars instead of left random — decomposed models start each restart at
      *  the "only real constraints violated" frontier rather than spending millions of flips

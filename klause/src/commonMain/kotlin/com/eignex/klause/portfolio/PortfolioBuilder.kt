@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent

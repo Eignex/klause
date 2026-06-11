@@ -20,7 +20,7 @@ import com.eignex.klause.ast.IntSum
 import com.eignex.klause.ast.Not
 import com.eignex.klause.ast.SetCard
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.IntFunctionLowering
+import com.eignex.klause.solver.factor.IntFunctionLowering
 import com.eignex.klause.solver.factor.Product
 
 /**

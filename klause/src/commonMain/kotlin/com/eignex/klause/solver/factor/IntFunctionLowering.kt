@@ -1,10 +1,8 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.Product
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import kotlin.math.abs
 
 /**

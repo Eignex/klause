@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.DefinitionalSweep
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 
 /**
@@ -81,7 +81,7 @@ data class FlatZincProgram(
      * The model-wide definitional DAG (every evaluable `defines_var` constraint, topologically
      * ordered) for the **local-search** engine's restart sweep: evaluate defined vars from the
      * free decision vars instead of searching them. `null` when the model has no evaluable
-     * definitions. See [com.eignex.klause.solver.DefinitionalSweep].
+     * definitions. See [com.eignex.klause.solver.localsearch.DefinitionalSweep].
      */
     val definitionalSweep: DefinitionalSweep? = null,
 )
