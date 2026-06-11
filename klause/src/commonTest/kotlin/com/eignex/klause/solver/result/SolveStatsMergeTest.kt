@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.result
 
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.SumResult

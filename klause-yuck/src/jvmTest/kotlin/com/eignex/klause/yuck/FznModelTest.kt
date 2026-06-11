@@ -3,7 +3,6 @@ package com.eignex.klause.yuck
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
@@ -22,6 +21,7 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertFailsWith

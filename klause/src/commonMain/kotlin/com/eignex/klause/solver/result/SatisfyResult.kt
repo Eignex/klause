@@ -1,5 +1,10 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.result
 
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.propagation.PropagationResult

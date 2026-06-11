@@ -2,9 +2,9 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.propagation.ClauseExchange
+import com.eignex.klause.solver.result.SearchEvent
 
 /**
  * Per-call params for [BacktrackSolver].
@@ -148,7 +148,7 @@ data class BacktrackParams(
      * — each worker keeps pruning against a tightening external bound even when its own
      * local incumbent is worse. `null` (default) disables external bound sharing; the
      * engine still tracks and prunes against its own internal incumbent. Only honoured
-     * for [com.eignex.klause.solver.LinearObjective] — arbitrary objective subtypes
+     * for [com.eignex.klause.solver.objective.LinearObjective] — arbitrary objective subtypes
      * can't yield a sound LB and silently skip external pruning.
      */
     val objectiveBoundSupplier: (() -> Double)? = null,
@@ -292,7 +292,7 @@ data class BacktrackParams(
     val lpTable: Boolean = false,
     /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
-     * [com.eignex.klause.solver.LinearObjective], a node also computes a Lagrangian bound from an
+     * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
      * constraints over them dualized) and prunes when that bound — rounded up — reaches the incumbent.
      * Independent of [lpBounding]; off by default; a no-op when no eligible AllDifferent exists.

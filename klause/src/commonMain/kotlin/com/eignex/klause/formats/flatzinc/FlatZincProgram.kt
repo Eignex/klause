@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.IncrementalObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.objective.IncrementalObjective
 
 /**
  * Parsed FlatZinc file lifted into klause's [Problem] representation plus the metadata a
@@ -71,10 +71,10 @@ data class FlatZincProgram(
      * `defines_var` constraints (abs / max / min / linear aux vars — the usual decomposed
      * objective), an [IncrementalObjective] that recomputes the
      * objective from the decision variables. This gives local search a real per-move gradient
-     * a plain `minimizeInt(V)` [com.eignex.klause.solver.LinearObjective] lacks (it only sees
+     * a plain `minimizeInt(V)` [com.eignex.klause.solver.objective.LinearObjective] lacks (it only sees
      * `V` itself). `null` for satisfy models, bare-decision-var objectives, or cones with a
      * node shape the builder can't evaluate exactly. Intended for the **local-search** engine
-     * only — complete/reference backends keep the [com.eignex.klause.solver.LinearObjective].
+     * only — complete/reference backends keep the [com.eignex.klause.solver.objective.LinearObjective].
      */
     val lsObjective: IncrementalObjective? = null,
     /**

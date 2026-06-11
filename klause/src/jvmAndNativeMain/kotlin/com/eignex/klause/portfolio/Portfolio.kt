@@ -3,11 +3,11 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolveStats
-import com.eignex.klause.solver.TerminationReason
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi

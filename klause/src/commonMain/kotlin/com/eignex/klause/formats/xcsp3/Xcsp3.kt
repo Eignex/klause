@@ -2,7 +2,6 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
@@ -18,6 +17,7 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.objective.LinearObjective
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
 class UnsupportedXcsp3Exception(msg: String) : RuntimeException("klause XCSP3: $msg")

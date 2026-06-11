@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.util.FloatInterval
 
 /**
  * Optional sidecar on [Problem] that records the original real-valued view of float

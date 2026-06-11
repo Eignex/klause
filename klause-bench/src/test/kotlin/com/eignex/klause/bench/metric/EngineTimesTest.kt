@@ -1,6 +1,6 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.solver.SearchEvent
+import com.eignex.klause.solver.result.SearchEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

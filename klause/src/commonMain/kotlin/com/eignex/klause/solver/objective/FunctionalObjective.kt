@@ -1,5 +1,8 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.objective
 
+import com.eignex.klause.solver.Assignment
+import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.Sample
 import kotlin.math.abs
 
 /**

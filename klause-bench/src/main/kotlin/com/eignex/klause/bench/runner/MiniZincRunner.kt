@@ -5,9 +5,9 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.maximizeInt
-import com.eignex.klause.solver.minimizeInt
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.maximizeInt
+import com.eignex.klause.solver.objective.minimizeInt
 import java.io.File
 import java.util.concurrent.TimeUnit
 

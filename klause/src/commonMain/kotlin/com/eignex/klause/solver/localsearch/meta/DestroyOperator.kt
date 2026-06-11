@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.localsearch.meta
 
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 import kotlin.random.Random

@@ -1,15 +1,15 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.IncrementalObjective
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.Presolver
+import com.eignex.klause.solver.result.SolveStats
 
 /*
  * Generic multi-mode CLI framework.

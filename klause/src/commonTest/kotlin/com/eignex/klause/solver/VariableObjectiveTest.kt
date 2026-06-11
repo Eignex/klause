@@ -7,6 +7,10 @@ import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.maximizeBool
+import com.eignex.klause.solver.objective.minimizeBool
+import com.eignex.klause.solver.objective.minimizeInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

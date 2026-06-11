@@ -1,6 +1,9 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.presolve
 
 import com.eignex.klause.ast.PbOp
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean

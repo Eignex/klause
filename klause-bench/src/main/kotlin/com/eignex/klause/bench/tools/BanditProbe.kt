@@ -9,18 +9,18 @@ import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.RegressionVariableHeuristic
 import com.eignex.klause.solver.backtrack.SolutionGuided
-import com.eignex.klause.solver.maximizeInt
-import com.eignex.klause.solver.minimizeInt
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.maximizeInt
+import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchEvent
 import java.io.File
 
 /**

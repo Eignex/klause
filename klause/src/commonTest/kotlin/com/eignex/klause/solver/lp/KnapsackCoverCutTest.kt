@@ -2,10 +2,10 @@ package com.eignex.klause.solver.lp
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 import kotlin.test.Test

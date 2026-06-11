@@ -2,13 +2,13 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

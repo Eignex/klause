@@ -1,4 +1,5 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.result
+import com.eignex.klause.solver.Sample
 
 /**
  * Why a solver / optimiser returned without a definitive verdict. Lets callers tell
@@ -14,7 +15,7 @@ enum class TerminationReason {
     /** Wall-clock `timeoutMillis` elapsed. */
     Timeout,
 
-    /** Cooperative [Cancellation] token tripped. */
+    /** Cooperative [com.eignex.klause.solver.Cancellation] token tripped. */
     Cancelled,
 
     /**
@@ -29,7 +30,7 @@ enum class TerminationReason {
 }
 
 /**
- * Result of [Solver.sample]. Replaces the previous `Sample?` with an explicit
+ * Result of [com.eignex.klause.solver.Solver.sample]. Replaces the previous `Sample?` with an explicit
  * three-way distinction so a `null`-style return can't conflate "no feasible
  * assignment exists" (provable Unsat) with "budget exhausted before any was found."
  *
@@ -54,7 +55,7 @@ sealed interface SampleResult {
         override val assignment: Sample get() = sample
     }
 
-    /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
+    /** Proven infeasible. See [com.eignex.klause.solver.SolveResult.Unsat.core] for [core] semantics. */
     data class Infeasible(val core: UnsatCore? = null) : SampleResult {
         override val assignment: Sample? = null
     }
@@ -69,7 +70,7 @@ sealed interface SampleResult {
 }
 
 /**
- * Result of [Optimizer.minimize]. Replaces `Sample?` with an explicit verdict so
+ * Result of [com.eignex.klause.solver.Optimizer.minimize]. Replaces `Sample?` with an explicit verdict so
  * "best-effort feasible at objective o" can't be confused with "proven optimal."
  * Only complete backends (`BacktrackSolver`, `BruteForceSolver`, LogicNG, SMT/Z3) can
  * ever return [Optimal] or [Infeasible]; the local-search backend returns [BestFound]
@@ -122,7 +123,7 @@ sealed interface MinimizeResult {
         override val stats: SolveStats = SolveStats.EMPTY,
     ) : WithSample
 
-    /** Proven infeasible. See [SolveResult.Unsat.core] for [core] semantics. */
+    /** Proven infeasible. See [com.eignex.klause.solver.SolveResult.Unsat.core] for [core] semantics. */
     data class Infeasible(val core: UnsatCore? = null, override val stats: SolveStats = SolveStats.EMPTY) :
         MinimizeResult {
         override val assignment: Sample? = null

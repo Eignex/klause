@@ -2,13 +2,8 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.MinimizeResult
-import com.eignex.klause.solver.MinimizeResult.Optimal
-import com.eignex.klause.solver.MinimizeResult.WithSample
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -21,6 +16,11 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.MinimizeResult.Optimal
+import com.eignex.klause.solver.result.MinimizeResult.WithSample
+import com.eignex.klause.solver.result.SearchEvent
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi

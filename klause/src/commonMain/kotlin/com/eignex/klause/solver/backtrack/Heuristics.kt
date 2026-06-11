@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationResult.Unsat
 import com.eignex.klause.solver.propagation.PropagationSession

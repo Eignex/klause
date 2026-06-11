@@ -3,25 +3,25 @@ package com.eignex.klause.solver.localsearch
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.Objective
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SampleResult
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolveStatsSink
 import com.eignex.klause.solver.Solver
-import com.eignex.klause.solver.TerminationReason
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SampleResult
+import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.result.TerminationReason
 import kotlin.random.Random
 
 /**

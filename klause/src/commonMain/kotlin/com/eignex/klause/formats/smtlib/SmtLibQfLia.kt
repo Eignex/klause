@@ -2,7 +2,6 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
@@ -10,6 +9,7 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.objective.LinearObjective
 
 /** Raised when an SMT-LIB construct outside the supported QF_LIA subset is encountered. */
 class UnsupportedSmtException(msg: String) : RuntimeException("klause SMT-LIB QF_LIA: $msg")

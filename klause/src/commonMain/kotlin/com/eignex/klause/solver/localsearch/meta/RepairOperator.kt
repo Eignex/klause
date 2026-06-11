@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.localsearch.meta
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 
 /**

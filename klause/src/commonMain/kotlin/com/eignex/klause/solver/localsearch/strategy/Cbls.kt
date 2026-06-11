@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.localsearch.strategy
 
-import com.eignex.klause.solver.FunctionalObjective
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.IntHashSet
 
 /**

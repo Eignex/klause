@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.util
 
 /**
  * Closed real interval `[lo, hi]` over IEEE-754 doubles. Used as the domain for float

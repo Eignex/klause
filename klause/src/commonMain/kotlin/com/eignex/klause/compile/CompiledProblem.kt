@@ -12,14 +12,14 @@ import com.eignex.klause.schema.OptBoolHandle
 import com.eignex.klause.schema.OptFloatHandle
 import com.eignex.klause.schema.OptIntHandle
 import com.eignex.klause.schema.OptNominalHandle
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.maximizeBool
-import com.eignex.klause.solver.maximizeInt
-import com.eignex.klause.solver.minimizeBool
-import com.eignex.klause.solver.minimizeInt
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.maximizeBool
+import com.eignex.klause.solver.objective.maximizeInt
+import com.eignex.klause.solver.objective.minimizeBool
+import com.eignex.klause.solver.objective.minimizeInt
 
 /**
  * Result of compiling a [com.eignex.klause.schema.VariableSchema] to a solver-side [Problem],

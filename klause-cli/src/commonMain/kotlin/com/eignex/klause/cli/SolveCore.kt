@@ -7,14 +7,10 @@ import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.LinearObjective
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
@@ -26,7 +22,11 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStats
 
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a

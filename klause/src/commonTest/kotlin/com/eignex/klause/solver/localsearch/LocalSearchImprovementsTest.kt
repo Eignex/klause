@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.localsearch
 
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.SolveStats
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

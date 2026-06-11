@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Bits
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet

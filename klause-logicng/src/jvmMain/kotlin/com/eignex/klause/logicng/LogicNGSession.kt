@@ -5,7 +5,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.TerminationReason
+import com.eignex.klause.solver.result.TerminationReason
 import org.logicng.datastructures.Tristate
 import org.logicng.formulas.Formula
 import org.logicng.formulas.FormulaFactory

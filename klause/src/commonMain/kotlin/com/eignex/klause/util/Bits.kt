@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.util
 
 /**
  * Minimal multiplatform bitset over `[0, size)` ints, backed by a [LongArray]. Carved out

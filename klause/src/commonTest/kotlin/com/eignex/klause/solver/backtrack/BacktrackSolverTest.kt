@@ -3,7 +3,6 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -13,6 +12,7 @@ import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult.Unsat
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.propagation.PropagationState

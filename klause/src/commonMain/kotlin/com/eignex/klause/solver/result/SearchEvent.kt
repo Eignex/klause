@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.result
 
 /**
  * Coarse-grained live search events, reported through the caller-supplied `onEvent` hook

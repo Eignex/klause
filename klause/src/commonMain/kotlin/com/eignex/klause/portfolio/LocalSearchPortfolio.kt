@@ -3,11 +3,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.IncrementalObjective
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SearchEvent
 import com.eignex.klause.solver.localsearch.AcceptanceCriterion
 import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.CostShaping
@@ -27,6 +24,9 @@ import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
+import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi

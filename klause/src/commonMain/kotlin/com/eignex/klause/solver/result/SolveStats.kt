@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.result
 
 import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.MaxResult
@@ -12,7 +12,7 @@ import kotlin.time.TimeSource.Monotonic
 
 /**
  * Snapshot of solver-side counters and distributions from a single solve. Carried as a
- * sidecar on [SolveResult] (and on the `MinimizeResult` variants for branch-and-bound
+ * sidecar on [com.eignex.klause.solver.SolveResult] (and on the `MinimizeResult` variants for branch-and-bound
  * runs); populated by backends that opt in, left at its zero / empty defaults by ones
  * that don't.
  *

@@ -2,7 +2,6 @@ package com.eignex.klause.yuck
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.LinearObjective
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
@@ -30,6 +29,7 @@ import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.objective.LinearObjective
 
 /**
  * Translates a klause [Problem] into FlatZinc text for Yuck. As a local-search **reference**,

@@ -1,16 +1,16 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.DefinitionalSweep
-import com.eignex.klause.solver.FunctionalObjective
-import com.eignex.klause.solver.FunctionalObjective.Operand
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.solver.objective.FunctionalObjective.Operand
 
 /**
  * Build a [FunctionalObjective] for `solve minimize/maximize <objName>` from the MiniZinc
  * `:: defines_var(V)` annotations — the cone of constraints that functionally compute the
  * objective variable. Returns `null` (so the caller falls back to a plain
- * [com.eignex.klause.solver.LinearObjective]) when the objective is a bare decision variable
+ * [com.eignex.klause.solver.objective.LinearObjective]) when the objective is a bare decision variable
  * (no cone) or the cone contains any node shape this evaluator can't reproduce exactly. The
  * returned objective is therefore always an *exact* mirror of the objective variable.
  *
