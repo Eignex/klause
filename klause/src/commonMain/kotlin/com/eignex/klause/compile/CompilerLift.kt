@@ -59,7 +59,12 @@ internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Bo
     val b = intVarOf(materializeIntVar(lift(den)).name)
     require(0 !in intDomains[b]) { "div/mod requires denominator domain to exclude 0; got ${intDomains[b]}" }
     val res = IntFunctionLowering.truncatedDivMod(
-        a, b, intDomains[a], intDomains[b], quotient = null, remainder = null,
+        a,
+        b,
+        intDomains[a],
+        intDomains[b],
+        quotient = null,
+        remainder = null,
         freshInt = { d -> intVarOf(newAuxIntVar(d)) },
         freshBool = { newBoolVar() },
     )

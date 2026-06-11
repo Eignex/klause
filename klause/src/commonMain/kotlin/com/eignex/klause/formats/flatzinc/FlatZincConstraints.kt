@@ -1409,13 +1409,17 @@ internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
 private fun FlatZincCompiler.emitTruncDivMod(a: Int, b: Int, qVar: Int?, remVar: Int?) {
     var n = 0
     val res = IntFunctionLowering.truncatedDivMod(
-        a, b, intDomains[a], intDomains[b], quotient = qVar, remainder = remVar,
+        a,
+        b,
+        intDomains[a],
+        intDomains[b],
+        quotient = qVar,
+        remainder = remVar,
         freshInt = { d -> allocInt("__divmod_${a}_${b}_i${n++}", d.min, d.max) },
         freshBool = { allocBool("__divmod_${a}_${b}_b${n++}") },
     )
     factors.addAll(res.factors)
 }
-
 
 /**
  * `array_int_element(idx, arr, result)` / `array_var_int_element(idx, arr, result)`:
