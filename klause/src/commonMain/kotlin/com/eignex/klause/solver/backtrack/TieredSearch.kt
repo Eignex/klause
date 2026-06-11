@@ -29,6 +29,9 @@ enum class TierVarSelect {
 
     /** Uniformly random free variable (`random_order`). */
     RandomOrder,
+
+    /** Largest gap between the two smallest domain values (`max_regret`). */
+    MaxRegret,
 }
 
 /**
@@ -77,7 +80,32 @@ class TieredVariableHeuristic(
             TierVarSelect.LargestDomain -> bestFree(tier, session) { size, _, _ -> size.toLong() }
             TierVarSelect.SmallestLowerBound -> bestFree(tier, session) { _, min, _ -> -min.toLong() }
             TierVarSelect.LargestUpperBound -> bestFree(tier, session) { _, _, max -> max.toLong() }
+            TierVarSelect.MaxRegret -> maxRegretFree(tier, session)
         }
+
+    /** Free variable with the largest gap between its two smallest domain values (`max_regret`);
+     *  free bools have the fixed regret `1`. Ties keep the earliest listed variable. The regret
+     *  needs the second-smallest *value*, which [bestFree]'s `(size, min, max)` score can't see. */
+    private fun maxRegretFree(tier: SearchTier, session: PropagationSession): VarRef? {
+        var best: VarRef? = null
+        var bestRegret = Int.MIN_VALUE
+        for (v in tier.boolVars) {
+            if (session.boolValue(v) == null && 1 > bestRegret) {
+                best = VarRef.Bool(v)
+                bestRegret = 1
+            }
+        }
+        for (v in tier.intVars) {
+            val d = session.intDomain(v)
+            if (d.size <= 1) continue
+            val regret = d.valueAt(1) - d.valueAt(0)
+            if (regret > bestRegret) {
+                best = VarRef.IntVar(v)
+                bestRegret = regret
+            }
+        }
+        return best
+    }
 
     private fun firstFree(tier: SearchTier, session: PropagationSession): VarRef? {
         for (v in tier.boolVars) if (session.boolValue(v) == null) return VarRef.Bool(v)

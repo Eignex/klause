@@ -13,7 +13,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.DomWdeg
+import com.eignex.klause.solver.backtrack.DomainMaxRegret
 import com.eignex.klause.solver.backtrack.IndomainMax
+import com.eignex.klause.solver.backtrack.IndomainMedian
 import com.eignex.klause.solver.backtrack.IndomainMiddle
 import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.IndomainRandom
@@ -329,6 +331,7 @@ internal class FlatZincCompiler(
         "anti_first_fail" -> TierVarSelect.LargestDomain
         "smallest" -> TierVarSelect.SmallestLowerBound
         "largest" -> TierVarSelect.LargestUpperBound
+        "max_regret" -> TierVarSelect.MaxRegret
         "random_order" -> TierVarSelect.RandomOrder
         else -> null
     }
@@ -340,6 +343,7 @@ internal class FlatZincCompiler(
         "anti_first_fail", "occurrence" -> LargestDomain
         "smallest" -> SmallestLowerBound
         "largest" -> LargestUpperBound
+        "max_regret" -> DomainMaxRegret
         "random_order" -> RandomVariable
         else -> null
     }
@@ -347,7 +351,8 @@ internal class FlatZincCompiler(
     internal fun mapValueStrategy(name: String): ValueHeuristic? = when (name) {
         "indomain_min", "indomain" -> IndomainMin
         "indomain_max" -> IndomainMax
-        "indomain_middle", "indomain_median" -> IndomainMiddle
+        "indomain_middle" -> IndomainMiddle
+        "indomain_median" -> IndomainMedian
         "indomain_split" -> IndomainSplit
         "indomain_random" -> IndomainRandom
         else -> null

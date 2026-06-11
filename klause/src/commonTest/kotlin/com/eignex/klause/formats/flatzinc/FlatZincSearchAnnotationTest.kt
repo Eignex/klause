@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.backtrack.IndomainMax
+import com.eignex.klause.solver.backtrack.IndomainMedian
 import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.IndomainSplit
 import com.eignex.klause.solver.backtrack.SmallestDomain
@@ -37,6 +38,20 @@ class FlatZincSearchAnnotationTest {
         assertEquals(TierVarSelect.SmallestDomain, tier.varSelect)
         assertEquals(IndomainMin, tier.valueHeuristic)
         assertEquals(SmallestDomain, varH.fallback)
+    }
+
+    @Test
+    fun `max_regret and indomain_median map to their own selectors not approximations`() {
+        val src = """
+            var 0..5: x;
+            constraint int_lin_le([1], [x], 3);
+            solve :: int_search([x], max_regret, indomain_median, complete) satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val varH = tieredVar(program)
+        assertEquals(TierVarSelect.MaxRegret, varH.tiers[0].varSelect)
+        // indomain_median is its own heuristic now, no longer conflated with indomain_middle.
+        assertEquals(IndomainMedian, varH.tiers[0].valueHeuristic)
     }
 
     @Test

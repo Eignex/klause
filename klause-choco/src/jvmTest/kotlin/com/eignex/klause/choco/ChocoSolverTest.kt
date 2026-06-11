@@ -7,6 +7,12 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MinimizeResult
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.IndomainMiddle
+import com.eignex.klause.solver.backtrack.InputOrder
+import com.eignex.klause.solver.backtrack.SearchTier
+import com.eignex.klause.solver.backtrack.TierVarSelect
+import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
@@ -30,6 +36,25 @@ class ChocoSolverTest {
         val r = ChocoSolver(p).solve(ChocoParams())
         assertTrue(r is SolveResult.Sat)
         assertTrue(r.assignment.bools[0] || r.assignment.bools[1])
+    }
+
+    @Test
+    fun `lcg fixed search with indomain_middle is sound (no false unsat)`() {
+        // A permutation of [0..2] under AllDifferent is satisfiable. Mirroring an indomain_middle
+        // fixed search onto the LCG engine with the classic makeIntEq decision operator produced a
+        // false UNSAT here (rasros/choco-lcg-false-unsat); applyFixedSearch now branches such tiers
+        // with makeIntSplit, so the reference stays sound.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+        )
+        val tier = SearchTier(IntArray(0), intArrayOf(0, 1, 2), TierVarSelect.InputOrder, IndomainMiddle)
+        // applyFixedSearch reads the tier's own value heuristic, not params.valueHeuristic.
+        val fixed = BacktrackParams(variableHeuristic = TieredVariableHeuristic(listOf(tier), InputOrder))
+        val r = ChocoSolver(p).solve(ChocoParams(lcg = true, fixedSearch = fixed))
+        assertTrue(r is SolveResult.Sat, "expected Sat under LCG fixed indomain_middle, got $r")
     }
 
     @Test

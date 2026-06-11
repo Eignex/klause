@@ -16,6 +16,7 @@ import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileScope
 import com.eignex.klause.bench.tools.Profiler
+import com.eignex.klause.portfolio.CompetitionMode
 
 /**
  * Runs a [MetricKind] over a concrete set of [ProblemRef]s. The single dispatch point shared
@@ -36,11 +37,12 @@ internal object MetricRunner {
         budget: Budget,
         reference: Backend?,
         profile: ProfileConfig? = null,
+        competition: CompetitionConfig? = null,
     ) {
         if (profile != null && profile.scope == ProfileScope.ALL) {
-            Profiler.record(profile) { dispatch(metric, refs, budget, reference, solveProfile = null) }
+            Profiler.record(profile) { dispatch(metric, refs, budget, reference, competition, solveProfile = null) }
         } else {
-            dispatch(metric, refs, budget, reference, solveProfile = profile)
+            dispatch(metric, refs, budget, reference, competition, solveProfile = profile)
         }
     }
 
@@ -51,13 +53,22 @@ internal object MetricRunner {
         refs: List<ProblemRef>,
         budget: Budget,
         reference: Backend?,
+        competition: CompetitionConfig?,
         solveProfile: ProfileConfig?,
     ) {
         fun <T> solve(block: () -> T): T = if (solveProfile != null) Profiler.record(solveProfile, block) else block()
         when (metric) {
             MetricKind.PARITY -> {
                 val resolved = BenchLoad.resolveRefs(refs)
-                solve { ParityMetric.run(resolved, budget, reference ?: Backend.CHOCO) }
+                solve {
+                    ParityMetric.run(
+                        resolved,
+                        budget,
+                        reference ?: Backend.CHOCO,
+                        competition?.mode ?: CompetitionMode.OPEN,
+                        competition?.threads ?: Runtime.getRuntime().availableProcessors(),
+                    )
+                }
             }
 
             MetricKind.ANYTIME -> {
