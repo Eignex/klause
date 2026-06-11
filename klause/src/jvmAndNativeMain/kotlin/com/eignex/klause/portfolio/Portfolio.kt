@@ -39,6 +39,14 @@ class Portfolio(
         require(workers.isNotEmpty()) { "Portfolio must have at least one worker" }
     }
 
+    // Streaming (samples/improvements) hands each worker loop to a daemon producer thread, fanned in
+    // through a lazy Sequence. A Sequence gives no close hook, so abandoning the iterator (e.g.
+    // `.take(20)`) cannot by itself signal the producers — left unbounded they would spin to their
+    // budget (forever, for an unbudgeted LS worker) and leak across calls. `close()` flips this flag;
+    // it is OR-ed into the cancellation each streaming worker polls, so the use-block boundary stops
+    // every producer promptly. Solve/minimize don't need it (they join their workers before returning).
+    private val streamStop = AtomicBoolean(false)
+
     /**
      * Solve in parallel (blocking). [PortfolioStrategy.RaceFirstFeasible] (default) cancels siblings
      * once any worker produces a definitive Sat/Unsat; [PortfolioStrategy.Exhaustive] runs every
@@ -169,10 +177,11 @@ class Portfolio(
         val start = TimeSource.Monotonic.markNow()
         val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
         fun readBound(): Double = incumbent.load().bound
+        val token: Cancellation = { streamStop.load() || cancellation() }
         return parallelStream(
             workers.map { worker ->
                 { emit: (AttributedImprovement) -> Unit ->
-                    for (r in worker.improvements(::readBound, cancellation)) {
+                    for (r in worker.improvements(::readBound, token)) {
                         if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
                             updateSharedBound(incumbent, r.objectiveValue, r.sample)
                             emit(AttributedImprovement(worker.label, start.elapsedNow(), r))
@@ -191,11 +200,16 @@ class Portfolio(
      * Stream samples across all workers as a lazy [Sequence], fanning in as they are produced. Each
      * worker runs to its own budget or until [cancellation]; stop early by flipping [cancellation].
      */
-    fun samples(cancellation: Cancellation = Cancellation.Never): Sequence<Sample> = parallelStream(
-        workers.map { worker -> { emit: (Sample) -> Unit -> for (s in worker.samples(cancellation)) emit(s) } },
-    )
+    fun samples(cancellation: Cancellation = Cancellation.Never): Sequence<Sample> {
+        val token: Cancellation = { streamStop.load() || cancellation() }
+        return parallelStream(
+            workers.map { worker -> { emit: (Sample) -> Unit -> for (s in worker.samples(token)) emit(s) } },
+        )
+    }
 
     override fun close() {
+        // Stop any in-flight streaming producers before tearing down their sessions.
+        streamStop.store(true)
         workers.forEach { runCatching { it.close() } }
     }
 }
