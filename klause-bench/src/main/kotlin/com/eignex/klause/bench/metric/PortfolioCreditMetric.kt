@@ -11,8 +11,6 @@ import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Cancellation
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
@@ -151,15 +149,13 @@ internal object PortfolioCreditMetric {
         var last: String? = null
         val contrib = LinkedHashMap<String, Int>()
         try {
-            runBlocking(Dispatchers.Default) {
-                portfolio.improvementsAttributed(cancel).collect { a ->
-                    if (first == null) {
-                        first = a.workerLabel
-                        firstMs = a.elapsed.inWholeMilliseconds
-                    }
-                    last = a.workerLabel
-                    contrib[a.workerLabel] = (contrib[a.workerLabel] ?: 0) + 1
+            portfolio.improvementsAttributed(cancel).forEach { a ->
+                if (first == null) {
+                    first = a.workerLabel
+                    firstMs = a.elapsed.inWholeMilliseconds
                 }
+                last = a.workerLabel
+                contrib[a.workerLabel] = (contrib[a.workerLabel] ?: 0) + 1
             }
         } catch (e: Exception) {
             System.err.println("[credit] portfolio aborted on ${entry.name}: ${e.message}")

@@ -15,7 +15,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
- * Single-threaded, bandit-scheduled sibling of [Portfolio]. Where [Portfolio] races every
+ * Single-threaded, bandit-scheduled sibling of `Portfolio`. Where `Portfolio` races every
  * worker concurrently, this gives the **one core to one arm at a time**, picked by a kumulant
  * [UnivariateBandit] at each segment boundary, and hands the shared incumbent between segments.
  * On a single-core budget (the competition free/fixed track) this beats running the concurrent
@@ -56,7 +56,7 @@ class SequentialPortfolio(
     /** Round-robin warmup slice: each arm is forced once for this long before the bandit takes
      *  over, so a short deadline can't leave a winning arm at zero budget (EXP3 starvation). */
     private val warmupSliceMillis: Long = 1_000,
-) : AutoCloseable {
+) : PortfolioExecutor {
 
     init {
         require(workers.isNotEmpty()) { "SequentialPortfolio must have at least one worker" }
@@ -76,7 +76,7 @@ class SequentialPortfolio(
      * (a complete backtrack arm proves Unsat; a slice-truncated arm yields Unknown and the loop
      * moves on). Reward is `1.0` for a definitive verdict, `0.0` for an inconclusive slice.
      */
-    fun solve(cancellation: Cancellation = Cancellation.Never): SolveResult {
+    override fun solve(cancellation: Cancellation): SolveResult {
         var stats = SolveStats.EMPTY
         var slice = baseSliceMillis
         var segment = 0
@@ -105,13 +105,13 @@ class SequentialPortfolio(
      * (backtrack prunes on it) and the incumbent assignment (LS warm-starts from it). Returns
      * [MinimizeResult.Optimal]/[MinimizeResult.Infeasible] only when an arm exhausts its search
      * (a `SearchExhausted` terminal that the slice did not truncate), otherwise the best incumbent
-     * as [MinimizeResult.BestFound]. [onIncumbent] fires once per strict global improvement, for
+     * as [MinimizeResult.BestFound]. `onIncumbent` fires once per strict global improvement, for
      * anytime telemetry.
      */
-    fun minimize(
-        cancellation: Cancellation = Cancellation.Never,
-        onIncumbent: ((MinimizeResult) -> Unit)? = null,
-    ): MinimizeResult {
+    override fun minimize(cancellation: Cancellation): MinimizeResult = minimize(cancellation, onIncumbent = null)
+
+    /** [minimize] with an `onIncumbent` callback fired once per strict global improvement. */
+    fun minimize(cancellation: Cancellation, onIncumbent: ((MinimizeResult) -> Unit)?): MinimizeResult {
         var bound = Double.POSITIVE_INFINITY
         var best: Sample? = null
         var rewardScale = 0.0

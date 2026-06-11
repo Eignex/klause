@@ -17,7 +17,7 @@ import com.eignex.kumulant.stream.lock
  * with no engine-specific switch.
  *
  * The returned [PortfolioWorker] list is the shared, executor-agnostic unit: wrap it in a parallel
- * [Portfolio] (`scenario.threads > 1`) or a single-core bandit-scheduled [SequentialPortfolio]
+ * `Portfolio` (`scenario.threads > 1`) or a single-core bandit-scheduled [SequentialPortfolio]
  * (`scenario.threads == 1`). The list is identical either way — only the executor differs.
  */
 object PortfolioBuilder {
@@ -31,7 +31,7 @@ object PortfolioBuilder {
      *
      * [definitionalSweep] is threaded into every LS worker (per-move invariants, #153). [onEvent]
      * threads the [SearchEvent] seam through to every worker tagged with its label; workers run
-     * concurrently under a parallel [Portfolio], so the listener must be thread-safe and cheap.
+     * concurrently under a parallel `Portfolio`, so the listener must be thread-safe and cheap.
      */
     fun build(
         problem: Problem,
@@ -116,7 +116,7 @@ object PortfolioBuilder {
      * pointless — LS ignores clauses). Created once per build and handed to every backtrack arm.
      * The lock is derived from the executor's concurrency: a no-op under the single-threaded
      * [SequentialPortfolio] (`Concurrency.None`, zero overhead — the pool is just cross-segment
-     * memory there) and a platform mutex under the parallel [Portfolio]'s concurrent writers.
+     * memory there) and a platform mutex under the parallel `Portfolio`'s concurrent writers.
      */
     private fun clausePoolFor(scenario: PortfolioScenario): SharedClausePool? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null

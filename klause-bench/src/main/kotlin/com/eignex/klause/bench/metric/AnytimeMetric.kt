@@ -28,8 +28,6 @@ import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stat.summary.ArgMinStat
 import com.eignex.kumulant.stat.summary.MinStat
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.Locale
@@ -332,19 +330,16 @@ internal object AnytimeMetric {
             var last: String? = null
             val contrib = LinkedHashMap<String, Int>()
             try {
-                // Dispatchers.Default → the channelFlow's per-worker launches get real OS threads
-                // and run in parallel; plain runBlocking is single-threaded and CPU-bound workers
-                // (which never suspend) would starve each other.
-                runBlocking(Dispatchers.Default) {
-                    portfolio.improvementsAttributed(cancel).collect { a ->
-                        if (first == null) {
-                            first = a.workerLabel
-                            firstMs = a.elapsed.inWholeMilliseconds
-                        }
-                        last = a.workerLabel
-                        contrib[a.workerLabel] = (contrib[a.workerLabel] ?: 0) + 1
-                        queue.put(a.result)
+                // The portfolio stream is blocking + real-threaded internally; this daemon thread
+                // drains it into the queue the returned sequence pulls from.
+                portfolio.improvementsAttributed(cancel).forEach { a ->
+                    if (first == null) {
+                        first = a.workerLabel
+                        firstMs = a.elapsed.inWholeMilliseconds
                     }
+                    last = a.workerLabel
+                    contrib[a.workerLabel] = (contrib[a.workerLabel] ?: 0) + 1
+                    queue.put(a.result)
                 }
             } finally {
                 portfolio.close()

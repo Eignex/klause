@@ -32,7 +32,7 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
- * Build a diverse pool of [LocalSearchSession] workers for a multi-core LS [Portfolio].
+ * Build a diverse pool of [LocalSearchSession] workers for a multi-core LS `Portfolio`.
  * Provides three coordinated capabilities:
  *
  *  - **Per-worker strategy selection** (`config`): each worker gets a distinct
@@ -333,7 +333,7 @@ internal enum class LsArm(val label: String) {
  * Static-side factory for assembling multi-core LS portfolios with shared state.
  *
  * The factory holds the shared atomic incumbent and exposes a *consumer* hook so
- * [Portfolio.minimize] (or a custom outer driver) can plug them into each worker's
+ * `Portfolio.minimize` (or a custom outer driver) can plug them into each worker's
  * params or restart-policy. Workers are constructed as plain [LocalSearchSession]
  * instances over private [LocalSearchSolver]s — they share the [Problem] but not
  * mutable state, so cross-worker contention is bounded by the atomic publishes.

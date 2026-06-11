@@ -13,7 +13,7 @@ import com.eignex.kumulant.stream.lock
  * clauses and pull others' via a per-arm cursor ([PoolClauseExchange]); every arm benefits from
  * every arm's learning.
  *
- * Used by both portfolio executors: the parallel [Portfolio] (many arms publishing concurrently —
+ * Used by both portfolio executors: the parallel `Portfolio` (many arms publishing concurrently —
  * needs a real lock) and the single-threaded [SequentialPortfolio] (arms run in time-sliced
  * segments, so the pool is also the *persistent memory* that survives a backtrack arm's session
  * rebuild between segments — it has no resume otherwise). The [lock] comes from the executor's

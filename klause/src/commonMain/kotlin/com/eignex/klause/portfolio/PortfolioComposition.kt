@@ -37,7 +37,7 @@ enum class EngineMix {
  * [PortfolioBuilder.build] materialises that list into runnable [PortfolioWorker]s — so every
  * scenario flows through one construction path.
  *
- * [threads] is the available concurrency. `threads > 1` ⇒ a parallel [Portfolio] of that many
+ * [threads] is the available concurrency. `threads > 1` ⇒ a parallel `Portfolio` of that many
  * workers (one arm per core, repeating the strong arms on fresh seeds past the pool size).
  * `threads == 1` ⇒ a single core: a [SequentialPortfolio] bandit-schedules a small pool
  * ([PortfolioComposition.SEQUENTIAL_POOL_SIZE]) of arms one slice at a time — pool size is

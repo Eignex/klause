@@ -21,9 +21,6 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.runTest
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -52,7 +49,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio solve on satisfiable problem returns sat`() = runTest {
+    fun `portfolio solve on satisfiable problem returns sat`() {
         val problem = exactlyOneOver(4)
         val workers = List(4) { i ->
             PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = i.toLong()))
@@ -64,7 +61,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio solve on unsat problem returns unsat`() = runTest {
+    fun `portfolio solve on unsat problem returns unsat`() {
         // x ∧ ¬x → trivially unsat
         val problem = Problem(
             numBoolVars = 1,
@@ -86,7 +83,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio samples fans in from all workers and respects collector cancellation`() = runTest {
+    fun `portfolio samples fans in from all workers and respects collector cancellation`() {
         val problem = exactlyOneOver(5)
         val workers = List(4) { i ->
             PortfolioWorker.of(
@@ -113,7 +110,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio with one worker behaves like the underlying session`() = runTest {
+    fun `portfolio with one worker behaves like the underlying session`() {
         val problem = exactlyOneOver(3)
         val solo = PortfolioWorker.of(
             "ls",
@@ -129,7 +126,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `portfolio minimize returns the global best across workers`() = runTest {
+    fun `portfolio minimize returns the global best across workers`() {
         // minimize x + 2y subject to x + y >= 3, x ∈ [0..5], y ∈ [0..5]. Optimum = 3.
         val problem = Problem(
             numBoolVars = 0,
@@ -168,7 +165,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `budget-capped workers never upgrade the incumbent to a false optimal`() = runTest {
+    fun `budget-capped workers never upgrade the incumbent to a false optimal`() {
         // minimize x over x ∈ [0..1000] with no constraints: the optimum is 0, but every
         // worker is decision-capped so none can exhaust its space. A pool of BestFound
         // verdicts under BudgetExhausted proves nothing about better solutions — the fold
@@ -185,13 +182,14 @@ class PortfolioTest {
             PortfolioWorker.of(
                 "bt#$i",
                 BacktrackSolver(problem).session(),
-                // Worker 0 walks down from 1000, worker 1 from the domain middle, so both
-                // hold real incumbents when the 50-decision cap lands — and neither is
-                // anywhere near reaching (or proving) the optimum at 0. A pool of capped
-                // BestFound verdicts is the exact shape that was upgraded falsely.
+                // Worker 0 walks down from 1000, worker 1 from the domain middle, so both hold real
+                // incumbents when the tiny decision cap lands — but neither can bisect all the way
+                // to (and prove) the optimum at 0 in so few decisions (which, with real-thread
+                // parallelism, would be a *legitimate* Optimal). A pool of capped BestFound verdicts
+                // is the exact shape that was upgraded falsely.
                 BacktrackParams(
                     randomSeed = i.toLong(),
-                    maxDecisions = 50,
+                    maxDecisions = 4,
                     variableHeuristic = InputOrder,
                     valueHeuristic = if (i == 0) IndomainMax else IndomainMiddle,
                 ),
@@ -211,7 +209,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `minimize returns a sample consistent with the reported bound`() = runTest {
+    fun `minimize returns a sample consistent with the reported bound`() {
         // #81 regression: the reported objectiveValue and the returned sample must agree. The fix
         // swaps (bound, sample) in one CAS so they can never desync under a worker race; here we
         // race several workers on a problem with multiple improving steps and verify the returned
@@ -248,7 +246,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `builder minimize wires a per-worker objective across a mixed pool`() = runTest {
+    fun `builder minimize wires a per-worker objective across a mixed pool`() {
         // minimize x + 2y subject to x + y >= 3 — same as above, but built through
         // PortfolioBuilder with BOTH a per-worker LS objective and a backtrack (linear) objective
         // (#63). LS workers descend lsObjective, backtrack workers bound linearObjective; the
@@ -287,7 +285,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `builder threads labeled onEvent through to workers`() = runTest {
+    fun `builder threads labeled onEvent through to workers`() {
         // Same mixed-pool minimize as above, with the SearchEvent seam attached: each worker's
         // incumbent improvements arrive tagged with its label. Workers run concurrently, so the
         // collection is locked.
@@ -327,7 +325,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `exhaustive strategy runs every worker to budget`() = runTest {
+    fun `exhaustive strategy runs every worker to budget`() {
         val problem = exactlyOneOver(3)
         val workers = List(2) { i ->
             PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
@@ -339,7 +337,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `builder makes a mixed LS plus backtrack portfolio that solves`() = runTest {
+    fun `builder makes a mixed LS plus backtrack portfolio that solves`() {
         val problem = exactlyOneOver(4)
         Portfolio(
             PortfolioBuilder.build(
@@ -353,7 +351,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `builder backtrack pool includes the sat-optimized worker and solves`() = runTest {
+    fun `builder backtrack pool includes the sat-optimized worker and solves`() {
         // A single backtrack worker (i % 3 == 0) must be the SAT-optimized config; confirm the
         // built pool both surfaces that worker and solves a conflict-heavy UNSAT instance.
         val problem = pigeonhole(pigeons = 4, holes = 3)
