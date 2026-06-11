@@ -24,7 +24,4 @@ data class ChocoParams(
     /** Annotation-derived klause search params to mirror onto the Choco model (see
      *  `applyFixedSearch`) for fixed-track comparisons; null leaves Choco's own search. */
     val fixedSearch: BacktrackParams? = null,
-    /** Build the Choco model with the lazy-clause-generation engine (the Choco CP-SAT
-     *  competition entry's architecture) instead of the classic CP kernel. */
-    val lcg: Boolean = false,
 ) : SolverParams

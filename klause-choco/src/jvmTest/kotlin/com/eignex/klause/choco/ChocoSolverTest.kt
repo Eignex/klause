@@ -53,7 +53,7 @@ class ChocoSolverTest {
         val tier = SearchTier(IntArray(0), intArrayOf(0, 1, 2), TierVarSelect.InputOrder, IndomainMiddle)
         // applyFixedSearch reads the tier's own value heuristic, not params.valueHeuristic.
         val fixed = BacktrackParams(variableHeuristic = TieredVariableHeuristic(listOf(tier), InputOrder))
-        val r = ChocoSolver(p).solve(ChocoParams(lcg = true, fixedSearch = fixed))
+        val r = ChocoSolver(p).solve(ChocoParams(fixedSearch = fixed))
         assertTrue(r is SolveResult.Sat, "expected Sat under LCG fixed indomain_middle, got $r")
     }
 
