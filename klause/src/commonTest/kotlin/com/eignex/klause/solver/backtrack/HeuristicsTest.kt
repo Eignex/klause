@@ -32,6 +32,31 @@ class HeuristicsTest {
     }
 
     @Test
+    fun `max regret prefers the int with the largest gap between its two smallest values`() {
+        // var 0: {0,1,2,3} regret 1; var 1: {0,2,3} (1 excluded) regret 2 — var 1 wins.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3).excludeValue(1)),
+            factors = arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem)
+        assertEquals(VarRef.IntVar(1), DomainMaxRegret.pick(session, rng))
+    }
+
+    @Test
+    fun `indomain_median is the middle by position - distinct from indomain_middle (mean of bounds)`() {
+        // Domain {0,1,2,3,10}: median by position is valueAt(2) = 2; the mean of bounds is 5,
+        // whose nearest present value is 3. So the two heuristics start on different values.
+        var d = IntDomain(0, 10)
+        for (v in 4..9) d = d.excludeValue(v)
+        val problem = Problem(0, 1, arrayOf(d), arrayOf<Factor>())
+        val session = PropagationSession(problem)
+        assertEquals(2, IndomainMedian.values(session, VarRef.IntVar(0), rng).first())
+        assertEquals(3, IndomainMiddle.values(session, VarRef.IntVar(0), rng).first())
+    }
+
+    @Test
     fun `smallest lower bound counts free bools as zero`() {
         val problem = Problem(
             numBoolVars = 1,

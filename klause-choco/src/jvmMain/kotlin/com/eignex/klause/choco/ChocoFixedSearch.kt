@@ -2,6 +2,7 @@ package com.eignex.klause.choco
 
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.IndomainMax
+import com.eignex.klause.solver.backtrack.IndomainMedian
 import com.eignex.klause.solver.backtrack.IndomainMiddle
 import com.eignex.klause.solver.backtrack.IndomainMin
 import com.eignex.klause.solver.backtrack.IndomainRandom
@@ -10,8 +11,10 @@ import com.eignex.klause.solver.backtrack.SearchTier
 import com.eignex.klause.solver.backtrack.TierVarSelect
 import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
 import org.chocosolver.solver.search.strategy.Search
+import org.chocosolver.solver.search.strategy.assignments.DecisionOperator
 import org.chocosolver.solver.search.strategy.assignments.DecisionOperatorFactory
 import org.chocosolver.solver.search.strategy.selectors.values.IntDomainMax
+import org.chocosolver.solver.search.strategy.selectors.values.IntDomainMedian
 import org.chocosolver.solver.search.strategy.selectors.values.IntDomainMiddle
 import org.chocosolver.solver.search.strategy.selectors.values.IntDomainMin
 import org.chocosolver.solver.search.strategy.selectors.values.IntDomainRandom
@@ -20,6 +23,7 @@ import org.chocosolver.solver.search.strategy.selectors.variables.AntiFirstFail
 import org.chocosolver.solver.search.strategy.selectors.variables.FirstFail
 import org.chocosolver.solver.search.strategy.selectors.variables.InputOrder
 import org.chocosolver.solver.search.strategy.selectors.variables.Largest
+import org.chocosolver.solver.search.strategy.selectors.variables.MaxRegret
 import org.chocosolver.solver.search.strategy.selectors.variables.Random
 import org.chocosolver.solver.search.strategy.selectors.variables.Smallest
 import org.chocosolver.solver.search.strategy.selectors.variables.VariableSelector
@@ -51,7 +55,7 @@ internal fun applyFixedSearch(cm: ChocoModel, params: BacktrackParams, seed: Lon
             Search.intVarSearch(
                 varSelector(cm, tier, seed),
                 valueSelector(tier, seed),
-                DecisionOperatorFactory.makeIntEq(),
+                decisionOperator(tier),
                 *vars.toTypedArray(),
             ),
         )
@@ -73,15 +77,37 @@ private fun varSelector(cm: ChocoModel, tier: SearchTier, seed: Long): VariableS
         TierVarSelect.LargestDomain -> AntiFirstFail(cm.model)
         TierVarSelect.SmallestLowerBound -> Smallest()
         TierVarSelect.LargestUpperBound -> Largest()
+        TierVarSelect.MaxRegret -> MaxRegret()
         TierVarSelect.RandomOrder -> Random(seed)
     }
 
 private fun valueSelector(tier: SearchTier, seed: Long): IntValueSelector = when (tier.valueHeuristic) {
     IndomainMin -> IntDomainMin()
+
     IndomainMax -> IntDomainMax()
+
+    // `indomain_middle` and `indomain_split` both bisect at the mean of the bounds (klause's IntNode
+    // is bound-split, so its IndomainMiddle is a split too); IntDomainMiddle(true) picks that pivot.
     IndomainMiddle, IndomainSplit -> IntDomainMiddle(true)
+
+    IndomainMedian -> IntDomainMedian()
+
     IndomainRandom -> IntDomainRandom(seed)
+
     else -> IntDomainMin()
+}
+
+/**
+ * Decision operator for a tier, working around an LCG soundness bug: `makeIntEq` paired with
+ * `IntDomainMiddle` produces a false UNSAT under LCG (`rasros/choco-lcg-false-unsat`). The split-style
+ * value selectors (`indomain_middle` / `indomain_split`) therefore branch with `makeIntSplit`
+ * (a sound domain bisection at the pivot — and the branching shape klause itself uses); the
+ * assignment-style selectors (`indomain_min/max/median/random`) keep `makeIntEq`, which is sound with
+ * any selector other than `IntDomainMiddle`.
+ */
+private fun decisionOperator(tier: SearchTier): DecisionOperator<IntVar> = when (tier.valueHeuristic) {
+    IndomainMiddle, IndomainSplit -> DecisionOperatorFactory.makeIntSplit()
+    else -> DecisionOperatorFactory.makeIntEq()
 }
 
 /** True when [params] carries a tiered (annotation-derived) search Choco can mirror. */

@@ -16,6 +16,7 @@ import com.eignex.klause.bench.tools.MeasureBacktrack
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
+import com.eignex.klause.portfolio.CompetitionMode
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -28,7 +29,8 @@ import com.eignex.klause.bench.tools.ProfileScope
  *
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
  * `category=SAT,OPT` `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N`
- * `reference=choco|ortools|yuck` `timeout=<ms>` `profile=cpu|wall|alloc` `profile-scope=solve|all`
+ * `reference=choco|ortools|yuck` `timeout=<ms>` `mode=fixed|free|parallel|open|local-search`
+ * `threads=N` (parity competition track) `profile=cpu|wall|alloc` `profile-scope=solve|all`
  * `profile-top=N`.
  *
  * Other commands:
@@ -78,6 +80,7 @@ object BenchCli {
             Catalog.problems(*target.suiteIds.toTypedArray()),
             target.budget,
             target.reference,
+            competition = target.competition,
         )
     }
 
@@ -99,8 +102,26 @@ object BenchCli {
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         val reference = f["reference"]?.let { Backend.valueOf(it.uppercase().replace("-", "")) }
         val profile = parseProfile(f)
+        val competition = parseCompetition(f)
         println("=== run: $metricName over ${refs.size} instance(s) ===")
-        MetricRunner.run(metric, refs, budget, reference, profile)
+        MetricRunner.run(metric, refs, budget, reference, profile, competition)
+    }
+
+    /** Parse the competition track from `mode=fixed|free|parallel|open|local-search` (+ optional
+     *  `threads=N`). Returns null when no `mode=` is given (the metric default, OPEN). Only parity
+     *  reads it. */
+    private fun parseCompetition(f: Map<String, String>): CompetitionConfig? {
+        val mode = f["mode"]?.let(::parseMode) ?: return null
+        return CompetitionConfig(mode, f["threads"]?.toIntOrNull())
+    }
+
+    private fun parseMode(name: String): CompetitionMode = when (name.lowercase()) {
+        "fixed" -> CompetitionMode.FIXED
+        "free" -> CompetitionMode.FREE
+        "parallel" -> CompetitionMode.PARALLEL
+        "open" -> CompetitionMode.OPEN
+        "local-search", "local_search", "ls" -> CompetitionMode.LOCAL_SEARCH
+        else -> error("mode must be fixed|free|parallel|open|local-search, got '$name'")
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
@@ -212,12 +233,15 @@ object BenchCli {
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>
+            |         mode=fixed|free|parallel|open|local-search threads=N (parity competition track)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
             |  bench verify suite=core
             |  bench parity suite=mzn-bench kind=cop per-family=1
             |  bench parity suite=smtlib-core reference=ortools
+            |  bench parity suite=mzn-bench mode=free        (1-thread, klause's own search)
+            |  bench parity suite=mzn-bench mode=fixed        (both follow the model annotation)
             |  bench search suite=slack-alldiff timeout=30000 profile=cpu
             """.trimMargin(),
         )

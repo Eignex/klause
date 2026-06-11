@@ -45,6 +45,7 @@ bench coverage:xcsp3|smtlib          parse/solve rates over a whole format libra
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
 | `reference=choco\|ortools\|yuck` | reference solver for parity/anytime |
 | `timeout=<ms>` | per-instance budget for metrics that honor it |
+| `mode=fixed\|free\|parallel\|open\|local-search` `threads=N` | parity competition track (below); `threads` overrides the host core count for the parallel tracks |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
 ## Metrics
@@ -80,6 +81,29 @@ bench search suite=core category=UNSAT timeout=30000
 # compile audit (needs `:klause-cli:installJvmDist`)
 bench audit suite=mzn-smoke
 ```
+
+### Competition modes
+
+`mode=` runs parity with the klause configuration of a MiniZinc / XCSP competition track, so a run
+measures klause exactly as the competition scores it. `kind=cop|csp` and `timeout=<ms>` compose with
+any mode; `threads=N` overrides the host core count for the parallel tracks.
+
+| mode | klause configuration |
+|---|---|
+| `fixed` | 1 thread, follow the model's `int_search` annotation (the reference mirrors it too — sound now that the LCG fixed-search bug is worked around); models with no annotation fall back to free search |
+| `free` | 1 thread, klause's own search (the single-core bandit-scheduled portfolio) |
+| `parallel` | multi-thread, a single engine (complete backtrack) |
+| `open` | multi-thread, mixed engines (the default) |
+| `local-search` | local search only |
+
+```
+bench parity suite=mzn-bench mode=free kind=cop timeout=300000   # 1-thread free COP track
+bench parity suite=mzn-bench mode=fixed                          # both solvers follow the annotation
+bench mzn-open                                                    # preset: open track, 300 s
+```
+
+The presets `mzn-fixed` / `mzn-free` / `mzn-parallel` / `mzn-open` / `mzn-ls` are these tracks over the
+MiniZinc Challenge corpus at the 300 s budget.
 
 (drop the `./gradlew :klause-bench:bench --args="…"` wrapper for brevity above.)
 

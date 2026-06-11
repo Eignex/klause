@@ -2,6 +2,14 @@ package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
+import com.eignex.klause.portfolio.CompetitionMode
+
+/**
+ * The competition track a parity run measures (the `mode=` filter), and the worker count for the
+ * parallel tracks (`threads=`, defaulting to the host core count when null). Only the parity metric
+ * reads it; other metrics ignore it.
+ */
+internal data class CompetitionConfig(val mode: CompetitionMode, val threads: Int? = null)
 
 /** Which measurement a target runs. */
 internal enum class MetricKind {
@@ -34,6 +42,8 @@ internal data class Target(
     /** Reference solver for differential metrics (PARITY / ANYTIME). `null` = the metric's
      *  own default (Choco for parity, OR-Tools for anytime). */
     val reference: Backend? = null,
+    /** Competition track for a PARITY preset; `null` = the metric default (OPEN). */
+    val competition: CompetitionConfig? = null,
 )
 
 internal object Targets {
@@ -81,7 +91,27 @@ internal object Targets {
             MetricKind.CREDIT,
             Budget(timeoutMillis = 10_000),
         ),
-    )
+    ) + competitionPresets()
+
+    /** Competition-track parity presets over the MiniZinc Challenge corpus at the 300 s challenge
+     *  budget — one per [CompetitionMode]. Each is `bench parity suite=mzn-bench mode=<track>
+     *  timeout=300000`; they earn their place by carrying the tuned budget + track together. */
+    private fun competitionPresets(): List<Target> = listOf(
+        "mzn-fixed" to CompetitionMode.FIXED,
+        "mzn-free" to CompetitionMode.FREE,
+        "mzn-parallel" to CompetitionMode.PARALLEL,
+        "mzn-open" to CompetitionMode.OPEN,
+        "mzn-ls" to CompetitionMode.LOCAL_SEARCH,
+    ).map { (id, mode) ->
+        Target(
+            id,
+            "Parity vs Choco on the $mode competition track over the MiniZinc Challenge benchmarks (300 s)",
+            listOf("mzn-bench"),
+            MetricKind.PARITY,
+            Budget(timeoutMillis = 300_000),
+            competition = CompetitionConfig(mode),
+        )
+    }
 
     fun get(id: String): Target =
         all.firstOrNull { it.id == id } ?: error("no such target: $id (have ${all.map { it.id }})")

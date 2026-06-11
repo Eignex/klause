@@ -234,6 +234,39 @@ object LargestUpperBound : VariableHeuristic {
 }
 
 /**
+ * Largest regret first (MiniZinc's `max_regret`): the free variable with the greatest gap between
+ * the two smallest values still in its domain — the cost of *not* taking its best value. Free bools
+ * have the fixed regret `1` (domain `{0, 1}`), so an int var with a wider low-end gap outranks them.
+ * Ties keep the earliest variable (bools precede ints).
+ *
+ * Domain-only (no objective), unlike the objective-weighted [MaxRegret] — this is the one the
+ * `max_regret` search annotation maps to, since the annotation applies to satisfaction too.
+ */
+object DomainMaxRegret : VariableHeuristic {
+    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        var best: VarRef? = null
+        var bestRegret = Int.MIN_VALUE
+        val problem = session.problem
+        for (v in 0 until problem.numBoolVars) {
+            if (session.boolValue(v) == null && 1 > bestRegret) {
+                best = VarRef.Bool(v)
+                bestRegret = 1
+            }
+        }
+        for (v in 0 until problem.numIntVars) {
+            val d = session.intDomain(v)
+            if (d.size <= 1) continue
+            val regret = d.valueAt(1) - d.valueAt(0)
+            if (regret > bestRegret) {
+                best = VarRef.IntVar(v)
+                bestRegret = regret
+            }
+        }
+        return best
+    }
+}
+
+/**
  * Variable State Independent Decaying Sum (Moskewicz et al., Chaff 2001 / MiniSAT). The
  * activity counter for each variable is bumped on every conflict the variable is implicated
  * in, with the bump amount `increment` growing geometrically over time so recent conflicts
@@ -1030,8 +1063,10 @@ object IndomainMax : ValueHeuristic {
 }
 
 /**
- * Value closest to the domain midpoint first, then alternating outward (`indomain_middle`).
- * Useful when the SAT distribution clusters around the middle of the domain.
+ * Value closest to the **mean of the current bounds** first, then alternating outward
+ * (`indomain_middle`: "the value in the domain closest to the mean of its bounds"). The mean
+ * may fall in a hole, so [centeredDomainValues] starts at the nearest present value. Distinct
+ * from [IndomainMedian] (middle *by position*) on skewed or holey domains.
  */
 object IndomainMiddle : ValueHeuristic {
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
@@ -1039,20 +1074,37 @@ object IndomainMiddle : ValueHeuristic {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            // Use the sparse-aware `valueAt` to land on the actual middle value
-            // (skipping holes) and then walk outward, filtering with `in d` so the
-            // sequence never yields a hole.
-            val mid = d.valueAt(d.size / 2)
-            sequence {
-                yield(mid)
-                var off = 1
-                while (mid - off >= d.min || mid + off <= d.max) {
-                    if (mid + off <= d.max && (mid + off) in d) yield(mid + off)
-                    if (mid - off >= d.min && (mid - off) in d) yield(mid - off)
-                    off++
-                }
-            }
+            centeredDomainValues(d, d.min + (d.max - d.min) / 2)
         }
+    }
+}
+
+/**
+ * Median value (middle of the domain *by position*) first, then alternating outward
+ * (`indomain_median`). [IntDomain.valueAt] is sparse-aware, so the median always lands on a
+ * present value; differs from [IndomainMiddle] (mean of bounds) when the domain is skewed or holey.
+ */
+object IndomainMedian : ValueHeuristic {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(0, 1)
+
+        is VarRef.IntVar -> {
+            val d = session.intDomain(varRef.varId)
+            centeredDomainValues(d, d.valueAt(d.size / 2))
+        }
+    }
+}
+
+/** Present domain values ordered by distance from [center] (ties prefer the upper value), skipping
+ *  holes via the `in d` membership check. The first value drives [IndomainMiddle]/[IndomainMedian]'s
+ *  int bound split; the tail keeps the sequence complete for any consumer that enumerates past it. */
+private fun centeredDomainValues(d: IntDomain, center: Int): Sequence<Int> = sequence {
+    if (center in d) yield(center)
+    var off = 1
+    while (center - off >= d.min || center + off <= d.max) {
+        if (center + off <= d.max && (center + off) in d) yield(center + off)
+        if (center - off >= d.min && (center - off) in d) yield(center - off)
+        off++
     }
 }
 
