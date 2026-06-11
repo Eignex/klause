@@ -107,7 +107,7 @@ object Presolve {
                 val x = f.vars[xi]
                 val y = f.vars[1 - xi]
                 val cx = f.coeffs[xi]
-                if (cx != 1 && cx != -1 || eliminated[x] || eliminated[y] || x == y || x in objectiveIntVars) continue
+                if ((cx != 1 && cx != -1) || eliminated[x] || eliminated[y] || x == y || x in objectiveIntVars) continue
                 // x = A·y + B; the alias case (A=1, B=0, i.e. x = y) substitutes into ANY factor via
                 // remap, otherwise x must occur only in foldable Linear factors.
                 val isAlias = -cx * f.coeffs[1 - xi] == 1 && cx * f.bound == 0
