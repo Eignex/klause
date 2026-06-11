@@ -118,7 +118,7 @@ class PresolveTest {
         val rng = Random(0x5A7)
         repeat(500) {
             val n = 2 + rng.nextInt(3) // 2..4
-            val lits = IntArray(n) { Lit.make(it, rng.nextBoolean()) }
+            val lits = IntArray(n) { i -> Lit.make(i, rng.nextBoolean()) }
             val weights = IntArray(n) { rng.nextInt(9) - 3 } // -3..5
             assertPbEquivalent(n, PseudoBoolean(weights, lits, PbOp.LE, rng.nextInt(15) - 3))
         }
