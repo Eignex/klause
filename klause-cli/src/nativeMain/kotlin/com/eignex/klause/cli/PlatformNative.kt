@@ -1,11 +1,13 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioExecutor
+import com.eignex.klause.portfolio.PortfolioWorker
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
-import kotlinx.coroutines.runBlocking
 import platform.posix.SEEK_END
 import platform.posix.fclose
 import platform.posix.fopen
@@ -60,4 +62,4 @@ internal actual fun readTextFile(path: String): String {
     }
 }
 
-internal actual fun <T> runBlockingBridge(block: suspend () -> T): T = runBlocking { block() }
+internal actual fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor = Portfolio(workers)

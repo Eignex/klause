@@ -2,8 +2,8 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
-import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
+import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.LinearObjective
@@ -182,23 +182,15 @@ internal object SolveCore {
         )
         val t0 = nowMillis()
         // threads == 1 → the single-core bandit-scheduled SequentialPortfolio (it persists/shares
-        // learned clauses across its segments); threads > 1 → the concurrent Portfolio. Both yield
-        // the same result types, so only the call differs (blocking vs the suspend bridge).
-        if (scenario.threads == 1) {
-            SequentialPortfolio.exp3(workers).use { seq ->
-                if (solvable.optimize) {
-                    emitMinimize(seq.minimize(cancel), solvable, common, output, complete, t0)
-                } else {
-                    emitSolve(seq.solve(cancel), solvable, common, output, t0)
-                }
-            }
-        } else {
-            Portfolio(workers).use { par ->
-                if (solvable.optimize) {
-                    emitMinimize(runBlockingBridge { par.minimize(cancel) }, solvable, common, output, complete, t0)
-                } else {
-                    emitSolve(runBlockingBridge { par.solve(cancel) }, solvable, common, output, t0)
-                }
+        // learned clauses across its segments); threads > 1 → the concurrent Portfolio. Both are
+        // blocking (the portfolio is coroutine-free) and yield the same result types.
+        val executor: PortfolioExecutor =
+            if (scenario.threads == 1) SequentialPortfolio.exp3(workers) else parallelPortfolio(workers)
+        executor.use {
+            if (solvable.optimize) {
+                emitMinimize(it.minimize(cancel), solvable, common, output, complete, t0)
+            } else {
+                emitSolve(it.solve(cancel), solvable, common, output, t0)
             }
         }
     }

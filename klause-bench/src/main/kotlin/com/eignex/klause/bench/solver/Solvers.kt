@@ -11,6 +11,7 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -26,10 +27,7 @@ import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.Presolver
 import com.eignex.klause.yuck.YuckParams
 import com.eignex.klause.yuck.YuckSolver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The solver axis. A [Backend] names an engine; a [SolverConfig] pre-binds a backend with
@@ -235,21 +233,27 @@ private class PortfolioBench(
     )
     override val name = "portfolio"
 
-    @Suppress("InjectDispatcher")
-    override fun solve(): SolveResult = runBlocking(Dispatchers.Default) { portfolio.solve() }
+    override fun solve(): SolveResult = portfolio.solve()
 
     override fun samples(n: Int): List<Sample> = collectSamples(n)
     override fun enumerated(n: Int): List<Sample> = collectSamples(n)
     override fun enumerateSequence(): Sequence<Sample> = collectSamples(SEQUENCE_CAP).asSequence()
     override fun samplesSequence(): Sequence<Sample> = collectSamples(SEQUENCE_CAP).asSequence()
 
-    /** Fan in [n] samples across the worker pool on the default dispatcher, then stop (the
-     *  `take` cancels the upstream flow, stopping every worker). */
-    @Suppress("InjectDispatcher")
-    private fun collectSamples(n: Int): List<Sample> = if (n <= 0) {
-        emptyList()
-    } else {
-        runBlocking(Dispatchers.Default) { portfolio.samples().take(n).toList() }
+    /** Fan in [n] samples across the worker pool, then flip the shared cancellation so every worker
+     *  stops (the blocking sample stream has no upstream to cancel on its own once we stop pulling). */
+    private fun collectSamples(n: Int): List<Sample> {
+        if (n <= 0) return emptyList()
+        val stop = AtomicBoolean(false)
+        val out = ArrayList<Sample>(n)
+        for (s in portfolio.samples(Cancellation { stop.get() })) {
+            out.add(s)
+            if (out.size >= n) {
+                stop.set(true)
+                break
+            }
+        }
+        return out
     }
 
     private companion object {

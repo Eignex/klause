@@ -21,8 +21,6 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
@@ -333,25 +331,19 @@ internal object ParityMetric {
         cancellation = Cancellation { System.currentTimeMillis() > deadline },
     )
 
-    @Suppress("InjectDispatcher")
     private fun klauseSolve(entry: ResolvedProblem, budget: Budget): SolveResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).solve(freeParamsWithDeadline(deadline))
-        return runBlocking(Dispatchers.Default) {
-            mixedPortfolio(entry, objective = null).use {
-                it.solve(Cancellation { System.currentTimeMillis() > deadline })
-            }
+        return mixedPortfolio(entry, objective = null).use {
+            it.solve(Cancellation { System.currentTimeMillis() > deadline })
         }
     }
 
-    @Suppress("InjectDispatcher")
     private fun klauseMinimize(entry: ResolvedProblem, obj: LinearObjective, budget: Budget): MinimizeResult {
         val deadline = System.currentTimeMillis() + budget.timeoutMillis
         if (fixedMode) return BacktrackSolver(entry.problem).minimize(obj, freeParamsWithDeadline(deadline))
-        return runBlocking(Dispatchers.Default) {
-            mixedPortfolio(entry, objective = obj).use {
-                it.minimize(Cancellation { System.currentTimeMillis() > deadline })
-            }
+        return mixedPortfolio(entry, objective = obj).use {
+            it.minimize(Cancellation { System.currentTimeMillis() > deadline })
         }
     }
 

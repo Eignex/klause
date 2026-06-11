@@ -9,7 +9,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
 
 /**
- * One configured engine instance in a [Portfolio]: a [Session] together with the base
+ * One configured engine instance in a `Portfolio`: a [Session] together with the base
  * params it runs under. The param type is **erased** behind plain `(Cancellation) -> …`
  * closures, so a single portfolio can hold a *heterogeneous* mix of workers — e.g. several
  * local-search workers racing alongside a backtrack worker — even though their param types
@@ -39,7 +39,7 @@ class PortfolioWorker private constructor(
      *
      *  [warmStart] is the portfolio's current incumbent assignment, handed to workers that can
      *  resume from it (local search via its `initialAssignment` seam; see [of]'s `withWarmStart`).
-     *  Workers without that seam ignore it. The concurrent [Portfolio] passes null (workers share
+     *  Workers without that seam ignore it. The concurrent `Portfolio` passes null (workers share
      *  the live bound, not a snapshot); the single-threaded [SequentialPortfolio] passes the
      *  incumbent so a fresh LS segment descends from it rather than a random restart. */
     fun improvements(

@@ -1,5 +1,6 @@
-@file:OptIn(ExperimentalWasmDsl::class)
+@file:OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
 
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -17,6 +18,22 @@ eignexPublish {
 val hostTargetsOnly = providers.gradleProperty("targets.hostOnly").isPresent
 
 kotlin {
+    // The parallel Portfolio needs real threads, which commonMain (shared with the single-threaded
+    // js/wasm targets) has none of. A `jvmAndNative` hierarchy group gives it a first-class
+    // intermediate source set (`jvmAndNativeMain`) shared by jvm + every native target — and, unlike
+    // a hand-created source set, one published as a consumable metadata variant so downstream KMP
+    // modules (klause-cli's native targets) resolve it. js/wasm get only SequentialPortfolio.
+    applyDefaultHierarchyTemplate {
+        common {
+            group("jvmAndNative") {
+                withJvm()
+                // Re-home the standard `native` group under jvmAndNative so the shared `nativeMain`
+                // source set (the native parallelRun/parallelStream actuals) sees the expects there.
+                group("native") { withNative() }
+            }
+        }
+    }
+
     jvm()
     linuxX64()
     if (!hostTargetsOnly) {
@@ -41,7 +58,6 @@ kotlin {
         commonMain.dependencies {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             api("com.eignex:skema:0.1.1")
             implementation("com.eignex:kumulant:0.3.3")
             implementation("com.eignex:kpermute:1.1.2")
@@ -50,7 +66,6 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
     }
 }

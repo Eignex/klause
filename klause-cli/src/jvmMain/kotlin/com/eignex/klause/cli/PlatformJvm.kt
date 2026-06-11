@@ -2,7 +2,9 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.config.installKlauseConfigFromEnv
-import kotlinx.coroutines.runBlocking
+import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioExecutor
+import com.eignex.klause.portfolio.PortfolioWorker
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -17,4 +19,4 @@ internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
 internal actual fun readTextFile(path: String): String = File(path).readText()
 
-internal actual fun <T> runBlockingBridge(block: suspend () -> T): T = runBlocking { block() }
+internal actual fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor = Portfolio(workers)
