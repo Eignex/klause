@@ -34,7 +34,7 @@ object Presolve {
         var changed = false
         for (factor in problem.factors) {
             val rewritten = when (factor) {
-                is Linear -> strengthenLinear(factor)
+                is Linear -> strengthenLinear(factor, problem.intDomains)
                 is PseudoBoolean -> strengthenPb(factor)
                 else -> factor
             }
@@ -214,14 +214,45 @@ object Presolve {
         Rel.NE -> if (bound.mod(g) == 0) Reduced.Bound(bound / g) else Reduced.Drop
     }
 
-    private fun strengthenLinear(factor: Linear): Factor? {
+    private fun strengthenLinear(factor: Linear, domains: Array<IntDomain>): Factor? {
         val g = gcdOf(factor.coeffs)
-        if (g <= 1) return factor
-        return when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
-            is Reduced.Bound -> Linear(divAll(factor.coeffs, g), factor.vars.copyOf(), factor.op, reduced.bound)
-            Reduced.Drop -> null
-            Reduced.Unchanged -> factor
+        val gcdReduced: Linear = if (g <= 1) {
+            factor
+        } else {
+            when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
+                is Reduced.Bound -> Linear(divAll(factor.coeffs, g), factor.vars.copyOf(), factor.op, reduced.bound)
+                Reduced.Drop -> return null
+                Reduced.Unchanged -> factor
+            }
         }
+        return liftBinaryLinear(gcdReduced, domains)
+    }
+
+    /**
+     * Knapsack coefficient lifting (#365) for a `≤` [Linear] over 0/1 variables with positive
+     * coefficients — the same cover-dual clamp as [liftKnapsack], valid because each variable is
+     * binary. `d = Σaⱼ − b`; `d ≤ 0` ⟹ always satisfied (dropped). Any other shape (non-`≤`,
+     * non-binary domain, non-positive coefficient, out-of-range slack) passes through unchanged —
+     * general bounded-integer lifting needs the full MIP coefficient-tightening, a follow-up.
+     */
+    private fun liftBinaryLinear(l: Linear, domains: Array<IntDomain>): Factor? {
+        if (l.op != LinearOp.LE) return l
+        for (c in l.coeffs) if (c <= 0) return l
+        for (v in l.vars) if (domains[v].min != 0 || domains[v].max != 1) return l
+        var sum = 0L
+        for (c in l.coeffs) sum += c
+        val d = sum - l.bound
+        if (d <= 0L) return null
+        if (d >= sum || d > Int.MAX_VALUE) return l
+        var changed = false
+        var newSum = 0L
+        val lifted = IntArray(l.coeffs.size) { i ->
+            (if (l.coeffs[i] > d) d.toInt().also { changed = true } else l.coeffs[i]).also { newSum += it }
+        }
+        if (!changed) return l
+        val newBound = newSum - d
+        if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return l
+        return Linear(lifted, l.vars.copyOf(), LinearOp.LE, newBound.toInt())
     }
 
     private fun strengthenPb(factor: PseudoBoolean): Factor? {
@@ -252,10 +283,31 @@ object Presolve {
      * more than `d` to covering it, so each `wⱼ` clamps to `min(wⱼ, d)` and the bound becomes
      * `Σ min(wⱼ,d) − d`. Exact (feasible-set-preserving), and it both shrinks coefficients and
      * tightens the relaxation beyond what GCD reduction reaches. `d ≤ 0` ⟹ the constraint is always
-     * satisfied (dropped). Non-`≤` ops and out-of-Int-range slacks are left untouched.
+     * satisfied (dropped). A `≥` constraint is first complemented to `≤` (#365); an `=` constraint
+     * can't be lifted by clamping (it ties both directions) and is left untouched, as are
+     * out-of-Int-range slacks.
      */
-    private fun liftKnapsack(pb: PseudoBoolean): Factor? {
-        if (pb.op != PbOp.LE) return pb
+    private fun liftKnapsack(input: PseudoBoolean): Factor? {
+        // GE → ≤ by complementing literals: Σwⱼlⱼ ≥ b ⟺ Σwⱼ¬lⱼ ≤ Σwⱼ − b. EQ can't be lifted by
+        // clamping (it ties both directions), so it passes through.
+        val pb: PseudoBoolean = when (input.op) {
+            PbOp.LE -> input
+
+            PbOp.EQ -> return input
+
+            PbOp.GE -> {
+                var s = 0L
+                for (w in input.weights) s += w
+                val nb = s - input.bound
+                if (nb !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return input
+                PseudoBoolean(
+                    input.weights.copyOf(),
+                    IntArray(input.literals.size) { Lit.negate(input.literals[it]) },
+                    PbOp.LE,
+                    nb.toInt(),
+                )
+            }
+        }
         val n = pb.literals.size
         val weights = IntArray(n)
         val lits = IntArray(n)
@@ -274,7 +326,7 @@ object Presolve {
         for (w in weights) sum += w
         val d = sum - bound
         if (d <= 0L) return null // always satisfied
-        if (d >= sum || d > Int.MAX_VALUE) return pb // no weight exceeds d, or slack out of range
+        if (d >= sum || d > Int.MAX_VALUE) return input // no weight exceeds d, or slack out of range — leave original
         var changed = false
         var newSum = 0L
         val lifted = IntArray(n) { i ->
@@ -285,9 +337,9 @@ object Presolve {
                 weights[i]
             }.also { newSum += it }
         }
-        if (!changed) return pb
+        if (!changed) return input
         val newBound = newSum - d
-        if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return pb
+        if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return input
         return PseudoBoolean(lifted, lits, PbOp.LE, newBound.toInt())
     }
 

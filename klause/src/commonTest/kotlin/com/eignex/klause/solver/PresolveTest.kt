@@ -125,6 +125,36 @@ class PresolveTest {
     }
 
     @Test
+    fun `ge and eq pseudo-boolean lifting`() {
+        val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
+        // GE: complemented to <= then lifted.
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, 1, 1), lits, PbOp.GE, 2))
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(10, 2, 3), lits, PbOp.GE, 9))
+        // EQ: not liftable by clamping — must stay feasible-set-equivalent (no wrong clamp).
+        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, 1, 1), lits, PbOp.EQ, 3))
+    }
+
+    @Test
+    fun `binary linear knapsack lifting`() {
+        // 0/1 domain, positive coeffs, LE: same cover-dual clamp as pseudo-Boolean.
+        assertLinearEquivalent(3, 1, Linear(intArrayOf(5, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 3))
+        assertLinearEquivalent(3, 1, Linear(intArrayOf(10, 2, 3), intArrayOf(0, 1, 2), LinearOp.LE, 4))
+        // non-binary domain (handled by assertLinearEquivalent's domain arg) must NOT be lifted.
+        assertLinearEquivalent(3, 4, Linear(intArrayOf(5, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 3))
+    }
+
+    @Test
+    fun `random ge knapsack constraints preserve the feasible set`() {
+        val rng = Random(0x6E)
+        repeat(400) {
+            val n = 2 + rng.nextInt(3)
+            val lits = IntArray(n) { i -> Lit.make(i, rng.nextBoolean()) }
+            val weights = IntArray(n) { 1 + rng.nextInt(6) }
+            assertPbEquivalent(n, PseudoBoolean(weights, lits, PbOp.GE, rng.nextInt(15)))
+        }
+    }
+
+    @Test
     fun `coprime coefficients are left untouched`() {
         val original = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 5)
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 4) }, listOf(original))
