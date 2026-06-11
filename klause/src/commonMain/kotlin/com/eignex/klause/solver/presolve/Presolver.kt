@@ -46,9 +46,16 @@ class PresolveContext(
     }
 }
 
-/** A configurable presolve transform. The string [id] is the serializable form used by
- *  [PresolveConfig.parse] and the CLI `--presolve` flag, so CLI, bench, and config strings never
- *  drift. */
+/**
+ * A configurable presolve transform.
+ *
+ * @property id the serializable form used by [PresolveConfig.parse] and the CLI `--presolve`
+ *  flag, so CLI, bench, and config strings never drift.
+ * @property stage which pipeline stage the pass runs at.
+ * @property preservesSolutionSet whether the pass keeps the full solution set (true) or may
+ *  collapse it (false, e.g. symmetry breaking) — the latter is only sound when the query
+ *  doesn't need every solution.
+ */
 enum class PresolvePass(val id: String, val stage: Stage, val preservesSolutionSet: Boolean) {
     /** GCD coefficient strengthening (#319). Same variable space, identity reconstruction. */
     STRENGTHEN_COEFFICIENTS("strengthen", Stage.PROBLEM, preservesSolutionSet = true),
@@ -74,7 +81,13 @@ enum class PresolvePass(val id: String, val stage: Stage, val preservesSolutionS
 
     /** The pipeline stage a pass runs at: at [Problem] construction (folded into `baked`) or as a
      *  problem-to-problem transform before solving. */
-    enum class Stage { CONSTRUCTION, PROBLEM }
+    enum class Stage {
+        /** Runs at [Problem] construction, folding its deductions into `baked` (SAC probing). */
+        CONSTRUCTION,
+
+        /** Runs as a problem-to-problem transform before solving (via [Presolver.run]). */
+        PROBLEM,
+    }
 
     /** Lookup by serializable [id]. */
     companion object {
@@ -95,17 +108,15 @@ class PresolveConfig(
 ) {
 
     /** Whether [pass] runs under [context]: an explicit setting wins, else the pass's auto rule. */
-    fun resolved(pass: PresolvePass, context: PresolveContext): Boolean =
-        settings[pass] ?: autoEnabled(pass, context)
+    fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = settings[pass] ?: autoEnabled(pass, context)
 
-    /** The [Stage.PROBLEM] passes that run under [context], in enum (application) order. */
+    /** The [PresolvePass.Stage.PROBLEM] passes that run under [context], in enum (application) order. */
     fun problemPasses(context: PresolveContext): List<PresolvePass> =
         PresolvePass.entries.filter { it.stage == PresolvePass.Stage.PROBLEM && resolved(it, context) }
 
     /** Force [PresolvePass.BREAK_SYMMETRIES] off — for a pure local-search engine, where the
      *  ordering constraints hurt, regardless of auto resolution. */
-    fun withoutSymmetry(): PresolveConfig =
-        PresolveConfig(settings + (PresolvePass.BREAK_SYMMETRIES to false))
+    fun withoutSymmetry(): PresolveConfig = PresolveConfig(settings + (PresolvePass.BREAK_SYMMETRIES to false))
 
     /** Auto rule per pass, chosen to preserve historical defaults: the cheap solution-preserving
      *  problem passes are on; symmetry is on only for non-solution-set-sensitive queries; the

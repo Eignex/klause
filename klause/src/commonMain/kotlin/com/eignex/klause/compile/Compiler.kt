@@ -60,8 +60,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RealLinearConstraint
-import com.eignex.klause.solver.presolve.PresolveContext
-import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.LinearOp
@@ -69,6 +67,8 @@ import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.presolve.PresolveContext
+import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.skema.SchemaDef
 import kotlin.math.roundToInt
 
